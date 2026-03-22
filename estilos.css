@@ -382,12 +382,13 @@ html, body{
 .groups-board{
   display:grid;
   grid-template-columns: 1fr 54px 1fr 54px 1fr;
+  grid-template-rows: auto 92px 34px 92px 92px 92px 92px;
   grid-template-areas:
     ". . title . ."
-    "contactados . . . ."
-    "arrowDown1 . . . ."
+    "contactados . reunion . ."
+    "arrowDown1 . reunion . ."
     "cotizando arrowRight1 reunion arrowRight2 perdidas"
-    "recotizando arrowRight3 . . ganadas"
+    "recotizando arrowRight3 reunion arrowRight4 ganadas"
     ". . cerradas . arrowDown2"
     ". . . . autorizadas";
   gap:14px 12px;
@@ -437,7 +438,14 @@ html, body{
 
 .contactados{ grid-area:contactados; }
 .cotizando{ grid-area:cotizando; }
-.reunion{ grid-area:reunion; }
+.reunion{
+  border-color:var(--line);
+  align-self:stretch;
+  min-height:100%;
+  display:flex;
+  flex-direction:column;
+  justify-content:center;
+}
 .perdidas{ grid-area:perdidas; }
 .recotizando{ grid-area:recotizando; }
 .ganadas{ grid-area:ganadas; }
@@ -530,6 +538,11 @@ html, body{
   color:var(--green);
 }
 
+.arrow-right-4{
+  grid-area:arrowRight4;
+  color:var(--green);
+}
+
 .arrow-down-2{
   grid-area:arrowDown2;
   color:var(--green);
@@ -547,6 +560,7 @@ html, body{
 @media (max-width: 900px){
   .groups-board{
     grid-template-columns: 1fr;
+    grid-template-rows: auto;
     grid-template-areas:
       "title"
       "contactados"
@@ -558,6 +572,7 @@ html, body{
       "perdidas"
       "recotizando"
       "arrowRight3"
+      "arrowRight4"
       "ganadas"
       "arrowDown2"
       "autorizadas"
