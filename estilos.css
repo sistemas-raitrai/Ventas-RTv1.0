@@ -347,12 +347,25 @@ html, body{
 
 .filtro-row{
   display:flex;
+  gap:28px;
+  align-items:center;
+  justify-content:center;
+  flex-wrap:wrap;
+}
+
+.filtro-row-doble{
+  width:100%;
+}
+
+.filtro-bloque{
+  display:flex;
   gap:18px;
   align-items:center;
   justify-content:center;
 }
 
-.filtro-row select{
+.filtro-row select,
+.filtro-bloque select{
   width:340px;
   height:48px;
   border:2px solid var(--line);
@@ -363,7 +376,8 @@ html, body{
   color:var(--header);
 }
 
-.filtro-row button{
+.filtro-row button,
+.filtro-bloque button{
   width:180px;
   height:48px;
   border:none;
@@ -630,9 +644,16 @@ html, body{
   .filtro-row{
     flex-direction:column;
   }
-
+  
+  .filtro-bloque{
+    width:100%;
+    flex-direction:column;
+  }
+  
   .filtro-row select,
-  .filtro-row button{
+  .filtro-row button,
+  .filtro-bloque select,
+  .filtro-bloque button{
     width:100%;
   }
 }
