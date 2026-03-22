@@ -445,6 +445,7 @@ html, body{
 .cotizando{
   grid-area:cotizando;
   justify-self:start;
+  align-self:start;
   width:100%;
   max-width:320px;
 }
@@ -454,7 +455,8 @@ html, body{
   justify-self:center;
   align-self:stretch;
   width:100%;
-  min-height:100%;
+  max-width:280px;
+  min-height:calc(92px + 14px + 92px);
   display:flex;
   flex-direction:column;
   justify-content:center;
@@ -463,6 +465,7 @@ html, body{
 .perdidas{
   grid-area:perdidas;
   justify-self:end;
+  align-self:start;
   width:100%;
   max-width:320px;
 }
@@ -470,6 +473,7 @@ html, body{
 .recotizando{
   grid-area:recotizando;
   justify-self:start;
+  align-self:end;
   width:100%;
   max-width:320px;
 }
@@ -477,6 +481,7 @@ html, body{
 .ganadas{
   grid-area:ganadas;
   justify-self:end;
+  align-self:end;
   width:100%;
   max-width:320px;
 }
@@ -493,7 +498,7 @@ html, body{
   justify-self:center;
   width:100%;
   max-width:280px;
-}}
+}
 
 .reunion{
   border-color:var(--line);
