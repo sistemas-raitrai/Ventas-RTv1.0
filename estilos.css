@@ -381,13 +381,13 @@ html, body{
 
 .groups-board{
   display:grid;
-  grid-template-columns: 1fr 54px 1fr 54px 1fr;
+  grid-template-columns: 1fr 54px minmax(220px, 280px) 54px 1fr;
   grid-template-areas:
     ". . title . ."
     "contactados . . . ."
-    "arrowDown1 . . . ."
+    "arrowDown1 . reunion . ."
     "cotizando arrowRight1 reunion arrowRight2 perdidas"
-    "recotizando arrowRight3 . . ganadas"
+    "recotizando arrowRight3 reunion arrowRight4 ganadas"
     ". . cerradas . arrowDown2"
     ". . . . autorizadas";
   gap:14px 12px;
