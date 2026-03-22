@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Inicio | Sistema Ventas RT</title>
+  <link rel="stylesheet" href="estilos.css" />
+</head>
+<body class="ventas-body">
+
+  <!-- HEADER -->
+  <header class="ventas-header">
+    <div class="ventas-header-left">
+      <div class="logo-box">
+        <!-- Si tienes logo, cambia esto por <img src="img/logo-raitrai.png" ...> -->
+        <span class="logo-text">RT</span>
+      </div>
+
+      <div class="header-divider"></div>
+
+      <div class="saludo-wrap">
+        <h1 id="saludo-usuario">Hola, Usuario(a)</h1>
+        <div id="usuario-conectado" class="usuario-conectado"></div>
+        <div id="scope-actual" class="scope-actual">Vista general</div>
+      </div>
+    </div>
+
+    <div class="ventas-header-right">
+      <a href="#" id="btn-home" class="header-icon" title="Inicio">⌂</a>
+      <a href="#" id="btn-logout" class="header-icon" title="Cerrar sesión">⇥</a>
+    </div>
+  </header>
+
+  <!-- MENU -->
+  <nav class="ventas-menu">
+    <a href="informe-excel.html">Informe Excel</a>
+    <a href="buscar.html">Buscar</a>
+    <a href="vendedores.html">Vendedores</a>
+    <a href="registrar-contacto.html">Registrar contacto</a>
+    <a href="editar-asignados.html">Editar Asignados</a>
+  </nav>
+
+  <!-- CONTENIDO -->
+  <main class="ventas-main">
+
+    <!-- COLUMNA IZQUIERDA -->
+    <section class="left-column">
+      <div class="panel panel-alertas">
+        <h2>ALERTAS</h2>
+
+        <div class="alert-row">
+          <span>Hay</span>
+          <strong id="count-sin-asignar">0</strong>
+          <span>contactos</span>
+          <a href="#" id="link-sin-asignar">Sin Asignar</a>
+        </div>
+
+        <div class="alert-row">
+          <span>Hay</span>
+          <strong id="count-a-contactar">0</strong>
+          <span>contactos</span>
+          <a href="#" id="link-a-contactar">A contactar</a>
+        </div>
+
+        <div class="alert-row">
+          <span>Hay</span>
+          <strong id="count-fichas-firmar">0</strong>
+          <span>fichas por firmar</span>
+          <a href="#" id="link-fichas-firmar">Ver</a>
+        </div>
+
+        <div class="alert-row alert-row-wrap">
+          <span>Hay</span>
+          <strong id="count-reunion-3dias">0</strong>
+          <span>reunión confirmada en los próximos tres días.</span>
+        </div>
+
+        <div class="alert-row">
+          <span>Hay</span>
+          <strong id="count-pendientes">0</strong>
+          <span>grupos Pendientes</span>
+          <a href="#" id="link-pendientes">Ver</a>
+        </div>
+      </div>
+
+      <div class="panel panel-importante">
+        <div class="importante-icon">✎</div>
+        <div>
+          <h2>IMPORTANTE</h2>
+          <p>Espacio reservado para avisos comerciales y observaciones generales.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- COLUMNA DERECHA -->
+    <section class="right-column">
+
+      <div class="panel panel-filtro">
+        <div class="filtro-row">
+          <select id="select-vendedor">
+            <option value="">Seleccionar Vendedor(a)</option>
+          </select>
+          <button id="btn-ir-vendedor">Ir</button>
+        </div>
+      </div>
+
+      <div class="panel panel-grupos">
+        <div class="groups-board">
+
+          <h2 class="groups-title">GRUPOS</h2>
+
+          <div class="flow-card contactados">
+            <h3>CONTACTADOS</h3>
+            <div class="flow-numbers top" id="contactados-top">00 | 00 | 00 | (00)</div>
+            <div class="flow-numbers bottom" id="contactados-bottom">00 | 00 | 00 | (00)</div>
+          </div>
+
+          <div class="arrow arrow-down-1">↓</div>
+
+          <div class="flow-card cotizando">
+            <h3>COTIZANDO</h3>
+            <div class="flow-numbers top" id="cotizando-top">00 | 00 | 00 | (00)</div>
+            <div class="flow-numbers bottom" id="cotizando-bottom">00 | 00 | 00 | (00)</div>
+          </div>
+
+          <div class="arrow arrow-right-1">→</div>
+
+          <div class="flow-card reunion">
+            <h3>REUNIÓN CONFIRMADA</h3>
+            <div class="flow-numbers top" id="reunion-top">00 | 00 | 00 | (00)</div>
+            <div class="flow-numbers bottom" id="reunion-bottom">00 | 00 | 00 | (00)</div>
+          </div>
+
+          <div class="arrow arrow-right-2">→</div>
+
+          <div class="flow-card perdidas">
+            <h3>PERDIDAS</h3>
+            <div class="flow-numbers top" id="perdidas-top">00 | 00 | 00 | (00)</div>
+          </div>
+
+          <div class="flow-card recotizando">
+            <h3>RE COTIZANDO</h3>
+            <div class="flow-numbers top" id="recotizando-top">00 | 00 | 00 | (00)</div>
+          </div>
+
+          <div class="arrow arrow-right-3">→</div>
+
+          <div class="flow-card ganadas">
+            <h3>GANADAS</h3>
+            <div class="flow-numbers top" id="ganadas-top">00 | 00 | 00 | (00)</div>
+          </div>
+
+          <div class="arrow arrow-down-2">↓</div>
+
+          <div class="flow-card autorizadas">
+            <h3>AUTORIZADAS</h3>
+            <div class="flow-numbers top" id="autorizadas-top">00 | 00 | 00 | (00)</div>
+          </div>
+
+          <div class="flow-card cerradas">
+            <h3>CERRADAS</h3>
+            <div class="flow-numbers top" id="cerradas-top">00</div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script type="module" src="script.js"></script>
+</body>
+</html>
