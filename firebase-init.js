@@ -33,22 +33,40 @@ export const VENTAS_USERS = [
     rol: "supervision"
   },
   {
+    email: "chernandez@raitrai.cl",
+    nombre: "Caro Hernández",
+    rol: "supervision"
+  },
+  {
     email: "yenny@raitrai.cl",
     nombre: "Yenny",
     rol: "supervision"
+  },
+  {
+    email: "secretaria@raitrai.cl",
+    nombre: "Andrea",
+    rol: "registro"
+  },
+  {
+    email: "elagos@raitrai.cl",
+    nombre: "Elías",
+    rol: "vendedor"
   }
 
-  // 🔽 AGREGA AQUÍ TUS VENDEDORES REALES
-  // ,{ email: "vendedor1@raitrai.cl", nombre: "Vendedor 1", rol: "vendedor" }
-  // ,{ email: "vendedor2@raitrai.cl", nombre: "Vendedor 2", rol: "vendedor" }
+  // 🔽 SIGUE AGREGANDO AQUÍ EL RESTO DE VENDEDORES / USUARIOS
+  // ,{ email: "correo@raitrai.cl", nombre: "Nombre", rol: "vendedor" }
 ];
 
 /* =========================================================
    HELPERS
 ========================================================= */
+export function normalizeEmail(email = "") {
+  return String(email || "").trim().toLowerCase();
+}
+
 export function getVentasUser(email = "") {
-  const safeEmail = String(email || "").trim().toLowerCase();
-  return VENTAS_USERS.find(u => u.email.toLowerCase() === safeEmail) || null;
+  const safeEmail = normalizeEmail(email);
+  return VENTAS_USERS.find(u => normalizeEmail(u.email) === safeEmail) || null;
 }
 
 export function getRolVentas(email = "") {
@@ -59,16 +77,36 @@ export function getNombreVentas(email = "") {
   return getVentasUser(email)?.nombre || "";
 }
 
-export function esVendedor(email = "") {
-  return getRolVentas(email) === "vendedor";
+export function esAdmin(email = "") {
+  return getRolVentas(email) === "admin";
 }
 
 export function esSupervisor(email = "") {
   return getRolVentas(email) === "supervision";
 }
 
-export function esAdmin(email = "") {
-  return getRolVentas(email) === "admin";
+export function esVendedor(email = "") {
+  return getRolVentas(email) === "vendedor";
+}
+
+export function esRegistro(email = "") {
+  return getRolVentas(email) === "registro";
+}
+
+export function puedeNavegarComo(email = "") {
+  return esAdmin(email) || esSupervisor(email);
+}
+
+export function puedeVerGeneral(email = "") {
+  return esAdmin(email) || esSupervisor(email) || esRegistro(email);
+}
+
+export function puedeModificarVentas(email = "") {
+  return esAdmin(email) || esSupervisor(email) || esVendedor(email);
+}
+
+export function puedeCrearCotizaciones(email = "") {
+  return esAdmin(email) || esSupervisor(email) || esVendedor(email) || esRegistro(email);
 }
 
 /* =========================================================
