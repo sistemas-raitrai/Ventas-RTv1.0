@@ -435,17 +435,69 @@ html, body{
   color:#213a7d;
 }
 
-.contactados{ grid-area:contactados; }
-.cotizando{ grid-area:cotizando; }
-.reunion{ grid-area:reunion; }
-.perdidas{ grid-area:perdidas; }
-.recotizando{ grid-area:recotizando; }
-.ganadas{ grid-area:ganadas; }
-.autorizadas{ grid-area:autorizadas; }
-.cerradas{ grid-area:cerradas; }
+.contactados{
+  grid-area:contactados;
+  justify-self:start;
+  width:100%;
+  max-width:320px;
+}
+
+.cotizando{
+  grid-area:cotizando;
+  justify-self:start;
+  width:100%;
+  max-width:320px;
+}
+
+.reunion{
+  grid-area:reunion;
+  justify-self:center;
+  align-self:stretch;
+  width:100%;
+  min-height:100%;
+  display:flex;
+  flex-direction:column;
+  justify-content:center;
+}
+
+.perdidas{
+  grid-area:perdidas;
+  justify-self:end;
+  width:100%;
+  max-width:320px;
+}
+
+.recotizando{
+  grid-area:recotizando;
+  justify-self:start;
+  width:100%;
+  max-width:320px;
+}
+
+.ganadas{
+  grid-area:ganadas;
+  justify-self:end;
+  width:100%;
+  max-width:320px;
+}
+
+.autorizadas{
+  grid-area:autorizadas;
+  justify-self:end;
+  width:100%;
+  max-width:320px;
+}
+
+.cerradas{
+  grid-area:cerradas;
+  justify-self:center;
+  width:100%;
+  max-width:280px;
+}}
 
 .reunion{
   border-color:var(--line);
+  min-height:100%;
 }
 
 .reunion h3{
@@ -530,6 +582,11 @@ html, body{
   color:var(--green);
 }
 
+.arrow-right-4{
+  grid-area:arrowRight4;
+  color:var(--green);
+}
+
 .arrow-down-2{
   grid-area:arrowDown2;
   color:var(--green);
@@ -558,6 +615,7 @@ html, body{
       "perdidas"
       "recotizando"
       "arrowRight3"
+      "arrowRight4"
       "ganadas"
       "arrowDown2"
       "autorizadas"
