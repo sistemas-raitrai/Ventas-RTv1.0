@@ -385,7 +385,7 @@ html, body{
   grid-template-areas:
     ". . title . ."
     "contactados . . . ."
-    "arrowDown1 . reunion . ."
+    "arrowDown1 . . . ."
     "cotizando arrowRight1 reunion arrowRight2 perdidas"
     "recotizando arrowRight3 reunion arrowRight4 ganadas"
     ". . cerradas . arrowDown2"
