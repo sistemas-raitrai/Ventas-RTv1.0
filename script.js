@@ -4,7 +4,8 @@ import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/
 import {
   auth,
   VENTAS_USERS,
-  getVentasUser
+  getVentasUser,
+  puedeNavegarComo
 } from "./firebase-init.js";
 
 /* =========================================================
@@ -13,6 +14,7 @@ import {
 
 // 🔁 CAMBIA ESTA URL CUANDO CREES EL REPO DE VENTAS EN GITHUB
 const GITHUB_HOME_URL = "https://sistemas-raitrai.github.io/Ventas-RT/";
+const ACTING_USER_KEY = "ventas_acting_user_email";
 
 /* =========================================================
    HELPERS DOM
@@ -24,6 +26,10 @@ function setText(id, value) {
   if (el) el.textContent = value;
 }
 
+function normalizeEmail(email = "") {
+  return String(email || "").trim().toLowerCase();
+}
+
 function formatNombreDesdeEmail(email = "") {
   const base = String(email || "")
     .split("@")[0]
@@ -31,6 +37,11 @@ function formatNombreDesdeEmail(email = "") {
     .trim();
 
   return base.replace(/\b\w/g, l => l.toUpperCase());
+}
+
+function getNombreUsuario(user) {
+  if (!user) return "";
+  return user.nombre || formatNombreDesdeEmail(user.email);
 }
 
 function setFlowNumbers(prefix, topText, bottomText = "") {
@@ -61,8 +72,6 @@ function actualizarReloj() {
     scope.dataset.baseText = scope.textContent;
   }
 
-  // No lo mostramos visualmente como campo separado,
-  // pero dejamos el dato disponible por si luego quieres ponerlo.
   document.body.dataset.reloj = `${hora} | ${fecha}`;
 }
 
@@ -87,6 +96,73 @@ function inicializarDashboardEnCeros() {
 }
 
 /* =========================================================
+   USUARIO REAL / USUARIO EFECTIVO
+========================================================= */
+function getRealUser() {
+  const firebaseUser = auth.currentUser;
+  if (!firebaseUser) return null;
+  return getVentasUser(firebaseUser.email || "");
+}
+
+function getEffectiveUser() {
+  const realUser = getRealUser();
+  if (!realUser) return null;
+
+  if (!puedeNavegarComo(realUser.email)) {
+    sessionStorage.removeItem(ACTING_USER_KEY);
+    return realUser;
+  }
+
+  const actingEmail = normalizeEmail(sessionStorage.getItem(ACTING_USER_KEY));
+  if (!actingEmail) return realUser;
+
+  const actingUser = getVentasUser(actingEmail);
+  return actingUser || realUser;
+}
+
+function estaNavegandoComoOtro(realUser, effectiveUser) {
+  if (!realUser || !effectiveUser) return false;
+  return normalizeEmail(realUser.email) !== normalizeEmail(effectiveUser.email);
+}
+
+/* =========================================================
+   SELECTOR DE USUARIO EFECTIVO (ADMIN / SUPERVISION)
+========================================================= */
+function renderActingUserSwitcher(realUser, effectiveUser) {
+  const box = $("admin-switcher");
+  const select = $("select-acting-user");
+  const btnApply = $("btn-acting-user");
+  const btnReset = $("btn-reset-acting-user");
+
+  if (!box || !select || !btnApply || !btnReset) return;
+
+  const puede = realUser && puedeNavegarComo(realUser.email);
+
+  if (!puede) {
+    box.classList.add("hidden");
+    return;
+  }
+
+  box.classList.remove("hidden");
+
+  select.innerHTML = `<option value="">Elegir usuario</option>`;
+
+  [...VENTAS_USERS]
+    .sort((a, b) => getNombreUsuario(a).localeCompare(getNombreUsuario(b), "es"))
+    .forEach((user) => {
+      const opt = document.createElement("option");
+      opt.value = normalizeEmail(user.email);
+      opt.textContent = `${getNombreUsuario(user)} — ${user.rol}`;
+      if (normalizeEmail(user.email) === normalizeEmail(effectiveUser.email)) {
+        opt.selected = true;
+      }
+      select.appendChild(opt);
+    });
+
+  btnReset.disabled = !estaNavegandoComoOtro(realUser, effectiveUser);
+}
+
+/* =========================================================
    SELECTOR DE VENDEDORES
 ========================================================= */
 function getVendedores() {
@@ -100,10 +176,8 @@ function poblarSelectorVendedores(currentUser) {
 
   const role = currentUser.rol;
 
-  // Limpiar
   select.innerHTML = "";
 
-  // Si es vendedor, solo ve su propia opción y el selector queda bloqueado
   if (role === "vendedor") {
     const option = document.createElement("option");
     option.value = currentUser.email;
@@ -116,7 +190,6 @@ function poblarSelectorVendedores(currentUser) {
     return;
   }
 
-  // Supervisor / admin
   const defaultOption = document.createElement("option");
   defaultOption.value = "";
   defaultOption.textContent = "Seleccionar Vendedor(a)";
@@ -134,63 +207,89 @@ function poblarSelectorVendedores(currentUser) {
   btn.disabled = false;
 }
 
-function aplicarScopeVisual(currentUser, vendedorSeleccionadoEmail = "") {
+function aplicarScopeVisual(realUser, effectiveUser, vendedorSeleccionadoEmail = "") {
   const scope = $("scope-actual");
   if (!scope) return;
 
-  if (currentUser.rol === "vendedor") {
-    scope.textContent = `Vista personal: ${currentUser.nombre || formatNombreDesdeEmail(currentUser.email)}`;
-    return;
+  let texto = "Vista general";
+
+  if (effectiveUser.rol === "vendedor") {
+    texto = `Vista personal: ${getNombreUsuario(effectiveUser)}`;
+  } else if (effectiveUser.rol === "registro") {
+    texto = "Vista general · solo registro de cotizaciones";
+  } else if (vendedorSeleccionadoEmail) {
+    const user = VENTAS_USERS.find(u => normalizeEmail(u.email) === normalizeEmail(vendedorSeleccionadoEmail));
+    const nombre = user?.nombre || formatNombreDesdeEmail(vendedorSeleccionadoEmail);
+    texto = `Vista filtrada por vendedor(a): ${nombre}`;
   }
 
-  if (vendedorSeleccionadoEmail) {
-    const user = VENTAS_USERS.find(u => u.email === vendedorSeleccionadoEmail);
-    const nombre = user?.nombre || formatNombreDesdeEmail(vendedorSeleccionadoEmail);
-    scope.textContent = `Vista filtrada por vendedor(a): ${nombre}`;
+  if (estaNavegandoComoOtro(realUser, effectiveUser)) {
+    scope.textContent = `Navegando como ${getNombreUsuario(effectiveUser)} · ${effectiveUser.rol} · ${texto}`;
   } else {
-    scope.textContent = "Vista general";
+    scope.textContent = texto;
   }
 }
 
 /* =========================================================
    SESIÓN / UI GLOBAL
 ========================================================= */
-onAuthStateChanged(auth, (user) => {
-  if (!user) return;
+function renderPantalla() {
+  const realUser = getRealUser();
+  const effectiveUser = getEffectiveUser();
 
-  const email = (user.email || "").toLowerCase();
-  const ventasUser = getVentasUser(email);
+  if (!realUser || !effectiveUser) return;
 
-  if (!ventasUser) return;
+  setText("usuario-conectado", normalizeEmail(realUser.email));
 
-  // Correo conectado
-  setText("usuario-conectado", email);
-
-  // Saludo
   const saludo = $("saludo-usuario");
   if (saludo) {
-    if (ventasUser.rol === "admin") {
+    if (effectiveUser.rol === "admin") {
       saludo.textContent = "Hola, Administrador(a)";
-    } else if (ventasUser.rol === "supervision") {
+    } else if (effectiveUser.rol === "supervision") {
       saludo.textContent = "Hola, Supervisor(a)";
+    } else if (effectiveUser.rol === "registro") {
+      saludo.textContent = "Hola, Registro";
     } else {
       saludo.textContent = "Hola, Vendedor(a)";
     }
   }
 
-  // Scope visual
-  aplicarScopeVisual(ventasUser);
-
-  // Selector vendedores
-  poblarSelectorVendedores(ventasUser);
-
-  // Dashboard por ahora en cero
+  renderActingUserSwitcher(realUser, effectiveUser);
+  poblarSelectorVendedores(effectiveUser);
+  aplicarScopeVisual(realUser, effectiveUser);
   inicializarDashboardEnCeros();
+}
+
+onAuthStateChanged(auth, (user) => {
+  if (!user) return;
+  renderPantalla();
 });
 
 /* =========================================================
    EVENTOS
 ========================================================= */
+const btnActingUser = $("btn-acting-user");
+if (btnActingUser) {
+  btnActingUser.addEventListener("click", () => {
+    const realUser = getRealUser();
+    if (!realUser || !puedeNavegarComo(realUser.email)) return;
+
+    const selectedEmail = normalizeEmail($("select-acting-user")?.value || "");
+    if (!selectedEmail) return;
+
+    sessionStorage.setItem(ACTING_USER_KEY, selectedEmail);
+    renderPantalla();
+  });
+}
+
+const btnResetActingUser = $("btn-reset-acting-user");
+if (btnResetActingUser) {
+  btnResetActingUser.addEventListener("click", () => {
+    sessionStorage.removeItem(ACTING_USER_KEY);
+    renderPantalla();
+  });
+}
+
 const btnIrVendedor = $("btn-ir-vendedor");
 const btnIrGrupo = $("btn-ir-grupo");
 const selectGrupo = $("select-grupo");
@@ -201,17 +300,11 @@ if (btnIrVendedor) {
     if (!select) return;
 
     const selectedEmail = select.value || "";
-    const user = auth.currentUser;
-    if (!user) return;
+    const realUser = getRealUser();
+    const effectiveUser = getEffectiveUser();
+    if (!realUser || !effectiveUser) return;
 
-    const email = (user.email || "").toLowerCase();
-    const ventasUser = getVentasUser(email);
-    if (!ventasUser) return;
-
-    aplicarScopeVisual(ventasUser, selectedEmail);
-
-    // Por ahora solo cambia el scope visual.
-    // En la siguiente etapa aquí llamaremos la carga real desde Firestore.
+    aplicarScopeVisual(realUser, effectiveUser, selectedEmail);
     inicializarDashboardEnCeros();
   });
 }
@@ -244,6 +337,7 @@ if (btnLogout) {
     e.preventDefault();
 
     try {
+      sessionStorage.removeItem(ACTING_USER_KEY);
       await signOut(auth);
       location.href = "login.html";
     } catch (error) {
