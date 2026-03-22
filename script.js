@@ -192,25 +192,36 @@ onAuthStateChanged(auth, (user) => {
    EVENTOS
 ========================================================= */
 const btnIrVendedor = $("btn-ir-vendedor");
+const btnIrGrupo = $("btn-ir-grupo");
+const selectGrupo = $("select-grupo");
+
 if (btnIrVendedor) {
   btnIrVendedor.addEventListener("click", () => {
     const select = $("select-vendedor");
     if (!select) return;
 
     const selectedEmail = select.value || "";
+    const user = auth.currentUser;
+    if (!user) return;
 
-    onAuthStateChanged(auth, (user) => {
-      if (!user) return;
-      const email = (user.email || "").toLowerCase();
-      const ventasUser = getVentasUser(email);
-      if (!ventasUser) return;
+    const email = (user.email || "").toLowerCase();
+    const ventasUser = getVentasUser(email);
+    if (!ventasUser) return;
 
-      aplicarScopeVisual(ventasUser, selectedEmail);
+    aplicarScopeVisual(ventasUser, selectedEmail);
 
-      // Por ahora solo cambia el scope visual.
-      // En la siguiente etapa aquí llamaremos la carga real desde Firestore.
-      inicializarDashboardEnCeros();
-    });
+    // Por ahora solo cambia el scope visual.
+    // En la siguiente etapa aquí llamaremos la carga real desde Firestore.
+    inicializarDashboardEnCeros();
+  });
+}
+
+if (btnIrGrupo) {
+  btnIrGrupo.addEventListener("click", () => {
+    const grupoSeleccionado = selectGrupo?.value || "";
+    console.log("Grupo seleccionado:", grupoSeleccionado);
+
+    // Más adelante aquí cargaremos el detalle real del grupo
   });
 }
 
