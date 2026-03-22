@@ -385,7 +385,7 @@ html, body{
   grid-template-rows: auto 92px 34px 92px 92px 92px 92px;
   grid-template-areas:
     ". . title . ."
-    "contactados . reunion . ."
+    "contactados . . . ."
     "arrowDown1 . reunion . ."
     "cotizando arrowRight1 reunion arrowRight2 perdidas"
     "recotizando arrowRight3 reunion arrowRight4 ganadas"
@@ -441,10 +441,10 @@ html, body{
 .reunion{
   border-color:var(--line);
   align-self:stretch;
-  min-height:100%;
   display:flex;
   flex-direction:column;
   justify-content:center;
+  min-height:100%;
 }
 .perdidas{ grid-area:perdidas; }
 .recotizando{ grid-area:recotizando; }
@@ -468,6 +468,16 @@ html, body{
 
 .perdidas{
   border-color:var(--red);
+}
+
+.perdidas{
+  border-color:var(--red);
+  align-self:start;
+}
+
+.ganadas{
+  border-color:var(--green);
+  align-self:end;
 }
 
 .perdidas h3,
