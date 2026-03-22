@@ -381,17 +381,19 @@ html, body{
 
 .groups-board{
   display:grid;
-  grid-template-columns: 1fr 54px 1fr 54px 1fr;
-  grid-template-rows: auto 92px 34px 92px 92px 92px 92px;
+  grid-template-columns: 320px 56px 280px 56px 320px;
+  grid-template-rows: auto 92px 34px 92px 92px 80px 34px 92px;
   grid-template-areas:
     ". . title . ."
     "contactados . . . ."
-    "arrowDown1 . reunion . ."
+    "arrowDown1 . . . ."
     "cotizando arrowRight1 reunion arrowRight2 perdidas"
-    "recotizando arrowRight3 reunion arrowRight4 ganadas"
-    ". . cerradas . arrowDown2"
+    "recotizando arrowRight3 . arrowRight4 ganadas"
+    ". . cerradas . ."
+    ". . . . arrowDown2"
     ". . . . autorizadas";
-  gap:14px 12px;
+  justify-content:space-between;
+  gap:14px 10px;
   align-items:center;
 }
 
@@ -436,21 +438,61 @@ html, body{
   color:#213a7d;
 }
 
-.contactados{ grid-area:contactados; }
-.cotizando{ grid-area:cotizando; }
-.reunion{
-  border-color:var(--line);
-  align-self:stretch;
-  display:flex;
-  flex-direction:column;
-  justify-content:center;
-  min-height:100%;
+.contactados{
+  grid-area:contactados;
+  justify-self:start;
+  width:100%;
+  max-width:320px;
 }
-.perdidas{ grid-area:perdidas; }
-.recotizando{ grid-area:recotizando; }
-.ganadas{ grid-area:ganadas; }
-.autorizadas{ grid-area:autorizadas; }
-.cerradas{ grid-area:cerradas; }
+
+.cotizando{
+  grid-area:cotizando;
+  justify-self:start;
+  width:100%;
+  max-width:320px;
+}
+
+.reunion{
+  grid-area:reunion;
+  justify-self:center;
+  width:100%;
+  max-width:280px;
+}
+
+.perdidas{
+  grid-area:perdidas;
+  justify-self:end;
+  width:100%;
+  max-width:320px;
+}
+
+.recotizando{
+  grid-area:recotizando;
+  justify-self:start;
+  width:100%;
+  max-width:320px;
+}
+
+.ganadas{
+  grid-area:ganadas;
+  justify-self:end;
+  width:100%;
+  max-width:320px;
+}
+
+.autorizadas{
+  grid-area:autorizadas;
+  justify-self:end;
+  width:100%;
+  max-width:320px;
+}
+
+.cerradas{
+  grid-area:cerradas;
+  justify-self:center;
+  width:100%;
+  max-width:280px;
+}
 
 .reunion{
   border-color:var(--line);
@@ -582,11 +624,11 @@ html, body{
       "perdidas"
       "recotizando"
       "arrowRight3"
-      "arrowRight4"
       "ganadas"
+      "cerradas"
       "arrowDown2"
-      "autorizadas"
-      "cerradas";
+      "autorizadas";
+    justify-content:stretch;
   }
 
   .filtro-row{
