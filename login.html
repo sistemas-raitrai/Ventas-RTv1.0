@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Login | Sistema Ventas RT</title>
+  <link rel="stylesheet" href="estilos.css" />
+</head>
+<body class="login-body">
+
+  <main class="login-wrapper">
+    <section class="login-card">
+      <div class="login-brand">
+        <div class="login-brand-logo">
+          <!-- Si tienes el logo, reemplaza este texto por una imagen -->
+          RT
+        </div>
+        <div>
+          <h1>Sistema Ventas RT</h1>
+          <p>Ingreso de usuarios</p>
+        </div>
+      </div>
+
+      <form id="loginForm" class="login-form">
+        <div class="form-group">
+          <label for="email">Correo Raitrai</label>
+          <input
+            type="email"
+            id="email"
+            placeholder="usuario@raitrai.cl"
+            autocomplete="username"
+            style="text-transform:none;"
+          />
+        </div>
+
+        <div class="form-group">
+          <label for="password">Contraseña</label>
+          <div class="password-container">
+            <input
+              type="password"
+              id="password"
+              placeholder="********"
+              autocomplete="current-password"
+              style="text-transform:none;"
+            />
+            <button type="button" id="togglePassBtn" class="eye-btn" aria-label="Mostrar contraseña">
+              👁️
+            </button>
+          </div>
+        </div>
+
+        <div class="button-container">
+          <button type="submit" id="loginBtn">Ingresar</button>
+        </div>
+
+        <div id="loginError" class="login-error"></div>
+      </form>
+    </section>
+  </main>
+
+  <script type="module">
+    import {
+      signInWithEmailAndPassword,
+      onAuthStateChanged
+    } from "https://www.gstatic.com/firebasejs/11.7.3/firebase-auth.js";
+
+    import {
+      auth,
+      getVentasUser
+    } from "./firebase-init.js";
+
+    const form = document.getElementById("loginForm");
+    const emailInput = document.getElementById("email");
+    const passInput = document.getElementById("password");
+    const errorBox = document.getElementById("loginError");
+    const toggleBtn = document.getElementById("togglePassBtn");
+
+    toggleBtn.addEventListener("click", () => {
+      passInput.type = passInput.type === "password" ? "text" : "password";
+    });
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+
+      const email = emailInput.value.trim().toLowerCase();
+      const password = passInput.value.trim();
+
+      if (!email || !password) {
+        errorBox.textContent = "Por favor completa ambos campos.";
+        return;
+      }
+
+      errorBox.textContent = "";
+
+      try {
+        await signInWithEmailAndPassword(auth, email, password);
+
+        // Validación local extra
+        const ventasUser = getVentasUser(email);
+        if (!ventasUser) {
+          errorBox.textContent = "Tu correo no está habilitado para Ventas.";
+          return;
+        }
+
+        location.href = "index.html";
+      } catch (error) {
+        errorBox.textContent = "❌ Error de acceso: " + error.message;
+      }
+    });
+
+    onAuthStateChanged(auth, (user) => {
+      if (!user) return;
+
+      const email = (user.email || "").toLowerCase();
+      const ventasUser = getVentasUser(email);
+
+      if (ventasUser) {
+        location.replace("index.html");
+      }
+    });
+  </script>
+</body>
+</html>
