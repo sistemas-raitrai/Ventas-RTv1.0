@@ -396,6 +396,59 @@ html, body{
   cursor:pointer;
 }
 
+.admin-switcher{
+  border:2px dashed var(--line);
+  background:rgba(36,18,56,.04);
+  padding:12px 14px;
+}
+
+.admin-switcher.hidden{
+  display:none;
+}
+
+.admin-switcher-title{
+  font-size:14px;
+  font-weight:700;
+  color:var(--header);
+  margin-bottom:10px;
+}
+
+.admin-switcher-row{
+  display:flex;
+  gap:12px;
+  align-items:center;
+  justify-content:center;
+  flex-wrap:wrap;
+}
+
+.admin-switcher-row select{
+  min-width:280px;
+  height:42px;
+  border:2px solid var(--line);
+  border-radius:6px;
+  background:#fff;
+  padding:0 12px;
+  font-size:15px;
+  color:var(--header);
+}
+
+.admin-switcher-row button{
+  min-width:150px;
+  height:42px;
+  border:none;
+  border-radius:6px;
+  background:var(--header);
+  color:#fff;
+  font-size:15px;
+  font-weight:700;
+  cursor:pointer;
+  padding:0 14px;
+}
+
+.admin-switcher-row .btn-secundario{
+  background:#6b6178;
+}
+
 .panel-grupos{
   min-height:536px;
 }
