@@ -342,7 +342,7 @@
     <section class="registro-panel">
       <div class="registro-title">
         <h2>Registrar contacto</h2>
-        <p id="registroScope">Crea una nueva cotización/contacto para iniciar el seguimiento comercial.</p>
+        <p id="registroScope">Registrar un nuevo conjtacto.</p>
       </div>
 
       <div id="statusCard" class="status-card hidden">
@@ -367,12 +367,12 @@
           />
           <datalist id="listaColegios"></datalist>
           <div class="helper">
-            Si coincide con la cartera, se asigna automáticamente la vendedora. Si no coincide, quedará sin asignar.
+            Si coincide con la cartera, se asigna automáticamente al vendedor/a. Si no coincide, quedará sin asignar.
           </div>
         </div>
         
         <div class="field col-4">
-          <label>Vendedora</label>
+          <label>Vendedor/a</label>
           <div id="vendedoraPreview" class="readonly-box">—</div>
         </div>
         
@@ -382,36 +382,38 @@
         </div>
         
         <div class="field col-4">
-          <label for="cursoNivel">Curso base *</label>
+          <label for="cursoNivel">Curso actual*</label>
           <select id="cursoNivel" required>
             <option value="">Seleccionar</option>
-            <option value="1° Básico">1° Básico</option>
-            <option value="2° Básico">2° Básico</option>
-            <option value="3° Básico">3° Básico</option>
-            <option value="4° Básico">4° Básico</option>
-            <option value="5° Básico">5° Básico</option>
-            <option value="6° Básico">6° Básico</option>
-            <option value="7° Básico">7° Básico</option>
-            <option value="8° Básico">8° Básico</option>
-            <option value="1° Medio">1° Medio</option>
-            <option value="2° Medio">2° Medio</option>
-            <option value="3° Medio">3° Medio</option>
             <option value="4° Medio">4° Medio</option>
+            <option value="3° Medio">3° Medio</option>
+            <option value="2° Medio">2° Medio</option>
+            <option value="1° Medio">1° Medio</option>
+            <option value="8° Básico">8° Básico</option>
+            <option value="7° Básico">7° Básico</option>
+            <option value="6° Básico">6° Básico</option>
+            <option value="5° Básico">5° Básico</option>
+            <option value="4° Básico">4° Básico</option>
+            <option value="3° Básico">3° Básico</option>
+            <option value="2° Básico">2° Básico</option>
+            <option value="1° Básico">1° Básico</option>
+            
+
           </select>
         </div>
         
         <div class="field col-4">
           <label for="cursoSeccion">Letra / nombre del curso *</label>
-          <input id="cursoSeccion" type="text" placeholder="A, B, C, Azul, etc." />
+          <input id="cursoSeccion" type="text" placeholder="A, B, C, o AB si es mas de un curso por nivel, etc." />
         </div>
         
         <div class="field col-4">
           <label for="anoViaje">Año del viaje *</label>
-          <input id="anoViaje" type="number" min="2025" max="2100" step="1" />
+          <input id="anoViaje" type="number" min="2026" max="2100" step="1" />
         </div>
         
         <div class="field col-4">
-          <label for="comunaCiudad">Comuna o ciudad</label>
+          <label for="comunaCiudad">Comuna o Ciudad</label>
           <input id="comunaCiudad" type="text" placeholder="Comuna o ciudad del grupo / cliente" />
         </div>
         
@@ -498,39 +500,6 @@
         </div>
         
         <div id="wrapDestinoSecundarioOtro" class="field col-12 hidden">
-          <label for="destinoSecundarioOtro">Otro destino secundario</label>
-          <input id="destinoSecundarioOtro" type="text" placeholder="Especifica el destino secundario" />
-        </div>
-
-        <div class="field">
-          <label for="destinoPrincipal">Destino principal *</label>
-          <select id="destinoPrincipal">
-            <option value="">Seleccionar</option>
-            <option value="Bariloche">Bariloche</option>
-            <option value="Sur de Chile">Sur de Chile</option>
-            <option value="Bariloche y Sur de Chile">Bariloche y Sur de Chile</option>
-            <option value="Brasil">Brasil</option>
-            <option value="Otro">Otro</option>
-          </select>
-        </div>
-
-        <div id="wrapDestinoPrincipalOtro" class="field span-2 hidden">
-          <label for="destinoPrincipalOtro">Otro destino principal</label>
-          <input id="destinoPrincipalOtro" type="text" placeholder="Especifica el destino principal" />
-        </div>
-
-        <div class="field span-3">
-          <label>Destinos secundarios</label>
-          <div class="check-group">
-            <label class="check-item"><input type="checkbox" name="destinoSecundario" value="Bariloche" /> Bariloche</label>
-            <label class="check-item"><input type="checkbox" name="destinoSecundario" value="Sur de Chile" /> Sur de Chile</label>
-            <label class="check-item"><input type="checkbox" name="destinoSecundario" value="Bariloche y Sur de Chile" /> Bariloche y Sur de Chile</label>
-            <label class="check-item"><input type="checkbox" name="destinoSecundario" value="Brasil" /> Brasil</label>
-            <label class="check-item"><input type="checkbox" name="destinoSecundario" value="Otro" /> Otro</label>
-          </div>
-        </div>
-
-        <div id="wrapDestinoSecundarioOtro" class="field span-3 hidden">
           <label for="destinoSecundarioOtro">Otro destino secundario</label>
           <input id="destinoSecundarioOtro" type="text" placeholder="Especifica el destino secundario" />
         </div>
