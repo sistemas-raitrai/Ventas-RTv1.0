@@ -2,22 +2,55 @@
 
 const page = document.body.dataset.page || "";
 
+import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.7.3/firebase-auth.js";
+import { auth, getVentasUser } from "./firebase-init.js";
+
 const menuItems = [
-  { key: "informe-excel", href: "informe-excel.html", label: "Informe Excel" },
-  { key: "buscar", href: "buscar.html", label: "Buscar" },
-  { key: "vendedores", href: "vendedores.html", label: "Vendedores" },
-  { key: "registrar-contacto", href: "registrar-contacto.html", label: "Registrar contacto" },
-  { key: "editar-asignados", href: "editar-asignados.html", label: "Editar Asignados" }
+  {
+    key: "registrar-contacto",
+    href: "registrar-contacto.html",
+    label: "Registrar contacto",
+    roles: ["admin", "supervision", "registro", "vendedor"]
+  },
+  {
+    key: "buscar",
+    href: "buscar.html",
+    label: "Buscar",
+    roles: ["admin", "supervision", "registro", "vendedor"]
+  },
+  {
+    key: "vendedores",
+    href: "vendedores.html",
+    label: "Catálogo",
+    roles: ["admin", "supervision", "registro", "vendedor"]
+  },
+  {
+    key: "editar-asignados",
+    href: "editar-asignados.html",
+    label: "Editar Asignados",
+    roles: ["admin", "supervision"]
+  },
+  {
+    key: "informe-excel",
+    href: "informe-excel.html",
+    label: "Informe Excel",
+    roles: ["admin", "supervision"]
+  }
 ];
 
-function renderMenuLinks() {
-  return menuItems.map(item => {
+function getVisibleMenuItems(user) {
+  const rol = user?.rol || "";
+  return menuItems.filter(item => item.roles.includes(rol));
+}
+
+function renderMenuLinks(user) {
+  return getVisibleMenuItems(user).map(item => {
     const activeClass = page === item.key ? "active" : "";
     return `<a href="${item.href}" class="${activeClass}">${item.label}</a>`;
   }).join("");
 }
 
-function renderLayoutTop() {
+function renderLayoutTop(user) {
   return `
     <!-- HEADER -->
     <header class="ventas-header">
@@ -31,6 +64,7 @@ function renderLayoutTop() {
         <div class="saludo-wrap">
           <h1 id="saludo-usuario">Hola, Usuario(a)</h1>
           <div id="usuario-conectado" class="usuario-conectado"></div>
+          <div id="scope-actual" class="scope-actual">Vista general</div>
         </div>
       </div>
 
@@ -42,7 +76,7 @@ function renderLayoutTop() {
 
     <!-- MENU -->
     <nav class="ventas-menu">
-      ${renderMenuLinks()}
+      ${renderMenuLinks(user)}
     </nav>
 
     <!-- HERRAMIENTAS GLOBALES DEL HEADER -->
@@ -67,6 +101,10 @@ function renderLayoutTop() {
 }
 
 const slot = document.getElementById("layout-top");
+
 if (slot) {
-  slot.innerHTML = renderLayoutTop();
+  onAuthStateChanged(auth, (firebaseUser) => {
+    const ventasUser = firebaseUser ? getVentasUser(firebaseUser.email || "") : null;
+    slot.innerHTML = renderLayoutTop(ventasUser);
+  });
 }
