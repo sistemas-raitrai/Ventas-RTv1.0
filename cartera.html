@@ -215,6 +215,32 @@
       width:170px;
       min-width:170px;
     }
+    
+    .check-col{
+      width:44px;
+      min-width:44px;
+      text-align:center;
+    }
+    
+    .row-check,
+    #checkAllRows{
+      width:16px;
+      height:16px;
+      cursor:pointer;
+    }
+    
+    .check-col{
+      width:44px;
+      min-width:44px;
+      text-align:center;
+    }
+    
+    .row-check,
+    #checkAllRows{
+      width:16px;
+      height:16px;
+      cursor:pointer;
+    }
 
     .table-actions{
       display:flex;
@@ -392,8 +418,11 @@
             Importar XLSX
             <input id="fileInputXlsx" type="file" accept=".xlsx,.xls" />
           </label>
-
+        
           <button id="btnExportar" class="btn-page sec" type="button">Exportar XLSX</button>
+          <button id="btnEliminarSeleccionados" class="btn-page warn hidden" type="button">
+            Eliminar seleccionados
+          </button>
           <button id="btnAgregar" class="btn-page green" type="button">Agregar colegio</button>
         </div>
       </div>
@@ -438,6 +467,9 @@
         <table class="cartera-table">
           <thead>
             <tr>
+              <th style="width:44px; min-width:44px; text-align:center;">
+                <input id="checkAllRows" type="checkbox" />
+              </th>
               <th>N° Colegio</th>
               <th>Vendedor(a)</th>
               <th>Colegio</th>
