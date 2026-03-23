@@ -19,8 +19,8 @@ const menuItems = [
     roles: ["admin", "supervision", "registro", "vendedor"]
   },
   {
-    key: "vendedores",
-    href: "vendedores.html",
+    key: "cartera",
+    href: "cartera.html",
     label: "Cartera",
     roles: ["admin", "supervision", "registro", "vendedor"]
   },
