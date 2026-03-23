@@ -60,7 +60,8 @@ const state = {
   search: "",
   modalMode: "create",
   editingOriginal: null,
-  vendors: []
+  vendors: [],
+  selectedKeys: new Set()
 };
 
 /* =========================================================
@@ -237,9 +238,14 @@ function renderRoleButtons() {
   const allowManage = canManageVentasRole(state.effectiveUser);
   const importLabel = $("labelImportar");
   const addBtn = $("btnAgregar");
+  const deleteSelectedBtn = $("btnEliminarSeleccionados");
 
   if (importLabel) importLabel.classList.toggle("hidden", !allowManage);
   if (addBtn) addBtn.classList.toggle("hidden", !allowManage);
+  if (deleteSelectedBtn) {
+    deleteSelectedBtn.classList.toggle("hidden", !allowManage);
+    deleteSelectedBtn.disabled = state.selectedKeys.size === 0;
+  }
 }
 
 function renderVendorFilter() {
@@ -305,6 +311,8 @@ function renderTable() {
   const tbody = $("tbodyCartera");
   const empty = $("emptyState");
   const summary = $("tableSummary");
+  const checkAll = $("checkAllRows");
+
   if (!tbody || !empty || !summary) return;
 
   const allowManage = canManageVentasRole(state.effectiveUser);
@@ -313,6 +321,11 @@ function renderTable() {
   if (!state.filteredRows.length) {
     tbody.innerHTML = "";
     empty.classList.remove("hidden");
+    if (checkAll) {
+      checkAll.checked = false;
+      checkAll.indeterminate = false;
+    }
+    renderRoleButtons();
     return;
   }
 
@@ -320,6 +333,8 @@ function renderTable() {
 
   tbody.innerHTML = state.filteredRows.map((row) => {
     const sellerName = `${row.nombreVendedor} ${row.apellidoVendedor}`.trim();
+    const rowKey = `${normalizeEmail(row.correoVendedor)}__${String(row.numeroColegio)}`;
+    const checked = state.selectedKeys.has(rowKey) ? "checked" : "";
 
     const actions = allowManage
       ? `
@@ -336,6 +351,15 @@ function renderTable() {
 
     return `
       <tr>
+        <td class="check-col">
+          <input
+            class="row-check"
+            type="checkbox"
+            data-action="toggle-row"
+            data-key="${escapeHtml(rowKey)}"
+            ${checked}
+          />
+        </td>
         <td>${escapeHtml(row.numeroColegio)}</td>
         <td>${escapeHtml(sellerName)}</td>
         <td>${escapeHtml(row.colegio)}</td>
@@ -346,6 +370,18 @@ function renderTable() {
       </tr>
     `;
   }).join("");
+
+  if (checkAll) {
+    const visibleKeys = state.filteredRows.map(
+      row => `${normalizeEmail(row.correoVendedor)}__${String(row.numeroColegio)}`
+    );
+    const selectedVisible = visibleKeys.filter(key => state.selectedKeys.has(key)).length;
+
+    checkAll.checked = visibleKeys.length > 0 && selectedVisible === visibleKeys.length;
+    checkAll.indeterminate = selectedVisible > 0 && selectedVisible < visibleKeys.length;
+  }
+
+  renderRoleButtons();
 }
 
 /* =========================================================
@@ -668,6 +704,67 @@ async function deleteRow(numeroColegio, correoVendedor) {
     setProgressStatus({
       text: "Error eliminando registro.",
       meta: error.message || "No se pudo eliminar.",
+      progress: 100,
+      type: "error"
+    });
+  }
+}
+
+async function deleteSelectedRows() {
+  if (!canManageVentasRole(state.effectiveUser)) return;
+  if (!state.selectedKeys.size) return;
+
+  const ok = confirm(`¿Seguro que quieres eliminar ${state.selectedKeys.size} colegio(s) seleccionados?`);
+  if (!ok) return;
+
+  try {
+    const selectedEntries = [...state.selectedKeys].map((key) => {
+      const [correoVendedor, numeroColegio] = key.split("__");
+      return { correoVendedor, numeroColegio };
+    });
+
+    setProgressStatus({
+      text: "Eliminando seleccionados...",
+      meta: `Registros a eliminar: ${selectedEntries.length}`,
+      progress: 15
+    });
+
+    let processed = 0;
+
+    for (let i = 0; i < selectedEntries.length; i += WRITE_BATCH_LIMIT) {
+      const chunk = selectedEntries.slice(i, i + WRITE_BATCH_LIMIT);
+      const batch = writeBatch(db);
+
+      chunk.forEach(({ correoVendedor, numeroColegio }) => {
+        batch.delete(doc(db, "ventas_cartera", normalizeEmail(correoVendedor), "items", String(numeroColegio)));
+      });
+
+      await batch.commit();
+      processed += chunk.length;
+
+      const pct = 15 + Math.round((processed / selectedEntries.length) * 85);
+      setProgressStatus({
+        text: "Eliminando seleccionados...",
+        meta: `Procesados: ${processed}/${selectedEntries.length}`,
+        progress: pct
+      });
+    }
+
+    state.selectedKeys.clear();
+
+    setProgressStatus({
+      text: "Eliminación lista.",
+      meta: `${selectedEntries.length} registro(s) eliminados.`,
+      progress: 100,
+      type: "success"
+    });
+    clearProgressStatus();
+    await loadData();
+  } catch (error) {
+    console.error(error);
+    setProgressStatus({
+      text: "Error eliminando seleccionados.",
+      meta: error.message || "No se pudo completar la eliminación masiva.",
       progress: 100,
       type: "error"
     });
@@ -999,10 +1096,12 @@ async function exportXlsx() {
    EVENTOS
 ========================================================= */
 function bindPageEvents() {
+
   const searchInput = $("searchInput");
   const vendorFilter = $("vendorFilter");
   const btnRecargar = $("btnRecargar");
   const btnAgregar = $("btnAgregar");
+  const btnEliminarSeleccionados = $("btnEliminarSeleccionados");
   const btnGuardarModal = $("btnGuardarModal");
   const btnCancelarModal = $("btnCancelarModal");
   const modalCloseBtn = $("modalCloseBtn");
@@ -1011,6 +1110,7 @@ function bindPageEvents() {
   const btnExportar = $("btnExportar");
   const tbody = $("tbodyCartera");
   const modalBackdrop = $("modalForm");
+  const checkAllRows = $("checkAllRows");
 
   if (searchInput && !searchInput.dataset.bound) {
     searchInput.dataset.bound = "1";
@@ -1041,6 +1141,11 @@ function bindPageEvents() {
       if (!canManageVentasRole(state.effectiveUser)) return;
       openCreateModal();
     });
+  }
+
+    if (btnEliminarSeleccionados && !btnEliminarSeleccionados.dataset.bound) {
+    btnEliminarSeleccionados.dataset.bound = "1";
+    btnEliminarSeleccionados.addEventListener("click", deleteSelectedRows);
   }
 
   if (btnGuardarModal && !btnGuardarModal.dataset.bound) {
@@ -1079,22 +1184,52 @@ function bindPageEvents() {
   if (tbody && !tbody.dataset.bound) {
     tbody.dataset.bound = "1";
     tbody.addEventListener("click", async (e) => {
+      const rowCheck = e.target.closest('input[data-action="toggle-row"]');
+      if (rowCheck) {
+        const key = rowCheck.dataset.key || "";
+        if (rowCheck.checked) {
+          state.selectedKeys.add(key);
+        } else {
+          state.selectedKeys.delete(key);
+        }
+        renderTable();
+        return;
+      }
+  
       const btn = e.target.closest("button[data-action]");
       if (!btn) return;
-
+  
       const action = btn.dataset.action;
       const numeroColegio = btn.dataset.id || "";
       const correoVendedor = normalizeEmail(btn.dataset.email || "");
-
+  
       const row = state.rows.find(r =>
         String(r.numeroColegio) === String(numeroColegio) &&
         normalizeEmail(r.correoVendedor) === correoVendedor
       );
-
+  
       if (!row) return;
-
+  
       if (action === "edit") openEditModal(row);
       if (action === "delete") await deleteRow(numeroColegio, correoVendedor);
+    });
+  }
+
+  if (checkAllRows && !checkAllRows.dataset.bound) {
+    checkAllRows.dataset.bound = "1";
+    checkAllRows.addEventListener("change", (e) => {
+      const checked = !!e.target.checked;
+  
+      state.filteredRows.forEach((row) => {
+        const rowKey = `${normalizeEmail(row.correoVendedor)}__${String(row.numeroColegio)}`;
+        if (checked) {
+          state.selectedKeys.add(rowKey);
+        } else {
+          state.selectedKeys.delete(rowKey);
+        }
+      });
+  
+      renderTable();
     });
   }
 
