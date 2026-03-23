@@ -50,36 +50,43 @@ export const VENTAS_USERS = [
   {
     email: "griveros@raitrai.cl",
     nombre: "Giselle",
+    aliascartera: "GISELLE",
     rol: "vendedor"
   },
   {
     email: "orietta@raitrai.cl",
     nombre: "Orietta",
+    aliascartera: "ORIETTA",
     rol: "vendedor"
   },
   {
     email: "crojas@raitrai.cl",
     nombre: "Claudio",
+    aliascartera: "CLAUDIO",
     rol: "vendedor"
   },
   {
     email: "ccayoso@raitrai.cl",
     nombre: "Carola",
+    aliascartera: "CAROLA",
     rol: "vendedor"
   },
   {
     email: "aflores@raitrai.cl",
     nombre: "Alejandra",
+    aliascartera: "ALEJANDRA",
     rol: "vendedor"
   },
   {
     email: "jpino@raitrai.cl",
     nombre: "Juan Pablo",
+    aliascartera: "JUAN PABLO",
     rol: "vendedor"
   },
   {
     email: "elagos@raitrai.cl",
     nombre: "Elías",
+    aliascartera: "ELIAS",
     rol: "vendedor"
   }
 
