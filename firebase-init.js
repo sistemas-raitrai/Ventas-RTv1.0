@@ -64,7 +64,7 @@ export const VENTAS_USERS = [
   },
   {
     email: "ccayoso@raitrai.cl",
-    nombre: "Garola",
+    nombre: "Carola",
     rol: "vendedor"
   },
   {
