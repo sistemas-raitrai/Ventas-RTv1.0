@@ -21,7 +21,7 @@ const menuItems = [
   {
     key: "vendedores",
     href: "vendedores.html",
-    label: "Catálogo",
+    label: "Cartera",
     roles: ["admin", "supervision", "registro", "vendedor"]
   },
   {
