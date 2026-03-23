@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Registrar contacto | Sistema Ventas RT</title>
+  <link rel="stylesheet" href="estilos.css" />
+  <link rel="icon" type="image/png" href="IMG/logo-raitrai.png" />
+
+  <style>
+    .registro-page{
+      padding:18px 30px 30px;
+    }
+
+    .registro-panel{
+      background:#efefef;
+      border:3px dashed var(--line);
+      padding:20px 22px;
+    }
+
+    .registro-title h2{
+      margin:0 0 6px;
+      font-size:30px;
+      color:var(--header);
+    }
+
+    .registro-title p{
+      margin:0 0 18px;
+      color:#5a5862;
+      font-size:14px;
+    }
+
+    .status-card{
+      background:#fff;
+      border:2px solid #d7dde6;
+      border-radius:12px;
+      padding:12px 14px;
+      margin-bottom:18px;
+    }
+
+    .status-card.hidden{
+      display:none;
+    }
+
+    .status-card.success .progress-bar{
+      background:#198754;
+    }
+
+    .status-card.error .progress-bar{
+      background:#b42318;
+    }
+
+    .status-top{
+      display:flex;
+      justify-content:space-between;
+      gap:12px;
+      align-items:center;
+      flex-wrap:wrap;
+      margin-bottom:10px;
+    }
+
+    .status-text{
+      font-weight:700;
+      color:var(--header);
+    }
+
+    .status-meta{
+      font-size:13px;
+      color:#666;
+    }
+
+    .progress-track{
+      width:100%;
+      height:10px;
+      border-radius:999px;
+      background:#ddd;
+      overflow:hidden;
+    }
+
+    .progress-bar{
+      width:0%;
+      height:100%;
+      background:var(--header);
+      transition:width .25s ease;
+    }
+
+    .registro-form{
+      display:grid;
+      grid-template-columns:repeat(3, minmax(0, 1fr));
+      gap:12px;
+    }
+
+    .field{
+      display:flex;
+      flex-direction:column;
+      gap:6px;
+    }
+
+    .field.span-2{
+      grid-column:span 2;
+    }
+
+    .field.span-3{
+      grid-column:1 / -1;
+    }
+
+    .field label{
+      font-size:13px;
+      font-weight:700;
+      color:var(--header);
+    }
+
+    .field input,
+    .field select,
+    .field textarea{
+      width:100%;
+      min-height:46px;
+      border:2px solid var(--line);
+      border-radius:8px;
+      background:#fff;
+      padding:10px 12px;
+      font-size:14px;
+      color:var(--header);
+      box-sizing:border-box;
+    }
+
+    .field textarea{
+      min-height:90px;
+      resize:vertical;
+    }
+
+    .readonly-box{
+      min-height:46px;
+      border:2px dashed #c5b8d8;
+      border-radius:8px;
+      background:#faf8fd;
+      padding:10px 12px;
+      display:flex;
+      align-items:center;
+      color:#4a4760;
+      font-size:14px;
+    }
+
+    .helper{
+      font-size:12px;
+      color:#666;
+    }
+
+    .hidden{
+      display:none !important;
+    }
+
+    .check-group{
+      display:grid;
+      grid-template-columns:repeat(2, minmax(0, 1fr));
+      gap:8px 14px;
+      padding:10px 12px;
+      border:2px solid var(--line);
+      border-radius:8px;
+      background:#fff;
+      min-height:46px;
+    }
+
+    .check-item{
+      display:flex;
+      align-items:center;
+      gap:8px;
+      font-size:14px;
+      color:var(--header);
+    }
+
+    .check-item input{
+      width:16px;
+      height:16px;
+      min-height:16px;
+      margin:0;
+      padding:0;
+      border:none;
+    }
+
+    .form-actions{
+      grid-column:1 / -1;
+      display:flex;
+      justify-content:flex-end;
+      gap:10px;
+      margin-top:8px;
+      flex-wrap:wrap;
+    }
+
+    .btn-page{
+      min-width:180px;
+      height:46px;
+      border:none;
+      border-radius:8px;
+      background:var(--header);
+      color:#fff;
+      font-size:15px;
+      font-weight:700;
+      cursor:pointer;
+      padding:0 16px;
+    }
+
+    .btn-page.green{
+      background:#157347;
+    }
+
+    .btn-page.sec{
+      background:#6b6178;
+    }
+
+    .btn-page:disabled{
+      opacity:.65;
+      cursor:not-allowed;
+    }
+
+    @media (max-width: 980px){
+      .registro-form{
+        grid-template-columns:1fr 1fr;
+      }
+
+      .field.span-3{
+        grid-column:1 / -1;
+      }
+    }
+
+    @media (max-width: 720px){
+      .registro-page{
+        padding:16px;
+      }
+
+      .registro-form{
+        grid-template-columns:1fr;
+      }
+
+      .field.span-2,
+      .field.span-3{
+        grid-column:auto;
+      }
+
+      .check-group{
+        grid-template-columns:1fr;
+      }
+    }
+  </style>
+</head>
+<body class="ventas-body" data-page="registrar-contacto">
+  <div id="layout-top"></div>
+
+  <main class="registro-page">
+    <section class="registro-panel">
+      <div class="registro-title">
+        <h2>Registrar contacto</h2>
+        <p id="registroScope">Crea una nueva cotización/contacto para iniciar el seguimiento comercial.</p>
+      </div>
+
+      <div id="statusCard" class="status-card hidden">
+        <div class="status-top">
+          <div id="statusText" class="status-text">Listo.</div>
+          <div id="statusMeta" class="status-meta"></div>
+        </div>
+        <div class="progress-track">
+          <div id="progressBar" class="progress-bar"></div>
+        </div>
+      </div>
+
+      <form id="registroForm" class="registro-form">
+        <div class="field">
+          <label for="tipoColegio">Tipo de colegio *</label>
+          <select id="tipoColegio" required>
+            <option value="cartera">Colegio de cartera</option>
+            <option value="otro">Otro colegio</option>
+          </select>
+        </div>
+
+        <div id="wrapColegioCartera" class="field span-2">
+          <label for="selectColegioCartera">Colegio de cartera *</label>
+          <select id="selectColegioCartera"></select>
+        </div>
+
+        <div id="wrapColegioOtro" class="field span-2 hidden">
+          <label for="inputColegioOtro">Otro colegio *</label>
+          <input id="inputColegioOtro" type="text" placeholder="Escribe el nombre del colegio" />
+        </div>
+
+        <div class="field">
+          <label>Vendedora</label>
+          <div id="vendedoraPreview" class="readonly-box">—</div>
+        </div>
+
+        <div class="field">
+          <label>Estado</label>
+          <div id="estadoPreview" class="readonly-box">—</div>
+        </div>
+
+        <div class="field">
+          <label for="cursoNivel">Curso base *</label>
+          <select id="cursoNivel" required>
+            <option value="">Seleccionar</option>
+            <option value="1° Básico">1° Básico</option>
+            <option value="2° Básico">2° Básico</option>
+            <option value="3° Básico">3° Básico</option>
+            <option value="4° Básico">4° Básico</option>
+            <option value="5° Básico">5° Básico</option>
+            <option value="6° Básico">6° Básico</option>
+            <option value="7° Básico">7° Básico</option>
+            <option value="8° Básico">8° Básico</option>
+            <option value="1° Medio">1° Medio</option>
+            <option value="2° Medio">2° Medio</option>
+            <option value="3° Medio">3° Medio</option>
+            <option value="4° Medio">4° Medio</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <label for="cursoSeccion">Letra / nombre del curso *</label>
+          <input id="cursoSeccion" type="text" placeholder="A, B, C, Azul, etc." />
+        </div>
+
+        <div class="field">
+          <label for="anoViaje">Año del viaje *</label>
+          <input id="anoViaje" type="number" min="2025" max="2100" step="1" />
+        </div>
+
+        <div class="field span-2">
+          <label for="comunaCiudad">Comuna o ciudad</label>
+          <input id="comunaCiudad" type="text" placeholder="Comuna o ciudad del grupo / cliente" />
+        </div>
+
+        <div class="field">
+          <label for="nombreCliente">Nombre del cliente *</label>
+          <input id="nombreCliente" type="text" placeholder="Quien hace la cotización" />
+        </div>
+
+        <div class="field">
+          <label for="rolCliente">Rol del cliente *</label>
+          <select id="rolCliente">
+            <option value="">Seleccionar</option>
+            <option value="Estudiante">Estudiante</option>
+            <option value="Apoderado(a)">Apoderado(a)</option>
+            <option value="Profesor(a)">Profesor(a)</option>
+            <option value="Otro(a)">Otro(a)</option>
+          </select>
+        </div>
+
+        <div class="field span-2">
+          <label for="correoCliente">Correo electrónico del cliente</label>
+          <input id="correoCliente" type="email" placeholder="cliente@correo.com" />
+          <div class="helper">Debe existir correo o celular para registrar la cotización.</div>
+        </div>
+
+        <div class="field">
+          <label for="celularCliente">Celular del cliente</label>
+          <input id="celularCliente" type="text" placeholder="+569..." />
+        </div>
+
+        <div class="field">
+          <label for="origenCliente">Origen del cliente *</label>
+          <select id="origenCliente">
+            <option value="">Seleccionar</option>
+            <option value="Directo">Directo</option>
+            <option value="Referido">Referido</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <label for="origenEspecificacion">Especificación del origen *</label>
+          <select id="origenEspecificacion">
+            <option value="">Seleccionar</option>
+            <option value="Correo">Correo</option>
+            <option value="WhatsApp">WhatsApp</option>
+            <option value="Llamada">Llamada</option>
+            <option value="Redes sociales">Redes sociales</option>
+            <option value="Google">Google</option>
+            <option value="Otro">Otro</option>
+          </select>
+        </div>
+
+        <div id="wrapOrigenEspecificacionOtro" class="field span-2 hidden">
+          <label for="origenEspecificacionOtro">Detalle del origen</label>
+          <input id="origenEspecificacionOtro" type="text" placeholder="Especifica el origen" />
+        </div>
+
+        <div class="field">
+          <label for="destinoPrincipal">Destino principal *</label>
+          <select id="destinoPrincipal">
+            <option value="">Seleccionar</option>
+            <option value="Bariloche">Bariloche</option>
+            <option value="Sur de Chile">Sur de Chile</option>
+            <option value="Bariloche y Sur de Chile">Bariloche y Sur de Chile</option>
+            <option value="Brasil">Brasil</option>
+            <option value="Otro">Otro</option>
+          </select>
+        </div>
+
+        <div id="wrapDestinoPrincipalOtro" class="field span-2 hidden">
+          <label for="destinoPrincipalOtro">Otro destino principal</label>
+          <input id="destinoPrincipalOtro" type="text" placeholder="Especifica el destino principal" />
+        </div>
+
+        <div class="field span-3">
+          <label>Destinos secundarios</label>
+          <div class="check-group">
+            <label class="check-item"><input type="checkbox" name="destinoSecundario" value="Bariloche" /> Bariloche</label>
+            <label class="check-item"><input type="checkbox" name="destinoSecundario" value="Sur de Chile" /> Sur de Chile</label>
+            <label class="check-item"><input type="checkbox" name="destinoSecundario" value="Bariloche y Sur de Chile" /> Bariloche y Sur de Chile</label>
+            <label class="check-item"><input type="checkbox" name="destinoSecundario" value="Brasil" /> Brasil</label>
+            <label class="check-item"><input type="checkbox" name="destinoSecundario" value="Otro" /> Otro</label>
+          </div>
+        </div>
+
+        <div id="wrapDestinoSecundarioOtro" class="field span-3 hidden">
+          <label for="destinoSecundarioOtro">Otro destino secundario</label>
+          <input id="destinoSecundarioOtro" type="text" placeholder="Especifica el destino secundario" />
+        </div>
+
+        <div class="form-actions">
+          <button id="btnLimpiar" class="btn-page sec" type="button">Limpiar</button>
+          <button id="btnGuardarRegistro" class="btn-page green" type="submit">Registrar contacto</button>
+        </div>
+      </form>
+    </section>
+  </main>
+
+  <script type="module" src="layout.js"></script>
+  <script type="module" src="registrar-contacto.js"></script>
+</body>
+</html>
