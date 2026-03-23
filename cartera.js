@@ -450,24 +450,6 @@ async function loadData() {
 /* =========================================================
    MODAL
 ========================================================= */
-function fillVendorSelectModal(selectedEmail = "") {
-  const select = $("vendedorSelectModal");
-  if (!select) return;
-
-  select.innerHTML = `<option value="">Seleccionar vendedor(a)</option>`;
-
-  state.vendors.forEach((vendor) => {
-    const opt = document.createElement("option");
-    opt.value = normalizeEmail(vendor.email);
-    opt.textContent = `${vendor.nombre} ${vendor.apellido}`.trim();
-    if (normalizeEmail(vendor.email) === normalizeEmail(selectedEmail)) {
-      opt.selected = true;
-    }
-    select.appendChild(opt);
-  });
-
-  updateVendorPreview();
-}
 
 function updateVendorPreview() {
   const select = $("vendedorSelectModal");
