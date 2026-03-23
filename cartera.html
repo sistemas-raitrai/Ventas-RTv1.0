@@ -57,8 +57,19 @@
       display:flex; justify-content:space-between; gap:16px;
       flex-wrap:wrap; margin-bottom:16px; align-items:end;
     }
-    .toolbar-left,.toolbar-right{
-      display:flex; gap:10px; flex-wrap:wrap; align-items:center;
+    .toolbar-left,
+    .toolbar-right{
+      display:flex;
+      gap:10px;
+      flex-wrap:wrap;
+    }
+    
+    .toolbar-left{
+      align-items:center;
+    }
+    
+    .toolbar-right{
+      align-items:flex-end;
     }
 
     .field-wrap{
@@ -75,9 +86,14 @@
     }
 
     .table-meta{
-      display:flex; justify-content:space-between; gap:12px;
-      flex-wrap:wrap; align-items:center; margin-bottom:10px;
-      font-size:14px; color:#555;
+      display:flex;
+      justify-content:flex-start;
+      gap:12px;
+      flex-wrap:wrap;
+      align-items:center;
+      margin-bottom:10px;
+      font-size:14px;
+      color:#555;
     }
 
     .table-wrap{
@@ -242,7 +258,6 @@
 
       <div class="table-meta">
         <div id="tableSummary">0 registros</div>
-        <div id="roleHint">Modo lectura</div>
       </div>
 
       <div class="table-wrap">
