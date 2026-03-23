@@ -7,57 +7,10 @@
   <link rel="stylesheet" href="estilos.css" />
   <link rel="icon" type="image/png" href="IMG/logo-raitrai.png" />
 </head>
-<body class="ventas-body">
+<body class="ventas-body" data-page="index">
 
-  <!-- HEADER -->
-  <header class="ventas-header">
-    <div class="ventas-header-left">
-      <div class="logo-box">
-        <img src="IMG/logo-raitrai.png" alt="Logo Rai Trai" class="logo-img">
-      </div>
-
-      <div class="header-divider"></div>
-
-      <div class="saludo-wrap">
-        <h1 id="saludo-usuario">Hola, Usuario(a)</h1>
-        <div id="usuario-conectado" class="usuario-conectado"></div>
-        <div id="scope-actual" class="scope-actual">Vista general</div>
-      </div>
-    </div>
-
-    <div class="ventas-header-right">
-      <a href="#" id="btn-home" class="header-icon" title="Inicio">⌂</a>
-      <a href="#" id="btn-logout" class="header-icon" title="Cerrar sesión">⇥</a>
-    </div>
-  </header>
-
-  <!-- MENU -->
-  <nav class="ventas-menu">
-    <a href="informe-excel.html">Informe Excel</a>
-    <a href="buscar.html">Buscar</a>
-    <a href="vendedores.html">Vendedores</a>
-    <a href="registrar-contacto.html">Registrar contacto</a>
-    <a href="editar-asignados.html">Editar Asignados</a>
-  </nav>
-
-  <!-- HERRAMIENTAS GLOBALES DEL HEADER -->
-  <section class="header-tools-wrap">
-    <div class="header-tools-inner">
-      <div id="admin-switcher" class="admin-switcher hidden">
-        <div class="admin-switcher-row">
-          <select id="select-acting-user">
-            <option value="">Elegir usuario</option>
-          </select>
-
-          <button id="btn-acting-user">Entrar como</button>
-
-          <button id="btn-reset-acting-user" class="btn-secundario">
-            Volver a mi usuario
-          </button>
-        </div>
-      </div>
-    </div>
-  </section>
+  <!-- LAYOUT GLOBAL -->
+  <div id="layout-top"></div>
 
   <!-- CONTENIDO -->
   <main class="ventas-main">
