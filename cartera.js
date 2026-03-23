@@ -720,7 +720,7 @@ async function readWorkbookRows(file) {
   const sheetNames = workbook.SheetNames;
 
   for (let s = 0; s < sheetNames.length; s++) {
-    const sheetName = sheetNames[s];
+    const sheetName = workbook.SheetNames[s];
     const sheet = workbook.Sheets[sheetName];
 
     setProgressStatus({
@@ -729,12 +729,52 @@ async function readWorkbookRows(file) {
       progress: 5 + Math.round(((s + 1) / sheetNames.length) * 15)
     });
 
-    const rawRows = XLSX.utils.sheet_to_json(sheet, {
-      defval: "",
-      range: 2
+    const matrix = XLSX.utils.sheet_to_json(sheet, {
+      header: 1,
+      defval: ""
     });
 
-    rawRows.forEach((row) => allRows.push(row));
+    if (!matrix.length) continue;
+
+    // Buscar automáticamente la fila de encabezados
+    let headerIndex = -1;
+
+    for (let r = 0; r < matrix.length; r++) {
+      const row = matrix[r].map(cell => normalizeHeader(cell));
+      const hasNro = row.includes("nro") || row.includes("numero colegio") || row.includes("número colegio");
+      const hasVendedor = row.includes("vendedor") || row.includes("nombre vendedor") || row.includes("vendedor(a)");
+      const hasColegio = row.includes("colegio") || row.includes("nombre colegio");
+
+      if (hasNro && hasVendedor && hasColegio) {
+        headerIndex = r;
+        break;
+      }
+    }
+
+    if (headerIndex === -1) {
+      continue;
+    }
+
+    const headers = matrix[headerIndex].map(h => normalizeText(h));
+
+    for (let r = headerIndex + 1; r < matrix.length; r++) {
+      const values = matrix[r] || [];
+
+      // Saltar filas vacías
+      const hasContent = values.some(v => normalizeText(v) !== "");
+      if (!hasContent) continue;
+
+      const obj = {};
+      headers.forEach((header, idx) => {
+        obj[header] = normalizeText(values[idx] ?? "");
+      });
+
+      allRows.push({
+        ...obj,
+        __sourceRow: r + 1,
+        __sheetName: sheetName
+      });
+    }
   }
 
   return allRows;
@@ -778,19 +818,19 @@ async function importXlsx(file) {
     const errors = [];
 
     for (let i = 0; i < rawRows.length; i++) {
-      const row = mapImportRow(rawRows[i]);
-
+      const row = mapImportRow(rawRows[i], rawRows[i].__sourceRow);
+    
       if (!row.numeroColegio || !row.colegio || !row.vendedorAliasOriginal) {
         continue;
       }
-
+    
       if (!row.correoVendedor) {
-        errors.push(`Fila ${i + 4}: no se pudo resolver el vendedor "${row.vendedorAliasOriginal}" con aliasCartera.`);
+        errors.push(`Fila ${row.__sourceRow || i + 1}: no se pudo resolver el vendedor "${row.vendedorAliasOriginal}" con aliasCartera.`);
         continue;
       }
-
+    
       parsedRows.push(row);
-
+    
       const pct = 20 + Math.round(((i + 1) / rawRows.length) * 20);
       setProgressStatus({
         text: "Importando XLSX...",
