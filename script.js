@@ -363,15 +363,7 @@ function renderPantalla() {
 
   const saludo = $("saludo-usuario");
   if (saludo) {
-    if (effectiveUser.rol === "admin") {
-      saludo.textContent = "Hola, Administrador(a)";
-    } else if (effectiveUser.rol === "supervision") {
-      saludo.textContent = "Hola, Supervisor(a)";
-    } else if (effectiveUser.rol === "registro") {
-      saludo.textContent = "Hola, Registro";
-    } else {
-      saludo.textContent = "Hola, Vendedor(a)";
-    }
+    saludo.textContent = `Hola, ${getNombreUsuario(effectiveUser)}`;
   }
 
   renderActingUserSwitcher(realUser, effectiveUser);
