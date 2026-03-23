@@ -1,0 +1,560 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Cartera | Sistema Ventas RT</title>
+  <link rel="stylesheet" href="estilos.css" />
+  <link rel="icon" type="image/png" href="IMG/logo-raitrai.png" />
+
+  <style>
+    .cartera-page{
+      padding:18px 30px 30px;
+    }
+
+    .cartera-panel{
+      background:#efefef;
+      border:3px dashed var(--line);
+      padding:20px 22px;
+    }
+
+    .cartera-topbar{
+      display:flex;
+      justify-content:space-between;
+      align-items:flex-start;
+      gap:18px;
+      flex-wrap:wrap;
+      margin-bottom:18px;
+    }
+
+    .cartera-title-wrap h2{
+      margin:0 0 6px;
+      font-size:30px;
+      color:var(--header);
+    }
+
+    .cartera-title-wrap p{
+      margin:0;
+      color:#5a5862;
+      font-size:14px;
+    }
+
+    .cartera-actions{
+      display:flex;
+      gap:10px;
+      flex-wrap:wrap;
+      align-items:center;
+    }
+
+    .btn-page,
+    .btn-file{
+      min-width:150px;
+      height:44px;
+      border:none;
+      border-radius:8px;
+      background:var(--header);
+      color:#fff;
+      font-size:15px;
+      font-weight:700;
+      cursor:pointer;
+      padding:0 16px;
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      text-decoration:none;
+    }
+
+    .btn-page.sec{
+      background:#6b6178;
+    }
+
+    .btn-page.warn{
+      background:#b42318;
+    }
+
+    .btn-page.green{
+      background:#157347;
+    }
+
+    .btn-page:disabled{
+      opacity:.6;
+      cursor:not-allowed;
+    }
+
+    .btn-file input{
+      display:none;
+    }
+
+    .status-card{
+      background:#fff;
+      border:2px solid #d7dde6;
+      border-radius:12px;
+      padding:12px 14px;
+      margin-bottom:18px;
+    }
+
+    .status-top{
+      display:flex;
+      justify-content:space-between;
+      gap:12px;
+      align-items:center;
+      flex-wrap:wrap;
+      margin-bottom:10px;
+    }
+
+    .status-text{
+      font-weight:700;
+      color:var(--header);
+    }
+
+    .status-meta{
+      font-size:13px;
+      color:#666;
+    }
+
+    .progress-track{
+      width:100%;
+      height:10px;
+      border-radius:999px;
+      background:#ddd;
+      overflow:hidden;
+    }
+
+    .progress-bar{
+      width:0%;
+      height:100%;
+      background:var(--header);
+      transition:width .25s ease;
+    }
+
+    .status-card.success .progress-bar{
+      background:#198754;
+    }
+
+    .status-card.error .progress-bar{
+      background:#b42318;
+    }
+
+    .status-card.hidden{
+      display:none;
+    }
+
+    .cartera-toolbar{
+      display:flex;
+      justify-content:space-between;
+      gap:16px;
+      flex-wrap:wrap;
+      margin-bottom:16px;
+      align-items:end;
+    }
+
+    .toolbar-left,
+    .toolbar-right{
+      display:flex;
+      gap:10px;
+      flex-wrap:wrap;
+      align-items:center;
+    }
+
+    .field-wrap{
+      display:flex;
+      flex-direction:column;
+      gap:6px;
+    }
+
+    .field-wrap label{
+      font-size:13px;
+      font-weight:700;
+      color:var(--header);
+    }
+
+    .cartera-toolbar input,
+    .cartera-toolbar select{
+      height:42px;
+      min-width:240px;
+      border:2px solid var(--line);
+      border-radius:8px;
+      padding:0 12px;
+      font-size:14px;
+      background:#fff;
+      color:var(--header);
+    }
+
+    .table-meta{
+      display:flex;
+      justify-content:space-between;
+      gap:12px;
+      flex-wrap:wrap;
+      align-items:center;
+      margin-bottom:10px;
+      font-size:14px;
+      color:#555;
+    }
+
+    .table-wrap{
+      background:#fff;
+      border:2px solid #d7dde6;
+      border-radius:12px;
+      overflow:auto;
+    }
+
+    .cartera-table{
+      width:100%;
+      border-collapse:collapse;
+      min-width:1200px;
+    }
+
+    .cartera-table thead th{
+      position:sticky;
+      top:0;
+      background:var(--header);
+      color:#fff;
+      text-align:left;
+      padding:12px 10px;
+      font-size:13px;
+      letter-spacing:.2px;
+      z-index:1;
+    }
+
+    .cartera-table tbody td{
+      border-bottom:1px solid #e5e7eb;
+      padding:10px;
+      font-size:14px;
+      vertical-align:top;
+      color:#2f2b3a;
+    }
+
+    .cartera-table tbody tr:hover{
+      background:#faf8fd;
+    }
+
+    .actions-col{
+      width:170px;
+      min-width:170px;
+    }
+
+    .table-actions{
+      display:flex;
+      gap:8px;
+      flex-wrap:wrap;
+    }
+
+    .btn-mini{
+      border:none;
+      border-radius:8px;
+      padding:8px 10px;
+      font-size:12px;
+      font-weight:700;
+      cursor:pointer;
+      color:#fff;
+      background:var(--header);
+    }
+
+    .btn-mini.edit{
+      background:#1f6feb;
+    }
+
+    .btn-mini.delete{
+      background:#b42318;
+    }
+
+    .btn-mini.view{
+      background:#6b6178;
+    }
+
+    .empty-state{
+      padding:28px 16px;
+      text-align:center;
+      color:#666;
+    }
+
+    .empty-state.hidden{
+      display:none;
+    }
+
+    .hidden{
+      display:none !important;
+    }
+
+    .modal-backdrop{
+      position:fixed;
+      inset:0;
+      background:rgba(0,0,0,.45);
+      display:none;
+      align-items:center;
+      justify-content:center;
+      padding:18px;
+      z-index:2000;
+    }
+
+    .modal-backdrop.show{
+      display:flex;
+    }
+
+    .modal-card{
+      width:min(860px, 100%);
+      background:#fff;
+      border-radius:16px;
+      box-shadow:0 24px 60px rgba(0,0,0,.22);
+      overflow:hidden;
+    }
+
+    .modal-head{
+      background:var(--header);
+      color:#fff;
+      padding:16px 18px;
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      gap:12px;
+    }
+
+    .modal-head h3{
+      margin:0;
+      font-size:22px;
+    }
+
+    .modal-close{
+      border:none;
+      background:transparent;
+      color:#fff;
+      font-size:28px;
+      cursor:pointer;
+      line-height:1;
+    }
+
+    .modal-body{
+      padding:18px;
+      display:grid;
+      grid-template-columns:repeat(2, minmax(0, 1fr));
+      gap:14px 16px;
+    }
+
+    .modal-field{
+      display:flex;
+      flex-direction:column;
+      gap:6px;
+    }
+
+    .modal-field.full{
+      grid-column:1 / -1;
+    }
+
+    .modal-field label{
+      font-size:13px;
+      font-weight:700;
+      color:var(--header);
+    }
+
+    .modal-field input,
+    .modal-field select,
+    .modal-field textarea{
+      width:100%;
+      border:2px solid var(--line);
+      border-radius:10px;
+      padding:10px 12px;
+      font-size:14px;
+      background:#fff;
+      color:var(--header);
+      box-sizing:border-box;
+    }
+
+    .modal-field textarea{
+      min-height:100px;
+      resize:vertical;
+    }
+
+    .readonly-box{
+      min-height:44px;
+      border:2px dashed #c5b8d8;
+      border-radius:10px;
+      padding:10px 12px;
+      background:#faf8fd;
+      font-size:14px;
+      color:#4a4760;
+      display:flex;
+      align-items:center;
+    }
+
+    .modal-foot{
+      padding:16px 18px 18px;
+      display:flex;
+      justify-content:flex-end;
+      gap:10px;
+      flex-wrap:wrap;
+    }
+
+    .help-note{
+      font-size:12px;
+      color:#666;
+      margin-top:-4px;
+    }
+
+    @media (max-width: 900px){
+      .cartera-page{
+        padding:16px;
+      }
+
+      .modal-body{
+        grid-template-columns:1fr;
+      }
+
+      .cartera-toolbar input,
+      .cartera-toolbar select{
+        min-width:100%;
+      }
+    }
+  </style>
+</head>
+<body class="ventas-body" data-page="cartera">
+  <div id="layout-top"></div>
+
+  <main class="cartera-page">
+    <section class="cartera-panel">
+      <div class="cartera-topbar">
+        <div class="cartera-title-wrap">
+          <h2>Cartera</h2>
+          <p id="carteraScope">Administración de colegios/clientes por vendedor(a).</p>
+        </div>
+
+        <div class="cartera-actions">
+          <label id="labelImportar" class="btn-file">
+            Importar XLSX
+            <input id="fileInputXlsx" type="file" accept=".xlsx,.xls" />
+          </label>
+
+          <button id="btnExportar" class="btn-page sec" type="button">Exportar XLSX</button>
+          <button id="btnAgregar" class="btn-page green" type="button">Agregar colegio</button>
+        </div>
+      </div>
+
+      <div id="statusCard" class="status-card hidden">
+        <div class="status-top">
+          <div id="statusText" class="status-text">Listo.</div>
+          <div id="statusMeta" class="status-meta"></div>
+        </div>
+        <div class="progress-track">
+          <div id="progressBar" class="progress-bar"></div>
+        </div>
+      </div>
+
+      <div class="cartera-toolbar">
+        <div class="toolbar-left">
+          <div class="field-wrap">
+            <label for="searchInput">Buscar</label>
+            <input
+              id="searchInput"
+              type="text"
+              placeholder="Colegio, número, comuna, ciudad, observaciones..."
+            />
+          </div>
+        </div>
+
+        <div class="toolbar-right">
+          <div id="vendorFilterWrap" class="field-wrap">
+            <label for="vendorFilter">Vendedor(a)</label>
+            <select id="vendorFilter"></select>
+          </div>
+
+          <button id="btnRecargar" class="btn-page" type="button">Recargar</button>
+        </div>
+      </div>
+
+      <div class="table-meta">
+        <div id="tableSummary">0 registros</div>
+        <div id="roleHint">Modo lectura</div>
+      </div>
+
+      <div class="table-wrap">
+        <table class="cartera-table">
+          <thead>
+            <tr>
+              <th>N° Colegio</th>
+              <th>Colegio</th>
+              <th>Nombre</th>
+              <th>Apellido</th>
+              <th>Correo vendedor(a)</th>
+              <th>Comuna</th>
+              <th>Ciudad</th>
+              <th>Observaciones</th>
+              <th class="actions-col">Acciones</th>
+            </tr>
+          </thead>
+          <tbody id="tbodyCartera"></tbody>
+        </table>
+
+        <div id="emptyState" class="empty-state hidden">
+          No hay registros para mostrar.
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- MODAL AGREGAR / EDITAR -->
+  <div id="modalForm" class="modal-backdrop">
+    <div class="modal-card">
+      <div class="modal-head">
+        <h3 id="modalTitle">Agregar colegio</h3>
+        <button id="modalCloseBtn" class="modal-close" type="button" aria-label="Cerrar">×</button>
+      </div>
+
+      <div class="modal-body">
+        <div class="modal-field">
+          <label for="numeroColegioInput">N° Colegio *</label>
+          <input id="numeroColegioInput" type="text" />
+          <div class="help-note">Será también el ID del documento dentro de la cartera del vendedor.</div>
+        </div>
+
+        <div class="modal-field">
+          <label for="colegioInput">Colegio *</label>
+          <input id="colegioInput" type="text" />
+        </div>
+
+        <div class="modal-field full">
+          <label for="vendedorSelectModal">Vendedor(a) *</label>
+          <select id="vendedorSelectModal"></select>
+        </div>
+
+        <div class="modal-field">
+          <label>Nombre vendedor(a)</label>
+          <div id="nombrePreview" class="readonly-box"></div>
+        </div>
+
+        <div class="modal-field">
+          <label>Apellido vendedor(a)</label>
+          <div id="apellidoPreview" class="readonly-box"></div>
+        </div>
+
+        <div class="modal-field full">
+          <label>Correo vendedor(a)</label>
+          <div id="correoPreview" class="readonly-box"></div>
+        </div>
+
+        <div class="modal-field">
+          <label for="comunaInput">Comuna</label>
+          <input id="comunaInput" type="text" />
+        </div>
+
+        <div class="modal-field">
+          <label for="ciudadInput">Ciudad</label>
+          <input id="ciudadInput" type="text" />
+        </div>
+
+        <div class="modal-field full">
+          <label for="observacionesInput">Observaciones</label>
+          <textarea id="observacionesInput"></textarea>
+        </div>
+      </div>
+
+      <div class="modal-foot">
+        <button id="btnCancelarModal" class="btn-page sec" type="button">Cancelar</button>
+        <button id="btnGuardarModal" class="btn-page green" type="button">Guardar</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+  <script type="module" src="layout.js"></script>
+  <script type="module" src="cartera.js"></script>
+</body>
+</html>
