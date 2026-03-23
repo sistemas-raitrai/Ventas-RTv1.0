@@ -1,0 +1,525 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Clientes | Sistema Ventas RT</title>
+  <link rel="stylesheet" href="estilos.css" />
+  <link rel="icon" type="image/png" href="IMG/logo-raitrai.png" />
+
+  <style>
+    .clientes-page{
+      padding:18px 30px 30px;
+    }
+
+    .clientes-panel{
+      background:#efefef;
+      border:3px dashed var(--line);
+      padding:20px 22px;
+    }
+
+    .clientes-topbar{
+      display:flex;
+      justify-content:space-between;
+      align-items:flex-start;
+      gap:18px;
+      flex-wrap:wrap;
+      margin-bottom:18px;
+    }
+
+    .clientes-title-wrap h2{
+      margin:0 0 6px;
+      font-size:30px;
+      color:var(--header);
+    }
+
+    .clientes-title-wrap p{
+      margin:0;
+      color:#5a5862;
+      font-size:14px;
+    }
+
+    .clientes-actions{
+      display:flex;
+      gap:10px;
+      flex-wrap:wrap;
+      align-items:center;
+    }
+
+    .btn-page,
+    .btn-file{
+      min-width:150px;
+      height:44px;
+      border:none;
+      border-radius:8px;
+      background:var(--header);
+      color:#fff;
+      font-size:15px;
+      font-weight:700;
+      cursor:pointer;
+      padding:0 16px;
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      text-decoration:none;
+    }
+
+    .btn-page.sec{ background:#6b6178; }
+    .btn-page.warn{ background:#c96f63; }
+    .btn-page.green{ background:#157347; }
+    .btn-page.blue{ background:#1f6feb; }
+    .btn-page:disabled{ opacity:.6; cursor:not-allowed; }
+
+    .btn-file input{
+      display:none;
+    }
+
+    .status-card{
+      background:#fff;
+      border:2px solid #d7dde6;
+      border-radius:12px;
+      padding:12px 14px;
+      margin-bottom:18px;
+    }
+
+    .status-card.hidden{
+      display:none;
+    }
+
+    .status-card.success .progress-bar{
+      background:#198754;
+    }
+
+    .status-card.error .progress-bar{
+      background:#b42318;
+    }
+
+    .status-top{
+      display:flex;
+      justify-content:space-between;
+      gap:12px;
+      align-items:center;
+      flex-wrap:wrap;
+      margin-bottom:10px;
+    }
+
+    .status-text{
+      font-weight:700;
+      color:var(--header);
+    }
+
+    .status-meta{
+      font-size:13px;
+      color:#666;
+    }
+
+    .progress-track{
+      width:100%;
+      height:10px;
+      border-radius:999px;
+      background:#ddd;
+      overflow:hidden;
+    }
+
+    .progress-bar{
+      width:0%;
+      height:100%;
+      background:var(--header);
+      transition:width .25s ease;
+    }
+
+    .clientes-toolbar{
+      display:flex;
+      justify-content:space-between;
+      gap:16px;
+      flex-wrap:wrap;
+      margin-bottom:16px;
+      align-items:end;
+    }
+
+    .toolbar-left,
+    .toolbar-right{
+      display:flex;
+      gap:10px;
+      flex-wrap:wrap;
+      align-items:flex-end;
+    }
+
+    .field-wrap{
+      display:flex;
+      flex-direction:column;
+      gap:6px;
+    }
+
+    .field-wrap label{
+      font-size:13px;
+      font-weight:700;
+      color:var(--header);
+    }
+
+    .clientes-toolbar input,
+    .clientes-toolbar select{
+      height:42px;
+      min-width:220px;
+      border:2px solid var(--line);
+      border-radius:8px;
+      padding:0 12px;
+      font-size:14px;
+      background:#fff;
+      color:var(--header);
+    }
+
+    .table-meta{
+      display:flex;
+      justify-content:flex-start;
+      gap:12px;
+      flex-wrap:wrap;
+      align-items:center;
+      margin-bottom:10px;
+      font-size:14px;
+      color:#555;
+    }
+
+    .table-wrap{
+      background:#fff;
+      border:2px solid #d7dde6;
+      border-radius:12px;
+      overflow:auto;
+    }
+
+    .clientes-table{
+      width:max-content;
+      min-width:100%;
+      border-collapse:collapse;
+    }
+
+    .clientes-table thead th{
+      position:sticky;
+      top:0;
+      background:var(--header);
+      color:#fff;
+      text-align:left;
+      padding:12px 10px;
+      font-size:13px;
+      letter-spacing:.2px;
+      z-index:1;
+      white-space:nowrap;
+    }
+
+    .clientes-table tbody td{
+      border-bottom:1px solid #e5e7eb;
+      padding:10px;
+      font-size:14px;
+      vertical-align:top;
+      color:#2f2b3a;
+      white-space:nowrap;
+      text-transform:uppercase;
+    }
+
+    .clientes-table tbody tr:hover{
+      background:#faf8fd;
+    }
+
+    .check-col{
+      width:44px;
+      min-width:44px;
+      text-align:center;
+    }
+
+    .row-check,
+    #checkAllRows{
+      width:16px;
+      height:16px;
+      cursor:pointer;
+    }
+
+    .actions-col{
+      width:220px;
+      min-width:220px;
+    }
+
+    .table-actions{
+      display:flex;
+      gap:8px;
+      flex-wrap:wrap;
+    }
+
+    .btn-mini{
+      border:none;
+      border-radius:8px;
+      padding:8px 10px;
+      font-size:12px;
+      font-weight:700;
+      cursor:pointer;
+      color:#fff;
+      background:var(--header);
+      text-transform:uppercase;
+    }
+
+    .btn-mini.open{ background:#6b6178; }
+    .btn-mini.edit{ background:#1f6feb; }
+    .btn-mini.delete{ background:#b42318; }
+
+    .empty-state{
+      padding:28px 16px;
+      text-align:center;
+      color:#666;
+    }
+
+    .empty-state.hidden,
+    .hidden{
+      display:none !important;
+    }
+
+    .editor-backdrop{
+      position:fixed;
+      inset:0;
+      background:rgba(0,0,0,.45);
+      display:none;
+      align-items:center;
+      justify-content:center;
+      padding:18px;
+      z-index:2200;
+    }
+
+    .editor-backdrop.show{
+      display:flex;
+    }
+
+    .editor-card{
+      width:min(1180px, 100%);
+      max-height:90vh;
+      overflow:hidden;
+      background:#fff;
+      border-radius:16px;
+      box-shadow:0 24px 60px rgba(0,0,0,.22);
+      display:flex;
+      flex-direction:column;
+    }
+
+    .editor-head{
+      background:var(--header);
+      color:#fff;
+      padding:16px 18px;
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      gap:12px;
+    }
+
+    .editor-head h3{
+      margin:0;
+      font-size:22px;
+    }
+
+    .editor-close{
+      border:none;
+      background:transparent;
+      color:#fff;
+      font-size:28px;
+      cursor:pointer;
+      line-height:1;
+    }
+
+    .editor-body{
+      padding:18px;
+      overflow:auto;
+      display:grid;
+      grid-template-columns:repeat(3, minmax(0, 1fr));
+      gap:14px 16px;
+    }
+
+    .editor-field{
+      display:flex;
+      flex-direction:column;
+      gap:6px;
+    }
+
+    .editor-field.span-2{
+      grid-column:span 2;
+    }
+
+    .editor-field.span-3{
+      grid-column:1 / -1;
+    }
+
+    .editor-field label{
+      font-size:13px;
+      font-weight:700;
+      color:var(--header);
+    }
+
+    .editor-field input,
+    .editor-field textarea,
+    .editor-field select{
+      width:100%;
+      border:2px solid var(--line);
+      border-radius:10px;
+      padding:10px 12px;
+      font-size:14px;
+      background:#fff;
+      color:var(--header);
+      box-sizing:border-box;
+    }
+
+    .editor-field textarea{
+      min-height:90px;
+      resize:vertical;
+    }
+
+    .editor-help{
+      font-size:12px;
+      color:#666;
+    }
+
+    .editor-foot{
+      padding:16px 18px 18px;
+      display:flex;
+      justify-content:flex-end;
+      gap:10px;
+      flex-wrap:wrap;
+      border-top:1px solid #eee;
+    }
+
+    @media (max-width: 1100px){
+      .editor-body{
+        grid-template-columns:repeat(2, minmax(0, 1fr));
+      }
+    }
+
+    @media (max-width: 900px){
+      .clientes-page{
+        padding:16px;
+      }
+
+      .clientes-toolbar input,
+      .clientes-toolbar select{
+        min-width:100%;
+      }
+
+      .toolbar-left,
+      .toolbar-right{
+        width:100%;
+      }
+
+      .editor-body{
+        grid-template-columns:1fr;
+      }
+
+      .editor-field.span-2,
+      .editor-field.span-3{
+        grid-column:auto;
+      }
+    }
+  </style>
+</head>
+<body class="ventas-body" data-page="clientes">
+  <div id="layout-top"></div>
+
+  <main class="clientes-page">
+    <section class="clientes-panel">
+      <div class="clientes-topbar">
+        <div class="clientes-title-wrap">
+          <h2>Clientes</h2>
+          <p id="clientesScope">Macro general de cotizaciones/grupos.</p>
+        </div>
+
+        <div class="clientes-actions">
+          <label id="labelImportar" class="btn-file">
+            Importar XLSX
+            <input id="fileInputXlsx" type="file" accept=".xlsx,.xls" />
+          </label>
+
+          <button id="btnExportar" class="btn-page sec" type="button">Exportar XLSX</button>
+          <button id="btnEliminarSeleccionados" class="btn-page warn" type="button" disabled>
+            Eliminar seleccionados
+          </button>
+        </div>
+      </div>
+
+      <div id="statusCard" class="status-card hidden">
+        <div class="status-top">
+          <div id="statusText" class="status-text">Listo.</div>
+          <div id="statusMeta" class="status-meta"></div>
+        </div>
+        <div class="progress-track">
+          <div id="progressBar" class="progress-bar"></div>
+        </div>
+      </div>
+
+      <div class="clientes-toolbar">
+        <div class="toolbar-left">
+          <div class="field-wrap">
+            <label for="searchInput">Buscar</label>
+            <input
+              id="searchInput"
+              type="text"
+              placeholder="Buscar en todas las columnas..."
+            />
+          </div>
+
+          <div class="field-wrap">
+            <label for="filterEstado">Estado</label>
+            <select id="filterEstado"></select>
+          </div>
+
+          <div class="field-wrap">
+            <label for="filterVendedora">Vendedora</label>
+            <select id="filterVendedora"></select>
+          </div>
+
+          <div class="field-wrap">
+            <label for="filterAnoViaje">Año viaje</label>
+            <select id="filterAnoViaje"></select>
+          </div>
+
+          <div class="field-wrap">
+            <label for="filterDestino">Destino principal</label>
+            <select id="filterDestino"></select>
+          </div>
+        </div>
+
+        <div class="toolbar-right">
+          <button id="btnRecargar" class="btn-page" type="button">Recargar</button>
+        </div>
+      </div>
+
+      <div class="table-meta">
+        <div id="tableSummary">0 registro(s)</div>
+      </div>
+
+      <div class="table-wrap">
+        <table class="clientes-table">
+          <thead id="theadClientes"></thead>
+          <tbody id="tbodyClientes"></tbody>
+        </table>
+
+        <div id="emptyState" class="empty-state hidden">
+          No hay registros para mostrar.
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- MODAL EDITOR DINÁMICO -->
+  <div id="editorModal" class="editor-backdrop">
+    <div class="editor-card">
+      <div class="editor-head">
+        <h3 id="editorTitle">Editar grupo</h3>
+        <button id="editorCloseBtn" class="editor-close" type="button" aria-label="Cerrar">×</button>
+      </div>
+
+      <div id="editorBody" class="editor-body"></div>
+
+      <div class="editor-foot">
+        <button id="btnCancelarEditor" class="btn-page sec" type="button">Cancelar</button>
+        <button id="btnGuardarEditor" class="btn-page green" type="button">Guardar cambios</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+  <script type="module" src="layout.js"></script>
+  <script type="module" src="clientes.js"></script>
+</body>
+</html>
