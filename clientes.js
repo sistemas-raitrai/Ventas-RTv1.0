@@ -27,7 +27,8 @@ import {
   getRealUser,
   getEffectiveUser,
   isActingAsAnother,
-  canManageVentasRole
+  canManageVentasRole,
+  isAdminRole
 } from "./roles.js";
 
 import {
@@ -167,6 +168,10 @@ function assertAccess() {
     return false;
   }
   return true;
+}
+
+function isAdminOnly() {
+  return isAdminRole(state.effectiveUser);
 }
 
 function buildScopeText() {
@@ -457,6 +462,16 @@ async function loadData() {
       return fb.localeCompare(fa, "es");
     });
 
+     const canAdmin = isAdminOnly();
+
+    $("labelImportar")?.classList.toggle("hidden", !canAdmin);
+    $("btnPlantilla")?.classList.toggle("hidden", !canAdmin);
+    $("btnEliminarSeleccionados")?.classList.toggle("hidden", !canAdmin);
+
+    if (!canAdmin) {
+      state.selectedKeys.clear();
+    }
+
     computeColumns();
     populateFilterOptions();
     applyFilters();
@@ -565,18 +580,21 @@ function renderTable() {
   const tbody = $("tbodyClientes");
   const empty = $("emptyState");
   const summary = $("tableSummary");
-  const checkAll = $("checkAllRows");
 
   if (!thead || !tbody || !empty || !summary) return;
 
   const columns = getDisplayColumns();
+  const canAdmin = isAdminOnly();
+
   summary.textContent = `${state.filteredRows.length} registro(s) mostrados · ${state.rowsFlat.length} total`;
 
   thead.innerHTML = `
     <tr>
-      <th class="check-col">
-        <input id="checkAllRows" type="checkbox" />
-      </th>
+      ${canAdmin ? `
+        <th class="check-col">
+          <input id="checkAllRows" type="checkbox" />
+        </th>
+      ` : ""}
       ${columns.map(key => `<th>${escapeHtml(prettifyFieldKey(key))}</th>`).join("")}
       <th class="actions-col">ACCIONES</th>
     </tr>
@@ -594,41 +612,53 @@ function renderTable() {
     const rowKey = buildRowKey(row);
     const checked = state.selectedKeys.has(rowKey) ? "checked" : "";
 
+    const adminActions = `
+      <button class="btn-mini open" data-action="open" data-id="${escapeHtml(row.idGrupo)}">Abrir</button>
+      <button class="btn-mini edit" data-action="edit" data-id="${escapeHtml(row.idGrupo)}">Editar</button>
+      <button class="btn-mini delete" data-action="delete" data-id="${escapeHtml(row.idGrupo)}">Eliminar</button>
+    `;
+
+    const supervisionActions = `
+      <button class="btn-mini open" data-action="open" data-id="${escapeHtml(row.idGrupo)}">Abrir</button>
+    `;
+
     return `
       <tr>
-        <td class="check-col">
-          <input
-            class="row-check"
-            type="checkbox"
-            data-action="toggle-row"
-            data-key="${escapeHtml(rowKey)}"
-            ${checked}
-          />
-        </td>
+        ${canAdmin ? `
+          <td class="check-col">
+            <input
+              class="row-check"
+              type="checkbox"
+              data-action="toggle-row"
+              data-key="${escapeHtml(rowKey)}"
+              ${checked}
+            />
+          </td>
+        ` : ""}
         ${columns.map(key => `<td>${escapeHtml(valueToString(row[key] ?? ""))}</td>`).join("")}
         <td class="actions-col">
           <div class="table-actions">
-            <button class="btn-mini open" data-action="open" data-id="${escapeHtml(row.idGrupo)}">Abrir</button>
-            <button class="btn-mini edit" data-action="edit" data-id="${escapeHtml(row.idGrupo)}">Editar</button>
-            <button class="btn-mini delete" data-action="delete" data-id="${escapeHtml(row.idGrupo)}">Eliminar</button>
+            ${canAdmin ? adminActions : supervisionActions}
           </div>
         </td>
       </tr>
     `;
   }).join("");
 
-  const visibleKeys = state.filteredRows.map(buildRowKey);
-  const selectedVisible = visibleKeys.filter(k => state.selectedKeys.has(k)).length;
-  const master = $("checkAllRows");
-
-  if (master) {
-    master.checked = visibleKeys.length > 0 && selectedVisible === visibleKeys.length;
-    master.indeterminate = selectedVisible > 0 && selectedVisible < visibleKeys.length;
-  }
-
   const btnDelete = $("btnEliminarSeleccionados");
   if (btnDelete) {
     btnDelete.disabled = state.selectedKeys.size === 0;
+  }
+
+  if (canAdmin) {
+    const visibleKeys = state.filteredRows.map(buildRowKey);
+    const selectedVisible = visibleKeys.filter(k => state.selectedKeys.has(k)).length;
+    const master = $("checkAllRows");
+
+    if (master) {
+      master.checked = visibleKeys.length > 0 && selectedVisible === visibleKeys.length;
+      master.indeterminate = selectedVisible > 0 && selectedVisible < visibleKeys.length;
+    }
   }
 }
 
@@ -666,6 +696,8 @@ function buildEditorField(key, value) {
 }
 
 function openEditor(idGrupo) {
+  if (!isAdminOnly()) return;
+  
   const raw = getRowRawById(idGrupo);
   const body = $("editorBody");
   const title = $("editorTitle");
@@ -692,6 +724,7 @@ function closeEditor() {
 }
 
 async function saveEditor() {
+  if (!isAdminOnly()) return;
   if (!state.editingId) return;
 
   const raw = getRowRawById(state.editingId);
@@ -745,6 +778,8 @@ async function saveEditor() {
    ELIMINACIÓN
 ========================================================= */
 async function deleteRow(idGrupo) {
+  if (!isAdminOnly()) return;
+  
   const ok = confirm(`¿Seguro que quieres eliminar el grupo ${idGrupo}?`);
   if (!ok) return;
 
@@ -778,6 +813,7 @@ async function deleteRow(idGrupo) {
 }
 
 async function deleteSelectedRows() {
+  if (!isAdminOnly()) return;
   if (!state.selectedKeys.size) return;
 
   const ok = confirm(`¿Seguro que quieres eliminar ${state.selectedKeys.size} grupo(s) seleccionados?`);
@@ -869,6 +905,7 @@ function findExistingDocId(payload, codeIndex) {
 }
 
 async function importXlsx(file) {
+  if (!isAdminOnly()) return;
   if (!file) return;
 
   try {
@@ -1048,10 +1085,45 @@ async function exportXlsx() {
   }
 }
 
+function downloadTemplateXlsx() {
+  try {
+    if (!isAdminOnly()) return;
+
+    if (typeof XLSX === "undefined") {
+      alert("No se encontró la librería XLSX.");
+      return;
+    }
+
+    const columns = state.allKeys.length ? getDisplayColumns() : BASE_COLUMNS;
+    const templateRow = {};
+
+    columns.forEach((key) => {
+      templateRow[key] = "";
+    });
+
+    // ejemplos útiles en algunos campos base
+    if ("estado" in templateRow) templateRow.estado = "A contactar";
+    if ("anoViaje" in templateRow) templateRow.anoViaje = new Date().getFullYear();
+    if ("requiereAsignacion" in templateRow) templateRow.requiereAsignacion = "No";
+    if ("destinosSecundarios" in templateRow) templateRow.destinosSecundarios = "Bariloche | Brasil";
+
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.json_to_sheet([templateRow]);
+    XLSX.utils.book_append_sheet(wb, ws, "Plantilla");
+
+    const filename = `plantilla_clientes_${formatNowForFile()}.xlsx`;
+    XLSX.writeFile(wb, filename);
+  } catch (error) {
+    console.error(error);
+    alert("No se pudo generar la plantilla XLSX.");
+  }
+}
+
 /* =========================================================
    EVENTOS
 ========================================================= */
 function bindPageEvents() {
+
   const searchInput = $("searchInput");
   const filterEstado = $("filterEstado");
   const filterVendedora = $("filterVendedora");
@@ -1060,6 +1132,7 @@ function bindPageEvents() {
   const btnRecargar = $("btnRecargar");
   const btnEliminarSeleccionados = $("btnEliminarSeleccionados");
   const fileInputXlsx = $("fileInputXlsx");
+  const btnPlantilla = $("btnPlantilla");
   const btnExportar = $("btnExportar");
   const tbody = $("tbodyClientes");
   const thead = $("theadClientes");
@@ -1128,6 +1201,11 @@ function bindPageEvents() {
     });
   }
 
+  if (btnPlantilla && !btnPlantilla.dataset.bound) {
+    btnPlantilla.dataset.bound = "1";
+    btnPlantilla.addEventListener("click", downloadTemplateXlsx);
+  }
+
   if (btnExportar && !btnExportar.dataset.bound) {
     btnExportar.dataset.bound = "1";
     btnExportar.addEventListener("click", exportXlsx);
@@ -1136,17 +1214,19 @@ function bindPageEvents() {
   if (thead && !thead.dataset.bound) {
     thead.dataset.bound = "1";
     thead.addEventListener("change", (e) => {
+      if (!isAdminOnly()) return;
+  
       const target = e.target;
       if (!(target instanceof HTMLInputElement)) return;
       if (target.id !== "checkAllRows") return;
-
+  
       const checked = !!target.checked;
       state.filteredRows.forEach((row) => {
         const key = buildRowKey(row);
         if (checked) state.selectedKeys.add(key);
         else state.selectedKeys.delete(key);
       });
-
+  
       renderTable();
     });
   }
@@ -1179,13 +1259,15 @@ function bindPageEvents() {
     });
 
     tbody.addEventListener("change", (e) => {
+      if (!isAdminOnly()) return;
+    
       const input = e.target.closest('input[data-action="toggle-row"]');
       if (!input) return;
-
+    
       const key = input.dataset.key || "";
       if (input.checked) state.selectedKeys.add(key);
       else state.selectedKeys.delete(key);
-
+    
       renderTable();
     });
   }
