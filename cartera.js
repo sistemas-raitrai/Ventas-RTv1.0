@@ -210,11 +210,9 @@ function renderRoleButtons() {
   const allowManage = canManageVentasRole(state.effectiveUser);
   const importLabel = $("labelImportar");
   const addBtn = $("btnAgregar");
-  const roleHint = $("roleHint");
 
   if (importLabel) importLabel.classList.toggle("hidden", !allowManage);
   if (addBtn) addBtn.classList.toggle("hidden", !allowManage);
-  if (roleHint) roleHint.textContent = getRoleHintText();
 }
 
 function renderVendorFilter() {
