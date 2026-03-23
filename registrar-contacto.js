@@ -38,6 +38,7 @@ import {
    CONFIG
 ========================================================= */
 const GITHUB_HOME_URL = "https://sistemas-raitrai.github.io/Ventas-RT/";
+const DETALLE_GRUPO_URL = "grupo.html";
 
 /* =========================================================
    ESTADO
@@ -45,7 +46,8 @@ const GITHUB_HOME_URL = "https://sistemas-raitrai.github.io/Ventas-RT/";
 const state = {
   realUser: null,
   effectiveUser: null,
-  carteraOptions: []
+  carteraOptions: [],
+  lastCreated: null
 };
 
 /* =========================================================
@@ -87,10 +89,11 @@ function getOptionKey(email, numeroColegio, colegio) {
   return `${normalizeEmail(email)}__${normalizeText(numeroColegio)}__${normalizeText(colegio)}`;
 }
 
-function getSelectedCarteraOption() {
-  const select = $("selectColegioCartera");
-  const key = select?.value || "";
-  return state.carteraOptions.find(opt => opt.key === key) || null;
+function getExactCarteraOptionByInput() {
+  const input = normalizeSearch($("inputColegio")?.value || "");
+  if (!input) return null;
+
+  return state.carteraOptions.find(opt => normalizeSearch(opt.colegio) === input) || null;
 }
 
 function getCheckedValues(name) {
@@ -214,16 +217,15 @@ async function loadCarteraOptions() {
 }
 
 function renderCarteraSelect() {
-  const select = $("selectColegioCartera");
-  if (!select) return;
+  const list = $("listaColegios");
+  if (!list) return;
 
-  select.innerHTML = `<option value="">Seleccionar colegio de cartera</option>`;
+  list.innerHTML = "";
 
   state.carteraOptions.forEach((opt) => {
     const option = document.createElement("option");
-    option.value = opt.key;
-    option.textContent = opt.colegio;
-    select.appendChild(option);
+    option.value = opt.colegio;
+    list.appendChild(option);
   });
 }
 
@@ -231,37 +233,29 @@ function renderCarteraSelect() {
    FORM UI
 ========================================================= */
 function updateSchoolModeUI() {
-  const tipo = $("tipoColegio")?.value || "cartera";
-  const wrapCartera = $("wrapColegioCartera");
-  const wrapOtro = $("wrapColegioOtro");
+  const matched = getExactCarteraOptionByInput();
+  const inputColegio = $("inputColegio");
   const vendedoraPreview = $("vendedoraPreview");
   const estadoPreview = $("estadoPreview");
   const comunaCiudad = $("comunaCiudad");
 
-  if (!wrapCartera || !wrapOtro || !vendedoraPreview || !estadoPreview) return;
+  if (!inputColegio || !vendedoraPreview || !estadoPreview) return;
 
-  if (tipo === "cartera") {
-    wrapCartera.classList.remove("hidden");
-    wrapOtro.classList.add("hidden");
+  if (matched) {
+    vendedoraPreview.textContent = matched.vendedora || "—";
+    estadoPreview.textContent = "A contactar";
 
-    const opt = getSelectedCarteraOption();
-
-    if (opt) {
-      vendedoraPreview.textContent = opt.vendedora || "—";
-      estadoPreview.textContent = "A contactar";
-
-      if (comunaCiudad && !normalizeText(comunaCiudad.value)) {
-        comunaCiudad.value = opt.comuna || "";
-      }
+    if (comunaCiudad && !normalizeText(comunaCiudad.value)) {
+      comunaCiudad.value = matched.comuna || "";
+    }
+  } else {
+    if (normalizeText(inputColegio.value)) {
+      vendedoraPreview.textContent = "Sin asignar";
+      estadoPreview.textContent = "Sin asignar";
     } else {
       vendedoraPreview.textContent = "—";
       estadoPreview.textContent = "—";
     }
-  } else {
-    wrapCartera.classList.add("hidden");
-    wrapOtro.classList.remove("hidden");
-    vendedoraPreview.textContent = "Sin asignar";
-    estadoPreview.textContent = "Sin asignar";
   }
 }
 
@@ -275,9 +269,29 @@ function updateConditionalFields() {
   $("wrapDestinoSecundarioOtro")?.classList.toggle("hidden", !secundarios.includes("Otro"));
 }
 
+function showSuccessModal() {
+  if (!state.lastCreated) return;
+
+  const dt = state.lastCreated.createdAt || new Date();
+
+  $("successCodigo").textContent = state.lastCreated.codigoRegistro || "—";
+  $("successColegio").textContent = state.lastCreated.colegio || "—";
+  $("successCreadoPor").textContent = state.lastCreated.creadoPor || "—";
+  $("successFecha").textContent = dt.toLocaleDateString("es-CL");
+  $("successHora").textContent = dt.toLocaleTimeString("es-CL", {
+    hour: "2-digit",
+    minute: "2-digit"
+  });
+
+  $("successModal")?.classList.add("show");
+}
+
+function closeSuccessModal() {
+  $("successModal")?.classList.remove("show");
+}
+
 function resetForm() {
   $("registroForm")?.reset();
-  $("tipoColegio").value = "cartera";
   $("anoViaje").value = getCurrentYear();
   updateSchoolModeUI();
   updateConditionalFields();
@@ -287,12 +301,8 @@ function resetForm() {
    VALIDACIÓN Y PAYLOAD
 ========================================================= */
 function validateForm(data) {
-  if (data.tipoColegio === "cartera" && !data.colegio) {
-    return "Debes seleccionar un colegio de cartera.";
-  }
-
-  if (data.tipoColegio === "otro" && !data.colegio) {
-    return "Debes escribir el nombre del otro colegio.";
+  if (!data.colegio) {
+    return "Debes indicar el colegio.";
   }
 
   if (!data.cursoNivel) {
@@ -343,18 +353,18 @@ function validateForm(data) {
     return "Debes especificar el otro destino secundario.";
   }
 
+  if (state.effectiveUser?.rol === "vendedor" && !data.esCartera) {
+    return "Como vendedor(a), solo puedes registrar cotizaciones de colegios que pertenezcan a tu cartera.";
+  }
+
   return "";
 }
 
 function readFormData() {
-  const tipoColegio = $("tipoColegio")?.value || "cartera";
-  const carteraOpt = getSelectedCarteraOption();
+  const carteraOpt = getExactCarteraOptionByInput();
+  const esCartera = !!carteraOpt;
 
-  const colegio =
-    tipoColegio === "cartera"
-      ? normalizeText(carteraOpt?.colegio || "")
-      : normalizeText($("inputColegioOtro")?.value || "");
-
+  const colegio = normalizeText($("inputColegio")?.value || "");
   const cursoNivel = normalizeText($("cursoNivel")?.value || "");
   const cursoSeccion = normalizeText($("cursoSeccion")?.value || "");
 
@@ -363,15 +373,16 @@ function readFormData() {
   );
 
   return {
-    tipoColegio,
+    esCartera,
+    tipoColegio: esCartera ? "cartera" : "otro",
     colegio,
-    colegioBase: tipoColegio === "cartera" ? normalizeText(carteraOpt?.colegioBase || carteraOpt?.colegio || "") : colegio,
-    carteraNumeroColegio: tipoColegio === "cartera" ? normalizeText(carteraOpt?.numeroColegio || "") : "",
-    carteraCorreoVendedora: tipoColegio === "cartera" ? normalizeEmail(carteraOpt?.vendedoraCorreo || "") : "",
-    vendedora: tipoColegio === "cartera" ? normalizeText(carteraOpt?.vendedora || "") : "Sin asignar",
-    vendedoraCorreo: tipoColegio === "cartera" ? normalizeEmail(carteraOpt?.vendedoraCorreo || "") : "",
-    requiereAsignacion: tipoColegio !== "cartera",
-    estado: tipoColegio === "cartera" ? "A contactar" : "Sin asignar",
+    colegioBase: esCartera ? normalizeText(carteraOpt?.colegioBase || carteraOpt?.colegio || "") : colegio,
+    carteraNumeroColegio: esCartera ? normalizeText(carteraOpt?.numeroColegio || "") : "",
+    carteraCorreoVendedora: esCartera ? normalizeEmail(carteraOpt?.vendedoraCorreo || "") : "",
+    vendedora: esCartera ? normalizeText(carteraOpt?.vendedora || "") : "Sin asignar",
+    vendedoraCorreo: esCartera ? normalizeEmail(carteraOpt?.vendedoraCorreo || "") : "",
+    requiereAsignacion: !esCartera,
+    estado: esCartera ? "A contactar" : "Sin asignar",
 
     cursoNivel,
     cursoSeccion,
@@ -483,9 +494,17 @@ async function saveRegistro(e) {
       progress: 100,
       type: "success"
     });
-    clearProgressStatus(2800);
+    clearProgressStatus(2000);
 
-    resetForm();
+    state.lastCreated = {
+      idGrupo,
+      codigoRegistro,
+      colegio: data.colegio,
+      creadoPor: getNombreUsuario(state.effectiveUser),
+      createdAt: new Date()
+    };
+
+    showSuccessModal();
   } catch (error) {
     console.error(error);
     setProgressStatus({
@@ -503,21 +522,19 @@ async function saveRegistro(e) {
    EVENTOS
 ========================================================= */
 function bindPageEvents() {
-  const tipoColegio = $("tipoColegio");
-  const selectColegioCartera = $("selectColegioCartera");
+  const inputColegio = $("inputColegio");
   const origenEspecificacion = $("origenEspecificacion");
   const destinoPrincipal = $("destinoPrincipal");
   const btnLimpiar = $("btnLimpiar");
+  const btnNuevoRegistro = $("btnNuevoRegistro");
+  const btnIrRegistro = $("btnIrRegistro");
+  const successModal = $("successModal");
   const form = $("registroForm");
 
-  if (tipoColegio && !tipoColegio.dataset.bound) {
-    tipoColegio.dataset.bound = "1";
-    tipoColegio.addEventListener("change", updateSchoolModeUI);
-  }
-
-  if (selectColegioCartera && !selectColegioCartera.dataset.bound) {
-    selectColegioCartera.dataset.bound = "1";
-    selectColegioCartera.addEventListener("change", updateSchoolModeUI);
+  if (inputColegio && !inputColegio.dataset.bound) {
+    inputColegio.dataset.bound = "1";
+    inputColegio.addEventListener("input", updateSchoolModeUI);
+    inputColegio.addEventListener("change", updateSchoolModeUI);
   }
 
   if (origenEspecificacion && !origenEspecificacion.dataset.bound) {
@@ -540,6 +557,32 @@ function bindPageEvents() {
   if (btnLimpiar && !btnLimpiar.dataset.bound) {
     btnLimpiar.dataset.bound = "1";
     btnLimpiar.addEventListener("click", resetForm);
+  }
+
+  if (btnNuevoRegistro && !btnNuevoRegistro.dataset.bound) {
+    btnNuevoRegistro.dataset.bound = "1";
+    btnNuevoRegistro.addEventListener("click", () => {
+      closeSuccessModal();
+      resetForm();
+      $("inputColegio")?.focus();
+    });
+  }
+
+  if (btnIrRegistro && !btnIrRegistro.dataset.bound) {
+    btnIrRegistro.dataset.bound = "1";
+    btnIrRegistro.addEventListener("click", () => {
+      if (!state.lastCreated?.idGrupo) return;
+      location.href = `${DETALLE_GRUPO_URL}?id=${encodeURIComponent(state.lastCreated.idGrupo)}`;
+    });
+  }
+
+  if (successModal && !successModal.dataset.bound) {
+    successModal.dataset.bound = "1";
+    successModal.addEventListener("click", (e) => {
+      if (e.target === successModal) {
+        closeSuccessModal();
+      }
+    });
   }
 
   if (form && !form.dataset.bound) {
