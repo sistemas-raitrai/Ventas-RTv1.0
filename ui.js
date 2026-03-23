@@ -1,146 +1,196 @@
-// roles.js
+// ui.js
 
-import { auth, VENTAS_USERS, getVentasUser } from "./firebase-init.js";
-import { normalizeEmail, normalizeText } from "./utils.js";
+import { $, setText, getNombreUsuario, getRolLabel, normalizeEmail } from "./utils.js";
+import { isActingAsAnother } from "./roles.js";
 
-export const ACTING_USER_KEY = "ventas_acting_user_email";
-export const VENDOR_FILTER_KEY = "ventas_vendor_filter_email";
-export const GROUP_FILTER_KEY = "ventas_group_filter_value";
+const progressTimers = new Map();
 
-function resolveRole(input = "") {
-  if (!input) return "";
-  if (typeof input === "string") return input;
-  return input.rol || "";
+export function setFlowNumbers(prefix, topText, bottomText = "") {
+  const top = $(`${prefix}-top`);
+  const bottom = $(`${prefix}-bottom`);
+
+  if (top) top.textContent = topText;
+  if (bottom) bottom.textContent = bottomText;
 }
 
-export function isAdminRole(input = "") {
-  return resolveRole(input) === "admin";
+export function updateClockDataset() {
+  const ahora = new Date();
+  const hora = ahora.toLocaleTimeString("es-CL", {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit"
+  });
+
+  const fecha = ahora.toLocaleDateString("es-CL", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric"
+  });
+
+  document.body.dataset.reloj = `${hora} | ${fecha}`;
 }
 
-export function isSupervisionRole(input = "") {
-  return resolveRole(input) === "supervision";
+export function setHeaderState({ realUser, effectiveUser, scopeText = "" }) {
+  if (!realUser || !effectiveUser) return;
+
+  setText("usuario-conectado", normalizeEmail(realUser.email));
+  setText("saludo-usuario", `Hola, ${getNombreUsuario(effectiveUser)}`);
+  setText("scope-actual", scopeText);
 }
 
-export function isRegistroRole(input = "") {
-  return resolveRole(input) === "registro";
-}
+export function renderActingUserSwitcher({ realUser, effectiveUser, users = [] }) {
+  const box = $("admin-switcher");
+  const select = $("select-acting-user");
+  const btnReset = $("btn-reset-acting-user");
 
-export function isVendedorRole(input = "") {
-  return resolveRole(input) === "vendedor";
-}
+  if (!box || !select || !btnReset || !realUser || !effectiveUser) return;
 
-export function canManageVentasRole(input = "") {
-  const role = resolveRole(input);
-  return role === "admin" || role === "supervision";
-}
+  const isAdmin = realUser.rol === "admin";
 
-export function canObserveOnlyRole(input = "") {
-  return resolveRole(input) === "registro";
-}
-
-export function getRealUser() {
-  const firebaseUser = auth.currentUser;
-  if (!firebaseUser) return null;
-  return getVentasUser(firebaseUser.email || "");
-}
-
-export function getEffectiveUser() {
-  const realUser = getRealUser();
-  if (!realUser) return null;
-
-  // Solo admin puede navegar como otro usuario
-  if (!isAdminRole(realUser)) {
-    sessionStorage.removeItem(ACTING_USER_KEY);
-    return realUser;
-  }
-
-  const actingEmail = normalizeEmail(sessionStorage.getItem(ACTING_USER_KEY));
-  if (!actingEmail) return realUser;
-
-  const actingUser = getVentasUser(actingEmail);
-  return actingUser || realUser;
-}
-
-export function isActingAsAnother(realUser, effectiveUser) {
-  if (!realUser || !effectiveUser) return false;
-  return normalizeEmail(realUser.email) !== normalizeEmail(effectiveUser.email);
-}
-
-export function setVendorFilter(email = "") {
-  const safe = normalizeEmail(email);
-  if (!safe) {
-    sessionStorage.removeItem(VENDOR_FILTER_KEY);
+  if (!isAdmin) {
+    box.classList.add("hidden");
     return;
   }
-  sessionStorage.setItem(VENDOR_FILTER_KEY, safe);
+
+  box.classList.remove("hidden");
+  select.innerHTML = `<option value="">Elegir usuario</option>`;
+
+  [...users]
+    .sort((a, b) => getNombreUsuario(a).localeCompare(getNombreUsuario(b), "es"))
+    .forEach((user) => {
+      const opt = document.createElement("option");
+      opt.value = normalizeEmail(user.email);
+      opt.textContent = `${getNombreUsuario(user)} — ${getRolLabel(user.rol)}`;
+
+      if (normalizeEmail(user.email) === normalizeEmail(effectiveUser.email)) {
+        opt.selected = true;
+      }
+
+      select.appendChild(opt);
+    });
+
+  btnReset.disabled = !isActingAsAnother(realUser, effectiveUser);
 }
 
-export function clearVendorFilter() {
-  sessionStorage.removeItem(VENDOR_FILTER_KEY);
-}
+export function bindLayoutButtons({
+  homeUrl,
+  onLogout,
+  onActAs,
+  onResetActAs
+}) {
+  const btnHome = $("btn-home");
+  const btnLogout = $("btn-logout");
+  const btnActingUser = $("btn-acting-user");
+  const btnResetActingUser = $("btn-reset-acting-user");
 
-export function getVendorFilter(effectiveUser) {
-  if (!effectiveUser) return "";
-
-  // Un vendedor siempre queda filtrado a sí mismo
-  if (isVendedorRole(effectiveUser)) {
-    return normalizeEmail(effectiveUser.email);
+  if (btnHome && !btnHome.dataset.bound) {
+    btnHome.dataset.bound = "1";
+    btnHome.addEventListener("click", (e) => {
+      e.preventDefault();
+      if (location.hostname.includes("github.io")) {
+        location.href = homeUrl;
+      } else {
+        location.href = "index.html";
+      }
+    });
   }
 
-  return normalizeEmail(sessionStorage.getItem(VENDOR_FILTER_KEY));
-}
-
-export function setGroupFilter(value = "") {
-  const safe = String(value || "").trim();
-  if (!safe) {
-    sessionStorage.removeItem(GROUP_FILTER_KEY);
-    return;
+  if (btnLogout && !btnLogout.dataset.bound) {
+    btnLogout.dataset.bound = "1";
+    btnLogout.addEventListener("click", async (e) => {
+      e.preventDefault();
+      if (typeof onLogout === "function") {
+        await onLogout();
+      }
+    });
   }
-  sessionStorage.setItem(GROUP_FILTER_KEY, safe);
+
+  if (btnActingUser && !btnActingUser.dataset.bound) {
+    btnActingUser.dataset.bound = "1";
+    btnActingUser.addEventListener("click", async () => {
+      const selectedEmail = normalizeEmail($("select-acting-user")?.value || "");
+      if (typeof onActAs === "function") {
+        await onActAs(selectedEmail);
+      }
+    });
+  }
+
+  if (btnResetActingUser && !btnResetActingUser.dataset.bound) {
+    btnResetActingUser.dataset.bound = "1";
+    btnResetActingUser.addEventListener("click", async () => {
+      if (typeof onResetActAs === "function") {
+        await onResetActAs();
+      }
+    });
+  }
 }
 
-export function getGroupFilter() {
-  return String(sessionStorage.getItem(GROUP_FILTER_KEY) || "").trim();
+export function setProgressStatus({
+  text,
+  meta = "",
+  progress = 0,
+  type = "working",
+  cardId = "statusCard",
+  textId = "statusText",
+  metaId = "statusMeta",
+  barId = "progressBar"
+}) {
+  const card = $(cardId);
+  const textEl = $(textId);
+  const metaEl = $(metaId);
+  const bar = $(barId);
+
+  if (!card || !textEl || !metaEl || !bar) return;
+
+  card.classList.remove("hidden", "success", "error");
+
+  if (type === "success") card.classList.add("success");
+  if (type === "error") card.classList.add("error");
+
+  textEl.textContent = text;
+  metaEl.textContent = meta;
+  bar.style.width = `${Math.max(0, Math.min(100, progress))}%`;
 }
 
-export function clearGroupFilter() {
-  sessionStorage.removeItem(GROUP_FILTER_KEY);
+export function clearProgressStatus({ cardId = "statusCard" } = {}, delay = 2200) {
+  const card = $(cardId);
+  if (!card) return;
+
+  const prev = progressTimers.get(cardId);
+  if (prev) window.clearTimeout(prev);
+
+  const t = window.setTimeout(() => {
+    card.classList.add("hidden");
+  }, delay);
+
+  progressTimers.set(cardId, t);
 }
 
-export function getVendorParts(user) {
-  if (!user) return { nombre: "", apellido: "" };
+export function waitForElement(id, maxChecks = 80, delay = 50) {
+  return new Promise((resolve, reject) => {
+    let checks = 0;
 
-  if (user.apellido) {
-    return {
-      nombre: normalizeText(user.nombre || ""),
-      apellido: normalizeText(user.apellido || "")
+    const tick = () => {
+      const el = $(id);
+      if (el) {
+        resolve(el);
+        return;
+      }
+
+      checks += 1;
+      if (checks >= maxChecks) {
+        reject(new Error(`No se encontró el elemento #${id}`));
+        return;
+      }
+
+      setTimeout(tick, delay);
     };
-  }
 
-  const fullName = normalizeText(user.nombre || "");
-  if (!fullName) return { nombre: "", apellido: "" };
-
-  const parts = fullName.split(/\s+/).filter(Boolean);
-
-  if (parts.length === 1) {
-    return { nombre: parts[0], apellido: "" };
-  }
-
-  return {
-    nombre: parts[0],
-    apellido: parts.slice(1).join(" ")
-  };
+    tick();
+  });
 }
 
-export function getVendorUsers() {
-  return VENTAS_USERS
-    .filter((u) => u.rol === "vendedor")
-    .map((u) => ({
-      ...u,
-      email: normalizeEmail(u.email),
-      ...getVendorParts(u)
-    }))
-    .sort((a, b) =>
-      `${a.nombre} ${a.apellido}`.localeCompare(`${b.nombre} ${b.apellido}`, "es")
-    );
+export async function waitForLayoutReady() {
+  await waitForElement("btn-home");
 }
