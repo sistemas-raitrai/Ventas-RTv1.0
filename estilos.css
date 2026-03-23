@@ -258,6 +258,27 @@ html, body{
   letter-spacing:.5px;
 }
 
+.header-tools-wrap{
+  background:var(--header);
+  padding:0 30px 18px;
+}
+
+.header-tools-inner{
+  max-width:1400px;
+  margin:0 auto;
+  display:flex;
+  justify-content:center;
+}
+
+.ventas-menu a.active{
+  text-decoration:underline;
+  text-underline-offset:4px;
+}
+
+.ui-hidden{
+  display:none !important;
+}
+
 .ventas-main{
   display:grid;
   grid-template-columns: 410px 1fr;
@@ -401,6 +422,9 @@ html, body{
   background:transparent;
   padding:0;
   margin:0;
+  width:100%;
+  display:flex;
+  justify-content:center;
 }
 
 .admin-switcher.hidden{
@@ -424,7 +448,7 @@ html, body{
 .admin-switcher-row select{
   min-width:280px;
   height:42px;
-  border:2px solid var(--line);
+  border:2px solid rgba(255,255,255,.7);
   border-radius:6px;
   background:#fff;
   padding:0 12px;
@@ -437,8 +461,8 @@ html, body{
   height:42px;
   border:none;
   border-radius:6px;
-  background:var(--header);
-  color:#fff;
+  background:#fff;
+  color:var(--header);
   font-size:15px;
   font-weight:700;
   cursor:pointer;
@@ -446,7 +470,8 @@ html, body{
 }
 
 .admin-switcher-row .btn-secundario{
-  background:#6b6178;
+  background:#8d849a;
+  color:#fff;
 }
 
 .panel-grupos{
@@ -728,6 +753,10 @@ html, body{
   .ventas-menu{
     gap:22px;
     padding-bottom:30px;
+  }
+
+  .header-tools-wrap{
+    padding:0 16px 16px;
   }
 
   .alert-row{
