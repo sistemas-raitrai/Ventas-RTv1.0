@@ -31,6 +31,12 @@ const menuItems = [
     roles: ["admin", "supervision"]
   },
   {
+    key: "clientes",
+    href: "clientes.html",
+    label: "Clientes",
+    roles: ["admin", "supervision"]
+  },
+  {
     key: "informe-excel",
     href: "informe-excel.html",
     label: "Informe Excel",
