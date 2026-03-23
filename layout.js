@@ -64,7 +64,6 @@ function renderLayoutTop(user) {
         <div class="saludo-wrap">
           <h1 id="saludo-usuario">Hola, Usuario(a)</h1>
           <div id="usuario-conectado" class="usuario-conectado"></div>
-          <div id="scope-actual" class="scope-actual">Vista general</div>
         </div>
       </div>
 
