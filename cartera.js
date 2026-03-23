@@ -77,12 +77,29 @@ function getVendorNameByEmail(email = "") {
   return seller ? `${seller.nombre} ${seller.apellido}`.trim() : email;
 }
 
-function getVendorPartsFromUser(user) {
-  if (!user) return { nombre: "", apellido: "" };
-  return {
-    nombre: normalizeText(user.nombre || ""),
-    apellido: normalizeText(user.apellido || "")
-  };
+function getAliasList(user) {
+  const raw = user?.aliasCartera;
+  if (Array.isArray(raw)) return raw.map(a => normalizeSearch(a)).filter(Boolean);
+  if (typeof raw === "string") return [normalizeSearch(raw)].filter(Boolean);
+  return [];
+}
+
+function findVendorByAlias(alias = "") {
+  const target = normalizeSearch(alias);
+  if (!target) return null;
+
+  for (const vendor of state.vendors) {
+    const aliases = getAliasList(vendor);
+    if (aliases.includes(target)) return vendor;
+  }
+
+  for (const vendor of state.vendors) {
+    const fullName = normalizeSearch(`${vendor.nombre} ${vendor.apellido}`.trim());
+    const firstName = normalizeSearch(vendor.nombre);
+    if (target === fullName || target === firstName) return vendor;
+  }
+
+  return null;
 }
 
 function buildScopeText() {
@@ -116,11 +133,12 @@ function mapDocToRow(docId, data) {
     correoVendedor: normalizeEmail(data.correoVendedor),
     comuna: normalizeText(data.comuna),
     ciudad: normalizeText(data.ciudad),
+    estatus: normalizeText(data.estatus),
     observaciones: normalizeText(data.observaciones)
   };
 }
 
-function buildItemPayload(input) {
+function buildItemPayload(input, existing = null) {
   return {
     numeroColegio: normalizeText(input.numeroColegio),
     colegio: normalizeText(input.colegio),
@@ -129,8 +147,17 @@ function buildItemPayload(input) {
     apellidoVendedor: normalizeText(input.apellidoVendedor),
     correoVendedor: normalizeEmail(input.correoVendedor),
     comuna: normalizeText(input.comuna),
-    ciudad: normalizeText(input.ciudad),
-    observaciones: normalizeText(input.observaciones),
+    ciudad: normalizeText(
+      input.ciudad !== undefined && input.ciudad !== null && input.ciudad !== ""
+        ? input.ciudad
+        : existing?.ciudad || ""
+    ),
+    estatus: normalizeText(input.estatus),
+    observaciones: normalizeText(
+      input.observaciones !== undefined && input.observaciones !== null && input.observaciones !== ""
+        ? input.observaciones
+        : existing?.observaciones || ""
+    ),
     actualizadoPor: normalizeEmail(state.realUser?.email || ""),
     fechaActualizacion: serverTimestamp()
   };
@@ -241,12 +268,12 @@ function renderVendorFilter() {
 function getSearchTarget(row) {
   return normalizeSearch([
     row.numeroColegio,
-    row.colegio,
     row.nombreVendedor,
     row.apellidoVendedor,
-    row.correoVendedor,
+    row.colegio,
     row.comuna,
     row.ciudad,
+    row.estatus,
     row.observaciones
   ].join(" "));
 }
@@ -292,6 +319,8 @@ function renderTable() {
   empty.classList.add("hidden");
 
   tbody.innerHTML = state.filteredRows.map((row) => {
+    const sellerName = `${row.nombreVendedor} ${row.apellidoVendedor}`.trim();
+
     const actions = allowManage
       ? `
         <div class="table-actions">
@@ -308,12 +337,10 @@ function renderTable() {
     return `
       <tr>
         <td>${escapeHtml(row.numeroColegio)}</td>
+        <td>${escapeHtml(sellerName)}</td>
         <td>${escapeHtml(row.colegio)}</td>
-        <td>${escapeHtml(row.nombreVendedor)}</td>
-        <td>${escapeHtml(row.apellidoVendedor)}</td>
-        <td>${escapeHtml(row.correoVendedor)}</td>
         <td>${escapeHtml(row.comuna)}</td>
-        <td>${escapeHtml(row.ciudad)}</td>
+        <td>${escapeHtml(row.estatus)}</td>
         <td>${escapeHtml(row.observaciones)}</td>
         <td class="actions-col">${actions}</td>
       </tr>
@@ -326,6 +353,7 @@ function renderTable() {
 ========================================================= */
 async function loadVendorItems(email) {
   const sellerEmail = normalizeEmail(email);
+
   setProgressStatus({
     text: "Cargando cartera...",
     meta: `Vendedor(a): ${sellerEmail}`,
@@ -459,6 +487,7 @@ function openCreateModal() {
   $("colegioInput").value = "";
   $("comunaInput").value = "";
   $("ciudadInput").value = "";
+  $("estatusInput").value = "";
   $("observacionesInput").value = "";
 
   fillVendorSelectModal("");
@@ -474,6 +503,7 @@ function openEditModal(row) {
   $("colegioInput").value = row.colegio || "";
   $("comunaInput").value = row.comuna || "";
   $("ciudadInput").value = row.ciudad || "";
+  $("estatusInput").value = row.estatus || "";
   $("observacionesInput").value = row.observaciones || "";
 
   fillVendorSelectModal(row.correoVendedor || "");
@@ -493,6 +523,7 @@ function readModalInput() {
     colegio: normalizeText($("colegioInput")?.value || ""),
     comuna: normalizeText($("comunaInput")?.value || ""),
     ciudad: normalizeText($("ciudadInput")?.value || ""),
+    estatus: normalizeText($("estatusInput")?.value || ""),
     observaciones: normalizeText($("observacionesInput")?.value || ""),
     correoVendedor: sellerEmail,
     nombreVendedor: vendor?.nombre || "",
@@ -557,8 +588,13 @@ async function saveModal() {
         normalizeText(old.numeroColegio) === normalizeText(input.numeroColegio);
 
       if (samePath) {
+        const existingSnap = await getDoc(newItemRef);
+        const existingData = existingSnap.exists() ? existingSnap.data() : null;
+
         await setDoc(newParentRef, buildParentVendorPayload(input), { merge: true });
-        await setDoc(newItemRef, { ...buildItemPayload(input) }, { merge: true });
+        await setDoc(newItemRef, {
+          ...buildItemPayload(input, existingData)
+        }, { merge: true });
       } else {
         const targetExists = await getDoc(newItemRef);
         if (targetExists.exists()) {
@@ -566,10 +602,13 @@ async function saveModal() {
           return;
         }
 
+        const oldSnap = await getDoc(oldItemRef);
+        const oldData = oldSnap.exists() ? oldSnap.data() : null;
+
         const batch = writeBatch(db);
         batch.set(newParentRef, buildParentVendorPayload(input), { merge: true });
         batch.set(newItemRef, {
-          ...buildItemPayload(input),
+          ...buildItemPayload(input, oldData),
           creadoPor: normalizeEmail(state.realUser?.email || ""),
           fechaCreacion: serverTimestamp()
         }, { merge: true });
@@ -654,22 +693,49 @@ function mapImportRow(rawRow) {
     return "";
   };
 
-  const correo = normalizeEmail(
-    getAny("correo", "correo vendedor", "correo vendedor/a", "correo vendedor(a)", "email")
-  );
-
-  const vendor = state.vendors.find(v => normalizeEmail(v.email) === correo);
+  const alias = getAny("vendedor", "nombre vendedor", "vendedor(a)");
+  const vendor = findVendorByAlias(alias);
 
   return {
-    numeroColegio: getAny("numero colegio", "número colegio", "numero", "número", "numero del colegio", "codigo colegio", "código colegio"),
+    numeroColegio: getAny("nro", "numero colegio", "número colegio", "numero", "número"),
     colegio: getAny("colegio", "nombre colegio"),
-    nombreVendedor: vendor?.nombre || getAny("nombre", "nombre vendedor", "nombre vendedor/a", "nombre vendedor(a)"),
-    apellidoVendedor: vendor?.apellido || getAny("apellido", "apellido vendedor", "apellido vendedor/a", "apellido vendedor(a)"),
-    correoVendedor: correo,
     comuna: getAny("comuna"),
-    ciudad: getAny("ciudad"),
-    observaciones: getAny("observaciones", "observacion", "observación", "observaciones generales")
+    estatus: getAny("estatus", "estado"),
+    observaciones: "",
+    ciudad: "",
+    nombreVendedor: vendor?.nombre || "",
+    apellidoVendedor: vendor?.apellido || "",
+    correoVendedor: vendor?.email || "",
+    vendedorAliasOriginal: alias
   };
+}
+
+async function readWorkbookRows(file) {
+  const buffer = await file.arrayBuffer();
+  const workbook = XLSX.read(buffer, { type: "array" });
+
+  const allRows = [];
+  const sheetNames = workbook.SheetNames;
+
+  for (let s = 0; s < sheetNames.length; s++) {
+    const sheetName = sheetNames[s];
+    const sheet = workbook.Sheets[sheetName];
+
+    setProgressStatus({
+      text: "Importando XLSX...",
+      meta: `Leyendo hoja ${s + 1}/${sheetNames.length}: ${sheetName}`,
+      progress: 5 + Math.round(((s + 1) / sheetNames.length) * 15)
+    });
+
+    const rawRows = XLSX.utils.sheet_to_json(sheet, {
+      defval: "",
+      range: 2
+    });
+
+    rawRows.forEach((row) => allRows.push(row));
+  }
+
+  return allRows;
 }
 
 async function importXlsx(file) {
@@ -688,11 +754,7 @@ async function importXlsx(file) {
       progress: 10
     });
 
-    const buffer = await file.arrayBuffer();
-    const workbook = XLSX.read(buffer, { type: "array" });
-    const firstSheetName = workbook.SheetNames[0];
-    const sheet = workbook.Sheets[firstSheetName];
-    const rawRows = XLSX.utils.sheet_to_json(sheet, { defval: "" });
+    const rawRows = await readWorkbookRows(file);
 
     setProgressStatus({
       text: "Importando XLSX...",
@@ -715,15 +777,13 @@ async function importXlsx(file) {
 
     for (let i = 0; i < rawRows.length; i++) {
       const row = mapImportRow(rawRows[i]);
-      const vendorExists = state.vendors.some(v => normalizeEmail(v.email) === normalizeEmail(row.correoVendedor));
 
-      if (!row.numeroColegio || !row.colegio || !row.correoVendedor) {
-        errors.push(`Fila ${i + 2}: faltan N° Colegio, Colegio o Correo.`);
+      if (!row.numeroColegio || !row.colegio || !row.vendedorAliasOriginal) {
         continue;
       }
 
-      if (!vendorExists) {
-        errors.push(`Fila ${i + 2}: el correo ${row.correoVendedor} no corresponde a un vendedor válido en firebase-init.`);
+      if (!row.correoVendedor) {
+        errors.push(`Fila ${i + 4}: no se pudo resolver el vendedor "${row.vendedorAliasOriginal}" con aliasCartera.`);
         continue;
       }
 
@@ -757,10 +817,12 @@ async function importXlsx(file) {
       return;
     }
 
-    const operations = [];
     const touchedVendors = new Map();
+    let createdCount = 0;
+    let updatedCount = 0;
 
-    parsedRows.forEach((row) => {
+    for (let i = 0; i < parsedRows.length; i++) {
+      const row = parsedRows[i];
       const email = normalizeEmail(row.correoVendedor);
 
       if (!touchedVendors.has(email)) {
@@ -771,58 +833,48 @@ async function importXlsx(file) {
         });
       }
 
-      operations.push({
-        type: "item",
-        email,
-        numeroColegio: normalizeText(row.numeroColegio),
-        data: {
-          ...buildItemPayload(row),
-          creadoPor: normalizeEmail(state.realUser?.email || ""),
-          fechaCreacion: serverTimestamp()
-        }
-      });
-    });
+      const parentRef = doc(db, "ventas_cartera", email);
+      const itemRef = doc(db, "ventas_cartera", email, "items", normalizeText(row.numeroColegio));
+      const existingSnap = await getDoc(itemRef);
+      const existingData = existingSnap.exists() ? existingSnap.data() : null;
 
-    const vendorOps = [...touchedVendors.values()].map((vendor) => ({
-      type: "vendor",
-      email: vendor.correoVendedor,
-      data: buildParentVendorPayload(vendor)
-    }));
+      await setDoc(parentRef, buildParentVendorPayload({
+        correoVendedor: email,
+        nombreVendedor: row.nombreVendedor,
+        apellidoVendedor: row.apellidoVendedor
+      }), { merge: true });
 
-    const finalOps = [...vendorOps, ...operations];
-    let processed = 0;
+      await setDoc(itemRef, {
+        ...buildItemPayload(row, existingData),
+        ...(existingSnap.exists()
+          ? {}
+          : {
+              creadoPor: normalizeEmail(state.realUser?.email || ""),
+              fechaCreacion: serverTimestamp()
+            })
+      }, { merge: true });
 
-    for (let i = 0; i < finalOps.length; i += WRITE_BATCH_LIMIT) {
-      const chunk = finalOps.slice(i, i + WRITE_BATCH_LIMIT);
-      const batch = writeBatch(db);
+      if (existingSnap.exists()) {
+        updatedCount += 1;
+      } else {
+        createdCount += 1;
+      }
 
-      chunk.forEach((op) => {
-        if (op.type === "vendor") {
-          batch.set(doc(db, "ventas_cartera", op.email), op.data, { merge: true });
-        } else {
-          batch.set(doc(db, "ventas_cartera", op.email, "items", op.numeroColegio), op.data, { merge: true });
-        }
-      });
-
-      await batch.commit();
-
-      processed += chunk.length;
-      const pct = 45 + Math.round((processed / finalOps.length) * 55);
-
+      const pct = 45 + Math.round(((i + 1) / parsedRows.length) * 55);
       setProgressStatus({
         text: "Importando XLSX...",
-        meta: `Guardando... ${processed}/${finalOps.length} operaciones`,
+        meta: `Guardando filas... ${i + 1}/${parsedRows.length}`,
         progress: pct
       });
     }
 
     setProgressStatus({
       text: "Importación lista.",
-      meta: `${parsedRows.length} fila(s) procesadas correctamente.`,
+      meta: `${createdCount} nuevos · ${updatedCount} actualizados · ${parsedRows.length} total`,
       progress: 100,
       type: "success"
     });
-    clearProgressStatus( {}, 2600 );
+    clearProgressStatus({}, 3000);
 
     $("fileInputXlsx").value = "";
     await loadData();
@@ -854,14 +906,13 @@ async function exportXlsx() {
     });
 
     const exportRows = state.filteredRows.map((row) => ({
-      "Numero Colegio": row.numeroColegio,
-      "Colegio": row.colegio,
-      "Nombre": row.nombreVendedor,
-      "Apellido": row.apellidoVendedor,
-      "Correo": row.correoVendedor,
-      "Comuna": row.comuna,
-      "Ciudad": row.ciudad,
-      "Observaciones": row.observaciones
+      "NRO": row.numeroColegio,
+      "VENDEDOR": `${row.nombreVendedor} ${row.apellidoVendedor}`.trim(),
+      "COLEGIO": row.colegio,
+      "COMUNA": row.comuna,
+      "ESTATUS": row.estatus,
+      "CIUDAD": row.ciudad,
+      "OBSERVACIONES": row.observaciones
     }));
 
     setProgressStatus({
@@ -905,6 +956,95 @@ async function exportXlsx() {
 /* =========================================================
    EVENTOS
 ========================================================= */
+function fillVendorSelectModal(selectedEmail = "") {
+  const select = $("vendedorSelectModal");
+  if (!select) return;
+
+  select.innerHTML = `<option value="">Seleccionar vendedor(a)</option>`;
+
+  state.vendors.forEach((vendor) => {
+    const opt = document.createElement("option");
+    opt.value = normalizeEmail(vendor.email);
+    opt.textContent = `${vendor.nombre} ${vendor.apellido}`.trim();
+    if (normalizeEmail(vendor.email) === normalizeEmail(selectedEmail)) {
+      opt.selected = true;
+    }
+    select.appendChild(opt);
+  });
+
+  updateVendorPreview();
+}
+
+function updateVendorPreview() {
+  const select = $("vendedorSelectModal");
+  const vendor = state.vendors.find(v => normalizeEmail(v.email) === normalizeEmail(select?.value || ""));
+
+  $("nombrePreview").textContent = vendor?.nombre || "—";
+  $("apellidoPreview").textContent = vendor?.apellido || "—";
+  $("correoPreview").textContent = vendor?.email || "—";
+}
+
+function openCreateModal() {
+  state.modalMode = "create";
+  state.editingOriginal = null;
+
+  $("modalTitle").textContent = "Agregar colegio";
+  $("numeroColegioInput").value = "";
+  $("colegioInput").value = "";
+  $("comunaInput").value = "";
+  $("ciudadInput").value = "";
+  $("estatusInput").value = "";
+  $("observacionesInput").value = "";
+
+  fillVendorSelectModal("");
+  $("modalForm").classList.add("show");
+}
+
+function openEditModal(row) {
+  state.modalMode = "edit";
+  state.editingOriginal = { ...row };
+
+  $("modalTitle").textContent = "Editar colegio";
+  $("numeroColegioInput").value = row.numeroColegio || "";
+  $("colegioInput").value = row.colegio || "";
+  $("comunaInput").value = row.comuna || "";
+  $("ciudadInput").value = row.ciudad || "";
+  $("estatusInput").value = row.estatus || "";
+  $("observacionesInput").value = row.observaciones || "";
+
+  fillVendorSelectModal(row.correoVendedor || "");
+  $("modalForm").classList.add("show");
+}
+
+function closeModal() {
+  $("modalForm").classList.remove("show");
+}
+
+function readModalInput() {
+  const sellerEmail = normalizeEmail($("vendedorSelectModal")?.value || "");
+  const vendor = state.vendors.find(v => normalizeEmail(v.email) === sellerEmail);
+
+  return {
+    numeroColegio: normalizeText($("numeroColegioInput")?.value || ""),
+    colegio: normalizeText($("colegioInput")?.value || ""),
+    comuna: normalizeText($("comunaInput")?.value || ""),
+    ciudad: normalizeText($("ciudadInput")?.value || ""),
+    estatus: normalizeText($("estatusInput")?.value || ""),
+    observaciones: normalizeText($("observacionesInput")?.value || ""),
+    correoVendedor: sellerEmail,
+    nombreVendedor: vendor?.nombre || "",
+    apellidoVendedor: vendor?.apellido || ""
+  };
+}
+
+function validateRowInput(input) {
+  if (!input.numeroColegio) return "Debes indicar el N° Colegio.";
+  if (!input.colegio) return "Debes indicar el nombre del colegio.";
+  if (!input.correoVendedor) return "Debes seleccionar un vendedor(a).";
+  if (!input.nombreVendedor) return "No se pudo determinar el nombre del vendedor(a).";
+  return "";
+}
+
 function bindPageEvents() {
   const searchInput = $("searchInput");
   const vendorFilter = $("vendorFilter");
