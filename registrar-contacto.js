@@ -168,18 +168,23 @@ async function loadCarteraOptions() {
 
     itemsSnap.docs.forEach((d) => {
       const data = d.data() || {};
+      const estatus = normalizeText(data.estatus || "");
+    
+      // Solo colegios con estatus OK entran a la lista de cartera
+      if (normalizeSearch(estatus) !== "ok") return;
+    
       const colegio =
         normalizeText(data.colegioBase || data.colegio || data.colegioOriginal || "");
-
+    
       if (!colegio) return;
-
+    
       const numeroColegio = normalizeText(data.numeroColegio || d.id || "");
       const vendedoraNombre = normalizeText(
         `${data.nombreVendedor || ""} ${data.apellidoVendedor || ""}`.trim()
       );
-
+    
       const key = normalizeSearch(colegio);
-
+    
       if (!map.has(key)) {
         map.set(key, {
           key: getOptionKey(data.correoVendedor || sellerEmail, numeroColegio, colegio),
@@ -188,7 +193,8 @@ async function loadCarteraOptions() {
           numeroColegio,
           vendedora: vendedoraNombre,
           vendedoraCorreo: normalizeEmail(data.correoVendedor || sellerEmail),
-          comuna: normalizeText(data.comuna || "")
+          comuna: normalizeText(data.comuna || ""),
+          estatus
         });
       }
     });
