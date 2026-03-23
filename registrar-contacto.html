@@ -186,7 +186,7 @@
       margin-top:8px;
       flex-wrap:wrap;
     }
-
+    
     .btn-page{
       min-width:180px;
       height:46px;
@@ -198,6 +198,65 @@
       font-weight:700;
       cursor:pointer;
       padding:0 16px;
+    }
+    
+    .success-backdrop{
+      position:fixed;
+      inset:0;
+      background:rgba(0,0,0,.45);
+      display:none;
+      align-items:center;
+      justify-content:center;
+      padding:18px;
+      z-index:2200;
+    }
+    
+    .success-backdrop.show{
+      display:flex;
+    }
+    
+    .success-card{
+      width:min(700px, 100%);
+      background:#fff;
+      border-radius:16px;
+      box-shadow:0 24px 60px rgba(0,0,0,.22);
+      overflow:hidden;
+    }
+    
+    .success-head{
+      background:var(--green-dark);
+      color:#fff;
+      padding:16px 18px;
+    }
+    
+    .success-head h3{
+      margin:0;
+      font-size:22px;
+    }
+    
+    .success-body{
+      padding:18px;
+      display:flex;
+      flex-direction:column;
+      gap:10px;
+    }
+    
+    .success-row{
+      font-size:14px;
+      color:var(--header);
+    }
+    
+    .success-row strong{
+      display:inline-block;
+      min-width:140px;
+    }
+    
+    .success-actions{
+      padding:0 18px 18px;
+      display:flex;
+      justify-content:flex-end;
+      gap:10px;
+      flex-wrap:wrap;
     }
 
     .btn-page.green{
@@ -264,34 +323,30 @@
       </div>
 
       <form id="registroForm" class="registro-form">
-        <div class="field">
-          <label for="tipoColegio">Tipo de colegio *</label>
-          <select id="tipoColegio" required>
-            <option value="cartera">Colegio de cartera</option>
-            <option value="otro">Otro colegio</option>
-          </select>
+        <div class="field span-2">
+          <label for="inputColegio">Colegio *</label>
+          <input
+            id="inputColegio"
+            type="text"
+            list="listaColegios"
+            placeholder="Escribe o selecciona un colegio"
+            autocomplete="off"
+          />
+          <datalist id="listaColegios"></datalist>
+          <div class="helper">
+            Si coincide con la cartera, se asigna automáticamente la vendedora. Si no coincide, quedará sin asignar.
+          </div>
         </div>
-
-        <div id="wrapColegioCartera" class="field span-2">
-          <label for="selectColegioCartera">Colegio de cartera *</label>
-          <select id="selectColegioCartera"></select>
-        </div>
-
-        <div id="wrapColegioOtro" class="field span-2 hidden">
-          <label for="inputColegioOtro">Otro colegio *</label>
-          <input id="inputColegioOtro" type="text" placeholder="Escribe el nombre del colegio" />
-        </div>
-
+        
         <div class="field">
           <label>Vendedora</label>
           <div id="vendedoraPreview" class="readonly-box">—</div>
         </div>
-
+        
         <div class="field">
           <label>Estado</label>
           <div id="estadoPreview" class="readonly-box">—</div>
         </div>
-
         <div class="field">
           <label for="cursoNivel">Curso base *</label>
           <select id="cursoNivel" required>
@@ -418,6 +473,27 @@
           <button id="btnGuardarRegistro" class="btn-page green" type="submit">Registrar contacto</button>
         </div>
       </form>
+      <div id="successModal" class="success-backdrop">
+        <div class="success-card">
+          <div class="success-head">
+            <h3>Registro creado correctamente</h3>
+          </div>
+      
+          <div class="success-body">
+            <div class="success-row"><strong>Código:</strong> <span id="successCodigo">—</span></div>
+            <div class="success-row"><strong>Colegio:</strong> <span id="successColegio">—</span></div>
+            <div class="success-row"><strong>Creado por:</strong> <span id="successCreadoPor">—</span></div>
+            <div class="success-row"><strong>Fecha:</strong> <span id="successFecha">—</span></div>
+            <div class="success-row"><strong>Hora:</strong> <span id="successHora">—</span></div>
+          </div>
+      
+          <div class="success-actions">
+            <button id="btnNuevoRegistro" class="btn-page sec" type="button">Registrar un grupo nuevo</button>
+            <button id="btnIrRegistro" class="btn-page green" type="button">Ir al registro del grupo</button>
+          </div>
+        </div>
+      </div>
+      
     </section>
   </main>
 
