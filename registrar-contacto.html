@@ -86,20 +86,36 @@
 
     .registro-form{
       display:grid;
-      grid-template-columns:repeat(3, minmax(0, 1fr));
+      grid-template-columns:repeat(12, minmax(0, 1fr));
       gap:12px;
     }
-
+    
     .field{
       display:flex;
       flex-direction:column;
       gap:6px;
     }
-
+    
+    .field.col-3{
+      grid-column:span 3;
+    }
+    
+    .field.col-4{
+      grid-column:span 4;
+    }
+    
+    .field.col-6{
+      grid-column:span 6;
+    }
+    
+    .field.col-12{
+      grid-column:1 / -1;
+    }
+    
     .field.span-2{
       grid-column:span 2;
     }
-
+    
     .field.span-3{
       grid-column:1 / -1;
     }
@@ -274,28 +290,45 @@
 
     @media (max-width: 980px){
       .registro-form{
-        grid-template-columns:1fr 1fr;
+        grid-template-columns:repeat(6, minmax(0, 1fr));
       }
-
+    
+      .field.col-12{
+        grid-column:1 / -1;
+      }
+    
+      .field.col-6{
+        grid-column:span 6;
+      }
+    
+      .field.col-4,
+      .field.col-3{
+        grid-column:span 3;
+      }
+    
       .field.span-3{
         grid-column:1 / -1;
       }
     }
-
+    
     @media (max-width: 720px){
       .registro-page{
         padding:16px;
       }
-
+    
       .registro-form{
         grid-template-columns:1fr;
       }
-
+    
+      .field.col-3,
+      .field.col-4,
+      .field.col-6,
+      .field.col-12,
       .field.span-2,
       .field.span-3{
         grid-column:auto;
       }
-
+    
       .check-group{
         grid-template-columns:1fr;
       }
@@ -323,7 +356,7 @@
       </div>
 
       <form id="registroForm" class="registro-form">
-        <div class="field span-2">
+        <div class="field col-4">
           <label for="inputColegio">Colegio *</label>
           <input
             id="inputColegio"
@@ -338,16 +371,17 @@
           </div>
         </div>
         
-        <div class="field">
+        <div class="field col-4">
           <label>Vendedora</label>
           <div id="vendedoraPreview" class="readonly-box">—</div>
         </div>
         
-        <div class="field">
+        <div class="field col-4">
           <label>Estado</label>
           <div id="estadoPreview" class="readonly-box">—</div>
         </div>
-        <div class="field">
+        
+        <div class="field col-4">
           <label for="cursoNivel">Curso base *</label>
           <select id="cursoNivel" required>
             <option value="">Seleccionar</option>
@@ -365,28 +399,28 @@
             <option value="4° Medio">4° Medio</option>
           </select>
         </div>
-
-        <div class="field">
+        
+        <div class="field col-4">
           <label for="cursoSeccion">Letra / nombre del curso *</label>
           <input id="cursoSeccion" type="text" placeholder="A, B, C, Azul, etc." />
         </div>
-
-        <div class="field">
+        
+        <div class="field col-4">
           <label for="anoViaje">Año del viaje *</label>
           <input id="anoViaje" type="number" min="2025" max="2100" step="1" />
         </div>
-
-        <div class="field span-2">
+        
+        <div class="field col-4">
           <label for="comunaCiudad">Comuna o ciudad</label>
           <input id="comunaCiudad" type="text" placeholder="Comuna o ciudad del grupo / cliente" />
         </div>
-
-        <div class="field">
+        
+        <div class="field col-4">
           <label for="nombreCliente">Nombre del cliente *</label>
           <input id="nombreCliente" type="text" placeholder="Quien hace la cotización" />
         </div>
-
-        <div class="field">
+        
+        <div class="field col-4">
           <label for="rolCliente">Rol del cliente *</label>
           <select id="rolCliente">
             <option value="">Seleccionar</option>
@@ -396,19 +430,19 @@
             <option value="Otro(a)">Otro(a)</option>
           </select>
         </div>
-
-        <div class="field span-2">
+        
+        <div class="field col-3">
           <label for="correoCliente">Correo electrónico del cliente</label>
           <input id="correoCliente" type="email" placeholder="cliente@correo.com" />
           <div class="helper">Debe existir correo o celular para registrar la cotización.</div>
         </div>
-
-        <div class="field">
+        
+        <div class="field col-3">
           <label for="celularCliente">Celular del cliente</label>
           <input id="celularCliente" type="text" placeholder="+569..." />
         </div>
-
-        <div class="field">
+        
+        <div class="field col-3">
           <label for="origenCliente">Origen del cliente *</label>
           <select id="origenCliente">
             <option value="">Seleccionar</option>
@@ -416,8 +450,8 @@
             <option value="Referido">Referido</option>
           </select>
         </div>
-
-        <div class="field">
+        
+        <div class="field col-3">
           <label for="origenEspecificacion">Especificación del origen *</label>
           <select id="origenEspecificacion">
             <option value="">Seleccionar</option>
@@ -429,10 +463,43 @@
             <option value="Otro">Otro</option>
           </select>
         </div>
-
-        <div id="wrapOrigenEspecificacionOtro" class="field span-2 hidden">
+        
+        <div id="wrapOrigenEspecificacionOtro" class="field col-12 hidden">
           <label for="origenEspecificacionOtro">Detalle del origen</label>
           <input id="origenEspecificacionOtro" type="text" placeholder="Especifica el origen" />
+        </div>
+        
+        <div class="field col-12">
+          <label for="destinoPrincipal">Destino principal *</label>
+          <select id="destinoPrincipal">
+            <option value="">Seleccionar</option>
+            <option value="Bariloche">Bariloche</option>
+            <option value="Sur de Chile">Sur de Chile</option>
+            <option value="Bariloche y Sur de Chile">Bariloche y Sur de Chile</option>
+            <option value="Brasil">Brasil</option>
+            <option value="Otro">Otro</option>
+          </select>
+        </div>
+        
+        <div id="wrapDestinoPrincipalOtro" class="field col-12 hidden">
+          <label for="destinoPrincipalOtro">Otro destino principal</label>
+          <input id="destinoPrincipalOtro" type="text" placeholder="Especifica el destino principal" />
+        </div>
+        
+        <div class="field col-12">
+          <label>Destinos secundarios</label>
+          <div class="check-group">
+            <label class="check-item"><input type="checkbox" name="destinoSecundario" value="Bariloche" /> Bariloche</label>
+            <label class="check-item"><input type="checkbox" name="destinoSecundario" value="Sur de Chile" /> Sur de Chile</label>
+            <label class="check-item"><input type="checkbox" name="destinoSecundario" value="Bariloche y Sur de Chile" /> Bariloche y Sur de Chile</label>
+            <label class="check-item"><input type="checkbox" name="destinoSecundario" value="Brasil" /> Brasil</label>
+            <label class="check-item"><input type="checkbox" name="destinoSecundario" value="Otro" /> Otro</label>
+          </div>
+        </div>
+        
+        <div id="wrapDestinoSecundarioOtro" class="field col-12 hidden">
+          <label for="destinoSecundarioOtro">Otro destino secundario</label>
+          <input id="destinoSecundarioOtro" type="text" placeholder="Especifica el destino secundario" />
         </div>
 
         <div class="field">
