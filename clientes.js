@@ -53,6 +53,7 @@ const BASE_COLUMNS = [
   "estado",
   "colegio",
   "curso",
+  "cantidadGrupo",
   "anoViaje",
   "vendedora",
   "vendedoraCorreo",
