@@ -332,9 +332,20 @@ function parseImportedValue(key, rawValue) {
     if (["no", "false", "0"].includes(val)) return false;
   }
 
-  if (key === "anoViaje") {
+  if (key === "anoViaje" || key === "cantidadGrupo") {
     const maybe = Number(value);
     return Number.isFinite(maybe) ? maybe : value;
+  }
+
+  // ISO string => Date (Firestore lo guarda como fecha consistente)
+  if (
+    /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z$/i.test(value) ||
+    /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2})?(?:\.\d+)?(?:Z|[+\-]\d{2}:\d{2})$/i.test(value)
+  ) {
+    const parsed = new Date(value);
+    if (!Number.isNaN(parsed.getTime())) {
+      return parsed;
+    }
   }
 
   return value;
@@ -350,6 +361,8 @@ function sanitizeImportKey(rawKey = "") {
     "codigo registro": "codigoRegistro",
     "código": "codigoRegistro",
     "código registro": "codigoRegistro",
+    "cantidad grupo": "cantidadGrupo",
+    "cantidadgrupo": "cantidadGrupo",
     "año viaje": "anoViaje",
     "anio viaje": "anoViaje",
     "vendedora": "vendedora",
@@ -404,6 +417,108 @@ function sanitizeImportKey(rawKey = "") {
   }).filter(Boolean);
 
   return pieces.join(".");
+}
+
+function normalizePersonName(value = "") {
+  return normalizeSearch(value).replace(/\s+/g, " ").trim();
+}
+
+function getUserAliases(user) {
+  const aliases = [];
+
+  const nombre = normalizeText(user?.nombre || "");
+  const apellido = normalizeText(user?.apellido || "");
+  const fullName = normalizeText(`${nombre} ${apellido}`.trim());
+
+  if (nombre) aliases.push(normalizePersonName(nombre));
+  if (fullName) aliases.push(normalizePersonName(fullName));
+
+  const aliasCartera = user?.aliasCartera;
+  if (Array.isArray(aliasCartera)) {
+    aliasCartera.forEach(a => aliases.push(normalizePersonName(a)));
+  } else if (typeof aliasCartera === "string") {
+    aliases.push(normalizePersonName(aliasCartera));
+  }
+
+  return [...new Set(aliases.filter(Boolean))];
+}
+
+function resolveVentasUserByEmail(email = "") {
+  const target = normalizeEmail(email);
+  if (!target) return null;
+  return VENTAS_USERS.find(u => normalizeEmail(u.email) === target) || null;
+}
+
+function resolveVentasUserByName(name = "") {
+  const target = normalizePersonName(name);
+  if (!target) return null;
+
+  for (const user of VENTAS_USERS) {
+    const aliases = getUserAliases(user);
+    if (aliases.includes(target)) return user;
+  }
+
+  return null;
+}
+
+function getDisplayName(user) {
+  if (!user) return "";
+  return normalizeText(`${user.nombre || ""} ${user.apellido || ""}`.trim() || user.nombre || "");
+}
+
+function autoResolveKnownPeople(payload) {
+  // vendedora -> vendedoraCorreo
+  if (normalizeText(payload.vendedora) && !normalizeEmail(payload.vendedoraCorreo)) {
+    const seller = resolveVentasUserByName(payload.vendedora);
+    if (seller) {
+      payload.vendedora = getDisplayName(seller) || payload.vendedora;
+      payload.vendedoraCorreo = normalizeEmail(seller.email || "");
+    }
+  }
+
+  // vendedoraCorreo -> vendedora
+  if (normalizeEmail(payload.vendedoraCorreo) && !normalizeText(payload.vendedora)) {
+    const seller = resolveVentasUserByEmail(payload.vendedoraCorreo);
+    if (seller) {
+      payload.vendedora = getDisplayName(seller);
+    }
+  }
+
+  // creadoPorCorreo -> creadoPor
+  if (normalizeEmail(payload.creadoPorCorreo) && !normalizeText(payload.creadoPor)) {
+    const creator = resolveVentasUserByEmail(payload.creadoPorCorreo);
+    if (creator) {
+      payload.creadoPor = getDisplayName(creator);
+    }
+  }
+
+  // creadoPor -> creadoPorCorreo
+  if (normalizeText(payload.creadoPor) && !normalizeEmail(payload.creadoPorCorreo)) {
+    const creator = resolveVentasUserByName(payload.creadoPor);
+    if (creator) {
+      payload.creadoPor = getDisplayName(creator) || payload.creadoPor;
+      payload.creadoPorCorreo = normalizeEmail(creator.email || "");
+    }
+  }
+
+  // actualizadoPorCorreo -> actualizadoPor
+  if (normalizeEmail(payload.actualizadoPorCorreo) && !normalizeText(payload.actualizadoPor)) {
+    const updater = resolveVentasUserByEmail(payload.actualizadoPorCorreo);
+    if (updater) {
+      payload.actualizadoPor = getDisplayName(updater);
+    }
+  }
+
+  // actualizadoPor -> actualizadoPorCorreo
+  if (normalizeText(payload.actualizadoPor) && !normalizeEmail(payload.actualizadoPorCorreo)) {
+    const updater = resolveVentasUserByName(payload.actualizadoPor);
+    if (updater) {
+      payload.actualizadoPor = getDisplayName(updater) || payload.actualizadoPor;
+      payload.actualizadoPorCorreo = normalizeEmail(updater.email || "");
+    }
+  }
+
+  return payload;
 }
 
 function buildRowKey(row) {
@@ -902,7 +1017,7 @@ function rowToFieldPayload(rowObj) {
     setNestedValue(payload, key, value);
   });
 
-  return payload;
+  return autoResolveKnownPeople(payload);
 }
 
 function findExistingDocId(payload, codeIndex) {
