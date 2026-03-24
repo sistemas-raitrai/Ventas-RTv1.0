@@ -278,6 +278,36 @@ function updateArchiveButton() {
   btn.textContent = state.showArchivedOnly ? "Ver Actuales" : "Ver Anteriores";
 }
 
+function valueToString(value) {
+  if (value === null || value === undefined) return "";
+
+  if (value instanceof Date) {
+    return formatDateTime(value);
+  }
+
+  if (isTimestampLike(value)) {
+    return formatDateTime(value);
+  }
+
+  if (Array.isArray(value)) {
+    return value.map(v => valueToString(v)).filter(Boolean).join(" | ");
+  }
+
+  if (typeof value === "boolean") {
+    return value ? "Sí" : "No";
+  }
+
+  if (typeof value === "number") {
+    return String(value);
+  }
+
+  if (typeof value === "object") {
+    return JSON.stringify(value);
+  }
+
+  return String(value);
+}
+
 function flattenObject(obj, prefix = "", out = {}) {
   if (!obj || typeof obj !== "object" || Array.isArray(obj)) {
     return out;
