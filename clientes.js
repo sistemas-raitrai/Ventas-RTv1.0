@@ -112,6 +112,7 @@ const LABELS = {
   estado: "ESTADO",
   colegio: "COLEGIO",
   curso: "CURSO",
+  cantidadGrupo: "CANTIDAD GRUPO",
   anoViaje: "AÑO VIAJE",
   vendedora: "VENDEDORA",
   vendedoraCorreo: "CORREO VENDEDORA",
