@@ -48,6 +48,21 @@ export const VENTAS_USERS = [
     rol: "registro"
   },
   {
+    email: "giras@raitrai.cl",
+    nombre: "Martiza",
+    rol: "registro"
+  },
+  {
+    email: "contacto@raitrai.cl",
+    nombre: "Isa",
+    rol: "registro"
+  },
+  {
+    email: "raitrai@raitrai.cl",
+    nombre: "Jessica",
+    rol: "registro"
+  },
+  {
     email: "griveros@raitrai.cl",
     nombre: "Giselle",
     apellido: "Riveros",
