@@ -151,6 +151,7 @@ const state = {
   dynamicKeys: [],
   editingId: null,
   search: "",
+  showArchivedOnly: false,
   filters: {
     estado: "",
     vendedora: "",
@@ -251,30 +252,28 @@ function formatDateTime(value) {
   return `${f} ${h}`;
 }
 
-function valueToString(value) {
-  if (value === null || value === undefined) return "";
+function getAnoViajeNumber(row) {
+  const raw = normalizeText(row.anoViaje || "");
+  if (!raw) return null;
 
-  if (isTimestampLike(value)) {
-    return formatDateTime(value);
-  }
+  const match = raw.match(/\d{4}/);
+  if (!match) return null;
 
-  if (Array.isArray(value)) {
-    return value.map(v => valueToString(v)).filter(Boolean).join(" | ");
-  }
+  const year = Number(match[0]);
+  return Number.isFinite(year) ? year : null;
+}
 
-  if (typeof value === "boolean") {
-    return value ? "Sí" : "No";
-  }
+function isArchivedRow(row) {
+  const year = getAnoViajeNumber(row);
+  if (!year) return false;
+  return year < new Date().getFullYear();
+}
 
-  if (typeof value === "number") {
-    return String(value);
-  }
+function updateArchiveButton() {
+  const btn = $("btnVerAnteriores");
+  if (!btn) return;
 
-  if (typeof value === "object") {
-    return JSON.stringify(value);
-  }
-
-  return String(value);
+  btn.textContent = state.showArchivedOnly ? "Ver Actuales" : "Ver Anteriores";
 }
 
 function flattenObject(obj, prefix = "", out = {}) {
@@ -462,12 +461,13 @@ async function loadData() {
       return fb.localeCompare(fa, "es");
     });
 
-     const canAdmin = isAdminOnly();
-
+    const canAdmin = isAdminOnly();
+    
     $("labelImportar")?.classList.toggle("hidden", !canAdmin);
     $("btnPlantilla")?.classList.toggle("hidden", !canAdmin);
     $("btnEliminarSeleccionados")?.classList.toggle("hidden", !canAdmin);
-
+    $("btnVerAnteriores")?.classList.remove("hidden");
+    
     if (!canAdmin) {
       state.selectedKeys.clear();
     }
@@ -543,6 +543,14 @@ function populateFilterOptions() {
 function applyFilters() {
   let rows = [...state.rowsFlat];
 
+  // Vista principal: solo actuales
+  // Vista archivo: solo anteriores
+  if (state.showArchivedOnly) {
+    rows = rows.filter(isArchivedRow);
+  } else {
+    rows = rows.filter((row) => !isArchivedRow(row));
+  }
+
   if (state.filters.estado) {
     rows = rows.filter(r => normalizeText(r.estado) === state.filters.estado);
   }
@@ -565,6 +573,7 @@ function applyFilters() {
   }
 
   state.filteredRows = rows;
+  updateArchiveButton();
   renderTable();
 }
 
@@ -1133,6 +1142,7 @@ function bindPageEvents() {
   const btnEliminarSeleccionados = $("btnEliminarSeleccionados");
   const fileInputXlsx = $("fileInputXlsx");
   const btnPlantilla = $("btnPlantilla");
+  const btnVerAnteriores = $("btnVerAnteriores");
   const btnExportar = $("btnExportar");
   const tbody = $("tbodyClientes");
   const thead = $("theadClientes");
@@ -1204,6 +1214,15 @@ function bindPageEvents() {
   if (btnPlantilla && !btnPlantilla.dataset.bound) {
     btnPlantilla.dataset.bound = "1";
     btnPlantilla.addEventListener("click", downloadTemplateXlsx);
+  }
+
+  if (btnVerAnteriores && !btnVerAnteriores.dataset.bound) {
+    btnVerAnteriores.dataset.bound = "1";
+    btnVerAnteriores.addEventListener("click", () => {
+      state.showArchivedOnly = !state.showArchivedOnly;
+      state.selectedKeys.clear();
+      applyFilters();
+    });
   }
 
   if (btnExportar && !btnExportar.dataset.bound) {
