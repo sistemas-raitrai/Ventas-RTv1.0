@@ -85,6 +85,153 @@ function getCurrentYear() {
   return new Date().getFullYear();
 }
 
+function normalizeCursoInput(value = "") {
+  return normalizeText(value)
+    .toUpperCase()
+    .replace(/\s+/g, "");
+}
+
+function hasValidCursoFormat(value = "") {
+  const curso = normalizeCursoInput(value);
+  return /^(?=.*\d)(?=.*[A-Z])[A-Z0-9]+$/.test(curso);
+}
+
+function extractCursoNumber(value = "") {
+  const match = normalizeCursoInput(value).match(/^(\d{1,2})/);
+  return match ? Number(match[1]) : null;
+}
+
+function extractCursoSuffix(value = "") {
+  const match = normalizeCursoInput(value).match(/^\d{1,2}(.*)$/);
+  return match ? match[1] : "";
+}
+
+function projectCursoToYear(cursoBase = "", anoBase = getCurrentYear(), anoViaje = getCurrentYear()) {
+  const baseCurso = normalizeCursoInput(cursoBase);
+  const baseNumber = extractCursoNumber(baseCurso);
+  const suffix = extractCursoSuffix(baseCurso);
+  const fromYear = Number(anoBase);
+  const toYear = Number(anoViaje);
+
+  if (!baseCurso || baseNumber === null || !suffix) return "";
+  if (!Number.isFinite(fromYear) || !Number.isFinite(toYear) || toYear < fromYear) return "";
+
+  let projectedNumber = baseNumber;
+  const diff = toYear - fromYear;
+
+  for (let i = 0; i < diff; i += 1) {
+    projectedNumber += 1;
+    if (projectedNumber > 8) projectedNumber = 1;
+  }
+
+  return `${projectedNumber}${suffix}`;
+}
+
+function buildAliasGrupo({ cursoBase = "", anoBase = "", cursoViaje = "", anoViaje = "", colegio = "" }) {
+  const base = normalizeCursoInput(cursoBase);
+  const trip = normalizeCursoInput(cursoViaje);
+  const school = normalizeText(colegio);
+
+  if (!base || !trip || !anoBase || !anoViaje || !school) return "";
+  return `${base} (${anoBase}) ${trip} (${anoViaje}) ${school}`.trim();
+}
+
+function buildAliasTripKey({ colegio = "", cursoViaje = "", anoViaje = "" }) {
+  return normalizeSearch(
+    `${normalizeText(colegio)}__${normalizeCursoInput(cursoViaje)}__${normalizeText(anoViaje)}`
+  );
+}
+
+function getDocBaseYear(data = {}) {
+  const explicit = Number(data.anoBaseCurso || "");
+  if (Number.isFinite(explicit) && explicit > 0) return explicit;
+
+  const ts = data.fechaCreacion;
+  if (ts?.toDate) {
+    return ts.toDate().getFullYear();
+  }
+
+  return getCurrentYear();
+}
+
+function buildLegacyCursoBase(data = {}) {
+  const direct = normalizeCursoInput(data.curso || "");
+  if (hasValidCursoFormat(direct)) return direct;
+
+  const nivel = normalizeText(data.cursoNivel || "");
+  const seccion = normalizeText(data.cursoSeccion || "").toUpperCase().replace(/\s+/g, "");
+  const numberMatch = nivel.match(/(\d{1,2})/);
+  const number = numberMatch ? numberMatch[1] : "";
+
+  const rebuilt = normalizeCursoInput(`${number}${seccion}`);
+  return hasValidCursoFormat(rebuilt) ? rebuilt : "";
+}
+
+function buildTripKeyFromExistingDoc(data = {}) {
+  const explicit = normalizeText(data.aliasTripKey || "");
+  if (explicit) return normalizeSearch(explicit);
+
+  const colegio = normalizeText(data.colegio || "");
+  const anoViaje = normalizeText(data.anoViaje || "");
+
+  if (!colegio || !anoViaje) return "";
+
+  const cursoBase = buildLegacyCursoBase(data);
+  const cursoViaje = normalizeCursoInput(
+    data.cursoViaje || projectCursoToYear(cursoBase, getDocBaseYear(data), anoViaje)
+  );
+
+  if (!cursoViaje) return "";
+
+  return buildAliasTripKey({ colegio, cursoViaje, anoViaje });
+}
+
+async function findExistingAliasConflict(targetTripKey = "") {
+  if (!targetTripKey) return null;
+
+  const snap = await getDocs(collection(db, "ventas_cotizaciones"));
+
+  for (const row of snap.docs) {
+    const data = row.data() || {};
+    const rowTripKey = buildTripKeyFromExistingDoc(data);
+
+    if (rowTripKey && rowTripKey === targetTripKey) {
+      return {
+        id: row.id,
+        data
+      };
+    }
+  }
+
+  return null;
+}
+
+function updateAliasPreview() {
+  const aliasPreview = $("aliasPreview");
+  if (!aliasPreview) return;
+
+  const colegio = normalizeText($("inputColegio")?.value || "");
+  const curso = normalizeCursoInput($("inputCurso")?.value || "");
+  const anoBase = getCurrentYear();
+  const anoViaje = normalizeText($("anoViaje")?.value || "");
+
+  if (!colegio || !curso || !anoViaje || !hasValidCursoFormat(curso)) {
+    aliasPreview.textContent = "—";
+    return;
+  }
+
+  const cursoViaje = projectCursoToYear(curso, anoBase, anoViaje);
+  const alias = buildAliasGrupo({
+    cursoBase: curso,
+    anoBase,
+    cursoViaje,
+    anoViaje,
+    colegio
+  });
+
+  aliasPreview.textContent = alias || "—";
+}
+
 function getOptionKey(email, numeroColegio, colegio) {
   return `${normalizeEmail(email)}__${normalizeText(numeroColegio)}__${normalizeText(colegio)}`;
 }
@@ -263,6 +410,8 @@ function updateSchoolModeUI() {
       estadoPreview.textContent = "—";
     }
   }
+  
+  updateAliasPreview();
 }
 
 function updateConditionalFields() {
@@ -301,6 +450,7 @@ function resetForm() {
   $("anoViaje").value = getCurrentYear();
   updateSchoolModeUI();
   updateConditionalFields();
+  updateAliasPreview();
 }
 
 /* =========================================================
@@ -311,16 +461,28 @@ function validateForm(data) {
     return "Debes indicar el colegio.";
   }
 
-  if (!data.cursoNivel) {
-    return "Debes seleccionar el curso base.";
+  if (!data.curso) {
+    return "Debes indicar el curso.";
   }
 
-  if (!data.cursoSeccion) {
-    return "Debes indicar la letra o nombre del curso.";
+  if (!hasValidCursoFormat(data.curso)) {
+    return "El curso debe llevar números y letras, sin espacios. Ejemplo: 4C, 3DAVINCI.";
   }
 
   if (!data.anoViaje) {
     return "Debes indicar el año del viaje.";
+  }
+
+  if (Number(data.anoViaje) < getCurrentYear()) {
+    return "El año del viaje no puede ser menor al año actual.";
+  }
+
+  if (!data.cursoViaje) {
+    return "No se pudo calcular el curso proyectado para el año del viaje.";
+  }
+
+  if (!data.aliasGrupo || !data.aliasTripKey) {
+    return "No se pudo construir el alias del grupo.";
   }
 
   if (!data.nombreCliente) {
@@ -371,8 +533,22 @@ function readFormData() {
   const esCartera = !!carteraOpt;
 
   const colegio = normalizeText($("inputColegio")?.value || "");
-  const cursoNivel = normalizeText($("cursoNivel")?.value || "");
-  const cursoSeccion = normalizeText($("cursoSeccion")?.value || "");
+  const curso = normalizeCursoInput($("inputCurso")?.value || "");
+  const anoBaseCurso = getCurrentYear();
+  const anoViaje = normalizeText($("anoViaje")?.value || "");
+  const cursoViaje = projectCursoToYear(curso, anoBaseCurso, anoViaje);
+  const aliasGrupo = buildAliasGrupo({
+    cursoBase: curso,
+    anoBase: anoBaseCurso,
+    cursoViaje,
+    anoViaje,
+    colegio
+  });
+  const aliasTripKey = buildAliasTripKey({
+    colegio,
+    cursoViaje,
+    anoViaje
+  });
 
   const destinosSecundarios = uniqueStrings(
     getCheckedValues("destinoSecundario").filter(v => v !== ($("destinoPrincipal")?.value || ""))
@@ -380,7 +556,7 @@ function readFormData() {
 
   return {
     esCartera,
-    tipoColegio: esCartera ? "cartera" : "otro",
+    tipoColegio: esCartera ? "Cartera" : "No cartera",
     colegio,
     colegioBase: esCartera ? normalizeText(carteraOpt?.colegioBase || carteraOpt?.colegio || "") : colegio,
     carteraNumeroColegio: esCartera ? normalizeText(carteraOpt?.numeroColegio || "") : "",
@@ -390,10 +566,12 @@ function readFormData() {
     requiereAsignacion: !esCartera,
     estado: esCartera ? "A contactar" : "Sin asignar",
 
-    cursoNivel,
-    cursoSeccion,
-    curso: `${cursoNivel} ${cursoSeccion}`.trim(),
-    anoViaje: normalizeText($("anoViaje")?.value || ""),
+    curso,
+    anoBaseCurso: String(anoBaseCurso),
+    cursoViaje,
+    aliasGrupo,
+    aliasTripKey,
+    anoViaje,
     comunaCiudad: normalizeText($("comunaCiudad")?.value || ""),
     nombreCliente: normalizeText($("nombreCliente")?.value || ""),
     rolCliente: normalizeText($("rolCliente")?.value || ""),
@@ -435,8 +613,31 @@ async function saveRegistro(e) {
     setProgressStatus({
       text: "Registrando contacto...",
       meta: "Preparando registro...",
-      progress: 25
+      progress: 20
     });
+
+    setProgressStatus({
+      text: "Registrando contacto...",
+      meta: "Validando alias del grupo...",
+      progress: 35
+    });
+
+    const conflict = await findExistingAliasConflict(data.aliasTripKey);
+
+    if (conflict) {
+      const conflictCode = normalizeText(conflict.data?.codigoRegistro || conflict.id || "");
+      const conflictAlias = normalizeText(conflict.data?.aliasGrupo || "");
+      clearProgressStatus();
+
+      alert(
+        `Ya existe una cotización para ${data.cursoViaje} (${data.anoViaje}) en ${data.colegio}.\n\n` +
+        `Registro existente: ${conflictCode || "sin código"}\n` +
+        `${conflictAlias ? `Alias: ${conflictAlias}\n\n` : "\n"}` +
+        `No se puede crear otro grupo con el mismo curso proyectado, año de viaje y colegio.`
+      );
+
+      return;
+    }
 
     const newRef = doc(collection(db, "ventas_cotizaciones"));
     const idGrupo = newRef.id;
@@ -458,9 +659,11 @@ async function saveRegistro(e) {
       requiereAsignacion: data.requiereAsignacion,
       estado: data.estado,
 
-      cursoNivel: data.cursoNivel,
-      cursoSeccion: data.cursoSeccion,
       curso: data.curso,
+      anoBaseCurso: data.anoBaseCurso,
+      cursoViaje: data.cursoViaje,
+      aliasGrupo: data.aliasGrupo,
+      aliasTripKey: data.aliasTripKey,
       anoViaje: data.anoViaje,
       comunaCiudad: data.comunaCiudad,
 
@@ -489,7 +692,7 @@ async function saveRegistro(e) {
     setProgressStatus({
       text: "Registrando contacto...",
       meta: "Guardando en Firebase...",
-      progress: 70
+      progress: 75
     });
 
     await setDoc(newRef, payload);
@@ -529,6 +732,8 @@ async function saveRegistro(e) {
 ========================================================= */
 function bindPageEvents() {
   const inputColegio = $("inputColegio");
+  const inputCurso = $("inputCurso");
+  const anoViaje = $("anoViaje");
   const origenEspecificacion = $("origenEspecificacion");
   const destinoPrincipal = $("destinoPrincipal");
   const btnLimpiar = $("btnLimpiar");
@@ -541,6 +746,24 @@ function bindPageEvents() {
     inputColegio.dataset.bound = "1";
     inputColegio.addEventListener("input", updateSchoolModeUI);
     inputColegio.addEventListener("change", updateSchoolModeUI);
+  }
+
+  if (inputCurso && !inputCurso.dataset.bound) {
+    inputCurso.dataset.bound = "1";
+    inputCurso.addEventListener("input", () => {
+      inputCurso.value = normalizeCursoInput(inputCurso.value);
+      updateAliasPreview();
+    });
+    inputCurso.addEventListener("change", () => {
+      inputCurso.value = normalizeCursoInput(inputCurso.value);
+      updateAliasPreview();
+    });
+  }
+
+  if (anoViaje && !anoViaje.dataset.bound) {
+    anoViaje.dataset.bound = "1";
+    anoViaje.addEventListener("input", updateAliasPreview);
+    anoViaje.addEventListener("change", updateAliasPreview);
   }
 
   if (origenEspecificacion && !origenEspecificacion.dataset.bound) {
