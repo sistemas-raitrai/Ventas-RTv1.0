@@ -133,7 +133,17 @@ function buildAliasGrupo({ cursoBase = "", anoBase = "", cursoViaje = "", anoVia
   const school = normalizeText(colegio);
 
   if (!base || !trip || !anoBase || !anoViaje || !school) return "";
-  return `${base} (${anoBase}) ${trip} (${anoViaje}) ${school}`.trim();
+
+  const baseYear = String(anoBase).trim();
+  const tripYear = String(anoViaje).trim();
+
+  // Si el año base y el año de viaje coinciden,
+  // no repetimos el curso/año proyectado.
+  if (baseYear === tripYear) {
+    return `${base} (${baseYear}) ${school}`.trim();
+  }
+
+  return `${base} (${baseYear}) ${trip} (${tripYear}) ${school}`.trim();
 }
 
 function buildAliasTripKey({ colegio = "", cursoViaje = "", anoViaje = "" }) {
