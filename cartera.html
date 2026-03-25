@@ -119,24 +119,34 @@
     .cartera-toolbar{
       display:flex;
       justify-content:space-between;
+      align-items:flex-end;
       gap:16px;
       flex-wrap:wrap;
       margin-bottom:16px;
-      align-items:end;
+      width:100%;
     }
 
-    .toolbar-left,
+    .toolbar-left{
+      display:flex;
+      align-items:flex-end;
+      gap:10px;
+      flex:1 1 420px;
+      min-width:320px;
+    }
+
     .toolbar-right{
       display:flex;
+      align-items:flex-end;
       gap:10px;
       flex-wrap:wrap;
-      align-items:flex-end;
+      margin-left:auto;
     }
 
     .field-wrap{
       display:flex;
       flex-direction:column;
       gap:6px;
+      min-width:0;
     }
 
     .field-wrap label{
@@ -145,16 +155,39 @@
       color:var(--header);
     }
 
+    .field-wrap.search-wrap{
+      flex:1 1 auto;
+      min-width:320px;
+    }
+
+    .field-wrap.search-wrap input{
+      width:100%;
+      min-width:0;
+    }
+
+    .field-wrap.status-wrap,
+    #vendorFilterWrap{
+      flex:0 0 180px;
+      width:180px;
+    }
+
     .cartera-toolbar input,
     .cartera-toolbar select{
       height:42px;
-      min-width:220px;
+      width:100%;
+      min-width:0;
       border:2px solid var(--line);
       border-radius:8px;
       padding:0 12px;
       font-size:14px;
       background:#fff;
       color:var(--header);
+      box-sizing:border-box;
+    }
+
+    #btnRecargar{
+      min-width:110px;
+      height:42px;
     }
 
     .table-meta{
@@ -533,9 +566,27 @@
         grid-template-columns:1fr;
       }
 
+      .toolbar-left,
+      .toolbar-right{
+        width:100%;
+        min-width:0;
+      }
+
+      .toolbar-right{
+        margin-left:0;
+      }
+
+      .field-wrap.search-wrap,
+      .field-wrap.status-wrap,
+      #vendorFilterWrap{
+        flex:1 1 100%;
+        width:100%;
+      }
+
       .cartera-toolbar input,
-      .cartera-toolbar select{
-        min-width:100%;
+      .cartera-toolbar select,
+      #btnRecargar{
+        width:100%;
       }
     }
   </style>
@@ -577,7 +628,7 @@
 
       <div class="cartera-toolbar">
         <div class="toolbar-left">
-          <div class="field-wrap">
+          <div class="field-wrap search-wrap">
             <label for="searchInput">Buscar</label>
             <input
               id="searchInput"
@@ -585,8 +636,10 @@
               placeholder="N° colegio, vendedor, colegio, comuna, estatus, observaciones..."
             />
           </div>
+        </div>
 
-          <div class="field-wrap">
+        <div class="toolbar-right">
+          <div class="field-wrap status-wrap">
             <label for="statusFilter">Estatus</label>
             <select id="statusFilter">
               <option value="ok" selected>OK</option>
@@ -594,7 +647,15 @@
               <option value="all">Todos</option>
             </select>
           </div>
+
+          <div id="vendorFilterWrap" class="field-wrap">
+            <label for="vendorFilter">Vendedor(a)</label>
+            <select id="vendorFilter"></select>
+          </div>
+
+          <button id="btnRecargar" class="btn-page" type="button">Recargar</button>
         </div>
+      </div>
 
         <div class="toolbar-right">
           <div id="vendorFilterWrap" class="field-wrap">
