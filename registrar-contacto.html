@@ -86,14 +86,31 @@
 
     .registro-form{
       display:grid;
-      grid-template-columns:repeat(12, minmax(0, 1fr));
+      grid-template-columns:repeat(11, minmax(0, 1fr));
       gap:12px;
+      align-items:start;
     }
     
     .field{
       display:flex;
       flex-direction:column;
       gap:6px;
+      min-width:0;
+    }
+
+    /* Escala visual:
+       1 = pequeña
+       2 = mediana
+       3 = grande
+       4 = muy grande
+       5 = máxima
+    */
+    .field.col-1{
+      grid-column:span 1;
+    }
+
+    .field.col-2{
+      grid-column:span 2;
     }
     
     .field.col-3{
@@ -103,9 +120,9 @@
     .field.col-4{
       grid-column:span 4;
     }
-    
-    .field.col-6{
-      grid-column:span 6;
+
+    .field.col-5{
+      grid-column:span 5;
     }
     
     .field.col-12{
@@ -292,20 +309,28 @@
       .registro-form{
         grid-template-columns:repeat(6, minmax(0, 1fr));
       }
-    
+
       .field.col-12{
         grid-column:1 / -1;
       }
-    
-      .field.col-6{
+
+      .field.col-5,
+      .field.col-4{
         grid-column:span 6;
       }
-    
-      .field.col-4,
+
       .field.col-3{
         grid-column:span 3;
       }
-    
+
+      .field.col-2{
+        grid-column:span 2;
+      }
+
+      .field.col-1{
+        grid-column:span 1;
+      }
+
       .field.span-3{
         grid-column:1 / -1;
       }
@@ -320,9 +345,11 @@
         grid-template-columns:1fr;
       }
     
+      .field.col-1,
+      .field.col-2,
       .field.col-3,
       .field.col-4,
-      .field.col-6,
+      .field.col-5,
       .field.col-12,
       .field.span-2,
       .field.span-3{
