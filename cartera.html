@@ -65,7 +65,7 @@
     }
 
     .btn-page.sec{ background:#6b6178; }
-    .btn-page.warn{ background:#b42318; }
+    .btn-page.warn{ background:#c96f63; }
     .btn-page.green{ background:#157347; }
     .btn-page:disabled{ opacity:.6; cursor:not-allowed; }
     .btn-file input{ display:none; }
@@ -122,6 +122,7 @@
       gap:16px;
       flex-wrap:wrap;
       margin-bottom:16px;
+      align-items:end;
     }
 
     .toolbar-left,
@@ -129,13 +130,6 @@
       display:flex;
       gap:10px;
       flex-wrap:wrap;
-    }
-
-    .toolbar-left{
-      align-items:center;
-    }
-
-    .toolbar-right{
       align-items:flex-end;
     }
 
@@ -154,7 +148,7 @@
     .cartera-toolbar input,
     .cartera-toolbar select{
       height:42px;
-      min-width:240px;
+      min-width:220px;
       border:2px solid var(--line);
       border-radius:8px;
       padding:0 12px;
@@ -174,6 +168,71 @@
       color:#555;
     }
 
+    .table-pager{
+      display:flex;
+      align-items:center;
+      gap:8px;
+      flex-wrap:wrap;
+      margin-left:auto;
+    }
+    
+    .pager-label{
+      font-size:13px;
+      font-weight:700;
+      color:var(--header);
+    }
+    
+    .table-pager select{
+      height:38px;
+      min-width:90px;
+      border:2px solid var(--line);
+      border-radius:8px;
+      padding:0 10px;
+      font-size:14px;
+      background:#fff;
+      color:var(--header);
+    }
+    
+    .btn-pager{
+      min-width:46px;
+      height:38px;
+      padding:0 12px;
+    }
+    
+    .page-indicator{
+      min-width:140px;
+      text-align:center;
+      font-size:13px;
+      font-weight:700;
+      color:var(--header);
+    }
+    
+    .th-sort{
+      width:100%;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:8px;
+      border:none;
+      background:transparent;
+      color:#fff;
+      padding:0;
+      font:inherit;
+      font-weight:700;
+      cursor:pointer;
+      text-transform:uppercase;
+    }
+    
+    .th-sort .sort-arrow{
+      font-size:12px;
+      opacity:.8;
+      flex:0 0 auto;
+    }
+    
+    .th-sort.active .sort-arrow{
+      opacity:1;
+    }
+
     .table-wrap{
       background:#fff;
       border:2px solid #d7dde6;
@@ -182,9 +241,9 @@
     }
 
     .cartera-table{
-      width:100%;
+      width:max-content;
+      min-width:100%;
       border-collapse:collapse;
-      min-width:1260px;
     }
 
     .cartera-table thead th{
@@ -197,6 +256,7 @@
       font-size:13px;
       letter-spacing:.2px;
       z-index:1;
+      white-space:nowrap;
     }
 
     .cartera-table tbody td{
@@ -205,6 +265,7 @@
       font-size:14px;
       vertical-align:top;
       color:#2f2b3a;
+      white-space:nowrap;
       text-transform:uppercase;
     }
 
@@ -538,40 +599,26 @@
 
       <div class="table-meta">
         <div id="tableSummary">0 registros</div>
-          <div class="table-controls">
-            <div class="field-wrap compact">
-              <label for="pageSizeSelect">Ver</label>
-              <select id="pageSizeSelect">
-                <option value="8">8</option>
-                <option value="16">16</option>
-                <option value="24">24</option>
-                <option value="all">Todos</option>
-              </select>
-            </div>
-        
-            <button id="btnPrevPage" type="button" class="btn-page sec page-nav">←</button>
-            <div id="pageIndicator" class="page-indicator">Página 0 de 0</div>
-            <button id="btnNextPage" type="button" class="btn-page sec page-nav">→</button>
-          </div>        
+      
+        <div class="table-pager">
+          <label class="pager-label" for="pageSizeSelect">Ver</label>
+      
+          <select id="pageSizeSelect">
+            <option value="8" selected>8</option>
+            <option value="16">16</option>
+            <option value="24">24</option>
+            <option value="all">Todos</option>
+          </select>
+      
+          <button id="btnPrevPage" class="btn-page sec btn-pager" type="button">←</button>
+          <div id="pageIndicator" class="page-indicator">Página 1 de 1</div>
+          <button id="btnNextPage" class="btn-page sec btn-pager" type="button">→</button>
+        </div>
       </div>
 
       <div class="table-wrap">
         <table class="cartera-table">
-          <thead>
-            <tr>
-              <th style="width:44px; min-width:44px; text-align:center;">
-                <input id="checkAllRows" type="checkbox" />
-              </th>
-              <th>N° Colegio</th>
-              <th>Vendedor(a)</th>
-              <th class="logo-col">Logo</th>
-              <th>Colegio</th>
-              <th>Comuna</th>
-              <th>Estatus</th>
-              <th>Observaciones</th>
-              <th class="actions-col">Acciones</th>
-            </tr>
-          </thead>
+          <thead id="theadCartera"></thead>
           <tbody id="tbodyCartera"></tbody>
         </table>
 
