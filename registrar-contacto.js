@@ -477,6 +477,14 @@ function validateForm(data) {
     return "El año del viaje no puede ser menor al año actual.";
   }
 
+  if (!data.cantidadGrupo && data.cantidadGrupo !== 0) {
+    return "Debes indicar la cantidad del grupo.";
+  }
+
+  if (!Number.isFinite(Number(data.cantidadGrupo)) || Number(data.cantidadGrupo) <= 0) {
+    return "La cantidad del grupo debe ser un número mayor a 0.";
+  }
+
   if (!data.cursoViaje) {
     return "No se pudo calcular el curso proyectado para el año del viaje.";
   }
@@ -536,6 +544,10 @@ function readFormData() {
   const curso = normalizeCursoInput($("inputCurso")?.value || "");
   const anoBaseCurso = getCurrentYear();
   const anoViaje = normalizeText($("anoViaje")?.value || "");
+  const cantidadGrupoRaw = normalizeText($("cantidadGrupo")?.value || "");
+  const cantidadGrupoNum = Number(cantidadGrupoRaw);
+  const cantidadGrupo = Number.isFinite(cantidadGrupoNum) ? cantidadGrupoNum : "";
+
   const cursoViaje = projectCursoToYear(curso, anoBaseCurso, anoViaje);
   const aliasGrupo = buildAliasGrupo({
     cursoBase: curso,
@@ -571,6 +583,7 @@ function readFormData() {
     cursoViaje,
     aliasGrupo,
     aliasTripKey,
+    cantidadGrupo,
     anoViaje,
     comunaCiudad: normalizeText($("comunaCiudad")?.value || ""),
     nombreCliente: normalizeText($("nombreCliente")?.value || ""),
@@ -664,6 +677,7 @@ async function saveRegistro(e) {
       cursoViaje: data.cursoViaje,
       aliasGrupo: data.aliasGrupo,
       aliasTripKey: data.aliasTripKey,
+      cantidadGrupo: data.cantidadGrupo,
       anoViaje: data.anoViaje,
       comunaCiudad: data.comunaCiudad,
 
@@ -734,6 +748,7 @@ function bindPageEvents() {
   const inputColegio = $("inputColegio");
   const inputCurso = $("inputCurso");
   const anoViaje = $("anoViaje");
+  const cantidadGrupo = $("cantidadGrupo");
   const origenEspecificacion = $("origenEspecificacion");
   const destinoPrincipal = $("destinoPrincipal");
   const btnLimpiar = $("btnLimpiar");
@@ -764,6 +779,13 @@ function bindPageEvents() {
     anoViaje.dataset.bound = "1";
     anoViaje.addEventListener("input", updateAliasPreview);
     anoViaje.addEventListener("change", updateAliasPreview);
+  }
+
+  if (cantidadGrupo && !cantidadGrupo.dataset.bound) {
+    cantidadGrupo.dataset.bound = "1";
+    cantidadGrupo.addEventListener("input", () => {
+      cantidadGrupo.value = String(cantidadGrupo.value || "").replace(/[^\d]/g, "");
+    });
   }
 
   if (origenEspecificacion && !origenEspecificacion.dataset.bound) {
