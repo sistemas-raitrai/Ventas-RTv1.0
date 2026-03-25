@@ -152,6 +152,8 @@ const state = {
   selectedKeys: new Set(),
   allKeys: [],
   dynamicKeys: [],
+  carteraIndex: new Map(),
+  carteraIndexLoaded: false,
   editingId: null,
   search: "",
   showArchivedOnly: false,
@@ -634,6 +636,206 @@ function autoResolveKnownPeople(payload) {
   }
 
   return payload;
+}
+
+function normalizeSchoolForCartera(value = "") {
+  return normalizeSearch(value).replace(/\s+/g, " ").trim();
+}
+
+function buildCarteraVendorName(data = {}) {
+  return normalizeText(`${data.nombreVendedor || ""} ${data.apellidoVendedor || ""}`.trim());
+}
+
+async function loadSchoolCarteraIndex(force = false) {
+  if (!force && state.carteraIndexLoaded) {
+    return state.carteraIndex;
+  }
+
+  const index = new Map();
+
+  const sellersSnap = await getDocs(collection(db, "ventas_cartera"));
+
+  for (const sellerDoc of sellersSnap.docs) {
+    const sellerEmail = normalizeEmail(sellerDoc.id);
+    const itemsSnap = await getDocs(collection(db, "ventas_cartera", sellerEmail, "items"));
+
+    itemsSnap.docs.forEach((itemDoc) => {
+      const data = itemDoc.data() || {};
+
+      const normalizedSchool = normalizeSchoolForCartera(
+        data.colegioNormalizado || data.colegio || itemDoc.id
+      );
+      if (!normalizedSchool) return;
+
+      const entry = {
+        colegio: normalizeText(data.colegio || ""),
+        vendedora: buildCarteraVendorName(data),
+        vendedoraCorreo: normalizeEmail(data.correoVendedor || sellerEmail),
+        matches: 1
+      };
+
+      if (!index.has(normalizedSchool)) {
+        index.set(normalizedSchool, entry);
+        return;
+      }
+
+      // Si el mismo colegio aparece en más de una cartera, marcamos múltiple.
+      const existing = index.get(normalizedSchool);
+      existing.matches += 1;
+
+      if (!existing.vendedora && entry.vendedora) {
+        existing.vendedora = entry.vendedora;
+      }
+
+      if (!existing.vendedoraCorreo && entry.vendedoraCorreo) {
+        existing.vendedoraCorreo = entry.vendedoraCorreo;
+      }
+
+      index.set(normalizedSchool, existing);
+    });
+  }
+
+  state.carteraIndex = index;
+  state.carteraIndexLoaded = true;
+
+  return state.carteraIndex;
+}
+
+function applyCarteraInfoToPayload(payload, carteraIndex, baseData = {}) {
+  const merged = {
+    ...(baseData || {}),
+    ...(payload || {})
+  };
+
+  const colegio = normalizeText(merged.colegio || "");
+  if (!colegio) {
+    return autoResolveKnownPeople(payload);
+  }
+
+  const key = normalizeSchoolForCartera(colegio);
+  const hit = carteraIndex.get(key);
+
+  if (!hit) {
+    payload.origenColegio = "No cartera";
+    return autoResolveKnownPeople(payload);
+  }
+
+  payload.origenColegio = "Cartera";
+
+  // Solo completamos vendedor/correo si hay una coincidencia única
+  // y el payload todavía no trae esos datos.
+  if (hit.matches === 1) {
+    if (!normalizeText(payload.vendedora) && normalizeText(hit.vendedora)) {
+      payload.vendedora = hit.vendedora;
+    }
+
+    if (!normalizeEmail(payload.vendedoraCorreo) && normalizeEmail(hit.vendedoraCorreo)) {
+      payload.vendedoraCorreo = hit.vendedoraCorreo;
+    }
+  }
+
+  return autoResolveKnownPeople(payload);
+}
+
+async function backfillOrigenColegioDesdeCartera() {
+  if (!isAdminOnly()) return;
+
+  try {
+    setProgressStatus({
+      text: "Completando origen colegio...",
+      meta: "Leyendo cartera y registros existentes...",
+      progress: 10
+    });
+
+    const carteraIndex = await loadSchoolCarteraIndex(true);
+    const pending = [];
+
+    state.rowsRaw.forEach(({ id, data }) => {
+      const currentData = data || {};
+      const colegioActual = normalizeText(currentData.colegio || "");
+      if (!colegioActual) return;
+
+      const patch = {};
+      applyCarteraInfoToPayload(patch, carteraIndex, currentData);
+
+      const origenNuevo = normalizeText(patch.origenColegio || "");
+      const origenActual = normalizeText(currentData.origenColegio || "");
+
+      const vendedoraNueva = normalizeText(patch.vendedora || "");
+      const vendedoraActual = normalizeText(currentData.vendedora || "");
+
+      const correoNuevo = normalizeEmail(patch.vendedoraCorreo || "");
+      const correoActual = normalizeEmail(currentData.vendedoraCorreo || "");
+
+      const changed =
+        origenNuevo !== origenActual ||
+        (!vendedoraActual && vendedoraNueva) ||
+        (!correoActual && correoNuevo);
+
+      if (!changed) return;
+
+      pending.push({
+        id,
+        patch: {
+          origenColegio: patch.origenColegio || "",
+          ...(!vendedoraActual && vendedoraNueva ? { vendedora: patch.vendedora } : {}),
+          ...(!correoActual && correoNuevo ? { vendedoraCorreo: patch.vendedoraCorreo } : {}),
+          actualizadoPor: getNombreUsuario(state.effectiveUser),
+          actualizadoPorCorreo: normalizeEmail(state.realUser?.email || ""),
+          fechaActualizacion: serverTimestamp()
+        }
+      });
+    });
+
+    if (!pending.length) {
+      setProgressStatus({
+        text: "Backfill listo.",
+        meta: "No había registros para actualizar.",
+        progress: 100,
+        type: "success"
+      });
+      clearProgressStatus({}, 2500);
+      return;
+    }
+
+    let processed = 0;
+
+    for (let i = 0; i < pending.length; i += WRITE_BATCH_LIMIT) {
+      const chunk = pending.slice(i, i + WRITE_BATCH_LIMIT);
+      const batch = writeBatch(db);
+
+      chunk.forEach(({ id, patch }) => {
+        batch.set(doc(db, "ventas_cotizaciones", id), patch, { merge: true });
+      });
+
+      await batch.commit();
+      processed += chunk.length;
+
+      setProgressStatus({
+        text: "Completando origen colegio...",
+        meta: `Procesados: ${processed}/${pending.length}`,
+        progress: 20 + Math.round((processed / pending.length) * 80)
+      });
+    }
+
+    setProgressStatus({
+      text: "Backfill listo.",
+      meta: `${pending.length} registro(s) actualizados.`,
+      progress: 100,
+      type: "success"
+    });
+    clearProgressStatus({}, 2500);
+
+    await loadData();
+  } catch (error) {
+    console.error(error);
+    setProgressStatus({
+      text: "Error completando origen colegio.",
+      meta: error.message || "No se pudo ejecutar el backfill.",
+      progress: 100,
+      type: "error"
+    });
+  }
 }
 
 function buildRowKey(row) {
@@ -1135,6 +1337,10 @@ async function saveEditor() {
     setNestedValue(payload, key, parsed);
   });
 
+  const carteraIndex = await loadSchoolCarteraIndex(true);
+  autoResolveKnownPeople(payload);
+  applyCarteraInfoToPayload(payload, carteraIndex, raw.data || {});
+
   payload.actualizadoPor = getNombreUsuario(state.effectiveUser);
   payload.actualizadoPorCorreo = normalizeEmail(state.realUser?.email || "");
   payload.fechaActualizacion = serverTimestamp();
@@ -1273,7 +1479,7 @@ function isRowEmpty(rowObj = {}) {
   return !Object.values(rowObj).some(v => normalizeText(v) !== "");
 }
 
-function rowToFieldPayload(rowObj) {
+function rowToFieldPayload(rowObj, carteraIndex = new Map()) {
   const payload = {};
 
   Object.entries(rowObj).forEach(([rawKey, rawValue]) => {
@@ -1285,7 +1491,10 @@ function rowToFieldPayload(rowObj) {
     setNestedValue(payload, key, value);
   });
 
-  return autoResolveKnownPeople(payload);
+  autoResolveKnownPeople(payload);
+  applyCarteraInfoToPayload(payload, carteraIndex);
+
+  return payload;
 }
 
 function findExistingDocId(payload, codeIndex) {
@@ -1349,12 +1558,15 @@ async function importXlsx(file) {
       if (code) codeIndex.set(code, id);
     });
 
+    // Leemos la cartera fresca en cada import
+    const carteraIndex = await loadSchoolCarteraIndex(true);
+
     let createdCount = 0;
     let updatedCount = 0;
     let processed = 0;
 
     for (const rowObj of rawRows) {
-      const payload = rowToFieldPayload(rowObj);
+      const payload = rowToFieldPayload(rowObj, carteraIndex);
       const existingId = findExistingDocId(payload, codeIndex);
 
       let ref;
@@ -1818,5 +2030,7 @@ async function initPage() {
     await loadData();
   });
 }
+
+window.backfillOrigenColegioDesdeCartera = backfillOrigenColegioDesdeCartera;
 
 initPage();
