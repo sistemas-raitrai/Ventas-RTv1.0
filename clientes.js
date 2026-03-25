@@ -148,12 +148,19 @@ const state = {
   rowsRaw: [],
   rowsFlat: [],
   filteredRows: [],
+  pageRows: [],
   selectedKeys: new Set(),
   allKeys: [],
   dynamicKeys: [],
   editingId: null,
   search: "",
   showArchivedOnly: false,
+  pageSize: 8,
+  currentPage: 1,
+  sort: {
+    key: "idGrupo",
+    dir: "desc"
+  },
   filters: {
     estado: "",
     vendedora: "",
@@ -798,6 +805,7 @@ function applyFilters() {
   }
 
   state.filteredRows = rows;
+  state.currentPage = 1; // cada filtro vuelve a la primera página
   updateArchiveButton();
   renderTable();
 }
@@ -807,6 +815,126 @@ function applyFilters() {
 ========================================================= */
 function getDisplayColumns() {
   return state.allKeys;
+}
+
+function getSortValue(row, key) {
+  const raw = valueToString(row?.[key] ?? "").trim();
+
+  if (!raw) {
+    return { empty: true, num: null, text: "" };
+  }
+
+  if (["idGrupo", "anoViaje", "cantidadGrupo"].includes(key)) {
+    const numericOnly = String(raw).replace(/[^\d.-]/g, "");
+    const num = Number(numericOnly);
+    if (Number.isFinite(num)) {
+      return { empty: false, num, text: raw };
+    }
+  }
+
+  if (/^-?\d+(?:[.,]\d+)?$/.test(raw)) {
+    const num = Number(raw.replace(",", "."));
+    if (Number.isFinite(num)) {
+      return { empty: false, num, text: raw };
+    }
+  }
+
+  return {
+    empty: false,
+    num: null,
+    text: normalizeText(raw).toLocaleLowerCase("es-CL")
+  };
+}
+
+function getSortedRows(rows = []) {
+  const sortKey = state.sort.key || "idGrupo";
+  const dir = state.sort.dir === "asc" ? 1 : -1;
+
+  return [...rows].sort((a, b) => {
+    const av = getSortValue(a, sortKey);
+    const bv = getSortValue(b, sortKey);
+
+    if (av.empty && bv.empty) return 0;
+    if (av.empty) return 1;
+    if (bv.empty) return -1;
+
+    if (av.num !== null && bv.num !== null && av.num !== bv.num) {
+      return (av.num - bv.num) * dir;
+    }
+
+    const cmp = av.text.localeCompare(bv.text, "es", {
+      numeric: true,
+      sensitivity: "base"
+    });
+
+    if (cmp !== 0) {
+      return cmp * dir;
+    }
+
+    // desempate estable por ID Grupo de mayor a menor
+    const aId = Number(String(a.idGrupo || "").replace(/[^\d.-]/g, "")) || 0;
+    const bId = Number(String(b.idGrupo || "").replace(/[^\d.-]/g, "")) || 0;
+    return bId - aId;
+  });
+}
+
+function getPaginationData(rows = []) {
+  const sortedRows = getSortedRows(rows);
+
+  if (state.pageSize === "all") {
+    state.currentPage = 1;
+    return {
+      sortedRows,
+      pageRows: sortedRows,
+      totalPages: sortedRows.length ? 1 : 1
+    };
+  }
+
+  const pageSize = Number(state.pageSize) || 8;
+  const totalPages = Math.max(1, Math.ceil(sortedRows.length / pageSize));
+
+  if (state.currentPage < 1) state.currentPage = 1;
+  if (state.currentPage > totalPages) state.currentPage = totalPages;
+
+  const start = (state.currentPage - 1) * pageSize;
+  const pageRows = sortedRows.slice(start, start + pageSize);
+
+  return {
+    sortedRows,
+    pageRows,
+    totalPages
+  };
+}
+
+function renderPaginationControls(totalFiltered, totalPages) {
+  const pageSizeSelect = $("pageSizeSelect");
+  const btnPrevPage = $("btnPrevPage");
+  const btnNextPage = $("btnNextPage");
+  const pageIndicator = $("pageIndicator");
+
+  if (pageSizeSelect) {
+    pageSizeSelect.value = String(state.pageSize);
+  }
+
+  const showingAll = state.pageSize === "all";
+
+  if (pageIndicator) {
+    if (!totalFiltered) {
+      pageIndicator.textContent = "Página 0 de 0";
+    } else if (showingAll) {
+      pageIndicator.textContent = `Todos (${totalFiltered})`;
+    } else {
+      pageIndicator.textContent = `Página ${state.currentPage} de ${totalPages}`;
+    }
+  }
+
+  if (btnPrevPage) {
+    btnPrevPage.disabled = !totalFiltered || showingAll || state.currentPage <= 1;
+  }
+
+  if (btnNextPage) {
+    btnNextPage.disabled = !totalFiltered || showingAll || state.currentPage >= totalPages;
+  }
 }
 
 function renderTable() {
@@ -820,7 +948,12 @@ function renderTable() {
   const columns = getDisplayColumns();
   const canAdmin = isAdminOnly();
 
-  summary.textContent = `${state.filteredRows.length} registro(s) mostrados · ${state.rowsFlat.length} total`;
+  const { sortedRows, pageRows, totalPages } = getPaginationData(state.filteredRows);
+  state.pageRows = pageRows;
+
+  summary.textContent = `${pageRows.length} registro(s) mostrados · ${sortedRows.length} filtrados · ${state.rowsFlat.length} total`;
+
+  renderPaginationControls(sortedRows.length, totalPages);
 
   thead.innerHTML = `
     <tr>
@@ -829,20 +962,47 @@ function renderTable() {
           <input id="checkAllRows" type="checkbox" />
         </th>
       ` : ""}
-      ${columns.map(key => `<th>${escapeHtml(prettifyFieldKey(key))}</th>`).join("")}
+      ${columns.map((key) => {
+        const isActive = state.sort.key === key;
+        const arrow = isActive
+          ? (state.sort.dir === "asc" ? "↑" : "↓")
+          : "↕";
+
+        return `
+          <th>
+            <button
+              class="th-sort ${isActive ? "active" : ""}"
+              type="button"
+              data-action="sort"
+              data-key="${escapeHtml(key)}"
+            >
+              <span>${escapeHtml(prettifyFieldKey(key))}</span>
+              <span class="sort-arrow" aria-hidden="true">${arrow}</span>
+            </button>
+          </th>
+        `;
+      }).join("")}
       <th class="actions-col">ACCIONES</th>
     </tr>
   `;
 
-  if (!state.filteredRows.length) {
+  if (!sortedRows.length) {
+    state.pageRows = [];
     tbody.innerHTML = "";
     empty.classList.remove("hidden");
+    renderPaginationControls(0, 1);
+
+    const btnDelete = $("btnEliminarSeleccionados");
+    if (btnDelete) {
+      btnDelete.disabled = state.selectedKeys.size === 0;
+    }
+
     return;
   }
 
   empty.classList.add("hidden");
 
-  tbody.innerHTML = state.filteredRows.map((row) => {
+  tbody.innerHTML = pageRows.map((row) => {
     const rowKey = buildRowKey(row);
     const checked = state.selectedKeys.has(rowKey) ? "checked" : "";
 
@@ -885,7 +1045,7 @@ function renderTable() {
   }
 
   if (canAdmin) {
-    const visibleKeys = state.filteredRows.map(buildRowKey);
+    const visibleKeys = pageRows.map(buildRowKey);
     const selectedVisible = visibleKeys.filter(k => state.selectedKeys.has(k)).length;
     const master = $("checkAllRows");
 
@@ -1357,7 +1517,6 @@ function downloadTemplateXlsx() {
    EVENTOS
 ========================================================= */
 function bindPageEvents() {
-
   const searchInput = $("searchInput");
   const filterEstado = $("filterEstado");
   const filterVendedora = $("filterVendedora");
@@ -1369,6 +1528,9 @@ function bindPageEvents() {
   const btnPlantilla = $("btnPlantilla");
   const btnVerAnteriores = $("btnVerAnteriores");
   const btnExportar = $("btnExportar");
+  const pageSizeSelect = $("pageSizeSelect");
+  const btnPrevPage = $("btnPrevPage");
+  const btnNextPage = $("btnNextPage");
   const tbody = $("tbodyClientes");
   const thead = $("theadClientes");
   const editorCloseBtn = $("editorCloseBtn");
@@ -1455,28 +1617,86 @@ function bindPageEvents() {
     btnExportar.addEventListener("click", exportXlsx);
   }
 
+  if (pageSizeSelect && !pageSizeSelect.dataset.bound) {
+    pageSizeSelect.dataset.bound = "1";
+    pageSizeSelect.addEventListener("change", (e) => {
+      const value = e.target.value || "8";
+      state.pageSize = value === "all" ? "all" : (Number(value) || 8);
+      state.currentPage = 1;
+      renderTable();
+    });
+  }
+
+  if (btnPrevPage && !btnPrevPage.dataset.bound) {
+    btnPrevPage.dataset.bound = "1";
+    btnPrevPage.addEventListener("click", () => {
+      if (state.pageSize === "all") return;
+      if (state.currentPage <= 1) return;
+      state.currentPage -= 1;
+      renderTable();
+    });
+  }
+
+  if (btnNextPage && !btnNextPage.dataset.bound) {
+    btnNextPage.dataset.bound = "1";
+    btnNextPage.addEventListener("click", () => {
+      if (state.pageSize === "all") return;
+
+      const pageSize = Number(state.pageSize) || 8;
+      const totalPages = Math.max(1, Math.ceil(state.filteredRows.length / pageSize));
+
+      if (state.currentPage >= totalPages) return;
+      state.currentPage += 1;
+      renderTable();
+    });
+  }
+
   if (thead && !thead.dataset.bound) {
     thead.dataset.bound = "1";
+
+    thead.addEventListener("click", (e) => {
+      const target = e.target instanceof Element ? e.target : null;
+      if (!target) return;
+
+      const sortBtn = target.closest('button[data-action="sort"]');
+      if (!sortBtn) return;
+
+      const key = sortBtn.dataset.key || "";
+      if (!key) return;
+
+      if (state.sort.key === key) {
+        state.sort.dir = state.sort.dir === "asc" ? "desc" : "asc";
+      } else {
+        state.sort.key = key;
+        state.sort.dir = key === "idGrupo" ? "desc" : "asc";
+      }
+
+      state.currentPage = 1;
+      renderTable();
+    });
+
     thead.addEventListener("change", (e) => {
       if (!isAdminOnly()) return;
-  
+
       const target = e.target;
       if (!(target instanceof HTMLInputElement)) return;
       if (target.id !== "checkAllRows") return;
-  
+
       const checked = !!target.checked;
-      state.filteredRows.forEach((row) => {
+
+      state.pageRows.forEach((row) => {
         const key = buildRowKey(row);
         if (checked) state.selectedKeys.add(key);
         else state.selectedKeys.delete(key);
       });
-  
+
       renderTable();
     });
   }
 
   if (tbody && !tbody.dataset.bound) {
     tbody.dataset.bound = "1";
+
     tbody.addEventListener("click", async (e) => {
       const checkbox = e.target.closest('input[data-action="toggle-row"]');
       if (checkbox) return;
@@ -1504,14 +1724,14 @@ function bindPageEvents() {
 
     tbody.addEventListener("change", (e) => {
       if (!isAdminOnly()) return;
-    
+
       const input = e.target.closest('input[data-action="toggle-row"]');
       if (!input) return;
-    
+
       const key = input.dataset.key || "";
       if (input.checked) state.selectedKeys.add(key);
       else state.selectedKeys.delete(key);
-    
+
       renderTable();
     });
   }
