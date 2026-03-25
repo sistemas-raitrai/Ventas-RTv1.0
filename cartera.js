@@ -65,6 +65,7 @@ const state = {
   effectiveUser: null,
   rows: [],
   filteredRows: [],
+  pageRows: [],
   vendorFilter: "",
   search: "",
   modalMode: "create",
@@ -73,7 +74,13 @@ const state = {
   selectedKeys: new Set(),
   pendingLogoFile: null,
   removeCurrentLogo: false,
-  logoPreviewObjectUrl: ""
+  logoPreviewObjectUrl: "",
+  pageSize: 8,
+  currentPage: 1,
+  sort: {
+    key: "numeroColegio",
+    dir: "asc"
+  }
 };
 
 /* =========================================================
@@ -411,6 +418,173 @@ function getSearchTarget(row) {
   ].join(" "));
 }
 
+const SORTABLE_COLUMNS = [
+  "numeroColegio",
+  "vendedor",
+  "colegio",
+  "comuna",
+  "estatus",
+  "observaciones"
+];
+
+const COLUMN_LABELS = {
+  numeroColegio: "N° Colegio",
+  vendedor: "Vendedor(a)",
+  colegio: "Colegio",
+  comuna: "Comuna",
+  estatus: "Estatus",
+  observaciones: "Observaciones"
+};
+
+function getColumnLabel(key = "") {
+  return COLUMN_LABELS[key] || key;
+}
+
+function getCellValue(row, key) {
+  if (key === "vendedor") {
+    return normalizeText(`${row.nombreVendedor || ""} ${row.apellidoVendedor || ""}`.trim());
+  }
+  return normalizeText(row?.[key] ?? "");
+}
+
+function getSortValue(row, key) {
+  const raw = getCellValue(row, key).trim();
+
+  if (!raw) {
+    return { empty: true, num: null, text: "" };
+  }
+
+  if (key === "numeroColegio") {
+    const onlyNum = String(raw).replace(/[^\d.-]/g, "");
+    const num = Number(onlyNum);
+    if (Number.isFinite(num)) {
+      return { empty: false, num, text: raw };
+    }
+  }
+
+  if (/^-?\d+(?:[.,]\d+)?$/.test(raw)) {
+    const num = Number(raw.replace(",", "."));
+    if (Number.isFinite(num)) {
+      return { empty: false, num, text: raw };
+    }
+  }
+
+  return {
+    empty: false,
+    num: null,
+    text: normalizeText(raw).toLocaleLowerCase("es-CL")
+  };
+}
+
+function getSortedRows(rows = []) {
+  const sortKey = state.sort.key || "numeroColegio";
+  const dir = state.sort.dir === "desc" ? -1 : 1;
+
+  return [...rows].sort((a, b) => {
+    const av = getSortValue(a, sortKey);
+    const bv = getSortValue(b, sortKey);
+
+    if (av.empty && bv.empty) return 0;
+    if (av.empty) return 1;
+    if (bv.empty) return -1;
+
+    if (av.num !== null && bv.num !== null && av.num !== bv.num) {
+      return (av.num - bv.num) * dir;
+    }
+
+    const cmp = av.text.localeCompare(bv.text, "es", {
+      numeric: true,
+      sensitivity: "base"
+    });
+
+    if (cmp !== 0) return cmp * dir;
+
+    return String(a.numeroColegio || "").localeCompare(
+      String(b.numeroColegio || ""),
+      "es",
+      { numeric: true, sensitivity: "base" }
+    );
+  });
+}
+
+function getPaginationData(rows = []) {
+  const sortedRows = getSortedRows(rows);
+
+  if (state.pageSize === "all") {
+    state.currentPage = 1;
+    return {
+      sortedRows,
+      pageRows: sortedRows,
+      totalPages: sortedRows.length ? 1 : 1
+    };
+  }
+
+  const pageSize = Number(state.pageSize) || 8;
+  const totalPages = Math.max(1, Math.ceil(sortedRows.length / pageSize));
+
+  if (state.currentPage < 1) state.currentPage = 1;
+  if (state.currentPage > totalPages) state.currentPage = totalPages;
+
+  const start = (state.currentPage - 1) * pageSize;
+  const pageRows = sortedRows.slice(start, start + pageSize);
+
+  return {
+    sortedRows,
+    pageRows,
+    totalPages
+  };
+}
+
+function renderPaginationControls(totalFiltered, totalPages) {
+  const pageSizeSelect = $("pageSizeSelect");
+  const btnPrevPage = $("btnPrevPage");
+  const btnNextPage = $("btnNextPage");
+  const pageIndicator = $("pageIndicator");
+
+  if (pageSizeSelect) {
+    pageSizeSelect.value = String(state.pageSize);
+  }
+
+  const showingAll = state.pageSize === "all";
+
+  if (pageIndicator) {
+    if (!totalFiltered) {
+      pageIndicator.textContent = "Página 0 de 0";
+    } else if (showingAll) {
+      pageIndicator.textContent = `Todos (${totalFiltered})`;
+    } else {
+      pageIndicator.textContent = `Página ${state.currentPage} de ${totalPages}`;
+    }
+  }
+
+  if (btnPrevPage) {
+    btnPrevPage.disabled = !totalFiltered || showingAll || state.currentPage <= 1;
+  }
+
+  if (btnNextPage) {
+    btnNextPage.disabled = !totalFiltered || showingAll || state.currentPage >= totalPages;
+  }
+}
+
+function renderSortButton(key) {
+  const isActive = state.sort.key === key;
+  const arrow = isActive
+    ? (state.sort.dir === "asc" ? "↑" : "↓")
+    : "↕";
+
+  return `
+    <button
+      class="th-sort ${isActive ? "active" : ""}"
+      type="button"
+      data-action="sort"
+      data-key="${escapeHtml(key)}"
+    >
+      <span>${escapeHtml(getColumnLabel(key))}</span>
+      <span class="sort-arrow" aria-hidden="true">${arrow}</span>
+    </button>
+  `;
+}
+
 function applyFilters() {
   let rows = [...state.rows];
 
@@ -423,42 +597,63 @@ function applyFilters() {
     rows = rows.filter(r => getSearchTarget(r).includes(q));
   }
 
-  rows.sort((a, b) => {
-    const aNum = String(a.numeroColegio || "");
-    const bNum = String(b.numeroColegio || "");
-    return aNum.localeCompare(bNum, "es", { numeric: true }) || a.colegio.localeCompare(b.colegio, "es");
-  });
-
   state.filteredRows = rows;
+  state.currentPage = 1;
   renderTable();
   renderHeaderState();
 }
 
 function renderTable() {
+  const thead = document.querySelector(".cartera-table thead");
   const tbody = $("tbodyCartera");
   const empty = $("emptyState");
   const summary = $("tableSummary");
-  const checkAll = $("checkAllRows");
 
-  if (!tbody || !empty || !summary) return;
+  if (!thead || !tbody || !empty || !summary) return;
 
   const allowManage = canManageVentasRole(state.effectiveUser);
-  summary.textContent = `${state.filteredRows.length} registro(s) mostrados · ${state.rows.length} total`;
+  const { sortedRows, pageRows, totalPages } = getPaginationData(state.filteredRows);
+  state.pageRows = pageRows;
 
-  if (!state.filteredRows.length) {
+  summary.textContent = `${pageRows.length} registro(s) mostrados · ${sortedRows.length} filtrados · ${state.rows.length} total`;
+
+  thead.innerHTML = `
+    <tr>
+      ${allowManage ? `
+        <th class="check-col check-head">
+          <input id="checkAllRows" type="checkbox" />
+        </th>
+      ` : ""}
+      <th>${renderSortButton("numeroColegio")}</th>
+      <th>${renderSortButton("vendedor")}</th>
+      <th class="logo-col logo-head">Logo</th>
+      <th>${renderSortButton("colegio")}</th>
+      <th>${renderSortButton("comuna")}</th>
+      <th>${renderSortButton("estatus")}</th>
+      <th>${renderSortButton("observaciones")}</th>
+      <th class="actions-col actions-head">Acciones</th>
+    </tr>
+  `;
+
+  renderPaginationControls(sortedRows.length, totalPages);
+
+  if (!sortedRows.length) {
     tbody.innerHTML = "";
     empty.classList.remove("hidden");
+
+    const checkAll = $("checkAllRows");
     if (checkAll) {
       checkAll.checked = false;
       checkAll.indeterminate = false;
     }
+
     renderRoleButtons();
     return;
   }
 
   empty.classList.add("hidden");
 
-  tbody.innerHTML = state.filteredRows.map((row) => {
+  tbody.innerHTML = pageRows.map((row) => {
     const sellerName = `${row.nombreVendedor} ${row.apellidoVendedor}`.trim();
     const rowKey = `${normalizeEmail(row.correoVendedor)}__${String(row.numeroColegio)}`;
     const checked = state.selectedKeys.has(rowKey) ? "checked" : "";
@@ -482,15 +677,17 @@ function renderTable() {
 
     return `
       <tr>
-        <td class="check-col">
-          <input
-            class="row-check"
-            type="checkbox"
-            data-action="toggle-row"
-            data-key="${escapeHtml(rowKey)}"
-            ${checked}
-          />
-        </td>
+        ${allowManage ? `
+          <td class="check-col">
+            <input
+              class="row-check"
+              type="checkbox"
+              data-action="toggle-row"
+              data-key="${escapeHtml(rowKey)}"
+              ${checked}
+            />
+          </td>
+        ` : ""}
         <td>${escapeHtml(row.numeroColegio)}</td>
         <td>${escapeHtml(sellerName)}</td>
         <td class="logo-col">${logoHtml}</td>
@@ -503,8 +700,9 @@ function renderTable() {
     `;
   }).join("");
 
+  const checkAll = $("checkAllRows");
   if (checkAll) {
-    const visibleKeys = state.filteredRows.map(
+    const visibleKeys = pageRows.map(
       row => `${normalizeEmail(row.correoVendedor)}__${String(row.numeroColegio)}`
     );
     const selectedVisible = visibleKeys.filter(key => state.selectedKeys.has(key)).length;
@@ -1257,7 +1455,7 @@ async function exportXlsx() {
       progress: 15
     });
 
-    const exportRows = state.filteredRows.map((row) => ({
+    const exportRows = getSortedRows(state.filteredRows).map((row) => ({
       "NRO": row.numeroColegio,
       "VENDEDOR": `${row.nombreVendedor} ${row.apellidoVendedor}`.trim(),
       "COLEGIO": row.colegio,
@@ -1309,7 +1507,6 @@ async function exportXlsx() {
    EVENTOS
 ========================================================= */
 function bindPageEvents() {
-
   const searchInput = $("searchInput");
   const vendorFilter = $("vendorFilter");
   const btnRecargar = $("btnRecargar");
@@ -1323,9 +1520,12 @@ function bindPageEvents() {
   const quitarLogoCheck = $("quitarLogoCheck");
   const fileInputXlsx = $("fileInputXlsx");
   const btnExportar = $("btnExportar");
+  const pageSizeSelect = $("pageSizeSelect");
+  const btnPrevPage = $("btnPrevPage");
+  const btnNextPage = $("btnNextPage");
+  const thead = document.querySelector(".cartera-table thead");
   const tbody = $("tbodyCartera");
   const modalBackdrop = $("modalForm");
-  const checkAllRows = $("checkAllRows");
 
   if (searchInput && !searchInput.dataset.bound) {
     searchInput.dataset.bound = "1";
@@ -1358,7 +1558,7 @@ function bindPageEvents() {
     });
   }
 
-    if (btnEliminarSeleccionados && !btnEliminarSeleccionados.dataset.bound) {
+  if (btnEliminarSeleccionados && !btnEliminarSeleccionados.dataset.bound) {
     btnEliminarSeleccionados.dataset.bound = "1";
     btnEliminarSeleccionados.addEventListener("click", deleteSelectedRows);
   }
@@ -1432,6 +1632,84 @@ function bindPageEvents() {
     btnExportar.addEventListener("click", exportXlsx);
   }
 
+  if (pageSizeSelect && !pageSizeSelect.dataset.bound) {
+    pageSizeSelect.dataset.bound = "1";
+    pageSizeSelect.addEventListener("change", (e) => {
+      const value = e.target.value || "8";
+      state.pageSize = value === "all" ? "all" : (Number(value) || 8);
+      state.currentPage = 1;
+      renderTable();
+    });
+  }
+
+  if (btnPrevPage && !btnPrevPage.dataset.bound) {
+    btnPrevPage.dataset.bound = "1";
+    btnPrevPage.addEventListener("click", () => {
+      if (state.pageSize === "all") return;
+      if (state.currentPage <= 1) return;
+      state.currentPage -= 1;
+      renderTable();
+    });
+  }
+
+  if (btnNextPage && !btnNextPage.dataset.bound) {
+    btnNextPage.dataset.bound = "1";
+    btnNextPage.addEventListener("click", () => {
+      if (state.pageSize === "all") return;
+
+      const pageSize = Number(state.pageSize) || 8;
+      const totalPages = Math.max(1, Math.ceil(state.filteredRows.length / pageSize));
+
+      if (state.currentPage >= totalPages) return;
+      state.currentPage += 1;
+      renderTable();
+    });
+  }
+
+  if (thead && !thead.dataset.bound) {
+    thead.dataset.bound = "1";
+
+    thead.addEventListener("click", (e) => {
+      const target = e.target instanceof Element ? e.target : null;
+      if (!target) return;
+
+      const sortBtn = target.closest('button[data-action="sort"]');
+      if (!sortBtn) return;
+
+      const key = sortBtn.dataset.key || "";
+      if (!key) return;
+
+      if (state.sort.key === key) {
+        state.sort.dir = state.sort.dir === "asc" ? "desc" : "asc";
+      } else {
+        state.sort.key = key;
+        state.sort.dir = "asc";
+      }
+
+      state.currentPage = 1;
+      renderTable();
+    });
+
+    thead.addEventListener("change", (e) => {
+      const target = e.target;
+      if (!(target instanceof HTMLInputElement)) return;
+      if (target.id !== "checkAllRows") return;
+
+      const checked = !!target.checked;
+
+      state.pageRows.forEach((row) => {
+        const rowKey = `${normalizeEmail(row.correoVendedor)}__${String(row.numeroColegio)}`;
+        if (checked) {
+          state.selectedKeys.add(rowKey);
+        } else {
+          state.selectedKeys.delete(rowKey);
+        }
+      });
+
+      renderTable();
+    });
+  }
+
   if (tbody && !tbody.dataset.bound) {
     tbody.dataset.bound = "1";
     tbody.addEventListener("click", async (e) => {
@@ -1446,41 +1724,23 @@ function bindPageEvents() {
         renderTable();
         return;
       }
-  
+
       const btn = e.target.closest("button[data-action]");
       if (!btn) return;
-  
+
       const action = btn.dataset.action;
       const numeroColegio = btn.dataset.id || "";
       const correoVendedor = normalizeEmail(btn.dataset.email || "");
-  
+
       const row = state.rows.find(r =>
         String(r.numeroColegio) === String(numeroColegio) &&
         normalizeEmail(r.correoVendedor) === correoVendedor
       );
-  
+
       if (!row) return;
-  
+
       if (action === "edit") openEditModal(row);
       if (action === "delete") await deleteRow(numeroColegio, correoVendedor);
-    });
-  }
-
-  if (checkAllRows && !checkAllRows.dataset.bound) {
-    checkAllRows.dataset.bound = "1";
-    checkAllRows.addEventListener("change", (e) => {
-      const checked = !!e.target.checked;
-  
-      state.filteredRows.forEach((row) => {
-        const rowKey = `${normalizeEmail(row.correoVendedor)}__${String(row.numeroColegio)}`;
-        if (checked) {
-          state.selectedKeys.add(rowKey);
-        } else {
-          state.selectedKeys.delete(rowKey);
-        }
-      });
-  
-      renderTable();
     });
   }
 
