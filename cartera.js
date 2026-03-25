@@ -10,6 +10,14 @@ import {
   serverTimestamp
 } from "https://www.gstatic.com/firebasejs/11.7.3/firebase-firestore.js";
 
+import {
+  getStorage,
+  ref as storageRef,
+  uploadBytes,
+  getDownloadURL,
+  deleteObject
+} from "https://www.gstatic.com/firebasejs/11.7.3/firebase-storage.js";
+
 import { auth, db, VENTAS_USERS } from "./firebase-init.js";
 
 import {
@@ -47,6 +55,7 @@ import {
 ========================================================= */
 const GITHUB_HOME_URL = "https://sistemas-raitrai.github.io/Ventas-RT/";
 const WRITE_BATCH_LIMIT = 400;
+const storage = getStorage();
 
 /* =========================================================
    ESTADO
@@ -61,7 +70,10 @@ const state = {
   modalMode: "create",
   editingOriginal: null,
   vendors: [],
-  selectedKeys: new Set()
+  selectedKeys: new Set(),
+  pendingLogoFile: null,
+  removeCurrentLogo: false,
+  logoPreviewObjectUrl: ""
 };
 
 /* =========================================================
@@ -135,7 +147,9 @@ function mapDocToRow(docId, data) {
     comuna: normalizeText(data.comuna),
     ciudad: normalizeText(data.ciudad),
     estatus: normalizeText(data.estatus),
-    observaciones: normalizeText(data.observaciones)
+    observaciones: normalizeText(data.observaciones),
+    logoUrl: String(data.logoUrl || "").trim(),
+    logoPath: String(data.logoPath || "").trim()
   };
 }
 
@@ -159,6 +173,14 @@ function buildItemPayload(input, existing = null) {
         ? input.observaciones
         : existing?.observaciones || ""
     ),
+    logoUrl:
+      input.logoUrl !== undefined && input.logoUrl !== null
+        ? String(input.logoUrl).trim()
+        : String(existing?.logoUrl || "").trim(),
+    logoPath:
+      input.logoPath !== undefined && input.logoPath !== null
+        ? String(input.logoPath).trim()
+        : String(existing?.logoPath || "").trim(),
     actualizadoPor: normalizeEmail(state.realUser?.email || ""),
     fechaActualizacion: serverTimestamp()
   };
@@ -172,6 +194,111 @@ function buildParentVendorPayload(vendor) {
     actualizadoPor: normalizeEmail(state.realUser?.email || ""),
     fechaActualizacion: serverTimestamp()
   };
+}
+
+function slugStoragePart(value = "") {
+  return String(value || "")
+    .trim()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-zA-Z0-9._-]+/g, "_")
+    .replace(/^_+|_+$/g, "") || "sin_valor";
+}
+
+function revokeLogoPreviewObjectUrl() {
+  if (state.logoPreviewObjectUrl) {
+    try {
+      URL.revokeObjectURL(state.logoPreviewObjectUrl);
+    } catch {}
+    state.logoPreviewObjectUrl = "";
+  }
+}
+
+function setLogoPreview(url = "") {
+  const img = $("logoPreviewImg");
+  const empty = $("logoPreviewEmpty");
+
+  if (!img || !empty) return;
+
+  if (url) {
+    img.src = url;
+    img.classList.remove("hidden");
+    empty.classList.add("hidden");
+  } else {
+    img.removeAttribute("src");
+    img.classList.add("hidden");
+    empty.classList.remove("hidden");
+  }
+}
+
+function refreshLogoPreview() {
+  const removeWrap = $("quitarLogoWrap");
+  const hasExistingLogo = !!state.editingOriginal?.logoUrl;
+
+  if (removeWrap) {
+    removeWrap.classList.toggle("hidden", !hasExistingLogo);
+  }
+
+  revokeLogoPreviewObjectUrl();
+
+  if (state.pendingLogoFile) {
+    state.logoPreviewObjectUrl = URL.createObjectURL(state.pendingLogoFile);
+    setLogoPreview(state.logoPreviewObjectUrl);
+    return;
+  }
+
+  if (hasExistingLogo && !state.removeCurrentLogo) {
+    setLogoPreview(state.editingOriginal.logoUrl);
+    return;
+  }
+
+  setLogoPreview("");
+}
+
+function resetLogoModalState() {
+  state.pendingLogoFile = null;
+  state.removeCurrentLogo = false;
+
+  if ($("logoInput")) $("logoInput").value = "";
+  if ($("quitarLogoCheck")) $("quitarLogoCheck").checked = false;
+
+  refreshLogoPreview();
+}
+
+async function uploadSchoolLogo(file, input) {
+  const ext =
+    (file?.name || "").includes(".")
+      ? file.name.split(".").pop().toLowerCase().replace(/[^a-z0-9]/g, "")
+      : "bin";
+
+  const sellerPart = slugStoragePart(input.correoVendedor);
+  const schoolPart = slugStoragePart(input.numeroColegio);
+  const path = `ventas_cartera_logos/${sellerPart}/${schoolPart}_${Date.now()}.${ext || "bin"}`;
+
+  const fileRef = storageRef(storage, path);
+
+  await uploadBytes(fileRef, file, {
+    contentType: file.type || "application/octet-stream"
+  });
+
+  const url = await getDownloadURL(fileRef);
+
+  return {
+    logoPath: path,
+    logoUrl: url
+  };
+}
+
+async function deleteLogoFromStorage(path = "") {
+  if (!path) return;
+
+  try {
+    await deleteObject(storageRef(storage, path));
+  } catch (error) {
+    if (error?.code !== "storage/object-not-found") {
+      console.warn("No se pudo eliminar logo antiguo:", error);
+    }
+  }
 }
 
 /* =========================================================
@@ -349,6 +476,10 @@ function renderTable() {
         </div>
       `;
 
+    const logoHtml = row.logoUrl
+      ? `<img class="school-logo-thumb" src="${escapeHtml(row.logoUrl)}" alt="Logo ${escapeHtml(row.colegio || row.numeroColegio)}" loading="lazy" />`
+      : `<div class="school-logo-empty">—</div>`;
+
     return `
       <tr>
         <td class="check-col">
@@ -362,6 +493,7 @@ function renderTable() {
         </td>
         <td>${escapeHtml(row.numeroColegio)}</td>
         <td>${escapeHtml(sellerName)}</td>
+        <td class="logo-col">${logoHtml}</td>
         <td>${escapeHtml(row.colegio)}</td>
         <td>${escapeHtml(row.comuna)}</td>
         <td>${escapeHtml(row.estatus)}</td>
@@ -529,6 +661,7 @@ function openCreateModal() {
   $("observacionesInput").value = "";
 
   fillVendorSelectModal("");
+  resetLogoModalState();
   $("modalForm").classList.add("show");
 }
 
@@ -545,10 +678,15 @@ function openEditModal(row) {
   $("observacionesInput").value = row.observaciones || "";
 
   fillVendorSelectModal(row.correoVendedor || "");
+  resetLogoModalState();
+  refreshLogoPreview();
   $("modalForm").classList.add("show");
 }
 
 function closeModal() {
+  revokeLogoPreviewObjectUrl();
+  state.pendingLogoFile = null;
+  state.removeCurrentLogo = false;
   $("modalForm").classList.remove("show");
 }
 
@@ -594,8 +732,10 @@ async function saveModal() {
     setProgressStatus({
       text: "Guardando registro...",
       meta: state.modalMode === "create" ? "Creando colegio..." : "Actualizando colegio...",
-      progress: 35
+      progress: 20
     });
+
+    let oldLogoPathToDelete = "";
 
     if (state.modalMode === "create") {
       const exists = await getDoc(newItemRef);
@@ -604,9 +744,21 @@ async function saveModal() {
         return;
       }
 
+      let logoData = { logoUrl: "", logoPath: "" };
+
+      if (state.pendingLogoFile) {
+        setProgressStatus({
+          text: "Guardando registro...",
+          meta: "Subiendo logo...",
+          progress: 45
+        });
+
+        logoData = await uploadSchoolLogo(state.pendingLogoFile, input);
+      }
+
       await setDoc(newParentRef, buildParentVendorPayload(input), { merge: true });
       await setDoc(newItemRef, {
-        ...buildItemPayload(input),
+        ...buildItemPayload({ ...input, ...logoData }),
         creadoPor: normalizeEmail(state.realUser?.email || ""),
         fechaCreacion: serverTimestamp()
       }, { merge: true });
@@ -629,10 +781,36 @@ async function saveModal() {
         const existingSnap = await getDoc(newItemRef);
         const existingData = existingSnap.exists() ? existingSnap.data() : null;
 
+        let logoUrl = String(existingData?.logoUrl || "").trim();
+        let logoPath = String(existingData?.logoPath || "").trim();
+
+        if (state.removeCurrentLogo) {
+          oldLogoPathToDelete = logoPath || "";
+          logoUrl = "";
+          logoPath = "";
+        }
+
+        if (state.pendingLogoFile) {
+          setProgressStatus({
+            text: "Guardando registro...",
+            meta: "Subiendo nuevo logo...",
+            progress: 50
+          });
+
+          const uploadedLogo = await uploadSchoolLogo(state.pendingLogoFile, input);
+          oldLogoPathToDelete = logoPath || "";
+          logoUrl = uploadedLogo.logoUrl;
+          logoPath = uploadedLogo.logoPath;
+        }
+
         await setDoc(newParentRef, buildParentVendorPayload(input), { merge: true });
         await setDoc(newItemRef, {
-          ...buildItemPayload(input, existingData)
+          ...buildItemPayload({ ...input, logoUrl, logoPath }, existingData)
         }, { merge: true });
+
+        if (oldLogoPathToDelete && oldLogoPathToDelete !== logoPath) {
+          await deleteLogoFromStorage(oldLogoPathToDelete);
+        }
       } else {
         const targetExists = await getDoc(newItemRef);
         if (targetExists.exists()) {
@@ -643,15 +821,41 @@ async function saveModal() {
         const oldSnap = await getDoc(oldItemRef);
         const oldData = oldSnap.exists() ? oldSnap.data() : null;
 
+        let logoUrl = String(oldData?.logoUrl || "").trim();
+        let logoPath = String(oldData?.logoPath || "").trim();
+
+        if (state.removeCurrentLogo) {
+          oldLogoPathToDelete = logoPath || "";
+          logoUrl = "";
+          logoPath = "";
+        }
+
+        if (state.pendingLogoFile) {
+          setProgressStatus({
+            text: "Guardando registro...",
+            meta: "Subiendo nuevo logo...",
+            progress: 50
+          });
+
+          const uploadedLogo = await uploadSchoolLogo(state.pendingLogoFile, input);
+          oldLogoPathToDelete = logoPath || "";
+          logoUrl = uploadedLogo.logoUrl;
+          logoPath = uploadedLogo.logoPath;
+        }
+
         const batch = writeBatch(db);
         batch.set(newParentRef, buildParentVendorPayload(input), { merge: true });
         batch.set(newItemRef, {
-          ...buildItemPayload(input, oldData),
-          creadoPor: normalizeEmail(state.realUser?.email || ""),
-          fechaCreacion: serverTimestamp()
+          ...buildItemPayload({ ...input, logoUrl, logoPath }, oldData),
+          creadoPor: oldData?.creadoPor || normalizeEmail(state.realUser?.email || ""),
+          fechaCreacion: oldData?.fechaCreacion || serverTimestamp()
         }, { merge: true });
         batch.delete(oldItemRef);
         await batch.commit();
+
+        if (oldLogoPathToDelete && oldLogoPathToDelete !== logoPath) {
+          await deleteLogoFromStorage(oldLogoPathToDelete);
+        }
       }
 
       setProgressStatus({
@@ -686,10 +890,19 @@ async function deleteRow(numeroColegio, correoVendedor) {
     setProgressStatus({
       text: "Eliminando registro...",
       meta: `${numeroColegio} · ${correoVendedor}`,
-      progress: 40
+      progress: 30
     });
 
-    await deleteDoc(doc(db, "ventas_cartera", normalizeEmail(correoVendedor), "items", String(numeroColegio)));
+    const itemRef = doc(db, "ventas_cartera", normalizeEmail(correoVendedor), "items", String(numeroColegio));
+    const snap = await getDoc(itemRef);
+    const data = snap.exists() ? snap.data() : null;
+    const logoPath = String(data?.logoPath || "").trim();
+
+    await deleteDoc(itemRef);
+
+    if (logoPath) {
+      await deleteLogoFromStorage(logoPath);
+    }
 
     setProgressStatus({
       text: "Registro eliminado.",
@@ -1106,6 +1319,8 @@ function bindPageEvents() {
   const btnCancelarModal = $("btnCancelarModal");
   const modalCloseBtn = $("modalCloseBtn");
   const vendedorSelectModal = $("vendedorSelectModal");
+  const logoInput = $("logoInput");
+  const quitarLogoCheck = $("quitarLogoCheck");
   const fileInputXlsx = $("fileInputXlsx");
   const btnExportar = $("btnExportar");
   const tbody = $("tbodyCartera");
@@ -1166,6 +1381,42 @@ function bindPageEvents() {
   if (vendedorSelectModal && !vendedorSelectModal.dataset.bound) {
     vendedorSelectModal.dataset.bound = "1";
     vendedorSelectModal.addEventListener("change", updateVendorPreview);
+  }
+
+  if (logoInput && !logoInput.dataset.bound) {
+    logoInput.dataset.bound = "1";
+    logoInput.addEventListener("change", (e) => {
+      const file = e.target.files?.[0] || null;
+
+      if (file && !String(file.type || "").startsWith("image/")) {
+        alert("El archivo debe ser una imagen válida.");
+        e.target.value = "";
+        return;
+      }
+
+      state.pendingLogoFile = file;
+
+      if (file) {
+        state.removeCurrentLogo = false;
+        if ($("quitarLogoCheck")) $("quitarLogoCheck").checked = false;
+      }
+
+      refreshLogoPreview();
+    });
+  }
+
+  if (quitarLogoCheck && !quitarLogoCheck.dataset.bound) {
+    quitarLogoCheck.dataset.bound = "1";
+    quitarLogoCheck.addEventListener("change", (e) => {
+      state.removeCurrentLogo = !!e.target.checked;
+
+      if (state.removeCurrentLogo) {
+        state.pendingLogoFile = null;
+        if ($("logoInput")) $("logoInput").value = "";
+      }
+
+      refreshLogoPreview();
+    });
   }
 
   if (fileInputXlsx && !fileInputXlsx.dataset.bound) {
