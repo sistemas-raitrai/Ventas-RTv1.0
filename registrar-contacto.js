@@ -263,6 +263,52 @@ function uniqueStrings(items = []) {
   return [...new Set(items.filter(Boolean))];
 }
 
+function toUppercaseLive(value = "") {
+  return String(value ?? "").toLocaleUpperCase("es-CL");
+}
+
+function forceUppercaseInputValue(el) {
+  if (!el || el.id === "correoCliente") return;
+
+  const next = toUppercaseLive(el.value || "");
+  if (el.value === next) return;
+
+  const start = el.selectionStart;
+  const end = el.selectionEnd;
+
+  el.value = next;
+
+  try {
+    if (typeof start === "number" && typeof end === "number") {
+      el.setSelectionRange(start, end);
+    }
+  } catch {}
+}
+
+function bindUppercaseField(el, onAfter = null) {
+  if (!el || el.dataset.uppercaseBound === "1") return;
+
+  el.dataset.uppercaseBound = "1";
+
+  const handler = () => {
+    forceUppercaseInputValue(el);
+    if (typeof onAfter === "function") onAfter();
+  };
+
+  el.addEventListener("input", handler);
+  el.addEventListener("change", handler);
+}
+
+function uppercaseSelectOptionLabels(selectEl) {
+  if (!selectEl || selectEl.dataset.uppercaseOptions === "1") return;
+
+  selectEl.dataset.uppercaseOptions = "1";
+
+  [...selectEl.options].forEach((opt) => {
+    opt.textContent = toUppercaseLive(opt.textContent || "");
+  });
+}
+
 /* =========================================================
    HEADER / LAYOUT
 ========================================================= */
@@ -798,20 +844,39 @@ function bindPageEvents() {
   const inputCurso = $("inputCurso");
   const anoViaje = $("anoViaje");
   const cantidadGrupo = $("cantidadGrupo");
+  const comunaCiudad = $("comunaCiudad");
+  const nombreCliente = $("nombreCliente");
+  const celularCliente = $("celularCliente");
+  const correoCliente = $("correoCliente");
+  const rolCliente = $("rolCliente");
+  const origenCliente = $("origenCliente");
   const origenEspecificacion = $("origenEspecificacion");
+  const origenEspecificacionOtro = $("origenEspecificacionOtro");
   const destinoPrincipal = $("destinoPrincipal");
+  const destinoPrincipalOtro = $("destinoPrincipalOtro");
+  const destinoSecundarioOtro = $("destinoSecundarioOtro");
   const btnLimpiar = $("btnLimpiar");
   const btnNuevoRegistro = $("btnNuevoRegistro");
   const btnIrRegistro = $("btnIrRegistro");
   const successModal = $("successModal");
   const form = $("registroForm");
 
-  if (inputColegio && !inputColegio.dataset.bound) {
-    inputColegio.dataset.bound = "1";
-    inputColegio.addEventListener("input", updateSchoolModeUI);
-    inputColegio.addEventListener("change", updateSchoolModeUI);
-  }
+  // Visualmente dejamos los selects en mayúscula, pero sin tocar sus values internos
+  uppercaseSelectOptionLabels(rolCliente);
+  uppercaseSelectOptionLabels(origenCliente);
+  uppercaseSelectOptionLabels(origenEspecificacion);
+  uppercaseSelectOptionLabels(destinoPrincipal);
 
+  // Campos de texto que deben ir en mayúscula
+  bindUppercaseField(inputColegio, updateSchoolModeUI);
+  bindUppercaseField(comunaCiudad);
+  bindUppercaseField(nombreCliente);
+  bindUppercaseField(celularCliente);
+  bindUppercaseField(origenEspecificacionOtro);
+  bindUppercaseField(destinoPrincipalOtro);
+  bindUppercaseField(destinoSecundarioOtro);
+
+  // El curso mantiene su lógica especial sin espacios
   if (inputCurso && !inputCurso.dataset.bound) {
     inputCurso.dataset.bound = "1";
     inputCurso.addEventListener("input", () => {
@@ -853,6 +918,17 @@ function bindPageEvents() {
       input.addEventListener("change", updateConditionalFields);
     }
   });
+
+  // El correo NO se fuerza a mayúscula
+  if (correoCliente && !correoCliente.dataset.bound) {
+    correoCliente.dataset.bound = "1";
+    correoCliente.addEventListener("input", () => {
+      correoCliente.value = String(correoCliente.value || "").trim();
+    });
+    correoCliente.addEventListener("change", () => {
+      correoCliente.value = String(correoCliente.value || "").trim();
+    });
+  }
 
   if (btnLimpiar && !btnLimpiar.dataset.bound) {
     btnLimpiar.dataset.bound = "1";
