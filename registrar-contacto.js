@@ -509,6 +509,12 @@ function validateForm(data) {
     return "No se pudo construir el alias del grupo.";
   }
 
+  // Si el colegio no está en cartera, la comuna/ciudad pasa a ser obligatoria
+  // porque no tenemos una referencia automática de ubicación.
+  if (!data.esCartera && !data.comunaCiudad) {
+    return "Debes indicar la comuna o ciudad cuando el colegio no pertenece a cartera.";
+  }
+
   if (!data.nombreCliente) {
     return "Debes indicar el nombre del cliente.";
   }
