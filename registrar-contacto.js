@@ -401,26 +401,32 @@ function updateSchoolModeUI() {
   const vendedoraPreview = $("vendedoraPreview");
   const estadoPreview = $("estadoPreview");
   const comunaCiudad = $("comunaCiudad");
+  const isVendor = state.effectiveUser?.rol === "vendedor";
 
   if (!inputColegio || !vendedoraPreview || !estadoPreview) return;
 
   if (matched) {
     vendedoraPreview.textContent = matched.vendedora || "—";
-    estadoPreview.textContent = "A contactar";
+    estadoPreview.textContent = isVendor ? "Contactado" : "A contactar";
 
     if (comunaCiudad && !normalizeText(comunaCiudad.value)) {
       comunaCiudad.value = matched.comuna || "";
     }
   } else {
     if (normalizeText(inputColegio.value)) {
-      vendedoraPreview.textContent = "Sin asignar";
-      estadoPreview.textContent = "Sin asignar";
+      if (isVendor) {
+        vendedoraPreview.textContent = "No permitido";
+        estadoPreview.textContent = "No permitido";
+      } else {
+        vendedoraPreview.textContent = "Sin asignar";
+        estadoPreview.textContent = "A contactar";
+      }
     } else {
       vendedoraPreview.textContent = "—";
       estadoPreview.textContent = "—";
     }
   }
-  
+
   updateAliasPreview();
 }
 
@@ -549,6 +555,7 @@ function validateForm(data) {
 function readFormData() {
   const carteraOpt = getExactCarteraOptionByInput();
   const esCartera = !!carteraOpt;
+  const isVendor = state.effectiveUser?.rol === "vendedor";
 
   const colegio = normalizeText($("inputColegio")?.value || "");
   const curso = normalizeCursoInput($("inputCurso")?.value || "");
@@ -586,7 +593,9 @@ function readFormData() {
     vendedora: esCartera ? normalizeText(carteraOpt?.vendedora || "") : "Sin asignar",
     vendedoraCorreo: esCartera ? normalizeEmail(carteraOpt?.vendedoraCorreo || "") : "",
     requiereAsignacion: !esCartera,
-    estado: esCartera ? "A contactar" : "Sin asignar",
+    estado: esCartera
+      ? (isVendor ? "Contactado" : "A contactar")
+      : "A contactar",
 
     curso,
     anoBaseCurso: String(anoBaseCurso),
