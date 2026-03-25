@@ -67,6 +67,7 @@ const state = {
   filteredRows: [],
   pageRows: [],
   vendorFilter: "",
+  statusFilter: "ok",
   search: "",
   modalMode: "create",
   editingOriginal: null,
@@ -591,6 +592,13 @@ function applyFilters() {
   if (state.vendorFilter) {
     rows = rows.filter(r => normalizeEmail(r.correoVendedor) === normalizeEmail(state.vendorFilter));
   }
+
+  if (state.statusFilter === "ok") {
+    rows = rows.filter(r => normalizeText(r.estatus) === "OK");
+  } else if (state.statusFilter === "pending") {
+    rows = rows.filter(r => normalizeText(r.estatus) !== "OK");
+  }
+  // "all" no filtra por estatus
 
   const q = normalizeSearch(state.search);
   if (q) {
@@ -1509,6 +1517,7 @@ async function exportXlsx() {
 function bindPageEvents() {
   const searchInput = $("searchInput");
   const vendorFilter = $("vendorFilter");
+  const statusFilter = $("statusFilter");
   const btnRecargar = $("btnRecargar");
   const btnAgregar = $("btnAgregar");
   const btnEliminarSeleccionados = $("btnEliminarSeleccionados");
@@ -1539,6 +1548,16 @@ function bindPageEvents() {
     vendorFilter.dataset.bound = "1";
     vendorFilter.addEventListener("change", (e) => {
       state.vendorFilter = normalizeEmail(e.target.value || "");
+      applyFilters();
+    });
+  }
+
+    if (statusFilter && !statusFilter.dataset.bound) {
+    statusFilter.dataset.bound = "1";
+    statusFilter.value = state.statusFilter || "ok";
+
+    statusFilter.addEventListener("change", (e) => {
+      state.statusFilter = e.target.value || "ok";
       applyFilters();
     });
   }
