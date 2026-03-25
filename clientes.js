@@ -382,71 +382,149 @@ function parseImportedValue(key, rawValue) {
 }
 
 function sanitizeImportKey(rawKey = "") {
-  const original = normalizeText(rawKey);
+  const original = normalizeText(rawKey).trim();
   if (!original) return "";
 
+  /* =========================================================
+     1) SI EL HEADER YA VIENE EXACTO COMO LO EXPORTA EL SISTEMA,
+        SE RESPETA TAL CUAL
+        Ej: anoViaje, codigoRegistro, origenColegio, vendedoraCorreo
+  ========================================================= */
+  if (BASE_COLUMNS.includes(original)) {
+    return original;
+  }
+
+  /* =========================================================
+     2) SI EL HEADER PARECE UNA KEY INTERNA VÁLIDA
+        (camelCase, snake_case o anidada con punto),
+        también se respeta tal cual.
+        Esto ayuda a reimportar columnas dinámicas exportadas
+        por el propio sistema.
+  ========================================================= */
+  const looksLikeInternalKey = /^[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)*$/.test(original);
+  if (looksLikeInternalKey && !/\s/.test(original)) {
+    return original;
+  }
+
+  /* =========================================================
+     3) ALIAS HUMANOS / VARIANTES MANUALES
+        Aquí aceptamos encabezados "bonitos" o escritos a mano
+  ========================================================= */
+  const normalized = normalizeSearch(original)
+    .replace(/\s+/g, " ")
+    .trim();
+
   const aliasMap = {
+    // base
     "id grupo": "idGrupo",
+    "idgrupo": "idGrupo",
+
     "codigo": "codigoRegistro",
-    "codigo registro": "codigoRegistro",
     "código": "codigoRegistro",
+    "codigo registro": "codigoRegistro",
     "código registro": "codigoRegistro",
+    "codigoregistro": "codigoRegistro",
+
+    "estado": "estado",
+    "colegio": "colegio",
+    "curso": "curso",
+
     "cantidad grupo": "cantidadGrupo",
     "cantidadgrupo": "cantidadGrupo",
+
     "año viaje": "anoViaje",
     "anio viaje": "anoViaje",
+    "anoviaje": "anoViaje",
+
+    // vendedora / cliente
     "vendedora": "vendedora",
     "correo vendedora": "vendedoraCorreo",
     "correo vendedor": "vendedoraCorreo",
+    "correo de vendedora": "vendedoraCorreo",
+
     "nombre cliente": "nombreCliente",
     "rol cliente": "rolCliente",
     "correo cliente": "correoCliente",
     "celular cliente": "celularCliente",
-    "comuna / ciudad": "comunaCiudad",
-    "comuna ciudad": "comunaCiudad",
-    "destino principal": "destinoPrincipal",
-    "destinos secundarios": "destinosSecundarios",
+
+    // origen
     "origen colegio": "origenColegio",
     "origen cliente": "origenCliente",
     "especificacion origen": "origenEspecificacion",
     "especificación origen": "origenEspecificacion",
     "detalle origen": "origenEspecificacionOtro",
+    "otro origen": "origenEspecificacionOtro",
+
+    // destino
+    "destino principal": "destinoPrincipal",
     "otro destino principal": "destinoPrincipalOtro",
+    "destinos secundarios": "destinosSecundarios",
+    "destino secundario": "destinosSecundarios",
     "otro destino secundario": "destinoSecundarioOtro",
+
+    // ubicación / asignación
+    "comuna ciudad": "comunaCiudad",
+    "comuna / ciudad": "comunaCiudad",
     "requiere asignacion": "requiereAsignacion",
     "requiere asignación": "requiereAsignacion",
+
+    // auditoría
+    "creado por": "creadoPor",
+    "correo creador": "creadoPorCorreo",
+    "correo creado por": "creadoPorCorreo",
     "fecha creacion": "fechaCreacion",
     "fecha creación": "fechaCreacion",
+
+    "actualizado por": "actualizadoPor",
+    "correo actualizacion": "actualizadoPorCorreo",
+    "correo actualización": "actualizadoPorCorreo",
+    "correo actualizado por": "actualizadoPorCorreo",
     "fecha actualizacion": "fechaActualizacion",
-    "fecha actualización": "fechaActualizacion",
-    "creado por": "creadoPor",
-    "actualizado por": "actualizadoPor"
+    "fecha actualización": "fechaActualizacion"
   };
 
-  const normalized = normalizeSearch(original).replace(/\s+/g, " ");
-  if (aliasMap[normalized]) return aliasMap[normalized];
+  if (aliasMap[normalized]) {
+    return aliasMap[normalized];
+  }
 
-  // conservar puntos para campos anidados
-  const pieces = original.split(".").map(piece => {
-    const cleaned = piece
-      .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "")
-      .replace(/[^a-zA-Z0-9 ]+/g, " ")
-      .trim();
+  /* =========================================================
+     4) FALLBACK:
+        convierte headers legibles a camelCase
+        Ej: "Nombre Cliente" -> "nombreCliente"
+        Mantiene puntos para campos anidados
+  ========================================================= */
+  const pieces = original
+    .split(".")
+    .map((piece) => {
+      const cleaned = piece
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/[^a-zA-Z0-9_ ]+/g, " ")
+        .trim();
 
-    if (!cleaned) return "";
+      if (!cleaned) return "";
 
-    const parts = cleaned.split(/\s+/);
-    return parts
-      .map((part, idx) => {
-        const low = part.toLowerCase();
-        if (idx === 0) return low;
-        return low.charAt(0).toUpperCase() + low.slice(1);
-      })
-      .join("");
-  }).filter(Boolean);
+      const parts = cleaned.split(/\s+/).filter(Boolean);
 
-  return pieces.join(".");
+      return parts
+        .map((part, idx) => {
+          const low = part.toLowerCase();
+          if (idx === 0) return low;
+          return low.charAt(0).toUpperCase() + low.slice(1);
+        })
+        .join("");
+    })
+    .filter(Boolean);
+
+  const candidate = pieces.join(".");
+
+  // si el fallback termina coincidiendo con una key base, perfecto
+  if (BASE_COLUMNS.includes(candidate)) {
+    return candidate;
+  }
+
+  // si no, igual devolvemos el candidate para permitir columnas dinámicas
+  return candidate;
 }
 
 function normalizePersonName(value = "") {
