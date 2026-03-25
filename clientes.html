@@ -180,6 +180,71 @@
       color:#555;
     }
 
+    .table-pager{
+      display:flex;
+      align-items:center;
+      gap:8px;
+      flex-wrap:wrap;
+      margin-left:auto;
+    }
+    
+    .pager-label{
+      font-size:13px;
+      font-weight:700;
+      color:var(--header);
+    }
+    
+    .table-pager select{
+      height:38px;
+      min-width:90px;
+      border:2px solid var(--line);
+      border-radius:8px;
+      padding:0 10px;
+      font-size:14px;
+      background:#fff;
+      color:var(--header);
+    }
+    
+    .btn-pager{
+      min-width:46px;
+      height:38px;
+      padding:0 12px;
+    }
+    
+    .page-indicator{
+      min-width:140px;
+      text-align:center;
+      font-size:13px;
+      font-weight:700;
+      color:var(--header);
+    }
+    
+    .th-sort{
+      width:100%;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:8px;
+      border:none;
+      background:transparent;
+      color:#fff;
+      padding:0;
+      font:inherit;
+      font-weight:700;
+      cursor:pointer;
+      text-transform:uppercase;
+    }
+    
+    .th-sort .sort-arrow{
+      font-size:12px;
+      opacity:.8;
+      flex:0 0 auto;
+    }
+    
+    .th-sort.active .sort-arrow{
+      opacity:1;
+    }
+
     .table-wrap{
       background:#fff;
       border:2px solid #d7dde6;
@@ -489,6 +554,21 @@
 
       <div class="table-meta">
         <div id="tableSummary">0 registro(s)</div>
+      
+        <div class="table-pager">
+          <label class="pager-label" for="pageSizeSelect">Ver</label>
+      
+          <select id="pageSizeSelect">
+            <option value="8" selected>8</option>
+            <option value="16">16</option>
+            <option value="24">24</option>
+            <option value="all">Todos</option>
+          </select>
+      
+          <button id="btnPrevPage" class="btn-page sec btn-pager" type="button">←</button>
+          <div id="pageIndicator" class="page-indicator">Página 1 de 1</div>
+          <button id="btnNextPage" class="btn-page sec btn-pager" type="button">→</button>
+        </div>
       </div>
 
       <div class="table-wrap">
