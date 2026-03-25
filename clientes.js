@@ -153,6 +153,7 @@ const state = {
   allKeys: [],
   dynamicKeys: [],
   carteraIndex: new Map(),
+  carteraEntries: [],
   carteraIndexLoaded: false,
   editingId: null,
   search: "",
@@ -639,20 +640,100 @@ function autoResolveKnownPeople(payload) {
 }
 
 function normalizeSchoolForCartera(value = "") {
-  return normalizeSearch(value).replace(/\s+/g, " ").trim();
+  return normalizeText(value)
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/&/g, " Y ")
+    .replace(/[^A-Z0-9 ]+/gi, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toUpperCase();
+}
+
+function compactSchoolKey(value = "") {
+  return normalizeSchoolForCartera(value).replace(/\s+/g, "");
 }
 
 function buildCarteraVendorName(data = {}) {
   return normalizeText(`${data.nombreVendedor || ""} ${data.apellidoVendedor || ""}`.trim());
 }
 
-async function loadSchoolCarteraIndex(force = false) {
-  if (!force && state.carteraIndexLoaded) {
-    return state.carteraIndex;
+function normalizeCarteraStatus(value = "") {
+  return normalizeSearch(value).replace(/\s+/g, " ").trim();
+}
+
+function isCarteraOkStatus(value = "") {
+  return normalizeCarteraStatus(value) === "ok";
+}
+
+function levenshteinDistance(a = "", b = "") {
+  const s = String(a);
+  const t = String(b);
+
+  if (s === t) return 0;
+  if (!s.length) return t.length;
+  if (!t.length) return s.length;
+
+  const rows = t.length + 1;
+  const cols = s.length + 1;
+  const dp = Array.from({ length: rows }, () => new Array(cols).fill(0));
+
+  for (let i = 0; i < rows; i++) dp[i][0] = i;
+  for (let j = 0; j < cols; j++) dp[0][j] = j;
+
+  for (let i = 1; i < rows; i++) {
+    for (let j = 1; j < cols; j++) {
+      const cost = t[i - 1] === s[j - 1] ? 0 : 1;
+      dp[i][j] = Math.min(
+        dp[i - 1][j] + 1,
+        dp[i][j - 1] + 1,
+        dp[i - 1][j - 1] + cost
+      );
+    }
   }
 
-  const index = new Map();
+  return dp[t.length][s.length];
+}
 
+function similarityRatio(a = "", b = "") {
+  const x = String(a || "");
+  const y = String(b || "");
+  if (!x && !y) return 1;
+  if (!x || !y) return 0;
+
+  const maxLen = Math.max(x.length, y.length);
+  if (!maxLen) return 1;
+
+  const dist = levenshteinDistance(x, y);
+  return 1 - (dist / maxLen);
+}
+
+function tokenOverlapRatio(a = "", b = "") {
+  const aTokens = normalizeSchoolForCartera(a).split(" ").filter(Boolean);
+  const bTokens = normalizeSchoolForCartera(b).split(" ").filter(Boolean);
+
+  if (!aTokens.length || !bTokens.length) return 0;
+
+  const aSet = new Set(aTokens);
+  const bSet = new Set(bTokens);
+
+  let common = 0;
+  aSet.forEach((token) => {
+    if (bSet.has(token)) common += 1;
+  });
+
+  return common / Math.max(aSet.size, bSet.size);
+}
+
+async function loadSchoolCarteraIndex(force = false) {
+  if (!force && state.carteraIndexLoaded) {
+    return {
+      byExact: state.carteraIndex,
+      entries: state.carteraEntries
+    };
+  }
+
+  const byExact = new Map();
   const sellersSnap = await getDocs(collection(db, "ventas_cartera"));
 
   for (const sellerDoc of sellersSnap.docs) {
@@ -667,41 +748,114 @@ async function loadSchoolCarteraIndex(force = false) {
       );
       if (!normalizedSchool) return;
 
-      const entry = {
+      const existing = byExact.get(normalizedSchool) || {
+        normalizedSchool,
+        compactKey: compactSchoolKey(normalizedSchool),
         colegio: normalizeText(data.colegio || ""),
-        vendedora: buildCarteraVendorName(data),
-        vendedoraCorreo: normalizeEmail(data.correoVendedor || sellerEmail),
-        matches: 1
+        matches: 0,
+        hasOk: false,
+        hasAny: false,
+        vendedora: "",
+        vendedoraCorreo: "",
+        statuses: new Set()
       };
 
-      if (!index.has(normalizedSchool)) {
-        index.set(normalizedSchool, entry);
-        return;
-      }
-
-      // Si el mismo colegio aparece en más de una cartera, marcamos múltiple.
-      const existing = index.get(normalizedSchool);
       existing.matches += 1;
+      existing.hasAny = true;
 
-      if (!existing.vendedora && entry.vendedora) {
-        existing.vendedora = entry.vendedora;
+      const statusNorm = normalizeCarteraStatus(data.estatus || "");
+      if (statusNorm) existing.statuses.add(statusNorm);
+      if (isCarteraOkStatus(data.estatus || "")) {
+        existing.hasOk = true;
       }
 
-      if (!existing.vendedoraCorreo && entry.vendedoraCorreo) {
-        existing.vendedoraCorreo = entry.vendedoraCorreo;
+      if (!existing.vendedora) {
+        existing.vendedora = buildCarteraVendorName(data);
       }
 
-      index.set(normalizedSchool, existing);
+      if (!existing.vendedoraCorreo) {
+        existing.vendedoraCorreo = normalizeEmail(data.correoVendedor || sellerEmail);
+      }
+
+      if (!existing.colegio) {
+        existing.colegio = normalizeText(data.colegio || "");
+      }
+
+      byExact.set(normalizedSchool, existing);
     });
   }
 
-  state.carteraIndex = index;
+  const entries = Array.from(byExact.values()).map((entry) => ({
+    ...entry,
+    statuses: Array.from(entry.statuses || [])
+  }));
+
+  state.carteraIndex = byExact;
+  state.carteraEntries = entries;
   state.carteraIndexLoaded = true;
 
-  return state.carteraIndex;
+  return { byExact, entries };
 }
 
-function applyCarteraInfoToPayload(payload, carteraIndex, baseData = {}) {
+function findBestCarteraMatch(colegio = "", carteraCache = { byExact: new Map(), entries: [] }) {
+  const exactKey = normalizeSchoolForCartera(colegio);
+  if (!exactKey) return null;
+
+  const direct = carteraCache.byExact.get(exactKey);
+  if (direct) {
+    return {
+      entry: direct,
+      score: 1,
+      mode: "exact"
+    };
+  }
+
+  const targetCompact = compactSchoolKey(colegio);
+  const targetPretty = normalizeSchoolForCartera(colegio);
+
+  let best = null;
+  let second = null;
+
+  for (const entry of (carteraCache.entries || [])) {
+    const simPretty = similarityRatio(targetPretty, entry.normalizedSchool);
+    const simCompact = similarityRatio(targetCompact, entry.compactKey);
+    const overlap = tokenOverlapRatio(targetPretty, entry.normalizedSchool);
+
+    const score = Math.max(simPretty, simCompact) * 0.8 + overlap * 0.2;
+
+    if (!best || score > best.score) {
+      second = best;
+      best = { entry, score, overlap, mode: "fuzzy" };
+    } else if (!second || score > second.score) {
+      second = { entry, score, overlap, mode: "fuzzy" };
+    }
+  }
+
+  if (!best) return null;
+
+  const bestScore = best.score || 0;
+  const secondScore = second?.score || 0;
+  const gap = bestScore - secondScore;
+
+  const isStrongEnough =
+    bestScore >= 0.93 ||
+    (bestScore >= 0.89 && (best.overlap || 0) >= 0.75);
+
+  const isClearlyBetter = gap >= 0.03;
+
+  if (!isStrongEnough || !isClearlyBetter) {
+    return null;
+  }
+
+  return best;
+}
+
+function resolveOrigenColegioFromMatch(match) {
+  if (!match?.entry) return "No cartera";
+  return match.entry.hasOk ? "Cartera" : "Pendiente en cartera";
+}
+
+function applyCarteraInfoToPayload(payload, carteraCache, baseData = {}) {
   const merged = {
     ...(baseData || {}),
     ...(payload || {})
@@ -712,25 +866,23 @@ function applyCarteraInfoToPayload(payload, carteraIndex, baseData = {}) {
     return autoResolveKnownPeople(payload);
   }
 
-  const key = normalizeSchoolForCartera(colegio);
-  const hit = carteraIndex.get(key);
+  const match = findBestCarteraMatch(colegio, carteraCache);
 
-  if (!hit) {
+  if (!match?.entry) {
     payload.origenColegio = "No cartera";
     return autoResolveKnownPeople(payload);
   }
 
-  payload.origenColegio = "Cartera";
+  payload.origenColegio = resolveOrigenColegioFromMatch(match);
 
-  // Solo completamos vendedor/correo si hay una coincidencia única
-  // y el payload todavía no trae esos datos.
-  if (hit.matches === 1) {
-    if (!normalizeText(payload.vendedora) && normalizeText(hit.vendedora)) {
-      payload.vendedora = hit.vendedora;
+  // Solo completamos vendedora/correo si la coincidencia es única y clara
+  if (match.entry.matches === 1) {
+    if (!normalizeText(payload.vendedora) && normalizeText(match.entry.vendedora)) {
+      payload.vendedora = match.entry.vendedora;
     }
 
-    if (!normalizeEmail(payload.vendedoraCorreo) && normalizeEmail(hit.vendedoraCorreo)) {
-      payload.vendedoraCorreo = hit.vendedoraCorreo;
+    if (!normalizeEmail(payload.vendedoraCorreo) && normalizeEmail(match.entry.vendedoraCorreo)) {
+      payload.vendedoraCorreo = match.entry.vendedoraCorreo;
     }
   }
 
@@ -747,7 +899,7 @@ async function backfillOrigenColegioDesdeCartera() {
       progress: 10
     });
 
-    const carteraIndex = await loadSchoolCarteraIndex(true);
+    const carteraCache = await loadSchoolCarteraIndex(true);
     const pending = [];
 
     state.rowsRaw.forEach(({ id, data }) => {
@@ -756,7 +908,7 @@ async function backfillOrigenColegioDesdeCartera() {
       if (!colegioActual) return;
 
       const patch = {};
-      applyCarteraInfoToPayload(patch, carteraIndex, currentData);
+      applyCarteraInfoToPayload(patch, carteraCache, currentData);
 
       const origenNuevo = normalizeText(patch.origenColegio || "");
       const origenActual = normalizeText(currentData.origenColegio || "");
@@ -1337,9 +1489,9 @@ async function saveEditor() {
     setNestedValue(payload, key, parsed);
   });
 
-  const carteraIndex = await loadSchoolCarteraIndex(true);
+  const carteraCache = await loadSchoolCarteraIndex(true);
   autoResolveKnownPeople(payload);
-  applyCarteraInfoToPayload(payload, carteraIndex, raw.data || {});
+  applyCarteraInfoToPayload(payload, carteraCache, raw.data || {});
 
   payload.actualizadoPor = getNombreUsuario(state.effectiveUser);
   payload.actualizadoPorCorreo = normalizeEmail(state.realUser?.email || "");
@@ -1479,7 +1631,7 @@ function isRowEmpty(rowObj = {}) {
   return !Object.values(rowObj).some(v => normalizeText(v) !== "");
 }
 
-function rowToFieldPayload(rowObj, carteraIndex = new Map()) {
+function rowToFieldPayload(rowObj, carteraCache = { byExact: new Map(), entries: [] }) {
   const payload = {};
 
   Object.entries(rowObj).forEach(([rawKey, rawValue]) => {
@@ -1492,7 +1644,7 @@ function rowToFieldPayload(rowObj, carteraIndex = new Map()) {
   });
 
   autoResolveKnownPeople(payload);
-  applyCarteraInfoToPayload(payload, carteraIndex);
+  applyCarteraInfoToPayload(payload, carteraCache);
 
   return payload;
 }
@@ -1559,14 +1711,14 @@ async function importXlsx(file) {
     });
 
     // Leemos la cartera fresca en cada import
-    const carteraIndex = await loadSchoolCarteraIndex(true);
+    const carteraCache = await loadSchoolCarteraIndex(true);
 
     let createdCount = 0;
     let updatedCount = 0;
     let processed = 0;
 
     for (const rowObj of rawRows) {
-      const payload = rowToFieldPayload(rowObj, carteraIndex);
+      const payload = rowToFieldPayload(rowObj, carteraCache);
       const existingId = findExistingDocId(payload, codeIndex);
 
       let ref;
