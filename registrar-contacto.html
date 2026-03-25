@@ -383,6 +383,19 @@
       </div>
 
       <form id="registroForm" class="registro-form">
+        <div class="field col-2">
+          <label for="inputCurso">Curso actual *</label>
+          <input
+            id="inputCurso"
+            type="text"
+            placeholder="Ej: 4C, 3DAVINCI, 2A"
+            autocomplete="off"
+          />
+          <div class="helper">
+            Debe llevar números y letras, sin espacios. Ejemplo: 4C, 3DAVINCI.
+          </div>
+        </div>
+
         <div class="field col-4">
           <label for="inputColegio">Colegio *</label>
           <input
@@ -397,36 +410,18 @@
             Si coincide con la cartera, se asigna automáticamente al vendedor/a. Si no coincide, quedará sin asignar.
           </div>
         </div>
-        
-        <div class="field col-4">
-          <label>Vendedor/a</label>
-          <div id="vendedoraPreview" class="readonly-box">—</div>
-        </div>
-        
-        <div class="field col-4">
-          <label>Estado</label>
-          <div id="estadoPreview" class="readonly-box">—</div>
-        </div>
-        
-        <div class="field col-4">
-          <label for="inputCurso">Curso actual *</label>
-          <input
-            id="inputCurso"
-            type="text"
-            placeholder="Ej: 4C, 3DAVINCI, 2A"
-            autocomplete="off"
-          />
-          <div class="helper">
-            Debe llevar números y letras, sin espacios. Ejemplo: 4C, 3DAVINCI.
-          </div>
-        </div>
-        
-        <div class="field col-4">
+
+        <div class="field col-1">
           <label for="anoViaje">Año del viaje *</label>
           <input id="anoViaje" type="number" min="2026" max="2100" step="1" />
         </div>
 
-        <div class="field col-4">
+        <div class="field col-3">
+          <label for="comunaCiudad">Comuna o Ciudad</label>
+          <input id="comunaCiudad" type="text" placeholder="Comuna o ciudad del grupo / cliente" />
+        </div>
+
+        <div class="field col-1">
           <label for="cantidadGrupo">Cantidad del grupo *</label>
           <input
             id="cantidadGrupo"
@@ -434,81 +429,14 @@
             min="1"
             max="999"
             step="1"
-            placeholder="Ej: 35"
+            placeholder="35"
             inputmode="numeric"
           />
           <div class="helper">
-            Ingresa la cantidad estimada del grupo.
+            Cantidad estimada.
           </div>
         </div>
 
-        <div class="field col-4">
-          <label>Alias del grupo</label>
-          <div id="aliasPreview" class="readonly-box">—</div>
-          <div class="helper">
-            Se construye automáticamente con curso actual, año del viaje y colegio.
-          </div>
-        </div>
-        
-        <div class="field col-4">
-          <label for="comunaCiudad">Comuna o Ciudad</label>
-          <input id="comunaCiudad" type="text" placeholder="Comuna o ciudad del grupo / cliente" />
-        </div>
-        
-        <div class="field col-4">
-          <label for="nombreCliente">Nombre del cliente *</label>
-          <input id="nombreCliente" type="text" placeholder="Quien hace la cotización" />
-        </div>
-        
-        <div class="field col-4">
-          <label for="rolCliente">Rol del cliente *</label>
-          <select id="rolCliente">
-            <option value="">Seleccionar</option>
-            <option value="Estudiante">Estudiante</option>
-            <option value="Apoderado(a)">Apoderado(a)</option>
-            <option value="Profesor(a)">Profesor(a)</option>
-            <option value="Otro(a)">Otro(a)</option>
-          </select>
-        </div>
-        
-        <div class="field col-3">
-          <label for="correoCliente">Correo electrónico del cliente</label>
-          <input id="correoCliente" type="email" placeholder="cliente@correo.com" />
-          <div class="helper">Debe existir correo o celular para registrar la cotización.</div>
-        </div>
-        
-        <div class="field col-3">
-          <label for="celularCliente">Celular del cliente</label>
-          <input id="celularCliente" type="text" placeholder="+569..." />
-        </div>
-        
-        <div class="field col-3">
-          <label for="origenCliente">Origen del cliente *</label>
-          <select id="origenCliente">
-            <option value="">Seleccionar</option>
-            <option value="Directo">Directo</option>
-            <option value="Referido">Referido</option>
-          </select>
-        </div>
-        
-        <div class="field col-3">
-          <label for="origenEspecificacion">Especificación del origen *</label>
-          <select id="origenEspecificacion">
-            <option value="">Seleccionar</option>
-            <option value="Correo">Correo</option>
-            <option value="WhatsApp">WhatsApp</option>
-            <option value="Llamada">Llamada</option>
-            <option value="Redes sociales">Redes sociales</option>
-            <option value="Google">Google</option>
-            <option value="Otro">Otro</option>
-          </select>
-        </div>
-        
-        <div id="wrapOrigenEspecificacionOtro" class="field col-12 hidden">
-          <label for="origenEspecificacionOtro">Detalle del origen</label>
-          <input id="origenEspecificacionOtro" type="text" placeholder="Especifica el origen" />
-        </div>
-        
         <div class="field col-12">
           <label for="destinoPrincipal">Destino principal *</label>
           <select id="destinoPrincipal">
@@ -540,6 +468,78 @@
         <div id="wrapDestinoSecundarioOtro" class="field col-12 hidden">
           <label for="destinoSecundarioOtro">Otro destino secundario</label>
           <input id="destinoSecundarioOtro" type="text" placeholder="Especifica el destino secundario" />
+        </div>
+
+        <div class="field col-3">
+          <label>Alias del grupo</label>
+          <div id="aliasPreview" class="readonly-box">—</div>
+          <div class="helper">
+            Se construye automáticamente con curso actual, año del viaje y colegio.
+          </div>
+        </div>
+        
+        <div class="field col-3">
+          <label>Vendedor/a</label>
+          <div id="vendedoraPreview" class="readonly-box">—</div>
+        </div>
+        
+        <div class="field col-3">
+          <label>Estado</label>
+          <div id="estadoPreview" class="readonly-box">—</div>
+        </div>
+
+        <div class="field col-4">
+          <label for="nombreCliente">Nombre del cliente *</label>
+          <input id="nombreCliente" type="text" placeholder="Quien hace la cotización" />
+        </div>
+
+        <div class="field col-3">
+          <label for="correoCliente">Correo electrónico del cliente</label>
+          <input id="correoCliente" type="email" placeholder="cliente@correo.com" />
+          <div class="helper">Debe existir correo o celular para registrar la cotización.</div>
+        </div>
+        
+        <div class="field col-2">
+          <label for="celularCliente">Celular del cliente</label>
+          <input id="celularCliente" type="text" placeholder="+569..." />
+        </div>
+
+        <div class="field col-3">
+          <label for="rolCliente">Rol del cliente *</label>
+          <select id="rolCliente">
+            <option value="">Seleccionar</option>
+            <option value="Estudiante">Estudiante</option>
+            <option value="Apoderado(a)">Apoderado(a)</option>
+            <option value="Profesor(a)">Profesor(a)</option>
+            <option value="Otro(a)">Otro(a)</option>
+          </select>
+        </div>
+        
+        <div class="field col-3">
+          <label for="origenCliente">Origen del cliente *</label>
+          <select id="origenCliente">
+            <option value="">Seleccionar</option>
+            <option value="Directo">Directo</option>
+            <option value="Referido">Referido</option>
+          </select>
+        </div>
+        
+        <div class="field col-3">
+          <label for="origenEspecificacion">Especificación del origen *</label>
+          <select id="origenEspecificacion">
+            <option value="">Seleccionar</option>
+            <option value="Correo">Correo</option>
+            <option value="WhatsApp">WhatsApp</option>
+            <option value="Llamada">Llamada</option>
+            <option value="Redes sociales">Redes sociales</option>
+            <option value="Google">Google</option>
+            <option value="Otro">Otro</option>
+          </select>
+        </div>
+        
+        <div id="wrapOrigenEspecificacionOtro" class="field col-12 hidden">
+          <label for="origenEspecificacionOtro">Detalle del origen</label>
+          <input id="origenEspecificacionOtro" type="text" placeholder="Especifica el origen" />
         </div>
 
         <div class="form-actions">
