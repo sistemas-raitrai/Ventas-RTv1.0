@@ -605,6 +605,30 @@ function buildCodigoRegistro(docId) {
   return `COT-${year}-${String(docId).slice(0, 6).toUpperCase()}`;
 }
 
+async function getNextSequentialIdGrupo() {
+  const snap = await getDocs(collection(db, "ventas_cotizaciones"));
+
+  // Piso inicial según tu base actual
+  let maxId = 10931;
+
+  snap.docs.forEach((row) => {
+    const data = row.data() || {};
+
+    const candidates = [
+      String(row.id || "").trim(),
+      String(data.idGrupo || "").trim()
+    ];
+
+    candidates.forEach((candidate) => {
+      if (/^\d+$/.test(candidate)) {
+        maxId = Math.max(maxId, Number(candidate));
+      }
+    });
+  });
+
+  return String(maxId + 1);
+}
+
 /* =========================================================
    GUARDAR
 ========================================================= */
@@ -652,8 +676,8 @@ async function saveRegistro(e) {
       return;
     }
 
-    const newRef = doc(collection(db, "ventas_cotizaciones"));
-    const idGrupo = newRef.id;
+    const idGrupo = await getNextSequentialIdGrupo();
+    const newRef = doc(db, "ventas_cotizaciones", idGrupo);
     const codigoRegistro = buildCodigoRegistro(idGrupo);
 
     const payload = {
