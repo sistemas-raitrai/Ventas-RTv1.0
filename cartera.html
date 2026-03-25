@@ -184,7 +184,7 @@
     .cartera-table{
       width:100%;
       border-collapse:collapse;
-      min-width:1180px;
+      min-width:1260px;
     }
 
     .cartera-table thead th{
@@ -210,6 +210,39 @@
 
     .cartera-table tbody tr:hover{
       background:#faf8fd;
+    }
+
+    .logo-col{
+      width:76px;
+      min-width:76px;
+      text-align:center;
+    }
+
+    .school-logo-thumb{
+      width:42px;
+      height:42px;
+      object-fit:contain;
+      display:block;
+      margin:0 auto;
+      padding:3px;
+      border-radius:8px;
+      border:1px solid #d7dde6;
+      background:#fff;
+    }
+
+    .school-logo-empty{
+      width:42px;
+      height:42px;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      margin:0 auto;
+      border-radius:8px;
+      border:1px dashed #c8ced8;
+      background:#fafafa;
+      color:#888;
+      font-size:14px;
+      font-weight:700;
     }
 
     .actions-col{
@@ -388,6 +421,48 @@
       margin-top:-4px;
     }
 
+    .logo-modal-preview{
+      min-height:120px;
+      border:2px dashed #c5b8d8;
+      border-radius:12px;
+      background:#faf8fd;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      padding:14px;
+      box-sizing:border-box;
+    }
+
+    .logo-modal-preview img{
+      max-width:100%;
+      max-height:90px;
+      object-fit:contain;
+      display:block;
+    }
+
+    .logo-preview-empty{
+      color:#6b6178;
+      font-size:13px;
+      text-align:center;
+    }
+
+    .logo-remove-row{
+      display:flex;
+      align-items:center;
+      gap:8px;
+      margin-top:10px;
+      font-size:13px;
+      color:#555;
+    }
+
+    .logo-remove-row input{
+      width:16px;
+      height:16px;
+      min-width:16px;
+      padding:0;
+      margin:0;
+    }
+
     @media (max-width: 900px){
       .cartera-page{
         padding:16px;
@@ -474,6 +549,7 @@
               </th>
               <th>N° Colegio</th>
               <th>Vendedor(a)</th>
+              <th class="logo-col">Logo</th>
               <th>Colegio</th>
               <th>Comuna</th>
               <th>Estatus</th>
@@ -508,6 +584,22 @@
         <div class="modal-field">
           <label for="colegioInput">Colegio *</label>
           <input id="colegioInput" type="text" />
+        </div>
+
+        <div class="modal-field full">
+          <label for="logoInput">Logo del colegio</label>
+          <input id="logoInput" type="file" accept="image/*" />
+          <div class="help-note">Opcional. Puedes subir JPG, PNG o WEBP.</div>
+
+          <div class="logo-modal-preview">
+            <img id="logoPreviewImg" class="hidden" alt="Vista previa del logo" />
+            <div id="logoPreviewEmpty" class="logo-preview-empty">Sin logo cargado</div>
+          </div>
+
+          <label id="quitarLogoWrap" class="logo-remove-row hidden">
+            <input id="quitarLogoCheck" type="checkbox" />
+            Quitar logo actual
+          </label>
         </div>
 
         <div class="modal-field full">
