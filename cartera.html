@@ -594,15 +594,15 @@
 <body class="ventas-body" data-page="cartera">
   <div id="layout-top"></div>
 
-  <main class="cartera-page">
-    <section class="cartera-panel">
-      <div class="cartera-topbar">
-        <div class="cartera-title-wrap">
+  <main class="page-shell cartera-page">
+    <section class="page-card panel cartera-panel">
+      <div class="page-header cartera-topbar">
+        <div class="page-title-wrap cartera-title-wrap">
           <h2>Cartera</h2>
           <p id="carteraScope">Administración de colegios/clientes por vendedor(a).</p>
         </div>
 
-        <div class="cartera-actions">
+        <div class="page-actions cartera-actions">
           <label id="labelImportar" class="btn-file">
             Importar XLSX
             <input id="fileInputXlsx" type="file" accept=".xlsx,.xls" />
@@ -616,7 +616,7 @@
         </div>
       </div>
 
-      <div id="statusCard" class="status-card hidden">
+      <div id="statusCard" class="status-card hidden" role="status" aria-live="polite">
         <div class="status-top">
           <div id="statusText" class="status-text">Listo.</div>
           <div id="statusMeta" class="status-meta"></div>
@@ -626,8 +626,8 @@
         </div>
       </div>
 
-      <div class="cartera-toolbar">
-        <div class="toolbar-left">
+      <div class="page-toolbar cartera-toolbar">
+        <div class="toolbar-left toolbar-group">
           <div class="field-wrap search-wrap">
             <label for="searchInput">Buscar</label>
             <input
@@ -638,7 +638,7 @@
           </div>
         </div>
 
-        <div class="toolbar-right">
+        <div class="toolbar-right toolbar-group toolbar-group-end">
           <div class="field-wrap status-wrap">
             <label for="statusFilter">Estatus</label>
             <select id="statusFilter">
@@ -676,7 +676,7 @@
         </div>
       </div>
 
-      <div class="table-wrap">
+      <div class="table-wrap table-card">
         <table class="cartera-table">
           <thead id="theadCartera"></thead>
           <tbody id="tbodyCartera"></tbody>
