@@ -990,6 +990,121 @@ async function backfillOrigenColegioDesdeCartera() {
   }
 }
 
+async function backfillVendedoraCorreoDesdeNombre({ overwriteExisting = false } = {}) {
+  if (!isAdminOnly()) return;
+
+  try {
+    setProgressStatus({
+      text: "Completando correos de vendedora...",
+      meta: "Revisando registros existentes...",
+      progress: 10
+    });
+
+    const pending = [];
+
+    state.rowsRaw.forEach(({ id, data }) => {
+      const currentData = data || {};
+
+      const nombreActual = normalizeText(currentData.vendedora || "");
+      const correoActual = normalizeEmail(currentData.vendedoraCorreo || "");
+
+      let nombreNuevo = nombreActual;
+      let correoNuevo = correoActual;
+
+      // 1) Si existe nombre de vendedora, intentar resolver su usuario
+      if (nombreActual) {
+        const seller = resolveVentasUserByName(nombreActual);
+        if (seller) {
+          nombreNuevo = getDisplayName(seller) || nombreActual;
+          correoNuevo = normalizeEmail(seller.email || "") || correoActual;
+        }
+      }
+
+      // 2) Si no hay nombre pero sí correo, intentar resolver nombre
+      if (!nombreNuevo && correoActual) {
+        const seller = resolveVentasUserByEmail(correoActual);
+        if (seller) {
+          nombreNuevo = getDisplayName(seller) || nombreNuevo;
+          correoNuevo = normalizeEmail(seller.email || "") || correoActual;
+        }
+      }
+
+      const shouldUpdateNombre =
+        !!nombreNuevo && nombreNuevo !== nombreActual;
+
+      const shouldUpdateCorreo =
+        !!correoNuevo &&
+        (
+          overwriteExisting
+            ? correoNuevo !== correoActual
+            : !correoActual
+        );
+
+      if (!shouldUpdateNombre && !shouldUpdateCorreo) return;
+
+      pending.push({
+        id,
+        patch: {
+          ...(shouldUpdateNombre ? { vendedora: nombreNuevo } : {}),
+          ...(shouldUpdateCorreo ? { vendedoraCorreo: correoNuevo } : {}),
+          actualizadoPor: getNombreUsuario(state.effectiveUser),
+          actualizadoPorCorreo: normalizeEmail(state.realUser?.email || ""),
+          fechaActualizacion: serverTimestamp()
+        }
+      });
+    });
+
+    if (!pending.length) {
+      setProgressStatus({
+        text: "Backfill listo.",
+        meta: "No había registros para actualizar.",
+        progress: 100,
+        type: "success"
+      });
+      clearProgressStatus({}, 2500);
+      return;
+    }
+
+    let processed = 0;
+
+    for (let i = 0; i < pending.length; i += WRITE_BATCH_LIMIT) {
+      const chunk = pending.slice(i, i + WRITE_BATCH_LIMIT);
+      const batch = writeBatch(db);
+
+      chunk.forEach(({ id, patch }) => {
+        batch.set(doc(db, "ventas_cotizaciones", id), patch, { merge: true });
+      });
+
+      await batch.commit();
+      processed += chunk.length;
+
+      setProgressStatus({
+        text: "Completando correos de vendedora...",
+        meta: `Procesados: ${processed}/${pending.length}`,
+        progress: 20 + Math.round((processed / pending.length) * 80)
+      });
+    }
+
+    setProgressStatus({
+      text: "Backfill listo.",
+      meta: `${pending.length} registro(s) actualizados.`,
+      progress: 100,
+      type: "success"
+    });
+    clearProgressStatus({}, 2500);
+
+    await loadData();
+  } catch (error) {
+    console.error(error);
+    setProgressStatus({
+      text: "Error completando correos de vendedora.",
+      meta: error.message || "No se pudo ejecutar el backfill.",
+      progress: 100,
+      type: "error"
+    });
+  }
+}
+
 function buildRowKey(row) {
   return String(row.idGrupo || "");
 }
@@ -2184,5 +2299,6 @@ async function initPage() {
 }
 
 window.backfillOrigenColegioDesdeCartera = backfillOrigenColegioDesdeCartera;
+window.backfillVendedoraCorreoDesdeNombre = backfillVendedoraCorreoDesdeNombre;
 
 initPage();
