@@ -462,6 +462,23 @@ function poblarSelectorVendedores(effectiveUser) {
   btn.classList.remove("ui-hidden");
 }
 
+function getAliasColegioSortKey(alias = "") {
+  let text = String(alias || "").trim();
+
+  // Quita el primer bloque tipo: 1C (2025)
+  text = text.replace(/^[0-9A-Z]+(?:\s*[A-Z]+)?\s*\(\d{4}\)\s*/i, "");
+
+  // Quita un segundo bloque si existe, por ejemplo:
+  // 1C (2026) 2C (2027) COLEGIO...
+  text = text.replace(/^[0-9A-Z]+(?:\s*[A-Z]+)?\s*\(\d{4}\)\s*/i, "");
+
+  return text
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
+}
+
 /* =========================================================
    SELECTOR DE GRUPOS
 ========================================================= */
@@ -496,12 +513,23 @@ function poblarSelectorGrupos(effectiveUser, rows = []) {
   select.appendChild(defaultOption);
 
   const items = rows
-    .map((row) => ({
-      value: getRowId(row),
-      label: `${getRowAlias(row)} — ${getRowApoderado(row)}`
-    }))
+    .map((row) => {
+      const alias = getRowAlias(row);
+      const apoderado = getRowApoderado(row);
+  
+      return {
+        value: getRowId(row),
+        label: `${alias} — ${apoderado}`,
+        sortKey: `${getAliasColegioSortKey(alias)} ${alias} ${apoderado}`
+      };
+    })
     .filter((item) => item.value)
-    .sort((a, b) => a.label.localeCompare(b.label, "es", { sensitivity: "base" }));
+    .sort((a, b) =>
+      a.sortKey.localeCompare(b.sortKey, "es", {
+        sensitivity: "base",
+        numeric: true
+      })
+    );
 
   items.forEach((item) => {
     const option = document.createElement("option");
