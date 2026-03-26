@@ -45,19 +45,17 @@ const menuItems = [
 ];
 
 const ICON_HOME = `
-  <svg viewBox="0 0 24 24" aria-hidden="true">
-    <path d="M3 10.5L12 3l9 7.5"></path>
-    <path d="M5 9.5V21h14V9.5"></path>
+  <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+    <path d="M3 10.5L12 3l9 7.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
+    <path d="M5 9.5V21h14V9.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
   </svg>
 `;
 
 const ICON_LOGOUT = `
-  <svg viewBox="0 0 24 24" aria-hidden="true">
-    <path d="M10 17l5-5-5-5"></path>
-    <path d="M15 12H4"></path>
-    <path d="M20 21H12"></path>
-    <path d="M20 3H12"></path>
-    <path d="M20 3v18"></path>
+  <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+    <path d="M10 17l5-5-5-5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
+    <path d="M15 12H4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
+    <path d="M20 4v16" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
   </svg>
 `;
 
@@ -72,16 +70,17 @@ function renderMenuLinks(user) {
   const homeLink = `
     <a
       href="index.html"
-      class="menu-link menu-link-home ${isHomeActive ? "active" : ""}"
+      class="menu-link menu-pill menu-link-home ${isHomeActive ? "active" : ""}"
       data-menu-key="home"
+      aria-current="${isHomeActive ? "page" : "false"}"
     >
       <span class="menu-link-icon">${ICON_HOME}</span>
-      <span>Inicio</span>
+      <span class="menu-link-text">Inicio</span>
     </a>
   `;
 
   const otherLinks = getVisibleMenuItems(user).map(item => {
-    const classes = ["menu-link"];
+    const classes = ["menu-link", "menu-pill"];
     if (page === item.key) classes.push("active");
 
     return `
@@ -89,8 +88,9 @@ function renderMenuLinks(user) {
         href="${item.href}"
         class="${classes.join(" ")}"
         data-menu-key="${item.key}"
+        aria-current="${page === item.key ? "page" : "false"}"
       >
-        <span>${item.label}</span>
+        <span class="menu-link-text">${item.label}</span>
       </a>
     `;
   }).join("");
@@ -102,20 +102,18 @@ function renderLayoutTop(user) {
   return `
     <!-- HEADER -->
     <header class="ventas-header app-header">
-      <div class="ventas-header-shell">
-        <div class="ventas-header-left">
-          <a href="index.html" class="logo-box brand-mark" aria-label="Ir al inicio">
-            <img src="IMG/logo-raitrai.png" alt="Logo Rai Trai" class="logo-img">
+      <div class="ventas-header-inner">
+        <div class="ventas-brand">
+          <a href="index.html" class="brand-link" aria-label="Ir al inicio">
+            <div class="logo-box brand-mark">
+              <img src="IMG/logo-raitrai.png" alt="Logo Rai Trai" class="logo-img">
+            </div>
           </a>
-
-          <div class="header-divider"></div>
 
           <div class="saludo-wrap header-user-block">
             <div class="header-kicker">Sistema Ventas RT</div>
             <h1 id="saludo-usuario" class="header-greeting">Hola, Usuario(a)</h1>
-            <div class="header-user-meta">
-              <div id="usuario-conectado" class="usuario-conectado"></div>
-            </div>
+            <div id="usuario-conectado" class="usuario-conectado"></div>
           </div>
         </div>
 
@@ -141,25 +139,26 @@ function renderLayoutTop(user) {
           </a>
         </div>
       </div>
-    </header>
 
-    <!-- MENU -->
-    <nav class="ventas-menu app-nav" aria-label="Navegación principal">
-      <div class="ventas-menu-shell">
-        ${renderMenuLinks(user)}
-      </div>
-    </nav>
+      <nav class="ventas-menu app-nav" aria-label="Navegación principal">
+        <div class="ventas-menu-inner menu-pills">
+          ${renderMenuLinks(user)}
+        </div>
+      </nav>
+    </header>
 
     <!-- HERRAMIENTAS GLOBALES DEL HEADER -->
     <section class="header-tools-wrap">
       <div class="header-tools-inner">
-        <div id="admin-switcher" class="admin-switcher hidden">
+        <div id="admin-switcher" class="admin-switcher admin-switcher-card hidden">
           <div class="admin-switcher-row">
             <select id="select-acting-user">
               <option value="">Elegir usuario</option>
             </select>
 
-            <button id="btn-acting-user">Entrar como</button>
+            <button id="btn-acting-user" class="btn-primary">
+              Entrar como
+            </button>
 
             <button id="btn-reset-acting-user" class="btn-secundario">
               Volver a mi usuario
@@ -169,13 +168,4 @@ function renderLayoutTop(user) {
       </div>
     </section>
   `;
-}
-
-const slot = document.getElementById("layout-top");
-
-if (slot) {
-  onAuthStateChanged(auth, (firebaseUser) => {
-    const ventasUser = firebaseUser ? getVentasUser(firebaseUser.email || "") : null;
-    slot.innerHTML = renderLayoutTop(ventasUser);
-  });
 }
