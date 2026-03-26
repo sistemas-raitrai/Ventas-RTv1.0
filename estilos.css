@@ -1073,7 +1073,298 @@ html, body{
     width:100%;
   }
 
+  /* =========================================================
+   LAYOUT GLOBAL MODERNO - SISTEMA VENTAS RT
+   Pegar al final de estilos.css
+========================================================= */
+
+.app-header{
+  background: linear-gradient(135deg, #24103a 0%, #31114e 55%, #3a195d 100%);
+  box-shadow: 0 14px 34px rgba(24, 8, 40, .22);
+  position: relative;
+  z-index: 20;
+}
+
+.ventas-header-inner{
+  max-width: 1240px;
+  margin: 0 auto;
+  padding: 18px 24px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.ventas-brand{
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-width: 0;
+}
+
+.brand-link{
+  display: inline-flex;
+  text-decoration: none;
+}
+
+.brand-mark{
+  width: 68px;
+  height: 68px;
+  border-radius: 20px;
+  background: linear-gradient(180deg, rgba(255,255,255,.18) 0%, rgba(255,255,255,.08) 100%);
+  border: 1px solid rgba(255,255,255,.18);
+  box-shadow: 0 12px 24px rgba(0,0,0,.18);
+  backdrop-filter: blur(8px);
+  display: grid;
+  place-items: center;
+  padding: 10px;
+  overflow: hidden;
+}
+
+.brand-mark .logo-img{
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+
+.header-divider{
+  display: none;
+}
+
+.header-user-block{
+  min-width: 0;
+}
+
+.header-kicker{
+  color: rgba(255,255,255,.78);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: .3px;
+  margin-bottom: 2px;
+}
+
+.header-greeting{
+  margin: 0;
+  color: #fff;
+  font-size: 18px;
+  line-height: 1.15;
+  font-weight: 800;
+}
+
+.usuario-conectado{
+  margin-top: 4px;
+  color: rgba(255,255,255,.78);
+  font-size: 13px;
+  line-height: 1.2;
+  word-break: break-word;
+}
+
+.header-actions{
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.icon-btn{
+  width: 44px;
+  height: 44px;
+  border-radius: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  text-decoration: none;
+  background: rgba(255,255,255,.09);
+  border: 1px solid rgba(255,255,255,.14);
+  box-shadow: 0 8px 20px rgba(0,0,0,.14);
+  transition: transform .18s ease, background .18s ease, border-color .18s ease, box-shadow .18s ease;
+}
+
+.icon-btn svg{
+  width: 20px;
+  height: 20px;
+  display: block;
+}
+
+.icon-btn:hover{
+  transform: translateY(-2px);
+  background: rgba(255,255,255,.14);
+  border-color: rgba(255,255,255,.22);
+  box-shadow: 0 12px 24px rgba(0,0,0,.18);
+}
+
+.icon-btn-danger:hover{
+  background: rgba(255,255,255,.14);
+}
+
+/* MENÚ */
+.app-nav{
+  max-width: 1240px;
+  margin: 0 auto;
+  padding: 0 24px 18px;
+}
+
+.ventas-menu-inner{
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.menu-link{
+  text-decoration: none;
+}
+
+.menu-pill{
+  min-height: 42px;
+  padding: 0 16px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255,255,255,.08);
+  border: 1px solid rgba(255,255,255,.14);
+  color: rgba(255,255,255,.92);
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: .1px;
+  box-shadow: 0 6px 16px rgba(0,0,0,.10);
+  transition: transform .18s ease, background .18s ease, border-color .18s ease, color .18s ease;
+}
+
+.menu-pill:hover{
+  transform: translateY(-1px);
+  background: rgba(255,255,255,.14);
+  border-color: rgba(255,255,255,.22);
+  color: #fff;
+}
+
+.menu-pill.active{
+  background: #fff;
+  color: #2b1145;
+  border-color: rgba(255,255,255,.55);
+  box-shadow: 0 10px 22px rgba(0,0,0,.16);
+}
+
+.menu-link-text{
+  white-space: nowrap;
+}
+
+/* HERRAMIENTAS DEL HEADER */
+.header-tools-wrap{
+  background: transparent;
+  padding: 14px 24px 0;
+}
+
+.header-tools-inner{
+  max-width: 1240px;
+  margin: 0 auto;
+}
+
+.admin-switcher-card{
+  background: rgba(255,255,255,.94);
+  border: 1px solid rgba(51, 24, 77, .10);
+  border-radius: 22px;
+  box-shadow: 0 14px 34px rgba(28, 14, 44, .10);
+  padding: 14px 16px;
+}
+
+.admin-switcher-row{
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  justify-content: center;
+}
+
+#select-acting-user{
+  min-width: 260px;
+  height: 44px;
+  border-radius: 12px;
+  border: 1px solid rgba(51, 24, 77, .14);
+  background: #fff;
+  padding: 0 14px;
+  font-size: 14px;
+  color: #2b1145;
+}
+
+#btn-acting-user,
+#btn-reset-acting-user{
+  height: 44px;
+  border-radius: 12px;
+  padding: 0 16px;
+  border: none;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform .18s ease, box-shadow .18s ease, opacity .18s ease;
+}
+
+#btn-acting-user,
+.btn-primary{
+  background: linear-gradient(135deg, #2b1145 0%, #4a2570 100%);
+  color: #fff;
+  box-shadow: 0 8px 18px rgba(43, 17, 69, .18);
+}
+
+#btn-reset-acting-user,
+.btn-secundario{
+  background: #e9e5ef;
+  color: #4a3a60;
+}
+
+#btn-acting-user:hover,
+#btn-reset-acting-user:hover{
+  transform: translateY(-1px);
+}
+
+/* Opcional: si el wrapper viejo del logo te lo ensucia */
+.logo-box{
+  box-sizing: border-box;
+}
+
+/* RESPONSIVE */
+@media (max-width: 900px){
+  .ventas-header-inner{
+    flex-direction: column;
+    align-items: stretch;
+    padding: 18px 16px 12px;
+  }
+
+  .ventas-brand{
+    justify-content: flex-start;
+  }
+
+  .header-actions{
+    align-self: flex-end;
+  }
+
+  .app-nav{
+    padding: 0 16px 16px;
+  }
+
+  .header-tools-wrap{
+    padding: 12px 16px 0;
+  }
+
+  .admin-switcher-row{
+    justify-content: stretch;
+  }
+
+  #select-acting-user,
+  #btn-acting-user,
+  #btn-reset-acting-user{
+    width: 100%;
+  }
+}
+
+  
+
   .arrow{
     font-size:24px;
   }
 }
+
+
