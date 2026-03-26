@@ -119,13 +119,13 @@ function renderLayoutTop(user) {
 
         <div class="ventas-header-right header-actions">
           <a
-            href="index.html"
-            id="btn-home"
-            class="header-icon icon-btn"
-            title="Inicio"
-            aria-label="Inicio"
+            href="#"
+            id="btn-logout"
+            class="header-icon icon-btn icon-btn-danger"
+            title="Cerrar sesión"
+            aria-label="Cerrar sesión"
           >
-            ${ICON_HOME}
+            ${ICON_LOGOUT}
           </a>
 
           <a
