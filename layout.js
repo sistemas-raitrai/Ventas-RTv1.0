@@ -51,43 +51,73 @@ function getVisibleMenuItems(user) {
 
 function renderMenuLinks(user) {
   return getVisibleMenuItems(user).map(item => {
-    const activeClass = page === item.key ? "active" : "";
-    return `<a href="${item.href}" class="${activeClass}">${item.label}</a>`;
+    const classes = ["menu-link"];
+    if (page === item.key) classes.push("active");
+
+    return `
+      <a
+        href="${item.href}"
+        class="${classes.join(" ")}"
+        data-menu-key="${item.key}"
+      >
+        ${item.label}
+      </a>
+    `;
   }).join("");
 }
 
 function renderLayoutTop(user) {
   return `
     <!-- HEADER -->
-    <header class="ventas-header">
-      <div class="ventas-header-left">
-        <div class="logo-box">
-          <img src="IMG/logo-raitrai.png" alt="Logo Rai Trai" class="logo-img">
+    <header class="ventas-header app-header">
+      <div class="ventas-header-inner">
+        <div class="ventas-header-left">
+          <div class="logo-box brand-mark">
+            <img src="IMG/logo-raitrai.png" alt="Logo Rai Trai" class="logo-img">
+          </div>
+
+          <div class="header-divider"></div>
+
+          <div class="saludo-wrap header-user-block">
+            <div class="header-kicker">Sistema Ventas RT</div>
+            <h1 id="saludo-usuario" class="header-greeting">Hola, Usuario(a)</h1>
+            <div class="header-user-meta">
+              <div id="usuario-conectado" class="usuario-conectado"></div>
+            </div>
+          </div>
         </div>
 
-        <div class="header-divider"></div>
+        <div class="ventas-header-right header-actions">
+          <a
+            href="#"
+            id="btn-home"
+            class="header-icon icon-btn"
+            title="Inicio"
+            aria-label="Inicio"
+          >⌂</a>
 
-        <div class="saludo-wrap">
-          <h1 id="saludo-usuario">Hola, Usuario(a)</h1>
-          <div id="usuario-conectado" class="usuario-conectado"></div>
+          <a
+            href="#"
+            id="btn-logout"
+            class="header-icon icon-btn"
+            title="Cerrar sesión"
+            aria-label="Cerrar sesión"
+          >⇥</a>
         </div>
-      </div>
-
-      <div class="ventas-header-right">
-        <a href="#" id="btn-home" class="header-icon" title="Inicio">⌂</a>
-        <a href="#" id="btn-logout" class="header-icon" title="Cerrar sesión">⇥</a>
       </div>
     </header>
 
     <!-- MENU -->
-    <nav class="ventas-menu">
-      ${renderMenuLinks(user)}
+    <nav class="ventas-menu app-nav" aria-label="Navegación principal">
+      <div class="ventas-menu-inner">
+        ${renderMenuLinks(user)}
+      </div>
     </nav>
 
     <!-- HERRAMIENTAS GLOBALES DEL HEADER -->
     <section class="header-tools-wrap">
       <div class="header-tools-inner">
-        <div id="admin-switcher" class="admin-switcher hidden">
+        <div id="admin-switcher" class="admin-switcher panel panel-soft hidden">
           <div class="admin-switcher-row">
             <select id="select-acting-user">
               <option value="">Elegir usuario</option>
