@@ -481,15 +481,15 @@
 <body class="ventas-body" data-page="clientes">
   <div id="layout-top"></div>
 
-  <main class="clientes-page">
-    <section class="clientes-panel">
-      <div class="clientes-topbar">
-        <div class="clientes-title-wrap">
+  <main class="page-shell clientes-page">
+    <section class="page-card panel clientes-panel">
+      <div class="page-header clientes-topbar">
+        <div class="page-title-wrap clientes-title-wrap">
           <h2>Clientes</h2>
           <p id="clientesScope">Macro general de cotizaciones/grupos.</p>
         </div>
 
-        <div class="clientes-actions">
+        <div class="page-actions clientes-actions">
           <button id="btnVerAnteriores" class="btn-page sec" type="button">Ver Anteriores</button>
           <button id="btnPlantilla" class="btn-page blue" type="button">Plantilla XLSX</button>
           
@@ -505,7 +505,7 @@
         </div>
       </div>
 
-      <div id="statusCard" class="status-card hidden">
+      <div id="statusCard" class="status-card hidden" role="status" aria-live="polite">
         <div class="status-top">
           <div id="statusText" class="status-text">Listo.</div>
           <div id="statusMeta" class="status-meta"></div>
@@ -515,8 +515,8 @@
         </div>
       </div>
 
-      <div class="clientes-toolbar">
-        <div class="toolbar-left">
+      <div class="page-toolbar clientes-toolbar">
+        <div class="toolbar-left toolbar-group">
           <div class="field-wrap">
             <label for="searchInput">Buscar</label>
             <input
@@ -532,7 +532,7 @@
           </div>
 
           <div class="field-wrap">
-            <label for="filterVendedora">Vendedora</label>
+            <label for="filterVendedora">Vendedor(a)</label>
             <select id="filterVendedora"></select>
           </div>
 
@@ -547,7 +547,7 @@
           </div>
         </div>
 
-        <div class="toolbar-right">
+        <div class="toolbar-right toolbar-group toolbar-group-end">
           <button id="btnRecargar" class="btn-page" type="button">Recargar</button>
         </div>
       </div>
@@ -571,7 +571,7 @@
         </div>
       </div>
 
-      <div class="table-wrap">
+      <div class="table-wrap table-card">
         <table class="clientes-table">
           <thead id="theadClientes"></thead>
           <tbody id="tbodyClientes"></tbody>
@@ -585,16 +585,16 @@
   </main>
 
   <!-- MODAL EDITOR DINÁMICO -->
-  <div id="editorModal" class="editor-backdrop">
-    <div class="editor-card">
-      <div class="editor-head">
+  <div id="editorModal" class="editor-backdrop modal-backdrop">
+    <div class="editor-card modal-card">
+      <div class="editor-head modal-head">
         <h3 id="editorTitle">Editar grupo</h3>
         <button id="editorCloseBtn" class="editor-close" type="button" aria-label="Cerrar">×</button>
       </div>
 
-      <div id="editorBody" class="editor-body"></div>
+      <div id="editorBody" class="editor-body modal-body"></div>
 
-      <div class="editor-foot">
+      <div class="editor-foot modal-foot">
         <button id="btnCancelarEditor" class="btn-page sec" type="button">Cancelar</button>
         <button id="btnGuardarEditor" class="btn-page green" type="button">Guardar cambios</button>
       </div>
