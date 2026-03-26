@@ -50,6 +50,7 @@ const WRITE_BATCH_LIMIT = 400;
 const BASE_COLUMNS = [
   "idGrupo",
   "codigoRegistro",
+  "aliasGrupo",
   "estado",
   "colegio",
   "curso",
@@ -110,6 +111,7 @@ const BOOLEAN_KEYS = new Set([
 const LABELS = {
   idGrupo: "ID GRUPO",
   codigoRegistro: "CÓDIGO",
+  aliasGrupo: "ALIAS",
   estado: "ESTADO",
   colegio: "COLEGIO",
   curso: "CURSO",
@@ -1099,6 +1101,185 @@ async function backfillVendedoraCorreoDesdeNombre({ overwriteExisting = false } 
     setProgressStatus({
       text: "Error completando correos de vendedora.",
       meta: error.message || "No se pudo ejecutar el backfill.",
+      progress: 100,
+      type: "error"
+    });
+  }
+}
+
+function normalizeCursoForAlias(value = "") {
+  return normalizeText(value).toUpperCase().replace(/\s+/g, "");
+}
+
+function getYearFromValue(value) {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+
+  const raw = normalizeText(value);
+  const match = raw.match(/\d{4}/);
+  if (!match) return null;
+
+  const year = Number(match[0]);
+  return Number.isFinite(year) ? year : null;
+}
+
+function getAnoBaseForAlias(data = {}) {
+  const explicit = getYearFromValue(data.anoBaseCurso);
+  if (explicit) return explicit;
+
+  const created = timestampToDate(data.fechaCreacion);
+  if (created && Number.isFinite(created.getFullYear())) {
+    return created.getFullYear();
+  }
+
+  const updated = timestampToDate(data.fechaActualizacion);
+  if (updated && Number.isFinite(updated.getFullYear())) {
+    return updated.getFullYear();
+  }
+
+  const tripYear = getYearFromValue(data.anoViaje);
+  if (!tripYear) return null;
+
+  if (tripYear <= 2026) return tripYear;
+
+  return tripYear - 1;
+}
+
+function extractCursoNumberForAlias(value = "") {
+  const match = normalizeCursoForAlias(value).match(/^(\d{1,2})/);
+  return match ? Number(match[1]) : null;
+}
+
+function extractCursoSuffixForAlias(value = "") {
+  const match = normalizeCursoForAlias(value).match(/^\d{1,2}(.*)$/);
+  return match ? match[1] : "";
+}
+
+function projectCursoForAlias(cursoBase = "", anoBase = null, anoViaje = null) {
+  const baseCurso = normalizeCursoForAlias(cursoBase);
+  const baseNumber = extractCursoNumberForAlias(baseCurso);
+  const suffix = extractCursoSuffixForAlias(baseCurso);
+
+  if (!baseCurso || baseNumber === null || !suffix) return "";
+  if (!Number.isFinite(Number(anoBase)) || !Number.isFinite(Number(anoViaje))) return "";
+
+  let projected = baseNumber;
+  const diff = Number(anoViaje) - Number(anoBase);
+
+  if (diff < 0) return "";
+
+  for (let i = 0; i < diff; i += 1) {
+    projected += 1;
+    if (projected > 8) projected = 1;
+  }
+
+  return `${projected}${suffix}`;
+}
+
+function buildAliasGrupoForRow(data = {}) {
+  const colegio = normalizeText(data.colegio || "");
+  const cursoBase = normalizeCursoForAlias(data.curso || "");
+  const anoViaje = getYearFromValue(data.anoViaje);
+
+  if (!colegio || !cursoBase || !anoViaje) return "";
+
+  // Regla:
+  // 2025 y 2026 => alias corto
+  if (anoViaje <= 2026) {
+    return `${cursoBase} (${anoViaje}) ${colegio}`.trim();
+  }
+
+  const anoBase = getAnoBaseForAlias(data);
+  if (!anoBase) {
+    return `${cursoBase} (${anoViaje}) ${colegio}`.trim();
+  }
+
+  const cursoViaje = normalizeCursoForAlias(
+    data.cursoViaje || projectCursoForAlias(cursoBase, anoBase, anoViaje)
+  );
+
+  if (!cursoViaje || anoBase >= anoViaje) {
+    return `${cursoBase} (${anoViaje}) ${colegio}`.trim();
+  }
+
+  return `${cursoBase} (${anoBase}) ${cursoViaje} (${anoViaje}) ${colegio}`.trim();
+}
+
+async function backfillAliasGrupo() {
+  if (!isAdminOnly()) return;
+
+  try {
+    setProgressStatus({
+      text: "Completando alias...",
+      meta: "Leyendo registros existentes...",
+      progress: 10
+    });
+
+    const pending = [];
+
+    state.rowsRaw.forEach(({ id, data }) => {
+      const currentData = data || {};
+      const aliasNuevo = buildAliasGrupoForRow(currentData);
+      const aliasActual = normalizeText(currentData.aliasGrupo || "");
+
+      if (!aliasNuevo) return;
+      if (aliasNuevo === aliasActual) return;
+
+      pending.push({
+        id,
+        patch: {
+          aliasGrupo: aliasNuevo,
+          actualizadoPor: getNombreUsuario(state.effectiveUser),
+          actualizadoPorCorreo: normalizeEmail(state.realUser?.email || ""),
+          fechaActualizacion: serverTimestamp()
+        }
+      });
+    });
+
+    if (!pending.length) {
+      setProgressStatus({
+        text: "Backfill alias listo.",
+        meta: "No había registros para actualizar.",
+        progress: 100,
+        type: "success"
+      });
+      clearProgressStatus({}, 2500);
+      return;
+    }
+
+    let processed = 0;
+
+    for (let i = 0; i < pending.length; i += WRITE_BATCH_LIMIT) {
+      const chunk = pending.slice(i, i + WRITE_BATCH_LIMIT);
+      const batch = writeBatch(db);
+
+      chunk.forEach(({ id, patch }) => {
+        batch.set(doc(db, "ventas_cotizaciones", id), patch, { merge: true });
+      });
+
+      await batch.commit();
+      processed += chunk.length;
+
+      setProgressStatus({
+        text: "Completando alias...",
+        meta: `Procesados: ${processed}/${pending.length}`,
+        progress: 20 + Math.round((processed / pending.length) * 80)
+      });
+    }
+
+    setProgressStatus({
+      text: "Backfill alias listo.",
+      meta: `${pending.length} registro(s) actualizados.`,
+      progress: 100,
+      type: "success"
+    });
+    clearProgressStatus({}, 2500);
+
+    await loadData();
+  } catch (error) {
+    console.error(error);
+    setProgressStatus({
+      text: "Error completando alias.",
+      meta: error.message || "No se pudo ejecutar el backfill del alias.",
       progress: 100,
       type: "error"
     });
@@ -2300,5 +2481,6 @@ async function initPage() {
 
 window.backfillOrigenColegioDesdeCartera = backfillOrigenColegioDesdeCartera;
 window.backfillVendedoraCorreoDesdeNombre = backfillVendedoraCorreoDesdeNombre;
+window.backfillAliasGrupo = backfillAliasGrupo;
 
 initPage();
