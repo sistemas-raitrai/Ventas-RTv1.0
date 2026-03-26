@@ -7,17 +7,17 @@
   <link rel="stylesheet" href="estilos.css" />
   <link rel="icon" type="image/png" href="IMG/logo-raitrai.png" />
 </head>
-<body class="login-body">
+<body class="ventas-body login-body auth-page" data-page="login">
 
-  <main class="login-wrapper">
-    <section class="login-card">
-      <div class="login-brand">
+  <main class="login-wrapper auth-wrapper">
+    <section class="login-card auth-card panel">
+      <div class="login-brand page-header page-header-single">
         <div class="login-brand-logo">
           <img src="IMG/logo-raitrai.png" alt="Logo Rai Trai" class="logo-img">
         </div>
         <div>
-          <h1>Sistema Ventas RT</h1>
-          <p>Ingreso de usuarios</p>
+          <h1 class="page-title">Sistema Ventas RT</h1>
+          <p class="page-subtitle">Ingreso de usuarios</p>
         </div>
       </div>
 
@@ -27,9 +27,9 @@
           <input
             type="email"
             id="email"
+            class="input-no-transform"
             placeholder="usuario@raitrai.cl"
             autocomplete="username"
-            style="text-transform:none;"
           />
         </div>
 
@@ -53,7 +53,7 @@
           <button type="submit" id="loginBtn">Ingresar</button>
         </div>
 
-        <div id="loginError" class="login-error"></div>
+        <div id="loginError" class="login-error" role="alert" aria-live="assertive"></div>
       </form>
     </section>
   </main>
