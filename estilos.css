@@ -392,6 +392,24 @@ html, body{
   justify-content:center;
 }
 
+/* =========================================================
+   FILTRO TRIPLE DEL DASHBOARD
+   - 1ª fila: Vendedor | Grupo
+   - 2ª fila:           Apoderado (alineado bajo Grupo)
+========================================================= */
+.filtro-row-triple{
+  display:grid;
+  grid-template-columns: repeat(2, max-content);
+  justify-content:center;
+  column-gap:28px;
+  row-gap:20px;
+  width:100%;
+}
+
+.filtro-row-triple .filtro-bloque:nth-child(3){
+  grid-column:2;
+}
+
 .filtro-row select,
 .filtro-bloque select{
   width:340px;
@@ -740,6 +758,14 @@ html, body{
   .filtro-bloque select,
   .filtro-bloque button{
     width:100%;
+  }
+
+  .filtro-row-triple{
+    grid-template-columns: 1fr;
+  }
+
+  .filtro-row-triple .filtro-bloque:nth-child(3){
+    grid-column:auto;
   }
 }
 
