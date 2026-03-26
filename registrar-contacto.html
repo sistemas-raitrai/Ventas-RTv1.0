@@ -371,14 +371,14 @@
 <body class="ventas-body" data-page="registrar-contacto">
   <div id="layout-top"></div>
 
-  <main class="registro-page">
-    <section class="registro-panel">
-      <div class="registro-title">
+  <main class="page-shell registro-page">
+    <section class="page-card panel registro-panel">
+      <div class="page-header page-header-single registro-title">
         <h2>Registrar contacto</h2>
-        <p id="registroScope">Registrar un nuevo conjtacto.</p>
+        <p id="registroScope" class="page-subtitle">Registrar un nuevo contacto.</p>
       </div>
 
-      <div id="statusCard" class="status-card hidden">
+      <div id="statusCard" class="status-card hidden" role="status" aria-live="polite">
         <div class="status-top">
           <div id="statusText" class="status-text">Listo.</div>
           <div id="statusMeta" class="status-meta"></div>
@@ -467,7 +467,7 @@
             <label class="check-item"><input type="checkbox" name="destinoSecundario" value="Sur de Chile" /> SUR DE CHILE</label>
             <label class="check-item"><input type="checkbox" name="destinoSecundario" value="Bariloche y Sur de Chile" /> SUR DE CHILE Y BARILOCHE</label>
             <label class="check-item"><input type="checkbox" name="destinoSecundario" value="Brasil" /> BRASIL</label>
-            <label class="check-item"><input type="checkbox" name="destinoSecundario" value="Brasil" /> NORTE DE CHILE</label>
+            <label class="check-item"><input type="checkbox" name="destinoSecundario" value="Norte de Chile" /> NORTE DE CHILE</label>
             <label class="check-item"><input type="checkbox" name="destinoSecundario" value="Otro" /> OTRO</label>
           </div>
         </div>
@@ -552,18 +552,18 @@
           <input id="origenEspecificacionOtro" type="text" placeholder="Especifica el origen" />
         </div>
 
-        <div class="form-actions">
+        <div class="form-actions page-actions page-actions-right">
           <button id="btnLimpiar" class="btn-page sec" type="button">Limpiar</button>
           <button id="btnGuardarRegistro" class="btn-page green" type="submit">Registrar contacto</button>
         </div>
       </form>
-      <div id="successModal" class="success-backdrop">
-        <div class="success-card">
-          <div class="success-head">
+      <div id="successModal" class="success-backdrop modal-backdrop">
+        <div class="success-card modal-card modal-card-sm">
+          <div class="success-head modal-head modal-head-success">
             <h3>Registro creado correctamente</h3>
           </div>
       
-          <div class="success-body">
+          <div class="success-body modal-body modal-body-stack">
             <div class="success-row"><strong>Código:</strong> <span id="successCodigo">—</span></div>
             <div class="success-row"><strong>Colegio:</strong> <span id="successColegio">—</span></div>
             <div class="success-row"><strong>Creado por:</strong> <span id="successCreadoPor">—</span></div>
@@ -571,7 +571,7 @@
             <div class="success-row"><strong>Hora:</strong> <span id="successHora">—</span></div>
           </div>
       
-          <div class="success-actions">
+          <div class="success-actions modal-foot">
             <button id="btnNuevoRegistro" class="btn-page sec" type="button">Registrar un grupo nuevo</button>
             <button id="btnIrRegistro" class="btn-page green" type="button">Ir al registro del grupo</button>
           </div>
