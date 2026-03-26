@@ -191,6 +191,39 @@ export function waitForElement(id, maxChecks = 80, delay = 50) {
   });
 }
 
-export async function waitForLayoutReady() {
-  await waitForElement("btn-home");
+export async function waitForLayoutReady(maxChecks = 120, delay = 50) {
+  return new Promise((resolve, reject) => {
+    let checks = 0;
+
+    const tick = () => {
+      const slot = $("layout-top");
+      const btnHome = $("btn-home");
+      const btnLogout = $("btn-logout");
+      const header = document.querySelector(".ventas-header");
+
+      const layoutRendered =
+        !!slot &&
+        (
+          !!btnHome ||
+          !!btnLogout ||
+          !!header ||
+          (slot.innerHTML && slot.innerHTML.trim() !== "")
+        );
+
+      if (layoutRendered) {
+        resolve(true);
+        return;
+      }
+
+      checks += 1;
+      if (checks >= maxChecks) {
+        reject(new Error("No se pudo montar el layout superior (#layout-top)."));
+        return;
+      }
+
+      setTimeout(tick, delay);
+    };
+
+    tick();
+  });
 }
