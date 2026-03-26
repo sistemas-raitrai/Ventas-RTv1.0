@@ -793,3 +793,287 @@ html, body{
     grid-column: 3 / 4;
   }
 }
+
+/* =========================================================
+   OVERRIDE VISUAL MODERNO - DASHBOARD VENTAS
+   Pegar al final de estilos.css
+========================================================= */
+
+:root{
+  --bg-soft:#f5f4f8;
+  --panel-border:rgba(58,42,82,.12);
+  --panel-shadow:0 10px 30px rgba(36,18,56,.08);
+  --panel-shadow-hover:0 16px 40px rgba(36,18,56,.12);
+  --input-border:rgba(58,42,82,.16);
+  --input-focus:rgba(45,24,68,.22);
+}
+
+/* Fondo general más limpio */
+.ventas-body{
+  background:
+    radial-gradient(circle at top left, rgba(255,255,255,.75), transparent 35%),
+    linear-gradient(180deg, #f6f5f9 0%, #efedf4 100%);
+}
+
+/* Header más premium */
+.ventas-header{
+  background:linear-gradient(135deg, var(--header) 0%, var(--header-2) 100%);
+  box-shadow:0 10px 24px rgba(36,18,56,.16);
+  padding:20px 30px;
+}
+
+.ventas-menu{
+  background:linear-gradient(135deg, var(--header) 0%, var(--header-2) 100%);
+  padding:14px 20px 42px;
+}
+
+.ventas-menu a{
+  opacity:.88;
+  transition:opacity .2s ease, transform .2s ease;
+}
+
+.ventas-menu a:hover{
+  opacity:1;
+  transform:translateY(-1px);
+}
+
+/* Layout con un poco más de aire */
+.ventas-main{
+  gap:24px;
+  padding:22px 30px 34px;
+}
+
+/* Panel base moderno */
+.panel{
+  background:rgba(255,255,255,.88);
+  border:1px solid var(--panel-border);
+  border-radius:22px;
+  box-shadow:var(--panel-shadow);
+  padding:22px 24px;
+  backdrop-filter:blur(6px);
+}
+
+/* Cada panel con acento superior */
+.panel-alertas{
+  min-height:306px;
+  border-top:4px solid var(--orange);
+}
+
+.panel-importante{
+  border-top:4px solid var(--blue);
+  min-height:110px;
+}
+
+.panel-filtro{
+  border-top:4px solid #5c45a6;
+  min-height:120px;
+}
+
+.panel-grupos{
+  border-top:4px solid var(--header);
+  min-height:536px;
+}
+
+/* Títulos más finos y modernos */
+.panel-alertas h2,
+.panel-importante h2{
+  font-size:24px;
+  letter-spacing:.4px;
+}
+
+/* Alertas tipo item/card */
+.alert-row{
+  background:#fff;
+  border:1px solid rgba(58,42,82,.08);
+  border-radius:16px;
+  padding:12px 14px;
+  margin-bottom:12px;
+  box-shadow:0 4px 14px rgba(36,18,56,.04);
+}
+
+.alert-row a{
+  text-decoration:none;
+  background:rgba(47,111,219,.10);
+  color:#1e5fbf;
+  padding:6px 10px;
+  border-radius:999px;
+  font-size:14px;
+  font-weight:700;
+}
+
+/* Ícono importante más limpio */
+.importante-icon{
+  width:42px;
+  height:42px;
+  font-size:20px;
+  box-shadow:0 8px 18px rgba(47,111,219,.20);
+}
+
+/* Filtros */
+.filtro-row-triple{
+  column-gap:24px;
+  row-gap:16px;
+}
+
+.filtro-bloque{
+  gap:12px;
+}
+
+.filtro-row select,
+.filtro-bloque select{
+  width:340px;
+  height:52px;
+  border:1px solid var(--input-border);
+  border-radius:14px;
+  background:#fff;
+  padding:0 16px;
+  font-size:16px;
+  color:var(--header);
+  box-shadow:0 2px 8px rgba(36,18,56,.04);
+  transition:border-color .2s ease, box-shadow .2s ease, transform .2s ease;
+}
+
+.filtro-row select:focus,
+.filtro-bloque select:focus{
+  outline:none;
+  border-color:var(--input-focus);
+  box-shadow:0 0 0 4px rgba(45,24,68,.08);
+  transform:translateY(-1px);
+}
+
+.filtro-row button,
+.filtro-bloque button{
+  width:140px;
+  height:52px;
+  border:none;
+  border-radius:14px;
+  background:linear-gradient(135deg, var(--header) 0%, var(--header-2) 100%);
+  color:#fff;
+  font-size:17px;
+  font-weight:700;
+  letter-spacing:.2px;
+  cursor:pointer;
+  box-shadow:0 10px 20px rgba(36,18,56,.18);
+  transition:transform .2s ease, box-shadow .2s ease, opacity .2s ease;
+}
+
+.filtro-row button:hover,
+.filtro-bloque button:hover{
+  transform:translateY(-2px);
+  box-shadow:0 14px 28px rgba(36,18,56,.22);
+}
+
+/* Tablero de grupos con más aire */
+.groups-board{
+  gap:18px 16px;
+}
+
+/* Cards del flujo modernas */
+.flow-card{
+  position:relative;
+  background:#fff;
+  border:1px solid rgba(58,42,82,.10);
+  border-radius:20px;
+  padding:16px 18px;
+  min-height:104px;
+  box-shadow:0 10px 24px rgba(36,18,56,.06);
+  transition:transform .2s ease, box-shadow .2s ease;
+  overflow:hidden;
+}
+
+.flow-card:hover{
+  transform:translateY(-2px);
+  box-shadow:var(--panel-shadow-hover);
+}
+
+.flow-card::before{
+  content:"";
+  position:absolute;
+  left:0;
+  top:0;
+  width:100%;
+  height:5px;
+  background:var(--line);
+}
+
+.contactados::before{ background:#5b46a1; }
+.cotizando::before{ background:#2f6fdb; }
+.reunion::before{ background:var(--green); }
+.perdidas::before{ background:var(--red); }
+.recotizando::before{ background:var(--yellow); }
+.ganadas::before{ background:#3aa55d; }
+.autorizadas::before{ background:#0f7b28; }
+.cerradas::before{ background:#7e8a97; }
+
+.flow-card h3{
+  margin:0 0 10px;
+  font-size:15px;
+  letter-spacing:.6px;
+  color:var(--header);
+}
+
+.flow-numbers{
+  font-size:17px;
+  font-weight:800;
+  text-decoration:none;
+  line-height:1.5;
+}
+
+.flow-numbers.top{
+  color:var(--header);
+}
+
+.flow-numbers.bottom{
+  color:#4d5b7c;
+}
+
+/* Estados especiales */
+.autorizadas{
+  background:#15384f;
+  border-color:rgba(21,56,79,.28);
+}
+
+.autorizadas h3,
+.autorizadas .flow-numbers.top{
+  color:#fff;
+}
+
+.cerradas{
+  border-style:solid;
+  background:#f8fafc;
+}
+
+/* Flechas menos pesadas */
+.arrow{
+  font-size:30px;
+  font-weight:700;
+  opacity:.55;
+  transform:scale(.95);
+}
+
+/* Logo más fino */
+.logo-box{
+  border:1px solid rgba(255,255,255,.20);
+  border-radius:16px;
+  background:rgba(255,255,255,.05);
+  backdrop-filter:blur(4px);
+}
+
+/* Responsive suave */
+@media (max-width: 900px){
+  .panel{
+    padding:18px;
+    border-radius:18px;
+  }
+
+  .filtro-row button,
+  .filtro-bloque button,
+  .filtro-row select,
+  .filtro-bloque select{
+    width:100%;
+  }
+
+  .arrow{
+    font-size:24px;
+  }
+}
