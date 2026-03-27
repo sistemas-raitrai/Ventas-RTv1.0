@@ -71,7 +71,10 @@ function bindEvents() {
   $("filtroAno")?.addEventListener("change", applyFiltersAndRender);
   $("filtroEstado")?.addEventListener("change", applyFiltersAndRender);
   $("filtroVendedora")?.addEventListener("change", applyFiltersAndRender);
-  $("toggleAnteriores")?.addEventListener("change", applyFiltersAndRender);
+  $("toggleAnteriores")?.addEventListener("change", () => {
+    fillYearFilter(state.allRows);
+    applyFiltersAndRender();
+  });
 
   $("buscadorSeguimiento")?.addEventListener("input", debounce(() => {
     applyFiltersAndRender();
@@ -177,13 +180,34 @@ function mapClienteDoc(id, data) {
   const cortesiaEstado = normalizeDocState(data.cortesiaEstado);
 
   const displayTitle = aliasGrupo || nombreApoderado || nombreGrupo || `Grupo ${id}`;
-
-  const subtitleParts = [
-    nombreGrupo && nombreGrupo !== displayTitle ? nombreGrupo : "",
-    colegio,
+  
+  const displayNorm = normalizeText(displayTitle);
+  const nombreGrupoNorm = normalizeText(nombreGrupo);
+  const colegioNorm = normalizeText(colegio);
+  
+  const subtitleCandidates = [
+    // Solo mostrar nombreGrupo si realmente aporta algo distinto
+    nombreGrupo && nombreGrupoNorm !== displayNorm && nombreGrupoNorm !== colegioNorm
+      ? nombreGrupo
+      : "",
+  
+    // Si ya existe aliasGrupo, NO repetir colegio debajo,
+    // porque el alias corto ya lo incorpora.
+    !aliasGrupo && colegio && colegioNorm !== displayNorm
+      ? colegio
+      : "",
+  
     curso ? `Curso ${curso}` : "",
     anoViaje ? `Año ${anoViaje}` : ""
   ].filter(Boolean);
+  
+  const seenSubtitle = new Set();
+  const subtitleParts = subtitleCandidates.filter((part) => {
+    const key = normalizeText(part);
+    if (!key || seenSubtitle.has(key)) return false;
+    seenSubtitle.add(key);
+    return true;
+  });
 
   return {
     id,
@@ -484,18 +508,28 @@ function fillYearFilter(rows) {
   if (!select) return;
 
   const previous = select.value || "todos";
+  const showOld = !!$("toggleAnteriores")?.checked;
 
-  const years = [...new Set(
+  let years = [...new Set(
     rows
       .map(r => Number(r.anoViaje || 0))
       .filter(Boolean)
   )].sort((a, b) => a - b);
+
+  // Si NO está activado "Ver años anteriores",
+  // ocultamos del selector los años menores al actual.
+  if (!showOld) {
+    years = years.filter(year => year >= CURRENT_YEAR);
+  }
 
   select.innerHTML = `
     <option value="todos">Todos</option>
     ${years.map(year => `<option value="${year}">${year}</option>`).join("")}
   `;
 
+  // Si el año previamente seleccionado ya no existe en el select
+  // (por ejemplo 2025 al desactivar "Ver años anteriores"),
+  // volvemos a "todos".
   if ([...select.options].some(opt => opt.value === previous)) {
     select.value = previous;
   } else {
