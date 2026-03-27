@@ -220,6 +220,11 @@ function setHeaderAndScope() {
   if (scope) {
     scope.textContent = "Macro general de cotizaciones y grupos comerciales.";
   }
+
+  // IMPORTANTE:
+  // Como el switcher del encabezado se vuelve a renderizar,
+  // hay que volver a conectar los listeners de sus botones.
+  bindHeaderActions();
 }
 
 function prettifyFieldKey(key = "") {
@@ -2465,7 +2470,6 @@ async function bootstrapFromSession() {
 async function initPage() {
   await waitForLayoutReady();
 
-  bindHeaderActions();
   bindPageEvents();
 
   onAuthStateChanged(auth, async (user) => {
