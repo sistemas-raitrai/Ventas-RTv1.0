@@ -170,7 +170,8 @@ const state = {
     estado: "",
     vendedora: "",
     anoViaje: "",
-    destinoPrincipal: ""
+    destinoPrincipal: "",
+    cartera: ""
   }
 };
 
@@ -286,6 +287,11 @@ function isArchivedRow(row) {
   const year = getAnoViajeNumber(row);
   if (!year) return false;
   return year < new Date().getFullYear();
+}
+
+function getCarteraBucket(row) {
+  const origen = normalizeSearch(row?.origenColegio || "");
+  return origen === "cartera" ? "cartera" : "no_cartera";
 }
 
 function updateArchiveButton() {
@@ -1457,6 +1463,10 @@ function applyFilters() {
     rows = rows.filter(r => normalizeText(r.destinoPrincipal) === state.filters.destinoPrincipal);
   }
 
+  if (state.filters.cartera) {
+    rows = rows.filter(r => getCarteraBucket(r) === state.filters.cartera);
+  }
+
   const q = normalizeSearch(state.search);
   if (q) {
     rows = rows.filter(r => getSearchTarget(r).includes(q));
@@ -2190,6 +2200,7 @@ function bindPageEvents() {
   const filterVendedora = $("filterVendedora");
   const filterAnoViaje = $("filterAnoViaje");
   const filterDestino = $("filterDestino");
+  const filterCartera = $("filterCartera");
   const btnRecargar = $("btnRecargar");
   const btnEliminarSeleccionados = $("btnEliminarSeleccionados");
   const fileInputXlsx = $("fileInputXlsx");
@@ -2242,6 +2253,14 @@ function bindPageEvents() {
     filterDestino.dataset.bound = "1";
     filterDestino.addEventListener("change", (e) => {
       state.filters.destinoPrincipal = normalizeText(e.target.value || "");
+      applyFilters();
+    });
+  }
+
+  if (filterCartera && !filterCartera.dataset.bound) {
+    filterCartera.dataset.bound = "1";
+    filterCartera.addEventListener("change", (e) => {
+      state.filters.cartera = e.target.value || "";
       applyFilters();
     });
   }
