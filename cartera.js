@@ -99,9 +99,19 @@ function getVendorNameByEmail(email = "") {
 }
 
 function getAliasList(user) {
-  const raw = user?.aliasCartera;
-  if (Array.isArray(raw)) return raw.map(a => normalizeSearch(a)).filter(Boolean);
-  if (typeof raw === "string") return [normalizeSearch(raw)].filter(Boolean);
+  // Soporta ambas variantes:
+  // - aliascartera  (como está hoy en firebase-init.js)
+  // - aliasCartera  (por si después normalizas el nombre)
+  const raw = user?.aliascartera ?? user?.aliasCartera;
+
+  if (Array.isArray(raw)) {
+    return raw.map(a => normalizeSearch(a)).filter(Boolean);
+  }
+
+  if (typeof raw === "string") {
+    return [normalizeSearch(raw)].filter(Boolean);
+  }
+
   return [];
 }
 
@@ -1248,7 +1258,9 @@ function mapImportRow(rawRow) {
     nombreVendedor: vendor?.nombre || "",
     apellidoVendedor: vendor?.apellido || "",
     correoVendedor: vendor?.email || "",
-    vendedorAliasOriginal: alias
+    vendedorAliasOriginal: alias,
+    __sourceRow: rawRow?.__sourceRow || "",
+    __sheetName: rawRow?.__sheetName || ""
   };
 }
 
@@ -1358,7 +1370,7 @@ async function importXlsx(file) {
     const errors = [];
 
     for (let i = 0; i < rawRows.length; i++) {
-      const row = mapImportRow(rawRows[i], rawRows[i].__sourceRow);
+      const row = mapImportRow(rawRows[i]);
     
       if (!row.numeroColegio || !row.colegio || !row.vendedorAliasOriginal) {
         continue;
