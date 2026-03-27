@@ -61,6 +61,7 @@ const ICON_LOGOUT = `
 
 function getVisibleMenuItems(user) {
   const rol = user?.rol || "";
+  if (!rol) return [];
   return menuItems.filter(item => item.roles.includes(rol));
 }
 
@@ -112,22 +113,26 @@ function renderLayoutTop(user) {
 
           <div class="saludo-wrap header-user-block">
             <div class="header-kicker">Sistema Ventas RT</div>
-            <h1 id="saludo-usuario" class="header-greeting">Hola, Usuario(a)</h1>
-            <div id="usuario-conectado" class="usuario-conectado"></div>
+            <h1 id="saludo-usuario" class="header-greeting">
+              ${user ? "Hola, Usuario(a)" : "Cargando..."}
+            </h1>
+            <div id="usuario-conectado" class="usuario-conectado">
+              ${user?.email || ""}
+            </div>
           </div>
         </div>
 
         <div class="ventas-header-right header-actions">
           <a
-            href="#"
-            id="btn-logout"
-            class="header-icon icon-btn icon-btn-danger"
-            title="Cerrar sesión"
-            aria-label="Cerrar sesión"
+            href="index.html"
+            id="btn-home"
+            class="header-icon icon-btn"
+            title="Inicio"
+            aria-label="Inicio"
           >
-            ${ICON_LOGOUT}
+            ${ICON_HOME}
           </a>
-
+        
           <a
             href="#"
             id="btn-logout"
@@ -168,4 +173,22 @@ function renderLayoutTop(user) {
       </div>
     </section>
   `;
+}
+
+function mountLayoutTop() {
+  const slot = document.getElementById("layout-top");
+  if (!slot) return;
+
+  slot.innerHTML = renderLayoutTop(null);
+
+  onAuthStateChanged(auth, (firebaseUser) => {
+    const ventasUser = firebaseUser ? getVentasUser(firebaseUser.email || "") : null;
+    slot.innerHTML = renderLayoutTop(ventasUser);
+  });
+}
+
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", mountLayoutTop, { once: true });
+} else {
+  mountLayoutTop();
 }
