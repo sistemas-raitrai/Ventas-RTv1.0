@@ -1002,8 +1002,8 @@ async function backfillVendedoraCorreoDesdeNombre({ overwriteExisting = false } 
 
   try {
     setProgressStatus({
-      text: "Completando correos de vendedora...",
-      meta: "Revisando registros existentes...",
+      text: "Completando datos de vendedora.",
+      meta: "Revisando registros existentes.",
       progress: 10
     });
 
@@ -1015,29 +1015,32 @@ async function backfillVendedoraCorreoDesdeNombre({ overwriteExisting = false } 
       const nombreActual = normalizeText(currentData.vendedora || "");
       const correoActual = normalizeEmail(currentData.vendedoraCorreo || "");
 
-      let nombreNuevo = nombreActual;
-      let correoNuevo = correoActual;
+      let seller = null;
 
-      // 1) Si existe nombre de vendedora, intentar resolver su usuario
-      if (nombreActual) {
-        const seller = resolveVentasUserByName(nombreActual);
-        if (seller) {
-          nombreNuevo = getDisplayName(seller) || nombreActual;
-          correoNuevo = normalizeEmail(seller.email || "") || correoActual;
-        }
+      // Prioridad 1:
+      // si hay correo, usarlo como fuente principal de verdad
+      if (correoActual) {
+        seller = resolveVentasUserByEmail(correoActual);
       }
 
-      // 2) Si no hay nombre pero sí correo, intentar resolver nombre
-      if (!nombreNuevo && correoActual) {
-        const seller = resolveVentasUserByEmail(correoActual);
-        if (seller) {
-          nombreNuevo = getDisplayName(seller) || nombreNuevo;
-          correoNuevo = normalizeEmail(seller.email || "") || correoActual;
-        }
+      // Prioridad 2:
+      // si no resolvió por correo, intentar por nombre actual
+      if (!seller && nombreActual) {
+        seller = resolveVentasUserByName(nombreActual);
       }
+
+      if (!seller) return;
+
+      const nombreNuevo = getDisplayName(seller) || nombreActual;
+      const correoNuevo = normalizeEmail(seller.email || "") || correoActual;
 
       const shouldUpdateNombre =
-        !!nombreNuevo && nombreNuevo !== nombreActual;
+        !!nombreNuevo &&
+        (
+          overwriteExisting
+            ? nombreNuevo !== nombreActual
+            : !nombreActual
+        );
 
       const shouldUpdateCorreo =
         !!correoNuevo &&
@@ -1086,7 +1089,7 @@ async function backfillVendedoraCorreoDesdeNombre({ overwriteExisting = false } 
       processed += chunk.length;
 
       setProgressStatus({
-        text: "Completando correos de vendedora...",
+        text: "Completando datos de vendedora.",
         meta: `Procesados: ${processed}/${pending.length}`,
         progress: 20 + Math.round((processed / pending.length) * 80)
       });
@@ -1104,7 +1107,7 @@ async function backfillVendedoraCorreoDesdeNombre({ overwriteExisting = false } 
   } catch (error) {
     console.error(error);
     setProgressStatus({
-      text: "Error completando correos de vendedora.",
+      text: "Error completando datos de vendedora.",
       meta: error.message || "No se pudo ejecutar el backfill.",
       progress: 100,
       type: "error"
