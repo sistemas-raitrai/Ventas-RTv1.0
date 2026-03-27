@@ -89,7 +89,7 @@ async function loadSeguimiento() {
   renderEmpty("Cargando grupos...");
 
   try {
-    const snap = await getDocs(collection(db, "clientes"));
+    const snap = await getDocs(collection(db, "ventas_cotizaciones"));
     const rows = [];
 
     snap.forEach((docSnap) => {
@@ -111,29 +111,27 @@ async function loadSeguimiento() {
    MAPEO DE DATOS
 ========================================================= */
 function mapClienteDoc(id, data) {
-  const alias = cleanText(data.alias);
+  const aliasGrupo = cleanText(data.aliasGrupo);
   const nombreApoderado = cleanText(
+    data.nombreCliente ||
     data.nombreApoderado ||
     data.apoderado ||
-    data.apoderadoNombre ||
-    data.nombreResponsable
+    ""
   );
 
   const nombreGrupo = cleanText(
     data.nombreGrupo ||
-    data.grupo ||
-    data.nombre ||
-    data.colegio
+    data.colegio ||
+    ""
   );
 
   const colegio = cleanText(data.colegio);
   const curso = cleanText(data.curso);
-  const anoViaje = Number(data.anoViaje || data.anioViaje || data.ano || 0) || 0;
+  const anoViaje = Number(data.anoViaje || 0) || 0;
 
   const destino = cleanText(
+    data.destinoPrincipal ||
     data.destino ||
-    data.programa ||
-    data.destinoViaje ||
     "Sin destino"
   );
 
@@ -141,8 +139,7 @@ function mapClienteDoc(id, data) {
     data.estado ||
     data.estadoGrupo ||
     data.estadoComercial ||
-    data.etapaComercial ||
-    data.estadoSeguimiento
+    data.etapaComercial
   );
 
   const autorizada = resolveAutorizada(data);
@@ -151,20 +148,14 @@ function mapClienteDoc(id, data) {
   const imagen = cleanText(
     data.imagen ||
     data.imagenUrl ||
-    data.foto ||
-    data.logo ||
-    data.logoUrl
+    ""
   );
 
   const ultimaGestionAt = toDate(
     data.ultimaGestionAt ||
-    data.ultimaGestion ||
+    data.fechaActualizacion ||
     data.actualizadoEl ||
     data.updatedAt ||
-    data.modificadoEl ||
-    data.fechaModificacion ||
-    data.fechaActualizacion ||
-    data.creadoEl ||
     data.fechaCreacion ||
     null
   );
@@ -172,57 +163,20 @@ function mapClienteDoc(id, data) {
   const fechaUltimaReunion = toDate(
     data.fechaUltimaReunion ||
     data.ultimaReunion ||
-    data.reunionFecha ||
     data.fechaReunion ||
     null
   );
 
-  const vendedora = cleanText(
-    data.vendedora ||
-    data.creadoPor ||
-    data.vendedor ||
-    data.usuario ||
-    ""
-  );
+  const vendedora = cleanText(data.vendedora || "");
+  const vendedoraCorreo = normalizeEmail(data.vendedoraCorreo || "");
 
-  const vendedoraCorreo = normalizeEmail(
-    data.vendedoraCorreo ||
-    data.creadoPorCorreo ||
-    data.vendedorCorreo ||
-    data.usuarioCorreo ||
-    ""
-  );
+  const fichaMedicaEstado = normalizeDocState(data.fichaMedicaEstado);
+  const nominaEstado = normalizeDocState(data.nominaEstado);
+  const fichaEstado = normalizeDocState(data.fichaEstado);
+  const contratoEstado = normalizeDocState(data.contratoEstado);
+  const cortesiaEstado = normalizeDocState(data.cortesiaEstado);
 
-  const fichaMedicaEstado = normalizeDocState(
-    data.fichaMedicaEstado ||
-    data.estadoFichaMedica ||
-    data.medicasEstado
-  );
-
-  const nominaEstado = normalizeDocState(
-    data.nominaEstado ||
-    data.estadoNomina ||
-    data.listadoEstado
-  );
-
-  const fichaEstado = normalizeDocState(
-    data.fichaEstado ||
-    data.estadoFicha ||
-    data.fichaGrupoEstado
-  );
-
-  const contratoEstado = normalizeDocState(
-    data.contratoEstado ||
-    data.estadoContrato
-  );
-
-  const cortesiaEstado = normalizeDocState(
-    data.cortesiaEstado ||
-    data.estadoCortesia ||
-    data.estadiasCortesiaEstado
-  );
-
-  const displayTitle = alias || nombreApoderado || nombreGrupo || `Grupo ${id}`;
+  const displayTitle = aliasGrupo || nombreApoderado || nombreGrupo || `Grupo ${id}`;
 
   const subtitleParts = [
     nombreGrupo && nombreGrupo !== displayTitle ? nombreGrupo : "",
@@ -233,7 +187,7 @@ function mapClienteDoc(id, data) {
 
   return {
     id,
-    alias,
+    aliasGrupo,
     nombreApoderado,
     nombreGrupo,
     colegio,
@@ -257,7 +211,7 @@ function mapClienteDoc(id, data) {
     subtitleParts,
     searchIndex: normalizeText([
       id,
-      alias,
+      aliasGrupo,
       nombreApoderado,
       nombreGrupo,
       colegio,
@@ -269,7 +223,6 @@ function mapClienteDoc(id, data) {
     ].join(" "))
   };
 }
-
 /* =========================================================
    FILTROS
 ========================================================= */
