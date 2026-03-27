@@ -124,6 +124,10 @@ function findVendorByAlias(alias = "") {
 }
 
 function buildScopeText() {
+  if (!state.effectiveUser) {
+    return "Cartera · Cargando usuario...";
+  }
+
   let texto = "Cartera · Vista general";
 
   if (isVendedorRole(state.effectiveUser)) {
@@ -131,15 +135,15 @@ function buildScopeText() {
   } else if (canObserveOnlyRole(state.effectiveUser)) {
     texto = "Cartera · Observador";
   } else {
-    texto = `Cartera · ${state.effectiveUser.rol}`;
+    texto = `Cartera · ${state.effectiveUser.rol || "sin rol"}`;
   }
 
   if (state.vendorFilter && !isVendedorRole(state.effectiveUser)) {
     texto += ` · Filtrada por ${getVendorNameByEmail(state.vendorFilter)}`;
   }
 
-  if (isActingAsAnother(state.realUser, state.effectiveUser)) {
-    return `Navegando como ${getNombreUsuario(state.effectiveUser)} · ${state.effectiveUser.rol} · ${texto}`;
+  if (state.realUser && isActingAsAnother(state.realUser, state.effectiveUser)) {
+    return `Navegando como ${getNombreUsuario(state.effectiveUser)} · ${state.effectiveUser.rol || "sin rol"} · ${texto}`;
   }
 
   return texto;
@@ -315,6 +319,26 @@ async function deleteLogoFromStorage(path = "") {
 function renderHeaderState() {
   const pageScope = $("carteraScope");
 
+  if (!state.effectiveUser) {
+    setHeaderState({
+      realUser: state.realUser,
+      effectiveUser: null,
+      scopeText: "Cartera · Cargando usuario..."
+    });
+
+    renderActingUserSwitcher({
+      realUser: state.realUser,
+      effectiveUser: null,
+      users: VENTAS_USERS
+    });
+
+    if (pageScope) {
+      pageScope.textContent = "Cargando permisos de usuario...";
+    }
+
+    return;
+  }
+
   setHeaderState({
     realUser: state.realUser,
     effectiveUser: state.effectiveUser,
@@ -370,7 +394,7 @@ function bindHeaderActions() {
    UI LOCAL
 ========================================================= */
 function renderRoleButtons() {
-  const allowManage = canManageVentasRole(state.effectiveUser);
+  const allowManage = state.effectiveUser ? canManageVentasRole(state.effectiveUser) : false;
   const importLabel = $("labelImportar");
   const addBtn = $("btnAgregar");
   const deleteSelectedBtn = $("btnEliminarSeleccionados");
@@ -379,7 +403,7 @@ function renderRoleButtons() {
   if (addBtn) addBtn.classList.toggle("hidden", !allowManage);
   if (deleteSelectedBtn) {
     deleteSelectedBtn.classList.toggle("hidden", !allowManage);
-    deleteSelectedBtn.disabled = state.selectedKeys.size === 0;
+    deleteSelectedBtn.disabled = !allowManage || state.selectedKeys.size === 0;
   }
 }
 
@@ -1793,9 +1817,12 @@ async function initPage() {
   await bootstrapFromSession();
   bindHeaderActions();
   bindPageEvents();
-  renderHeaderState();
-  renderRoleButtons();
-  renderVendorFilter();
+
+  if (state.effectiveUser) {
+    renderHeaderState();
+    renderRoleButtons();
+    renderVendorFilter();
+  }
 
   onAuthStateChanged(auth, async (user) => {
     if (!user) return;
@@ -1806,5 +1833,4 @@ async function initPage() {
     await loadData();
   });
 }
-
 initPage();
