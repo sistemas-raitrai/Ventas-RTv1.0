@@ -1367,4 +1367,172 @@ html, body{
   }
 }
 
+/* =========================================================
+   FIX MENU HOME + BOTONES DE NAVEGACIÓN
+========================================================= */
+
+.ventas-menu-inner,
+.ventas-menu-shell{
+  display:flex;
+  flex-wrap:wrap;
+  align-items:center;
+  gap:10px;
+}
+
+.menu-link{
+  text-decoration:none;
+}
+
+.menu-pill{
+  min-height:42px;
+  padding:0 16px;
+  border-radius:999px;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  gap:10px;
+  background:rgba(255,255,255,.08);
+  border:1px solid rgba(255,255,255,.14);
+  color:rgba(255,255,255,.92);
+  font-size:14px;
+  font-weight:700;
+  letter-spacing:.1px;
+  box-shadow:0 6px 16px rgba(0,0,0,.10);
+  transition:transform .18s ease, background .18s ease, border-color .18s ease, color .18s ease;
+}
+
+.menu-pill:hover{
+  transform:translateY(-1px);
+  background:rgba(255,255,255,.14);
+  border-color:rgba(255,255,255,.22);
+  color:#fff;
+}
+
+.menu-pill.active{
+  background:#fff;
+  color:#2b1145;
+  border-color:rgba(255,255,255,.55);
+  box-shadow:0 10px 22px rgba(0,0,0,.16);
+}
+
+.menu-link-home{
+  padding-left:14px;
+  padding-right:18px;
+}
+
+.menu-link-icon{
+  width:18px;
+  height:18px;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  flex:0 0 18px;
+}
+
+.menu-link-icon svg{
+  width:18px;
+  height:18px;
+  display:block;
+}
+
+.menu-link-text{
+  white-space:nowrap;
+  line-height:1;
+}
+
+/* Header compacto y coherente */
+.ventas-header-inner{
+  max-width:1240px;
+  margin:0 auto;
+  padding:18px 24px 14px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:18px;
+}
+
+.ventas-brand{
+  display:flex;
+  align-items:center;
+  gap:16px;
+  min-width:0;
+}
+
+.brand-link{
+  display:inline-flex;
+  text-decoration:none;
+}
+
+.brand-mark{
+  width:68px;
+  height:68px;
+  border-radius:20px;
+  background:linear-gradient(180deg, rgba(255,255,255,.18) 0%, rgba(255,255,255,.08) 100%);
+  border:1px solid rgba(255,255,255,.18);
+  box-shadow:0 12px 24px rgba(0,0,0,.18);
+  backdrop-filter:blur(8px);
+  display:grid;
+  place-items:center;
+  padding:10px;
+  overflow:hidden;
+}
+
+.brand-mark .logo-img{
+  width:100%;
+  height:100%;
+  object-fit:contain;
+  display:block;
+}
+
+.header-actions{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  flex-shrink:0;
+}
+
+.icon-btn{
+  width:44px;
+  height:44px;
+  border-radius:14px;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  color:#fff;
+  text-decoration:none;
+  background:rgba(255,255,255,.09);
+  border:1px solid rgba(255,255,255,.14);
+  box-shadow:0 8px 20px rgba(0,0,0,.14);
+  transition:transform .18s ease, background .18s ease, border-color .18s ease, box-shadow .18s ease;
+}
+
+.icon-btn svg{
+  width:20px;
+  height:20px;
+  display:block;
+}
+
+.icon-btn:hover{
+  transform:translateY(-2px);
+  background:rgba(255,255,255,.14);
+  border-color:rgba(255,255,255,.22);
+  box-shadow:0 12px 24px rgba(0,0,0,.18);
+}
+
+.admin-switcher-card{
+  background:rgba(255,255,255,.94);
+  border:1px solid rgba(51,24,77,.10);
+  border-radius:22px;
+  box-shadow:0 14px 34px rgba(28,14,44,.10);
+  padding:14px 16px;
+}
+
+.admin-switcher-row{
+  display:flex;
+  flex-wrap:wrap;
+  gap:10px;
+  align-items:center;
+  justify-content:center;
+}
+
 
