@@ -181,33 +181,21 @@ function mapClienteDoc(id, data) {
 
   const displayTitle = aliasGrupo || nombreApoderado || nombreGrupo || `Grupo ${id}`;
   
-  const displayNorm = normalizeText(displayTitle);
-  const nombreGrupoNorm = normalizeText(nombreGrupo);
-  const colegioNorm = normalizeText(colegio);
+  let subtitleParts = [];
   
-  const subtitleCandidates = [
-    // Solo mostrar nombreGrupo si realmente aporta algo distinto
-    nombreGrupo && nombreGrupoNorm !== displayNorm && nombreGrupoNorm !== colegioNorm
-      ? nombreGrupo
-      : "",
-  
-    // Si ya existe aliasGrupo, NO repetir colegio debajo,
-    // porque el alias corto ya lo incorpora.
-    !aliasGrupo && colegio && colegioNorm !== displayNorm
-      ? colegio
-      : "",
-  
-    curso ? `Curso ${curso}` : "",
-    anoViaje ? `Año ${anoViaje}` : ""
-  ].filter(Boolean);
-  
-  const seenSubtitle = new Set();
-  const subtitleParts = subtitleCandidates.filter((part) => {
-    const key = normalizeText(part);
-    if (!key || seenSubtitle.has(key)) return false;
-    seenSubtitle.add(key);
-    return true;
-  });
+  if (aliasGrupo) {
+    // Si tiene alias: abajo solo año
+    subtitleParts = [
+      anoViaje ? `Año ${anoViaje}` : ""
+    ].filter(Boolean);
+  } else {
+    // Si no tiene alias: título = nombre apoderada
+    // abajo colegio + año
+    subtitleParts = [
+      colegio || nombreGrupo || "",
+      anoViaje ? `Año ${anoViaje}` : ""
+    ].filter(Boolean);
+  }
 
   return {
     id,
@@ -233,6 +221,8 @@ function mapClienteDoc(id, data) {
     cortesiaEstado,
     displayTitle,
     subtitleParts,
+    hasAlias: !!aliasGrupo,
+    avatarBaseText: colegio || nombreGrupo || nombreApoderado || displayTitle,
     searchIndex: normalizeText([
       id,
       aliasGrupo,
@@ -368,7 +358,7 @@ function renderRow(row) {
 
             <div class="seg-group-sub">
               ${row.subtitleParts.map(part => `<span>${escapeHtml(part)}</span>`).join("")}
-              ${row.vendedora ? `<span class="seg-chip-vendor">${escapeHtml(row.vendedora)}</span>` : ""}
+              ${row.hasAlias && row.vendedora ? `<span class="seg-chip-vendor">${escapeHtml(row.vendedora)}</span>` : ""}
             </div>
           </div>
         </div>
@@ -452,12 +442,12 @@ function renderAvatar(row) {
       <img
         src="${escapeAttr(row.imagen)}"
         alt="${escapeAttr(row.displayTitle)}"
-        onerror="this.parentNode.textContent='${escapeJs(getInitials(row.displayTitle))}'"
+        onerror="this.parentNode.textContent='${escapeJs(getInitials(row.avatarBaseText || row.displayTitle))}'"
       />
     `;
   }
 
-  return escapeHtml(getInitials(row.displayTitle));
+  return escapeHtml(getInitials(row.avatarBaseText || row.displayTitle));
 }
 
 function renderSummary(rows) {
