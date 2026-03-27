@@ -132,7 +132,7 @@ function renderLayoutTop(user) {
           >
             ${ICON_HOME}
           </a>
-        
+
           <a
             href="#"
             id="btn-logout"
@@ -161,9 +161,7 @@ function renderLayoutTop(user) {
               <option value="">Elegir usuario</option>
             </select>
 
-            <button id="btn-acting-user" class="btn-primary">
-              Entrar como
-            </button>
+            <button id="btn-acting-user" class="btn-primary">Entrar como</button>
 
             <button id="btn-reset-acting-user" class="btn-secundario">
               Volver a mi usuario
