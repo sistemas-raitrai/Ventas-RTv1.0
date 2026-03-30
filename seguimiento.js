@@ -542,17 +542,17 @@ function renderRow(row) {
   return `
     <tr>
       <td>
-        <div class="seg-group">
+        <a class="seg-group-link" href="grupo.html?id=${encodeURIComponent(row.id)}">
           <div class="seg-avatar">${avatarHtml}</div>
-
+      
           <div class="seg-group-info">
             <div class="seg-group-title">${escapeHtml(row.displayTitle)}</div>
-
+      
             <div class="seg-group-sub">
               ${row.subtitleParts.map((part) => `<span>${escapeHtml(part)}</span>`).join("")}
             </div>
           </div>
-        </div>
+        </a>
       </td>
 
       <td class="td-vendedor">
