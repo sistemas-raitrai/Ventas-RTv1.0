@@ -1,7 +1,6 @@
 import {
   auth,
   db,
-  getVentasUser,
   puedeVerGeneral,
   normalizeEmail,
   VENTAS_USERS
@@ -37,21 +36,29 @@ const CURRENT_YEAR = new Date().getFullYear();
 const state = {
   allRows: [],
   filteredRows: [],
+  visibleRows: [],
   authEmail: "",
   effectiveEmail: "",
   currentUser: null,
   realUser: null,
-  canSeeAll: false
+  canSeeAll: false,
+
+  // Perdidas oculto por defecto
+  hiddenSummaryStates: new Set(["perdida"]),
+
+  // Orden default pedido: por vendedor
+  sortKey: "vendedora",
+  sortDir: "asc"
 };
 
 const STAGE_META = {
-  a_contactar:        { label: "A contactar",        steps: 1, fillClass: "seg-fill-red" },
-  contactado:         { label: "Contactado",         steps: 2, fillClass: "seg-fill-orange" },
-  cotizando:          { label: "Cotizando",          steps: 3, fillClass: "seg-fill-yellow" },
-  recotizando:        { label: "Recotizando",        steps: 3, fillClass: "seg-fill-yellow" },
-  reunion_confirmada: { label: "Reunión confirmada", steps: 4, fillClass: "seg-fill-mix" },
-  ganada:             { label: "Ganada",             steps: 5, fillClass: "seg-fill-green" },
-  perdida:            { label: "Perdida",            steps: 5, fillClass: "seg-fill-red" }
+  a_contactar:        { label: "A contactar",        steps: 1, fillClass: "seg-fill-red",    order: 1 },
+  contactado:         { label: "Contactado",         steps: 2, fillClass: "seg-fill-orange", order: 2 },
+  cotizando:          { label: "Cotizando",          steps: 3, fillClass: "seg-fill-yellow", order: 3 },
+  recotizando:        { label: "Recotizando",        steps: 3, fillClass: "seg-fill-yellow", order: 4 },
+  reunion_confirmada: { label: "Reunión confirmada", steps: 4, fillClass: "seg-fill-mix",    order: 5 },
+  ganada:             { label: "Ganada",             steps: 5, fillClass: "seg-fill-green",  order: 6 },
+  perdida:            { label: "Perdida",            steps: 5, fillClass: "seg-fill-red",    order: 7 }
 };
 
 const DOCS_META = [
@@ -67,12 +74,37 @@ const DOCS_META = [
 ========================================================= */
 initPage();
 
+async function initPage() {
+  bindEvents();
+  await waitForLayoutReady();
+  bindHeaderActions();
+
+  onAuthStateChanged(auth, async (user) => {
+    if (!user) return;
+
+    await bootstrapFromSession();
+    renderActingUserSwitcherSimple();
+    updateSummaryButtonsUI();
+    updateSortHeaderUI();
+    await loadSeguimiento();
+  });
+}
+
 async function bootstrapFromSession() {
   state.realUser = getRealUser();
   state.currentUser = getEffectiveUser();
   state.authEmail = normalizeEmail(state.realUser?.email || auth.currentUser?.email || "");
   state.effectiveEmail = normalizeEmail(state.currentUser?.email || state.authEmail);
-  state.canSeeAll = puedeVerGeneral(state.effectiveEmail) || puedeVerGeneral(state.authEmail);
+
+  // IMPORTANTE:
+  // usar solo el usuario efectivo, para que "Entrar como" sí respete
+  // la vista del vendedor.
+  state.canSeeAll = puedeVerGeneral(state.effectiveEmail);
+
+  document.body.classList.toggle(
+    "is-vendedor-view",
+    String(state.currentUser?.rol || "").toLowerCase() === "vendedor"
+  );
 }
 
 function bindHeaderActions() {
@@ -93,11 +125,17 @@ function bindHeaderActions() {
 
       sessionStorage.setItem(ACTING_USER_KEY, selectedEmail);
       await bootstrapFromSession();
+      renderActingUserSwitcherSimple();
+      updateSummaryButtonsUI();
+      updateSortHeaderUI();
       await loadSeguimiento();
     },
     onResetActAs: async () => {
       sessionStorage.removeItem(ACTING_USER_KEY);
       await bootstrapFromSession();
+      renderActingUserSwitcherSimple();
+      updateSummaryButtonsUI();
+      updateSortHeaderUI();
       await loadSeguimiento();
     }
   });
@@ -117,7 +155,7 @@ function renderActingUserSwitcherSimple() {
 
   const current = select.value || "";
   const options = VENTAS_USERS
-    .map(u => {
+    .map((u) => {
       const nombreCompleto = [u.nombre, u.apellido].filter(Boolean).join(" ");
       return {
         email: u.email,
@@ -128,26 +166,12 @@ function renderActingUserSwitcherSimple() {
 
   select.innerHTML = `
     <option value="">Elegir usuario</option>
-    ${options.map(opt => `<option value="${opt.email}">${opt.label}</option>`).join("")}
+    ${options.map((opt) => `<option value="${opt.email}">${opt.label}</option>`).join("")}
   `;
 
-  select.value = options.some(opt => opt.email === state.effectiveEmail)
+  select.value = options.some((opt) => opt.email === state.effectiveEmail)
     ? state.effectiveEmail
     : current;
-}
-
-async function initPage() {
-  bindEvents();
-  await waitForLayoutReady();
-  bindHeaderActions();
-
-  onAuthStateChanged(auth, async (user) => {
-    if (!user) return;
-
-    await bootstrapFromSession();
-    renderActingUserSwitcherSimple();
-    await loadSeguimiento();
-  });
 }
 
 /* =========================================================
@@ -157,6 +181,7 @@ function bindEvents() {
   $("filtroAno")?.addEventListener("change", applyFiltersAndRender);
   $("filtroEstado")?.addEventListener("change", applyFiltersAndRender);
   $("filtroVendedora")?.addEventListener("change", applyFiltersAndRender);
+
   $("toggleAnteriores")?.addEventListener("change", () => {
     fillYearFilter(state.allRows);
     applyFiltersAndRender();
@@ -168,6 +193,82 @@ function bindEvents() {
 
   $("btnRecargarSeguimiento")?.addEventListener("click", async () => {
     await loadSeguimiento();
+  });
+
+  $("btnExportarSeguimiento")?.addEventListener("click", exportVisibleRowsToXlsx);
+
+  document.querySelectorAll(".summary-filter").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const summaryState = String(btn.dataset.summaryState || "");
+
+      if (!summaryState) return;
+
+      // Total = mostrar todos
+      if (summaryState === "__all__") {
+        state.hiddenSummaryStates.clear();
+      } else {
+        if (state.hiddenSummaryStates.has(summaryState)) {
+          state.hiddenSummaryStates.delete(summaryState);
+        } else {
+          state.hiddenSummaryStates.add(summaryState);
+        }
+      }
+
+      updateSummaryButtonsUI();
+      applyFiltersAndRender();
+    });
+  });
+
+  document.querySelectorAll(".th-sort").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const sortKey = String(btn.dataset.sort || "");
+      if (!sortKey) return;
+
+      if (state.sortKey === sortKey) {
+        state.sortDir = state.sortDir === "asc" ? "desc" : "asc";
+      } else {
+        state.sortKey = sortKey;
+        state.sortDir = "asc";
+      }
+
+      updateSortHeaderUI();
+      applyFiltersAndRender();
+    });
+  });
+}
+
+function updateSummaryButtonsUI() {
+  document.querySelectorAll(".summary-filter").forEach((btn) => {
+    const summaryState = String(btn.dataset.summaryState || "");
+
+    if (summaryState === "__all__") {
+      const allVisible = state.hiddenSummaryStates.size === 0;
+      btn.classList.toggle("is-active", allVisible);
+      btn.classList.toggle("is-off", !allVisible);
+      return;
+    }
+
+    const isHidden = state.hiddenSummaryStates.has(summaryState);
+    btn.classList.toggle("is-active", !isHidden);
+    btn.classList.toggle("is-off", isHidden);
+  });
+}
+
+function updateSortHeaderUI() {
+  document.querySelectorAll(".th-sort").forEach((btn) => {
+    const key = String(btn.dataset.sort || "");
+    const active = key === state.sortKey;
+
+    btn.classList.toggle("active", active);
+
+    const arrow = btn.querySelector(".sort-arrow");
+    if (!arrow) return;
+
+    if (!active) {
+      arrow.textContent = "↕";
+    } else {
+      arrow.textContent = state.sortDir === "asc" ? "↑" : "↓";
+    }
   });
 }
 
@@ -201,6 +302,7 @@ async function loadSeguimiento() {
 ========================================================= */
 function mapClienteDoc(id, data) {
   const aliasGrupo = cleanText(data.aliasGrupo);
+
   const nombreApoderado = cleanText(
     data.nombreCliente ||
     data.nombreApoderado ||
@@ -266,17 +368,14 @@ function mapClienteDoc(id, data) {
   const cortesiaEstado = normalizeDocState(data.cortesiaEstado);
 
   const displayTitle = aliasGrupo || nombreApoderado || nombreGrupo || `Grupo ${id}`;
-  
+
   let subtitleParts = [];
-  
+
   if (aliasGrupo) {
-    // Si tiene alias: abajo solo año
     subtitleParts = [
       anoViaje ? `Año ${anoViaje}` : ""
     ].filter(Boolean);
   } else {
-    // Si no tiene alias: título = nombre apoderada
-    // abajo colegio + año
     subtitleParts = [
       colegio || nombreGrupo || "",
       anoViaje ? `Año ${anoViaje}` : ""
@@ -323,6 +422,7 @@ function mapClienteDoc(id, data) {
     ].join(" "))
   };
 }
+
 /* =========================================================
    FILTROS
 ========================================================= */
@@ -344,6 +444,7 @@ function applyFiltersAndRender() {
 
   let rows = [...state.allRows];
 
+  // Restricción por rol
   rows = rows.filter((row) => {
     if (state.canSeeAll) return true;
 
@@ -351,17 +452,17 @@ function applyFiltersAndRender() {
     const rowVendorName = normalizeText(row.vendedora);
 
     if (rowVendorEmail && rowVendorEmail === state.effectiveEmail) return true;
-    if (rowVendorEmail && rowVendorEmail === state.authEmail) return true;
 
     if (currentVendorFullName && rowVendorName.includes(currentVendorFullName)) return true;
 
     if (currentVendorAliases.length) {
-      return currentVendorAliases.some(alias => rowVendorName.includes(alias));
+      return currentVendorAliases.some((alias) => rowVendorName.includes(alias));
     }
 
     return false;
   });
 
+  // Filtro año
   rows = rows.filter((row) => {
     if (filtroAno !== "todos") {
       return String(row.anoViaje || "") === String(filtroAno);
@@ -371,11 +472,13 @@ function applyFiltersAndRender() {
     return !row.anoViaje || row.anoViaje >= CURRENT_YEAR;
   });
 
+  // Filtro estado selector
   rows = rows.filter((row) => {
     if (filtroEstado === "todos") return true;
     return row.estado === filtroEstado;
   });
 
+  // Filtro vendedor selector
   rows = rows.filter((row) => {
     if (!state.canSeeAll) return true;
     if (filtroVendedora === "todos") return true;
@@ -388,25 +491,28 @@ function applyFiltersAndRender() {
     );
   });
 
+  // Buscador
   rows = rows.filter((row) => {
     if (!search) return true;
     return row.searchIndex.includes(search);
   });
 
-  rows.sort((a, b) => {
-    const ay = Number(a.anoViaje || 0);
-    const by = Number(b.anoViaje || 0);
-    if (ay !== by) return ay - by;
+  state.filteredRows = rows;
 
-    const ad = a.ultimaGestionAt ? a.ultimaGestionAt.getTime() : 0;
-    const bd = b.ultimaGestionAt ? b.ultimaGestionAt.getTime() : 0;
-    if (ad !== bd) return bd - ad;
+  // El resumen refleja filtros normales, no los botones toggle
+  renderSummary(rows);
+  updateSummaryButtonsUI();
 
-    return a.displayTitle.localeCompare(b.displayTitle, "es", { sensitivity: "base" });
+  // Aplicar ocultamiento por botones resumen
+  rows = rows.filter((row) => {
+    const bucket = getSummaryBucket(row.estado);
+    return !state.hiddenSummaryStates.has(bucket);
   });
 
-  state.filteredRows = rows;
-  renderSummary(rows);
+  // Orden final
+  rows.sort((a, b) => compareRows(a, b, state.sortKey, state.sortDir));
+
+  state.visibleRows = rows;
   renderRows(rows);
 }
 
@@ -443,11 +549,14 @@ function renderRow(row) {
             <div class="seg-group-title">${escapeHtml(row.displayTitle)}</div>
 
             <div class="seg-group-sub">
-              ${row.subtitleParts.map(part => `<span>${escapeHtml(part)}</span>`).join("")}
-              ${row.hasAlias && row.vendedora ? `<span class="seg-chip-vendor">${escapeHtml(row.vendedora)}</span>` : ""}
+              ${row.subtitleParts.map((part) => `<span>${escapeHtml(part)}</span>`).join("")}
             </div>
           </div>
         </div>
+      </td>
+
+      <td class="td-vendedor">
+        ${escapeHtml(row.vendedora || row.vendedoraCorreo || "—")}
       </td>
 
       <td class="seg-destino">${escapeHtml(row.destino || "Sin destino")}</td>
@@ -548,12 +657,14 @@ function renderSummary(rows) {
   };
 
   for (const row of rows) {
-    if (row.estado === "a_contactar") totals.a_contactar++;
-    else if (row.estado === "contactado") totals.contactado++;
-    else if (row.estado === "cotizando" || row.estado === "recotizando") totals.cotizando++;
-    else if (row.estado === "reunion_confirmada") totals.reunion_confirmada++;
-    else if (row.estado === "ganada") totals.ganada++;
-    else if (row.estado === "perdida") totals.perdida++;
+    const bucket = getSummaryBucket(row.estado);
+
+    if (bucket === "a_contactar") totals.a_contactar++;
+    else if (bucket === "contactado") totals.contactado++;
+    else if (bucket === "cotizando") totals.cotizando++;
+    else if (bucket === "reunion_confirmada") totals.reunion_confirmada++;
+    else if (bucket === "ganada") totals.ganada++;
+    else if (bucket === "perdida") totals.perdida++;
   }
 
   setText("sumTotal", totals.total);
@@ -569,11 +680,135 @@ function renderEmpty(message) {
   const tbody = $("tbodySeguimiento");
   if (!tbody) return;
 
+  const colspan = document.body.classList.contains("is-vendedor-view") ? 8 : 9;
+
   tbody.innerHTML = `
     <tr>
-      <td colspan="8" class="seg-empty">${escapeHtml(message)}</td>
+      <td colspan="${colspan}" class="seg-empty">${escapeHtml(message)}</td>
     </tr>
   `;
+}
+
+/* =========================================================
+   EXPORTAR
+========================================================= */
+function exportVisibleRowsToXlsx() {
+  try {
+    if (typeof XLSX === "undefined") {
+      alert("No se encontró la librería XLSX.");
+      return;
+    }
+
+    if (!state.visibleRows.length) {
+      alert("No hay registros visibles para exportar.");
+      return;
+    }
+
+    const rowsToExport = state.visibleRows.map((row) => ({
+      "GRUPO": row.displayTitle || "",
+      "VENDEDOR(A)": row.vendedora || row.vendedoraCorreo || "",
+      "COLEGIO": row.colegio || row.nombreGrupo || "",
+      "CURSO": row.curso || "",
+      "AÑO VIAJE": row.anoViaje || "",
+      "DESTINO": row.destino || "",
+      "PROGRESO": STAGE_META[row.estado]?.label || row.estado || "",
+      "AUTORIZADA": row.autorizada ? "SI" : "NO",
+      "CERRADA": row.cerrada ? "SI" : "NO",
+      "ÚLT. GESTIÓN": formatDateTimeText(row.ultimaGestionAt),
+      "ÚLT. REUNIÓN": formatDateTimeText(row.fechaUltimaReunion),
+      "FICHAS MÉDICAS": getDocLabel(row.fichaMedicaEstado),
+      "NÓMINA": getDocLabel(row.nominaEstado),
+      "FICHA DEL GRUPO": getDocLabel(row.fichaEstado),
+      "CONTRATO": getDocLabel(row.contratoEstado),
+      "CORTESÍAS": getDocLabel(row.cortesiaEstado)
+    }));
+
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.json_to_sheet(rowsToExport);
+    XLSX.utils.book_append_sheet(wb, ws, "Seguimiento");
+    XLSX.writeFile(wb, `seguimiento_grupos_${fileStamp()}.xlsx`);
+  } catch (error) {
+    console.error("[seguimiento] error exportando xlsx:", error);
+    alert("No se pudo exportar el XLSX.");
+  }
+}
+
+/* =========================================================
+   FILTROS AUXILIARES / SORT
+========================================================= */
+function getSummaryBucket(estado) {
+  const normalized = normalizeEstado(estado);
+  if (normalized === "recotizando") return "cotizando";
+  return normalized;
+}
+
+function compareRows(a, b, sortKey, sortDir) {
+  let result = 0;
+
+  switch (sortKey) {
+    case "grupo":
+      result = compareText(a.displayTitle, b.displayTitle);
+      break;
+
+    case "vendedora":
+      result = compareText(a.vendedora || a.vendedoraCorreo, b.vendedora || b.vendedoraCorreo);
+      break;
+
+    case "destino":
+      result = compareText(a.destino, b.destino);
+      break;
+
+    case "estado":
+      result = compareText(STAGE_META[a.estado]?.label || a.estado, STAGE_META[b.estado]?.label || b.estado);
+      break;
+
+    case "autorizada":
+      result = compareNumber(a.autorizada ? 1 : 0, b.autorizada ? 1 : 0);
+      break;
+
+    case "cerrada":
+      result = compareNumber(a.cerrada ? 1 : 0, b.cerrada ? 1 : 0);
+      break;
+
+    case "ultimaGestion":
+      result = compareNumber(
+        a.ultimaGestionAt ? a.ultimaGestionAt.getTime() : 0,
+        b.ultimaGestionAt ? b.ultimaGestionAt.getTime() : 0
+      );
+      break;
+
+    case "ultimaReunion":
+      result = compareNumber(
+        a.fechaUltimaReunion ? a.fechaUltimaReunion.getTime() : 0,
+        b.fechaUltimaReunion ? b.fechaUltimaReunion.getTime() : 0
+      );
+      break;
+
+    case "documentos":
+      result = compareText(getDocsSortText(a), getDocsSortText(b));
+      break;
+
+    default:
+      result = compareText(a.displayTitle, b.displayTitle);
+      break;
+  }
+
+  return sortDir === "desc" ? -result : result;
+}
+
+function compareText(a, b) {
+  return String(a || "").localeCompare(String(b || ""), "es", {
+    sensitivity: "base",
+    numeric: true
+  });
+}
+
+function compareNumber(a, b) {
+  return Number(a || 0) - Number(b || 0);
+}
+
+function getDocsSortText(row) {
+  return DOCS_META.map((item) => `${item.label}:${getDocLabel(row[item.key])}`).join(" | ");
 }
 
 /* =========================================================
@@ -588,25 +823,20 @@ function fillYearFilter(rows) {
 
   let years = [...new Set(
     rows
-      .map(r => Number(r.anoViaje || 0))
+      .map((r) => Number(r.anoViaje || 0))
       .filter(Boolean)
   )].sort((a, b) => a - b);
 
-  // Si NO está activado "Ver años anteriores",
-  // ocultamos del selector los años menores al actual.
   if (!showOld) {
-    years = years.filter(year => year >= CURRENT_YEAR);
+    years = years.filter((year) => year >= CURRENT_YEAR);
   }
 
   select.innerHTML = `
     <option value="todos">Todos</option>
-    ${years.map(year => `<option value="${year}">${year}</option>`).join("")}
+    ${years.map((year) => `<option value="${year}">${year}</option>`).join("")}
   `;
 
-  // Si el año previamente seleccionado ya no existe en el select
-  // (por ejemplo 2025 al desactivar "Ver años anteriores"),
-  // volvemos a "todos".
-  if ([...select.options].some(opt => opt.value === previous)) {
+  if ([...select.options].some((opt) => opt.value === previous)) {
     select.value = previous;
   } else {
     select.value = "todos";
@@ -624,7 +854,6 @@ function fillVendorFilter(rows) {
   }
 
   const previous = select.value || "todos";
-
   const vendorMap = new Map();
 
   for (const row of rows) {
@@ -645,10 +874,10 @@ function fillVendorFilter(rows) {
   select.disabled = false;
   select.innerHTML = `
     <option value="todos">Todos</option>
-    ${vendors.map(v => `<option value="${escapeAttr(v.value)}">${escapeHtml(v.label)}</option>`).join("")}
+    ${vendors.map((v) => `<option value="${escapeAttr(v.value)}">${escapeHtml(v.label)}</option>`).join("")}
   `;
 
-  if ([...select.options].some(opt => opt.value === previous)) {
+  if ([...select.options].some((opt) => opt.value === previous)) {
     select.value = previous;
   } else {
     select.value = "todos";
@@ -680,7 +909,7 @@ function resolveAutorizada(data) {
   const raw = data.autorizada ?? data.autorizacion ?? data.estadoAutorizacion ?? null;
 
   if (typeof raw === "boolean") return raw;
-  if (Array.isArray(raw)) return raw.some(v => normalizeText(v).includes("autoriz"));
+  if (Array.isArray(raw)) return raw.some((v) => normalizeText(v).includes("autoriz"));
   if (typeof raw === "string") {
     const v = normalizeText(raw);
     return v.includes("autoriz") || v === "si" || v === "sí" || v === "true";
@@ -693,7 +922,7 @@ function resolveCerrada(data) {
   const raw = data.cerrada ?? data.cierre ?? data.estadoCierre ?? null;
 
   if (typeof raw === "boolean") return raw;
-  if (Array.isArray(raw)) return raw.some(v => normalizeText(v).includes("cerrad"));
+  if (Array.isArray(raw)) return raw.some((v) => normalizeText(v).includes("cerrad"));
   if (typeof raw === "string") {
     const v = normalizeText(raw);
     return v.includes("cerrad") || v === "si" || v === "sí" || v === "true";
@@ -798,6 +1027,14 @@ function formatDateTime(date, emptySub = "Sin registro") {
   };
 }
 
+function formatDateTimeText(date) {
+  if (!date) return "";
+  return `${date.toLocaleDateString("es-CL")} ${date.toLocaleTimeString("es-CL", {
+    hour: "2-digit",
+    minute: "2-digit"
+  })}`;
+}
+
 function getInitials(text) {
   const parts = String(text || "")
     .trim()
@@ -805,7 +1042,7 @@ function getInitials(text) {
     .filter(Boolean);
 
   if (!parts.length) return "G";
-  return parts.slice(0, 2).map(p => p[0]?.toUpperCase() || "").join("");
+  return parts.slice(0, 2).map((p) => p[0]?.toUpperCase() || "").join("");
 }
 
 function setText(id, value) {
@@ -838,4 +1075,14 @@ function debounce(fn, wait = 150) {
     clearTimeout(timer);
     timer = setTimeout(() => fn(...args), wait);
   };
+}
+
+function fileStamp() {
+  const d = new Date();
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  const hh = String(d.getHours()).padStart(2, "0");
+  const mi = String(d.getMinutes()).padStart(2, "0");
+  return `${yyyy}${mm}${dd}_${hh}${mi}`;
 }
