@@ -593,17 +593,7 @@
           </select>
         </div>
 
-        <div class="field-wrap search-wide">
-          <label for="buscadorSeguimiento">Buscar</label>
-          <input
-            id="buscadorSeguimiento"
-            type="text"
-            placeholder="Alias, apoderado, grupo, colegio, destino..."
-            autocomplete="off"
-          />
-        </div>
-
-        <div class="toggle-wrap">
+        <div class="field-wrap toggle-wrap">
           <label for="toggleAnteriores">Mostrar</label>
           <label class="toggle-box" for="toggleAnteriores">
             <input id="toggleAnteriores" type="checkbox" />
@@ -613,6 +603,16 @@
       </div>
 
       <div class="toolbar-right">
+        <div class="field-wrap search-wide">
+          <label for="buscadorSeguimiento">Buscar</label>
+          <input
+            id="buscadorSeguimiento"
+            type="text"
+            placeholder="Alias, apoderado, grupo, colegio, destino..."
+            autocomplete="off"
+          />
+        </div>
+        
         <div class="seguimiento-actions">
           <button id="btnExportarSeguimiento" class="btn-page sec" type="button">
             Exportar XLSX
