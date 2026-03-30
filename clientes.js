@@ -1139,6 +1139,46 @@ function resolveOrigenColegioFromMatch(match) {
   return match.entry.hasOk ? "Cartera" : "Pendiente en cartera";
 }
 
+function applyCarteraInfoToPayload(payload, carteraCache, baseData = {}) {
+  const merged = {
+    ...(baseData || {}),
+    ...(payload || {})
+  };
+
+  const colegio = normalizeText(merged.colegio || "");
+  if (!colegio) {
+    return autoResolveKnownPeople(payload);
+  }
+
+  const match = findBestCarteraMatch(colegio, carteraCache);
+
+  if (!match?.entry) {
+    payload.origenColegio = "No cartera";
+    return autoResolveKnownPeople(payload);
+  }
+
+  payload.origenColegio = resolveOrigenColegioFromMatch(match);
+
+  // El logo pertenece al colegio, no al alias ni al curso.
+  // Si hay match por colegio, copiamos el logo aunque el estado sea pendiente.
+  if (match.entry.logoColegioUrl) {
+    payload.logoColegioUrl = match.entry.logoColegioUrl;
+  }
+
+  // Solo completamos vendedora/correo si la coincidencia es única y clara
+  if (match.entry.matches === 1) {
+    if (!normalizeText(payload.vendedora) && normalizeText(match.entry.vendedora)) {
+      payload.vendedora = match.entry.vendedora;
+    }
+
+    if (!normalizeEmail(payload.vendedoraCorreo) && normalizeEmail(match.entry.vendedoraCorreo)) {
+      payload.vendedoraCorreo = match.entry.vendedoraCorreo;
+    }
+  }
+
+  return autoResolveKnownPeople(payload);
+}
+
 function hasImportedContent(value = "") {
   return normalizeSearch(value || "") !== "";
 }
