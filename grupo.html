@@ -1,0 +1,1343 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Grupo | Sistema Ventas RT</title>
+  <link rel="stylesheet" href="estilos.css" />
+  <link rel="icon" type="image/png" href="IMG/logo-raitrai.png" />
+
+  <style>
+    .grupo-shell{
+      max-width: 1380px;
+      margin: 0 auto;
+      padding: 22px 30px 34px;
+    }
+
+    .grupo-hero{
+      position: relative;
+      overflow: hidden;
+      padding: 26px 28px;
+      border-radius: 26px;
+      background: linear-gradient(135deg, #241238 0%, #31194b 58%, #3c1d5a 100%);
+      color: #fff;
+      box-shadow: 0 18px 42px rgba(36,18,56,.20);
+      margin-bottom: 24px;
+    }
+
+    .grupo-hero::before{
+      content: "";
+      position: absolute;
+      inset: auto -80px -80px auto;
+      width: 220px;
+      height: 220px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(255,255,255,.18) 0%, rgba(255,255,255,0) 70%);
+      pointer-events: none;
+    }
+
+    .grupo-hero-top{
+      display: flex;
+      gap: 24px;
+      justify-content: space-between;
+      align-items: flex-start;
+      flex-wrap: wrap;
+    }
+
+    .grupo-hero-left{
+      display: flex;
+      gap: 18px;
+      align-items: flex-start;
+      min-width: 0;
+      flex: 1 1 620px;
+    }
+
+    .grupo-logo{
+      width: 86px;
+      height: 86px;
+      border-radius: 22px;
+      background: rgba(255,255,255,.10);
+      border: 1px solid rgba(255,255,255,.18);
+      display: grid;
+      place-items: center;
+      overflow: hidden;
+      box-shadow: 0 12px 26px rgba(0,0,0,.16);
+      flex: 0 0 auto;
+      font-weight: 800;
+      font-size: 26px;
+      letter-spacing: .4px;
+    }
+
+    .grupo-logo img{
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+    .grupo-hero-text{
+      min-width: 0;
+    }
+
+    .grupo-kicker{
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: .5px;
+      text-transform: uppercase;
+      color: rgba(255,255,255,.74);
+      margin-bottom: 6px;
+    }
+
+    .grupo-title{
+      margin: 0;
+      font-size: clamp(28px, 4vw, 42px);
+      line-height: 1.03;
+      font-weight: 900;
+      letter-spacing: .2px;
+      word-break: break-word;
+    }
+
+    .grupo-subtitle{
+      margin-top: 8px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px 14px;
+      font-size: 15px;
+      color: rgba(255,255,255,.82);
+    }
+
+    .grupo-subtitle strong{
+      color: #fff;
+    }
+
+    .grupo-badges{
+      margin-top: 16px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .g-badge{
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      min-height: 38px;
+      padding: 0 14px;
+      border-radius: 999px;
+      font-size: 13px;
+      font-weight: 800;
+      letter-spacing: .2px;
+      border: 1px solid rgba(255,255,255,.12);
+      background: rgba(255,255,255,.12);
+      color: #fff;
+      backdrop-filter: blur(5px);
+    }
+
+    .g-badge.estado-a_contactar{ background: rgba(255,74,65,.18); }
+    .g-badge.estado-contactado{ background: rgba(255,142,60,.18); }
+    .g-badge.estado-cotizando{ background: rgba(241,169,41,.18); }
+    .g-badge.estado-recotizando{ background: rgba(233,183,42,.18); }
+    .g-badge.estado-reunion_confirmada{ background: rgba(78,194,120,.18); }
+    .g-badge.estado-ganada{ background: rgba(17,138,47,.18); }
+    .g-badge.estado-perdida{ background: rgba(255,74,65,.18); }
+
+    .g-badge.is-ok{
+      background: rgba(30,125,54,.22);
+    }
+
+    .g-badge.is-muted{
+      background: rgba(255,255,255,.08);
+      color: rgba(255,255,255,.85);
+    }
+
+    .grupo-hero-right{
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      min-width: 300px;
+      flex: 0 1 360px;
+    }
+
+    .grupo-quick-grid{
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0,1fr));
+      gap: 12px;
+    }
+
+    .grupo-quick-card{
+      border-radius: 18px;
+      background: rgba(255,255,255,.10);
+      border: 1px solid rgba(255,255,255,.14);
+      padding: 14px 14px 12px;
+      backdrop-filter: blur(4px);
+      box-shadow: 0 10px 20px rgba(0,0,0,.10);
+    }
+
+    .grupo-quick-label{
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: .4px;
+      color: rgba(255,255,255,.72);
+      margin-bottom: 6px;
+      font-weight: 800;
+    }
+
+    .grupo-quick-value{
+      font-size: 18px;
+      font-weight: 900;
+      color: #fff;
+      line-height: 1.15;
+    }
+
+    .grupo-quick-sub{
+      margin-top: 4px;
+      font-size: 12px;
+      color: rgba(255,255,255,.76);
+    }
+
+    .grupo-hero-actions{
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 8px;
+    }
+
+    .btn-pill,
+    .btn-light,
+    .btn-dark,
+    .btn-ghost,
+    .btn-danger{
+      min-height: 44px;
+      padding: 0 16px;
+      border-radius: 14px;
+      border: none;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 800;
+      letter-spacing: .15px;
+      transition: transform .18s ease, box-shadow .18s ease, opacity .18s ease;
+    }
+
+    .btn-pill:hover,
+    .btn-light:hover,
+    .btn-dark:hover,
+    .btn-ghost:hover,
+    .btn-danger:hover{
+      transform: translateY(-1px);
+    }
+
+    .btn-light{
+      background: #fff;
+      color: #2b1145;
+      box-shadow: 0 10px 22px rgba(0,0,0,.12);
+    }
+
+    .btn-dark{
+      background: linear-gradient(135deg, #2b1145 0%, #4a2570 100%);
+      color: #fff;
+      box-shadow: 0 10px 22px rgba(43,17,69,.18);
+    }
+
+    .btn-ghost{
+      background: rgba(255,255,255,.10);
+      color: #fff;
+      border: 1px solid rgba(255,255,255,.16);
+    }
+
+    .btn-danger{
+      background: #f1d6d6;
+      color: #8d1f1f;
+    }
+
+    .btn-pill{
+      background: #ebe5f3;
+      color: #40235f;
+    }
+
+    .btn-light:disabled,
+    .btn-dark:disabled,
+    .btn-ghost:disabled,
+    .btn-pill:disabled,
+    .btn-danger:disabled{
+      opacity: .45;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .grupo-grid{
+      display: grid;
+      grid-template-columns: 360px minmax(0,1fr);
+      gap: 24px;
+      align-items: start;
+    }
+
+    .grupo-col{
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+      min-width: 0;
+    }
+
+    .grupo-panel{
+      background: rgba(255,255,255,.92);
+      border: 1px solid rgba(58,42,82,.10);
+      border-radius: 24px;
+      box-shadow: 0 12px 30px rgba(36,18,56,.08);
+      overflow: hidden;
+    }
+
+    .grupo-panel-head{
+      padding: 18px 20px 14px;
+      border-bottom: 1px solid rgba(58,42,82,.08);
+      display: flex;
+      gap: 14px;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+    }
+
+    .grupo-panel-title{
+      margin: 0;
+      font-size: 18px;
+      font-weight: 900;
+      color: var(--header);
+      letter-spacing: .2px;
+    }
+
+    .grupo-panel-sub{
+      margin: 4px 0 0;
+      font-size: 13px;
+      color: #6a6075;
+    }
+
+    .grupo-panel-body{
+      padding: 18px 20px 20px;
+    }
+
+    .info-stack{
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .info-item{
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .info-label{
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: .35px;
+      color: #7a7185;
+      font-weight: 800;
+    }
+
+    .info-value{
+      font-size: 15px;
+      font-weight: 700;
+      color: #251b32;
+      line-height: 1.4;
+      word-break: break-word;
+    }
+
+    .grupo-kpi-list{
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0,1fr));
+      gap: 12px;
+    }
+
+    .grupo-kpi{
+      padding: 14px;
+      border-radius: 18px;
+      background: #f7f5fa;
+      border: 1px solid rgba(58,42,82,.08);
+    }
+
+    .grupo-kpi .info-value{
+      font-size: 18px;
+      font-weight: 900;
+    }
+
+    .grupo-data-grid{
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0,1fr));
+      gap: 14px 18px;
+    }
+
+    .grupo-data-grid .full{
+      grid-column: 1 / -1;
+    }
+
+    .grupo-chip-row{
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .doc-chip{
+      min-height: 38px;
+      padding: 0 12px;
+      border-radius: 999px;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+      font-weight: 800;
+      border: 1px solid rgba(58,42,82,.10);
+      background: #f6f4f8;
+      color: #403550;
+    }
+
+    .doc-chip.ok{
+      background: #e8f7ea;
+      color: #1f6f2c;
+      border-color: rgba(31,111,44,.14);
+    }
+
+    .doc-chip.pendiente{
+      background: #fff4df;
+      color: #9a6300;
+      border-color: rgba(154,99,0,.12);
+    }
+
+    .doc-chip.no_aplica{
+      background: #eef1f5;
+      color: #5d6775;
+      border-color: rgba(93,103,117,.12);
+    }
+
+    .flow-steps{
+      display: grid;
+      gap: 12px;
+      margin-top: 14px;
+    }
+
+    .flow-step{
+      border: 1px solid rgba(58,42,82,.08);
+      border-radius: 18px;
+      padding: 14px;
+      background: #faf9fb;
+    }
+
+    .flow-step-top{
+      display: flex;
+      gap: 10px;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      margin-bottom: 6px;
+    }
+
+    .flow-step-title{
+      font-size: 14px;
+      font-weight: 900;
+      color: var(--header);
+    }
+
+    .flow-step-status{
+      min-height: 30px;
+      padding: 0 10px;
+      border-radius: 999px;
+      display: inline-flex;
+      align-items: center;
+      font-size: 12px;
+      font-weight: 900;
+      background: #ece7f3;
+      color: #4a3564;
+    }
+
+    .flow-step-status.signed{
+      background: #e8f7ea;
+      color: #1f6f2c;
+    }
+
+    .flow-step-meta{
+      font-size: 13px;
+      color: #6a6075;
+      line-height: 1.45;
+    }
+
+    .list-clean{
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .list-card{
+      border: 1px solid rgba(58,42,82,.08);
+      border-radius: 18px;
+      background: #fff;
+      padding: 14px;
+      box-shadow: 0 4px 14px rgba(36,18,56,.04);
+    }
+
+    .list-card-top{
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+      align-items: flex-start;
+      margin-bottom: 8px;
+    }
+
+    .list-card-title{
+      font-size: 15px;
+      font-weight: 900;
+      color: #261d33;
+    }
+
+    .list-card-meta{
+      font-size: 13px;
+      color: #6a6075;
+      line-height: 1.45;
+      white-space: pre-line;
+    }
+
+    .alert-manual{
+      border-left: 4px solid #d38d00;
+    }
+
+    .alert-auto{
+      border-left: 4px solid #2f6fdb;
+    }
+
+    .alert-critical{
+      border-left-color: #cf2d2d;
+    }
+
+    .timeline{
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .timeline-item{
+      position: relative;
+      padding: 14px 14px 14px 18px;
+      border-radius: 18px;
+      background: #fff;
+      border: 1px solid rgba(58,42,82,.08);
+      box-shadow: 0 4px 14px rgba(36,18,56,.04);
+    }
+
+    .timeline-item::before{
+      content: "";
+      position: absolute;
+      left: 0;
+      top: 14px;
+      bottom: 14px;
+      width: 4px;
+      border-radius: 99px;
+      background: #5c45a6;
+    }
+
+    .timeline-head{
+      display: flex;
+      gap: 10px;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      margin-bottom: 6px;
+    }
+
+    .timeline-title{
+      font-size: 15px;
+      font-weight: 900;
+      color: #241a30;
+    }
+
+    .timeline-date{
+      font-size: 12px;
+      color: #7b7086;
+      font-weight: 700;
+    }
+
+    .timeline-body{
+      font-size: 13px;
+      color: #5f566b;
+      line-height: 1.5;
+      white-space: pre-line;
+    }
+
+    .empty-box{
+      padding: 20px;
+      border-radius: 18px;
+      background: #faf9fb;
+      border: 1px dashed rgba(58,42,82,.14);
+      color: #6f657c;
+      font-weight: 700;
+      text-align: center;
+    }
+
+    .modal{
+      position: fixed;
+      inset: 0;
+      background: rgba(20,10,28,.56);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 18px;
+      z-index: 1200;
+    }
+
+    .modal.show{
+      display: flex;
+    }
+
+    .modal-card{
+      width: min(980px, 100%);
+      max-height: calc(100vh - 40px);
+      overflow: auto;
+      background: #fff;
+      border-radius: 24px;
+      border: 1px solid rgba(58,42,82,.10);
+      box-shadow: 0 24px 54px rgba(0,0,0,.22);
+    }
+
+    .modal-head{
+      padding: 18px 20px 14px;
+      border-bottom: 1px solid rgba(58,42,82,.08);
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .modal-title{
+      margin: 0;
+      color: var(--header);
+      font-size: 20px;
+      font-weight: 900;
+    }
+
+    .modal-close{
+      width: 42px;
+      height: 42px;
+      border-radius: 14px;
+      border: none;
+      background: #efeaf5;
+      color: var(--header);
+      cursor: pointer;
+      font-size: 22px;
+      font-weight: 900;
+    }
+
+    .modal-body{
+      padding: 20px;
+    }
+
+    .form-grid{
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0,1fr));
+      gap: 16px 18px;
+    }
+
+    .form-field{
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .form-field.span-2{
+      grid-column: span 2;
+    }
+
+    .form-field.span-3{
+      grid-column: 1 / -1;
+    }
+
+    .form-field label{
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: .35px;
+      color: #73697f;
+      font-weight: 800;
+    }
+
+    .form-field input,
+    .form-field select,
+    .form-field textarea{
+      width: 100%;
+      min-height: 48px;
+      border-radius: 14px;
+      border: 1px solid rgba(58,42,82,.14);
+      background: #fff;
+      padding: 0 14px;
+      font-size: 15px;
+      color: #261d33;
+      outline: none;
+    }
+
+    .form-field textarea{
+      min-height: 118px;
+      resize: vertical;
+      padding: 12px 14px;
+      font-family: inherit;
+    }
+
+    .form-field input:focus,
+    .form-field select:focus,
+    .form-field textarea:focus{
+      border-color: rgba(58,42,82,.34);
+      box-shadow: 0 0 0 4px rgba(58,42,82,.08);
+    }
+
+    .modal-actions{
+      padding: 16px 20px 20px;
+      border-top: 1px solid rgba(58,42,82,.08);
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .hidden{
+      display: none !important;
+    }
+
+    .muted{
+      color: #7b7086;
+    }
+
+    .small{
+      font-size: 12px;
+    }
+
+    @media (max-width: 1180px){
+      .grupo-grid{
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 900px){
+      .grupo-shell{
+        padding: 18px 16px 26px;
+      }
+
+      .grupo-hero{
+        padding: 20px 18px;
+        border-radius: 22px;
+      }
+
+      .grupo-hero-left{
+        flex-direction: column;
+      }
+
+      .grupo-quick-grid,
+      .grupo-kpi-list,
+      .grupo-data-grid,
+      .form-grid{
+        grid-template-columns: 1fr;
+      }
+
+      .form-field.span-2,
+      .form-field.span-3,
+      .grupo-data-grid .full{
+        grid-column: auto;
+      }
+    }
+  </style>
+</head>
+
+<body class="ventas-body" data-page="grupo">
+  <div id="layout-top"></div>
+
+  <main class="grupo-shell">
+    <section class="grupo-hero">
+      <div class="grupo-hero-top">
+        <div class="grupo-hero-left">
+          <div class="grupo-logo" id="grupoLogoWrap">RT</div>
+
+          <div class="grupo-hero-text">
+            <div class="grupo-kicker">Portafolio comercial del grupo</div>
+            <h1 class="grupo-title" id="heroTitle">Cargando grupo...</h1>
+
+            <div class="grupo-subtitle">
+              <span><strong>Colegio:</strong> <span id="heroColegio">—</span></span>
+              <span><strong>Año de viaje:</strong> <span id="heroAnoViaje">—</span></span>
+              <span><strong>Vendedor(a):</strong> <span id="heroVendedora">—</span></span>
+              <span><strong>ID Grupo:</strong> <span id="heroIdGrupo">—</span></span>
+            </div>
+
+            <div class="grupo-badges" id="heroBadges"></div>
+          </div>
+        </div>
+
+        <div class="grupo-hero-right">
+          <div class="grupo-quick-grid">
+            <div class="grupo-quick-card">
+              <div class="grupo-quick-label">Próxima reunión</div>
+              <div class="grupo-quick-value" id="heroProximaReunion">Sin reunión</div>
+              <div class="grupo-quick-sub" id="heroProximaReunionSub">—</div>
+            </div>
+
+            <div class="grupo-quick-card">
+              <div class="grupo-quick-label">Última gestión</div>
+              <div class="grupo-quick-value" id="heroUltimaGestion">—</div>
+              <div class="grupo-quick-sub" id="heroUltimaGestionSub">Sin historial reciente</div>
+            </div>
+
+            <div class="grupo-quick-card">
+              <div class="grupo-quick-label">Ficha</div>
+              <div class="grupo-quick-value" id="heroFichaEstado">Pendiente</div>
+              <div class="grupo-quick-sub" id="heroFichaEstadoSub">Sin firmas completas</div>
+            </div>
+
+            <div class="grupo-quick-card">
+              <div class="grupo-quick-label">Alertas activas</div>
+              <div class="grupo-quick-value" id="heroAlertasActivas">0</div>
+              <div class="grupo-quick-sub" id="heroAlertasActivasSub">0 automáticas / 0 manuales</div>
+            </div>
+          </div>
+
+          <div class="grupo-hero-actions">
+            <button class="btn-light" id="btnEditarDatosHero" type="button">Editar datos</button>
+            <button class="btn-ghost" id="btnEditarSituacionHero" type="button">Situación / estado</button>
+            <button class="btn-ghost" id="btnNuevaReunionHero" type="button">Nueva reunión</button>
+            <button class="btn-ghost" id="btnNuevaAlertaHero" type="button">Nueva alerta</button>
+            <button class="btn-ghost" id="btnCrearFicha" type="button">Crear ficha</button>
+            <button class="btn-ghost" id="btnCrearContrato" type="button">Crear contrato</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="grupo-grid">
+      <aside class="grupo-col">
+        <article class="grupo-panel">
+          <div class="grupo-panel-head">
+            <div>
+              <h2 class="grupo-panel-title">Situación del grupo</h2>
+              <p class="grupo-panel-sub">Resumen comercial y siguiente paso</p>
+            </div>
+            <button class="btn-pill" id="btnEditarSituacion" type="button">Editar</button>
+          </div>
+          <div class="grupo-panel-body">
+            <div class="info-stack">
+              <div class="grupo-kpi-list">
+                <div class="grupo-kpi">
+                  <div class="info-label">Estado comercial</div>
+                  <div class="info-value" id="situacionEstado">—</div>
+                </div>
+                <div class="grupo-kpi">
+                  <div class="info-label">Autorización</div>
+                  <div class="info-value" id="situacionAutorizacion">—</div>
+                </div>
+                <div class="grupo-kpi">
+                  <div class="info-label">Cierre</div>
+                  <div class="info-value" id="situacionCierre">—</div>
+                </div>
+                <div class="grupo-kpi">
+                  <div class="info-label">Siguiente paso</div>
+                  <div class="info-value" id="situacionProximoPaso">—</div>
+                </div>
+              </div>
+
+              <div class="info-item">
+                <div class="info-label">Resumen</div>
+                <div class="info-value" id="situacionResumen">—</div>
+              </div>
+
+              <div class="info-item">
+                <div class="info-label">Observación ventas</div>
+                <div class="info-value" id="situacionObsVentas">—</div>
+              </div>
+
+              <div class="info-item">
+                <div class="info-label">Observación jefa ventas</div>
+                <div class="info-value" id="situacionObsJefa">—</div>
+              </div>
+
+              <div class="info-item">
+                <div class="info-label">Observación administración</div>
+                <div class="info-value" id="situacionObsAdmin">—</div>
+              </div>
+            </div>
+          </div>
+        </article>
+
+        <article class="grupo-panel">
+          <div class="grupo-panel-head">
+            <div>
+              <h2 class="grupo-panel-title">Próxima reunión</h2>
+              <p class="grupo-panel-sub">Agenda conectada al calendario comercial</p>
+            </div>
+            <button class="btn-pill" id="btnNuevaReunion" type="button">Agendar</button>
+          </div>
+          <div class="grupo-panel-body">
+            <div class="info-stack" id="panelProximaReunion"></div>
+          </div>
+        </article>
+
+        <article class="grupo-panel">
+          <div class="grupo-panel-head">
+            <div>
+              <h2 class="grupo-panel-title">Alertas del grupo</h2>
+              <p class="grupo-panel-sub">Automáticas y manuales</p>
+            </div>
+            <button class="btn-pill" id="btnNuevaAlerta" type="button">Nueva alerta</button>
+          </div>
+          <div class="grupo-panel-body">
+            <div class="list-clean" id="alertsList"></div>
+          </div>
+        </article>
+
+        <article class="grupo-panel">
+          <div class="grupo-panel-head">
+            <div>
+              <h2 class="grupo-panel-title">Acciones rápidas</h2>
+              <p class="grupo-panel-sub">Flujo comercial y documental</p>
+            </div>
+          </div>
+          <div class="grupo-panel-body">
+            <div class="grupo-hero-actions">
+              <button class="btn-dark" id="btnFirmarVendedor" type="button">Firmar vendedor(a)</button>
+              <button class="btn-pill" id="btnFirmarJefaVentas" type="button">Firmar jefa ventas</button>
+              <button class="btn-pill" id="btnFirmarAdministracion" type="button">Firmar administración</button>
+            </div>
+            <p class="muted small" style="margin:14px 0 0;">
+              Si el grupo ya está autorizado, los cambios críticos deben volver a pasar por revisión y re-firma de administración.
+            </p>
+          </div>
+        </article>
+      </aside>
+
+      <section class="grupo-col">
+        <article class="grupo-panel">
+          <div class="grupo-panel-head">
+            <div>
+              <h2 class="grupo-panel-title">Datos del grupo</h2>
+              <p class="grupo-panel-sub">Información principal que alimenta ficha y seguimiento</p>
+            </div>
+            <button class="btn-pill" id="btnEditarDatos" type="button">Editar datos</button>
+          </div>
+          <div class="grupo-panel-body">
+            <div class="grupo-data-grid" id="datosGrupoGrid"></div>
+          </div>
+        </article>
+
+        <article class="grupo-panel">
+          <div class="grupo-panel-head">
+            <div>
+              <h2 class="grupo-panel-title">Documentos y flujo de ficha</h2>
+              <p class="grupo-panel-sub">Control visible desde seguimiento</p>
+            </div>
+            <button class="btn-pill" id="btnEditarDocumentos" type="button">Editar documentos</button>
+          </div>
+          <div class="grupo-panel-body">
+            <div class="grupo-chip-row" id="docsChips"></div>
+
+            <div class="flow-steps" id="flowSteps" style="margin-top:18px;"></div>
+          </div>
+        </article>
+
+        <article class="grupo-panel">
+          <div class="grupo-panel-head">
+            <div>
+              <h2 class="grupo-panel-title">Reuniones del grupo</h2>
+              <p class="grupo-panel-sub">Presenciales o virtuales</p>
+            </div>
+            <button class="btn-pill" id="btnNuevaReunionListado" type="button">Nueva reunión</button>
+          </div>
+          <div class="grupo-panel-body">
+            <div class="list-clean" id="meetingsList"></div>
+          </div>
+        </article>
+
+        <article class="grupo-panel">
+          <div class="grupo-panel-head">
+            <div>
+              <h2 class="grupo-panel-title">Historial</h2>
+              <p class="grupo-panel-sub">Trazabilidad del grupo</p>
+            </div>
+          </div>
+          <div class="grupo-panel-body">
+            <div class="timeline" id="historyList"></div>
+          </div>
+        </article>
+      </section>
+    </section>
+  </main>
+
+  <!-- MODAL DATOS -->
+  <div class="modal" id="modalDatos">
+    <div class="modal-card">
+      <div class="modal-head">
+        <h3 class="modal-title">Editar datos del grupo</h3>
+        <button class="modal-close" type="button" data-close="modalDatos">×</button>
+      </div>
+
+      <div class="modal-body">
+        <form id="formDatos" class="form-grid">
+          <div class="form-field">
+            <label for="d_aliasGrupo">Alias grupo</label>
+            <input id="d_aliasGrupo" name="aliasGrupo" type="text" />
+          </div>
+
+          <div class="form-field">
+            <label for="d_estado">Estado</label>
+            <select id="d_estado" name="estado">
+              <option value="a_contactar">A contactar</option>
+              <option value="contactado">Contactado</option>
+              <option value="cotizando">Cotizando</option>
+              <option value="recotizando">Recotizando</option>
+              <option value="reunion_confirmada">Reunión confirmada</option>
+              <option value="ganada">Ganada</option>
+              <option value="perdida">Perdida</option>
+            </select>
+          </div>
+
+          <div class="form-field">
+            <label for="d_vendedora">Vendedor(a)</label>
+            <input id="d_vendedora" name="vendedora" type="text" />
+          </div>
+
+          <div class="form-field">
+            <label for="d_colegio">Colegio</label>
+            <input id="d_colegio" name="colegio" type="text" />
+          </div>
+
+          <div class="form-field">
+            <label for="d_curso">Curso</label>
+            <input id="d_curso" name="curso" type="text" />
+          </div>
+
+          <div class="form-field">
+            <label for="d_anoViaje">Año viaje</label>
+            <input id="d_anoViaje" name="anoViaje" type="number" />
+          </div>
+
+          <div class="form-field">
+            <label for="d_cantidadGrupo">Cantidad grupo</label>
+            <input id="d_cantidadGrupo" name="cantidadGrupo" type="number" />
+          </div>
+
+          <div class="form-field span-2">
+            <label for="d_destinoPrincipal">Destino principal</label>
+            <input id="d_destinoPrincipal" name="destinoPrincipal" type="text" />
+          </div>
+
+          <div class="form-field span-3">
+            <label for="d_programa">Programa</label>
+            <input id="d_programa" name="programa" type="text" />
+          </div>
+
+          <div class="form-field">
+            <label for="d_tramo">Tramo</label>
+            <input id="d_tramo" name="tramo" type="text" />
+          </div>
+
+          <div class="form-field">
+            <label for="d_asistenciaMed">Asistencia médica</label>
+            <input id="d_asistenciaMed" name="asistenciaMed" type="text" />
+          </div>
+
+          <div class="form-field">
+            <label for="d_semanaViaje">Semana de viaje</label>
+            <input id="d_semanaViaje" name="semanaViaje" type="text" />
+          </div>
+
+          <div class="form-field">
+            <label for="d_fechaViaje">Fecha de viaje</label>
+            <input id="d_fechaViaje" name="fechaViaje" type="date" />
+          </div>
+
+          <div class="form-field span-2">
+            <label for="d_comunaCiudad">Comuna / ciudad</label>
+            <input id="d_comunaCiudad" name="comunaCiudad" type="text" />
+          </div>
+
+          <div class="form-field">
+            <label for="d_nombreCliente">1° Contacto</label>
+            <input id="d_nombreCliente" name="nombreCliente" type="text" />
+          </div>
+
+          <div class="form-field">
+            <label for="d_rolCliente">Rol 1° Contacto</label>
+            <input id="d_rolCliente" name="rolCliente" type="text" />
+          </div>
+
+          <div class="form-field">
+            <label for="d_correoCliente">Correo 1° Contacto</label>
+            <input id="d_correoCliente" name="correoCliente" type="email" />
+          </div>
+
+          <div class="form-field">
+            <label for="d_celularCliente">Celular 1° Contacto</label>
+            <input id="d_celularCliente" name="celularCliente" type="text" />
+          </div>
+
+          <div class="form-field">
+            <label for="d_nombreCliente2">2° Contacto</label>
+            <input id="d_nombreCliente2" name="nombreCliente2" type="text" />
+          </div>
+
+          <div class="form-field">
+            <label for="d_rolCliente2">Rol 2° Contacto</label>
+            <input id="d_rolCliente2" name="rolCliente2" type="text" />
+          </div>
+
+          <div class="form-field">
+            <label for="d_correoCliente2">Correo 2° Contacto</label>
+            <input id="d_correoCliente2" name="correoCliente2" type="email" />
+          </div>
+
+          <div class="form-field">
+            <label for="d_celularCliente2">Celular 2° Contacto</label>
+            <input id="d_celularCliente2" name="celularCliente2" type="text" />
+          </div>
+        </form>
+      </div>
+
+      <div class="modal-actions">
+        <button class="btn-pill" type="button" data-close="modalDatos">Cancelar</button>
+        <button class="btn-dark" type="button" id="btnGuardarDatos">Guardar datos</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL SITUACION -->
+  <div class="modal" id="modalSituacion">
+    <div class="modal-card">
+      <div class="modal-head">
+        <h3 class="modal-title">Editar situación del grupo</h3>
+        <button class="modal-close" type="button" data-close="modalSituacion">×</button>
+      </div>
+
+      <div class="modal-body">
+        <form id="formSituacion" class="form-grid">
+          <div class="form-field">
+            <label for="s_estado">Estado</label>
+            <select id="s_estado" name="estado">
+              <option value="a_contactar">A contactar</option>
+              <option value="contactado">Contactado</option>
+              <option value="cotizando">Cotizando</option>
+              <option value="recotizando">Recotizando</option>
+              <option value="reunion_confirmada">Reunión confirmada</option>
+              <option value="ganada">Ganada</option>
+              <option value="perdida">Perdida</option>
+            </select>
+          </div>
+
+          <div class="form-field">
+            <label for="s_autorizada">Autorizada</label>
+            <select id="s_autorizada" name="autorizada">
+              <option value="false">No</option>
+              <option value="true">Sí</option>
+            </select>
+          </div>
+
+          <div class="form-field">
+            <label for="s_cerrada">Cerrada</label>
+            <select id="s_cerrada" name="cerrada">
+              <option value="false">No</option>
+              <option value="true">Sí</option>
+            </select>
+          </div>
+
+          <div class="form-field span-3">
+            <label for="s_resumen">Resumen</label>
+            <textarea id="s_resumen" name="situacion.resumen"></textarea>
+          </div>
+
+          <div class="form-field span-3">
+            <label for="s_proximoPaso">Próximo paso</label>
+            <textarea id="s_proximoPaso" name="situacion.proximoPaso"></textarea>
+          </div>
+
+          <div class="form-field span-3">
+            <label for="s_obsVentas">Observación ventas</label>
+            <textarea id="s_obsVentas" name="situacion.observacionVentas"></textarea>
+          </div>
+
+          <div class="form-field span-3">
+            <label for="s_obsJefa">Observación jefa ventas</label>
+            <textarea id="s_obsJefa" name="situacion.observacionJefaVentas"></textarea>
+          </div>
+
+          <div class="form-field span-3">
+            <label for="s_obsAdmin">Observación administración</label>
+            <textarea id="s_obsAdmin" name="situacion.observacionAdministracion"></textarea>
+          </div>
+        </form>
+      </div>
+
+      <div class="modal-actions">
+        <button class="btn-pill" type="button" data-close="modalSituacion">Cancelar</button>
+        <button class="btn-dark" type="button" id="btnGuardarSituacion">Guardar situación</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL DOCUMENTOS -->
+  <div class="modal" id="modalDocumentos">
+    <div class="modal-card">
+      <div class="modal-head">
+        <h3 class="modal-title">Editar documentos y flujo</h3>
+        <button class="modal-close" type="button" data-close="modalDocumentos">×</button>
+      </div>
+
+      <div class="modal-body">
+        <form id="formDocumentos" class="form-grid">
+          <div class="form-field">
+            <label for="doc_fichaMedicaEstado">Fichas médicas</label>
+            <select id="doc_fichaMedicaEstado" name="fichaMedicaEstado">
+              <option value="pendiente">Pendiente</option>
+              <option value="ok">Ok</option>
+              <option value="no_aplica">No aplica</option>
+            </select>
+          </div>
+
+          <div class="form-field">
+            <label for="doc_nominaEstado">Nómina</label>
+            <select id="doc_nominaEstado" name="nominaEstado">
+              <option value="pendiente">Pendiente</option>
+              <option value="ok">Ok</option>
+              <option value="no_aplica">No aplica</option>
+            </select>
+          </div>
+
+          <div class="form-field">
+            <label for="doc_cortesiaEstado">Cortesías</label>
+            <select id="doc_cortesiaEstado" name="cortesiaEstado">
+              <option value="pendiente">Pendiente</option>
+              <option value="ok">Ok</option>
+              <option value="no_aplica">No aplica</option>
+            </select>
+          </div>
+
+          <div class="form-field">
+            <label for="doc_fichaEstado">Ficha del grupo</label>
+            <select id="doc_fichaEstado" name="fichaEstado">
+              <option value="pendiente">Pendiente</option>
+              <option value="en_edicion">En edición</option>
+              <option value="lista_vendedor">Lista vendedor</option>
+              <option value="revisada_jefa_ventas">Revisada jefa ventas</option>
+              <option value="autorizada_admin">Autorizada administración</option>
+              <option value="ok">Ok</option>
+            </select>
+          </div>
+
+          <div class="form-field">
+            <label for="doc_contratoEstado">Contrato</label>
+            <select id="doc_contratoEstado" name="contratoEstado">
+              <option value="pendiente">Pendiente</option>
+              <option value="generado">Generado</option>
+              <option value="enviado">Enviado</option>
+              <option value="firmado">Firmado</option>
+              <option value="ok">Ok</option>
+            </select>
+          </div>
+        </form>
+      </div>
+
+      <div class="modal-actions">
+        <button class="btn-pill" type="button" data-close="modalDocumentos">Cancelar</button>
+        <button class="btn-dark" type="button" id="btnGuardarDocumentos">Guardar documentos</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL REUNION -->
+  <div class="modal" id="modalReunion">
+    <div class="modal-card">
+      <div class="modal-head">
+        <h3 class="modal-title">Nueva reunión</h3>
+        <button class="modal-close" type="button" data-close="modalReunion">×</button>
+      </div>
+
+      <div class="modal-body">
+        <form id="formReunion" class="form-grid">
+          <div class="form-field span-2">
+            <label for="r_titulo">Título</label>
+            <input id="r_titulo" name="titulo" type="text" />
+          </div>
+
+          <div class="form-field">
+            <label for="r_tipo">Tipo</label>
+            <select id="r_tipo" name="tipo">
+              <option value="presencial">Presencial</option>
+              <option value="virtual">Virtual</option>
+            </select>
+          </div>
+
+          <div class="form-field">
+            <label for="r_fechaInicio">Fecha inicio</label>
+            <input id="r_fechaInicio" name="fechaInicio" type="datetime-local" />
+          </div>
+
+          <div class="form-field">
+            <label for="r_fechaFin">Fecha fin</label>
+            <input id="r_fechaFin" name="fechaFin" type="datetime-local" />
+          </div>
+
+          <div class="form-field span-3" id="wrapDireccion">
+            <label for="r_direccion">Dirección física</label>
+            <input id="r_direccion" name="direccion" type="text" />
+          </div>
+
+          <div class="form-field span-3 hidden" id="wrapLink">
+            <label for="r_link">Link reunión virtual</label>
+            <input id="r_link" name="link" type="url" />
+          </div>
+
+          <div class="form-field span-3">
+            <label for="r_observaciones">Observaciones</label>
+            <textarea id="r_observaciones" name="observaciones"></textarea>
+          </div>
+        </form>
+      </div>
+
+      <div class="modal-actions">
+        <button class="btn-pill" type="button" data-close="modalReunion">Cancelar</button>
+        <button class="btn-dark" type="button" id="btnGuardarReunion">Guardar reunión</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL ALERTA -->
+  <div class="modal" id="modalAlerta">
+    <div class="modal-card">
+      <div class="modal-head">
+        <h3 class="modal-title">Nueva alerta manual</h3>
+        <button class="modal-close" type="button" data-close="modalAlerta">×</button>
+      </div>
+
+      <div class="modal-body">
+        <form id="formAlerta" class="form-grid">
+          <div class="form-field span-2">
+            <label for="a_titulo">Título</label>
+            <input id="a_titulo" name="titulo" type="text" />
+          </div>
+
+          <div class="form-field">
+            <label for="a_nivel">Nivel</label>
+            <select id="a_nivel" name="nivel">
+              <option value="info">Info</option>
+              <option value="warning">Warning</option>
+              <option value="critica">Crítica</option>
+            </select>
+          </div>
+
+          <div class="form-field span-3">
+            <label for="a_mensaje">Mensaje</label>
+            <textarea id="a_mensaje" name="mensaje"></textarea>
+          </div>
+        </form>
+      </div>
+
+      <div class="modal-actions">
+        <button class="btn-pill" type="button" data-close="modalAlerta">Cancelar</button>
+        <button class="btn-dark" type="button" id="btnGuardarAlerta">Guardar alerta</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="layout.js"></script>
+  <script type="module" src="grupo.js"></script>
+</body>
+</html>
