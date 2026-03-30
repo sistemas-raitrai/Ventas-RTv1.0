@@ -3,7 +3,8 @@ import {
   db,
   getVentasUser,
   puedeVerGeneral,
-  normalizeEmail
+  normalizeEmail,
+  VENTAS_USERS
 } from "./firebase-init.js";
 
 import {
@@ -12,8 +13,20 @@ import {
 } from "https://www.gstatic.com/firebasejs/11.7.3/firebase-firestore.js";
 
 import {
-  onAuthStateChanged
+  onAuthStateChanged,
+  signOut
 } from "https://www.gstatic.com/firebasejs/11.7.3/firebase-auth.js";
+
+import {
+  ACTING_USER_KEY,
+  getRealUser,
+  getEffectiveUser
+} from "./roles.js";
+
+import {
+  bindLayoutButtons,
+  waitForLayoutReady
+} from "./ui.js";
 
 /* =========================================================
    CONFIG
@@ -27,6 +40,7 @@ const state = {
   authEmail: "",
   effectiveEmail: "",
   currentUser: null,
+  realUser: null,
   canSeeAll: false
 };
 
@@ -51,18 +65,90 @@ const DOCS_META = [
 /* =========================================================
    INIT
 ========================================================= */
-bindEvents();
+initPage();
 
-onAuthStateChanged(auth, async (user) => {
-  if (!user) return;
-
-  state.authEmail = normalizeEmail(user.email || "");
-  state.effectiveEmail = resolveEffectiveEmail(state.authEmail);
-  state.currentUser = getVentasUser(state.effectiveEmail) || getVentasUser(state.authEmail) || null;
+async function bootstrapFromSession() {
+  state.realUser = getRealUser();
+  state.currentUser = getEffectiveUser();
+  state.authEmail = normalizeEmail(state.realUser?.email || auth.currentUser?.email || "");
+  state.effectiveEmail = normalizeEmail(state.currentUser?.email || state.authEmail);
   state.canSeeAll = puedeVerGeneral(state.effectiveEmail) || puedeVerGeneral(state.authEmail);
+}
 
-  await loadSeguimiento();
-});
+function bindHeaderActions() {
+  bindLayoutButtons({
+    homeUrl: "index.html",
+    onLogout: async () => {
+      try {
+        sessionStorage.removeItem(ACTING_USER_KEY);
+        await signOut(auth);
+        location.href = "login.html";
+      } catch (error) {
+        alert("Error al cerrar sesión: " + error.message);
+      }
+    },
+    onActAs: async (selectedEmail) => {
+      if (!state.realUser || state.realUser.rol !== "admin") return;
+      if (!selectedEmail) return;
+
+      sessionStorage.setItem(ACTING_USER_KEY, selectedEmail);
+      await bootstrapFromSession();
+      await loadSeguimiento();
+    },
+    onResetActAs: async () => {
+      sessionStorage.removeItem(ACTING_USER_KEY);
+      await bootstrapFromSession();
+      await loadSeguimiento();
+    }
+  });
+}
+
+function renderActingUserSwitcherSimple() {
+  const wrap = document.getElementById("admin-switcher");
+  const select = document.getElementById("select-acting-user");
+  if (!wrap || !select) return;
+
+  if (!state.realUser || state.realUser.rol !== "admin") {
+    wrap.classList.add("hidden");
+    return;
+  }
+
+  wrap.classList.remove("hidden");
+
+  const current = select.value || "";
+  const options = VENTAS_USERS
+    .map(u => {
+      const nombreCompleto = [u.nombre, u.apellido].filter(Boolean).join(" ");
+      return {
+        email: u.email,
+        label: `${nombreCompleto || u.email} · ${u.rol}`
+      };
+    })
+    .sort((a, b) => a.label.localeCompare(b.label, "es"));
+
+  select.innerHTML = `
+    <option value="">Elegir usuario</option>
+    ${options.map(opt => `<option value="${opt.email}">${opt.label}</option>`).join("")}
+  `;
+
+  select.value = options.some(opt => opt.email === state.effectiveEmail)
+    ? state.effectiveEmail
+    : current;
+}
+
+async function initPage() {
+  bindEvents();
+  await waitForLayoutReady();
+  bindHeaderActions();
+
+  onAuthStateChanged(auth, async (user) => {
+    if (!user) return;
+
+    await bootstrapFromSession();
+    renderActingUserSwitcherSimple();
+    await loadSeguimiento();
+  });
+}
 
 /* =========================================================
    EVENTOS
@@ -648,46 +734,6 @@ function getDocLabel(value) {
 /* =========================================================
    HELPERS
 ========================================================= */
-function resolveEffectiveEmail(fallbackEmail = "") {
-  try {
-    const candidateObjects = [];
-
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i) || "";
-      const lowerKey = key.toLowerCase();
-
-      if (!/(acting|scope|ventas|imperson|switch|user)/i.test(lowerKey)) continue;
-
-      const raw = localStorage.getItem(key);
-      if (!raw || raw.length > 1000) continue;
-
-      try {
-        const parsed = JSON.parse(raw);
-        candidateObjects.push(parsed);
-      } catch {
-        // ignorar
-      }
-    }
-
-    for (const parsed of candidateObjects) {
-      const email =
-        parsed?.email ||
-        parsed?.correo ||
-        parsed?.userEmail ||
-        parsed?.vendedoraCorreo ||
-        parsed?.targetEmail ||
-        "";
-
-      const safeEmail = normalizeEmail(email);
-      if (safeEmail) return safeEmail;
-    }
-  } catch (err) {
-    console.warn("[seguimiento] no se pudo leer acting user:", err);
-  }
-
-  return normalizeEmail(fallbackEmail);
-}
-
 function normalizeText(value) {
   return String(value ?? "")
     .normalize("NFD")
