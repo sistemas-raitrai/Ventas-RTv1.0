@@ -114,7 +114,7 @@ function renderLayoutTop(user) {
           <div class="saludo-wrap header-user-block">
             <div class="header-kicker">Sistema Ventas RT</div>
             <h1 id="saludo-usuario" class="header-greeting">
-              ${user ? "Hola, Usuario(a)" : "Cargando..."}
+              ${user ? `Hola, ${user.nombre || "Usuario(a)"}` : "Cargando..."}
             </h1>
             <div id="usuario-conectado" class="usuario-conectado">
               ${user?.email || ""}
