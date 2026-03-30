@@ -52,26 +52,78 @@ const BASE_COLUMNS = [
   "codigoRegistro",
   "aliasGrupo",
   "estado",
+  "fechaUltimoCambioEstado",
+
   "colegio",
   "curso",
   "cantidadGrupo",
   "anoViaje",
+
   "vendedora",
   "vendedoraCorreo",
+
   "nombreCliente",
   "rolCliente",
   "correoCliente",
   "celularCliente",
+
+  "nombreCliente2",
+  "rolCliente2",
+  "correoCliente2",
+  "celularCliente2",
+
   "origenColegio",
   "origenCliente",
   "origenEspecificacion",
   "origenEspecificacionOtro",
+
   "destinoPrincipal",
   "destinoPrincipalOtro",
   "destinosSecundarios",
   "destinoSecundarioOtro",
+
+  "programa",
+  "tramo",
+  "semanaViaje",
+  "fechaViaje",
+  "fechaReunionCliente",
+  "solicitudReserva",
+  "solicitudHotel",
+
   "comunaCiudad",
   "requiereAsignacion",
+
+  "observacionesOperaciones",
+  "observacionesAdministracion",
+
+  "asistenciaMed",
+  "liberados",
+  "valorPrograma",
+
+  "autorizacionGerencia",
+  "descuentoFicha",
+
+  "versionFicha",
+  "fechaActualizacionFicha",
+  "observacionesFicha",
+
+  "firmaVendedor",
+  "firmaSupervision",
+  "firmaAdministracion",
+
+  "autorizada",
+  "cerrada",
+  "cierre",
+  "fichaEstado",
+  "contratoEstado",
+  "nominaEstado",
+  "fichaMedicaEstado",
+  "cortesiaEstado",
+
+  "numeroNegocio",
+  "usuarioProgramaAdm",
+  "claveAdministrativa",
+
   "creadoPor",
   "creadoPorCorreo",
   "fechaCreacion",
@@ -138,6 +190,52 @@ const LABELS = {
   destinoSecundarioOtro: "OTRO DESTINO SECUNDARIO",
   comunaCiudad: "COMUNA / CIUDAD",
   requiereAsignacion: "REQUIERE ASIGNACIÓN",
+
+  fechaUltimoCambioEstado: "FECHA ÚLTIMO CAMBIO ESTADO",
+
+  nombreCliente2: "CONTACTO 2",
+  rolCliente2: "ROL CONTACTO 2",
+  correoCliente2: "CORREO CONTACTO 2",
+  celularCliente2: "CELULAR CONTACTO 2",
+
+  programa: "PROGRAMA",
+  tramo: "TRAMO",
+  semanaViaje: "SEMANA VIAJE",
+  fechaViaje: "FECHA DE VIAJE",
+  fechaReunionCliente: "FECHA REUNIÓN CLIENTE",
+  solicitudReserva: "SOLICITUD RESERVA",
+  solicitudHotel: "SOLICITUD HOTEL",
+
+  observacionesOperaciones: "OBSERVACIONES OPERACIONES",
+  observacionesAdministracion: "OBSERVACIONES ADMINISTRACIÓN",
+
+  asistenciaMed: "ASISTENCIA EN VIAJES",
+  liberados: "LIBERADOS",
+  valorPrograma: "VALOR PROGRAMA",
+
+  autorizacionGerencia: "AUTORIZACIÓN GERENCIA",
+  descuentoFicha: "DESCUENTO",
+  versionFicha: "VERSIÓN FICHA",
+  fechaActualizacionFicha: "FECHA ACTUALIZACIÓN FICHA",
+  observacionesFicha: "OBSERVACIONES FICHA",
+
+  firmaVendedor: "FIRMA VENDEDOR",
+  firmaSupervision: "FIRMA SUPERVISIÓN",
+  firmaAdministracion: "FIRMA ADMINISTRACIÓN",
+
+  autorizada: "AUTORIZADA",
+  cerrada: "CERRADA",
+  cierre: "CIERRE",
+  fichaEstado: "ESTADO FICHA",
+  contratoEstado: "ESTADO CONTRATO",
+  nominaEstado: "ESTADO NÓMINA",
+  fichaMedicaEstado: "ESTADO FICHAS MÉDICAS",
+  cortesiaEstado: "ESTADO CORTESÍAS",
+
+  numeroNegocio: "NÚMERO NEGOCIO",
+  usuarioProgramaAdm: "USUARIO PROGRAMA ADM",
+  claveAdministrativa: "CLAVE ADMINISTRATIVA",
+
   creadoPor: "CREADO POR",
   creadoPorCorreo: "CORREO CREADOR",
   fechaCreacion: "FECHA CREACIÓN",
@@ -375,6 +473,110 @@ function setNestedValue(target, path, value) {
   ref[parts[parts.length - 1]] = value;
 }
 
+const NUMERIC_IMPORT_KEYS = new Set([
+  "anoViaje",
+  "cantidadGrupo",
+  "liberados",
+  "valorPrograma",
+  "numeroNegocio"
+]);
+
+const DATE_IMPORT_KEYS = new Set([
+  "fechaUltimoCambioEstado",
+  "fechaReunionCliente",
+  "solicitudReserva",
+  "fechaActualizacionFicha",
+  "fechaViaje",
+  "fechaCreacion",
+  "fechaActualizacion"
+]);
+
+function parseImportedNumber(rawValue) {
+  if (rawValue === null || rawValue === undefined) return null;
+
+  if (typeof rawValue === "number" && Number.isFinite(rawValue)) {
+    return rawValue;
+  }
+
+  let raw = String(rawValue ?? "").trim();
+  if (!raw) return null;
+
+  raw = raw.replace(/\$/g, "").replace(/\s+/g, "");
+
+  if (raw.includes(".") && raw.includes(",")) {
+    if (raw.lastIndexOf(",") > raw.lastIndexOf(".")) {
+      raw = raw.replace(/\./g, "").replace(",", ".");
+    } else {
+      raw = raw.replace(/,/g, "");
+    }
+  } else if ((raw.match(/\./g) || []).length > 1) {
+    raw = raw.replace(/\./g, "");
+  } else if ((raw.match(/,/g) || []).length > 1) {
+    raw = raw.replace(/,/g, "");
+  } else if (raw.includes(",") && !raw.includes(".")) {
+    raw = raw.replace(",", ".");
+  }
+
+  const maybe = Number(raw);
+  return Number.isFinite(maybe) ? maybe : null;
+}
+
+function parseExcelSerialDate(rawValue) {
+  const serial = Number(rawValue);
+  if (!Number.isFinite(serial)) return null;
+  if (serial < 20000 || serial > 70000) return null;
+
+  const utcDays = Math.floor(serial - 25569);
+  const utcValue = utcDays * 86400;
+  const fractionalDay = serial % 1;
+  const totalSeconds = Math.round(fractionalDay * 86400);
+
+  const d = new Date((utcValue + totalSeconds) * 1000);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+function parseImportedDate(rawValue) {
+  if (!rawValue && rawValue !== 0) return null;
+
+  if (rawValue instanceof Date && !Number.isNaN(rawValue.getTime())) {
+    return rawValue;
+  }
+
+  if (typeof rawValue === "number") {
+    return parseExcelSerialDate(rawValue);
+  }
+
+  const raw = String(rawValue ?? "").trim();
+  if (!raw) return null;
+
+  const iso = new Date(raw);
+  if (!Number.isNaN(iso.getTime())) {
+    return iso;
+  }
+
+  const match = raw.match(
+    /^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})(?:\s+(\d{1,2}):(\d{2}))?$/
+  );
+
+  if (match) {
+    let year = Number(match[3]);
+    if (year < 100) year += 2000;
+
+    const d = new Date(
+      year,
+      Number(match[2]) - 1,
+      Number(match[1]),
+      Number(match[4] || 0),
+      Number(match[5] || 0),
+      0
+    );
+
+    return Number.isNaN(d.getTime()) ? null : d;
+  }
+
+  return null;
+}
+
 function parseImportedValue(key, rawValue) {
   const value = normalizeText(rawValue);
 
@@ -387,15 +589,19 @@ function parseImportedValue(key, rawValue) {
   if (BOOLEAN_KEYS.has(key)) {
     const val = normalizeSearch(value);
     if (["si", "sí", "true", "1", "yes"].includes(val)) return true;
-    if (["no", "false", "0"].includes(val)) return false;
+    if (["no", "false", "0", "abierta"].includes(val)) return false;
   }
 
-  if (key === "anoViaje" || key === "cantidadGrupo") {
-    const maybe = Number(value);
-    return Number.isFinite(maybe) ? maybe : value;
+  if (NUMERIC_IMPORT_KEYS.has(key)) {
+    const maybe = parseImportedNumber(rawValue);
+    return maybe !== null ? maybe : value;
   }
 
-  // ISO string => Date (Firestore lo guarda como fecha consistente)
+  if (DATE_IMPORT_KEYS.has(key)) {
+    const parsed = parseImportedDate(rawValue);
+    return parsed || value;
+  }
+
   if (
     /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z$/i.test(value) ||
     /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2})?(?:\.\d+)?(?:Z|[+\-]\d{2}:\d{2})$/i.test(value)
@@ -489,6 +695,61 @@ function sanitizeImportKey(rawKey = "") {
     "destinos secundarios": "destinosSecundarios",
     "destino secundario": "destinosSecundarios",
     "otro destino secundario": "destinoSecundarioOtro",
+
+    // contacto 2
+    "contacto 2": "nombreCliente2",
+    "nombre contacto 2": "nombreCliente2",
+    "rol contacto 2": "rolCliente2",
+    "correo contacto 2": "correoCliente2",
+    "celular contacto 2": "celularCliente2",
+
+    // datos grupo / operativos
+    "fecha de ultimo cambio de estado": "fechaUltimoCambioEstado",
+    "fecha de último cambio de estado": "fechaUltimoCambioEstado",
+    "programa": "programa",
+    "tramo": "tramo",
+    "fecha tentativa": "semanaViaje",
+    "solicitud reserva": "solicitudReserva",
+    "solicitud de reserva": "solicitudReserva",
+    "fecha reunion cliente": "fechaReunionCliente",
+    "fecha reunión cliente": "fechaReunionCliente",
+    "hotel": "solicitudHotel",
+    "solicitud hotel": "solicitudHotel",
+
+    // observaciones
+    "observacion operaciones": "observacionesOperaciones",
+    "observación operaciones": "observacionesOperaciones",
+    "observaciones operaciones": "observacionesOperaciones",
+    "observaciones administracion": "observacionesAdministracion",
+    "observaciones administración": "observacionesAdministracion",
+
+    // ficha
+    "asistencia en viaje": "asistenciaMed",
+    "asistencia en viajes": "asistenciaMed",
+    "liberados": "liberados",
+    "valor programa": "valorPrograma",
+    "autorizacion": "autorizacionGerencia",
+    "autorización": "autorizacionGerencia",
+    "descuento": "descuentoFicha",
+    "version ficha": "versionFicha",
+    "fecha actualizacion ficha": "fechaActualizacionFicha",
+    "fecha actualización ficha": "fechaActualizacionFicha",
+    "observaciones ficha": "observacionesFicha",
+
+    // firmas / flujo
+    "firma vendedor": "firmaVendedor",
+    "firma supervision": "firmaSupervision",
+    "firma supervisión": "firmaSupervision",
+    "firma administracion": "firmaAdministracion",
+    "firma administración": "firmaAdministracion",
+    "cierre": "cierre",
+
+    // integración / administración
+    "numero negocio": "numeroNegocio",
+    "n negocio": "numeroNegocio",
+    "n de negocio": "numeroNegocio",
+    "usuario programa adm": "usuarioProgramaAdm",
+    "clave administrativa": "claveAdministrativa",
 
     // ubicación / asignación
     "comuna ciudad": "comunaCiudad",
@@ -878,44 +1139,176 @@ function resolveOrigenColegioFromMatch(match) {
   return match.entry.hasOk ? "Cartera" : "Pendiente en cartera";
 }
 
-function applyCarteraInfoToPayload(payload, carteraCache, baseData = {}) {
-  const merged = {
-    ...(baseData || {}),
-    ...(payload || {})
-  };
+function hasImportedContent(value = "") {
+  return normalizeSearch(value || "") !== "";
+}
 
-  const colegio = normalizeText(merged.colegio || "");
-  if (!colegio) {
-    return autoResolveKnownPeople(payload);
+function normalizeCierreFicha(value = "") {
+  const v = normalizeSearch(value || "");
+  if (v.includes("cerrad")) return "cerrada";
+  if (v.includes("abiert")) return "abierta";
+  return String(value || "").trim();
+}
+
+function deriveFichaEstadoFromLegacy(payload = {}) {
+  const signedV = hasImportedContent(payload.firmaVendedor);
+  const signedS = hasImportedContent(payload.firmaSupervision);
+  const signedA = hasImportedContent(payload.firmaAdministracion);
+  const cierreNorm = normalizeCierreFicha(payload.cierre);
+
+  if (cierreNorm === "cerrada" || signedA) return "autorizada_admin";
+  if (signedS) return "revisada_jefa_ventas";
+  if (signedV) return "lista_vendedor";
+
+  return normalizeText(payload.fichaEstado || "") || "pendiente";
+}
+
+function applyLegacyWorkflowFields(payload = {}) {
+  const hasRelevantLegacyData = [
+    "fechaUltimoCambioEstado",
+    "solicitudReserva",
+    "observacionesOperaciones",
+    "observacionesAdministracion",
+    "asistenciaMed",
+    "liberados",
+    "valorPrograma",
+    "autorizacionGerencia",
+    "descuentoFicha",
+    "versionFicha",
+    "fechaActualizacionFicha",
+    "observacionesFicha",
+    "firmaVendedor",
+    "firmaSupervision",
+    "firmaAdministracion",
+    "cierre",
+    "numeroNegocio",
+    "usuarioProgramaAdm",
+    "claveAdministrativa"
+  ].some((key) => key in payload);
+
+  if (!hasRelevantLegacyData) {
+    return payload;
   }
 
-  const match = findBestCarteraMatch(colegio, carteraCache);
+  const signedV = hasImportedContent(payload.firmaVendedor);
+  const signedS = hasImportedContent(payload.firmaSupervision);
+  const signedA = hasImportedContent(payload.firmaAdministracion);
+  const cierreNorm = normalizeCierreFicha(payload.cierre);
+  const isClosed = cierreNorm === "cerrada";
+  const isAuthorized = isClosed || signedA;
 
-  if (!match?.entry) {
-    payload.origenColegio = "No cartera";
-    return autoResolveKnownPeople(payload);
+  // Resumen de situación
+  if ("fechaUltimoCambioEstado" in payload) {
+    setNestedValue(payload, "situacion.fechaUltimoCambioEstado", payload.fechaUltimoCambioEstado);
   }
 
-  payload.origenColegio = resolveOrigenColegioFromMatch(match);
-
-  // El logo pertenece al colegio, no al alias ni al curso.
-  // Si hay match por colegio, copiamos el logo aunque el estado sea pendiente.
-  if (match.entry.logoColegioUrl) {
-    payload.logoColegioUrl = match.entry.logoColegioUrl;
+  if ("observacionesOperaciones" in payload) {
+    setNestedValue(payload, "situacion.observacionOperaciones", payload.observacionesOperaciones || "");
   }
 
-  // Solo completamos vendedora/correo si la coincidencia es única y clara
-  if (match.entry.matches === 1) {
-    if (!normalizeText(payload.vendedora) && normalizeText(match.entry.vendedora)) {
-      payload.vendedora = match.entry.vendedora;
-    }
-
-    if (!normalizeEmail(payload.vendedoraCorreo) && normalizeEmail(match.entry.vendedoraCorreo)) {
-      payload.vendedoraCorreo = match.entry.vendedoraCorreo;
-    }
+  if ("observacionesAdministracion" in payload) {
+    setNestedValue(payload, "situacion.observacionAdministracion", payload.observacionesAdministracion || "");
   }
 
-  return autoResolveKnownPeople(payload);
+  // Bloque ficha
+  if ("versionFicha" in payload) {
+    setNestedValue(payload, "ficha.version", payload.versionFicha || "");
+  }
+
+  if ("fechaActualizacionFicha" in payload) {
+    setNestedValue(payload, "ficha.fechaActualizacion", payload.fechaActualizacionFicha || "");
+  }
+
+  if ("observacionesFicha" in payload) {
+    setNestedValue(payload, "ficha.observacionesGenerales", payload.observacionesFicha || "");
+  }
+
+  if ("autorizacionGerencia" in payload) {
+    setNestedValue(payload, "ficha.autorizacionGerencia", payload.autorizacionGerencia || "");
+  }
+
+  if ("descuentoFicha" in payload) {
+    setNestedValue(payload, "ficha.descuento", payload.descuentoFicha || "");
+  }
+
+  if ("asistenciaMed" in payload) {
+    setNestedValue(payload, "ficha.asistenciaMed", payload.asistenciaMed || "");
+  }
+
+  if ("liberados" in payload) {
+    setNestedValue(payload, "ficha.liberados", payload.liberados ?? "");
+  }
+
+  if ("valorPrograma" in payload) {
+    setNestedValue(payload, "ficha.valorPrograma", payload.valorPrograma ?? "");
+  }
+
+  if ("numeroNegocio" in payload) {
+    setNestedValue(payload, "ficha.numeroNegocio", payload.numeroNegocio ?? "");
+  }
+
+  if ("solicitudReserva" in payload) {
+    setNestedValue(payload, "ficha.solicitudReserva", payload.solicitudReserva || "");
+  }
+
+  // Bloque administración
+  if ("usuarioProgramaAdm" in payload) {
+    setNestedValue(payload, "administracion.usuarioProgramaAdm", payload.usuarioProgramaAdm || "");
+  }
+
+  if ("claveAdministrativa" in payload) {
+    setNestedValue(payload, "administracion.claveAdministrativa", payload.claveAdministrativa || "");
+  }
+
+  // Derivar resumen de ficha
+  if (
+    "firmaVendedor" in payload ||
+    "firmaSupervision" in payload ||
+    "firmaAdministracion" in payload ||
+    "cierre" in payload ||
+    !normalizeText(payload.fichaEstado || "")
+  ) {
+    payload.fichaEstado = deriveFichaEstadoFromLegacy(payload);
+    setNestedValue(payload, "documentos.fichaGrupo.estado", payload.fichaEstado);
+  }
+
+  if ("cierre" in payload) {
+    payload.cierre = cierreNorm || payload.cierre || "";
+  }
+
+  if ("cierre" in payload || "firmaAdministracion" in payload) {
+    payload.cerrada = isClosed;
+    payload.autorizada = isAuthorized;
+  }
+
+  // Flujo de firmas
+  if (
+    "firmaVendedor" in payload ||
+    "firmaSupervision" in payload ||
+    "firmaAdministracion" in payload ||
+    "cierre" in payload
+  ) {
+    setNestedValue(payload, "flowFicha.habilitada", signedV || signedS || signedA || isAuthorized);
+    setNestedValue(payload, "flowFicha.estado", payload.fichaEstado || "pendiente");
+    setNestedValue(payload, "flowFicha.requiereRefirmaAdministracion", false);
+
+    setNestedValue(payload, "flowFicha.vendedor.firmado", signedV);
+    setNestedValue(payload, "flowFicha.vendedor.firmadoPor", payload.firmaVendedor || "");
+    setNestedValue(payload, "flowFicha.vendedor.firmadoPorCorreo", "");
+    setNestedValue(payload, "flowFicha.vendedor.observacion", "");
+
+    setNestedValue(payload, "flowFicha.jefaVentas.firmado", signedS);
+    setNestedValue(payload, "flowFicha.jefaVentas.firmadoPor", payload.firmaSupervision || "");
+    setNestedValue(payload, "flowFicha.jefaVentas.firmadoPorCorreo", "");
+    setNestedValue(payload, "flowFicha.jefaVentas.observacion", "");
+
+    setNestedValue(payload, "flowFicha.administracion.firmado", signedA);
+    setNestedValue(payload, "flowFicha.administracion.firmadoPor", payload.firmaAdministracion || "");
+    setNestedValue(payload, "flowFicha.administracion.firmadoPorCorreo", "");
+    setNestedValue(payload, "flowFicha.administracion.observacion", "");
+  }
+
+  return payload;
 }
 
 async function backfillOrigenColegioDesdeCartera() {
@@ -2066,6 +2459,7 @@ function rowToFieldPayload(rowObj, carteraCache = { byExact: new Map(), entries:
 
   autoResolveKnownPeople(payload);
   applyCarteraInfoToPayload(payload, carteraCache);
+  applyLegacyWorkflowFields(payload);
 
   return payload;
 }
