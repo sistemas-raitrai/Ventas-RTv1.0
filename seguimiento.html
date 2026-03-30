@@ -477,150 +477,180 @@
 <body class="ventas-body" data-page="seguimiento">
   <div id="layout-top"></div>
 
-  <main class="ventas-main seguimiento-main">
-    <section class="seguimiento-wrap">
+<main class="page-shell seguimiento-page">
+  <section class="page-card panel seguimiento-panel-main">
 
-      <section class="panel">
-        <div class="seguimiento-header">
-          <div>
-            <h1 class="seguimiento-title">Seguimiento de grupos</h1>
-          </div>
+    <div class="page-header seguimiento-topbar">
+      <div class="page-title-wrap seguimiento-title-wrap">
+        <h2>Seguimiento de grupos</h2>
+        <p>Vista general del avance comercial de grupos y cotizaciones.</p>
+      </div>
+    </div>
+
+    <div class="page-toolbar seguimiento-toolbar">
+      <div class="toolbar-left">
+        <div class="field-wrap">
+          <label for="filtroAno">Año</label>
+          <select id="filtroAno">
+            <option value="todos">Todos</option>
+          </select>
         </div>
 
-        <div class="seguimiento-toolbar">
-          <div class="seguimiento-field">
-            <label for="filtroAno">Año</label>
-            <select id="filtroAno">
-              <option value="todos">Todos</option>
-            </select>
-          </div>
-
-          <div class="seguimiento-field">
-            <label for="filtroEstado">Estado</label>
-            <select id="filtroEstado">
-              <option value="todos">Todos</option>
-              <option value="a_contactar">A contactar</option>
-              <option value="contactado">Contactado</option>
-              <option value="cotizando">Cotizando</option>
-              <option value="recotizando">Recotizando</option>
-              <option value="reunion_confirmada">Reunión confirmada</option>
-              <option value="ganada">Ganada</option>
-              <option value="perdida">Perdida</option>
-            </select>
-          </div>
-
-          <div class="seguimiento-field">
-            <label for="filtroVendedora">Vendedor(a)</label>
-            <select id="filtroVendedora">
-              <option value="todos">Todos</option>
-            </select>
-          </div>
-
-          <div class="seguimiento-field">
-            <label for="buscadorSeguimiento">Buscar</label>
-            <input
-              id="buscadorSeguimiento"
-              type="text"
-              placeholder="Alias, apoderado, grupo, colegio, destino..."
-              autocomplete="off"
-            />
-          </div>
-
-          <div class="seguimiento-field">
-            <label>Mostrar</label>
-            <label class="seguimiento-toggle" for="toggleAnteriores">
-              <input id="toggleAnteriores" type="checkbox" />
-              <span>Ver años anteriores</span>
-            </label>
-          </div>
-
-          <button id="btnRecargarSeguimiento" class="seguimiento-btn" type="button">
-            Recargar
-          </button>
-        </div>
-      </section>
-
-      <section class="seguimiento-summary">
-        <div class="seguimiento-summary-card"><div class="label">Total</div><div class="value" id="sumTotal">0</div></div>
-        <div class="seguimiento-summary-card"><div class="label">A contactar</div><div class="value" id="sumAContactar">0</div></div>
-        <div class="seguimiento-summary-card"><div class="label">Contactado</div><div class="value" id="sumContactado">0</div></div>
-        <div class="seguimiento-summary-card"><div class="label">Cotizando</div><div class="value" id="sumCotizando">0</div></div>
-        <div class="seguimiento-summary-card"><div class="label">Reunión</div><div class="value" id="sumReunion">0</div></div>
-        <div class="seguimiento-summary-card"><div class="label">Ganadas</div><div class="value" id="sumGanadas">0</div></div>
-        <div class="seguimiento-summary-card"><div class="label">Perdidas</div><div class="value" id="sumPerdidas">0</div></div>
-      </section>
-
-      <section class="panel seguimiento-panel">
-        <div class="seguimiento-legend">
-          <div class="seguimiento-legend-item">
-            <span class="seguimiento-legend-bar">
-              <span class="seg-fill-red"></span><span></span><span></span><span></span><span></span>
-            </span>
-            A contactar
-          </div>
-
-          <div class="seguimiento-legend-item">
-            <span class="seguimiento-legend-bar">
-              <span class="seg-fill-orange"></span><span class="seg-fill-orange"></span><span></span><span></span><span></span>
-            </span>
-            Contactado
-          </div>
-
-          <div class="seguimiento-legend-item">
-            <span class="seguimiento-legend-bar">
-              <span class="seg-fill-yellow"></span><span class="seg-fill-yellow"></span><span class="seg-fill-yellow"></span><span></span><span></span>
-            </span>
-            Cotizando / Recotizando
-          </div>
-
-          <div class="seguimiento-legend-item">
-            <span class="seguimiento-legend-bar">
-              <span class="seg-fill-mix"></span><span class="seg-fill-mix"></span><span class="seg-fill-mix"></span><span class="seg-fill-mix"></span><span></span>
-            </span>
-            Reunión confirmada
-          </div>
-
-          <div class="seguimiento-legend-item">
-            <span class="seguimiento-legend-bar">
-              <span class="seg-fill-green"></span><span class="seg-fill-green"></span><span class="seg-fill-green"></span><span class="seg-fill-green"></span><span class="seg-fill-green"></span>
-            </span>
-            Ganada
-          </div>
-
-          <div class="seguimiento-legend-item">
-            <span class="seg-badge seg-badge-blue">Autorizada</span>
-          </div>
-
-          <div class="seguimiento-legend-item">
-            <span class="seg-badge seg-badge-green-dark">Cerrada</span>
-          </div>
+        <div class="field-wrap">
+          <label for="filtroEstado">Estado</label>
+          <select id="filtroEstado">
+            <option value="todos">Todos</option>
+            <option value="a_contactar">A contactar</option>
+            <option value="contactado">Contactado</option>
+            <option value="cotizando">Cotizando</option>
+            <option value="recotizando">Recotizando</option>
+            <option value="reunion_confirmada">Reunión confirmada</option>
+            <option value="ganada">Ganada</option>
+            <option value="perdida">Perdida</option>
+          </select>
         </div>
 
-        <div class="seguimiento-table-wrap">
-          <table class="seguimiento-table">
-            <thead>
-              <tr>
-                <th>Grupo</th>
-                <th>Destino</th>
-                <th>Progreso</th>
-                <th>Aut.</th>
-                <th>Cerr.</th>
-                <th>Últ. gestión</th>
-                <th>Últ. reunión</th>
-                <th>Documentos / hitos</th>
-              </tr>
-            </thead>
-            <tbody id="tbodySeguimiento">
-              <tr>
-                <td colspan="8" class="seg-empty">Cargando grupos...</td>
-              </tr>
-            </tbody>
-          </table>
+        <div class="field-wrap">
+          <label for="filtroVendedora">Vendedor(a)</label>
+          <select id="filtroVendedora">
+            <option value="todos">Todos</option>
+          </select>
         </div>
-      </section>
 
+        <div class="field-wrap search-wide">
+          <label for="buscadorSeguimiento">Buscar</label>
+          <input
+            id="buscadorSeguimiento"
+            type="text"
+            placeholder="Alias, apoderado, grupo, colegio, destino..."
+            autocomplete="off"
+          />
+        </div>
+
+        <div class="field-wrap toggle-wrap">
+          <label for="toggleAnteriores">Mostrar</label>
+          <label class="toggle-box" for="toggleAnteriores">
+            <input id="toggleAnteriores" type="checkbox" />
+            <span>Ver años anteriores</span>
+          </label>
+        </div>
+      </div>
+
+      <div class="toolbar-right">
+        <button id="btnRecargarSeguimiento" class="btn-page" type="button">
+          Recargar
+        </button>
+      </div>
+    </div>
+
+    <section class="seguimiento-summary">
+      <div class="seguimiento-summary-card">
+        <div class="label">Total</div>
+        <div class="value" id="sumTotal">0</div>
+      </div>
+
+      <div class="seguimiento-summary-card">
+        <div class="label">A contactar</div>
+        <div class="value" id="sumAContactar">0</div>
+      </div>
+
+      <div class="seguimiento-summary-card">
+        <div class="label">Contactado</div>
+        <div class="value" id="sumContactado">0</div>
+      </div>
+
+      <div class="seguimiento-summary-card">
+        <div class="label">Cotizando</div>
+        <div class="value" id="sumCotizando">0</div>
+      </div>
+
+      <div class="seguimiento-summary-card">
+        <div class="label">Reunión</div>
+        <div class="value" id="sumReunion">0</div>
+      </div>
+
+      <div class="seguimiento-summary-card">
+        <div class="label">Ganadas</div>
+        <div class="value" id="sumGanadas">0</div>
+      </div>
+
+      <div class="seguimiento-summary-card">
+        <div class="label">Perdidas</div>
+        <div class="value" id="sumPerdidas">0</div>
+      </div>
     </section>
-  </main>
+
+    <div class="table-wrap seguimiento-table-card">
+      <div class="seguimiento-legend">
+        <div class="seguimiento-legend-item">
+          <span class="seguimiento-legend-bar">
+            <span class="seg-fill-red"></span><span></span><span></span><span></span><span></span>
+          </span>
+          A contactar
+        </div>
+
+        <div class="seguimiento-legend-item">
+          <span class="seguimiento-legend-bar">
+            <span class="seg-fill-orange"></span><span class="seg-fill-orange"></span><span></span><span></span><span></span>
+          </span>
+          Contactado
+        </div>
+
+        <div class="seguimiento-legend-item">
+          <span class="seguimiento-legend-bar">
+            <span class="seg-fill-yellow"></span><span class="seg-fill-yellow"></span><span class="seg-fill-yellow"></span><span></span><span></span>
+          </span>
+          Cotizando / Recotizando
+        </div>
+
+        <div class="seguimiento-legend-item">
+          <span class="seguimiento-legend-bar">
+            <span class="seg-fill-mix"></span><span class="seg-fill-mix"></span><span class="seg-fill-mix"></span><span class="seg-fill-mix"></span><span></span>
+          </span>
+          Reunión confirmada
+        </div>
+
+        <div class="seguimiento-legend-item">
+          <span class="seguimiento-legend-bar">
+            <span class="seg-fill-green"></span><span class="seg-fill-green"></span><span class="seg-fill-green"></span><span class="seg-fill-green"></span><span class="seg-fill-green"></span>
+          </span>
+          Ganada
+        </div>
+
+        <div class="seguimiento-legend-item">
+          <span class="seg-badge seg-badge-blue">Autorizada</span>
+        </div>
+
+        <div class="seguimiento-legend-item">
+          <span class="seg-badge seg-badge-green-dark">Cerrada</span>
+        </div>
+      </div>
+
+      <div class="seguimiento-table-wrap">
+        <table class="seguimiento-table">
+          <thead>
+            <tr>
+              <th>Grupo</th>
+              <th>Destino</th>
+              <th>Progreso</th>
+              <th>Aut.</th>
+              <th>Cerr.</th>
+              <th>Últ. gestión</th>
+              <th>Últ. reunión</th>
+              <th>Documentos / hitos</th>
+            </tr>
+          </thead>
+          <tbody id="tbodySeguimiento">
+            <tr>
+              <td colspan="8" class="seg-empty">Cargando grupos...</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </section>
+</main>
 
   <script type="module" src="layout.js"></script>
   <script type="module" src="seguimiento.js"></script>
