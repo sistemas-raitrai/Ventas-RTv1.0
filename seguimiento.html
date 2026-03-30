@@ -433,6 +433,81 @@
     font-weight:700;
   }
 
+  .seguimiento-actions{
+  display:flex;
+  gap:10px;
+  align-items:center;
+  flex-wrap:wrap;
+  }
+  
+  .summary-filter{
+    border:2px solid #d7dde6;
+    border-radius:12px;
+    background:#fff;
+    text-align:left;
+    cursor:pointer;
+    transition:transform .15s ease, box-shadow .15s ease, opacity .15s ease, border-color .15s ease;
+  }
+  
+  .summary-filter:hover{
+    transform:translateY(-1px);
+    box-shadow:0 8px 18px rgba(36,18,56,.08);
+  }
+  
+  .summary-filter.is-active{
+    border-color:rgba(58,42,82,.24);
+  }
+  
+  .summary-filter.is-off{
+    opacity:.42;
+  }
+  
+  .summary-filter .label,
+  .summary-filter .value{
+    pointer-events:none;
+  }
+  
+  .th-sort{
+    width:100%;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:8px;
+    border:none;
+    background:transparent;
+    color:#fff;
+    padding:0;
+    font:inherit;
+    font-weight:700;
+    cursor:pointer;
+    text-transform:uppercase;
+  }
+  
+  .th-sort .sort-arrow{
+    font-size:12px;
+    opacity:.8;
+    flex:0 0 auto;
+  }
+  
+  .th-sort.active .sort-arrow{
+    opacity:1;
+  }
+  
+  .col-vendedor,
+  .td-vendedor{
+    white-space:nowrap;
+  }
+  
+  .td-vendedor{
+    font-weight:700;
+    color:#4b5563;
+  }
+  
+  body.is-vendedor-view .col-vendedor,
+  body.is-vendedor-view .td-vendedor{
+    display:none;
+  }
+
   @media (max-width: 1280px){
     .seguimiento-summary{
       grid-template-columns:repeat(4, minmax(120px, 1fr));
@@ -536,48 +611,53 @@
         </div>
       </div>
 
-      <div class="toolbar-right">
+    <div class="toolbar-right">
+      <div class="seguimiento-actions">
+        <button id="btnExportarSeguimiento" class="btn-page sec" type="button">
+          Exportar XLSX
+        </button>
+    
         <button id="btnRecargarSeguimiento" class="btn-page" type="button">
           Recargar
         </button>
       </div>
     </div>
 
-    <section class="seguimiento-summary">
-      <div class="seguimiento-summary-card">
+    <section class="seguimiento-summary" id="seguimientoSummaryFilters">
+      <button type="button" class="seguimiento-summary-card summary-filter is-active" data-summary-state="__all__">
         <div class="label">Total</div>
         <div class="value" id="sumTotal">0</div>
-      </div>
-
-      <div class="seguimiento-summary-card">
+      </button>
+    
+      <button type="button" class="seguimiento-summary-card summary-filter is-active" data-summary-state="a_contactar">
         <div class="label">A contactar</div>
         <div class="value" id="sumAContactar">0</div>
-      </div>
-
-      <div class="seguimiento-summary-card">
+      </button>
+    
+      <button type="button" class="seguimiento-summary-card summary-filter is-active" data-summary-state="contactado">
         <div class="label">Contactado</div>
         <div class="value" id="sumContactado">0</div>
-      </div>
-
-      <div class="seguimiento-summary-card">
+      </button>
+    
+      <button type="button" class="seguimiento-summary-card summary-filter is-active" data-summary-state="cotizando">
         <div class="label">Cotizando</div>
         <div class="value" id="sumCotizando">0</div>
-      </div>
-
-      <div class="seguimiento-summary-card">
+      </button>
+    
+      <button type="button" class="seguimiento-summary-card summary-filter is-active" data-summary-state="reunion_confirmada">
         <div class="label">Reunión</div>
         <div class="value" id="sumReunion">0</div>
-      </div>
-
-      <div class="seguimiento-summary-card">
+      </button>
+    
+      <button type="button" class="seguimiento-summary-card summary-filter is-active" data-summary-state="ganada">
         <div class="label">Ganadas</div>
         <div class="value" id="sumGanadas">0</div>
-      </div>
-
-      <div class="seguimiento-summary-card">
+      </button>
+    
+      <button type="button" class="seguimiento-summary-card summary-filter is-off" data-summary-state="perdida">
         <div class="label">Perdidas</div>
         <div class="value" id="sumPerdidas">0</div>
-      </div>
+      </button>
     </section>
 
     <div class="table-wrap seguimiento-table-card">
@@ -630,19 +710,73 @@
         <table class="seguimiento-table">
           <thead>
             <tr>
-              <th>Grupo</th>
-              <th>Destino</th>
-              <th>Progreso</th>
-              <th>Aut.</th>
-              <th>Cerr.</th>
-              <th>Últ. gestión</th>
-              <th>Últ. reunión</th>
-              <th>Documentos / hitos</th>
+              <th>
+                <button type="button" class="th-sort" data-sort="grupo">
+                  <span>Grupo</span>
+                  <span class="sort-arrow">↕</span>
+                </button>
+              </th>
+          
+              <th class="col-vendedor">
+                <button type="button" class="th-sort active" data-sort="vendedora" data-default-sort="1">
+                  <span>Vendedor(a)</span>
+                  <span class="sort-arrow">↑</span>
+                </button>
+              </th>
+          
+              <th>
+                <button type="button" class="th-sort" data-sort="destino">
+                  <span>Destino</span>
+                  <span class="sort-arrow">↕</span>
+                </button>
+              </th>
+          
+              <th>
+                <button type="button" class="th-sort" data-sort="estado">
+                  <span>Progreso</span>
+                  <span class="sort-arrow">↕</span>
+                </button>
+              </th>
+          
+              <th>
+                <button type="button" class="th-sort" data-sort="autorizada">
+                  <span>Aut.</span>
+                  <span class="sort-arrow">↕</span>
+                </button>
+              </th>
+          
+              <th>
+                <button type="button" class="th-sort" data-sort="cerrada">
+                  <span>Cerr.</span>
+                  <span class="sort-arrow">↕</span>
+                </button>
+              </th>
+          
+              <th>
+                <button type="button" class="th-sort" data-sort="ultimaGestion">
+                  <span>Últ. gestión</span>
+                  <span class="sort-arrow">↕</span>
+                </button>
+              </th>
+          
+              <th>
+                <button type="button" class="th-sort" data-sort="ultimaReunion">
+                  <span>Últ. reunión</span>
+                  <span class="sort-arrow">↕</span>
+                </button>
+              </th>
+          
+              <th>
+                <button type="button" class="th-sort" data-sort="documentos">
+                  <span>Documentos / hitos</span>
+                  <span class="sort-arrow">↕</span>
+                </button>
+              </th>
             </tr>
           </thead>
           <tbody id="tbodySeguimiento">
             <tr>
-              <td colspan="8" class="seg-empty">Cargando grupos...</td>
+              <td colspan="9" class="seg-empty">Cargando grupos...</td>
             </tr>
           </tbody>
         </table>
@@ -652,6 +786,7 @@
   </section>
 </main>
 
+  <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
   <script type="module" src="layout.js"></script>
   <script type="module" src="seguimiento.js"></script>
 </body>
