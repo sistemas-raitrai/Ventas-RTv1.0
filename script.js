@@ -756,10 +756,12 @@ async function initPage() {
         selectApoderado.value = grupoSeleccionado || "";
       }
 
-      console.log("Grupo seleccionado:", grupoSeleccionado);
-      // Cuando tengas definida la ficha destino, aquí puedes redirigir.
-      // Ejemplo:
-      // if (grupoSeleccionado) location.href = `grupo.html?id=${encodeURIComponent(grupoSeleccionado)}`;
+      if (!grupoSeleccionado) {
+        alert("Debes seleccionar un grupo.");
+        return;
+      }
+      
+      location.href = `grupo.html?id=${encodeURIComponent(grupoSeleccionado)}`;
     });
   }
 
@@ -776,8 +778,12 @@ async function initPage() {
         selectGrupo.value = apoderadoSeleccionado || "";
       }
 
-      console.log("Apoderado seleccionado:", apoderadoSeleccionado);
-      // Cuando tengas definida la ficha destino, aquí puedes redirigir.
+      if (!apoderadoSeleccionado) {
+        alert("Debes seleccionar un apoderado.");
+        return;
+      }
+      
+      location.href = `grupo.html?id=${encodeURIComponent(apoderadoSeleccionado)}`;
     });
   }
 
