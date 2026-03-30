@@ -170,12 +170,28 @@ function mapDocToRow(docId, data) {
     ciudad: normalizeText(data.ciudad),
     estatus: normalizeText(data.estatus),
     observaciones: normalizeText(data.observaciones),
-    logoUrl: String(data.logoUrl || "").trim(),
-    logoPath: String(data.logoPath || "").trim()
+
+    // Compatibilidad:
+    // seguimos usando logoUrl/logoPath en la vista actual de cartera,
+    // pero además exponemos logoColegioUrl/logoColegioPath.
+    logoUrl: String(data.logoColegioUrl || data.logoUrl || "").trim(),
+    logoPath: String(data.logoColegioPath || data.logoPath || "").trim(),
+    logoColegioUrl: String(data.logoColegioUrl || data.logoUrl || "").trim(),
+    logoColegioPath: String(data.logoColegioPath || data.logoPath || "").trim()
   };
 }
 
 function buildItemPayload(input, existing = null) {
+  const nextLogoUrl =
+    input.logoUrl !== undefined && input.logoUrl !== null
+      ? String(input.logoUrl).trim()
+      : String(input.logoColegioUrl ?? existing?.logoUrl ?? existing?.logoColegioUrl ?? "").trim();
+
+  const nextLogoPath =
+    input.logoPath !== undefined && input.logoPath !== null
+      ? String(input.logoPath).trim()
+      : String(input.logoColegioPath ?? existing?.logoPath ?? existing?.logoColegioPath ?? "").trim();
+
   return {
     numeroColegio: normalizeText(input.numeroColegio),
     colegio: normalizeText(input.colegio),
@@ -195,14 +211,19 @@ function buildItemPayload(input, existing = null) {
         ? input.observaciones
         : existing?.observaciones || ""
     ),
-    logoUrl:
-      input.logoUrl !== undefined && input.logoUrl !== null
-        ? String(input.logoUrl).trim()
-        : String(existing?.logoUrl || "").trim(),
-    logoPath:
-      input.logoPath !== undefined && input.logoPath !== null
-        ? String(input.logoPath).trim()
-        : String(existing?.logoPath || "").trim(),
+
+    // Se guardan ambos nombres en paralelo
+    logoUrl: nextLogoUrl,
+    logoPath: nextLogoPath,
+    logoColegioUrl:
+      input.logoColegioUrl !== undefined && input.logoColegioUrl !== null
+        ? String(input.logoColegioUrl).trim()
+        : nextLogoUrl,
+    logoColegioPath:
+      input.logoColegioPath !== undefined && input.logoColegioPath !== null
+        ? String(input.logoColegioPath).trim()
+        : nextLogoPath,
+
     actualizadoPor: normalizeEmail(state.realUser?.email || ""),
     fechaActualizacion: serverTimestamp()
   };
