@@ -108,6 +108,11 @@ const BOOLEAN_KEYS = new Set([
   "requiereAsignacion"
 ]);
 
+const HIDDEN_DYNAMIC_KEYS = new Set([
+  "logoColegioUrl",
+  "logoColegioPath"
+]);
+
 const LABELS = {
   idGrupo: "ID GRUPO",
   codigoRegistro: "CÓDIGO",
@@ -770,6 +775,7 @@ async function loadSchoolCarteraIndex(force = false) {
         hasAny: false,
         vendedora: "",
         vendedoraCorreo: "",
+        logoColegioUrl: "",
         statuses: new Set()
       };
 
@@ -792,6 +798,10 @@ async function loadSchoolCarteraIndex(force = false) {
 
       if (!existing.colegio) {
         existing.colegio = normalizeText(data.colegio || "");
+      }
+
+      if (!existing.logoColegioUrl) {
+        existing.logoColegioUrl = String(data.logoColegioUrl || data.logoUrl || "").trim();
       }
 
       byExact.set(normalizedSchool, existing);
@@ -887,6 +897,12 @@ function applyCarteraInfoToPayload(payload, carteraCache, baseData = {}) {
   }
 
   payload.origenColegio = resolveOrigenColegioFromMatch(match);
+
+  // El logo pertenece al colegio, no al alias ni al curso.
+  // Si hay match por colegio, copiamos el logo aunque el estado sea pendiente.
+  if (match.entry.logoColegioUrl) {
+    payload.logoColegioUrl = match.entry.logoColegioUrl;
+  }
 
   // Solo completamos vendedora/correo si la coincidencia es única y clara
   if (match.entry.matches === 1) {
@@ -996,6 +1012,95 @@ async function backfillOrigenColegioDesdeCartera() {
     console.error(error);
     setProgressStatus({
       text: "Error completando origen colegio.",
+      meta: error.message || "No se pudo ejecutar el backfill.",
+      progress: 100,
+      type: "error"
+    });
+  }
+}
+
+async function backfillLogoColegioDesdeCartera() {
+  if (!isAdminOnly()) return;
+
+  try {
+    setProgressStatus({
+      text: "Completando logos de colegio...",
+      meta: "Leyendo cartera y registros existentes...",
+      progress: 10
+    });
+
+    const carteraCache = await loadSchoolCarteraIndex(true);
+    const pending = [];
+
+    state.rowsRaw.forEach(({ id, data }) => {
+      const currentData = data || {};
+      const colegioActual = normalizeText(currentData.colegio || "");
+      if (!colegioActual) return;
+
+      const patch = {};
+      applyCarteraInfoToPayload(patch, carteraCache, currentData);
+
+      const logoNuevo = String(patch.logoColegioUrl || "").trim();
+      const logoActual = String(currentData.logoColegioUrl || "").trim();
+
+      if (!logoNuevo) return;
+      if (logoNuevo === logoActual) return;
+
+      pending.push({
+        id,
+        patch: {
+          logoColegioUrl: logoNuevo,
+          actualizadoPor: getNombreUsuario(state.effectiveUser),
+          actualizadoPorCorreo: normalizeEmail(state.realUser?.email || ""),
+          fechaActualizacion: serverTimestamp()
+        }
+      });
+    });
+
+    if (!pending.length) {
+      setProgressStatus({
+        text: "Backfill listo.",
+        meta: "No había logos para actualizar.",
+        progress: 100,
+        type: "success"
+      });
+      clearProgressStatus({}, 2500);
+      return;
+    }
+
+    let processed = 0;
+
+    for (let i = 0; i < pending.length; i += WRITE_BATCH_LIMIT) {
+      const chunk = pending.slice(i, i + WRITE_BATCH_LIMIT);
+      const batch = writeBatch(db);
+
+      chunk.forEach(({ id, patch }) => {
+        batch.set(doc(db, "ventas_cotizaciones", id), patch, { merge: true });
+      });
+
+      await batch.commit();
+      processed += chunk.length;
+
+      setProgressStatus({
+        text: "Completando logos de colegio...",
+        meta: `Procesados: ${processed}/${pending.length}`,
+        progress: 20 + Math.round((processed / pending.length) * 80)
+      });
+    }
+
+    setProgressStatus({
+      text: "Backfill listo.",
+      meta: `${pending.length} registro(s) actualizados.`,
+      progress: 100,
+      type: "success"
+    });
+    clearProgressStatus({}, 2500);
+
+    await loadData();
+  } catch (error) {
+    console.error(error);
+    setProgressStatus({
+      text: "Error completando logos de colegio.",
       meta: error.message || "No se pudo ejecutar el backfill.",
       progress: 100,
       type: "error"
@@ -1322,7 +1427,9 @@ function computeColumns() {
 
   state.allKeys = [
     ...BASE_COLUMNS.filter(k => keySet.has(k)),
-    ...[...keySet].filter(k => !BASE_COLUMNS.includes(k)).sort((a, b) => a.localeCompare(b, "es"))
+    ...[...keySet]
+      .filter(k => !BASE_COLUMNS.includes(k) && !HIDDEN_DYNAMIC_KEYS.has(k))
+      .sort((a, b) => a.localeCompare(b, "es"))
   ];
 
   state.dynamicKeys = state.allKeys.filter(k => !BASE_COLUMNS.includes(k));
@@ -2508,5 +2615,6 @@ async function initPage() {
 window.backfillOrigenColegioDesdeCartera = backfillOrigenColegioDesdeCartera;
 window.backfillVendedoraCorreoDesdeNombre = backfillVendedoraCorreoDesdeNombre;
 window.backfillAliasGrupo = backfillAliasGrupo;
+window.backfillLogoColegioDesdeCartera = backfillLogoColegioDesdeCartera;
 
 initPage();
