@@ -1838,6 +1838,136 @@ async function backfillAliasGrupo() {
   }
 }
 
+async function backfillLegacyVentas() {
+  if (!isAdminOnly()) return;
+
+  try {
+    setProgressStatus({
+      text: "Marcando base como legacy...",
+      meta: "Leyendo registros existentes...",
+      progress: 10
+    });
+
+    const pending = [];
+
+    state.rowsRaw.forEach(({ id, data }) => {
+      const currentData = data || {};
+      const flowFicha = currentData.flowFicha || {};
+      const ficha = currentData.ficha || {};
+
+      const modoActualRaiz = normalizeText(currentData.fichaFlujoModo || "");
+      const modoActualFlow = normalizeText(flowFicha.modo || "");
+      const modoActualFicha = normalizeText(ficha.flujoModo || "");
+
+      // Si ya tiene modo definido, no lo tocamos
+      if (modoActualRaiz || modoActualFlow || modoActualFicha) return;
+
+      const pdfExistente = normalizeText(
+        currentData.fichaPdfUrl ||
+        ficha.pdfUrl ||
+        ficha.urlPdf ||
+        ""
+      );
+
+      const firmadoVendedor = !!flowFicha?.vendedor?.firmado || normalizeText(currentData.firmaVendedor || "") !== "";
+      const firmadoJefa = !!flowFicha?.jefaVentas?.firmado || normalizeText(currentData.firmaSupervision || "") !== "";
+      const firmadoAdmin = !!flowFicha?.administracion?.firmado || normalizeText(currentData.firmaAdministracion || "") !== "";
+
+      const patch = {
+        fichaFlujoModo: "legacy",
+        legacyMigrado: true,
+        legacyMigradoAt: serverTimestamp(),
+        legacyMigradoPor: getNombreUsuario(state.effectiveUser),
+        legacyMigradoPorCorreo: normalizeEmail(state.realUser?.email || ""),
+
+        flowFicha: {
+          ...(flowFicha || {}),
+          modo: "legacy",
+          legacy: true,
+          bloqueadaParaVendedor: firmadoVendedor,
+          requiereActualizacion: false,
+
+          vendedor: {
+            ...(flowFicha.vendedor || {}),
+            firmado: firmadoVendedor
+          },
+
+          jefaVentas: {
+            ...(flowFicha.jefaVentas || {}),
+            firmado: firmadoJefa
+          },
+
+          administracion: {
+            ...(flowFicha.administracion || {}),
+            firmado: firmadoAdmin
+          }
+        },
+
+        ficha: {
+          ...(ficha || {}),
+          flujoModo: "legacy",
+          pdfPendienteLegacy: !pdfExistente
+        },
+
+        actualizadoPor: getNombreUsuario(state.effectiveUser),
+        actualizadoPorCorreo: normalizeEmail(state.realUser?.email || ""),
+        fechaActualizacion: serverTimestamp()
+      };
+
+      pending.push({ id, patch });
+    });
+
+    if (!pending.length) {
+      setProgressStatus({
+        text: "Backfill legacy listo.",
+        meta: "No había registros para actualizar.",
+        progress: 100,
+        type: "success"
+      });
+      clearProgressStatus({}, 2500);
+      return;
+    }
+
+    let processed = 0;
+
+    for (let i = 0; i < pending.length; i += WRITE_BATCH_LIMIT) {
+      const chunk = pending.slice(i, i + WRITE_BATCH_LIMIT);
+      const batch = writeBatch(db);
+
+      chunk.forEach(({ id, patch }) => {
+        batch.set(doc(db, "ventas_cotizaciones", id), patch, { merge: true });
+      });
+
+      await batch.commit();
+      processed += chunk.length;
+
+      setProgressStatus({
+        text: "Marcando base como legacy...",
+        meta: `Procesados: ${processed}/${pending.length}`,
+        progress: 20 + Math.round((processed / pending.length) * 80)
+      });
+    }
+
+    setProgressStatus({
+      text: "Backfill legacy listo.",
+      meta: `${pending.length} registro(s) actualizados.`,
+      progress: 100,
+      type: "success"
+    });
+    clearProgressStatus({}, 2500);
+
+    await loadData();
+  } catch (error) {
+    console.error(error);
+    setProgressStatus({
+      text: "Error marcando legacy.",
+      meta: error.message || "No se pudo ejecutar el backfill legacy.",
+      progress: 100,
+      type: "error"
+    });
+  }
+}
+
 function buildRowKey(row) {
   return String(row.idGrupo || "");
 }
@@ -3050,5 +3180,7 @@ window.backfillOrigenColegioDesdeCartera = backfillOrigenColegioDesdeCartera;
 window.backfillVendedoraCorreoDesdeNombre = backfillVendedoraCorreoDesdeNombre;
 window.backfillAliasGrupo = backfillAliasGrupo;
 window.backfillLogoColegioDesdeCartera = backfillLogoColegioDesdeCartera;
+window.backfillLegacyVentas = backfillLegacyVentas;
+
 
 initPage();
