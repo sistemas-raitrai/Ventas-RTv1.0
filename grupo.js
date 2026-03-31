@@ -42,6 +42,9 @@ const HISTORIAL_COLLECTION = "ventas_historial";
 const ALERTAS_COLLECTION = "ventas_alertas";
 const SOLICITUDES_COLLECTION = "ventas_solicitudes_actualizacion";
 
+const richSelectionByEditor = new Map();
+let richEditorsBound = false;
+
 const state = {
   realUser: null,
   effectiveUser: null,
@@ -113,7 +116,8 @@ const SITUACION_FIELDS = [
   "situacion.proximoPaso",
   "situacion.observacionVentas",
   "situacion.observacionJefaVentas",
-  "situacion.observacionAdministracion"
+  "situacion.observacionAdministracion",
+  "situacion.observacionOperaciones"
 ];
 
 const DOC_FIELDS = [
@@ -505,21 +509,21 @@ function renderSituacion() {
   setText("situacionAutorizacion", state.group.autorizada ? "Autorizada" : "No autorizada");
   setText("situacionCierre", state.group.cerrada ? "Cerrada" : "Abierta");
   setText("situacionProximoPaso", getByPath(state.group, "situacion.proximoPaso") || "—");
-  setText("situacionResumen", getByPath(state.group, "situacion.resumen") || "—");
-  setText("situacionObsVentas", getByPath(state.group, "situacion.observacionVentas") || "—");
-  setText("situacionObsJefa", getByPath(state.group, "situacion.observacionJefaVentas") || "—");
-  setText(
+
+  renderRichText(
     "situacionObsAdmin",
     getByPath(state.group, "situacion.observacionAdministracion") ||
     state.group.observacionesAdministracion ||
-    "—"
+    ""
   );
-  setText(
+
+  renderRichText(
     "situacionObsOperaciones",
     getByPath(state.group, "situacion.observacionOperaciones") ||
     state.group.observacionesOperaciones ||
-    "—"
+    ""
   );
+
   setText("situacionUltimoCambioEstado", fechaCambioEstadoTxt);
 
   const box = $("panelProximaReunion");
@@ -905,6 +909,8 @@ function buildAutomaticAlerts() {
    MODALS / EVENTS
 ========================================================= */
 function bindEvents() {
+  bindRichEditors();
+
   document.querySelectorAll("[data-close]").forEach((btn) => {
     btn.addEventListener("click", () => closeModal(btn.dataset.close));
   });
@@ -1029,7 +1035,20 @@ function openSituacionModal() {
   setFormValue("s_proximoPaso", getByPath(state.group, "situacion.proximoPaso"));
   setFormValue("s_obsVentas", getByPath(state.group, "situacion.observacionVentas"));
   setFormValue("s_obsJefa", getByPath(state.group, "situacion.observacionJefaVentas"));
-  setFormValue("s_obsAdmin", getByPath(state.group, "situacion.observacionAdministracion"));
+
+  setRichEditorHtml(
+    "s_obsAdmin",
+    getByPath(state.group, "situacion.observacionAdministracion") ||
+    state.group.observacionesAdministracion ||
+    ""
+  );
+
+  setRichEditorHtml(
+    "s_obsOperaciones",
+    getByPath(state.group, "situacion.observacionOperaciones") ||
+    state.group.observacionesOperaciones ||
+    ""
+  );
 
   openModal("modalSituacion");
 }
@@ -1077,6 +1096,151 @@ function syncMeetingTypeVisibility() {
   const type = String($("r_tipo")?.value || "presencial");
   $("wrapDireccion")?.classList.toggle("hidden", type !== "presencial");
   $("wrapLink")?.classList.toggle("hidden", type !== "virtual");
+}
+
+function bindRichEditors() {
+  if (richEditorsBound) return;
+  richEditorsBound = true;
+
+  document.addEventListener("selectionchange", () => {
+    const sel = window.getSelection();
+    if (!sel || !sel.rangeCount) return;
+
+    const anchorNode = sel.anchorNode;
+    const editor =
+      anchorNode?.nodeType === 3
+        ? anchorNode.parentElement?.closest(".rich-editor[contenteditable='true']")
+        : anchorNode?.closest?.(".rich-editor[contenteditable='true']");
+
+    if (!editor || !editor.id) return;
+
+    richSelectionByEditor.set(editor.id, sel.getRangeAt(0).cloneRange());
+  });
+
+  document.addEventListener("mousedown", (e) => {
+    const btn = e.target.closest("[data-rich-cmd]");
+    if (!btn) return;
+
+    e.preventDefault();
+
+    const targetId = String(btn.dataset.editorTarget || "");
+    const cmd = String(btn.dataset.richCmd || "");
+    if (!targetId || !cmd) return;
+
+    applyRichCommand(targetId, cmd);
+  });
+
+  document.addEventListener("input", (e) => {
+    const input = e.target.closest("[data-rich-color]");
+    if (!input) return;
+
+    const targetId = String(input.dataset.editorTarget || "");
+    const cmd = String(input.dataset.richColor || "");
+    if (!targetId || !cmd) return;
+
+    applyRichCommand(targetId, cmd, input.value);
+  });
+}
+
+function applyRichCommand(targetId, cmd, value = null) {
+  const editor = $(targetId);
+  if (!editor) return;
+
+  editor.focus();
+  restoreRichSelection(targetId);
+
+  try {
+    document.execCommand("styleWithCSS", false, true);
+  } catch (e) {
+    // sin acción
+  }
+
+  if (cmd === "hiliteColor") {
+    const ok = document.execCommand("hiliteColor", false, value);
+    if (!ok) {
+      document.execCommand("backColor", false, value);
+    }
+  } else {
+    document.execCommand(cmd, false, value);
+  }
+
+  editor.focus();
+  captureRichSelection(targetId);
+}
+
+function captureRichSelection(targetId) {
+  const sel = window.getSelection();
+  if (!sel || !sel.rangeCount) return;
+  richSelectionByEditor.set(targetId, sel.getRangeAt(0).cloneRange());
+}
+
+function restoreRichSelection(targetId) {
+  const range = richSelectionByEditor.get(targetId);
+  if (!range) return;
+
+  const sel = window.getSelection();
+  if (!sel) return;
+
+  sel.removeAllRanges();
+  sel.addRange(range);
+}
+
+function setRichEditorHtml(id, html) {
+  const el = $(id);
+  if (!el) return;
+  el.innerHTML = sanitizeRichHtml(html || "");
+}
+
+function getRichEditorHtml(id) {
+  const el = $(id);
+  if (!el) return "";
+  return normalizeRichHtml(sanitizeRichHtml(el.innerHTML || ""));
+}
+
+function renderRichText(id, html, fallback = "—") {
+  const el = $(id);
+  if (!el) return;
+
+  const safe = sanitizeRichHtml(html || "");
+  el.innerHTML = safe || fallback;
+}
+
+function sanitizeRichHtml(html = "") {
+  const raw = String(html || "");
+  if (!raw.trim()) return "";
+
+  const template = document.createElement("template");
+  template.innerHTML = raw;
+
+  template.content
+    .querySelectorAll("script, iframe, object, embed, link, meta")
+    .forEach((el) => el.remove());
+
+  template.content.querySelectorAll("*").forEach((el) => {
+    [...el.attributes].forEach((attr) => {
+      const name = attr.name.toLowerCase();
+      const value = String(attr.value || "");
+
+      if (name.startsWith("on")) {
+        el.removeAttribute(attr.name);
+      }
+
+      if ((name === "href" || name === "src") && /^\s*javascript:/i.test(value)) {
+        el.removeAttribute(attr.name);
+      }
+    });
+  });
+
+  return normalizeRichHtml(template.innerHTML);
+}
+
+function normalizeRichHtml(html = "") {
+  return String(html || "")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/<div><br><\/div>/gi, "")
+    .replace(/<p><br><\/p>/gi, "")
+    .replace(/>\s+</g, "><")
+    .trim();
 }
 
 /* =========================================================
@@ -1150,14 +1314,25 @@ async function saveSituacion() {
     "situacion.proximoPaso": $("s_proximoPaso")?.value || "",
     "situacion.observacionVentas": $("s_obsVentas")?.value || "",
     "situacion.observacionJefaVentas": $("s_obsJefa")?.value || "",
-    "situacion.observacionAdministracion": $("s_obsAdmin")?.value || ""
+    "situacion.observacionAdministracion": getRichEditorHtml("s_obsAdmin"),
+    "situacion.observacionOperaciones": getRichEditorHtml("s_obsOperaciones")
   };
 
   for (const path of SITUACION_FIELDS) {
-    const nuevo = values[path];
-    const anterior = getByPath(state.group, path);
+    const anterior =
+      path === "situacion.observacionAdministracion"
+        ? (getByPath(state.group, path) || state.group.observacionesAdministracion || "")
+        : path === "situacion.observacionOperaciones"
+          ? (getByPath(state.group, path) || state.group.observacionesOperaciones || "")
+          : getByPath(state.group, path);
 
-    if (!sameValue(anterior, nuevo)) {
+    const nuevo = values[path];
+
+    const changed = path === "situacion.observacionAdministracion" || path === "situacion.observacionOperaciones"
+      ? normalizeRichHtml(anterior) !== normalizeRichHtml(nuevo)
+      : !sameValue(anterior, nuevo);
+
+    if (changed) {
       setNestedValue(patch, path, nuevo);
       cambios.push({ campo: path, anterior, nuevo });
     }
@@ -1167,6 +1342,9 @@ async function saveSituacion() {
     closeModal("modalSituacion");
     return;
   }
+
+  patch.observacionesAdministracion = values["situacion.observacionAdministracion"];
+  patch.observacionesOperaciones = values["situacion.observacionOperaciones"];
 
   await applyCriticalChangeRules(patch, cambios);
   await saveGroupPatch(patch, {
@@ -1800,7 +1978,8 @@ function prettyLabel(path = "") {
     "situacion.proximoPaso": "Próximo paso",
     "situacion.observacionVentas": "Observación ventas",
     "situacion.observacionJefaVentas": "Observación jefa ventas",
-    "situacion.observacionAdministracion": "Observación administración"
+    "situacion.observacionAdministracion": "Observaciones administración",
+    "situacion.observacionOperaciones": "Observaciones operaciones"
   };
 
   return map[path] || String(path)
