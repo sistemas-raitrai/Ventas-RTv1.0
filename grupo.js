@@ -492,6 +492,15 @@ function renderHeroBadges() {
 }
 
 function renderSituacion() {
+  const fechaCambioEstado =
+    state.group.fechaUltimoCambioEstado ||
+    getByPath(state.group, "situacion.fechaUltimoCambioEstado") ||
+    null;
+
+  const fechaCambioEstadoTxt = toDate(fechaCambioEstado)
+    ? formatDateTime(fechaCambioEstado)
+    : (stringValue(fechaCambioEstado) || "—");
+
   setText("situacionEstado", getEstadoLabel(state.group.estado));
   setText("situacionAutorizacion", state.group.autorizada ? "Autorizada" : "No autorizada");
   setText("situacionCierre", state.group.cerrada ? "Cerrada" : "Abierta");
@@ -499,7 +508,19 @@ function renderSituacion() {
   setText("situacionResumen", getByPath(state.group, "situacion.resumen") || "—");
   setText("situacionObsVentas", getByPath(state.group, "situacion.observacionVentas") || "—");
   setText("situacionObsJefa", getByPath(state.group, "situacion.observacionJefaVentas") || "—");
-  setText("situacionObsAdmin", getByPath(state.group, "situacion.observacionAdministracion") || "—");
+  setText(
+    "situacionObsAdmin",
+    getByPath(state.group, "situacion.observacionAdministracion") ||
+    state.group.observacionesAdministracion ||
+    "—"
+  );
+  setText(
+    "situacionObsOperaciones",
+    getByPath(state.group, "situacion.observacionOperaciones") ||
+    state.group.observacionesOperaciones ||
+    "—"
+  );
+  setText("situacionUltimoCambioEstado", fechaCambioEstadoTxt);
 
   const box = $("panelProximaReunion");
   if (!box) return;
@@ -537,23 +558,73 @@ function renderDatos() {
   const grid = $("datosGrupoGrid");
   if (!grid) return;
 
+  const solicitudReserva =
+    state.group.solicitudReserva ||
+    getByPath(state.group, "ficha.solicitudReserva") ||
+    "";
+
+  const liberados =
+    state.group.liberados ??
+    getByPath(state.group, "ficha.liberados") ??
+    "";
+
+  const valorPrograma =
+    state.group.valorPrograma ??
+    getByPath(state.group, "ficha.valorPrograma") ??
+    "";
+
+  const numeroNegocio =
+    state.group.numeroNegocio ??
+    getByPath(state.group, "ficha.numeroNegocio") ??
+    "";
+
+  const versionFicha =
+    state.group.versionFicha ||
+    getByPath(state.group, "ficha.version") ||
+    "";
+
+  const fechaActualizacionFicha =
+    state.group.fechaActualizacionFicha ||
+    getByPath(state.group, "ficha.fechaActualizacion") ||
+    "";
+
+  const solicitudReservaTxt = toDate(solicitudReserva)
+    ? formatDate(solicitudReserva)
+    : (stringValue(solicitudReserva) || "");
+
+  const fechaActualizacionFichaTxt = toDate(fechaActualizacionFicha)
+    ? formatDate(fechaActualizacionFicha)
+    : (stringValue(fechaActualizacionFicha) || "");
+
   const items = [
     itemData("Colegio", state.group.colegio),
     itemData("Curso", state.group.curso),
     itemData("Año viaje", state.group.anoViaje),
     itemData("Cantidad grupo", state.group.cantidadGrupo),
+
     itemData("Destino principal", state.group.destinoPrincipal),
     itemData("Programa", state.group.programa, true),
     itemData("Tramo", state.group.tramo),
-    itemData("Asistencia médica", state.group.asistenciaMed),
     itemData("Semana viaje", state.group.semanaViaje),
+
     itemData("Fecha viaje", state.group.fechaViaje),
+    itemData("Solicitud reserva", solicitudReservaTxt),
+    itemData("Asistencia en viajes", state.group.asistenciaMed),
+    itemData("Liberados", liberados),
+
+    itemData("Valor programa", valorPrograma),
+    itemData("Número negocio", numeroNegocio),
+    itemData("Versión ficha", versionFicha),
+    itemData("Fecha actualización ficha", fechaActualizacionFichaTxt),
+
     itemData("Comuna / ciudad", state.group.comunaCiudad),
     itemData("Vendedor(a)", state.group.vendedora || state.group.vendedoraCorreo),
+
     itemData("1° Contacto", state.group.nombreCliente),
     itemData("Rol 1° Contacto", state.group.rolCliente),
     itemData("Correo 1° Contacto", state.group.correoCliente),
     itemData("Celular 1° Contacto", state.group.celularCliente),
+
     itemData("2° Contacto", state.group.nombreCliente2),
     itemData("Rol 2° Contacto", state.group.rolCliente2),
     itemData("Correo 2° Contacto", state.group.correoCliente2),
