@@ -540,10 +540,14 @@ function renderRow(row) {
   const ultimaReunion = formatDateTime(row.fechaUltimaReunion, "Sin reunión");
 
   return `
-    <tr>
-      <td>
-        <a class="seg-group-link" href="grupo.html?id=${encodeURIComponent(row.id)}">
-          <div class="seg-avatar">${avatarHtml}</div>
+    <td>
+      <a
+        class="seg-group-link"
+        href="grupo.html?id=${encodeURIComponent(row.id)}"
+        target="_blank"
+        rel="noopener noreferrer"
+      >
+        <div class="seg-avatar">${avatarHtml}</div>
       
           <div class="seg-group-info">
             <div class="seg-group-title">${escapeHtml(row.displayTitle)}</div>
