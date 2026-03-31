@@ -1,0 +1,875 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Ficha de viaje | Sistema Ventas RT</title>
+  <link rel="stylesheet" href="estilos.css" />
+  <link rel="icon" type="image/png" href="IMG/logo-raitrai.png" />
+
+  <style>
+    .ficha-shell{
+      max-width: 1420px;
+      margin: 0 auto;
+      padding: 22px 28px 34px;
+    }
+
+    .ficha-hero{
+      position: relative;
+      overflow: hidden;
+      padding: 26px 28px;
+      border-radius: 26px;
+      background: linear-gradient(135deg, #241238 0%, #31194b 58%, #3c1d5a 100%);
+      color: #fff;
+      box-shadow: 0 18px 42px rgba(36,18,56,.20);
+      margin-bottom: 24px;
+    }
+
+    .ficha-hero::before{
+      content: "";
+      position: absolute;
+      inset: auto -80px -80px auto;
+      width: 220px;
+      height: 220px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(255,255,255,.18) 0%, rgba(255,255,255,0) 70%);
+      pointer-events: none;
+    }
+
+    .ficha-hero-top{
+      display: flex;
+      gap: 24px;
+      justify-content: space-between;
+      align-items: flex-start;
+      flex-wrap: wrap;
+    }
+
+    .ficha-hero-left{
+      min-width: 0;
+      flex: 1 1 650px;
+    }
+
+    .ficha-kicker{
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: .5px;
+      text-transform: uppercase;
+      color: rgba(255,255,255,.74);
+      margin-bottom: 8px;
+    }
+
+    .ficha-title{
+      margin: 0;
+      font-size: clamp(28px, 4vw, 42px);
+      line-height: 1.04;
+      font-weight: 900;
+      letter-spacing: .2px;
+      word-break: break-word;
+    }
+
+    .ficha-subtitle{
+      margin-top: 8px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px 14px;
+      font-size: 15px;
+      color: rgba(255,255,255,.82);
+    }
+
+    .ficha-subtitle strong{
+      color: #fff;
+    }
+
+    .ficha-badges{
+      margin-top: 16px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .f-badge{
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      min-height: 38px;
+      padding: 0 14px;
+      border-radius: 999px;
+      font-size: 13px;
+      font-weight: 800;
+      letter-spacing: .2px;
+      border: 1px solid rgba(255,255,255,.12);
+      background: rgba(255,255,255,.12);
+      color: #fff;
+      backdrop-filter: blur(5px);
+    }
+
+    .f-badge.ok{ background: rgba(30,125,54,.22); }
+    .f-badge.warn{ background: rgba(241,169,41,.18); }
+    .f-badge.muted{ background: rgba(255,255,255,.08); }
+
+    .ficha-hero-right{
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      min-width: 320px;
+      flex: 0 1 420px;
+    }
+
+    .hero-actions{
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      justify-content: flex-end;
+    }
+
+    .hero-kpi-grid{
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0,1fr));
+      gap: 12px;
+    }
+
+    .hero-kpi{
+      border-radius: 18px;
+      background: rgba(255,255,255,.10);
+      border: 1px solid rgba(255,255,255,.14);
+      padding: 14px 14px 12px;
+      backdrop-filter: blur(4px);
+      box-shadow: 0 10px 20px rgba(0,0,0,.10);
+    }
+
+    .hero-kpi-label{
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: .4px;
+      color: rgba(255,255,255,.72);
+      margin-bottom: 6px;
+      font-weight: 800;
+    }
+
+    .hero-kpi-value{
+      font-size: 18px;
+      font-weight: 900;
+      color: #fff;
+      line-height: 1.15;
+    }
+
+    .hero-kpi-sub{
+      margin-top: 4px;
+      font-size: 12px;
+      color: rgba(255,255,255,.76);
+    }
+
+    .btn-pill,
+    .btn-light,
+    .btn-dark,
+    .btn-ghost{
+      min-height: 44px;
+      padding: 0 16px;
+      border-radius: 14px;
+      border: none;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 800;
+      letter-spacing: .15px;
+      transition: transform .18s ease, box-shadow .18s ease, opacity .18s ease;
+    }
+
+    .btn-pill:hover,
+    .btn-light:hover,
+    .btn-dark:hover,
+    .btn-ghost:hover{
+      transform: translateY(-1px);
+    }
+
+    .btn-light{
+      background: #fff;
+      color: #2b1145;
+      box-shadow: 0 10px 22px rgba(0,0,0,.12);
+    }
+
+    .btn-dark{
+      background: linear-gradient(135deg, #2b1145 0%, #4a2570 100%);
+      color: #fff;
+      box-shadow: 0 10px 22px rgba(43,17,69,.18);
+    }
+
+    .btn-ghost{
+      background: rgba(255,255,255,.10);
+      color: #fff;
+      border: 1px solid rgba(255,255,255,.16);
+    }
+
+    .btn-pill{
+      background: #ebe5f3;
+      color: #40235f;
+    }
+
+    .btn-pill:disabled,
+    .btn-light:disabled,
+    .btn-dark:disabled,
+    .btn-ghost:disabled{
+      opacity: .45;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .ficha-grid{
+      display: grid;
+      grid-template-columns: 360px minmax(0,1fr);
+      gap: 24px;
+      align-items: start;
+    }
+
+    .ficha-col{
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+      min-width: 0;
+    }
+
+    .ficha-panel{
+      background: rgba(255,255,255,.92);
+      border: 1px solid rgba(58,42,82,.10);
+      border-radius: 24px;
+      box-shadow: 0 12px 30px rgba(36,18,56,.08);
+      overflow: hidden;
+    }
+
+    .ficha-panel-head{
+      padding: 18px 20px 14px;
+      border-bottom: 1px solid rgba(58,42,82,.08);
+      display: flex;
+      gap: 14px;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+    }
+
+    .ficha-panel-title{
+      margin: 0;
+      font-size: 18px;
+      font-weight: 900;
+      color: var(--header);
+      letter-spacing: .2px;
+    }
+
+    .ficha-panel-sub{
+      margin: 4px 0 0;
+      font-size: 13px;
+      color: #6a6075;
+    }
+
+    .ficha-panel-body{
+      padding: 18px 20px 20px;
+    }
+
+    .mini-grid{
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0,1fr));
+      gap: 12px;
+    }
+
+    .mini-card{
+      padding: 14px;
+      border-radius: 18px;
+      background: #f7f5fa;
+      border: 1px solid rgba(58,42,82,.08);
+    }
+
+    .mini-label{
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: .35px;
+      color: #7a7185;
+      font-weight: 800;
+      margin-bottom: 6px;
+    }
+
+    .mini-value{
+      font-size: 16px;
+      font-weight: 900;
+      color: #251b32;
+      line-height: 1.35;
+      word-break: break-word;
+    }
+
+    .form-grid{
+      display: grid;
+      grid-template-columns: repeat(12, minmax(0,1fr));
+      gap: 16px 18px;
+    }
+
+    .field{
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      min-width: 0;
+    }
+
+    .span-3{ grid-column: span 3; }
+    .span-4{ grid-column: span 4; }
+    .span-5{ grid-column: span 5; }
+    .span-6{ grid-column: span 6; }
+    .span-7{ grid-column: span 7; }
+    .span-8{ grid-column: span 8; }
+    .span-12{ grid-column: 1 / -1; }
+
+    .field label{
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: .35px;
+      color: #73697f;
+      font-weight: 800;
+    }
+
+    .field input,
+    .field select,
+    .field textarea{
+      width: 100%;
+      min-height: 48px;
+      border-radius: 14px;
+      border: 1px solid rgba(58,42,82,.14);
+      background: #fff;
+      padding: 0 14px;
+      font-size: 15px;
+      color: #261d33;
+      outline: none;
+      font-family: inherit;
+    }
+
+    .field textarea{
+      min-height: 120px;
+      resize: vertical;
+      padding: 12px 14px;
+    }
+
+    .field input:focus,
+    .field select:focus,
+    .field textarea:focus{
+      border-color: rgba(58,42,82,.34);
+      box-shadow: 0 0 0 4px rgba(58,42,82,.08);
+    }
+
+    .field.readonly input{
+      background: #f7f5fa;
+    }
+
+    .sheet-box{
+      border-radius: 22px;
+      background: linear-gradient(180deg, #fff 0%, #fcfbfe 100%);
+      border: 1px solid rgba(58,42,82,.10);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.9);
+    }
+
+    .sheet-box-head{
+      padding: 18px 20px 14px;
+      border-bottom: 1px solid rgba(58,42,82,.08);
+    }
+
+    .sheet-title{
+      margin: 0;
+      text-align: center;
+      font-size: 26px;
+      font-weight: 900;
+      color: #251b32;
+      letter-spacing: .2px;
+    }
+
+    .sheet-subtitle{
+      margin: 8px 0 0;
+      text-align: center;
+      font-size: 13px;
+      font-weight: 800;
+      color: #6a6075;
+      text-transform: uppercase;
+      letter-spacing: .35px;
+    }
+
+    .sheet-body{
+      padding: 20px;
+    }
+
+    .rich-wrap{
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+    }
+
+    .rich-toolbar{
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      padding: 10px;
+      border: 1px solid rgba(58,42,82,.14);
+      border-bottom: none;
+      border-radius: 14px 14px 0 0;
+      background: #f7f4fb;
+    }
+
+    .rich-btn{
+      min-width: 38px;
+      height: 36px;
+      padding: 0 10px;
+      border: none;
+      border-radius: 10px;
+      background: #fff;
+      color: #2f2142;
+      font-size: 14px;
+      font-weight: 800;
+      cursor: pointer;
+      box-shadow: 0 2px 8px rgba(36,18,56,.06);
+    }
+
+    .rich-btn:hover{
+      background: #efe7f8;
+    }
+
+    .rich-color{
+      width: 42px;
+      height: 36px;
+      padding: 4px;
+      border: none;
+      border-radius: 10px;
+      background: #fff;
+      cursor: pointer;
+      box-shadow: 0 2px 8px rgba(36,18,56,.06);
+    }
+
+    .rich-editor{
+      min-height: 190px;
+      border: 1px solid rgba(58,42,82,.14);
+      border-radius: 0 0 14px 14px;
+      background: #fff;
+      padding: 12px 14px;
+      font-size: 15px;
+      color: #261d33;
+      outline: none;
+      line-height: 1.55;
+    }
+
+    .rich-editor:focus{
+      border-color: rgba(58,42,82,.34);
+      box-shadow: 0 0 0 4px rgba(58,42,82,.08);
+    }
+
+    .rich-editor:empty::before{
+      content: attr(data-placeholder);
+      color: #9a90a6;
+    }
+
+    .rich-editor p{
+      margin: 0 0 8px;
+    }
+
+    .rich-editor p:last-child{
+      margin-bottom: 0;
+    }
+
+    .muted{
+      color: #7b7086;
+    }
+
+    .small{
+      font-size: 12px;
+    }
+
+    .hidden{
+      display: none !important;
+    }
+
+    @media (max-width: 1180px){
+      .ficha-grid{
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 900px){
+      .ficha-shell{
+        padding: 18px 16px 26px;
+      }
+
+      .ficha-hero{
+        padding: 20px 18px;
+        border-radius: 22px;
+      }
+
+      .hero-kpi-grid,
+      .mini-grid{
+        grid-template-columns: 1fr;
+      }
+
+      .span-3,
+      .span-4,
+      .span-5,
+      .span-6,
+      .span-7,
+      .span-8,
+      .span-12{
+        grid-column: 1 / -1;
+      }
+    }
+
+    @media print{
+      body{
+        background: #fff !important;
+      }
+
+      #layout-top,
+      .hero-actions,
+      .no-print{
+        display: none !important;
+      }
+
+      .ficha-shell{
+        max-width: none;
+        padding: 0;
+      }
+
+      .ficha-hero{
+        background: #fff !important;
+        color: #000 !important;
+        box-shadow: none !important;
+        border: 1px solid #ddd;
+      }
+
+      .ficha-hero::before{
+        display: none !important;
+      }
+
+      .f-badge{
+        color: #000 !important;
+        border-color: #ccc !important;
+        background: #fff !important;
+      }
+
+      .ficha-panel,
+      .sheet-box{
+        box-shadow: none !important;
+        border: 1px solid #ddd !important;
+        background: #fff !important;
+      }
+
+      .rich-toolbar{
+        display: none !important;
+      }
+
+      .rich-editor{
+        border-top-left-radius: 14px !important;
+        border-top-right-radius: 14px !important;
+      }
+    }
+  </style>
+</head>
+
+<body class="ventas-body" data-page="fichas">
+  <div id="layout-top"></div>
+
+  <main class="ficha-shell">
+    <section class="ficha-hero">
+      <div class="ficha-hero-top">
+        <div class="ficha-hero-left">
+          <div class="ficha-kicker">Ficha de viaje</div>
+          <h1 class="ficha-title" id="heroTitle">Cargando ficha...</h1>
+
+          <div class="ficha-subtitle">
+            <span><strong>ID Grupo:</strong> <span id="heroIdGrupo">—</span></span>
+            <span><strong>Colegio:</strong> <span id="heroColegio">—</span></span>
+            <span><strong>Año viaje:</strong> <span id="heroAnoViaje">—</span></span>
+            <span><strong>Vendedor(a):</strong> <span id="heroVendedora">—</span></span>
+          </div>
+
+          <div class="ficha-badges" id="heroBadges"></div>
+        </div>
+
+        <div class="ficha-hero-right">
+          <div class="hero-actions no-print">
+            <button class="btn-light" id="btnVolverGrupo" type="button">Volver al grupo</button>
+            <button class="btn-pill" id="btnImprimirFicha" type="button">Imprimir / Guardar PDF</button>
+            <button class="btn-pill" id="btnAbrirPdfFicha" type="button">Abrir PDF guardado</button>
+            <button class="btn-dark" id="btnGuardarFicha" type="button">Guardar ficha</button>
+          </div>
+
+          <div class="hero-kpi-grid">
+            <div class="hero-kpi">
+              <div class="hero-kpi-label">Estado ficha</div>
+              <div class="hero-kpi-value" id="heroFichaEstado">Pendiente</div>
+              <div class="hero-kpi-sub" id="heroFichaEstadoSub">Sin ficha creada</div>
+            </div>
+
+            <div class="hero-kpi">
+              <div class="hero-kpi-label">PDF</div>
+              <div class="hero-kpi-value" id="heroPdfEstado">Sin PDF</div>
+              <div class="hero-kpi-sub" id="heroPdfEstadoSub">Se enlazará en el siguiente paso</div>
+            </div>
+
+            <div class="hero-kpi">
+              <div class="hero-kpi-label">Última actualización</div>
+              <div class="hero-kpi-value" id="heroFechaActualizacion">—</div>
+              <div class="hero-kpi-sub" id="heroFechaActualizacionSub">Sin guardar aún</div>
+            </div>
+
+            <div class="hero-kpi">
+              <div class="hero-kpi-label">Permiso de edición</div>
+              <div class="hero-kpi-value" id="heroPermiso">—</div>
+              <div class="hero-kpi-sub" id="heroPermisoSub">—</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="ficha-grid">
+      <aside class="ficha-col">
+        <article class="ficha-panel">
+          <div class="ficha-panel-head">
+            <div>
+              <h2 class="ficha-panel-title">Resumen base del grupo</h2>
+              <p class="ficha-panel-sub">Datos comerciales que alimentan la ficha</p>
+            </div>
+          </div>
+
+          <div class="ficha-panel-body">
+            <div class="mini-grid" id="grupoResumenGrid"></div>
+          </div>
+        </article>
+
+        <article class="ficha-panel">
+          <div class="ficha-panel-head">
+            <div>
+              <h2 class="ficha-panel-title">Control de la ficha</h2>
+              <p class="ficha-panel-sub">Estado, vínculo PDF y trazabilidad</p>
+            </div>
+          </div>
+
+          <div class="ficha-panel-body">
+            <div class="mini-grid">
+              <div class="mini-card">
+                <div class="mini-label">Estado actual</div>
+                <div class="mini-value" id="sideEstadoFicha">Pendiente</div>
+              </div>
+
+              <div class="mini-card">
+                <div class="mini-label">Versión</div>
+                <div class="mini-value" id="sideVersionFicha">—</div>
+              </div>
+
+              <div class="mini-card">
+                <div class="mini-label">Número negocio</div>
+                <div class="mini-value" id="sideNumeroNegocio">—</div>
+              </div>
+
+              <div class="mini-card">
+                <div class="mini-label">PDF guardado</div>
+                <div class="mini-value" id="sidePdfGuardado">No</div>
+              </div>
+            </div>
+
+            <p class="muted small no-print" style="margin:14px 0 0;">
+              En este paso queda lista la estructura y el guardado de la ficha.
+              El guardado del PDF en storage y el enlace automático en grupo/seguimiento
+              lo conectamos en el siguiente paso.
+            </p>
+          </div>
+        </article>
+      </aside>
+
+      <section class="ficha-col">
+        <article class="sheet-box">
+          <div class="sheet-box-head">
+            <h2 class="sheet-title">Ficha de viaje <span id="sheetAno">—</span></h2>
+            <p class="sheet-subtitle">Solicitud de reserva y control administrativo</p>
+          </div>
+
+          <div class="sheet-body">
+            <form id="formFicha" class="form-grid">
+              <div class="field span-12">
+                <label for="f_solicitudReserva">Solicitud reserva</label>
+                <input id="f_solicitudReserva" type="text" />
+              </div>
+
+              <div class="field span-7">
+                <label for="f_nombreGrupo">Nombre del grupo</label>
+                <input id="f_nombreGrupo" type="text" />
+              </div>
+
+              <div class="field span-5">
+                <label for="f_apoderadoEncargado">Apoderado(a) / Encargado(a)</label>
+                <input id="f_apoderadoEncargado" type="text" />
+              </div>
+
+              <div class="field span-3">
+                <label for="f_telefono">Teléfono</label>
+                <input id="f_telefono" type="text" />
+              </div>
+
+              <div class="field span-4">
+                <label for="f_correo">Correo</label>
+                <input id="f_correo" type="email" />
+              </div>
+
+              <div class="field span-5">
+                <label for="f_nombrePrograma">Nombre programa</label>
+                <input id="f_nombrePrograma" type="text" />
+              </div>
+
+              <div class="field span-3">
+                <label for="f_valorPrograma">Valor programa</label>
+                <input id="f_valorPrograma" type="text" />
+              </div>
+
+              <div class="field span-3">
+                <label for="f_numeroPaxTotal">Número pax total</label>
+                <input id="f_numeroPaxTotal" type="text" />
+              </div>
+
+              <div class="field span-3">
+                <label for="f_tramo">Tramo</label>
+                <input id="f_tramo" type="text" />
+              </div>
+
+              <div class="field span-3">
+                <label for="f_liberados">Liberados</label>
+                <input id="f_liberados" type="text" />
+              </div>
+
+              <div class="field span-6">
+                <label for="f_categoriaHoteleraContratada">Categoría hotelera contratada</label>
+                <input id="f_categoriaHoteleraContratada" type="text" />
+              </div>
+
+              <div class="field span-12">
+                <label for="f_autorizacionGerencia">Autorización gerencia</label>
+                <textarea id="f_autorizacionGerencia"></textarea>
+              </div>
+
+              <div class="field span-4">
+                <label for="f_descuentoValorBase">Descuento de valor base</label>
+                <input id="f_descuentoValorBase" type="text" />
+              </div>
+
+              <div class="field span-4">
+                <label for="f_fechaViajeTexto">Fecha de viaje</label>
+                <input id="f_fechaViajeTexto" type="text" />
+              </div>
+
+              <div class="field span-4">
+                <label for="f_asistenciaEnViajes">Asistencia en viajes</label>
+                <input id="f_asistenciaEnViajes" type="text" />
+              </div>
+
+              <div class="field span-12">
+                <label for="f_nombreVendedor">Nombre vendedor(a)</label>
+                <input id="f_nombreVendedor" type="text" />
+              </div>
+
+              <div class="field span-6">
+                <label>Información para operaciones</label>
+                <div class="rich-wrap">
+                  <div class="rich-toolbar no-print" data-editor-target="f_infoOperaciones">
+                    <button class="rich-btn" type="button" data-rich-cmd="bold" data-editor-target="f_infoOperaciones"><strong>B</strong></button>
+                    <button class="rich-btn" type="button" data-rich-cmd="italic" data-editor-target="f_infoOperaciones"><em>I</em></button>
+                    <button class="rich-btn" type="button" data-rich-cmd="underline" data-editor-target="f_infoOperaciones"><u>U</u></button>
+                    <button class="rich-btn" type="button" data-rich-cmd="insertUnorderedList" data-editor-target="f_infoOperaciones">• Lista</button>
+                    <button class="rich-btn" type="button" data-rich-cmd="insertOrderedList" data-editor-target="f_infoOperaciones">1. Lista</button>
+                    <button class="rich-btn" type="button" data-rich-cmd="removeFormat" data-editor-target="f_infoOperaciones">Limpiar</button>
+                    <input class="rich-color" type="color" value="#000000" data-rich-color="foreColor" data-editor-target="f_infoOperaciones" title="Color texto" />
+                    <input class="rich-color" type="color" value="#fff2a8" data-rich-color="hiliteColor" data-editor-target="f_infoOperaciones" title="Resaltar" />
+                  </div>
+
+                  <div
+                    id="f_infoOperaciones"
+                    class="rich-editor"
+                    contenteditable="true"
+                    data-placeholder="Escribe aquí la información para operaciones..."
+                  ></div>
+                </div>
+              </div>
+
+              <div class="field span-6">
+                <label>Información para administración</label>
+                <div class="rich-wrap">
+                  <div class="rich-toolbar no-print" data-editor-target="f_infoAdministracion">
+                    <button class="rich-btn" type="button" data-rich-cmd="bold" data-editor-target="f_infoAdministracion"><strong>B</strong></button>
+                    <button class="rich-btn" type="button" data-rich-cmd="italic" data-editor-target="f_infoAdministracion"><em>I</em></button>
+                    <button class="rich-btn" type="button" data-rich-cmd="underline" data-editor-target="f_infoAdministracion"><u>U</u></button>
+                    <button class="rich-btn" type="button" data-rich-cmd="insertUnorderedList" data-editor-target="f_infoAdministracion">• Lista</button>
+                    <button class="rich-btn" type="button" data-rich-cmd="insertOrderedList" data-editor-target="f_infoAdministracion">1. Lista</button>
+                    <button class="rich-btn" type="button" data-rich-cmd="removeFormat" data-editor-target="f_infoAdministracion">Limpiar</button>
+                    <input class="rich-color" type="color" value="#000000" data-rich-color="foreColor" data-editor-target="f_infoAdministracion" title="Color texto" />
+                    <input class="rich-color" type="color" value="#fff2a8" data-rich-color="hiliteColor" data-editor-target="f_infoAdministracion" title="Resaltar" />
+                  </div>
+
+                  <div
+                    id="f_infoAdministracion"
+                    class="rich-editor"
+                    contenteditable="true"
+                    data-placeholder="Escribe aquí la información para administración..."
+                  ></div>
+                </div>
+              </div>
+
+              <div class="field span-4">
+                <label for="f_numeroNegocio">N° de negocio</label>
+                <input id="f_numeroNegocio" type="text" />
+              </div>
+
+              <div class="field span-4">
+                <label for="f_usuarioFicha">Usuario</label>
+                <input id="f_usuarioFicha" type="text" />
+              </div>
+
+              <div class="field span-4">
+                <label for="f_claveAdministrativa">Clave administrativa</label>
+                <input id="f_claveAdministrativa" type="text" />
+              </div>
+
+              <div class="field span-4">
+                <label for="f_version">Versión ficha</label>
+                <select id="f_version">
+                  <option value="ORIGINAL">ORIGINAL</option>
+                  <option value="ACTUALIZADA">ACTUALIZADA</option>
+                  <option value="REEMPLAZADA">REEMPLAZADA</option>
+                </select>
+              </div>
+
+              <div class="field span-8 readonly">
+                <label for="f_fechaActualizacionTexto">Fecha actualización</label>
+                <input id="f_fechaActualizacionTexto" type="text" readonly />
+              </div>
+
+              <div class="field span-12">
+                <label>Observaciones</label>
+                <div class="rich-wrap">
+                  <div class="rich-toolbar no-print" data-editor-target="f_observacionesHtml">
+                    <button class="rich-btn" type="button" data-rich-cmd="bold" data-editor-target="f_observacionesHtml"><strong>B</strong></button>
+                    <button class="rich-btn" type="button" data-rich-cmd="italic" data-editor-target="f_observacionesHtml"><em>I</em></button>
+                    <button class="rich-btn" type="button" data-rich-cmd="underline" data-editor-target="f_observacionesHtml"><u>U</u></button>
+                    <button class="rich-btn" type="button" data-rich-cmd="insertUnorderedList" data-editor-target="f_observacionesHtml">• Lista</button>
+                    <button class="rich-btn" type="button" data-rich-cmd="insertOrderedList" data-editor-target="f_observacionesHtml">1. Lista</button>
+                    <button class="rich-btn" type="button" data-rich-cmd="removeFormat" data-editor-target="f_observacionesHtml">Limpiar</button>
+                    <input class="rich-color" type="color" value="#000000" data-rich-color="foreColor" data-editor-target="f_observacionesHtml" title="Color texto" />
+                    <input class="rich-color" type="color" value="#fff2a8" data-rich-color="hiliteColor" data-editor-target="f_observacionesHtml" title="Resaltar" />
+                  </div>
+
+                  <div
+                    id="f_observacionesHtml"
+                    class="rich-editor"
+                    contenteditable="true"
+                    data-placeholder="Observaciones generales de la ficha..."
+                  ></div>
+                </div>
+              </div>
+            </form>
+          </div>
+        </article>
+      </section>
+    </section>
+  </main>
+
+  <script type="module" src="layout.js"></script>
+  <script type="module" src="fichas.js"></script>
+</body>
+</html>
