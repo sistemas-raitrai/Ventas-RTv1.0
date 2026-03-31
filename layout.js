@@ -14,7 +14,7 @@ const menuItems = [
   },
   {
     key: "buscar",
-    href: "buscar.html",
+    href: "seguimiento.html",
     label: "Buscar",
     roles: ["admin", "supervision", "registro", "vendedor"]
   },
