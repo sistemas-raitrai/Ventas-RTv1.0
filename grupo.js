@@ -94,9 +94,7 @@ const DATA_FIELDS = [
   "destinoPrincipal",
   "programa",
   "tramo",
-  "asistenciaMed",
   "semanaViaje",
-  "fechaViaje",
   "comunaCiudad",
   "nombreCliente",
   "rolCliente",
@@ -386,6 +384,149 @@ function isAdministracion() {
   return normalizeEmail(state.effectiveEmail) === "yenny@raitrai.cl" || state.effectiveUser?.rol === "admin";
 }
 
+function canCreateFichaFromEstado() {
+  return normalizeState(state.group?.estado) === "ganada";
+}
+
+function getFichaSummary() {
+  const ficha = getByPath(state.group, "ficha") || {};
+
+  const numeroNegocio =
+    state.group.numeroNegocio ??
+    ficha.numeroNegocio ??
+    "";
+
+  const version =
+    state.group.versionFicha ||
+    ficha.version ||
+    "";
+
+  const fechaActualizacion =
+    state.group.fechaActualizacionFicha ||
+    ficha.fechaActualizacion ||
+    "";
+
+  const pdfUrl =
+    cleanText(
+      state.group.fichaPdfUrl ||
+      ficha.pdfUrl ||
+      ficha.urlPdf ||
+      ""
+    );
+
+  const pdfNombre =
+    cleanText(
+      state.group.fichaPdfNombre ||
+      ficha.pdfNombre ||
+      ficha.nombrePdf ||
+      ""
+    );
+
+  const estadoRaw =
+    state.group.fichaEstado ||
+    ficha.estado ||
+    (pdfUrl || numeroNegocio || version ? "ok" : "pendiente");
+
+  return {
+    exists: Boolean(
+      pdfUrl ||
+      numeroNegocio ||
+      version ||
+      fechaActualizacion ||
+      Object.keys(ficha).length
+    ),
+    estadoLabel: getFichaEstadoLabel(estadoRaw),
+    numeroNegocio: stringValue(numeroNegocio) || "—",
+    version: stringValue(version) || "—",
+    fechaActualizacion: toDate(fechaActualizacion)
+      ? formatDate(fechaActualizacion)
+      : (stringValue(fechaActualizacion) || "—"),
+    pdfUrl,
+    pdfNombre: pdfNombre || "PDF ficha"
+  };
+}
+
+function renderFichaPanel() {
+  const box = $("panelFichaViajeBody");
+  if (!box) return;
+
+  const ficha = getFichaSummary();
+  const isGanada = canCreateFichaFromEstado();
+
+  if (!isGanada && !ficha.exists) {
+    box.innerHTML = `
+      <div class="empty-box">
+        La ficha de viaje se habilita cuando el grupo está en estado GANADA.
+      </div>
+    `;
+    return;
+  }
+
+  box.innerHTML = `
+    <div class="grupo-kpi-list">
+      <div class="grupo-kpi">
+        <div class="info-label">Estado ficha</div>
+        <div class="info-value">${escapeHtml(ficha.estadoLabel)}</div>
+      </div>
+
+      <div class="grupo-kpi">
+        <div class="info-label">Versión ficha</div>
+        <div class="info-value">${escapeHtml(ficha.version)}</div>
+      </div>
+
+      <div class="grupo-kpi">
+        <div class="info-label">Número negocio</div>
+        <div class="info-value">${escapeHtml(ficha.numeroNegocio)}</div>
+      </div>
+
+      <div class="grupo-kpi">
+        <div class="info-label">Fecha actualización ficha</div>
+        <div class="info-value">${escapeHtml(ficha.fechaActualizacion)}</div>
+      </div>
+    </div>
+
+    <div class="info-stack" style="margin-top:14px;">
+      <div class="info-item">
+        <div class="info-label">PDF ficha</div>
+        <div class="info-value">
+          ${escapeHtml(ficha.pdfUrl ? ficha.pdfNombre : "Sin PDF generado")}
+        </div>
+      </div>
+
+      <div class="info-item">
+        <div class="info-label">Regla de habilitación</div>
+        <div class="info-value">
+          ${
+            isGanada
+              ? "Este grupo ya puede crear o editar ficha."
+              : "La ficha solo puede crearse cuando el grupo está Ganada."
+          }
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function openFichaEditor() {
+  if (!canCreateFichaFromEstado()) {
+    alert("La ficha solo se habilita cuando el grupo está en estado GANADA.");
+    return;
+  }
+
+  location.href = `fichas.html?id=${encodeURIComponent(state.groupId)}`;
+}
+
+function openFichaPdf() {
+  const ficha = getFichaSummary();
+
+  if (!ficha.pdfUrl) {
+    alert("Este grupo todavía no tiene un PDF de ficha generado.");
+    return;
+  }
+
+  window.open(ficha.pdfUrl, "_blank", "noopener");
+}
+
 /* =========================================================
    RENDER
 ========================================================= */
@@ -393,6 +534,7 @@ function renderGroup() {
   renderHero();
   renderSituacion();
   renderDatos();
+  renderFichaPanel();
   renderDocs();
   renderMeetings();
   renderAlerts();
@@ -562,44 +704,6 @@ function renderDatos() {
   const grid = $("datosGrupoGrid");
   if (!grid) return;
 
-  const solicitudReserva =
-    state.group.solicitudReserva ||
-    getByPath(state.group, "ficha.solicitudReserva") ||
-    "";
-
-  const liberados =
-    state.group.liberados ??
-    getByPath(state.group, "ficha.liberados") ??
-    "";
-
-  const valorPrograma =
-    state.group.valorPrograma ??
-    getByPath(state.group, "ficha.valorPrograma") ??
-    "";
-
-  const numeroNegocio =
-    state.group.numeroNegocio ??
-    getByPath(state.group, "ficha.numeroNegocio") ??
-    "";
-
-  const versionFicha =
-    state.group.versionFicha ||
-    getByPath(state.group, "ficha.version") ||
-    "";
-
-  const fechaActualizacionFicha =
-    state.group.fechaActualizacionFicha ||
-    getByPath(state.group, "ficha.fechaActualizacion") ||
-    "";
-
-  const solicitudReservaTxt = toDate(solicitudReserva)
-    ? formatDate(solicitudReserva)
-    : (stringValue(solicitudReserva) || "");
-
-  const fechaActualizacionFichaTxt = toDate(fechaActualizacionFicha)
-    ? formatDate(fechaActualizacionFicha)
-    : (stringValue(fechaActualizacionFicha) || "");
-
   const items = [
     itemData("Colegio", state.group.colegio),
     itemData("Curso", state.group.curso),
@@ -610,16 +714,6 @@ function renderDatos() {
     itemData("Programa", state.group.programa, true),
     itemData("Tramo", state.group.tramo),
     itemData("Semana viaje", state.group.semanaViaje),
-
-    itemData("Fecha viaje", state.group.fechaViaje),
-    itemData("Solicitud reserva", solicitudReservaTxt),
-    itemData("Asistencia en viajes", state.group.asistenciaMed),
-    itemData("Liberados", liberados),
-
-    itemData("Valor programa", valorPrograma),
-    itemData("Número negocio", numeroNegocio),
-    itemData("Versión ficha", versionFicha),
-    itemData("Fecha actualización ficha", fechaActualizacionFichaTxt),
 
     itemData("Comuna / ciudad", state.group.comunaCiudad),
     itemData("Vendedor(a)", state.group.vendedora || state.group.vendedoraCorreo),
@@ -779,6 +873,7 @@ function syncButtons() {
   const editable = canEditGroup();
   const isGanada = normalizeState(state.group.estado) === "ganada";
   const autorizada = !!state.group.autorizada;
+  const ficha = getFichaSummary();
 
   [
     "btnEditarDatosHero",
@@ -797,7 +892,10 @@ function syncButtons() {
   });
 
   const btnFicha = $("btnCrearFicha");
-  if (btnFicha) btnFicha.disabled = !isGanada;
+  if (btnFicha) btnFicha.disabled = !editable || !isGanada;
+
+  const btnAbrirFichaPdf = $("btnAbrirFichaPdf");
+  if (btnAbrirFichaPdf) btnAbrirFichaPdf.disabled = !ficha.pdfUrl;
 
   const btnContrato = $("btnCrearContrato");
   if (btnContrato) btnContrato.disabled = !autorizada;
@@ -957,14 +1055,9 @@ function bindEvents() {
   $("btnFirmarVendedor")?.addEventListener("click", () => signFlow("vendedor"));
   $("btnFirmarJefaVentas")?.addEventListener("click", () => signFlow("jefaVentas"));
   $("btnFirmarAdministracion")?.addEventListener("click", () => signFlow("administracion"));
-
-  $("btnCrearFicha")?.addEventListener("click", () => {
-    if (normalizeState(state.group?.estado) !== "ganada") {
-      alert("La ficha solo se habilita cuando el grupo está en estado GANADA.");
-      return;
-    }
-    alert("Aquí conectarás el generador de ficha.");
-  });
+  
+  $("btnCrearFicha")?.addEventListener("click", openFichaEditor);
+  $("btnAbrirFichaPdf")?.addEventListener("click", openFichaPdf);
 
   $("btnCrearContrato")?.addEventListener("click", () => {
     if (!state.group?.autorizada) {
@@ -1006,9 +1099,7 @@ function openDatosModal() {
   setFormValue("d_destinoPrincipal", state.group.destinoPrincipal);
   setFormValue("d_programa", state.group.programa);
   setFormValue("d_tramo", state.group.tramo);
-  setFormValue("d_asistenciaMed", state.group.asistenciaMed);
   setFormValue("d_semanaViaje", state.group.semanaViaje);
-  setFormValue("d_fechaViaje", formatInputDate(state.group.fechaViaje));
   setFormValue("d_comunaCiudad", state.group.comunaCiudad);
   setFormValue("d_nombreCliente", state.group.nombreCliente);
   setFormValue("d_rolCliente", state.group.rolCliente);
@@ -1261,9 +1352,7 @@ async function saveDatos() {
     destinoPrincipal: $("d_destinoPrincipal")?.value || "",
     programa: $("d_programa")?.value || "",
     tramo: $("d_tramo")?.value || "",
-    asistenciaMed: $("d_asistenciaMed")?.value || "",
     semanaViaje: $("d_semanaViaje")?.value || "",
-    fechaViaje: $("d_fechaViaje")?.value || "",
     comunaCiudad: $("d_comunaCiudad")?.value || "",
     nombreCliente: $("d_nombreCliente")?.value || "",
     rolCliente: $("d_rolCliente")?.value || "",
