@@ -994,12 +994,30 @@
           <div class="grupo-panel-head">
             <div>
               <h2 class="grupo-panel-title">Datos del grupo</h2>
-              <p class="grupo-panel-sub">Información principal que alimenta ficha y seguimiento</p>
+              <p class="grupo-panel-sub">Base comercial y de contactos del grupo</p>
             </div>
             <button class="btn-pill" id="btnEditarDatos" type="button">Editar datos</button>
           </div>
           <div class="grupo-panel-body">
             <div class="grupo-data-grid" id="datosGrupoGrid"></div>
+          </div>
+        </article>
+        
+        <article class="grupo-panel">
+          <div class="grupo-panel-head">
+            <div>
+              <h2 class="grupo-panel-title">Ficha de viaje</h2>
+              <p class="grupo-panel-sub">Documento operativo y administrativo del grupo</p>
+            </div>
+        
+            <div class="grupo-hero-actions" style="margin-top:0;">
+              <button class="btn-dark" id="btnCrearFicha" type="button">Crear / editar ficha</button>
+              <button class="btn-pill" id="btnAbrirFichaPdf" type="button">Abrir PDF</button>
+            </div>
+          </div>
+        
+          <div class="grupo-panel-body" id="panelFichaViajeBody">
+            <div class="empty-box">Cargando ficha...</div>
           </div>
         </article>
 
@@ -1113,22 +1131,12 @@
             <label for="d_tramo">Tramo</label>
             <input id="d_tramo" name="tramo" type="text" />
           </div>
-
-          <div class="form-field">
-            <label for="d_asistenciaMed">Asistencia médica</label>
-            <input id="d_asistenciaMed" name="asistenciaMed" type="text" />
-          </div>
-
+          
           <div class="form-field">
             <label for="d_semanaViaje">Semana de viaje</label>
             <input id="d_semanaViaje" name="semanaViaje" type="text" />
           </div>
-
-          <div class="form-field">
-            <label for="d_fechaViaje">Fecha de viaje</label>
-            <input id="d_fechaViaje" name="fechaViaje" type="date" />
-          </div>
-
+          
           <div class="form-field span-2">
             <label for="d_comunaCiudad">Comuna / ciudad</label>
             <input id="d_comunaCiudad" name="comunaCiudad" type="text" />
