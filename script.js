@@ -296,30 +296,146 @@ function isAContactar(row = {}) {
   return normalizeLoose(row.estado).includes("a contactar");
 }
 
-function isPendiente(row = {}) {
-  return normalizeLoose(row.estado).includes("pendiente");
+function getRoleKey(user = {}) {
+  return normalizeLoose(user?.rol || "");
 }
 
-function isFichaPorFirmar(row = {}) {
-  const candidateKeys = [
-    "fichaFirmada",
-    "firmaVendedor",
-    "firmaSupervision",
-    "firmaAdministracion",
-    "fichaLista",
-    "documentoFirmado"
-  ];
+function isAdminDashboardRole(user = {}) {
+  return getRoleKey(user) === "admin";
+}
 
-  const existingKeys = candidateKeys.filter((key) => key in row);
-  if (!existingKeys.length) return false;
+function isSupervisionDashboardRole(user = {}) {
+  return getRoleKey(user) === "supervision";
+}
 
-  // Si existe una marca global y está falsa, cuenta
-  if ("fichaFirmada" in row) {
-    return !isTruthyFlag(row.fichaFirmada);
+function getFichaFlowModeRow(row = {}) {
+  return normalizeLoose(
+    row.fichaFlujoModo ||
+    row?.flowFicha?.modo ||
+    row?.ficha?.flujoModo ||
+    ""
+  );
+}
+
+function getFichaFirmas(row = {}) {
+  const flow = row.flowFicha || {};
+
+  return {
+    vendedor: !!flow?.vendedor?.firmado || isTruthyFlag(row.firmaVendedor),
+    jefa: !!flow?.jefaVentas?.firmado || isTruthyFlag(row.firmaSupervision),
+    admin: !!flow?.administracion?.firmado || isTruthyFlag(row.firmaAdministracion)
+  };
+}
+
+function hasFichaCreada(row = {}) {
+  const flowMode = getFichaFlowModeRow(row);
+  if (flowMode) return true;
+
+  if (row.ficha && typeof row.ficha === "object" && Object.keys(row.ficha).length) {
+    return true;
   }
 
-  // Si existen firmas parciales y alguna está faltante, cuenta
-  return existingKeys.some((key) => !isTruthyFlag(row[key]));
+  if (row.flowFicha && typeof row.flowFicha === "object" && Object.keys(row.flowFicha).length) {
+    return true;
+  }
+
+  const rootSignals = [
+    row.solicitudReserva,
+    row.versionFicha,
+    row.fechaActualizacionFicha,
+    row.fichaEstado,
+    row.fichaPdfUrl,
+    row.numeroNegocio,
+    row.usuarioProgramaAdm,
+    row.claveAdministrativa,
+    row.firmaVendedor,
+    row.firmaSupervision,
+    row.firmaAdministracion
+  ];
+
+  return rootSignals.some((value) => String(value ?? "").trim() !== "");
+}
+
+function isFichaCerrada(row = {}) {
+  const firmas = getFichaFirmas(row);
+  const estadoFicha = normalizeLoose(row.fichaEstado || "");
+  const cierre = normalizeLoose(row.cierre || "");
+
+  return (
+    isTruthyFlag(row.cerrada) ||
+    isTruthyFlag(row.autorizada) ||
+    cierre.includes("cerrad") ||
+    estadoFicha === "autorizada_admin" ||
+    (firmas.vendedor && firmas.jefa && firmas.admin)
+  );
+}
+
+function isGanadaComercial(row = {}) {
+  return resolveEstadoBucket(row) === "ganadas";
+}
+
+function isFichaPorFirmarSegunUsuario(row = {}, effectiveUser = null) {
+  const user = effectiveUser || getEffectiveUser();
+  if (!user) return false;
+
+  const email = normalizeEmail(user?.email || "");
+  const firmas = getFichaFirmas(row);
+  const fichaCreada = hasFichaCreada(row);
+  const cerrada = isFichaCerrada(row);
+  const ganada = isGanadaComercial(row);
+
+  if (cerrada) return false;
+
+  // VENDEDOR:
+  // solo cuenta grupos ganados donde todavía no se ha creado la ficha.
+  if (isVendedorRole(user)) {
+    return ganada && !fichaCreada;
+  }
+
+  // CHERNANDEZ:
+  // muestra las que ya firmó vendedor(a) y todavía no firma Yenny.
+  if (email === "chernandez@raitrai.cl") {
+    return ganada && firmas.vendedor && !firmas.admin;
+  }
+
+  // YENNY:
+  // muestra las que ya firmó vendedor(a) y jefa de ventas,
+  // pero aún no firma administración.
+  if (email === "yenny@raitrai.cl") {
+    return ganada && firmas.vendedor && firmas.jefa && !firmas.admin;
+  }
+
+  // ADMIN / SUPERVISIÓN GENERAL:
+  // todo lo que entró al flujo de ficha y aún no está cerrado.
+  if (isAdminDashboardRole(user) || isSupervisionDashboardRole(user)) {
+    return (ganada || fichaCreada || firmas.vendedor || firmas.jefa || firmas.admin) && !cerrada;
+  }
+
+  return false;
+}
+
+function setAlertRowVisibleByChild(childId, visible = true) {
+  const child = $(childId);
+  const row = child?.closest(".alert-row") || child?.closest(".alert-row-wrap");
+  if (!row) return;
+
+  row.style.display = visible ? "" : "none";
+}
+
+function syncAlertRowsByRole(effectiveUser = null) {
+  const user = effectiveUser || getEffectiveUser();
+
+  const canSeeSinAsignar =
+    isAdminDashboardRole(user) || isSupervisionDashboardRole(user);
+
+  const canSeeFichas =
+    isVendedorRole(user) ||
+    isAdminDashboardRole(user) ||
+    isSupervisionDashboardRole(user);
+
+  setAlertRowVisibleByChild("link-sin-asignar", canSeeSinAsignar);
+  setAlertRowVisibleByChild("link-fichas-firmar", canSeeFichas);
+  setAlertRowVisibleByChild("count-pendientes", false);
 }
 
 function isReunionEnProximosTresDias(row = {}) {
@@ -486,12 +602,15 @@ function inicializarDashboardEnCeros() {
     if (el) el.textContent = value;
   };
 
+  const effectiveUser = getEffectiveUser();
+  
   setText("count-sin-asignar", "0");
   setAlertCountLink("count-a-contactar", 0, "a_contactar");
   setAlertHref("link-a-contactar", "a_contactar");
   setText("count-fichas-firmar", "0");
   setText("count-reunion-3dias", "0");
-  setText("count-pendientes", "0");
+  
+  syncAlertRowsByRole(effectiveUser);
 
   renderBucketLinks("contactados-top", "contactados", []);
   renderBucketLinks("cotizando-top", "cotizando", []);
@@ -518,13 +637,19 @@ function renderDashboard(rows = []) {
   const autorizadas = getBucketRows(rows, "autorizadas");
   const cerradas = getBucketRows(rows, "cerradas");
 
+  const effectiveUser = getEffectiveUser();
+  const fichasPorFirmar = rows.filter((row) =>
+    isFichaPorFirmarSegunUsuario(row, effectiveUser)
+  );
+  
   // ALERTAS
   setText("count-sin-asignar", rows.filter(isSinAsignar).length);
   setAlertCountLink("count-a-contactar", rows.filter(isAContactar).length, "a_contactar");
   setAlertHref("link-a-contactar", "a_contactar");
-  setText("count-fichas-firmar", rows.filter(isFichaPorFirmar).length);
+  setText("count-fichas-firmar", fichasPorFirmar.length);
   setText("count-reunion-3dias", rows.filter(isReunionEnProximosTresDias).length);
-  setText("count-pendientes", rows.filter(isPendiente).length);
+  
+  syncAlertRowsByRole(effectiveUser);
 
   // FLUJO CON LINKS
   renderBucketLinks("contactados-top", "contactados", contactados);
