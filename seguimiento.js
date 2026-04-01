@@ -43,6 +43,13 @@ const state = {
   realUser: null,
   canSeeAll: false,
 
+  // filtro recibido desde dashboard
+  dashboardPreset: {
+    bucket: "",
+    ano: "",
+    archivados: false
+  },
+
   // Perdidas oculto por defecto
   hiddenSummaryStates: new Set(["perdida"]),
 
@@ -287,9 +294,10 @@ async function loadSeguimiento() {
     });
 
     state.allRows = rows;
-
-    fillYearFilter(rows);
+    
     fillVendorFilter(rows);
+    applyDashboardPreset();
+    updateSummaryButtonsUI();
     applyFiltersAndRender();
   } catch (err) {
     console.error("[seguimiento] error cargando clientes:", err);
@@ -476,6 +484,29 @@ function applyFiltersAndRender() {
   rows = rows.filter((row) => {
     if (filtroEstado === "todos") return true;
     return row.estado === filtroEstado;
+  });
+
+  // Filtro extra recibido desde dashboard
+  rows = rows.filter((row) => {
+    const bucket = state.dashboardPreset?.bucket || "";
+    if (!bucket) return true;
+  
+    // CONTACTADOS en dashboard = A contactar + Contactado
+    if (bucket === "contactados") {
+      return row.estado === "a_contactar" || row.estado === "contactado";
+    }
+  
+    // AUTORIZADAS se filtra por flag, no por estado textual
+    if (bucket === "autorizadas") {
+      return !!row.autorizada;
+    }
+  
+    // CERRADAS se filtra por flag, no por estado textual
+    if (bucket === "cerradas") {
+      return !!row.cerrada;
+    }
+  
+    return true;
   });
 
   // Filtro vendedor selector
@@ -734,6 +765,67 @@ function exportVisibleRowsToXlsx() {
   } catch (error) {
     console.error("[seguimiento] error exportando xlsx:", error);
     alert("No se pudo exportar el XLSX.");
+  }
+}
+
+function getDashboardQueryPreset() {
+  const params = new URLSearchParams(window.location.search);
+
+  return {
+    bucket: normalizeText(params.get("dashboardBucket") || ""),
+    ano: String(params.get("ano") || "").trim(),
+    archivados: params.get("archivados") === "1"
+  };
+}
+
+function applyDashboardPreset() {
+  const preset = getDashboardQueryPreset();
+  state.dashboardPreset = preset;
+
+  const toggleAnteriores = $("toggleAnteriores");
+  const filtroAno = $("filtroAno");
+  const filtroEstado = $("filtroEstado");
+
+  // Si viene archivados=1 o viene un año menor al actual,
+  // activamos archivados para que ese año se pueda mostrar.
+  if (
+    toggleAnteriores &&
+    (preset.archivados || (preset.ano && Number(preset.ano) < CURRENT_YEAR))
+  ) {
+    toggleAnteriores.checked = true;
+  }
+
+  // Rehacer selector de años con el toggle ya aplicado
+  fillYearFilter(state.allRows);
+
+  // Aplicar año recibido desde dashboard
+  if (
+    preset.ano &&
+    filtroAno &&
+    [...filtroAno.options].some((opt) => opt.value === preset.ano)
+  ) {
+    filtroAno.value = preset.ano;
+  }
+
+  // Traducir bucket del dashboard al valor real del select de estado
+  const bucketToEstado = {
+    cotizando: "cotizando",
+    recotizando: "recotizando",
+    reunion: "reunion_confirmada",
+    reunion_confirmada: "reunion_confirmada",
+    ganadas: "ganada",
+    ganada: "ganada",
+    perdidas: "perdida",
+    perdida: "perdida"
+  };
+
+  if (filtroEstado) {
+    filtroEstado.value = bucketToEstado[preset.bucket] || "todos";
+  }
+
+  // Si vienen desde pérdidas, que no quede oculto por defecto
+  if (preset.bucket === "perdidas" || preset.bucket === "perdida") {
+    state.hiddenSummaryStates.delete("perdida");
   }
 }
 
