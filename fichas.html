@@ -635,6 +635,49 @@
             </p>
           </div>
         </article>
+                <article class="ficha-panel">
+          <div class="ficha-panel-head">
+            <div>
+              <h2 class="ficha-panel-title">Flujo de revisión y firmas</h2>
+              <p class="ficha-panel-sub">Proceso interno de ficha comercial y administrativa</p>
+            </div>
+          </div>
+
+          <div class="ficha-panel-body">
+            <div class="mini-grid">
+              <div class="mini-card">
+                <div class="mini-label">Vendedor(a)</div>
+                <div class="mini-value" id="wfEstadoVendedor">Pendiente</div>
+                <div class="muted small" id="wfMetaVendedor">Revisión comercial final</div>
+              </div>
+
+              <div class="mini-card">
+                <div class="mini-label">Jefa de ventas</div>
+                <div class="mini-value" id="wfEstadoJefa">Pendiente</div>
+                <div class="muted small" id="wfMetaJefa">Revisión de supervisión</div>
+              </div>
+
+              <div class="mini-card">
+                <div class="mini-label">Administración</div>
+                <div class="mini-value" id="wfEstadoAdmin">Pendiente</div>
+                <div class="muted small" id="wfMetaAdmin">Cierre administrativo</div>
+              </div>
+
+              <div class="mini-card">
+                <div class="mini-label">Solicitud de actualización</div>
+                <div class="mini-value" id="wfEstadoSolicitud">Sin solicitudes pendientes</div>
+                <div class="muted small" id="wfMetaSolicitud">Flujo de cambios posteriores</div>
+              </div>
+            </div>
+
+            <div class="hero-actions no-print" style="justify-content:flex-start; margin-top:16px;">
+              <button class="btn-dark" id="btnFirmarFichaVendedor" type="button">Firmar vendedor(a)</button>
+              <button class="btn-pill" id="btnFirmarFichaJefa" type="button">Firmar jefa ventas</button>
+              <button class="btn-pill" id="btnFirmarFichaAdmin" type="button">Firmar administración</button>
+              <button class="btn-pill hidden" id="btnSolicitarActualizacionFicha" type="button">Solicitar actualización</button>
+            </div>
+          </div>
+        </article>
       </aside>
 
       <section class="ficha-col">
@@ -829,6 +872,34 @@
       </section>
     </section>
   </main>
+
+  <div class="modal" id="modalSolicitudFicha">
+    <div class="modal-card">
+      <div class="modal-head">
+        <h3 class="modal-title">Solicitar actualización de ficha</h3>
+        <button class="modal-close" type="button" data-close="modalSolicitudFicha">×</button>
+      </div>
+
+      <div class="modal-body">
+        <form id="formSolicitudFicha" class="form-grid">
+          <div class="field span-12">
+            <label for="sr_asunto">Asunto</label>
+            <input id="sr_asunto" type="text" />
+          </div>
+
+          <div class="field span-12">
+            <label for="sr_detalle">Qué hay que cambiar</label>
+            <textarea id="sr_detalle"></textarea>
+          </div>
+        </form>
+      </div>
+
+      <div class="modal-actions">
+        <button class="btn-pill" type="button" data-close="modalSolicitudFicha">Cancelar</button>
+        <button class="btn-dark" type="button" id="btnEnviarSolicitudFicha">Enviar solicitud</button>
+      </div>
+    </div>
+  </div>
 
   <script type="module" src="layout.js"></script>
   <script type="module" src="fichas.js"></script>
