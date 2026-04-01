@@ -491,9 +491,9 @@ function applyFiltersAndRender() {
     const bucket = state.dashboardPreset?.bucket || "";
     if (!bucket) return true;
   
-    // CONTACTADOS en dashboard = A contactar + Contactado
+    // CONTACTADOS = solo Contactado
     if (bucket === "contactados") {
-      return row.estado === "a_contactar" || row.estado === "contactado";
+      return row.estado === "contactado";
     }
   
     // AUTORIZADAS se filtra por flag, no por estado textual
@@ -809,6 +809,7 @@ function applyDashboardPreset() {
 
   // Traducir bucket del dashboard al valor real del select de estado
   const bucketToEstado = {
+    contactados: "contactado",
     cotizando: "cotizando",
     recotizando: "recotizando",
     reunion: "reunion_confirmada",
