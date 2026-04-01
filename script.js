@@ -275,7 +275,8 @@ function resolveEstadoBucket(row = {}) {
   if (estado.includes("ganad")) return "ganadas";
   if (estado.includes("autoriz")) return "autorizadas";
   if (estado.includes("cerrad")) return "cerradas";
-  if (estado.includes("contact") || estado.includes("a contactar")) return "contactados";
+  if (estado.includes("a contactar")) return "a_contactar";
+  if (estado.includes("contactad")) return "contactados";
 
   return "";
 }
@@ -402,6 +403,34 @@ function renderFlowAnchor({ label = "00", bucket = "", ano = "", archivados = fa
   `;
 }
 
+function setAlertCountLink(targetId, count = 0, bucket = "") {
+  const el = $(targetId);
+  if (!el) return;
+
+  const href = buildSeguimientoUrl({
+    bucket,
+    archivados: true
+  });
+
+  el.innerHTML = `
+    <a
+      href="${href}"
+      class="flow-number-link"
+      style="color:inherit;text-decoration:none;"
+    >${count}</a>
+  `;
+}
+
+function setAlertHref(targetId, bucket = "") {
+  const el = $(targetId);
+  if (!el) return;
+
+  el.href = buildSeguimientoUrl({
+    bucket,
+    archivados: true
+  });
+}
+
 function renderBucketLinks(targetId, bucket, rows = []) {
   const el = $(targetId);
   if (!el) return;
@@ -443,7 +472,8 @@ function inicializarDashboardEnCeros() {
   };
 
   setText("count-sin-asignar", "0");
-  setText("count-a-contactar", "0");
+  setAlertCountLink("count-a-contactar", 0, "a_contactar");
+  setAlertHref("link-a-contactar", "a_contactar");
   setText("count-fichas-firmar", "0");
   setText("count-reunion-3dias", "0");
   setText("count-pendientes", "0");
@@ -475,7 +505,8 @@ function renderDashboard(rows = []) {
 
   // ALERTAS
   setText("count-sin-asignar", rows.filter(isSinAsignar).length);
-  setText("count-a-contactar", rows.filter(isAContactar).length);
+  setAlertCountLink("count-a-contactar", rows.filter(isAContactar).length, "a_contactar");
+  setAlertHref("link-a-contactar", "a_contactar");
   setText("count-fichas-firmar", rows.filter(isFichaPorFirmar).length);
   setText("count-reunion-3dias", rows.filter(isReunionEnProximosTresDias).length);
   setText("count-pendientes", rows.filter(isPendiente).length);
