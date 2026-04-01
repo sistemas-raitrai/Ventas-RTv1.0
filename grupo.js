@@ -369,7 +369,13 @@ function canAccessGroup(groupData = {}) {
 function canEditGroup() {
   if (!state.canModify) return false;
 
-  if (state.group?.autorizada && String(state.effectiveUser?.rol || "").toLowerCase() === "vendedor") {
+  const isVendor = String(state.effectiveUser?.rol || "").toLowerCase() === "vendedor";
+
+  if (isVendor && isVendorLockedByFlow(state.group)) {
+    return false;
+  }
+
+  if (state.group?.autorizada && isVendor) {
     return false;
   }
 
@@ -382,6 +388,27 @@ function isJefaVentas() {
 
 function isAdministracion() {
   return normalizeEmail(state.effectiveEmail) === "yenny@raitrai.cl" || state.effectiveUser?.rol === "admin";
+}
+
+function getFichaFlowMode(groupData = {}) {
+  const flow = groupData.flowFicha || {};
+  const ficha = groupData.ficha || {};
+
+  return normalizeSearchLocal(
+    groupData.fichaFlujoModo ||
+    flow.modo ||
+    ficha.flujoModo ||
+    ""
+  );
+}
+
+function isV2FichaFlow(groupData = {}) {
+  return getFichaFlowMode(groupData) === "v2";
+}
+
+function isVendorLockedByFlow(groupData = {}) {
+  const flow = groupData.flowFicha || {};
+  return isV2FichaFlow(groupData) && !!flow?.vendedor?.firmado;
 }
 
 function canCreateFichaFromEstado() {
@@ -1707,13 +1734,25 @@ async function signFlow(step) {
     }
 
     const patch = {
+      fichaFlujoModo: "v2",
       fichaEstado: "lista_vendedor",
       "documentos.fichaGrupo.estado": "lista_vendedor",
+    
+      ficha: {
+        ...(state.group.ficha || {}),
+        flujoModo: "v2"
+      },
+    
       flowFicha: {
         ...(state.group.flowFicha || {}),
+        modo: "v2",
+        legacy: false,
         habilitada: true,
         estado: "lista_vendedor",
+        bloqueadaParaVendedor: true,
+        requiereActualizacion: false,
         vendedor: {
+          ...(state.group.flowFicha?.vendedor || {}),
           firmado: true,
           firmadoAt: serverTimestamp(),
           firmadoPor: nombre,
@@ -2026,7 +2065,13 @@ function getBlockedEditMessage() {
     return "Tu rol actual es solo de lectura en este grupo.";
   }
 
-  if (state.group?.autorizada && String(state.effectiveUser?.rol || "").toLowerCase() === "vendedor") {
+  const isVendor = String(state.effectiveUser?.rol || "").toLowerCase() === "vendedor";
+
+  if (isVendor && isVendorLockedByFlow(state.group)) {
+    return "Ya firmaste la ficha. Desde este momento no puedes modificar el grupo ni la ficha; debes solicitar actualización a jefa de ventas.";
+  }
+
+  if (state.group?.autorizada && isVendor) {
     return "El grupo ya está autorizado. El vendedor(a) debe solicitar actualización y la modificación final debe hacerla jefa de ventas.";
   }
 
