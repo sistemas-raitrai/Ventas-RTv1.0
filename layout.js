@@ -26,7 +26,7 @@ const menuItems = [
   },
   {
     key: "editar-asignados",
-    href: "editar-asignados.html",
+    href: "asignados.html",
     label: "Editar Asignados",
     roles: ["admin", "supervision"]
   },
