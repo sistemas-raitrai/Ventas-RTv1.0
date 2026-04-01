@@ -359,27 +359,10 @@ async function loadDashboardData() {
 /* =========================================================
    DASHBOARD BASE
 ========================================================= */
-function inicializarDashboardEnCeros() {
-  const setText = (id, value) => {
-    const el = $(id);
-    if (el) el.textContent = value;
-  };
-
-  setText("count-sin-asignar", "0");
-  setText("count-a-contactar", "0");
-  setText("count-fichas-firmar", "0");
-  setText("count-reunion-3dias", "0");
-  setText("count-pendientes", "0");
-
-  setFlowNumbers("contactados", "00 | 00 | 00 | (00)", "00 | 00 | 00 | (00)");
-  setFlowNumbers("cotizando", "00 | 00 | 00 | (00)", "00 | 00 | 00 | (00)");
-  setFlowNumbers("reunion", "00 | 00 | 00 | (00)", "00 | 00 | 00 | (00)");
-  setFlowNumbers("perdidas", "00 | 00 | 00 | (00)");
-  setFlowNumbers("recotizando", "00 | 00 | 00 | (00)");
-  setFlowNumbers("ganadas", "00 | 00 | 00 | (00)");
-  setFlowNumbers("autorizadas", "00 | 00 | 00 | (00)");
-  setFlowNumbers("cerradas", "00");
-}function getYearBucketCounts(rows = []) {
+/* =========================================================
+   DASHBOARD BASE
+========================================================= */
+function getYearBucketCounts(rows = []) {
   const baseYear = getDashboardBaseYear();
   const years = [baseYear, baseYear + 1, baseYear + 2];
   const counts = [0, 0, 0];
