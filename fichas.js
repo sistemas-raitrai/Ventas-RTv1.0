@@ -260,27 +260,6 @@ function canAccessGroup(groupData = {}) {
   return aliases.some((alias) => alias && vendorName.includes(alias));
 }
 
-function getFichaFlowMode(groupData = {}) {
-  const flow = groupData.flowFicha || {};
-  const ficha = groupData.ficha || {};
-
-  return normalizeSearchLocal(
-    groupData.fichaFlujoModo ||
-    flow.modo ||
-    ficha.flujoModo ||
-    ""
-  );
-}
-
-function isV2FichaFlow(groupData = {}) {
-  return getFichaFlowMode(groupData) === "v2";
-}
-
-function isVendorLockedByFlow(groupData = {}) {
-  const flow = groupData.flowFicha || {};
-  return isV2FichaFlow(groupData) && !!flow?.vendedor?.firmado;
-}
-
 function isJefaVentas() {
   return normalizeEmail(state.effectiveEmail) === "chernandez@raitrai.cl" || state.effectiveUser?.rol === "admin";
 }
@@ -328,11 +307,13 @@ function canRequestFichaUpdate() {
 function canEditFicha() {
   if (!state.canModify) return false;
 
-  if (isVendorLockedByFlow(state.group)) {
+  const isVendor = isVendorRole();
+
+  if (isVendor && isVendorLockedByFlow(state.group)) {
     return false;
   }
 
-  if (state.group?.autorizada && isVendorRole()) {
+  if (state.group?.autorizada && isVendor) {
     return false;
   }
 
