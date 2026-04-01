@@ -241,10 +241,37 @@ function canAccessGroup(groupData = {}) {
   return aliases.some((alias) => alias && vendorName.includes(alias));
 }
 
+function getFichaFlowMode(groupData = {}) {
+  const flow = groupData.flowFicha || {};
+  const ficha = groupData.ficha || {};
+
+  return normalizeSearchLocal(
+    groupData.fichaFlujoModo ||
+    flow.modo ||
+    ficha.flujoModo ||
+    ""
+  );
+}
+
+function isV2FichaFlow(groupData = {}) {
+  return getFichaFlowMode(groupData) === "v2";
+}
+
+function isVendorLockedByFlow(groupData = {}) {
+  const flow = groupData.flowFicha || {};
+  return isV2FichaFlow(groupData) && !!flow?.vendedor?.firmado;
+}
+
 function canEditFicha() {
   if (!state.canModify) return false;
 
-  if (state.group?.autorizada && String(state.effectiveUser?.rol || "").toLowerCase() === "vendedor") {
+  const isVendor = String(state.effectiveUser?.rol || "").toLowerCase() === "vendedor";
+
+  if (isVendor && isVendorLockedByFlow(state.group)) {
+    return false;
+  }
+
+  if (state.group?.autorizada && isVendor) {
     return false;
   }
 
@@ -903,7 +930,13 @@ function getBlockedEditMessage() {
     return "Tu rol actual es solo de lectura para esta ficha.";
   }
 
-  if (state.group?.autorizada && String(state.effectiveUser?.rol || "").toLowerCase() === "vendedor") {
+  const isVendor = String(state.effectiveUser?.rol || "").toLowerCase() === "vendedor";
+
+  if (isVendor && isVendorLockedByFlow(state.group)) {
+    return "Ya firmaste la ficha. Desde este momento no puedes modificarla; debes solicitar actualización a jefa de ventas.";
+  }
+
+  if (state.group?.autorizada && isVendor) {
     return "El grupo ya está autorizado. El vendedor(a) no puede modificar esta ficha directamente.";
   }
 
