@@ -379,6 +379,100 @@ function inicializarDashboardEnCeros() {
   setFlowNumbers("ganadas", "00 | 00 | 00 | (00)");
   setFlowNumbers("autorizadas", "00 | 00 | 00 | (00)");
   setFlowNumbers("cerradas", "00");
+}function getYearBucketCounts(rows = []) {
+  const baseYear = getDashboardBaseYear();
+  const years = [baseYear, baseYear + 1, baseYear + 2];
+  const counts = [0, 0, 0];
+
+  rows.forEach((row) => {
+    const y = getAnoViajeNumber(row);
+    const index = years.indexOf(y);
+    if (index >= 0) counts[index] += 1;
+  });
+
+  return {
+    years,
+    counts,
+    total: rows.length
+  };
+}
+
+function buildSeguimientoUrl({ bucket = "", ano = "", archivados = false } = {}) {
+  const url = new URL("seguimiento.html", window.location.href);
+
+  if (bucket) url.searchParams.set("dashboardBucket", String(bucket));
+  if (ano) url.searchParams.set("ano", String(ano));
+  if (archivados) url.searchParams.set("archivados", "1");
+
+  return `${url.pathname}${url.search}`;
+}
+
+function renderFlowAnchor({ label = "00", bucket = "", ano = "", archivados = false } = {}) {
+  const href = buildSeguimientoUrl({ bucket, ano, archivados });
+
+  return `
+    <a
+      href="${href}"
+      class="flow-number-link"
+      style="color:inherit;text-decoration:none;"
+    >${label}</a>
+  `;
+}
+
+function renderBucketLinks(targetId, bucket, rows = []) {
+  const el = $(targetId);
+  if (!el) return;
+
+  const { years, counts, total } = getYearBucketCounts(rows);
+
+  const [link1, link2, link3] = counts.map((count, index) =>
+    renderFlowAnchor({
+      label: pad2(count),
+      bucket,
+      ano: years[index]
+    })
+  );
+
+  const totalLink = renderFlowAnchor({
+    label: pad2(total),
+    bucket,
+    archivados: true
+  });
+
+  el.innerHTML = `${link1} | ${link2} | ${link3} | (${totalLink})`;
+}
+
+function renderSingleTotalLink(targetId, bucket, count = 0) {
+  const el = $(targetId);
+  if (!el) return;
+
+  el.innerHTML = renderFlowAnchor({
+    label: pad2(count),
+    bucket,
+    archivados: true
+  });
+}
+
+function inicializarDashboardEnCeros() {
+  const setText = (id, value) => {
+    const el = $(id);
+    if (el) el.textContent = value;
+  };
+
+  setText("count-sin-asignar", "0");
+  setText("count-a-contactar", "0");
+  setText("count-fichas-firmar", "0");
+  setText("count-reunion-3dias", "0");
+  setText("count-pendientes", "0");
+
+  renderBucketLinks("contactados-top", "contactados", []);
+  renderBucketLinks("cotizando-top", "cotizando", []);
+  renderBucketLinks("reunion-top", "reunion", []);
+  renderBucketLinks("perdidas-top", "perdidas", []);
+  renderBucketLinks("recotizando-top", "recotizando", []);
+  renderBucketLinks("ganadas-top", "ganadas", []);
+  renderBucketLinks("autorizadas-top", "autorizadas", []);
+  renderSingleTotalLink("cerradas-top", "cerradas", 0);
 }
 
 function renderDashboard(rows = []) {
@@ -403,18 +497,15 @@ function renderDashboard(rows = []) {
   setText("count-reunion-3dias", rows.filter(isReunionEnProximosTresDias).length);
   setText("count-pendientes", rows.filter(isPendiente).length);
 
-  // FLUJO
-  // Primera línea = por año comercial (base marzo)
-  // Segunda línea, por ahora, la dejo igual que la primera en las cajas que tienen 2 líneas
-  // para no inventar una lógica distinta todavía.
-  setFlowNumbers("contactados", formatYearBuckets(contactados), formatYearBuckets(contactados));
-  setFlowNumbers("cotizando", formatYearBuckets(cotizando), formatYearBuckets(cotizando));
-  setFlowNumbers("reunion", formatYearBuckets(reunion), formatYearBuckets(reunion));
-  setFlowNumbers("perdidas", formatYearBuckets(perdidas));
-  setFlowNumbers("recotizando", formatYearBuckets(recotizando));
-  setFlowNumbers("ganadas", formatYearBuckets(ganadas));
-  setFlowNumbers("autorizadas", formatYearBuckets(autorizadas));
-  setFlowNumbers("cerradas", pad2(cerradas.length));
+  // FLUJO CON LINKS
+  renderBucketLinks("contactados-top", "contactados", contactados);
+  renderBucketLinks("cotizando-top", "cotizando", cotizando);
+  renderBucketLinks("reunion-top", "reunion", reunion);
+  renderBucketLinks("perdidas-top", "perdidas", perdidas);
+  renderBucketLinks("recotizando-top", "recotizando", recotizando);
+  renderBucketLinks("ganadas-top", "ganadas", ganadas);
+  renderBucketLinks("autorizadas-top", "autorizadas", autorizadas);
+  renderSingleTotalLink("cerradas-top", "cerradas", cerradas.length);
 }
 
 /* =========================================================
