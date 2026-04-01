@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Asignación Comercial | Sistema Ventas RT</title>
+  <link rel="stylesheet" href="estilos.css" />
+  <link rel="icon" type="image/png" href="IMG/logo-raitrai.png" />
+</head>
+<body class="ventas-body" data-page="asignados">
+
+  <div id="layout-top"></div>
+
+  <main class="ventas-main">
+    <section class="panel panel-asignados">
+      <div class="asignados-head">
+        <div>
+          <h1 class="panel-title">ASIGNACIÓN COMERCIAL</h1>
+          <p id="asignadosScope" class="panel-subtitle">
+            Asignar, reasignar y quitar asignación de grupos comerciales.
+          </p>
+        </div>
+
+        <div class="asignados-head-actions">
+          <button id="btnRecargar" class="btn-secondary" type="button">Recargar</button>
+        </div>
+      </div>
+
+      <div class="asignados-tabs">
+        <button id="btnTabSinAsignar" class="scope-tab active" type="button">Sin asignar</button>
+        <button id="btnTabAsignados" class="scope-tab" type="button">Asignados</button>
+      </div>
+
+      <div class="asignados-filtros">
+        <input id="searchInput" type="search" placeholder="Buscar por ID, alias, colegio, apoderado..." />
+
+        <select id="filterVendedora">
+          <option value="">Todas las vendedoras</option>
+        </select>
+
+        <select id="filterAnoViaje">
+          <option value="">Todos los años</option>
+        </select>
+
+        <select id="filterEstado">
+          <option value="">Todos los estados</option>
+        </select>
+      </div>
+
+      <div id="tableSummary" class="table-summary"></div>
+
+      <div class="table-wrap">
+        <table class="clientes-table">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Alias / Grupo</th>
+              <th>Colegio</th>
+              <th>Año</th>
+              <th>Cliente</th>
+              <th>Estado</th>
+              <th>Vendedor(a) actual</th>
+              <th>Asignar a</th>
+              <th>Acciones</th>
+            </tr>
+          </thead>
+          <tbody id="tbodyAsignados"></tbody>
+        </table>
+      </div>
+
+      <div id="emptyState" class="empty-state hidden">
+        No hay registros para esta vista.
+      </div>
+    </section>
+  </main>
+
+  <!-- MODAL HISTORIAL -->
+  <div id="historyModal" class="simple-modal">
+    <div class="simple-modal-card">
+      <div class="simple-modal-head">
+        <h3 id="historyTitle">Historial de asignación</h3>
+        <button id="historyCloseBtn" type="button" class="modal-close-btn">✕</button>
+      </div>
+
+      <div id="historyBody" class="history-body"></div>
+
+      <div class="simple-modal-actions">
+        <button id="historyCloseBtn2" type="button" class="btn-secondary">Cerrar</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="layout.js"></script>
+  <script type="module" src="asignados.js"></script>
+</body>
+</html>
