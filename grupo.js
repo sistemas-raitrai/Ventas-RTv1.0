@@ -951,19 +951,40 @@ function renderHistory() {
   }
 
   list.innerHTML = state.history.map((item) => {
-    const cambios = Array.isArray(item?.metadata?.cambios) ? item.metadata.cambios : [];
-    const cambiosHtml = cambios.length
-      ? "\n" + cambios.map((c) => `• ${prettyLabel(c.campo)}: ${stringValue(c.anterior)} → ${stringValue(c.nuevo)}`).join("\n")
+    const cambiosDetallados =
+      Array.isArray(item?.metadata?.cambiosDetallados) && item.metadata.cambiosDetallados.length
+        ? item.metadata.cambiosDetallados
+        : buildDetailedChanges(
+            Array.isArray(item?.metadata?.cambios) ? item.metadata.cambios : []
+          );
+
+    const cambiosHtml = cambiosDetallados.length
+      ? "\n" + cambiosDetallados.map((c) => {
+          if (c.tipoCambio === "agregado") {
+            return `• [Agregado] ${prettyLabel(c.campo)}: ${stringValue(c.nuevoPreview || "sin valor")}`;
+          }
+
+          if (c.tipoCambio === "eliminado") {
+            return `• [Eliminado] ${prettyLabel(c.campo)}: ${stringValue(c.anteriorPreview || "sin valor")}`;
+          }
+
+          return `• [Modificado] ${prettyLabel(c.campo)}: ${stringValue(c.anteriorPreview || "vacío")} → ${stringValue(c.nuevoPreview || "vacío")}`;
+        }).join("\n")
       : "";
+
+    const encabezado = item.asunto || item.titulo || "Movimiento";
+    const usuario = item.creadoPor || item.creadoPorCorreo || "Sin usuario";
 
     return `
       <div class="timeline-item">
         <div class="timeline-head">
-          <div class="timeline-title">${escapeHtml(item.titulo || "Movimiento")}</div>
+          <div class="timeline-title">${escapeHtml(encabezado)}</div>
           <div class="timeline-date">${escapeHtml(formatDateTime(item.fecha))}</div>
         </div>
 
-        <div class="timeline-body">${escapeHtml(item.mensaje || "Sin detalle")}${escapeHtml(cambiosHtml)}</div>
+        <div class="timeline-body">${escapeHtml(item.mensaje || "Sin detalle")}
+${escapeHtml(`Usuario: ${usuario}`)}
+${escapeHtml(cambiosHtml)}</div>
       </div>
     `;
   }).join("");
@@ -1438,6 +1459,118 @@ function normalizeRichHtml(html = "") {
     .replace(/<p><br><\/p>/gi, "")
     .replace(/>\s+</g, "><")
     .trim();
+}
+
+function stripHistoryHtml(value = "") {
+  return String(value || "")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function isRichHistoryField(path = "") {
+  return [
+    "situacion.observacionAdministracion",
+    "situacion.observacionOperaciones"
+  ].includes(String(path || "").trim());
+}
+
+function getHistoryComparable(value, rich = false) {
+  if (value === null || value === undefined) return "";
+
+  if (typeof value === "boolean") return value ? "true" : "false";
+  if (typeof value === "number") return String(value);
+
+  if (Array.isArray(value)) {
+    return value.map((item) => getHistoryComparable(item, false)).filter(Boolean).join(" | ").trim();
+  }
+
+  if (typeof value === "object") {
+    try {
+      return JSON.stringify(value);
+    } catch {
+      return String(value);
+    }
+  }
+
+  const raw = String(value || "");
+  const text = rich ? stripHistoryHtml(raw) : raw;
+
+  return text.replace(/\s+/g, " ").trim();
+}
+
+function getHistoryPreview(value, rich = false) {
+  const text = getHistoryComparable(value, rich);
+  if (!text) return "";
+  return text.length > 180 ? `${text.slice(0, 177)}...` : text;
+}
+
+function classifyHistoryChangeType({ anterior, nuevo, rich = false } = {}) {
+  const oldValue = getHistoryComparable(anterior, rich);
+  const newValue = getHistoryComparable(nuevo, rich);
+
+  if (oldValue === newValue) return "sin_cambio";
+  if (!oldValue && newValue) return "agregado";
+  if (oldValue && !newValue) return "eliminado";
+  return "modificado";
+}
+
+function buildDetailedChanges(changes = []) {
+  return (changes || [])
+    .map((item) => {
+      const campo = cleanText(item?.campo || "campo");
+      const rich = isRichHistoryField(campo);
+
+      const anterior = item?.anterior ?? "";
+      const nuevo = item?.nuevo ?? "";
+      const tipoCambio = classifyHistoryChangeType({ anterior, nuevo, rich });
+
+      return {
+        campo,
+        tipoCambio,
+        anterior,
+        nuevo,
+        anteriorPreview: getHistoryPreview(anterior, rich),
+        nuevoPreview: getHistoryPreview(nuevo, rich)
+      };
+    })
+    .filter((item) => item.tipoCambio !== "sin_cambio");
+}
+
+function buildHistorySubject({ titulo = "", cambios = [] } = {}) {
+  const prefix = cleanText(titulo || "Movimiento");
+  if (!cambios.length) return prefix;
+
+  const first = cambios[0];
+  const actionLabel = {
+    agregado: "Agregado",
+    eliminado: "Eliminado",
+    modificado: "Modificado"
+  }[first.tipoCambio] || "Cambio";
+
+  if (cambios.length === 1) {
+    return `${prefix} · ${actionLabel} ${prettyLabel(first.campo)}`;
+  }
+
+  return `${prefix} · ${actionLabel} ${prettyLabel(first.campo)} (+${cambios.length - 1})`;
+}
+
+function buildHistorySummary(cambios = []) {
+  if (!cambios.length) return "";
+
+  return cambios.map((item) => {
+    const base = `${capitalize(item.tipoCambio)} ${prettyLabel(item.campo)}`;
+
+    if (item.tipoCambio === "agregado") {
+      return `${base}: ${item.nuevoPreview || "sin valor"}`;
+    }
+
+    if (item.tipoCambio === "eliminado") {
+      return `${base}: ${item.anteriorPreview || "sin valor"}`;
+    }
+
+    return `${base}: ${item.anteriorPreview || "vacío"} → ${item.nuevoPreview || "vacío"}`;
+  }).join(" | ");
 }
 
 /* =========================================================
@@ -2001,8 +2134,10 @@ async function saveGroupPatch(patch, {
   tipoMovimiento = "edicion_datos",
   modulo = "grupo",
   titulo = "Actualización",
+  asunto = "",
   mensaje = "",
   cambios = [],
+  metadata = {},
   reloadAfterSave = true
 } = {}) {
   // Si dentro de los cambios viene "estado",
@@ -2020,8 +2155,10 @@ async function saveGroupPatch(patch, {
     tipoMovimiento,
     modulo,
     titulo,
+    asunto,
     mensaje,
-    metadata: { cambios }
+    cambios,
+    metadata
   });
 
   if (reloadAfterSave) {
@@ -2033,19 +2170,49 @@ async function createHistoryEntry({
   tipoMovimiento = "movimiento",
   modulo = "grupo",
   titulo = "Movimiento",
+  asunto = "",
   mensaje = "",
+  cambios = [],
   metadata = {}
 } = {}) {
+  const baseChanges =
+    Array.isArray(cambios) && cambios.length
+      ? cambios
+      : (Array.isArray(metadata?.cambios) ? metadata.cambios : []);
+
+  const cambiosDetallados = buildDetailedChanges(baseChanges);
+  const asuntoFinal =
+    cleanText(asunto) ||
+    buildHistorySubject({ titulo, cambios: cambiosDetallados }) ||
+    cleanText(titulo) ||
+    "Movimiento";
+
+  const resumenCambios = buildHistorySummary(cambiosDetallados);
+  const mensajeFinal =
+    cleanText(mensaje) ||
+    resumenCambios ||
+    asuntoFinal;
+
   await addDoc(collection(db, HISTORIAL_COLLECTION), {
     idGrupo: String(state.groupId),
     codigoRegistro: cleanText(state.group?.codigoRegistro),
     aliasGrupo: cleanText(state.group?.aliasGrupo),
     colegio: cleanText(state.group?.colegio),
+
     tipoMovimiento,
     modulo,
     titulo,
-    mensaje,
-    metadata,
+    asunto: asuntoFinal,
+    mensaje: mensajeFinal,
+
+    metadata: {
+      ...metadata,
+      totalCambios: cambiosDetallados.length,
+      resumenCambios,
+      cambios: baseChanges,
+      cambiosDetallados
+    },
+
     creadoPor: getDisplayName(state.effectiveUser),
     creadoPorCorreo: state.effectiveEmail,
     fecha: serverTimestamp()
