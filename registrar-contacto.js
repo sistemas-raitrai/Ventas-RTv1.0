@@ -755,18 +755,23 @@ async function saveRegistro(e) {
       idGrupo,
       codigoRegistro,
       tipoRegistro: "cotizacion",
-
+    
+      // Marca explícita para distinguir registros creados
+      // desde el sistema nuevo y evitar que el backfill legacy
+      // los tome por error como registros antiguos.
+      fichaFlujoModo: "nuevo",
+    
       origenColegio: data.tipoColegio,
       colegio: data.colegio,
       colegioBase: data.colegioBase,
       carteraNumeroColegio: data.carteraNumeroColegio,
       carteraCorreoVendedora: data.carteraCorreoVendedora,
-
+    
       vendedora: data.vendedora,
       vendedoraCorreo: data.vendedoraCorreo,
       requiereAsignacion: data.requiereAsignacion,
       estado: data.estado,
-
+    
       curso: data.curso,
       anoBaseCurso: data.anoBaseCurso,
       cursoViaje: data.cursoViaje,
@@ -775,21 +780,21 @@ async function saveRegistro(e) {
       cantidadGrupo: data.cantidadGrupo,
       anoViaje: data.anoViaje,
       comunaCiudad: data.comunaCiudad,
-
+    
       nombreCliente: data.nombreCliente,
       rolCliente: data.rolCliente,
       correoCliente: data.correoCliente,
       celularCliente: data.celularCliente,
-
+    
       origenCliente: data.origenCliente,
       origenEspecificacion: data.origenEspecificacion,
       origenEspecificacionOtro: data.origenEspecificacionOtro,
-
+    
       destinoPrincipal: data.destinoPrincipal,
       destinoPrincipalOtro: data.destinoPrincipalOtro,
       destinosSecundarios: data.destinosSecundarios,
       destinoSecundarioOtro: data.destinoSecundarioOtro,
-
+    
       creadoPor: getNombreUsuario(state.effectiveUser),
       creadoPorCorreo: normalizeEmail(state.realUser?.email || ""),
       fechaCreacion: serverTimestamp(),
@@ -797,7 +802,7 @@ async function saveRegistro(e) {
       actualizadoPorCorreo: normalizeEmail(state.realUser?.email || ""),
       fechaActualizacion: serverTimestamp()
     };
-
+    
     setProgressStatus({
       text: "Registrando contacto...",
       meta: "Guardando en Firebase...",
