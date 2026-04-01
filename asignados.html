@@ -11,68 +11,112 @@
 
   <div id="layout-top"></div>
 
-  <main class="ventas-main">
-    <section class="panel panel-asignados">
-      <div class="asignados-head">
-        <div>
-          <h1 class="panel-title">ASIGNACIÓN COMERCIAL</h1>
-          <p id="asignadosScope" class="panel-subtitle">
-            Asignar, reasignar y quitar asignación de grupos comerciales.
-          </p>
+  <main class="page-shell asignados-page">
+    <section class="page-card panel asignados-panel-main">
+  
+      <div class="page-header asignados-topbar">
+        <div class="asignados-title-wrap">
+          <h2>Asignación comercial</h2>
+          <p id="asignadosScope">Grupos sin vendedor(a) asignado.</p>
         </div>
-
-        <div class="asignados-head-actions">
-          <button id="btnRecargar" class="btn-secondary" type="button">Recargar</button>
+  
+        <div class="asignados-top-actions">
+          <button id="btnRecargar" class="btn-page" type="button">Recargar</button>
         </div>
       </div>
-
-      <div class="asignados-tabs">
-        <button id="btnTabSinAsignar" class="scope-tab active" type="button">Sin asignar</button>
-        <button id="btnTabAsignados" class="scope-tab" type="button">Asignados</button>
+  
+      <div class="asignados-toolbar">
+        <div class="toolbar-left">
+          <div class="field-wrap search-wide">
+            <label for="searchInput">Buscar</label>
+            <input
+              id="searchInput"
+              type="text"
+              placeholder="Buscar por ID, alias, colegio, cliente..."
+              autocomplete="off"
+            />
+          </div>
+  
+          <div class="field-wrap">
+            <label for="filterVendedora">Vendedor(a)</label>
+            <select id="filterVendedora">
+              <option value="">Todas las vendedoras</option>
+            </select>
+          </div>
+  
+          <div class="field-wrap">
+            <label for="filterAnoViaje">Año</label>
+            <select id="filterAnoViaje">
+              <option value="">Todos los años</option>
+            </select>
+          </div>
+  
+          <div class="field-wrap">
+            <label for="filterEstado">Estado</label>
+            <select id="filterEstado">
+              <option value="">Todos los estados</option>
+            </select>
+          </div>
+        </div>
+  
+        <div class="toolbar-right">
+          <div class="field-wrap">
+            <label>Vista</label>
+            <div class="asignados-tabs">
+              <button id="btnTabSinAsignar" class="scope-tab active" type="button">Sin asignar</button>
+              <button id="btnTabAsignados" class="scope-tab" type="button">Asignados</button>
+            </div>
+          </div>
+  
+          <div class="field-wrap">
+            <label>Resumen</label>
+            <div id="tableSummary" class="asignados-summary-inline">0 registro(s) en esta vista</div>
+          </div>
+        </div>
       </div>
-
-      <div class="asignados-filtros">
-        <input id="searchInput" type="search" placeholder="Buscar por ID, alias, colegio, apoderado..." />
-
-        <select id="filterVendedora">
-          <option value="">Todas las vendedoras</option>
-        </select>
-
-        <select id="filterAnoViaje">
-          <option value="">Todos los años</option>
-        </select>
-
-        <select id="filterEstado">
-          <option value="">Todos los estados</option>
-        </select>
+  
+      <div class="asignados-table-card">
+        <div class="asignados-table-wrap">
+          <table class="asignados-table">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Alias / Grupo</th>
+                <th>Colegio</th>
+                <th>Año</th>
+                <th>Cliente</th>
+                <th>Estado</th>
+                <th>Vendedor(a) actual</th>
+                <th>Asignar a</th>
+                <th>Acciones</th>
+              </tr>
+            </thead>
+            <tbody id="tbodyAsignados"></tbody>
+          </table>
+        </div>
       </div>
-
-      <div id="tableSummary" class="table-summary"></div>
-
-      <div class="table-wrap">
-        <table class="clientes-table">
-          <thead>
-            <tr>
-              <th>ID</th>
-              <th>Alias / Grupo</th>
-              <th>Colegio</th>
-              <th>Año</th>
-              <th>Cliente</th>
-              <th>Estado</th>
-              <th>Vendedor(a) actual</th>
-              <th>Asignar a</th>
-              <th>Acciones</th>
-            </tr>
-          </thead>
-          <tbody id="tbodyAsignados"></tbody>
-        </table>
-      </div>
-
-      <div id="emptyState" class="empty-state hidden">
+  
+      <div id="emptyState" class="asignados-empty hidden">
         No hay registros para esta vista.
       </div>
+  
     </section>
   </main>
+  
+  <div id="historyModal" class="simple-modal">
+    <div class="simple-modal-card">
+      <div class="simple-modal-head">
+        <h3 id="historyTitle">Historial de asignación</h3>
+        <button id="historyCloseBtn" type="button" class="modal-close-btn">✕</button>
+      </div>
+  
+      <div id="historyBody" class="history-body"></div>
+  
+      <div class="simple-modal-actions">
+        <button id="historyCloseBtn2" type="button" class="btn-page sec">Cerrar</button>
+      </div>
+    </div>
+  </div>
 
   <!-- MODAL HISTORIAL -->
   <div id="historyModal" class="simple-modal">
