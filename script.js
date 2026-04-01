@@ -381,12 +381,27 @@ function getYearBucketCounts(rows = []) {
   };
 }
 
+function getDashboardVendorScope() {
+  const effectiveUser = getEffectiveUser();
+  if (!effectiveUser) return "";
+
+  // Si el usuario efectivo es vendedor, el scope es su propio correo
+  if (isVendedorRole(effectiveUser)) {
+    return normalizeEmail(effectiveUser.email || "");
+  }
+
+  // Si es supervisión / registro / admin, usar el vendedor seleccionado en el dashboard
+  return normalizeEmail(getVendorFilter(effectiveUser) || "");
+}
+
 function buildSeguimientoUrl({ bucket = "", ano = "", archivados = false } = {}) {
   const url = new URL("seguimiento.html", window.location.href);
+  const vendor = getDashboardVendorScope();
 
   if (bucket) url.searchParams.set("dashboardBucket", String(bucket));
   if (ano) url.searchParams.set("ano", String(ano));
   if (archivados) url.searchParams.set("archivados", "1");
+  if (vendor) url.searchParams.set("vendor", vendor);
 
   return `${url.pathname}${url.search}`;
 }
