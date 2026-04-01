@@ -4,6 +4,7 @@ import {
   doc,
   getDocs,
   setDoc,
+  addDoc,
   serverTimestamp
 } from "https://www.gstatic.com/firebasejs/11.7.3/firebase-firestore.js";
 
@@ -39,6 +40,7 @@ import {
 ========================================================= */
 const GITHUB_HOME_URL = "https://sistemas-raitrai.github.io/Ventas-RT/";
 const DETALLE_GRUPO_URL = "grupo.html";
+const HISTORIAL_COLLECTION = "ventas_historial";
 
 /* =========================================================
    ESTADO
@@ -676,6 +678,45 @@ function buildCodigoRegistro(docId) {
   return `COT-${year}-${String(docId).slice(0, 6).toUpperCase()}`;
 }
 
+async function createRegistroHistorialEntry({
+  idGrupo = "",
+  codigoRegistro = "",
+  aliasGrupo = "",
+  colegio = "",
+  estado = "",
+  vendedora = "",
+  vendedoraCorreo = "",
+  origenColegio = "",
+  creadoPor = "",
+  creadoPorCorreo = ""
+} = {}) {
+  await addDoc(collection(db, HISTORIAL_COLLECTION), {
+    idGrupo: String(idGrupo || ""),
+    codigoRegistro: normalizeText(codigoRegistro || ""),
+    aliasGrupo: normalizeText(aliasGrupo || ""),
+    colegio: normalizeText(colegio || ""),
+
+    tipoMovimiento: "registro_contacto",
+    modulo: "registro-contacto",
+    titulo: "Registro inicial del grupo",
+    mensaje: `${creadoPor || "Usuario"} registró el grupo en el sistema.`,
+
+    metadata: {
+      cambios: [
+        { campo: "estado", anterior: "", nuevo: normalizeText(estado || "") },
+        { campo: "vendedora", anterior: "", nuevo: normalizeText(vendedora || "") },
+        { campo: "vendedoraCorreo", anterior: "", nuevo: normalizeEmail(vendedoraCorreo || "") },
+        { campo: "origenColegio", anterior: "", nuevo: normalizeText(origenColegio || "") }
+      ],
+      creadoDesde: "registro-contacto"
+    },
+
+    creadoPor: creadoPor || "",
+    creadoPorCorreo: normalizeEmail(creadoPorCorreo || ""),
+    fecha: serverTimestamp()
+  });
+}
+
 async function getNextSequentialIdGrupo() {
   const snap = await getDocs(collection(db, "ventas_cotizaciones"));
 
@@ -810,7 +851,20 @@ async function saveRegistro(e) {
     });
 
     await setDoc(newRef, payload);
-
+    
+    await createRegistroHistorialEntry({
+      idGrupo,
+      codigoRegistro,
+      aliasGrupo: data.aliasGrupo,
+      colegio: data.colegio,
+      estado: data.estado,
+      vendedora: data.vendedora,
+      vendedoraCorreo: data.vendedoraCorreo,
+      origenColegio: data.tipoColegio,
+      creadoPor: getNombreUsuario(state.effectiveUser),
+      creadoPorCorreo: normalizeEmail(state.realUser?.email || "")
+    });
+    
     setProgressStatus({
       text: "Registro creado.",
       meta: `Código: ${codigoRegistro}`,
