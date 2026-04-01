@@ -47,7 +47,8 @@ const state = {
   dashboardPreset: {
     bucket: "",
     ano: "",
-    archivados: false
+    archivados: false,
+    vendor: ""
   },
 
   // Perdidas oculto por defecto
@@ -777,7 +778,8 @@ function getDashboardQueryPreset() {
   return {
     bucket: normalizeText(params.get("dashboardBucket") || ""),
     ano: String(params.get("ano") || "").trim(),
-    archivados: params.get("archivados") === "1"
+    archivados: params.get("archivados") === "1",
+    vendor: normalizeEmail(params.get("vendor") || "")
   };
 }
 
@@ -788,6 +790,7 @@ function applyDashboardPreset() {
   const toggleAnteriores = $("toggleAnteriores");
   const filtroAno = $("filtroAno");
   const filtroEstado = $("filtroEstado");
+  const filtroVendedora = $("filtroVendedora");
 
   // Si viene archivados=1 o viene un año menor al actual,
   // activamos archivados para que ese año se pueda mostrar.
@@ -798,10 +801,10 @@ function applyDashboardPreset() {
     toggleAnteriores.checked = true;
   }
 
-  // Rehacer selector de años con el toggle ya aplicado
+  // Rehacer selector de años después de aplicar archivados
   fillYearFilter(state.allRows);
 
-  // Aplicar año recibido desde dashboard
+  // Aplicar año
   if (
     preset.ano &&
     filtroAno &&
@@ -810,7 +813,7 @@ function applyDashboardPreset() {
     filtroAno.value = preset.ano;
   }
 
-  // Traducir bucket del dashboard al valor real del select de estado
+  // Aplicar estado
   const bucketToEstado = {
     a_contactar: "a_contactar",
     contactados: "contactado",
@@ -828,7 +831,18 @@ function applyDashboardPreset() {
     filtroEstado.value = bucketToEstado[preset.bucket] || "todos";
   }
 
-  // Si vienen desde pérdidas, que no quede oculto por defecto
+  // Aplicar vendedor en el selector visual
+  if (preset.vendor && filtroVendedora) {
+    const matchingOption = [...filtroVendedora.options].find(
+      (opt) => normalizeEmail(opt.value) === preset.vendor
+    );
+
+    if (matchingOption) {
+      filtroVendedora.value = matchingOption.value;
+    }
+  }
+
+  // Si vienen desde pérdidas, dejarla visible
   if (preset.bucket === "perdidas" || preset.bucket === "perdida") {
     state.hiddenSummaryStates.delete("perdida");
   }
