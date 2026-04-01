@@ -562,6 +562,12 @@ function setAlertHref(targetId, bucket = "") {
   });
 }
 
+function setSinAsignarManagementHref() {
+  const el = $("link-sin-asignar");
+  if (!el) return;
+  el.href = "asignados.html?tab=sin_asignar";
+}
+
 function renderBucketLinks(targetId, bucket, rows = []) {
   const el = $(targetId);
   if (!el) return;
@@ -605,6 +611,7 @@ function inicializarDashboardEnCeros() {
   const effectiveUser = getEffectiveUser();
   
   setText("count-sin-asignar", "0");
+  setSinAsignarManagementHref();
   setAlertCountLink("count-a-contactar", 0, "a_contactar");
   setAlertHref("link-a-contactar", "a_contactar");
   setText("count-fichas-firmar", "0");
@@ -644,6 +651,7 @@ function renderDashboard(rows = []) {
   
   // ALERTAS
   setText("count-sin-asignar", rows.filter(isSinAsignar).length);
+  setSinAsignarManagementHref();
   setAlertCountLink("count-a-contactar", rows.filter(isAContactar).length, "a_contactar");
   setAlertHref("link-a-contactar", "a_contactar");
   setText("count-fichas-firmar", fichasPorFirmar.length);
