@@ -382,6 +382,11 @@ function canEditGroup() {
   return canAccessGroup(state.group);
 }
 
+function canEditDocuments() {
+  const rol = String(state.effectiveUser?.rol || "").toLowerCase();
+  return rol === "admin" || rol === "supervision";
+}
+
 function isJefaVentas() {
   return normalizeEmail(state.effectiveEmail) === "chernandez@raitrai.cl" || state.effectiveUser?.rol === "admin";
 }
@@ -907,7 +912,6 @@ function syncButtons() {
     "btnEditarDatos",
     "btnEditarSituacionHero",
     "btnEditarSituacion",
-    "btnEditarDocumentos",
     "btnNuevaReunionHero",
     "btnNuevaReunion",
     "btnNuevaReunionListado",
@@ -917,6 +921,13 @@ function syncButtons() {
     const el = $(id);
     if (el) el.disabled = !editable;
   });
+
+  const btnEditarDocumentos = $("btnEditarDocumentos");
+  if (btnEditarDocumentos) {
+    const canDocs = canEditDocuments();
+    btnEditarDocumentos.disabled = !canDocs;
+    btnEditarDocumentos.classList.toggle("hidden", !canDocs);
+  }
 
   const btnFicha = $("btnCrearFicha");
   if (btnFicha) btnFicha.disabled = !editable || !isGanada;
@@ -1172,8 +1183,8 @@ function openSituacionModal() {
 }
 
 function openDocsModal() {
-  if (!canEditGroup()) {
-    alert(getBlockedEditMessage());
+  if (!canEditDocuments()) {
+    alert("Solo administración y supervisión pueden editar el estado de documentos.");
     return;
   }
 
@@ -1475,6 +1486,11 @@ async function saveSituacion() {
 }
 
 async function saveDocumentos() {
+    if (!canEditDocuments()) {
+    alert("Solo administración y supervisión pueden editar el estado de documentos.");
+    return;
+  }
+  
   const patch = {};
   const cambios = [];
 
