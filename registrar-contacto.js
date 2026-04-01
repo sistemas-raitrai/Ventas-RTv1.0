@@ -680,7 +680,7 @@ async function getNextSequentialIdGrupo() {
   const snap = await getDocs(collection(db, "ventas_cotizaciones"));
 
   // Piso inicial según tu base actual
-  let maxId = 10931;
+  let maxId = 10935;
 
   snap.docs.forEach((row) => {
     const data = row.data() || {};
