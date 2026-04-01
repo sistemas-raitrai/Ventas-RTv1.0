@@ -491,7 +491,10 @@ function applyFiltersAndRender() {
     const bucket = state.dashboardPreset?.bucket || "";
     if (!bucket) return true;
   
-    // CONTACTADOS = solo Contactado
+    if (bucket === "a_contactar") {
+      return row.estado === "a_contactar";
+    }
+  
     if (bucket === "contactados") {
       return row.estado === "contactado";
     }
@@ -809,6 +812,7 @@ function applyDashboardPreset() {
 
   // Traducir bucket del dashboard al valor real del select de estado
   const bucketToEstado = {
+    a_contactar: "a_contactar",
     contactados: "contactado",
     cotizando: "cotizando",
     recotizando: "recotizando",
