@@ -227,6 +227,13 @@ async function loadAll() {
     return;
   }
 
+  // Si el usuario actual es vendedor, el grupo le corresponde
+  // y está en "A contactar", al abrirlo pasa automáticamente a "Contactado".
+  // saveGroupPatch recargará la ficha y dejará historial.
+  if (await autoMarkVendorGroupAsContactedOnOpen()) {
+    return;
+  }
+
   await Promise.all([
     loadMeetings(),
     loadHistory(),
@@ -385,6 +392,67 @@ function canEditGroup() {
 function canEditDocuments() {
   const rol = String(state.effectiveUser?.rol || "").toLowerCase();
   return rol === "admin" || rol === "supervision";
+}
+
+function isEffectiveVendorRole() {
+  return String(state.effectiveUser?.rol || "").toLowerCase() === "vendedor";
+}
+
+function shouldAutoMarkVendorGroupAsContacted(groupData = {}) {
+  return (
+    isEffectiveVendorRole() &&
+    canAccessGroup(groupData) &&
+    normalizeState(groupData.estado) === "a_contactar"
+  );
+}
+
+function getEstadoChangeFromCambios(cambios = []) {
+  return Array.isArray(cambios)
+    ? cambios.find((item) => String(item?.campo || "").trim() === "estado")
+    : null;
+}
+
+function applyEstadoAuditFields(patch = {}, cambios = []) {
+  const estadoChange = getEstadoChangeFromCambios(cambios);
+  if (!estadoChange) return;
+
+  // Marca visual para la ficha y panel de situación
+  patch.fechaUltimoCambioEstado = serverTimestamp();
+  setNestedValue(patch, "situacion.fechaUltimoCambioEstado", serverTimestamp());
+
+  // También deja huella como última gestión
+  if (!("ultimaGestionAt" in patch)) {
+    patch.ultimaGestionAt = serverTimestamp();
+  }
+
+  if (!("ultimaGestionTipo" in patch)) {
+    patch.ultimaGestionTipo = "cambio_estado";
+  }
+}
+
+async function autoMarkVendorGroupAsContactedOnOpen() {
+  if (!shouldAutoMarkVendorGroupAsContacted(state.group)) return false;
+
+  await saveGroupPatch(
+    {
+      estado: "contactado"
+    },
+    {
+      tipoMovimiento: "cambio_estado",
+      modulo: "grupo",
+      titulo: "Cambio automático de estado",
+      mensaje: `${getDisplayName(state.effectiveUser)} abrió el grupo y el sistema cambió el estado de A contactar a Contactado.`,
+      cambios: [
+        {
+          campo: "estado",
+          anterior: normalizeState(state.group.estado),
+          nuevo: "contactado"
+        }
+      ]
+    }
+  );
+
+  return true;
 }
 
 function isJefaVentas() {
@@ -1937,6 +2005,11 @@ async function saveGroupPatch(patch, {
   cambios = [],
   reloadAfterSave = true
 } = {}) {
+  // Si dentro de los cambios viene "estado",
+  // dejamos automáticamente fecha de último cambio de estado
+  // y última gestión, tanto para cambios automáticos como manuales.
+  applyEstadoAuditFields(patch, cambios);
+
   patch.actualizadoPor = getDisplayName(state.effectiveUser);
   patch.actualizadoPorCorreo = state.effectiveEmail;
   patch.fechaActualizacion = serverTimestamp();
