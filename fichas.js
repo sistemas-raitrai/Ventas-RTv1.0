@@ -37,6 +37,7 @@ const $ = (id) => document.getElementById(id);
 
 const GITHUB_HOME_URL = "https://sistemas-raitrai.github.io/Ventas-RT/";
 const HISTORIAL_COLLECTION = "ventas_historial";
+const SOLICITUDES_COLLECTION = "ventas_solicitudes_actualizacion";
 
 const richSelectionByEditor = new Map();
 let richEditorsBound = false;
@@ -52,7 +53,8 @@ const state = {
   groupDocId: "",
   groupId: "",
   group: null,
-  ficha: null
+  ficha: null,
+  requests: []
 };
 
 const FICHA_FIELDS = [
@@ -186,6 +188,7 @@ async function loadAll() {
     return;
   }
 
+  await loadRequests();
   state.ficha = hydrateFicha(state.group);
   renderPage();
 }
@@ -216,6 +219,22 @@ async function resolveGroupByParam(id) {
     groupId: String(first.data()?.idGrupo || first.id),
     data: first.data() || {}
   };
+}
+
+async function loadRequests() {
+  state.requests = [];
+
+  try {
+    const snap = await getDocs(
+      query(collection(db, SOLICITUDES_COLLECTION), where("idGrupo", "==", String(state.groupId)))
+    );
+
+    state.requests = snap.docs
+      .map((d) => ({ id: d.id, ...d.data() }))
+      .sort((a, b) => (toDate(b.fechaSolicitud)?.getTime() || 0) - (toDate(a.fechaSolicitud)?.getTime() || 0));
+  } catch (error) {
+    console.error("[fichas] loadRequests", error);
+  }
 }
 
 /* =========================================================
@@ -262,16 +281,58 @@ function isVendorLockedByFlow(groupData = {}) {
   return isV2FichaFlow(groupData) && !!flow?.vendedor?.firmado;
 }
 
+function isJefaVentas() {
+  return normalizeEmail(state.effectiveEmail) === "chernandez@raitrai.cl" || state.effectiveUser?.rol === "admin";
+}
+
+function isAdministracion() {
+  return normalizeEmail(state.effectiveEmail) === "yenny@raitrai.cl" || state.effectiveUser?.rol === "admin";
+}
+
+function getFichaFlowMode(groupData = {}) {
+  const flow = groupData.flowFicha || {};
+  const ficha = groupData.ficha || {};
+
+  return normalizeSearchLocal(
+    groupData.fichaFlujoModo ||
+    flow.modo ||
+    ficha.flujoModo ||
+    ""
+  );
+}
+
+function isV2FichaFlow(groupData = {}) {
+  return getFichaFlowMode(groupData) === "v2";
+}
+
+function isVendorRole() {
+  return String(state.effectiveUser?.rol || "").toLowerCase() === "vendedor";
+}
+
+function isVendorLockedByFlow(groupData = {}) {
+  const flow = groupData.flowFicha || {};
+  return isV2FichaFlow(groupData) && !!flow?.vendedor?.firmado;
+}
+
+function hasPendingUpdateRequest() {
+  return state.requests.some((item) => {
+    return normalizeSearchLocal(item.estadoSolicitud || "") === "pendiente"
+      && normalizeSearchLocal(item.tipoSolicitud || "") === "actualizacion_ficha";
+  });
+}
+
+function canRequestFichaUpdate() {
+  return isVendorRole() && isVendorLockedByFlow(state.group) && canAccessGroup(state.group);
+}
+
 function canEditFicha() {
   if (!state.canModify) return false;
 
-  const isVendor = String(state.effectiveUser?.rol || "").toLowerCase() === "vendedor";
-
-  if (isVendor && isVendorLockedByFlow(state.group)) {
+  if (isVendorLockedByFlow(state.group)) {
     return false;
   }
 
-  if (state.group?.autorizada && isVendor) {
+  if (state.group?.autorizada && isVendorRole()) {
     return false;
   }
 
@@ -288,6 +349,7 @@ function canOpenFicha() {
 function renderPage() {
   renderHero();
   renderResumenGrupo();
+  renderWorkflowPanel();
   fillForm();
   syncButtons();
 }
@@ -390,6 +452,52 @@ function renderResumenGrupo() {
   `).join("");
 }
 
+function renderWorkflowPanel() {
+  const flow = state.group?.flowFicha || {};
+  const pendingRequest = state.requests.find((item) => {
+    return normalizeSearchLocal(item.estadoSolicitud || "") === "pendiente"
+      && normalizeSearchLocal(item.tipoSolicitud || "") === "actualizacion_ficha";
+  });
+
+  setText("wfEstadoVendedor", flow?.vendedor?.firmado ? "Firmado" : "Pendiente");
+  setText(
+    "wfMetaVendedor",
+    flow?.vendedor?.firmado
+      ? `${flow.vendedor.firmadoPor || "—"} · ${formatDateTime(flow.vendedor.firmadoAt)}`
+      : "Revisión comercial final"
+  );
+
+  setText("wfEstadoJefa", flow?.jefaVentas?.firmado ? "Firmado" : "Pendiente");
+  setText(
+    "wfMetaJefa",
+    flow?.jefaVentas?.firmado
+      ? `${flow.jefaVentas.firmadoPor || "—"} · ${formatDateTime(flow.jefaVentas.firmadoAt)}`
+      : "Revisión de supervisión"
+  );
+
+  setText("wfEstadoAdmin", flow?.administracion?.firmado ? "Firmado" : "Pendiente");
+  setText(
+    "wfMetaAdmin",
+    flow?.administracion?.firmado
+      ? `${flow.administracion.firmadoPor || "—"} · ${formatDateTime(flow.administracion.firmadoAt)}`
+      : "Cierre administrativo"
+  );
+
+  setText(
+    "wfEstadoSolicitud",
+    pendingRequest
+      ? (pendingRequest.asunto || "Solicitud pendiente")
+      : "Sin solicitudes pendientes"
+  );
+
+  setText(
+    "wfMetaSolicitud",
+    pendingRequest
+      ? `${pendingRequest.solicitadoPor || "—"} · ${formatDateTime(pendingRequest.fechaSolicitud)}`
+      : "Flujo de cambios posteriores"
+  );
+}
+
 function fillForm() {
   const f = state.ficha || {};
 
@@ -423,6 +531,10 @@ function fillForm() {
 function syncButtons() {
   const editable = canEditFicha();
   const tienePdf = !!cleanText(state.ficha?.pdfUrl || state.group?.fichaPdfUrl || "");
+  const flow = state.group?.flowFicha || {};
+  const isGanada = normalizeState(state.group?.estado) === "ganada";
+  const isLegacy = getFichaFlowMode(state.group) === "legacy";
+  const pendingUpdate = hasPendingUpdateRequest();
 
   const btnGuardar = $("btnGuardarFicha");
   if (btnGuardar) btnGuardar.disabled = !editable;
@@ -442,6 +554,32 @@ function syncButtons() {
   document.querySelectorAll(".rich-btn, .rich-color").forEach((el) => {
     el.disabled = !editable;
   });
+
+  const btnVend = $("btnFirmarFichaVendedor");
+  if (btnVend) {
+    btnVend.classList.toggle("hidden", !isVendorRole() || isLegacy);
+    btnVend.disabled = !isVendorRole() || !editable || !isGanada || !!flow?.vendedor?.firmado || isLegacy;
+  }
+
+  const btnJefa = $("btnFirmarFichaJefa");
+  if (btnJefa) {
+    btnJefa.classList.toggle("hidden", !isJefaVentas() || isLegacy);
+    btnJefa.disabled = !isJefaVentas() || !flow?.vendedor?.firmado || !!flow?.jefaVentas?.firmado || isLegacy;
+  }
+
+  const btnAdmin = $("btnFirmarFichaAdmin");
+  if (btnAdmin) {
+    btnAdmin.classList.toggle("hidden", !isAdministracion() || isLegacy);
+    btnAdmin.disabled = !isAdministracion() || !flow?.jefaVentas?.firmado || !!flow?.administracion?.firmado || isLegacy;
+  }
+
+  const btnSolicitar = $("btnSolicitarActualizacionFicha");
+  if (btnSolicitar) {
+    const show = canRequestFichaUpdate() && !isLegacy;
+    btnSolicitar.classList.toggle("hidden", !show);
+    btnSolicitar.disabled = !show || pendingUpdate;
+    btnSolicitar.textContent = pendingUpdate ? "Actualización solicitada" : "Solicitar actualización";
+  }
 }
 
 function renderFatal(message) {
@@ -481,6 +619,293 @@ function bindEvents() {
     }
     window.open(url, "_blank", "noopener");
   });
+
+  $("btnFirmarFichaVendedor")?.addEventListener("click", () => signFlowFromFicha("vendedor"));
+  $("btnFirmarFichaJefa")?.addEventListener("click", () => signFlowFromFicha("jefaVentas"));
+  $("btnFirmarFichaAdmin")?.addEventListener("click", () => signFlowFromFicha("administracion"));
+
+  $("btnSolicitarActualizacionFicha")?.addEventListener("click", openUpdateRequestModal);
+  $("btnEnviarSolicitudFicha")?.addEventListener("click", saveUpdateRequest);
+
+  document.querySelectorAll("[data-close]").forEach((btn) => {
+    btn.addEventListener("click", () => closeModal(btn.dataset.close));
+  });
+
+  $("modalSolicitudFicha")?.addEventListener("click", (e) => {
+    if (e.target === $("modalSolicitudFicha")) closeModal("modalSolicitudFicha");
+  });
+}
+
+function openModal(id) {
+  $(id)?.classList.add("show");
+}
+
+function closeModal(id) {
+  $(id)?.classList.remove("show");
+}
+
+function openUpdateRequestModal() {
+  if (!canRequestFichaUpdate()) {
+    alert("Solo el vendedor(a) del grupo, después de firmar, puede solicitar actualización.");
+    return;
+  }
+
+  if (hasPendingUpdateRequest()) {
+    alert("Ya existe una solicitud pendiente para este grupo.");
+    return;
+  }
+
+  $("formSolicitudFicha")?.reset();
+  setValue(
+    "sr_asunto",
+    `Actualizar ficha · ${state.group?.aliasGrupo || state.group?.colegio || state.groupId}`
+  );
+
+  openModal("modalSolicitudFicha");
+}
+
+async function signFlowFromFicha(step) {
+  if (!state.group) return;
+
+  const flow = state.group.flowFicha || {};
+  const nombre = getDisplayName(state.effectiveUser);
+
+  if (step === "vendedor") {
+    if (!isVendorRole()) {
+      alert("Esta firma solo la realiza el vendedor(a) del grupo.");
+      return;
+    }
+
+    if (!canEditFicha()) {
+      alert(getBlockedEditMessage());
+      return;
+    }
+
+    if (normalizeState(state.group.estado) !== "ganada") {
+      alert("La firma de vendedor(a) solo se habilita cuando el grupo está GANADA.");
+      return;
+    }
+
+    if (flow?.vendedor?.firmado) {
+      alert("La firma de vendedor(a) ya está registrada.");
+      return;
+    }
+
+    const patch = {
+      fichaFlujoModo: "v2",
+      fichaEstado: "lista_vendedor",
+      "documentos.fichaGrupo.estado": "lista_vendedor",
+      ficha: {
+        ...(state.group.ficha || {}),
+        flujoModo: "v2"
+      },
+      flowFicha: {
+        ...(state.group.flowFicha || {}),
+        modo: "v2",
+        legacy: false,
+        habilitada: true,
+        estado: "lista_vendedor",
+        bloqueadaParaVendedor: true,
+        requiereActualizacion: false,
+        vendedor: {
+          ...(state.group.flowFicha?.vendedor || {}),
+          firmado: true,
+          firmadoAt: serverTimestamp(),
+          firmadoPor: nombre,
+          firmadoPorCorreo: state.effectiveEmail,
+          observacion: ""
+        }
+      }
+    };
+
+    await saveGroupPatch(patch, {
+      tipoMovimiento: "firma_vendedor",
+      modulo: "ficha",
+      titulo: "Firma de vendedor(a)",
+      mensaje: `${nombre} dejó la ficha lista como vendedor(a).`,
+      cambios: [
+        { campo: "fichaEstado", anterior: state.group.fichaEstado || "", nuevo: "lista_vendedor" }
+      ]
+    });
+    return;
+  }
+
+  if (step === "jefaVentas") {
+    if (!isJefaVentas()) {
+      alert("Esta firma solo puede realizarla la jefa de ventas.");
+      return;
+    }
+
+    if (!flow?.vendedor?.firmado) {
+      alert("Primero debe firmar el vendedor(a).");
+      return;
+    }
+
+    if (flow?.jefaVentas?.firmado) {
+      alert("La firma de jefa de ventas ya está registrada.");
+      return;
+    }
+
+    const patch = {
+      fichaFlujoModo: "v2",
+      fichaEstado: "revisada_jefa_ventas",
+      "documentos.fichaGrupo.estado": "revisada_jefa_ventas",
+      ficha: {
+        ...(state.group.ficha || {}),
+        flujoModo: "v2"
+      },
+      flowFicha: {
+        ...(state.group.flowFicha || {}),
+        modo: "v2",
+        legacy: false,
+        estado: "revisada_jefa_ventas",
+        jefaVentas: {
+          ...(state.group.flowFicha?.jefaVentas || {}),
+          firmado: true,
+          firmadoAt: serverTimestamp(),
+          firmadoPor: nombre,
+          firmadoPorCorreo: state.effectiveEmail,
+          observacion: ""
+        }
+      }
+    };
+
+    await saveGroupPatch(patch, {
+      tipoMovimiento: "firma_jefa_ventas",
+      modulo: "ficha",
+      titulo: "Firma jefa de ventas",
+      mensaje: `${nombre} revisó la ficha como jefa de ventas.`,
+      cambios: [
+        { campo: "fichaEstado", anterior: state.group.fichaEstado || "", nuevo: "revisada_jefa_ventas" }
+      ]
+    });
+    return;
+  }
+
+  if (step === "administracion") {
+    if (!isAdministracion()) {
+      alert("Esta firma solo puede realizarla administración.");
+      return;
+    }
+
+    if (!flow?.jefaVentas?.firmado) {
+      alert("Primero debe firmar jefa de ventas.");
+      return;
+    }
+
+    if (flow?.administracion?.firmado) {
+      alert("La firma de administración ya está registrada.");
+      return;
+    }
+
+    const patch = {
+      fichaFlujoModo: "v2",
+      fichaEstado: "autorizada_admin",
+      "documentos.fichaGrupo.estado": "autorizada_admin",
+      autorizada: true,
+      ficha: {
+        ...(state.group.ficha || {}),
+        flujoModo: "v2",
+        pdfPendienteGeneracion: true
+      },
+      flowFicha: {
+        ...(state.group.flowFicha || {}),
+        modo: "v2",
+        legacy: false,
+        estado: "autorizada_admin",
+        requiereActualizacion: false,
+        administracion: {
+          ...(state.group.flowFicha?.administracion || {}),
+          firmado: true,
+          firmadoAt: serverTimestamp(),
+          firmadoPor: nombre,
+          firmadoPorCorreo: state.effectiveEmail,
+          observacion: ""
+        }
+      }
+    };
+
+    await saveGroupPatch(patch, {
+      tipoMovimiento: "firma_administracion",
+      modulo: "ficha",
+      titulo: "Firma administración",
+      mensaje: `${nombre} autorizó el grupo desde administración.`,
+      cambios: [
+        { campo: "autorizada", anterior: !!state.group.autorizada, nuevo: true },
+        { campo: "fichaEstado", anterior: state.group.fichaEstado || "", nuevo: "autorizada_admin" }
+      ]
+    });
+  }
+}
+
+async function saveUpdateRequest() {
+  if (!canRequestFichaUpdate()) {
+    alert("No tienes permisos para solicitar actualización.");
+    return;
+  }
+
+  if (hasPendingUpdateRequest()) {
+    alert("Ya existe una solicitud pendiente para este grupo.");
+    closeModal("modalSolicitudFicha");
+    return;
+  }
+
+  const asunto = getValue("sr_asunto");
+  const detalle = getValue("sr_detalle");
+
+  if (!detalle) {
+    alert("Debes explicar qué hay que cambiar.");
+    return;
+  }
+
+  await addDoc(collection(db, SOLICITUDES_COLLECTION), {
+    idGrupo: String(state.groupId),
+    codigoRegistro: cleanText(state.group.codigoRegistro),
+    aliasGrupo: cleanText(state.group.aliasGrupo),
+    colegio: cleanText(state.group.colegio),
+    tipoSolicitud: "actualizacion_ficha",
+    asunto: asunto || `Actualizar ficha · ${state.group.aliasGrupo || state.group.colegio || state.groupId}`,
+    detalle,
+    estadoSolicitud: "pendiente",
+    destinatarioRol: "jefa_ventas",
+    destinatarioCorreo: "chernandez@raitrai.cl",
+    solicitadoPor: getDisplayName(state.effectiveUser),
+    solicitadoPorCorreo: state.effectiveEmail,
+    fechaSolicitud: serverTimestamp()
+  });
+
+  await saveGroupPatch(
+    {
+      flowFicha: {
+        ...(state.group.flowFicha || {}),
+        modo: getFichaFlowMode(state.group) || "v2",
+        requiereActualizacion: true,
+        ultimaSolicitudActualizacion: {
+          asunto: asunto || `Actualizar ficha · ${state.group.aliasGrupo || state.group.colegio || state.groupId}`,
+          detalle,
+          solicitadaPor: getDisplayName(state.effectiveUser),
+          solicitadaPorCorreo: state.effectiveEmail,
+          fechaSolicitud: serverTimestamp(),
+          estado: "pendiente"
+        }
+      }
+    },
+    {
+      tipoMovimiento: "solicitud_actualizacion_ficha",
+      modulo: "ficha",
+      titulo: "Solicitud de actualización de ficha",
+      mensaje: `${getDisplayName(state.effectiveUser)} solicitó actualización de la ficha.`,
+      cambios: [
+        {
+          campo: "flowFicha.requiereActualizacion",
+          anterior: !!state.group.flowFicha?.requiereActualizacion,
+          nuevo: true
+        }
+      ]
+    }
+  );
+
+  closeModal("modalSolicitudFicha");
 }
 
 /* =========================================================
@@ -594,6 +1019,56 @@ async function saveFicha() {
 
   alert("Ficha guardada correctamente.");
   await loadAll();
+}
+
+async function saveGroupPatch(patch, {
+  tipoMovimiento = "movimiento",
+  modulo = "ficha",
+  titulo = "Movimiento",
+  mensaje = "",
+  cambios = [],
+  reloadAfterSave = true
+} = {}) {
+  patch.actualizadoPor = getDisplayName(state.effectiveUser);
+  patch.actualizadoPorCorreo = state.effectiveEmail;
+  patch.fechaActualizacion = serverTimestamp();
+
+  await setDoc(doc(db, "ventas_cotizaciones", state.groupDocId), patch, { merge: true });
+
+  await createHistoryEntry({
+    tipoMovimiento,
+    modulo,
+    titulo,
+    mensaje,
+    metadata: { cambios }
+  });
+
+  if (reloadAfterSave) {
+    await loadAll();
+  }
+}
+
+async function createHistoryEntry({
+  tipoMovimiento = "movimiento",
+  modulo = "ficha",
+  titulo = "Movimiento",
+  mensaje = "",
+  metadata = {}
+} = {}) {
+  await addDoc(collection(db, HISTORIAL_COLLECTION), {
+    idGrupo: String(state.groupId),
+    codigoRegistro: cleanText(state.group?.codigoRegistro),
+    aliasGrupo: cleanText(state.group?.aliasGrupo),
+    colegio: cleanText(state.group?.colegio),
+    tipoMovimiento,
+    modulo,
+    titulo,
+    mensaje,
+    metadata,
+    creadoPor: getDisplayName(state.effectiveUser),
+    creadoPorCorreo: state.effectiveEmail,
+    fecha: serverTimestamp()
+  });
 }
 
 /* =========================================================
