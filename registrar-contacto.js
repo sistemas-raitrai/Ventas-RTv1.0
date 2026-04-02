@@ -95,17 +95,37 @@ function normalizeCursoInput(value = "") {
 
 function hasValidCursoFormat(value = "") {
   const curso = normalizeCursoInput(value);
-  return /^(?=.*\d)(?=.*[A-Z])[A-Z0-9]+$/.test(curso);
+
+  // Reglas válidas:
+  // 1 a 8  -> pueden llevar letras: 4, 4A, 8DAVINCI
+  // 9 a 11 -> para colegios con sistema americano: 9, 10, 11, 10A, 11DAVINCI
+  // Siempre todo junto y sin espacios
+  return /^(?:11|10|[1-9])[A-Z]*$/.test(curso);
 }
 
 function extractCursoNumber(value = "") {
-  const match = normalizeCursoInput(value).match(/^(\d{1,2})/);
+  const match = normalizeCursoInput(value).match(/^(11|10|[1-9])/);
   return match ? Number(match[1]) : null;
 }
 
 function extractCursoSuffix(value = "") {
-  const match = normalizeCursoInput(value).match(/^\d{1,2}(.*)$/);
+  const match = normalizeCursoInput(value).match(/^(?:11|10|[1-9])(.*)$/);
   return match ? match[1] : "";
+}
+
+function getNextCursoNumber(currentNumber) {
+  // Básica / media tradicional
+  if (currentNumber >= 1 && currentNumber <= 7) return currentNumber + 1;
+  if (currentNumber === 8) return 1;
+
+  // Sistema americano
+  if (currentNumber === 9) return 10;
+  if (currentNumber === 10) return 11;
+
+  // Tope actual permitido según tu regla
+  if (currentNumber === 11) return 11;
+
+  return null;
 }
 
 function projectCursoToYear(cursoBase = "", anoBase = getCurrentYear(), anoViaje = getCurrentYear()) {
@@ -115,15 +135,16 @@ function projectCursoToYear(cursoBase = "", anoBase = getCurrentYear(), anoViaje
   const fromYear = Number(anoBase);
   const toYear = Number(anoViaje);
 
-  if (!baseCurso || baseNumber === null || !suffix) return "";
+  if (!baseCurso || baseNumber === null) return "";
   if (!Number.isFinite(fromYear) || !Number.isFinite(toYear) || toYear < fromYear) return "";
 
   let projectedNumber = baseNumber;
   const diff = toYear - fromYear;
 
   for (let i = 0; i < diff; i += 1) {
-    projectedNumber += 1;
-    if (projectedNumber > 8) projectedNumber = 1;
+    const nextNumber = getNextCursoNumber(projectedNumber);
+    if (nextNumber === null) return "";
+    projectedNumber = nextNumber;
   }
 
   return `${projectedNumber}${suffix}`;
@@ -530,7 +551,7 @@ function validateForm(data) {
   }
 
   if (!hasValidCursoFormat(data.curso)) {
-    return "El curso debe llevar números y letras, sin espacios. Ejemplo: 4C, 3DAVINCI.";
+    return "El curso debe comenzar con un número válido (1 a 11) y luego puede llevar letras, todo junto y sin espacios. Ejemplo: 4, 4A, 8DAVINCI, 9, 10A, 11DAVINCI.";
   }
 
   if (!data.anoViaje) {
