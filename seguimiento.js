@@ -89,9 +89,11 @@ async function initPage() {
 
   onAuthStateChanged(auth, async (user) => {
     if (!user) return;
-
+  
     await bootstrapFromSession();
     renderActingUserSwitcherSimple();
+    bindHeaderActions(); // reengancha entrar como / volver a mi usuario
+  
     updateSummaryButtonsUI();
     updateSortHeaderUI();
     await loadSeguimiento();
