@@ -615,10 +615,7 @@ function renderFichaPanel() {
 }
 
 function openFichaEditor() {
-  const ficha = getFichaSummary();
-
-  // Si no está ganada y todavía no existe ficha, no dejamos entrar.
-  if (!canCreateFichaFromEstado() && !ficha.exists) {
+  if (!canCreateFichaFromEstado()) {
     alert("La ficha solo se habilita cuando el grupo está en estado GANADA.");
     return;
   }
@@ -662,10 +659,11 @@ function getFichaMainButtonMode() {
   const editable = canEditGroup();
   const vendorLocked = isVendorLockedByFlow(state.group);
 
-  // Si todavía no está ganada y no existe ficha, no se puede abrir.
-  if (!isGanada && !ficha.exists) {
+  // Regla única y coherente:
+  // la ficha solo se puede abrir cuando el grupo está GANADA.
+  if (!isGanada) {
     return {
-      label: "Crear ficha",
+      label: ficha.exists ? "Ficha bloqueada" : "Crear ficha",
       disabled: true
     };
   }
@@ -678,15 +676,15 @@ function getFichaMainButtonMode() {
     };
   }
 
-  // Si puede editar y está ganada, mantenemos crear/editar según exista o no.
-  if (editable && isGanada) {
+  // Si está ganada, crear o editar según exista.
+  if (editable) {
     return {
       label: ficha.exists ? "Editar ficha" : "Crear ficha",
       disabled: false
     };
   }
 
-  // Si no puede editar, pero ya existe ficha, al menos puede verla.
+  // Si no puede editar pero sí está ganada y ya existe, puede verla.
   if (ficha.exists) {
     return {
       label: "Ver ficha",
