@@ -1859,10 +1859,15 @@ async function initPage() {
 
   onAuthStateChanged(auth, async (user) => {
     if (!user) return;
+  
     await bootstrapFromSession();
+  
     renderHeaderState();
+    bindHeaderActions(); // ← volver a enlazar navegar como / volver a mi usuario
+  
     renderRoleButtons();
     renderVendorFilter();
+  
     await loadData();
   });
 }
