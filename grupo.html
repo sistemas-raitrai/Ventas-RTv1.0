@@ -971,7 +971,25 @@
       </aside>
 
       <section class="grupo-col">
-        <article class="grupo-panel">
+        <article class="grupo-panel" id="panelFichaViaje">
+          <div class="grupo-panel-head">
+            <div>
+              <h2 class="grupo-panel-title">Ficha de viaje</h2>
+              <p class="grupo-panel-sub">Documento operativo y administrativo del grupo</p>
+            </div>
+        
+            <div class="grupo-hero-actions" style="margin-top:0;">
+              <button class="btn-dark" id="btnCrearFicha" type="button">Abrir ficha</button>
+              <button class="btn-pill" id="btnAbrirFichaPdf" type="button">Abrir PDF</button>
+            </div>
+          </div>
+        
+          <div class="grupo-panel-body" id="panelFichaViajeBody">
+            <div class="empty-box">Cargando ficha...</div>
+          </div>
+        </article>
+        
+        <article class="grupo-panel" id="panelDatosGrupo">
           <div class="grupo-panel-head">
             <div>
               <h2 class="grupo-panel-title">Datos del grupo</h2>
@@ -981,24 +999,6 @@
           </div>
           <div class="grupo-panel-body">
             <div class="grupo-data-grid" id="datosGrupoGrid"></div>
-          </div>
-        </article>
-        
-        <article class="grupo-panel">
-          <div class="grupo-panel-head">
-            <div>
-              <h2 class="grupo-panel-title">Ficha de viaje</h2>
-              <p class="grupo-panel-sub">Documento operativo y administrativo del grupo</p>
-            </div>
-        
-            <div class="grupo-hero-actions" style="margin-top:0;">
-              <button class="btn-dark" id="btnCrearFicha" type="button">Crear / editar ficha</button>
-              <button class="btn-pill" id="btnAbrirFichaPdf" type="button">Abrir PDF</button>
-            </div>
-          </div>
-        
-          <div class="grupo-panel-body" id="panelFichaViajeBody">
-            <div class="empty-box">Cargando ficha...</div>
           </div>
         </article>
 
