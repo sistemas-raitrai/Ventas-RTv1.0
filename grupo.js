@@ -640,7 +640,7 @@ function renderFichaPanel() {
     </div>
 
     <div class="grupo-ficha-focus">
-      <div class="grupo-ficha-focus-head">Resumen rápido para ubicarte</div>
+      <div class="grupo-ficha-focus-head">Resumen</div>
 
       <div class="grupo-ficha-focus-grid">
         <div class="grupo-ficha-focus-item is-highlight">
