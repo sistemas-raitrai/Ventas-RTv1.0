@@ -81,6 +81,10 @@ function setHeaderAndScope() {
     effectiveUser: state.effectiveUser,
     users: VENTAS_USERS
   });
+
+  // Como el switcher del header puede re-renderizarse,
+  // volvemos a enlazar sus botones.
+  bindHeaderActions();
 }
 
 function getCurrentYear() {
