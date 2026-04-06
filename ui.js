@@ -112,15 +112,23 @@ export function bindLayoutButtons({
       const selectedEmail = normalizeEmail($("select-acting-user")?.value || "");
       if (typeof onActAs === "function") {
         await onActAs(selectedEmail);
+  
+        window.dispatchEvent(new CustomEvent("ventas-acting-user-changed", {
+          detail: { selectedEmail }
+        }));
       }
     });
   }
-
+  
   if (btnResetActingUser && !btnResetActingUser.dataset.bound) {
     btnResetActingUser.dataset.bound = "1";
     btnResetActingUser.addEventListener("click", async () => {
       if (typeof onResetActAs === "function") {
         await onResetActAs();
+  
+        window.dispatchEvent(new CustomEvent("ventas-acting-user-changed", {
+          detail: { selectedEmail: "" }
+        }));
       }
     });
   }
