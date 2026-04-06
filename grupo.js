@@ -527,6 +527,41 @@ function getFichaSummary() {
     ficha.estado ||
     (pdfUrl || numeroNegocio || version ? "ok" : "pendiente");
 
+  const programa =
+    cleanText(
+      ficha.nombrePrograma ||
+      state.group.programa ||
+      ""
+    );
+
+  const tramo =
+    cleanText(
+      ficha.tramo ||
+      state.group.tramo ||
+      ""
+    );
+
+  const hotel =
+    cleanText(
+      ficha.categoriaHoteleraContratada ||
+      state.group.categoriaHoteleraContratada ||
+      state.group.hotel ||
+      state.group.solicitudHotel ||
+      ""
+    );
+
+  // Fecha tentativa:
+  // 1) semanaViaje del grupo
+  // 2) fechaViajeTexto de ficha
+  // 3) fechaViaje real si existe
+  const fechaTentativa =
+    cleanText(
+      state.group.semanaViaje ||
+      ficha.fechaViajeTexto ||
+      ""
+    ) ||
+    (toDate(state.group.fechaViaje) ? formatDate(state.group.fechaViaje) : "");
+
   return {
     exists: Boolean(
       pdfUrl ||
@@ -542,7 +577,13 @@ function getFichaSummary() {
       ? formatDate(fechaActualizacion)
       : (stringValue(fechaActualizacion) || "—"),
     pdfUrl,
-    pdfNombre: pdfNombre || "PDF ficha"
+    pdfNombre: pdfNombre || "PDF ficha",
+
+    // Resumen visual rápido
+    programa: programa || "—",
+    tramo: tramo || "—",
+    hotel: hotel || "—",
+    fechaTentativa: fechaTentativa || "—"
   };
 }
 
@@ -598,7 +639,33 @@ function renderFichaPanel() {
       </div>
     </div>
 
-    <div class="info-stack" style="margin-top:14px;">
+    <div class="grupo-ficha-focus">
+      <div class="grupo-ficha-focus-head">Resumen rápido para ubicarte</div>
+
+      <div class="grupo-ficha-focus-grid">
+        <div class="grupo-ficha-focus-item is-highlight">
+          <div class="grupo-ficha-focus-label">Programa</div>
+          <div class="grupo-ficha-focus-value">${escapeHtml(ficha.programa)}</div>
+        </div>
+
+        <div class="grupo-ficha-focus-item">
+          <div class="grupo-ficha-focus-label">Tramo</div>
+          <div class="grupo-ficha-focus-value">${escapeHtml(ficha.tramo)}</div>
+        </div>
+
+        <div class="grupo-ficha-focus-item">
+          <div class="grupo-ficha-focus-label">Hotel</div>
+          <div class="grupo-ficha-focus-value">${escapeHtml(ficha.hotel)}</div>
+        </div>
+
+        <div class="grupo-ficha-focus-item is-highlight">
+          <div class="grupo-ficha-focus-label">Fecha tentativa</div>
+          <div class="grupo-ficha-focus-value">${escapeHtml(ficha.fechaTentativa)}</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="info-stack" style="margin-top:16px;">
       <div class="info-item">
         <div class="info-label">PDF ficha</div>
         <div class="info-value">
@@ -610,6 +677,10 @@ function renderFichaPanel() {
         <div class="info-label">Regla de habilitación</div>
         <div class="info-value">${escapeHtml(regla)}</div>
       </div>
+    </div>
+
+    <div class="grupo-ficha-note">
+      Este bloque resume los datos más importantes de la ficha para ubicarte rápido sin tener que leer todo el grupo.
     </div>
   `;
 }
