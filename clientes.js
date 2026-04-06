@@ -293,6 +293,10 @@ function isAdminOnly() {
   return isAdminRole(state.effectiveUser);
 }
 
+function getCurrentYear() {
+  return new Date().getFullYear();
+}
+
 function buildScopeText() {
   let text = "Clientes · Macro general de cotizaciones";
 
