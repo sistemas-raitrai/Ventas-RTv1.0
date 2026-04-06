@@ -2856,14 +2856,19 @@ async function importXlsx(file) {
     let createdCount = 0;
     let updatedCount = 0;
     let processed = 0;
-
-    for (const rowObj of rawRows) {
+    let skippedCount = 0;
+    const skippedConflicts = [];
+    
+    for (let rowIndex = 0; rowIndex < rawRows.length; rowIndex += 1) {
+      const rowObj = rawRows[rowIndex];
+      const rowNumber = rowIndex + 2; // +2 considerando encabezado XLSX + índice base 0
+    
       const payload = rowToFieldPayload(rowObj, carteraCache, importBaseYear);
       const existingId = findExistingDocId(payload, codeIndex);
-
+    
       let ref;
       let isNew = false;
-
+    
       if (existingId) {
         ref = doc(db, "ventas_cotizaciones", String(existingId));
       } else {
@@ -2872,20 +2877,20 @@ async function importXlsx(file) {
         ref = doc(db, "ventas_cotizaciones", newSequentialId);
         isNew = true;
       }
-
+    
       const snap = await getDoc(ref);
       const currentData = snap.exists() ? (snap.data() || {}) : {};
-
+    
       const mergedForDerivation = {
         ...currentData,
         ...payload
       };
-
+    
       const derived = deriveCursoAliasFields(
         mergedForDerivation,
         getAnoBaseForAlias(mergedForDerivation, importBaseYear)
       );
-
+    
       const finalPayload = {
         ...payload,
         ...derived,
@@ -2894,45 +2899,60 @@ async function importXlsx(file) {
         actualizadoPorCorreo: normalizeEmail(state.realUser?.email || ""),
         fechaActualizacion: serverTimestamp()
       };
-
+    
       finalPayload.codigoRegistro =
         normalizeText(finalPayload.codigoRegistro) ||
         normalizeText(currentData.codigoRegistro) ||
         buildCodigoRegistro(finalPayload.idGrupo);
-
+    
       if (!normalizeText(finalPayload.anoBaseCurso)) {
         finalPayload.anoBaseCurso = String(
           getAnoBaseForAlias(finalPayload, importBaseYear)
         );
       }
-
+    
       const nextTripKey = normalizeText(finalPayload.aliasTripKey || "");
       const previousTripKey = buildTripKeyFromExistingDoc(currentData, importBaseYear);
       const ownerId = nextTripKey ? aliasIndex.get(nextTripKey) : "";
-      
+    
       if (nextTripKey && ownerId && String(ownerId) !== String(ref.id)) {
         const ownerRow = state.rowsRaw.find(r => String(r.id) === String(ownerId));
         const ownerData = ownerRow?.data || {};
-      
-        throw new Error(
-          `Conflicto al importar: ya existe un grupo para ${finalPayload.cursoViaje || finalPayload.curso} (${finalPayload.anoViaje}) en ${finalPayload.colegio}. ` +
-          `Debes importar esta fila con el idGrupo o código del registro existente si lo que quieres es actualizarlo. ` +
-          `Registro en conflicto: ID ${ownerId}${ownerData.codigoRegistro ? ` · ${normalizeText(ownerData.codigoRegistro)}` : ""}.`
-        );
+    
+        skippedCount += 1;
+        skippedConflicts.push({
+          rowNumber,
+          colegio: normalizeText(finalPayload.colegio || ""),
+          cursoViaje: normalizeText(finalPayload.cursoViaje || finalPayload.curso || ""),
+          anoViaje: normalizeText(finalPayload.anoViaje || ""),
+          conflictId: String(ownerId),
+          conflictCode: normalizeText(ownerData.codigoRegistro || "")
+        });
+    
+        processed += 1;
+        const pct = 35 + Math.round((processed / rawRows.length) * 65);
+        setProgressStatus({
+          text: "Importando XLSX.",
+          meta: `Procesados: ${processed}/${rawRows.length} · Omitidos por conflicto: ${skippedCount}`,
+          progress: pct,
+          type: "warning"
+        });
+    
+        continue;
       }
-
+    
       if (isNew || !snap.exists()) {
         finalPayload.creadoPor = getNombreUsuario(state.effectiveUser);
         finalPayload.creadoPorCorreo = normalizeEmail(state.realUser?.email || "");
         finalPayload.fechaCreacion = serverTimestamp();
-
+    
         await setDoc(ref, finalPayload, { merge: true });
         createdCount += 1;
       } else {
         await setDoc(ref, finalPayload, { merge: true });
         updatedCount += 1;
       }
-
+    
       if (
         previousTripKey &&
         previousTripKey !== nextTripKey &&
@@ -2940,35 +2960,50 @@ async function importXlsx(file) {
       ) {
         aliasIndex.delete(previousTripKey);
       }
-
+    
       if (nextTripKey) {
         aliasIndex.set(nextTripKey, String(ref.id));
       }
-
+    
       const finalCode = normalizeText(finalPayload.codigoRegistro || "");
       if (finalCode) {
         codeIndex.set(finalCode, String(ref.id));
       }
-
+    
       processed += 1;
       const pct = 35 + Math.round((processed / rawRows.length) * 65);
       setProgressStatus({
         text: "Importando XLSX.",
-        meta: `Procesados: ${processed}/${rawRows.length}`,
+        meta: `Procesados: ${processed}/${rawRows.length}${skippedCount ? ` · Omitidos por conflicto: ${skippedCount}` : ""}`,
         progress: pct
       });
     }
-
+    
     setProgressStatus({
-      text: "Importación lista.",
-      meta: `${createdCount} nuevos · ${updatedCount} actualizados · ${rawRows.length} total`,
+      text: skippedCount ? "Importación lista con observaciones." : "Importación lista.",
+      meta: `${createdCount} nuevos · ${updatedCount} actualizados · ${skippedCount} omitidos por conflicto · ${rawRows.length} total`,
       progress: 100,
-      type: "success"
+      type: skippedCount ? "warning" : "success"
     });
     clearProgressStatus({}, 3000);
-
+    
     $("fileInputXlsx").value = "";
     await loadData();
+    
+    if (skippedConflicts.length) {
+      const detalle = skippedConflicts
+        .slice(0, 20)
+        .map(item =>
+          `Fila ${item.rowNumber}: ${item.cursoViaje} (${item.anoViaje}) en ${item.colegio} → conflicto con ID ${item.conflictId}${item.conflictCode ? ` · ${item.conflictCode}` : ""}`
+        )
+        .join("\n");
+    
+      alert(
+        `El import terminó, pero se omitieron ${skippedConflicts.length} fila(s) por conflicto.\n\n` +
+        `${detalle}` +
+        `${skippedConflicts.length > 20 ? "\n\nSe muestran solo las primeras 20." : ""}`
+      );
+    }
   } catch (error) {
     console.error(error);
     setProgressStatus({
