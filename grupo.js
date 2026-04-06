@@ -552,6 +552,7 @@ function renderFichaPanel() {
 
   const ficha = getFichaSummary();
   const isGanada = canCreateFichaFromEstado();
+  const vendorLocked = isVendorLockedByFlow(state.group);
 
   if (!isGanada && !ficha.exists) {
     box.innerHTML = `
@@ -560,6 +561,18 @@ function renderFichaPanel() {
       </div>
     `;
     return;
+  }
+
+  let regla = "La ficha solo puede crearse cuando el grupo está Ganada.";
+
+  if (isGanada) {
+    regla = ficha.exists
+      ? "Este grupo ya tiene ficha y puedes entrar a revisarla."
+      : "Este grupo ya puede crear su ficha.";
+  }
+
+  if (vendorLocked) {
+    regla = "La ficha ya fue firmada por vendedor(a). Desde este portafolio solo se puede ver.";
   }
 
   box.innerHTML = `
@@ -595,20 +608,17 @@ function renderFichaPanel() {
 
       <div class="info-item">
         <div class="info-label">Regla de habilitación</div>
-        <div class="info-value">
-          ${
-            isGanada
-              ? "Este grupo ya puede crear o editar ficha."
-              : "La ficha solo puede crearse cuando el grupo está Ganada."
-          }
-        </div>
+        <div class="info-value">${escapeHtml(regla)}</div>
       </div>
     </div>
   `;
 }
 
 function openFichaEditor() {
-  if (!canCreateFichaFromEstado()) {
+  const ficha = getFichaSummary();
+
+  // Si no está ganada y todavía no existe ficha, no dejamos entrar.
+  if (!canCreateFichaFromEstado() && !ficha.exists) {
     alert("La ficha solo se habilita cuando el grupo está en estado GANADA.");
     return;
   }
@@ -627,6 +637,69 @@ function openFichaPdf() {
   window.open(ficha.pdfUrl, "_blank", "noopener");
 }
 
+function prioritizeFichaPanelInLayout() {
+  const fichaPanel = $("panelFichaViaje");
+  const datosPanel = $("panelDatosGrupo");
+
+  if (!fichaPanel || !datosPanel) return;
+  if (!fichaPanel.parentElement || fichaPanel.parentElement !== datosPanel.parentElement) return;
+
+  const parent = fichaPanel.parentElement;
+
+  // Si está ganada, la ficha pasa a ser más importante visualmente.
+  if (normalizeState(state.group?.estado) === "ganada") {
+    parent.insertBefore(fichaPanel, datosPanel);
+    return;
+  }
+
+  // En cualquier otro estado, dejamos primero los datos.
+  parent.insertBefore(datosPanel, fichaPanel);
+}
+
+function getFichaMainButtonMode() {
+  const ficha = getFichaSummary();
+  const isGanada = canCreateFichaFromEstado();
+  const editable = canEditGroup();
+  const vendorLocked = isVendorLockedByFlow(state.group);
+
+  // Si todavía no está ganada y no existe ficha, no se puede abrir.
+  if (!isGanada && !ficha.exists) {
+    return {
+      label: "Crear ficha",
+      disabled: true
+    };
+  }
+
+  // Si el vendedor ya firmó, desde grupo solo debe verla.
+  if (vendorLocked) {
+    return {
+      label: "Ver ficha",
+      disabled: false
+    };
+  }
+
+  // Si puede editar y está ganada, mantenemos crear/editar según exista o no.
+  if (editable && isGanada) {
+    return {
+      label: ficha.exists ? "Editar ficha" : "Crear ficha",
+      disabled: false
+    };
+  }
+
+  // Si no puede editar, pero ya existe ficha, al menos puede verla.
+  if (ficha.exists) {
+    return {
+      label: "Ver ficha",
+      disabled: false
+    };
+  }
+
+  return {
+    label: "Crear ficha",
+    disabled: true
+  };
+}
+
 /* =========================================================
    RENDER
 ========================================================= */
@@ -639,6 +712,10 @@ function renderGroup() {
   renderMeetings();
   renderAlerts();
   renderHistory();
+
+  // Reordena visualmente los paneles para priorizar ficha cuando el grupo está ganada
+  prioritizeFichaPanelInLayout();
+
   syncButtons();
 }
 
@@ -1019,7 +1096,12 @@ function syncButtons() {
   }
 
   const btnFicha = $("btnCrearFicha");
-  if (btnFicha) btnFicha.disabled = !editable || !isGanada;
+  if (btnFicha) {
+    const fichaButtonMode = getFichaMainButtonMode();
+  
+    btnFicha.textContent = fichaButtonMode.label;
+    btnFicha.disabled = fichaButtonMode.disabled;
+  }
 
   const btnAbrirFichaPdf = $("btnAbrirFichaPdf");
   if (btnAbrirFichaPdf) btnAbrirFichaPdf.disabled = !ficha.pdfUrl;
