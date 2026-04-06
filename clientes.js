@@ -635,21 +635,33 @@ function sanitizeImportKey(rawKey = "") {
         SE RESPETA TAL CUAL
         Ej: anoViaje, codigoRegistro, origenColegio, vendedoraCorreo
   ========================================================= */
-  if (BASE_COLUMNS.includes(original)) {
-    return original;
-  }
+if (BASE_COLUMNS.includes(original)) {
+  return original;
+}
 
-  /* =========================================================
-     2) SI EL HEADER PARECE UNA KEY INTERNA VÁLIDA
-        (camelCase, snake_case o anidada con punto),
-        también se respeta tal cual.
-        Esto ayuda a reimportar columnas dinámicas exportadas
-        por el propio sistema.
-  ========================================================= */
-  const looksLikeInternalKey = /^[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)*$/.test(original);
-  if (looksLikeInternalKey && !/\s/.test(original)) {
-    return original;
-  }
+/* =========================================================
+   1.5) SI EL HEADER COINCIDE CON UNA KEY BASE PERO CON OTRA
+        CAPITALIZACIÓN, devolvemos la key oficial del sistema.
+        Ej: Curso -> curso, AliasGrupo -> aliasGrupo
+========================================================= */
+const baseColumnInsensitive = BASE_COLUMNS.find(
+  (col) => normalizeSearch(col) === normalizeSearch(original)
+);
+if (baseColumnInsensitive) {
+  return baseColumnInsensitive;
+}
+
+/* =========================================================
+   2) SI EL HEADER PARECE UNA KEY INTERNA VÁLIDA
+      (camelCase, snake_case o anidada con punto),
+      también se respeta tal cual.
+      Esto ayuda a reimportar columnas dinámicas exportadas
+      por el propio sistema.
+========================================================= */
+const looksLikeInternalKey = /^[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)*$/.test(original);
+if (looksLikeInternalKey && !/\s/.test(original)) {
+  return original;
+}
 
   /* =========================================================
      3) ALIAS HUMANOS / VARIANTES MANUALES
@@ -2788,7 +2800,7 @@ function rowToFieldPayload(rowObj, carteraCache = { byExact: new Map(), entries:
     if (IMPORT_IGNORE_KEYS.has(key)) return;
   
     // Estos campos se recalculan internamente.
-    // Si vienen en el XLSX y están viejos, no deben entrar al payload.
+    // No deben entrar desde el XLSX porque pueden venir desfasados.
     if (DERIVED_IMPORT_KEYS.has(key)) return;
   
     const value = parseImportedValue(key, rawValue);
