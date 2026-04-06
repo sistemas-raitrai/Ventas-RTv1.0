@@ -1792,15 +1792,33 @@ function deriveCursoAliasFields(data = {}, fallbackYear = getCurrentYear()) {
   if (!hasValidCursoFormatForAlias(cursoBase)) return {};
 
   const anoBase = getAnoBaseForAlias(data, fallbackYear);
-  
-  // IMPORTANTE:
-  // cursoViaje SIEMPRE se recalcula desde curso + anoBase + anoViaje.
-  // No reutilizamos data.cursoViaje porque si viene viejo desde el XLSX,
-  // deja alias y tripKey desfasados.
+
+  // Mantener la lógica histórica/actual como estaba bien para 2025 y 2026:
+  // alias corto = CURSO (AÑO VIAJE) COLEGIO
+  // y el tripKey usa ese mismo curso.
+  if (Number(anoViaje) <= getCurrentYear()) {
+    const cursoViaje = cursoBase;
+    const aliasGrupo = `${cursoBase} (${anoViaje}) ${colegio}`.trim();
+    const aliasTripKey = buildAliasTripKeyForRow({
+      colegio,
+      cursoViaje,
+      anoViaje
+    });
+
+    return {
+      curso: cursoBase,
+      anoBaseCurso: String(anoBase),
+      cursoViaje,
+      aliasGrupo,
+      aliasTripKey
+    };
+  }
+
+  // Para años futuros sí usamos proyección
   const cursoViaje = normalizeCursoForAlias(
     projectCursoForAlias(cursoBase, anoBase, anoViaje)
   );
-  
+
   if (!cursoViaje) return {};
 
   const aliasGrupo =
