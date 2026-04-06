@@ -2909,10 +2909,15 @@ async function importXlsx(file) {
       const nextTripKey = normalizeText(finalPayload.aliasTripKey || "");
       const previousTripKey = buildTripKeyFromExistingDoc(currentData, importBaseYear);
       const ownerId = nextTripKey ? aliasIndex.get(nextTripKey) : "";
-
+      
       if (nextTripKey && ownerId && String(ownerId) !== String(ref.id)) {
+        const ownerRow = state.rowsRaw.find(r => String(r.id) === String(ownerId));
+        const ownerData = ownerRow?.data || {};
+      
         throw new Error(
-          `Conflicto al importar: ya existe un grupo para ${finalPayload.cursoViaje || finalPayload.curso} (${finalPayload.anoViaje}) en ${finalPayload.colegio}.`
+          `Conflicto al importar: ya existe un grupo para ${finalPayload.cursoViaje || finalPayload.curso} (${finalPayload.anoViaje}) en ${finalPayload.colegio}. ` +
+          `Debes importar esta fila con el idGrupo o código del registro existente si lo que quieres es actualizarlo. ` +
+          `Registro en conflicto: ID ${ownerId}${ownerData.codigoRegistro ? ` · ${normalizeText(ownerData.codigoRegistro)}` : ""}.`
         );
       }
 
