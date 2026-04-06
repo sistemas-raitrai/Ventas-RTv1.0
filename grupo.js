@@ -640,27 +640,27 @@ function renderFichaPanel() {
     </div>
 
     <div class="grupo-ficha-focus">
-      <div class="grupo-ficha-focus-head">Resumen</div>
+      <div class="grupo-ficha-focus-head">Resumen rápido para ubicarte</div>
 
       <div class="grupo-ficha-focus-grid">
         <div class="grupo-ficha-focus-item is-highlight">
           <div class="grupo-ficha-focus-label">Programa</div>
-          <div class="grupo-ficha-focus-value">${escapeHtml(ficha.programa)}</div>
+          <div class="grupo-ficha-focus-value">${escapeHtml(ficha.programa || "—")}</div>
         </div>
 
         <div class="grupo-ficha-focus-item">
           <div class="grupo-ficha-focus-label">Tramo</div>
-          <div class="grupo-ficha-focus-value">${escapeHtml(ficha.tramo)}</div>
+          <div class="grupo-ficha-focus-value">${escapeHtml(ficha.tramo || "—")}</div>
         </div>
 
         <div class="grupo-ficha-focus-item">
           <div class="grupo-ficha-focus-label">Hotel</div>
-          <div class="grupo-ficha-focus-value">${escapeHtml(ficha.hotel)}</div>
+          <div class="grupo-ficha-focus-value">${escapeHtml(ficha.hotel || "—")}</div>
         </div>
 
         <div class="grupo-ficha-focus-item is-highlight">
           <div class="grupo-ficha-focus-label">Fecha tentativa</div>
-          <div class="grupo-ficha-focus-value">${escapeHtml(ficha.fechaTentativa)}</div>
+          <div class="grupo-ficha-focus-value">${escapeHtml(ficha.fechaTentativa || "—")}</div>
         </div>
       </div>
     </div>
@@ -680,7 +680,7 @@ function renderFichaPanel() {
     </div>
 
     <div class="grupo-ficha-note">
-      Este bloque resume los datos más importantes de la ficha para ubicarte rápido sin tener que leer todo el grupo.
+      <strong>Tip visual:</strong> aquí quedan arriba los datos que más necesitas para ubicarte rápido, sin tener que leer toda la ficha ni todo el grupo.
     </div>
   `;
 }
@@ -897,22 +897,40 @@ function renderSituacion() {
   setText("situacionAutorizacion", state.group.autorizada ? "Autorizada" : "No autorizada");
   setText("situacionCierre", state.group.cerrada ? "Cerrada" : "Abierta");
   setText("situacionProximoPaso", getByPath(state.group, "situacion.proximoPaso") || "—");
+  setText("situacionUltimoCambioEstado", fechaCambioEstadoTxt);
 
-  renderRichText(
-    "situacionObsAdmin",
+  const obsAdmin = sanitizeRichHtml(
     getByPath(state.group, "situacion.observacionAdministracion") ||
     state.group.observacionesAdministracion ||
     ""
-  );
+  ) || "—";
 
-  renderRichText(
-    "situacionObsOperaciones",
+  const obsOps = sanitizeRichHtml(
     getByPath(state.group, "situacion.observacionOperaciones") ||
     state.group.observacionesOperaciones ||
     ""
-  );
+  ) || "—";
 
-  setText("situacionUltimoCambioEstado", fechaCambioEstadoTxt);
+  const adminEl = $("situacionObsAdmin");
+  const opsEl = $("situacionObsOperaciones");
+
+  if (adminEl) {
+    adminEl.innerHTML = `
+      <div class="obs-box admin">
+        <div class="obs-title">Observaciones para administración</div>
+        <div class="obs-body">${obsAdmin}</div>
+      </div>
+    `;
+  }
+
+  if (opsEl) {
+    opsEl.innerHTML = `
+      <div class="obs-box ops">
+        <div class="obs-title">Observaciones para operaciones</div>
+        <div class="obs-body">${obsOps}</div>
+      </div>
+    `;
+  }
 
   const box = $("panelProximaReunion");
   if (!box) return;
@@ -924,24 +942,14 @@ function renderSituacion() {
   }
 
   box.innerHTML = `
-    <div class="info-item">
-      <div class="info-label">Fecha</div>
-      <div class="info-value">${escapeHtml(formatDateTime(nextMeeting.fechaInicio))}</div>
-    </div>
-
-    <div class="info-item">
-      <div class="info-label">Tipo</div>
-      <div class="info-value">${escapeHtml(capitalize(nextMeeting.tipo || "—"))}</div>
-    </div>
-
-    <div class="info-item">
-      <div class="info-label">Lugar / link</div>
-      <div class="info-value">${escapeHtml(meetingPlaceLabel(nextMeeting))}</div>
-    </div>
-
-    <div class="info-item">
-      <div class="info-label">Observaciones</div>
-      <div class="info-value">${escapeHtml(nextMeeting.observaciones || "Sin observaciones")}</div>
+    <div class="obs-box">
+      <div class="obs-title">Próxima reunión agendada</div>
+      <div class="obs-body">
+        <p><strong>Fecha:</strong> ${escapeHtml(formatDateTime(nextMeeting.fechaInicio))}</p>
+        <p><strong>Tipo:</strong> ${escapeHtml(capitalize(nextMeeting.tipo || "—"))}</p>
+        <p><strong>Lugar / link:</strong> ${escapeHtml(meetingPlaceLabel(nextMeeting))}</p>
+        <p><strong>Observaciones:</strong> ${escapeHtml(nextMeeting.observaciones || "Sin observaciones")}</p>
+      </div>
     </div>
   `;
 }
@@ -951,18 +959,18 @@ function renderDatos() {
   if (!grid) return;
 
   const items = [
-    itemData("Colegio", state.group.colegio),
+    itemData("Colegio", state.group.colegio, true),
     itemData("Curso", state.group.curso),
     itemData("Año viaje", state.group.anoViaje),
     itemData("Cantidad grupo", state.group.cantidadGrupo),
 
-    itemData("Destino principal", state.group.destinoPrincipal),
+    itemData("Destino principal", state.group.destinoPrincipal, true),
     itemData("Programa", state.group.programa, true),
     itemData("Tramo", state.group.tramo),
     itemData("Semana viaje", state.group.semanaViaje),
-
     itemData("Comuna / ciudad", state.group.comunaCiudad),
-    itemData("Vendedor(a)", state.group.vendedora || state.group.vendedoraCorreo),
+
+    itemData("Vendedor(a)", state.group.vendedora || state.group.vendedoraCorreo, true),
 
     itemData("1° Contacto", state.group.nombreCliente),
     itemData("Rol 1° Contacto", state.group.rolCliente),
@@ -975,12 +983,12 @@ function renderDatos() {
     itemData("Celular 2° Contacto", state.group.celularCliente2)
   ];
 
+  grid.className = "grupo-data-card-grid";
+
   grid.innerHTML = items.map((item) => `
-    <div class="${item.full ? "full" : ""}">
-      <div class="info-item">
-        <div class="info-label">${escapeHtml(item.label)}</div>
-        <div class="info-value">${escapeHtml(item.value || "—")}</div>
-      </div>
+    <div class="grupo-data-card ${item.full ? "full is-strong" : ""}">
+      <div class="info-label">${escapeHtml(item.label)}</div>
+      <div class="info-value">${escapeHtml(item.value || "—")}</div>
     </div>
   `).join("");
 }
