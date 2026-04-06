@@ -152,6 +152,13 @@ const IMPORT_IGNORE_KEYS = new Set([
   "fechaActualizacion"
 ]);
 
+const DERIVED_IMPORT_KEYS = new Set([
+  "anoBaseCurso",
+  "cursoViaje",
+  "aliasGrupo",
+  "aliasTripKey"
+]);
+
 const ARRAY_KEYS = new Set([
   "destinosSecundarios"
 ]);
@@ -1773,10 +1780,15 @@ function deriveCursoAliasFields(data = {}, fallbackYear = getCurrentYear()) {
   if (!hasValidCursoFormatForAlias(cursoBase)) return {};
 
   const anoBase = getAnoBaseForAlias(data, fallbackYear);
+  
+  // IMPORTANTE:
+  // cursoViaje SIEMPRE se recalcula desde curso + anoBase + anoViaje.
+  // No reutilizamos data.cursoViaje porque si viene viejo desde el XLSX,
+  // deja alias y tripKey desfasados.
   const cursoViaje = normalizeCursoForAlias(
-    data.cursoViaje || projectCursoForAlias(cursoBase, anoBase, anoViaje)
+    projectCursoForAlias(cursoBase, anoBase, anoViaje)
   );
-
+  
   if (!cursoViaje) return {};
 
   const aliasGrupo =
@@ -2774,7 +2786,11 @@ function rowToFieldPayload(rowObj, carteraCache = { byExact: new Map(), entries:
     const key = sanitizeImportKey(rawKey);
     if (!key) return;
     if (IMPORT_IGNORE_KEYS.has(key)) return;
-
+  
+    // Estos campos se recalculan internamente.
+    // Si vienen en el XLSX y están viejos, no deben entrar al payload.
+    if (DERIVED_IMPORT_KEYS.has(key)) return;
+  
     const value = parseImportedValue(key, rawValue);
     setNestedValue(payload, key, value);
   });
@@ -2992,16 +3008,23 @@ async function importXlsx(file) {
     
     if (skippedConflicts.length) {
       const detalle = skippedConflicts
-        .slice(0, 20)
         .map(item =>
-          `Fila ${item.rowNumber}: ${item.cursoViaje} (${item.anoViaje}) en ${item.colegio} → conflicto con ID ${item.conflictId}${item.conflictCode ? ` · ${item.conflictCode}` : ""}`
+          `Fila ${item.rowNumber}: ${item.cursoViaje} (${item.anoViaje}) en ${item.colegio} -> conflicto con ID ${item.conflictId}${item.conflictCode ? ` · ${item.conflictCode}` : ""}`
         )
         .join("\n");
     
-      alert(
-        `El import terminó, pero se omitieron ${skippedConflicts.length} fila(s) por conflicto.\n\n` +
-        `${detalle}` +
-        `${skippedConflicts.length > 20 ? "\n\nSe muestran solo las primeras 20." : ""}`
+      const textoCopiable =
+        `OMITIDOS POR CONFLICTO\n` +
+        `Total: ${skippedConflicts.length}\n\n` +
+        detalle;
+    
+      try {
+        await navigator.clipboard.writeText(textoCopiable);
+      } catch {}
+    
+      window.prompt(
+        `Se omitieron ${skippedConflicts.length} fila(s). El detalle${navigator.clipboard ? " fue copiado al portapapeles y además" : ""} queda aquí para copiar:`,
+        textoCopiable
       );
     }
   } catch (error) {
