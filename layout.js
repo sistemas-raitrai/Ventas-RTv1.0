@@ -4,6 +4,7 @@ const page = document.body.dataset.page || "";
 
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.7.3/firebase-auth.js";
 import { auth, getVentasUser } from "./firebase-init.js";
+import { getEffectiveUser } from "./roles.js";
 
 const menuItems = [
   {
@@ -193,6 +194,16 @@ function updateLayoutUser(user) {
   }));
 }
 
+function resolveLayoutUser() {
+  const effectiveUser = getEffectiveUser();
+  if (effectiveUser) return effectiveUser;
+
+  const firebaseUser = auth.currentUser;
+  if (!firebaseUser?.email) return null;
+
+  return getVentasUser(firebaseUser.email || "") || null;
+}
+
 function mountLayoutTop() {
   const slot = document.getElementById("layout-top");
   if (!slot) return;
@@ -203,9 +214,12 @@ function mountLayoutTop() {
     detail: { user: null }
   }));
 
-  onAuthStateChanged(auth, (firebaseUser) => {
-    const ventasUser = firebaseUser ? getVentasUser(firebaseUser.email || "") : null;
-    updateLayoutUser(ventasUser);
+  onAuthStateChanged(auth, () => {
+    updateLayoutUser(resolveLayoutUser());
+  });
+  
+  window.addEventListener("ventas-acting-user-changed", () => {
+    updateLayoutUser(resolveLayoutUser());
   });
 }
 
