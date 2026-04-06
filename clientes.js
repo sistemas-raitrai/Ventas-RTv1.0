@@ -1663,6 +1663,17 @@ function normalizeCursoForAlias(value = "") {
   return normalizeText(value).toUpperCase().replace(/\s+/g, "");
 }
 
+function hasValidCursoFormatForAlias(value = "") {
+  const curso = normalizeCursoForAlias(value);
+
+  // Válidos:
+  // 1 a 8   -> básica / media tradicional
+  // 9 a 11  -> colegios con sistema americano
+  // Puede venir solo número o número + letras
+  // Ej: 4, 4A, 8DAVINCI, 9, 10A, 11DAVINCI
+  return /^(?:11|10|[1-9])[A-Z]*$/.test(curso);
+}
+
 function getYearFromValue(value) {
   if (typeof value === "number" && Number.isFinite(value)) return value;
 
@@ -1674,7 +1685,7 @@ function getYearFromValue(value) {
   return Number.isFinite(year) ? year : null;
 }
 
-function getAnoBaseForAlias(data = {}) {
+function getAnoBaseForAlias(data = {}, fallbackYear = getCurrentYear()) {
   const explicit = getYearFromValue(data.anoBaseCurso);
   if (explicit) return explicit;
 
@@ -1688,22 +1699,37 @@ function getAnoBaseForAlias(data = {}) {
     return updated.getFullYear();
   }
 
+  const fallback = getYearFromValue(fallbackYear);
+  if (fallback) return fallback;
+
   const tripYear = getYearFromValue(data.anoViaje);
-  if (!tripYear) return null;
+  if (tripYear) return tripYear;
 
-  if (tripYear <= 2026) return tripYear;
-
-  return tripYear - 1;
+  return getCurrentYear();
 }
 
 function extractCursoNumberForAlias(value = "") {
-  const match = normalizeCursoForAlias(value).match(/^(\d{1,2})/);
+  const match = normalizeCursoForAlias(value).match(/^(11|10|[1-9])/);
   return match ? Number(match[1]) : null;
 }
 
 function extractCursoSuffixForAlias(value = "") {
-  const match = normalizeCursoForAlias(value).match(/^\d{1,2}(.*)$/);
+  const match = normalizeCursoForAlias(value).match(/^(?:11|10|[1-9])(.*)$/);
   return match ? match[1] : "";
+}
+
+function getNextCursoNumberForAlias(currentNumber) {
+  if (currentNumber >= 1 && currentNumber <= 7) return currentNumber + 1;
+  if (currentNumber === 8) return 1;
+
+  if (currentNumber === 9) return 10;
+  if (currentNumber === 10) return 11;
+
+  // Por ahora 11 queda en 11.
+  // Si después quieres otra regla, se cambia aquí.
+  if (currentNumber === 11) return 11;
+
+  return null;
 }
 
 function projectCursoForAlias(cursoBase = "", anoBase = null, anoViaje = null) {
@@ -1711,7 +1737,7 @@ function projectCursoForAlias(cursoBase = "", anoBase = null, anoViaje = null) {
   const baseNumber = extractCursoNumberForAlias(baseCurso);
   const suffix = extractCursoSuffixForAlias(baseCurso);
 
-  if (!baseCurso || baseNumber === null || !suffix) return "";
+  if (!baseCurso || baseNumber === null) return "";
   if (!Number.isFinite(Number(anoBase)) || !Number.isFinite(Number(anoViaje))) return "";
 
   let projected = baseNumber;
@@ -1720,66 +1746,141 @@ function projectCursoForAlias(cursoBase = "", anoBase = null, anoViaje = null) {
   if (diff < 0) return "";
 
   for (let i = 0; i < diff; i += 1) {
-    projected += 1;
-    if (projected > 8) projected = 1;
+    const next = getNextCursoNumberForAlias(projected);
+    if (next === null) return "";
+    projected = next;
   }
 
   return `${projected}${suffix}`;
 }
 
-function buildAliasGrupoForRow(data = {}) {
+function buildAliasTripKeyForRow({ colegio = "", cursoViaje = "", anoViaje = "" } = {}) {
+  return normalizeSearch(
+    `${normalizeText(colegio)}__${normalizeCursoForAlias(cursoViaje)}__${normalizeText(anoViaje)}`
+  );
+}
+
+function deriveCursoAliasFields(data = {}, fallbackYear = getCurrentYear()) {
   const colegio = normalizeText(data.colegio || "");
   const cursoBase = normalizeCursoForAlias(data.curso || "");
   const anoViaje = getYearFromValue(data.anoViaje);
 
-  if (!colegio || !cursoBase || !anoViaje) return "";
+  if (!colegio || !cursoBase || !anoViaje) return {};
+  if (!hasValidCursoFormatForAlias(cursoBase)) return {};
 
-  // Regla:
-  // 2025 y 2026 => alias corto
-  if (anoViaje <= 2026) {
-    return `${cursoBase} (${anoViaje}) ${colegio}`.trim();
-  }
-
-  const anoBase = getAnoBaseForAlias(data);
-  if (!anoBase) {
-    return `${cursoBase} (${anoViaje}) ${colegio}`.trim();
-  }
-
+  const anoBase = getAnoBaseForAlias(data, fallbackYear);
   const cursoViaje = normalizeCursoForAlias(
     data.cursoViaje || projectCursoForAlias(cursoBase, anoBase, anoViaje)
   );
 
-  if (!cursoViaje || anoBase >= anoViaje) {
-    return `${cursoBase} (${anoViaje}) ${colegio}`.trim();
-  }
+  if (!cursoViaje) return {};
 
-  return `${cursoBase} (${anoBase}) ${cursoViaje} (${anoViaje}) ${colegio}`.trim();
+  const aliasGrupo =
+    Number(anoBase) === Number(anoViaje)
+      ? `${cursoBase} (${anoBase}) ${colegio}`.trim()
+      : `${cursoBase} (${anoBase}) ${cursoViaje} (${anoViaje}) ${colegio}`.trim();
+
+  const aliasTripKey = buildAliasTripKeyForRow({
+    colegio,
+    cursoViaje,
+    anoViaje
+  });
+
+  return {
+    curso: cursoBase,
+    anoBaseCurso: String(anoBase),
+    cursoViaje,
+    aliasGrupo,
+    aliasTripKey
+  };
 }
 
-async function backfillAliasGrupo() {
+function buildAliasGrupoForRow(data = {}, fallbackYear = getCurrentYear()) {
+  return deriveCursoAliasFields(data, fallbackYear).aliasGrupo || "";
+}
+
+function buildTripKeyFromExistingDoc(data = {}, fallbackYear = getCurrentYear()) {
+  const explicit = normalizeText(data.aliasTripKey || "");
+  if (explicit) return normalizeSearch(explicit);
+
+  return normalizeSearch(
+    deriveCursoAliasFields(data, fallbackYear).aliasTripKey || ""
+  );
+}
+
+async function backfillCursoAliasTripKey() {
   if (!isAdminOnly()) return;
 
   try {
     setProgressStatus({
-      text: "Completando alias...",
-      meta: "Leyendo registros existentes...",
+      text: "Corrigiendo curso y alias...",
+      meta: "Preparando recálculo...",
       progress: 10
     });
+
+    const derivedMap = new Map();
+    const tripKeyOwners = new Map();
+    const conflicts = [];
+
+    state.rowsRaw.forEach(({ id, data }) => {
+      const currentData = data || {};
+      const derived = deriveCursoAliasFields(currentData, getAnoBaseForAlias(currentData));
+
+      if (!Object.keys(derived).length) return;
+
+      derivedMap.set(String(id), derived);
+
+      const tripKey = normalizeText(derived.aliasTripKey || "");
+      if (!tripKey) return;
+
+      const prevOwner = tripKeyOwners.get(tripKey);
+      if (prevOwner && prevOwner !== String(id)) {
+        conflicts.push({
+          tripKey,
+          firstId: prevOwner,
+          secondId: String(id)
+        });
+        return;
+      }
+
+      tripKeyOwners.set(tripKey, String(id));
+    });
+
+    if (conflicts.length) {
+      const preview = conflicts
+        .slice(0, 5)
+        .map(c => `${c.tripKey} [${c.firstId} / ${c.secondId}]`)
+        .join(" · ");
+
+      throw new Error(
+        `Se detectaron conflictos de aliasTripKey al recalcular cursos. Revisa primero estos casos: ${preview}`
+      );
+    }
 
     const pending = [];
 
     state.rowsRaw.forEach(({ id, data }) => {
       const currentData = data || {};
-      const aliasNuevo = buildAliasGrupoForRow(currentData);
-      const aliasActual = normalizeText(currentData.aliasGrupo || "");
+      const derived = derivedMap.get(String(id));
+      if (!derived) return;
 
-      if (!aliasNuevo) return;
-      if (aliasNuevo === aliasActual) return;
+      const patch = {};
+
+      ["curso", "anoBaseCurso", "cursoViaje", "aliasGrupo", "aliasTripKey"].forEach((key) => {
+        const currentValue = normalizeText(currentData[key] ?? "");
+        const nextValue = normalizeText(derived[key] ?? "");
+
+        if (currentValue !== nextValue) {
+          patch[key] = derived[key];
+        }
+      });
+
+      if (!Object.keys(patch).length) return;
 
       pending.push({
         id,
         patch: {
-          aliasGrupo: aliasNuevo,
+          ...patch,
           actualizadoPor: getNombreUsuario(state.effectiveUser),
           actualizadoPorCorreo: normalizeEmail(state.realUser?.email || ""),
           fechaActualizacion: serverTimestamp()
@@ -1789,7 +1890,7 @@ async function backfillAliasGrupo() {
 
     if (!pending.length) {
       setProgressStatus({
-        text: "Backfill alias listo.",
+        text: "Backfill listo.",
         meta: "No había registros para actualizar.",
         progress: 100,
         type: "success"
@@ -1805,21 +1906,21 @@ async function backfillAliasGrupo() {
       const batch = writeBatch(db);
 
       chunk.forEach(({ id, patch }) => {
-        batch.set(doc(db, "ventas_cotizaciones", id), patch, { merge: true });
+        batch.set(doc(db, "ventas_cotizaciones", String(id)), patch, { merge: true });
       });
 
       await batch.commit();
       processed += chunk.length;
 
       setProgressStatus({
-        text: "Completando alias...",
+        text: "Corrigiendo curso y alias...",
         meta: `Procesados: ${processed}/${pending.length}`,
         progress: 20 + Math.round((processed / pending.length) * 80)
       });
     }
 
     setProgressStatus({
-      text: "Backfill alias listo.",
+      text: "Backfill listo.",
       meta: `${pending.length} registro(s) actualizados.`,
       progress: 100,
       type: "success"
@@ -1830,12 +1931,16 @@ async function backfillAliasGrupo() {
   } catch (error) {
     console.error(error);
     setProgressStatus({
-      text: "Error completando alias.",
-      meta: error.message || "No se pudo ejecutar el backfill del alias.",
+      text: "Error corrigiendo curso y alias.",
+      meta: error.message || "No se pudo ejecutar el backfill.",
       progress: 100,
       type: "error"
     });
   }
+}
+
+async function backfillAliasGrupo() {
+  return backfillCursoAliasTripKey();
 }
 
 async function backfillLegacyVentas() {
@@ -2615,7 +2720,50 @@ function isRowEmpty(rowObj = {}) {
   return !Object.values(rowObj).some(v => normalizeText(v) !== "");
 }
 
-function rowToFieldPayload(rowObj, carteraCache = { byExact: new Map(), entries: [] }) {
+function getMaxSequentialIdFromRows(rowsRaw = []) {
+  let maxId = 10935;
+
+  rowsRaw.forEach(({ id, data }) => {
+    const candidates = [
+      String(id || "").trim(),
+      String(data?.idGrupo || "").trim()
+    ];
+
+    candidates.forEach((candidate) => {
+      if (/^\d+$/.test(candidate)) {
+        maxId = Math.max(maxId, Number(candidate));
+      }
+    });
+  });
+
+  return maxId;
+}
+
+function buildCodeIndex(rowsRaw = []) {
+  const index = new Map();
+
+  rowsRaw.forEach(({ id, data }) => {
+    const code = normalizeText(data?.codigoRegistro || "");
+    if (code) index.set(code, String(id));
+  });
+
+  return index;
+}
+
+function buildAliasIndex(rowsRaw = [], fallbackYear = getCurrentYear()) {
+  const index = new Map();
+
+  rowsRaw.forEach(({ id, data }) => {
+    const tripKey = buildTripKeyFromExistingDoc(data || {}, fallbackYear);
+    if (tripKey) {
+      index.set(normalizeText(tripKey), String(id));
+    }
+  });
+
+  return index;
+}
+
+function rowToFieldPayload(rowObj, carteraCache = { byExact: new Map(), entries: [] }, fallbackAnoBase = getCurrentYear()) {
   const payload = {};
 
   Object.entries(rowObj).forEach(([rawKey, rawValue]) => {
@@ -2630,6 +2778,9 @@ function rowToFieldPayload(rowObj, carteraCache = { byExact: new Map(), entries:
   autoResolveKnownPeople(payload);
   applyCarteraInfoToPayload(payload, carteraCache);
   applyLegacyWorkflowFields(payload);
+
+  // Si la fila trae curso/colegio/año, recalculamos campos derivados
+  Object.assign(payload, deriveCursoAliasFields(payload, fallbackAnoBase));
 
   return payload;
 }
@@ -2655,8 +2806,8 @@ async function importXlsx(file) {
     }
 
     setProgressStatus({
-      text: "Importando XLSX...",
-      meta: "Leyendo archivo...",
+      text: "Importando XLSX.",
+      meta: "Leyendo archivo.",
       progress: 10
     });
 
@@ -2671,7 +2822,7 @@ async function importXlsx(file) {
 
       const pct = 10 + Math.round(((idx + 1) / workbook.SheetNames.length) * 20);
       setProgressStatus({
-        text: "Importando XLSX...",
+        text: "Importando XLSX.",
         meta: `Leyendo hoja ${idx + 1}/${workbook.SheetNames.length}: ${sheetName}`,
         progress: pct
       });
@@ -2689,47 +2840,83 @@ async function importXlsx(file) {
       return;
     }
 
-    const codeIndex = new Map();
-    state.rowsRaw.forEach(({ id, data }) => {
-      const code = normalizeText(data.codigoRegistro || "");
-      if (code) codeIndex.set(code, id);
-    });
+    const importBaseYear = getCurrentYear();
+    const codeIndex = buildCodeIndex(state.rowsRaw);
+    const aliasIndex = buildAliasIndex(state.rowsRaw, importBaseYear);
 
     // Leemos la cartera fresca en cada import
     const carteraCache = await loadSchoolCarteraIndex(true);
+
+    let nextSequentialId = getMaxSequentialIdFromRows(state.rowsRaw) + 1;
 
     let createdCount = 0;
     let updatedCount = 0;
     let processed = 0;
 
     for (const rowObj of rawRows) {
-      const payload = rowToFieldPayload(rowObj, carteraCache);
+      const payload = rowToFieldPayload(rowObj, carteraCache, importBaseYear);
       const existingId = findExistingDocId(payload, codeIndex);
 
       let ref;
       let isNew = false;
 
       if (existingId) {
-        ref = doc(db, "ventas_cotizaciones", existingId);
+        ref = doc(db, "ventas_cotizaciones", String(existingId));
       } else {
-        ref = doc(collection(db, "ventas_cotizaciones"));
+        const newSequentialId = String(nextSequentialId++);
+        payload.idGrupo = newSequentialId;
+        ref = doc(db, "ventas_cotizaciones", newSequentialId);
         isNew = true;
       }
 
       const snap = await getDoc(ref);
+      const currentData = snap.exists() ? (snap.data() || {}) : {};
+
+      const mergedForDerivation = {
+        ...currentData,
+        ...payload
+      };
+
+      const derived = deriveCursoAliasFields(
+        mergedForDerivation,
+        getAnoBaseForAlias(mergedForDerivation, importBaseYear)
+      );
+
       const finalPayload = {
         ...payload,
-        idGrupo: snap.exists() ? (snap.data().idGrupo || ref.id) : ref.id,
+        ...derived,
+        idGrupo: normalizeText(payload.idGrupo || currentData.idGrupo || ref.id),
         actualizadoPor: getNombreUsuario(state.effectiveUser),
         actualizadoPorCorreo: normalizeEmail(state.realUser?.email || ""),
         fechaActualizacion: serverTimestamp()
       };
 
+      finalPayload.codigoRegistro =
+        normalizeText(finalPayload.codigoRegistro) ||
+        normalizeText(currentData.codigoRegistro) ||
+        buildCodigoRegistro(finalPayload.idGrupo);
+
+      if (!normalizeText(finalPayload.anoBaseCurso)) {
+        finalPayload.anoBaseCurso = String(
+          getAnoBaseForAlias(finalPayload, importBaseYear)
+        );
+      }
+
+      const nextTripKey = normalizeText(finalPayload.aliasTripKey || "");
+      const previousTripKey = buildTripKeyFromExistingDoc(currentData, importBaseYear);
+      const ownerId = nextTripKey ? aliasIndex.get(nextTripKey) : "";
+
+      if (nextTripKey && ownerId && String(ownerId) !== String(ref.id)) {
+        throw new Error(
+          `Conflicto al importar: ya existe un grupo para ${finalPayload.cursoViaje || finalPayload.curso} (${finalPayload.anoViaje}) en ${finalPayload.colegio}.`
+        );
+      }
+
       if (isNew || !snap.exists()) {
-        finalPayload.codigoRegistro = normalizeText(finalPayload.codigoRegistro) || buildCodigoRegistro(ref.id);
         finalPayload.creadoPor = getNombreUsuario(state.effectiveUser);
         finalPayload.creadoPorCorreo = normalizeEmail(state.realUser?.email || "");
         finalPayload.fechaCreacion = serverTimestamp();
+
         await setDoc(ref, finalPayload, { merge: true });
         createdCount += 1;
       } else {
@@ -2737,10 +2924,27 @@ async function importXlsx(file) {
         updatedCount += 1;
       }
 
+      if (
+        previousTripKey &&
+        previousTripKey !== nextTripKey &&
+        aliasIndex.get(previousTripKey) === String(ref.id)
+      ) {
+        aliasIndex.delete(previousTripKey);
+      }
+
+      if (nextTripKey) {
+        aliasIndex.set(nextTripKey, String(ref.id));
+      }
+
+      const finalCode = normalizeText(finalPayload.codigoRegistro || "");
+      if (finalCode) {
+        codeIndex.set(finalCode, String(ref.id));
+      }
+
       processed += 1;
       const pct = 35 + Math.round((processed / rawRows.length) * 65);
       setProgressStatus({
-        text: "Importando XLSX...",
+        text: "Importando XLSX.",
         meta: `Procesados: ${processed}/${rawRows.length}`,
         progress: pct
       });
@@ -3175,6 +3379,9 @@ async function initPage() {
     await loadData();
   });
 }
+
+window.backfillCursoAliasTripKey = backfillCursoAliasTripKey;
+window.backfillAliasGrupo = backfillAliasGrupo;
 
 window.backfillOrigenColegioDesdeCartera = backfillOrigenColegioDesdeCartera;
 window.backfillVendedoraCorreoDesdeNombre = backfillVendedoraCorreoDesdeNombre;
