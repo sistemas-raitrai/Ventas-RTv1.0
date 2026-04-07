@@ -18,7 +18,6 @@
     }
 
     :root{
-      --screen-scale: 1.22;
       --pdf-ink: #241733;
       --pdf-muted: #655a73;
       --pdf-line: #5b4a72;
@@ -83,14 +82,12 @@
       box-sizing:border-box;
       width:210mm;
       height:297mm;
-      margin:0 auto calc(297mm * (var(--screen-scale) - 1) + 18px);
+      margin:0 auto;
       background:#fff;
       border:1px solid rgba(59,35,87,.14);
       box-shadow:0 18px 40px rgba(25,15,40,.12);
       padding:4mm 5mm 4mm;
       overflow:hidden;
-      transform:scale(var(--screen-scale));
-      transform-origin:top center;
       break-inside:avoid;
       page-break-inside:avoid;
     }
@@ -324,10 +321,6 @@
     }
     
     @media print{
-      :root{
-        --screen-scale: 1;
-      }
-    
       body{
         background:#fff !important;
       }
@@ -351,8 +344,6 @@
         box-shadow:none !important;
         padding:4mm 5mm 4mm !important;
         overflow:hidden !important;
-        transform:none !important;
-        transform-origin:top center !important;
         break-inside:avoid;
         page-break-inside:avoid;
       }
