@@ -110,37 +110,43 @@
     }
     
     .pdf-solicitud{
-      display:grid;
-      grid-template-columns:132px 1fr;
-      align-items:center;
-      gap:8px;
       margin-bottom:18px;
     }
-
-    .pdf-solicitud-label{
-      text-align:right;
-      font-size:11px;
-      color:var(--pdf-brand);
-      font-weight:400;
-      line-height:1.15;
-    }
-
-    .pdf-solicitud-value{
-      min-height:24px;
+    
+    .pdf-solicitud-band{
+      width:100%;
+      min-height:30px;
       border:1px solid var(--pdf-line);
       background:var(--pdf-fill-soft);
-      color:var(--pdf-brand);
-      font-weight:800;
-      text-align:center;
-      font-size:12px;
-      letter-spacing:.35px;
-      padding:2px 8px 3px;
-      text-transform:uppercase;
       display:flex;
       align-items:center;
       justify-content:center;
+      padding:3px 10px 4px;
       print-color-adjust: exact;
       -webkit-print-color-adjust: exact;
+    }
+    
+    .pdf-solicitud-band-label{
+      font-size:13px;
+      color:var(--pdf-brand);
+      font-weight:400;
+      line-height:1.1;
+      text-align:center;
+    }
+    
+    .pdf-solicitud-status{
+      margin-top:8px;
+      text-align:center;
+      font-size:20px;
+      line-height:1.05;
+      letter-spacing:.4px;
+      color:var(--pdf-brand);
+      font-weight:400;
+      text-transform:uppercase;
+    }
+    
+    .pdf-solicitud-status strong{
+      font-weight:400;
     }
 
     .pdf-form{
@@ -365,8 +371,11 @@
       </div>
 
       <div class="pdf-solicitud">
-        <div class="pdf-solicitud-label">Solicitud reserva:</div>
-        <div class="pdf-solicitud-value" id="pdfSolicitudReserva">—</div>
+        <div class="pdf-solicitud-band">
+          <div class="pdf-solicitud-band-label">Fecha Solicitud de Reserva:</div>
+        </div>
+      
+        <div class="pdf-solicitud-status" id="pdfSolicitudReserva">—</div>
       </div>
 
       <div class="pdf-form">
