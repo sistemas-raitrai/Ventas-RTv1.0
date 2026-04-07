@@ -342,6 +342,7 @@ function hydrateFicha(group = {}) {
 
     fechaViajeTexto: pick(
       ficha.fechaViajeTexto,
+      group.semanaViaje,
       humanDateLong(group.fechaViaje),
       ""
     ),
@@ -405,7 +406,37 @@ function hydrateFicha(group = {}) {
     observacionesHtml: pick(
       ficha.observacionesHtml,
       ""
-    )
+    ),
+    
+    pdfUrl: pick(
+      ficha.pdfUrl,
+      group.fichaPdfUrl,
+      ""
+    ),
+    
+    pdfNombre: pick(
+      ficha.pdfNombre,
+      group.fichaPdfNombre,
+      ""
+    ),
+    
+    estado: pick(
+      ficha.estado,
+      group.fichaEstado,
+      "pendiente"
+    ),
+    
+    actualizadoPor: pick(
+      ficha.actualizadoPor,
+      ""
+    ),
+    
+    actualizadoPorCorreo: pick(
+      ficha.actualizadoPorCorreo,
+      ""
+    ),
+    
+    fechaActualizacion: ficha.fechaActualizacion || group.fechaActualizacionFicha || null
   };
 }
 
