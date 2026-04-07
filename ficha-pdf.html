@@ -9,14 +9,11 @@
 
   <style>
     :root{
-      --preview-scale: 1.24;
       --pdf-ink: #241733;
-      --pdf-muted: #655a73;
       --pdf-line: #5b4a72;
       --pdf-brand: #3b2357;
-      --pdf-brand-2: #5a3a80;
       --pdf-box: #ffffff;
-      --pdf-fill-soft: #ede6df;
+      --pdf-fill-soft: #e8e0d9;
     }
 
     *{ box-sizing:border-box; }
@@ -35,7 +32,7 @@
     }
 
     .pdf-toolbar{
-      max-width:1100px;
+      width:210mm;
       margin:0 auto 16px;
       display:flex;
       gap:10px;
@@ -81,35 +78,29 @@
       box-shadow:0 10px 22px rgba(43,17,69,.16);
     }
 
-    .pdf-preview{
-      width:210mm;
-      height:297mm;
-      margin:0 auto calc(297mm * (var(--preview-scale) - 1) + 24px);
-      transform:scale(var(--preview-scale));
-      transform-origin:top center;
-    }
-
     .pdf-page{
       box-sizing:border-box;
       width:210mm;
       height:297mm;
-      margin:0;
+      margin:0 auto;
       background:#fff;
       border:1px solid rgba(59,35,87,.14);
       box-shadow:0 18px 40px rgba(25,15,40,.12);
-      padding:6mm 7mm 6mm;
+      padding:8mm 9mm 8mm;
       overflow:hidden;
       break-inside:avoid;
       page-break-inside:avoid;
+      print-color-adjust: exact;
+      -webkit-print-color-adjust: exact;
     }
 
     .pdf-title{
       text-align:center;
       font-weight:400;
       font-size:14px;
-      letter-spacing:.3px;
+      letter-spacing:.25px;
       color:var(--pdf-brand);
-      margin:0 0 8px;
+      margin:0 0 9px;
       text-transform:uppercase;
     }
 
@@ -120,10 +111,10 @@
 
     .pdf-solicitud{
       display:grid;
-      grid-template-columns:145px 1fr;
+      grid-template-columns:132px 1fr;
       align-items:center;
       gap:8px;
-      margin-bottom:9px;
+      margin-bottom:10px;
     }
 
     .pdf-solicitud-label{
@@ -131,10 +122,11 @@
       font-size:11px;
       color:var(--pdf-brand);
       font-weight:400;
+      line-height:1.15;
     }
 
     .pdf-solicitud-value{
-      min-height:22px;
+      min-height:24px;
       border:1px solid var(--pdf-line);
       background:var(--pdf-fill-soft);
       color:var(--pdf-brand);
@@ -147,38 +139,40 @@
       display:flex;
       align-items:center;
       justify-content:center;
+      print-color-adjust: exact;
+      -webkit-print-color-adjust: exact;
     }
 
     .pdf-form{
       display:flex;
       flex-direction:column;
-      gap:5px;
+      gap:7px;
     }
 
     .pdf-row{
       display:grid;
       align-items:start;
-      gap:6px;
+      gap:7px;
     }
 
     .pdf-row.row-1{
-      grid-template-columns:122px 1fr;
+      grid-template-columns:136px 1fr;
     }
 
     .pdf-row.row-2{
-      grid-template-columns:122px 1fr 56px 1fr;
+      grid-template-columns:136px 1fr 60px 1fr;
     }
 
     .pdf-row.row-2a{
-      grid-template-columns:122px minmax(0,1fr) 92px 130px;
+      grid-template-columns:136px minmax(0,1fr) 96px 132px;
     }
 
     .pdf-row.row-3{
-      grid-template-columns:122px 52px 48px 92px 64px 68px;
+      grid-template-columns:136px 56px 50px 92px 66px 74px;
     }
 
     .pdf-row.row-2b{
-      grid-template-columns:122px 84px 84px 1fr;
+      grid-template-columns:136px 88px 84px 1fr;
     }
 
     .pdf-row.row-ops{
@@ -188,26 +182,26 @@
     }
 
     .pdf-row.row-3bottom{
-      grid-template-columns:88px 94px 56px 104px 106px 1fr;
+      grid-template-columns:94px 106px 60px 112px 118px 1fr;
     }
 
     .pdf-row.row-2bottom{
-      grid-template-columns:88px 110px 104px 1fr;
+      grid-template-columns:94px 116px 112px 1fr;
     }
 
     .pdf-label{
-      font-size:10.5px;
+      font-size:11px;
       color:var(--pdf-brand);
       line-height:1.15;
-      padding-top:4px;
+      padding-top:5px;
       white-space:nowrap;
     }
 
     .pdf-inline-label{
-      font-size:10.5px;
+      font-size:11px;
       color:var(--pdf-brand);
       line-height:1.15;
-      padding-top:4px;
+      padding-top:5px;
       white-space:nowrap;
       text-align:left;
     }
@@ -215,13 +209,15 @@
     .pdf-box{
       border:1px solid var(--pdf-line);
       background:var(--pdf-box);
-      min-height:19px;
-      padding:2px 6px 3px;
+      min-height:22px;
+      padding:3px 7px 3px;
       font-size:9.5px;
-      line-height:1.16;
+      line-height:1.18;
       color:#20152c;
       overflow:hidden;
       word-break:break-word;
+      print-color-adjust: exact;
+      -webkit-print-color-adjust: exact;
     }
 
     .pdf-box.upper{
@@ -233,33 +229,29 @@
     }
 
     .pdf-box.tall{
-      min-height:38px;
+      min-height:42px;
+      max-height:42px;
       padding-top:4px;
       padding-bottom:4px;
     }
 
     .pdf-box.fecha{
-      min-height:46px;
+      min-height:50px;
+      max-height:50px;
       padding-top:5px;
       padding-bottom:5px;
     }
 
     .pdf-box.rich{
-      min-height:74px;
-      max-height:74px;
-      padding:4px 6px;
+      min-height:86px;
+      max-height:86px;
+      padding:4px 7px;
     }
 
     .pdf-box.obs{
-      min-height:26px;
-      max-height:26px;
-      padding:4px 6px;
-    }
-
-    .pdf-box.empty::before{
-      content:"";
-      display:block;
-      min-height:1px;
+      min-height:30px;
+      max-height:30px;
+      padding:4px 7px;
     }
 
     .pdf-header-cell{
@@ -270,18 +262,20 @@
       font-size:10px;
       text-align:center;
       padding:2px 6px;
-      min-height:17px;
+      min-height:18px;
       display:flex;
       align-items:center;
       justify-content:center;
+      print-color-adjust: exact;
+      -webkit-print-color-adjust: exact;
     }
 
     .pdf-rich{
-      font-size:8.8px;
-      line-height:1.14;
+      font-size:9px;
+      line-height:1.15;
       color:#241733;
       overflow:hidden;
-      max-height:64px;
+      max-height:76px;
     }
 
     .pdf-rich p{
@@ -306,37 +300,15 @@
       display:none;
     }
 
-    .pdf-page,
-    .pdf-box,
-    .pdf-header-cell,
-    .pdf-solicitud-value{
-      print-color-adjust: exact;
-      -webkit-print-color-adjust: exact;
-    }
-
-    @media (max-width: 1380px){
-      :root{
-        --preview-scale: 1.14;
-      }
-    }
-
     @media (max-width: 1180px){
-      :root{
-        --preview-scale: 1;
-      }
-
-      .pdf-preview{
-        width:100%;
-        height:auto;
-        margin:0 auto;
-        transform:none;
+      .pdf-toolbar{
+        width:210mm;
+        max-width:100%;
       }
 
       .pdf-page{
         width:210mm;
         max-width:100%;
-        height:auto;
-        min-height:297mm;
       }
     }
 
@@ -361,13 +333,6 @@
         overflow:visible !important;
       }
 
-      .pdf-preview{
-        width:auto !important;
-        height:auto !important;
-        margin:0 !important;
-        transform:none !important;
-      }
-
       .pdf-page{
         box-sizing:border-box;
         width:210mm !important;
@@ -375,7 +340,7 @@
         margin:0 auto !important;
         border:none !important;
         box-shadow:none !important;
-        padding:6mm 7mm 6mm !important;
+        padding:8mm 9mm 8mm !important;
         overflow:hidden !important;
         break-inside:avoid;
         page-break-inside:avoid;
@@ -394,113 +359,111 @@
       <button class="btn-dark" id="btnImprimirFichaPdf" type="button">Imprimir / Guardar PDF</button>
     </div>
 
-    <div class="pdf-preview">
-      <section class="pdf-page">
-        <div class="pdf-title">
-          <strong>FICHA DE VIAJE</strong>&nbsp;&nbsp;<span id="pdfAnoTitulo">—</span>
+    <section class="pdf-page">
+      <div class="pdf-title">
+        <strong>FICHA DE VIAJE</strong>&nbsp;&nbsp;<span id="pdfAnoTitulo">—</span>
+      </div>
+
+      <div class="pdf-solicitud">
+        <div class="pdf-solicitud-label">Solicitud reserva:</div>
+        <div class="pdf-solicitud-value" id="pdfSolicitudReserva">—</div>
+      </div>
+
+      <div class="pdf-form">
+        <div class="pdf-row row-1">
+          <div class="pdf-label">Nombre del Grupo:</div>
+          <div class="pdf-box upper" id="pdfNombreGrupo">—</div>
         </div>
 
-        <div class="pdf-solicitud">
-          <div class="pdf-solicitud-label">Solicitud reserva:</div>
-          <div class="pdf-solicitud-value" id="pdfSolicitudReserva">—</div>
+        <div class="pdf-row row-1">
+          <div class="pdf-label">Apoderado(a) Encargado(a):</div>
+          <div class="pdf-box upper" id="pdfApoderadoEncargado">—</div>
         </div>
 
-        <div class="pdf-form">
-          <div class="pdf-row row-1">
-            <div class="pdf-label">Nombre del Grupo:</div>
-            <div class="pdf-box upper" id="pdfNombreGrupo">—</div>
+        <div class="pdf-row row-2">
+          <div class="pdf-label">Teléfono:</div>
+          <div class="pdf-box" id="pdfTelefono">—</div>
+          <div class="pdf-inline-label">Correo:</div>
+          <div class="pdf-box" id="pdfCorreo">—</div>
+        </div>
+
+        <div class="pdf-row row-2a">
+          <div class="pdf-label">Nombre Programa:</div>
+          <div class="pdf-box upper" id="pdfNombrePrograma">—</div>
+          <div class="pdf-inline-label">Valor Programa:</div>
+          <div class="pdf-box center" id="pdfValorPrograma">—</div>
+        </div>
+
+        <div class="pdf-row row-3">
+          <div class="pdf-label">Número de pax total:</div>
+          <div class="pdf-box center" id="pdfNumeroPaxTotal">—</div>
+          <div class="pdf-inline-label">Tramo:</div>
+          <div class="pdf-box center" id="pdfTramo">—</div>
+          <div class="pdf-inline-label">Liberados:</div>
+          <div class="pdf-box center" id="pdfLiberados">—</div>
+        </div>
+
+        <div class="pdf-row row-1">
+          <div class="pdf-label">Categoría hotelera contratada:</div>
+          <div class="pdf-box upper" id="pdfCategoriaHoteleraContratada">—</div>
+        </div>
+
+        <div class="pdf-row row-1">
+          <div class="pdf-label">Autorización gerencia:</div>
+          <div class="pdf-box tall upper" id="pdfAutorizacionGerencia">—</div>
+        </div>
+
+        <div class="pdf-row row-2b">
+          <div class="pdf-label">Descuento de valor Base:</div>
+          <div class="pdf-box upper" id="pdfDescuentoValorBase">—</div>
+          <div class="pdf-inline-label">Fecha de Viaje:</div>
+          <div class="pdf-box fecha" id="pdfFechaViajeTexto">—</div>
+        </div>
+
+        <div class="pdf-row row-1">
+          <div class="pdf-label">Asistencia en Viajes:</div>
+          <div class="pdf-box upper" id="pdfAsistenciaEnViajes">—</div>
+        </div>
+
+        <div class="pdf-row row-1">
+          <div class="pdf-label">Nombre vendedor:</div>
+          <div class="pdf-box upper" id="pdfNombreVendedor">—</div>
+        </div>
+
+        <div class="pdf-row row-ops">
+          <div>
+            <div class="pdf-header-cell">Información para operaciones</div>
+            <div class="pdf-box rich" id="pdfInfoOperaciones">—</div>
           </div>
 
-          <div class="pdf-row row-1">
-            <div class="pdf-label">Apoderado(a) Encargado(a):</div>
-            <div class="pdf-box upper" id="pdfApoderadoEncargado">—</div>
-          </div>
-
-          <div class="pdf-row row-2">
-            <div class="pdf-label">Teléfono:</div>
-            <div class="pdf-box" id="pdfTelefono">—</div>
-            <div class="pdf-inline-label">Correo:</div>
-            <div class="pdf-box" id="pdfCorreo">—</div>
-          </div>
-
-          <div class="pdf-row row-2a">
-            <div class="pdf-label">Nombre Programa:</div>
-            <div class="pdf-box upper" id="pdfNombrePrograma">—</div>
-            <div class="pdf-inline-label">Valor Programa:</div>
-            <div class="pdf-box center" id="pdfValorPrograma">—</div>
-          </div>
-
-          <div class="pdf-row row-3">
-            <div class="pdf-label">Número de pax total:</div>
-            <div class="pdf-box center" id="pdfNumeroPaxTotal">—</div>
-            <div class="pdf-inline-label">Tramo:</div>
-            <div class="pdf-box center" id="pdfTramo">—</div>
-            <div class="pdf-inline-label">Liberados:</div>
-            <div class="pdf-box center" id="pdfLiberados">—</div>
-          </div>
-
-          <div class="pdf-row row-1">
-            <div class="pdf-label">Categoría hotelera contratada:</div>
-            <div class="pdf-box upper" id="pdfCategoriaHoteleraContratada">—</div>
-          </div>
-
-          <div class="pdf-row row-1">
-            <div class="pdf-label">Autorización gerencia:</div>
-            <div class="pdf-box tall upper" id="pdfAutorizacionGerencia">—</div>
-          </div>
-
-          <div class="pdf-row row-2b">
-            <div class="pdf-label">Descuento de valor Base:</div>
-            <div class="pdf-box upper" id="pdfDescuentoValorBase">—</div>
-            <div class="pdf-inline-label">Fecha de Viaje:</div>
-            <div class="pdf-box fecha" id="pdfFechaViajeTexto">—</div>
-          </div>
-
-          <div class="pdf-row row-1">
-            <div class="pdf-label">Asistencia en Viajes:</div>
-            <div class="pdf-box upper" id="pdfAsistenciaEnViajes">—</div>
-          </div>
-
-          <div class="pdf-row row-1">
-            <div class="pdf-label">Nombre vendedor:</div>
-            <div class="pdf-box upper" id="pdfNombreVendedor">—</div>
-          </div>
-
-          <div class="pdf-row row-ops">
-            <div>
-              <div class="pdf-header-cell">Información para operaciones</div>
-              <div class="pdf-box rich" id="pdfInfoOperaciones">—</div>
-            </div>
-
-            <div>
-              <div class="pdf-header-cell">Información para administración</div>
-              <div class="pdf-box rich" id="pdfInfoAdministracion">—</div>
-            </div>
-          </div>
-
-          <div class="pdf-row row-3bottom">
-            <div class="pdf-label">N° de Negocio:</div>
-            <div class="pdf-box center" id="pdfNumeroNegocio">—</div>
-            <div class="pdf-inline-label">Usuario:</div>
-            <div class="pdf-box center" id="pdfUsuarioFicha">—</div>
-            <div class="pdf-inline-label">Clave Administrativa:</div>
-            <div class="pdf-box center" id="pdfClaveAdministrativa">—</div>
-          </div>
-
-          <div class="pdf-row row-2bottom">
-            <div class="pdf-label">Versión Ficha:</div>
-            <div class="pdf-box center upper" id="pdfVersionFicha">—</div>
-            <div class="pdf-inline-label">Fecha Actualización:</div>
-            <div class="pdf-box center" id="pdfFechaActualizacion">—</div>
-          </div>
-
-          <div class="pdf-row row-1">
-            <div class="pdf-label">Observaciones:</div>
-            <div class="pdf-box obs" id="pdfObservaciones">—</div>
+          <div>
+            <div class="pdf-header-cell">Información para administración</div>
+            <div class="pdf-box rich" id="pdfInfoAdministracion">—</div>
           </div>
         </div>
-      </section>
-    </div>
+
+        <div class="pdf-row row-3bottom">
+          <div class="pdf-label">N° de Negocio:</div>
+          <div class="pdf-box center" id="pdfNumeroNegocio">—</div>
+          <div class="pdf-inline-label">Usuario:</div>
+          <div class="pdf-box center" id="pdfUsuarioFicha">—</div>
+          <div class="pdf-inline-label">Clave Administrativa:</div>
+          <div class="pdf-box center" id="pdfClaveAdministrativa">—</div>
+        </div>
+
+        <div class="pdf-row row-2bottom">
+          <div class="pdf-label">Versión Ficha:</div>
+          <div class="pdf-box center upper" id="pdfVersionFicha">—</div>
+          <div class="pdf-inline-label">Fecha Actualización:</div>
+          <div class="pdf-box center" id="pdfFechaActualizacion">—</div>
+        </div>
+
+        <div class="pdf-row row-1">
+          <div class="pdf-label">Observaciones:</div>
+          <div class="pdf-box obs" id="pdfObservaciones">—</div>
+        </div>
+      </div>
+    </section>
   </main>
 
   <script type="module" src="layout.js"></script>
