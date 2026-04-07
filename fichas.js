@@ -519,10 +519,25 @@ function syncButtons() {
 
   const btnGuardar = $("btnGuardarFicha");
   if (btnGuardar) btnGuardar.disabled = !editable;
-
+  
+  const btnGuardarBottom = $("btnGuardarFichaBottom");
+  if (btnGuardarBottom) btnGuardarBottom.disabled = !editable;
+  
   const btnAbrirPdf = $("btnAbrirPdfFicha");
   if (btnAbrirPdf) btnAbrirPdf.disabled = !tienePdf;
-
+  
+  const btnVerPdf = $("btnVerFichaPdfHtml");
+  if (btnVerPdf) btnVerPdf.disabled = !canOpenFicha();
+  
+  const btnVerPdfBottom = $("btnVerFichaPdfHtmlBottom");
+  if (btnVerPdfBottom) btnVerPdfBottom.disabled = !canOpenFicha();
+  
+  const btnGenerarPdf = $("btnGenerarPdfVersion");
+  if (btnGenerarPdf) btnGenerarPdf.disabled = !editable || !canOpenFicha();
+  
+  const btnGenerarPdfBottom = $("btnGenerarPdfVersionBottom");
+  if (btnGenerarPdfBottom) btnGenerarPdfBottom.disabled = !editable || !canOpenFicha();
+  
   document.querySelectorAll("#formFicha input, #formFicha select, #formFicha textarea").forEach((el) => {
     el.disabled = !editable;
   });
@@ -586,12 +601,25 @@ function bindEvents() {
     location.href = `grupo.html?id=${encodeURIComponent(state.groupId || state.requestedId || "")}`;
   });
 
-  $("btnGuardarFicha")?.addEventListener("click", saveFicha);
-
-  $("btnImprimirFicha")?.addEventListener("click", () => {
-    window.print();
+  $("btnGuardarFicha")?.addEventListener("click", () => saveFicha());
+  $("btnGuardarFichaBottom")?.addEventListener("click", () => saveFicha());
+  
+  $("btnVerFichaPdfHtml")?.addEventListener("click", () => {
+    openFichaPdfHtml();
   });
-
+  
+  $("btnVerFichaPdfHtmlBottom")?.addEventListener("click", () => {
+    openFichaPdfHtml();
+  });
+  
+  $("btnGenerarPdfVersion")?.addEventListener("click", async () => {
+    await handleGenerarPdfVersion();
+  });
+  
+  $("btnGenerarPdfVersionBottom")?.addEventListener("click", async () => {
+    await handleGenerarPdfVersion();
+  });
+  
   $("btnAbrirPdfFicha")?.addEventListener("click", () => {
     const url = cleanText(state.ficha?.pdfUrl || state.group?.fichaPdfUrl || "");
     if (!url) {
@@ -892,10 +920,10 @@ async function saveUpdateRequest() {
 /* =========================================================
    SAVE
 ========================================================= */
-async function saveFicha() {
+async function saveFicha({ silent = false, reloadAfterSave = true } = {}) {
   if (!canEditFicha()) {
     alert(getBlockedEditMessage());
-    return;
+    return { ok: false, reason: "blocked" };
   }
 
   const oldFicha = state.group?.ficha || {};
@@ -948,8 +976,10 @@ async function saveFicha() {
   const fichaWasEmpty = !Object.keys(oldFicha || {}).length;
 
   if (!cambios.length && !fichaWasEmpty) {
-    alert("No hay cambios para guardar.");
-    return;
+    if (!silent) {
+      alert("No hay cambios para guardar.");
+    }
+    return { ok: true, changed: false };
   }
 
   const patch = {
@@ -998,8 +1028,15 @@ async function saveFicha() {
     fecha: serverTimestamp()
   });
 
-  alert("Ficha guardada correctamente.");
-  await loadAll();
+  if (!silent) {
+    alert("Ficha guardada correctamente.");
+  }
+
+  if (reloadAfterSave) {
+    await loadAll();
+  }
+
+  return { ok: true, changed: true };
 }
 
 async function saveGroupPatch(patch, {
@@ -1381,6 +1418,41 @@ function isRichField(path = "") {
 /* =========================================================
    HELPERS
 ========================================================= */
+function buildFichaPdfHtmlUrl() {
+  const id = encodeURIComponent(state.groupId || state.requestedId || "");
+  return `ficha-pdf.html?id=${id}`;
+}
+
+function openFichaPdfHtml() {
+  if (!canOpenFicha()) {
+    alert("La vista PDF solo se habilita cuando el grupo está en estado GANADA.");
+    return;
+  }
+
+  window.open(buildFichaPdfHtmlUrl(), "_blank", "noopener");
+}
+
+async function handleGenerarPdfVersion() {
+  if (!canOpenFicha()) {
+    alert("La generación de la versión PDF solo se habilita cuando el grupo está en estado GANADA.");
+    return;
+  }
+
+  const result = await saveFicha({ silent: true, reloadAfterSave: false });
+
+  if (!result?.ok) return;
+
+  window.open(buildFichaPdfHtmlUrl(), "_blank", "noopener");
+
+  await loadAll();
+
+  if (result.changed) {
+    alert("Ficha guardada. Se abrió la vista PDF para imprimir o guardar esta versión.");
+  } else {
+    alert("Se abrió la vista PDF actual para imprimir o guardar esta versión.");
+  }
+}
+
 function getBlockedEditMessage() {
   if (!state.canModify) {
     return "Tu rol actual es solo de lectura para esta ficha.";
