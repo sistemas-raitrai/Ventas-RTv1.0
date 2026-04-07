@@ -1,11 +1,15 @@
 import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.7.3/firebase-auth.js";
+
 import {
   collection,
   query,
   where,
   getDocs,
   getDoc,
-  doc
+  addDoc,
+  updateDoc,
+  doc,
+  serverTimestamp
 } from "https://www.gstatic.com/firebasejs/11.7.3/firebase-firestore.js";
 
 import {
@@ -31,6 +35,9 @@ import {
 
 const $ = (id) => document.getElementById(id);
 const GITHUB_HOME_URL = "https://sistemas-raitrai.github.io/Ventas-RT/";
+const HISTORIAL_COLLECTION = "ventas_historial";
+const MAIL_COLLECTION = "mail";
+const FICHA_ALERT_EMAIL = "aleoperaciones@raitrai.cl";
 
 const state = {
   realUser: null,
@@ -41,7 +48,8 @@ const state = {
   groupDocId: "",
   groupId: "",
   group: null,
-  ficha: null
+  ficha: null,
+  isClosingPdf: false
 };
 
 initPage();
@@ -228,12 +236,14 @@ function renderPage() {
   setText("pdfNumeroNegocio", valueOrDash(state.ficha?.numeroNegocio));
   setText("pdfUsuarioFicha", valueOrDash(state.ficha?.usuarioFicha));
   setText("pdfClaveAdministrativa", valueOrDash(state.ficha?.claveAdministrativa));
-  setText("pdfVersionFicha", valueOrDash(state.ficha?.version).toUpperCase());
+  setText("pdfVersionFicha", getFichaVersionLabel(state.ficha));
   setText("pdfFechaActualizacion", valueOrDash(state.ficha?.fechaActualizacionTexto));
 
   renderRichAsHtml("pdfInfoOperaciones", state.ficha?.infoOperacionesHtml);
   renderRichAsHtml("pdfInfoAdministracion", state.ficha?.infoAdministracionHtml);
   renderRichAsHtml("pdfObservaciones", state.ficha?.observacionesHtml);
+
+  syncPrintButton();
 }
 
 /* =========================================================
@@ -248,9 +258,374 @@ function bindEvents() {
     location.href = `grupo.html?id=${encodeURIComponent(state.groupId || state.requestedId || "")}`;
   });
 
-  $("btnImprimirFichaPdf")?.addEventListener("click", () => {
-    window.print();
+  $("btnImprimirFichaPdf")?.addEventListener("click", async () => {
+    await handlePrintButtonClick();
   });
+}
+
+async function handlePrintButtonClick() {
+  if (!state.group) return;
+  if (state.isClosingPdf) return;
+
+  if (isPdfOfficiallyConfirmed()) {
+    window.print();
+    return;
+  }
+
+  if (!canFinalizeFichaPdf()) {
+    alert(getFinalizeBlockedMessage());
+    return;
+  }
+
+  const alias =
+    cleanText(state.group?.aliasGrupo) ||
+    cleanText(state.ficha?.nombreGrupo) ||
+    `Grupo ${state.groupId}`;
+
+  const ok = window.confirm(
+    `Vas a confirmar oficialmente la ficha del grupo ${alias}. Esta acción dejará historial y luego abrirá la impresión.`
+  );
+
+  if (!ok) return;
+
+  state.isClosingPdf = true;
+  syncPrintButton();
+
+  try {
+    const result = await confirmOfficialPdfClosure();
+    await loadAll();
+
+    if (result?.emailQueued === false) {
+      alert("La ficha se confirmó correctamente, pero el correo quedó pendiente de envío. Revisa la configuración de la colección mail / extensión de correo.");
+    }
+
+    window.print();
+  } catch (error) {
+    console.error("[ficha-pdf] confirmOfficialPdfClosure", error);
+    alert("No se pudo confirmar oficialmente la ficha: " + (error?.message || error));
+  } finally {
+    state.isClosingPdf = false;
+    syncPrintButton();
+  }
+}
+
+function syncPrintButton() {
+  const btn = $("btnImprimirFichaPdf");
+  if (!btn) return;
+
+  if (state.isClosingPdf) {
+    btn.disabled = true;
+    btn.textContent = "Confirmando ficha...";
+    return;
+  }
+
+  if (isPdfOfficiallyConfirmed()) {
+    btn.disabled = !canFinalizeFichaAsCurrentUser();
+    btn.textContent = "Reimprimir / Guardar PDF";
+    return;
+  }
+
+  btn.disabled = !canFinalizeFichaPdf();
+  btn.textContent = "Imprimir / Guardar PDF";
+}
+
+function canFinalizeFichaPdf() {
+  if (!canFinalizeFichaAsCurrentUser()) return false;
+  if (!state.group || !state.groupDocId) return false;
+  if (!canAccessGroup(state.group)) return false;
+
+  const flow = state.group.flowFicha || {};
+  const fichaEstado = normalizeSearchLocal(state.group?.fichaEstado || "");
+  const adminFirmado = !!flow?.administracion?.firmado;
+
+  return fichaEstado === "autorizada_admin" && adminFirmado;
+}
+
+function getFinalizeBlockedMessage() {
+  if (!canFinalizeFichaAsCurrentUser()) {
+    return "Solo admin, yenny@raitrai.cl o administracion@raitrai.cl pueden confirmar oficialmente esta ficha para impresión.";
+  }
+
+  const flow = state.group?.flowFicha || {};
+  if (!flow?.administracion?.firmado) {
+    return "Primero debe existir la firma de administración.";
+  }
+
+  if (normalizeSearchLocal(state.group?.fichaEstado || "") !== "autorizada_admin") {
+    return "La ficha todavía no está en estado autorizada por administración.";
+  }
+
+  return "La ficha todavía no está lista para cierre oficial.";
+}
+
+function isPdfOfficiallyConfirmed() {
+  const fichaEstado = normalizeSearchLocal(state.group?.fichaEstado || "");
+  const ficha = getByPath(state.group, "ficha") || {};
+
+  return (
+    fichaEstado === "confirmada_pdf" ||
+    fichaEstado === "pdf_confirmado" ||
+    ficha.confirmada === true
+  );
+}
+
+function canFinalizeFichaAsCurrentUser() {
+  const email = normalizeEmail(state.effectiveEmail || "");
+  const rol = String(state.effectiveUser?.rol || "").toLowerCase();
+
+  if (rol === "admin") return true;
+
+  return (
+    email === "yenny@raitrai.cl" ||
+    email === "administracion@raitrai.cl"
+  );
+}
+
+function getDisplayName(user = {}) {
+  const full = [user?.nombre, user?.apellido].filter(Boolean).join(" ").trim();
+  if (full) return full;
+  if (user?.nombre) return String(user.nombre).trim();
+  if (user?.email) return String(user.email).trim();
+  return "Usuario";
+}
+
+function resolveNextFichaVersion() {
+  const fichaActual = getByPath(state.group, "ficha") || {};
+
+  const prevNumeroRaw = pick(
+    fichaActual.versionNumero,
+    state.group?.versionFichaNumero,
+    ""
+  );
+
+  const prevNumero = Number(prevNumeroRaw);
+
+  const prevTipo = normalizeSearchLocal(
+    pick(
+      fichaActual.tipoVersion,
+      fichaActual.version,
+      state.group?.tipoVersionFicha,
+      state.group?.versionFicha,
+      ""
+    )
+  );
+
+  const hasPreviousVersion =
+    (Number.isFinite(prevNumero) && prevNumero > 0) ||
+    prevTipo.includes("original") ||
+    prevTipo.includes("actualiz");
+
+  if (!hasPreviousVersion) {
+    return {
+      tipoVersion: "original",
+      version: "ORIGINAL",
+      versionNumero: 1
+    };
+  }
+
+  return {
+    tipoVersion: "actualizacion",
+    version: "ACTUALIZACIÓN",
+    versionNumero: Number.isFinite(prevNumero) && prevNumero > 0 ? prevNumero + 1 : 2
+  };
+}
+
+function getFichaVersionLabel(ficha = {}) {
+  const version = cleanText(ficha?.version || "ORIGINAL").toUpperCase();
+  const numero = Number(ficha?.versionNumero || 0);
+
+  if (version === "ORIGINAL") return "ORIGINAL";
+  if (version === "ACTUALIZACIÓN" && numero > 1) return `ACTUALIZACIÓN ${numero}`;
+  if (version === "ACTUALIZACIÓN") return "ACTUALIZACIÓN";
+
+  return version || "ORIGINAL";
+}
+
+async function queueFichaConfirmationEmail({ versionLabel, nombre }) {
+  const alias =
+    cleanText(state.group?.aliasGrupo) ||
+    cleanText(state.ficha?.nombreGrupo) ||
+    `Grupo ${state.groupId}`;
+
+  const idGrupo = String(state.groupId || "");
+  const numeroNegocio = cleanText(state.ficha?.numeroNegocio || state.group?.numeroNegocio || "");
+  const solicitudReserva = cleanText(state.ficha?.solicitudReserva || state.group?.solicitudReserva || "");
+  const anoViaje = cleanText(state.group?.anoViaje || "");
+  const subject = `Nueva versión de ficha | ID ${idGrupo} | ${alias}`;
+
+  const text = [
+    "Se confirmó oficialmente una nueva versión de la ficha.",
+    "",
+    `ID Grupo: ${idGrupo}`,
+    `Alias: ${alias}`,
+    `Versión: ${versionLabel}`,
+    `Año de viaje: ${anoViaje || "-"}`,
+    `N° Negocio: ${numeroNegocio || "-"}`,
+    `Fecha solicitud reserva: ${solicitudReserva || "-"}`,
+    `Confirmada por: ${nombre}`,
+    `Correo usuario: ${state.effectiveEmail || "-"}`,
+    "",
+    "Este aviso fue generado automáticamente desde ficha-pdf.js."
+  ].join("\n");
+
+  const html = `
+    <div style="font-family:Arial,Helvetica,sans-serif;color:#2d2240;line-height:1.5;">
+      <h2 style="margin:0 0 12px;">Nueva versión de ficha confirmada</h2>
+      <p style="margin:0 0 12px;">Se confirmó oficialmente una nueva versión de la ficha.</p>
+
+      <table style="border-collapse:collapse;">
+        <tr><td style="padding:4px 10px 4px 0;"><strong>ID Grupo:</strong></td><td>${escapeHtml(idGrupo)}</td></tr>
+        <tr><td style="padding:4px 10px 4px 0;"><strong>Alias:</strong></td><td>${escapeHtml(alias)}</td></tr>
+        <tr><td style="padding:4px 10px 4px 0;"><strong>Versión:</strong></td><td>${escapeHtml(versionLabel)}</td></tr>
+        <tr><td style="padding:4px 10px 4px 0;"><strong>Año de viaje:</strong></td><td>${escapeHtml(anoViaje || "-")}</td></tr>
+        <tr><td style="padding:4px 10px 4px 0;"><strong>N° Negocio:</strong></td><td>${escapeHtml(numeroNegocio || "-")}</td></tr>
+        <tr><td style="padding:4px 10px 4px 0;"><strong>Fecha solicitud reserva:</strong></td><td>${escapeHtml(solicitudReserva || "-")}</td></tr>
+        <tr><td style="padding:4px 10px 4px 0;"><strong>Confirmada por:</strong></td><td>${escapeHtml(nombre)}</td></tr>
+        <tr><td style="padding:4px 10px 4px 0;"><strong>Correo usuario:</strong></td><td>${escapeHtml(state.effectiveEmail || "-")}</td></tr>
+      </table>
+
+      <p style="margin:16px 0 0;font-size:12px;color:#6b6280;">
+        Este aviso fue generado automáticamente desde ficha-pdf.js.
+      </p>
+    </div>
+  `;
+
+  await addDoc(collection(db, MAIL_COLLECTION), {
+    to: [FICHA_ALERT_EMAIL],
+    message: {
+      subject,
+      text,
+      html
+    },
+    meta: {
+      tipo: "ficha_confirmada_pdf",
+      idGrupo,
+      aliasGrupo: alias,
+      version: versionLabel,
+      creadoPor: nombre,
+      creadoPorCorreo: state.effectiveEmail || ""
+    }
+  });
+
+  return { subject };
+}
+
+async function confirmOfficialPdfClosure() {
+  const nombre = getDisplayName(state.effectiveUser);
+  const fichaActual = getByPath(state.group, "ficha") || {};
+  const flow = state.group.flowFicha || {};
+  const groupRef = doc(db, "ventas_cotizaciones", state.groupDocId);
+  const versionData = resolveNextFichaVersion();
+  const versionLabel = getFichaVersionLabel(versionData);
+
+  await updateDoc(groupRef, {
+    fichaEstado: "confirmada_pdf",
+    autorizada: true,
+    ultimaGestionAt: serverTimestamp(),
+    ultimaGestionTipo: "confirmacion_ficha_pdf",
+
+    versionFicha: versionData.version,
+    tipoVersionFicha: versionData.tipoVersion,
+    versionFichaNumero: versionData.versionNumero,
+    fechaActualizacionFicha: serverTimestamp(),
+
+    "ficha.estado": "confirmada_pdf",
+    "ficha.confirmada": true,
+    "ficha.confirmadaEl": serverTimestamp(),
+    "ficha.confirmadaPor": nombre,
+    "ficha.confirmadaPorCorreo": state.effectiveEmail,
+    "ficha.pdfPendienteGeneracion": true,
+    "ficha.pendienteEnvioCorreo": true,
+    "ficha.version": versionData.version,
+    "ficha.tipoVersion": versionData.tipoVersion,
+    "ficha.versionNumero": versionData.versionNumero,
+    "ficha.fechaActualizacion": serverTimestamp(),
+    "ficha.actualizadoPor": nombre,
+    "ficha.actualizadoPorCorreo": state.effectiveEmail,
+
+    "flowFicha.estado": "confirmada_pdf",
+    "flowFicha.administracion.firmado": !!flow?.administracion?.firmado,
+    "flowFicha.administracion.firmadoPor": flow?.administracion?.firmadoPor || nombre,
+    "flowFicha.administracion.firmadoPorCorreo": flow?.administracion?.firmadoPorCorreo || state.effectiveEmail,
+
+    "documentos.fichaGrupo.estado": "confirmada_pdf"
+  });
+
+  await addDoc(collection(db, HISTORIAL_COLLECTION), {
+    idGrupo: String(state.groupId || ""),
+    codigoRegistro: cleanText(state.group?.codigoRegistro || ""),
+    aliasGrupo: cleanText(state.group?.aliasGrupo || state.ficha?.nombreGrupo || ""),
+    modulo: "ficha",
+    tipoMovimiento: "confirmacion_ficha_pdf",
+    titulo: "Confirmación oficial de ficha PDF",
+    asunto: "Confirmación oficial de ficha PDF",
+    mensaje: `${nombre} confirmó oficialmente la ficha para impresión (${versionLabel}).`,
+    fecha: serverTimestamp(),
+    creadoPor: nombre,
+    creadoPorCorreo: state.effectiveEmail,
+    metadata: {
+      cambios: [
+        {
+          campo: "fichaEstado",
+          anterior: state.group?.fichaEstado || "",
+          nuevo: "confirmada_pdf"
+        },
+        {
+          campo: "ficha.confirmada",
+          anterior: !!fichaActual?.confirmada,
+          nuevo: true
+        },
+        {
+          campo: "ficha.confirmadaPor",
+          anterior: fichaActual?.confirmadaPor || "",
+          nuevo: nombre
+        },
+        {
+          campo: "ficha.version",
+          anterior: fichaActual?.version || state.group?.versionFicha || "",
+          nuevo: versionData.version
+        },
+        {
+          campo: "ficha.versionNumero",
+          anterior: fichaActual?.versionNumero || state.group?.versionFichaNumero || "",
+          nuevo: versionData.versionNumero
+        },
+        {
+          campo: "ficha.pendienteEnvioCorreo",
+          anterior: !!fichaActual?.pendienteEnvioCorreo,
+          nuevo: true
+        }
+      ]
+    }
+  });
+
+  let emailQueued = false;
+
+  try {
+    const emailInfo = await queueFichaConfirmationEmail({
+      versionLabel,
+      nombre
+    });
+
+    emailQueued = true;
+
+    await updateDoc(groupRef, {
+      "ficha.pendienteEnvioCorreo": false,
+      "ficha.ultimoCorreoEstado": "encolado",
+      "ficha.ultimoCorreoDestinatario": FICHA_ALERT_EMAIL,
+      "ficha.ultimoCorreoAsunto": emailInfo.subject || "",
+      "ficha.ultimoCorreoEl": serverTimestamp()
+    });
+  } catch (emailError) {
+    console.error("[ficha-pdf] queueFichaConfirmationEmail", emailError);
+
+    await updateDoc(groupRef, {
+      "ficha.pendienteEnvioCorreo": true,
+      "ficha.ultimoCorreoEstado": "error"
+    });
+  }
+
+  return { emailQueued };
 }
 
 /* =========================================================
@@ -382,7 +757,21 @@ function hydrateFicha(group = {}) {
       group.versionFicha,
       "ORIGINAL"
     ),
-
+    
+    tipoVersion: pick(
+      ficha.tipoVersion,
+      group.tipoVersionFicha,
+      "original"
+    ),
+    
+    versionNumero: Number(
+      pick(
+        ficha.versionNumero,
+        group.versionFichaNumero,
+        1
+      )
+    ) || 1,
+    
     fechaActualizacionTexto: pick(
       ficha.fechaActualizacionTexto,
       humanDateLong(group.fechaActualizacionFicha),
