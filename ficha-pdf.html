@@ -40,6 +40,14 @@
       flex-wrap:wrap;
     }
 
+    .pdf-top-actions--gated{
+      display:none;
+    }
+
+    .pdf-toolbar.pdf-top-actions--visible{
+      display:flex;
+    }
+
     .btn-light,
     .btn-pill,
     .btn-dark{
@@ -359,7 +367,7 @@
   <div id="layout-top"></div>
 
   <main class="pdf-shell">
-    <div class="pdf-toolbar no-print">
+    <div id="pdfTopActions" class="pdf-toolbar pdf-top-actions--gated no-print" aria-hidden="true">
       <button class="btn-light" id="btnVolverFichaEditable" type="button">Volver a ficha editable</button>
       <button class="btn-pill" id="btnVolverGrupo" type="button">Volver al grupo</button>
       <button class="btn-dark" id="btnImprimirFichaPdf" type="button">Imprimir / Guardar PDF</button>
