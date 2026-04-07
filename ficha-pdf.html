@@ -8,17 +8,6 @@
   <link rel="icon" type="image/png" href="IMG/logo-raitrai.png" />
 
   <style>
-    :root{
-      --pdf-ink: #241733;
-      --pdf-muted: #655a73;
-      --pdf-line: #5b4a72;
-      --pdf-soft: #eee8f3;
-      --pdf-soft-2: #f7f4fa;
-      --pdf-brand: #3b2357;
-      --pdf-brand-2: #5a3a80;
-      --pdf-box: #ffffff;
-    }
-
     *{ box-sizing:border-box; }
 
     body{
@@ -28,16 +17,20 @@
       font-family: Arial, Helvetica, sans-serif;
     }
 
-    .pdf-shell{
-      padding:20px 16px 30px;
-      zoom: 1.18;
+    :root{
+      --screen-scale: 1.22;
+      --pdf-ink: #241733;
+      --pdf-muted: #655a73;
+      --pdf-line: #5b4a72;
+      --pdf-soft: #eee8f3;
+      --pdf-soft-2: #f7f4fa;
+      --pdf-brand: #3b2357;
+      --pdf-brand-2: #5a3a80;
+      --pdf-box: #ffffff;
     }
     
-    @media print{
-      .pdf-shell{
-        padding:0 !important;
-        zoom: 1 !important;
-      }
+    .pdf-shell{
+      padding:20px 16px 30px;
     }
 
     .pdf-toolbar{
@@ -87,14 +80,19 @@
     }
 
     .pdf-page{
-      width:198mm;
-      min-height:285mm;
-      margin:0 auto;
+      box-sizing:border-box;
+      width:210mm;
+      height:297mm;
+      margin:0 auto calc(297mm * (var(--screen-scale) - 1) + 18px);
       background:#fff;
       border:1px solid rgba(59,35,87,.14);
       box-shadow:0 18px 40px rgba(25,15,40,.12);
-      padding:5mm 6mm 5mm;
+      padding:4mm 5mm 4mm;
       overflow:hidden;
+      transform:scale(var(--screen-scale));
+      transform-origin:top center;
+      break-inside:avoid;
+      page-break-inside:avoid;
     }
 
     .pdf-title{
@@ -143,13 +141,13 @@
     .pdf-form{
       display:flex;
       flex-direction:column;
-      gap:4px;
+      gap:3px;
     }
     
     .pdf-row{
       display:grid;
       align-items:start;
-      gap:6px;
+      gap:4px;
     }
 
     .pdf-row.row-1{
@@ -191,18 +189,18 @@
     }
 
     .pdf-label{
-      font-size:10px;
+      font-size:9px;
       color:var(--pdf-brand);
-      line-height:1.15;
-      padding-top:3px;
+      line-height:1.08;
+      padding-top:2px;
       white-space:nowrap;
     }
     
     .pdf-inline-label{
-      font-size:10px;
+      font-size:9px;
       color:var(--pdf-brand);
-      line-height:1.15;
-      padding-top:3px;
+      line-height:1.08;
+      padding-top:2px;
       white-space:nowrap;
       text-align:left;
     }
@@ -210,37 +208,37 @@
     .pdf-box{
       border:1px solid var(--pdf-line);
       background:var(--pdf-box);
-      min-height:17px;
-      padding:1px 6px 2px;
-      font-size:9px;
-      line-height:1.18;
+      min-height:15px;
+      padding:1px 5px 1px;
+      font-size:8px;
+      line-height:1.1;
       color:#20152c;
       overflow:hidden;
       word-break:break-word;
     }
     
     .pdf-box.tall{
-      min-height:34px;
-      padding-top:4px;
-      padding-bottom:4px;
+      min-height:24px;
+      padding-top:3px;
+      padding-bottom:3px;
     }
     
     .pdf-box.fecha{
-      min-height:36px;
-      padding-top:4px;
-      padding-bottom:4px;
+      min-height:27px;
+      padding-top:3px;
+      padding-bottom:3px;
     }
     
     .pdf-box.rich{
-      min-height:78px;
-      max-height:78px;
-      padding:4px 6px;
+      min-height:48px;
+      max-height:48px;
+      padding:3px 5px;
     }
     
     .pdf-box.obs{
-      min-height:28px;
-      max-height:28px;
-      padding:4px 6px;
+      min-height:18px;
+      max-height:18px;
+      padding:3px 5px;
     }
 
     .pdf-box.empty::before{
@@ -254,18 +252,18 @@
       border-bottom:none;
       background:#f1ecec;
       color:var(--pdf-brand);
-      font-size:10px;
+      font-size:9px;
       text-align:center;
-      padding:1px 6px;
-      min-height:16px;
+      padding:1px 5px;
+      min-height:14px;
     }
     
     .pdf-rich{
-      font-size:8.7px;
-      line-height:1.18;
+      font-size:7.4px;
+      line-height:1.08;
       color:#241733;
       overflow:hidden;
-      max-height:70px;
+      max-height:42px;
     }
 
     .pdf-rich p{
@@ -322,10 +320,14 @@
 
     @page{
       size:A4 portrait;
-      margin:6mm;
+      margin:0;
     }
     
     @media print{
+      :root{
+        --screen-scale: 1;
+      }
+    
       body{
         background:#fff !important;
       }
@@ -341,13 +343,18 @@
       }
     
       .pdf-page{
-        width:198mm;
-        min-height:285mm;
-        margin:0 auto;
-        border:none;
-        box-shadow:none;
-        padding:5mm 6mm 5mm;
-        overflow:hidden;
+        box-sizing:border-box;
+        width:210mm !important;
+        height:297mm !important;
+        margin:0 auto !important;
+        border:none !important;
+        box-shadow:none !important;
+        padding:4mm 5mm 4mm !important;
+        overflow:hidden !important;
+        transform:none !important;
+        transform-origin:top center !important;
+        break-inside:avoid;
+        page-break-inside:avoid;
       }
     }
   </style>
