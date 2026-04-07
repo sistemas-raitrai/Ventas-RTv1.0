@@ -30,7 +30,6 @@ import {
 } from "./ui.js";
 
 const $ = (id) => document.getElementById(id);
-
 const GITHUB_HOME_URL = "https://sistemas-raitrai.github.io/Ventas-RT/";
 
 const state = {
@@ -38,7 +37,6 @@ const state = {
   effectiveUser: null,
   effectiveEmail: "",
   canSeeAll: false,
-
   requestedId: "",
   groupDocId: "",
   groupId: "",
@@ -210,157 +208,44 @@ function canOpenFichaPdf() {
    RENDER
 ========================================================= */
 function renderPage() {
-  renderHeader();
-  renderFields();
-  renderRichBlocks();
-  renderFooter();
-}
-
-function renderHeader() {
-  const title =
-    cleanText(state.ficha?.nombreGrupo) ||
-    cleanText(state.group?.aliasGrupo) ||
-    cleanText(state.group?.nombreGrupo) ||
-    cleanText(state.group?.colegio) ||
-    `Grupo ${state.groupId}`;
-
-  setText("pdfTitle", title);
-  setText("pdfIdGrupo", state.groupId);
-  setText("pdfColegio", state.group?.colegio || "—");
-  setText("pdfCurso", state.group?.curso || "—");
-  setText("pdfAnoViaje", state.group?.anoViaje || "—");
-  setText("pdfVendedora", state.group?.vendedora || state.group?.vendedoraCorreo || "—");
-
-  const estadoFicha = getFichaEstadoLabel(
-    state.group?.fichaEstado ||
-    state.ficha?.estado ||
-    "pendiente"
-  );
-
-  setText("pdfEstadoFicha", estadoFicha);
-  setText(
-    "pdfEstadoFichaSub",
-    state.group?.autorizada
-      ? "Grupo autorizado para operaciones"
-      : "Flujo todavía no cerrado"
-  );
-
-  setText("pdfVersion", state.ficha?.version || "—");
-  setText("pdfNumeroNegocio", state.ficha?.numeroNegocio || "—");
-  setText(
-    "pdfFechaActualizacion",
-    state.ficha?.fechaActualizacionTexto ||
-    formatDate(state.ficha?.fechaActualizacion) ||
-    "Sin fecha"
-  );
-
-  setText("pdfSolicitudReserva", state.ficha?.solicitudReserva || "—");
-
-  const chipRow = $("pdfChipRow");
-  if (chipRow) {
-    chipRow.innerHTML = `
-      <span class="pdf-chip">Estado grupo: ${escapeHtml(getEstadoLabel(state.group?.estado))}</span>
-      <span class="pdf-chip">${state.group?.autorizada ? "Autorizada" : "No autorizada"}</span>
-      <span class="pdf-chip">${cleanText(state.ficha?.pdfUrl || state.group?.fichaPdfUrl || "") ? "PDF previo enlazado" : "Sin PDF enlazado"}</span>
-    `;
-  }
-
-  const statusRow = $("pdfStatusRow");
-  if (statusRow) {
-    statusRow.innerHTML = `
-      <span class="status-pill ${state.group?.autorizada ? "ok" : "warn"}">
-        ${state.group?.autorizada ? "Autorizada" : "Pendiente"}
-      </span>
-      <span class="status-pill ${cleanText(state.group?.fichaPdfUrl || state.ficha?.pdfUrl || "") ? "ok" : "warn"}">
-        ${cleanText(state.group?.fichaPdfUrl || state.ficha?.pdfUrl || "") ? "Con PDF previo" : "Sin PDF previo"}
-      </span>
-    `;
-  }
-}
-
-function renderFields() {
-  setText("pdfPrograma", state.ficha?.nombrePrograma || state.group?.programa || "—");
-  setText("pdfTramo", state.ficha?.tramo || state.group?.tramo || "—");
-  setText(
-    "pdfHotel",
-    state.ficha?.categoriaHoteleraContratada ||
-    state.group?.categoriaHoteleraContratada ||
-    state.group?.hotel ||
-    "—"
-  );
-  setText(
-    "pdfFechaTentativa",
-    state.ficha?.fechaViajeTexto ||
-    state.group?.semanaViaje ||
-    humanDateLong(state.group?.fechaViaje) ||
-    "—"
-  );
-
-  setText("pdfNombreGrupo", state.ficha?.nombreGrupo || "—");
-  setText("pdfApoderado", state.ficha?.apoderadoEncargado || "—");
-  setText("pdfTelefono", state.ficha?.telefono || "—");
-  setText("pdfCorreo", state.ficha?.correo || "—");
-  setText("pdfPax", state.ficha?.numeroPaxTotal || "—");
-  setText("pdfLiberados", state.ficha?.liberados || "—");
+  setText("pdfAnoTitulo", state.group?.anoViaje || "—");
+  setText("pdfSolicitudReserva", valueOrDash(state.ficha?.solicitudReserva).toUpperCase());
+  setText("pdfNombreGrupo", valueOrDash(state.ficha?.nombreGrupo).toUpperCase());
+  setText("pdfApoderadoEncargado", valueOrDash(state.ficha?.apoderadoEncargado).toUpperCase());
+  setText("pdfTelefono", valueOrDash(state.ficha?.telefono));
+  setText("pdfCorreo", valueOrDash(state.ficha?.correo));
+  setText("pdfNombrePrograma", valueOrDash(state.ficha?.nombrePrograma).toUpperCase());
   setText("pdfValorPrograma", formatMoneyMaybe(state.ficha?.valorPrograma));
-  setText("pdfAutorizacionGerencia", state.ficha?.autorizacionGerencia || "—");
-  setText("pdfDescuentoValorBase", state.ficha?.descuentoValorBase || "—");
-  setText("pdfAsistenciaViajes", state.ficha?.asistenciaEnViajes || "—");
-  setText("pdfNombreVendedor", state.ficha?.nombreVendedor || "—");
-  setText("pdfUsuarioFicha", state.ficha?.usuarioFicha || "—");
-  setText("pdfClaveAdministrativa", state.ficha?.claveAdministrativa || "—");
-}
+  setText("pdfNumeroPaxTotal", valueOrDash(state.ficha?.numeroPaxTotal));
+  setText("pdfTramo", valueOrDash(state.ficha?.tramo));
+  setText("pdfLiberados", valueOrDash(state.ficha?.liberados));
+  setText("pdfCategoriaHoteleraContratada", valueOrDash(state.ficha?.categoriaHoteleraContratada).toUpperCase());
+  setText("pdfAutorizacionGerencia", valueOrDash(state.ficha?.autorizacionGerencia).toUpperCase());
+  setText("pdfDescuentoValorBase", valueOrDash(state.ficha?.descuentoValorBase).toUpperCase());
+  setText("pdfFechaViajeTexto", valueOrDash(state.ficha?.fechaViajeTexto));
+  setText("pdfAsistenciaEnViajes", valueOrDash(state.ficha?.asistenciaEnViajes).toUpperCase());
+  setText("pdfNombreVendedor", valueOrDash(state.ficha?.nombreVendedor).toUpperCase());
+  setText("pdfNumeroNegocio", valueOrDash(state.ficha?.numeroNegocio));
+  setText("pdfUsuarioFicha", valueOrDash(state.ficha?.usuarioFicha));
+  setText("pdfClaveAdministrativa", valueOrDash(state.ficha?.claveAdministrativa));
+  setText("pdfVersionFicha", valueOrDash(state.ficha?.version).toUpperCase());
+  setText("pdfFechaActualizacion", valueOrDash(state.ficha?.fechaActualizacionTexto));
 
-function renderRichBlocks() {
-  renderRich("pdfInfoOperaciones", state.ficha?.infoOperacionesHtml);
-  renderRich("pdfInfoAdministracion", state.ficha?.infoAdministracionHtml);
-  renderRich("pdfObservaciones", state.ficha?.observacionesHtml);
-}
-
-function renderFooter() {
-  setText("pdfFooterVersion", state.ficha?.version || "—");
-  setText(
-    "pdfFooterFecha",
-    state.ficha?.fechaActualizacionTexto ||
-    formatDate(state.ficha?.fechaActualizacion) ||
-    "—"
-  );
-}
-
-function renderFatal(message) {
-  document.body.innerHTML = `
-    <main style="max-width:820px;margin:40px auto;padding:24px;">
-      <div style="background:#fff;border:1px solid rgba(58,42,82,.12);border-radius:20px;padding:22px;box-shadow:0 10px 24px rgba(36,18,56,.08);font-family:Arial,Helvetica,sans-serif;">
-        <div style="font-weight:900;font-size:22px;color:#31194b;margin-bottom:8px;">Ficha PDF</div>
-        <div style="color:#3a2a52;font-size:15px;line-height:1.5;">${escapeHtml(message)}</div>
-      </div>
-    </main>
-  `;
-}
-
-function renderRich(id, html = "") {
-  const el = $(id);
-  if (!el) return;
-
-  const safe = sanitizeRichHtml(html || "");
-  if (!safe) {
-    el.innerHTML = `<div class="empty-rich">Sin información registrada.</div>`;
-    return;
-  }
-
-  el.innerHTML = safe;
+  renderRichAsHtml("pdfInfoOperaciones", state.ficha?.infoOperacionesHtml);
+  renderRichAsHtml("pdfInfoAdministracion", state.ficha?.infoAdministracionHtml);
+  renderRichAsHtml("pdfObservaciones", state.ficha?.observacionesHtml);
 }
 
 /* =========================================================
    EVENTS
 ========================================================= */
 function bindEvents() {
-  $("btnVolverGrupo")?.addEventListener("click", () => {
-    location.href = `grupo.html?id=${encodeURIComponent(state.groupId || state.requestedId || "")}`;
+  $("btnVolverFichaEditable")?.addEventListener("click", () => {
+    location.href = `fichas.html?id=${encodeURIComponent(state.groupId || state.requestedId || "")}`;
   });
 
-  $("btnAbrirFichaEditable")?.addEventListener("click", () => {
-    location.href = `fichas.html?id=${encodeURIComponent(state.groupId || state.requestedId || "")}`;
+  $("btnVolverGrupo")?.addEventListener("click", () => {
+    location.href = `grupo.html?id=${encodeURIComponent(state.groupId || state.requestedId || "")}`;
   });
 
   $("btnImprimirFichaPdf")?.addEventListener("click", () => {
@@ -369,7 +254,7 @@ function bindEvents() {
 }
 
 /* =========================================================
-   DATA BUILD
+   DATA
 ========================================================= */
 function hydrateFicha(group = {}) {
   const ficha = getByPath(group, "ficha") || {};
@@ -457,7 +342,6 @@ function hydrateFicha(group = {}) {
 
     fechaViajeTexto: pick(
       ficha.fechaViajeTexto,
-      group.semanaViaje,
       humanDateLong(group.fechaViaje),
       ""
     ),
@@ -521,39 +405,55 @@ function hydrateFicha(group = {}) {
     observacionesHtml: pick(
       ficha.observacionesHtml,
       ""
-    ),
-
-    pdfUrl: pick(
-      ficha.pdfUrl,
-      group.fichaPdfUrl,
-      ""
-    ),
-
-    pdfNombre: pick(
-      ficha.pdfNombre,
-      group.fichaPdfNombre,
-      ""
-    ),
-
-    estado: pick(
-      ficha.estado,
-      group.fichaEstado,
-      "pendiente"
-    ),
-
-    actualizadoPor: pick(ficha.actualizadoPor, ""),
-    actualizadoPorCorreo: pick(ficha.actualizadoPorCorreo, ""),
-    fechaActualizacion: ficha.fechaActualizacion || group.fechaActualizacionFicha || null
+    )
   };
 }
 
 /* =========================================================
    HELPERS
 ========================================================= */
+function renderRichAsHtml(id, html = "") {
+  const el = $(id);
+  if (!el) return;
+
+  const safe = sanitizeRichHtml(html || "");
+  if (!safe) {
+    el.innerHTML = `<div class="empty"></div>`;
+    return;
+  }
+
+  el.innerHTML = `<div class="pdf-rich">${safe}</div>`;
+}
+
+function renderFatal(message) {
+  document.body.innerHTML = `
+    <main style="max-width:820px;margin:40px auto;padding:24px;font-family:Arial,Helvetica,sans-serif;">
+      <div style="background:#fff;border:1px solid rgba(58,42,82,.12);border-radius:20px;padding:22px;box-shadow:0 10px 24px rgba(36,18,56,.08);">
+        <div style="font-weight:900;font-size:22px;color:#31194b;margin-bottom:8px;">Ficha PDF</div>
+        <div style="color:#3a2a52;font-size:15px;line-height:1.5;">${escapeHtml(message)}</div>
+      </div>
+    </main>
+  `;
+}
+
 function setText(id, value) {
   const el = $(id);
   if (!el) return;
   el.textContent = String(value ?? "");
+}
+
+function valueOrDash(value) {
+  const s = String(value ?? "").trim();
+  return s || "—";
+}
+
+function pick(...values) {
+  for (const value of values) {
+    if (value === null || value === undefined) continue;
+    if (typeof value === "string" && !value.trim()) continue;
+    return value;
+  }
+  return "";
 }
 
 function getByPath(obj, path = "") {
@@ -568,15 +468,6 @@ function getByPath(obj, path = "") {
   return ref;
 }
 
-function pick(...values) {
-  for (const value of values) {
-    if (value === null || value === undefined) continue;
-    if (typeof value === "string" && !value.trim()) continue;
-    return value;
-  }
-  return "";
-}
-
 function buildDefaultGroupName(group = {}) {
   return [
     cleanText(group.aliasGrupo) ||
@@ -585,31 +476,6 @@ function buildDefaultGroupName(group = {}) {
     "",
     group.anoViaje ? `(${group.anoViaje})` : ""
   ].filter(Boolean).join(" ");
-}
-
-function getEstadoLabel(value = "") {
-  const key = normalizeState(value);
-  const map = {
-    a_contactar: "A contactar",
-    contactado: "Contactado",
-    cotizando: "Cotizando",
-    recotizando: "Recotizando",
-    reunion_confirmada: "Reunión confirmada",
-    ganada: "Ganada",
-    perdida: "Perdida"
-  };
-  return map[key] || "A contactar";
-}
-
-function getFichaEstadoLabel(value = "") {
-  const v = normalizeSearchLocal(value);
-  if (!v) return "Pendiente";
-  if (v === "lista_vendedor") return "Lista vendedor";
-  if (v === "revisada_jefa_ventas") return "Revisada jefa ventas";
-  if (v === "autorizada_admin") return "Autorizada administración";
-  if (v === "en_edicion") return "En edición";
-  if (v === "ok") return "Ok";
-  return capitalize(String(value).replaceAll("_", " "));
 }
 
 function normalizeState(value = "") {
@@ -638,26 +504,20 @@ function cleanText(value = "") {
 
 function toDate(value) {
   if (!value) return null;
-  if (value instanceof Date) return isNaN(value) ? null : value;
+  if (value instanceof Date) return Number.isNaN(value.getTime()) ? null : value;
   if (typeof value?.toDate === "function") {
     const d = value.toDate();
-    return isNaN(d) ? null : d;
-  }
-  if (typeof value === "string") {
-    const d = new Date(value);
-    return isNaN(d) ? null : d;
+    return Number.isNaN(d?.getTime?.()) ? null : d;
   }
   if (typeof value === "number") {
     const d = new Date(value);
-    return isNaN(d) ? null : d;
+    return Number.isNaN(d.getTime()) ? null : d;
+  }
+  if (typeof value === "string") {
+    const d = new Date(value);
+    return Number.isNaN(d.getTime()) ? null : d;
   }
   return null;
-}
-
-function formatDate(value) {
-  const d = toDate(value);
-  if (!d) return "";
-  return d.toLocaleDateString("es-CL");
 }
 
 function humanDateLong(value) {
@@ -676,7 +536,6 @@ function formatMoneyMaybe(value) {
 
   const normalized = raw.replace(/[^\d,-.]/g, "");
   const onlyDigits = normalized.replace(/[^\d]/g, "");
-
   if (!onlyDigits) return raw;
 
   const n = Number(onlyDigits);
@@ -712,6 +571,10 @@ function sanitizeRichHtml(html = "") {
       if ((name === "href" || name === "src") && /^\s*javascript:/i.test(value)) {
         el.removeAttribute(attr.name);
       }
+
+      if (name === "style") {
+        el.removeAttribute(attr.name);
+      }
     });
   });
 
@@ -725,12 +588,6 @@ function normalizeRichHtml(html = "") {
     .replace(/<p><br><\/p>/gi, "")
     .replace(/>\s+</g, "><")
     .trim();
-}
-
-function capitalize(value = "") {
-  const s = String(value || "").trim();
-  if (!s) return "";
-  return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
 function escapeHtml(value = "") {
