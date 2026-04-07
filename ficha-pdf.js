@@ -230,47 +230,6 @@ function syncPdfTopActionsVisibility() {
   box.setAttribute("aria-hidden", visible ? "false" : "true");
 }
 
-function isVendorPdfReadOnlyView() {
-  return String(state.effectiveUser?.rol || "").toLowerCase() === "vendedor";
-}
-
-function syncPdfTopActionsVisibility() {
-  const hideAllActions = isVendorPdfReadOnlyView();
-
-  const actionButtons = [
-    $("btnVolverFichaEditable"),
-    $("btnVolverGrupo"),
-    $("btnImprimirFichaPdf")
-  ].filter(Boolean);
-
-  actionButtons.forEach((btn) => {
-    btn.classList.toggle("hidden", hideAllActions);
-    btn.style.display = hideAllActions ? "none" : "";
-  });
-
-  const explicitToolbar =
-    document.querySelector("[data-pdf-actions]") ||
-    document.querySelector(".pdf-actions") ||
-    document.querySelector(".pdf-top-actions") ||
-    document.querySelector(".pdf-toolbar");
-
-  if (explicitToolbar) {
-    explicitToolbar.classList.toggle("hidden", hideAllActions);
-    explicitToolbar.style.display = hideAllActions ? "none" : "";
-    return;
-  }
-
-  const commonParent = actionButtons.length ? actionButtons[0].parentElement : null;
-  const sameParent =
-    commonParent &&
-    actionButtons.length &&
-    actionButtons.every((btn) => btn.parentElement === commonParent);
-
-  if (sameParent) {
-    commonParent.style.display = hideAllActions ? "none" : "";
-  }
-}
-
 /* =========================================================
    RENDER
 ========================================================= */
