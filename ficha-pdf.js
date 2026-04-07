@@ -216,6 +216,24 @@ function isVendorPdfReadOnlyView() {
   return String(state.effectiveUser?.rol || "").toLowerCase() === "vendedor";
 }
 
+function canSeePdfTopActions() {
+  return !isVendorPdfReadOnlyView();
+}
+
+function syncPdfTopActionsVisibility() {
+  const box = $("pdfTopActions");
+  if (!box) return;
+
+  const visible = canSeePdfTopActions();
+
+  box.classList.toggle("pdf-top-actions--visible", visible);
+  box.setAttribute("aria-hidden", visible ? "false" : "true");
+}
+
+function isVendorPdfReadOnlyView() {
+  return String(state.effectiveUser?.rol || "").toLowerCase() === "vendedor";
+}
+
 function syncPdfTopActionsVisibility() {
   const hideAllActions = isVendorPdfReadOnlyView();
 
@@ -358,16 +376,6 @@ async function handlePrintButtonClick() {
 function syncPrintButton() {
   const btn = $("btnImprimirFichaPdf");
   if (!btn) return;
-
-  if (isVendorPdfReadOnlyView()) {
-    btn.disabled = true;
-    btn.classList.add("hidden");
-    btn.style.display = "none";
-    return;
-  }
-
-  btn.classList.remove("hidden");
-  btn.style.display = "";
 
   if (state.isClosingPdf) {
     btn.disabled = true;
