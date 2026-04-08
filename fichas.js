@@ -998,6 +998,172 @@ async function signFlowFromFicha(step) {
     return;
   }
 }
+
+async function saveUpdateRequest() {
+  if (!canRequestFichaUpdate()) {
+    alert("No tienes permisos para solicitar actualización.");
+    return;
+  }
+
+  if (hasPendingUpdateRequest()) {
+    alert("Ya existe una solicitud pendiente para este grupo.");
+    closeModal("modalSolicitudFicha");
+    return;
+  }
+
+  const asunto = getValue("sr_asunto");
+  const detalle = getValue("sr_detalle");
+
+  if (!detalle) {
+    alert("Debes explicar qué hay que cambiar.");
+    return;
+  }
+
+  const asuntoFinal =
+    asunto || `Actualizar ficha · ${state.group.aliasGrupo || state.group.colegio || state.groupId}`;
+
+  await addDoc(collection(db, SOLICITUDES_COLLECTION), {
+    idGrupo: String(state.groupId),
+    codigoRegistro: cleanText(state.group.codigoRegistro),
+    aliasGrupo: cleanText(state.group.aliasGrupo),
+    colegio: cleanText(state.group.colegio),
+    tipoSolicitud: "actualizacion_ficha",
+    asunto: asuntoFinal,
+    detalle,
+    estadoSolicitud: "pendiente",
+    destinatarioRol: "jefa_ventas",
+    destinatarioCorreo: "chernandez@raitrai.cl",
+    solicitadoPor: getDisplayName(state.effectiveUser),
+    solicitadoPorCorreo: state.effectiveEmail,
+    fechaSolicitud: serverTimestamp()
+  });
+
+  const nombreVendedorFirmado =
+    cleanText(state.group?.flowFicha?.vendedor?.firmadoPor) ||
+    cleanText(state.group?.firmaVendedor) ||
+    getDisplayName(state.effectiveUser);
+
+  const correoVendedorFirmado =
+    normalizeEmail(
+      state.group?.flowFicha?.vendedor?.firmadoPorCorreo ||
+      state.group?.vendedoraCorreo ||
+      state.effectiveEmail
+    );
+
+  await saveGroupPatch(
+    {
+      autorizada: false,
+      cerrada: false,
+      cierre: "",
+
+      fichaFlujoModo: "v2",
+      fichaEstado: "lista_vendedor",
+      firmaSupervision: "",
+      firmaAdministracion: "",
+
+      ficha: {
+        ...(state.group.ficha || {}),
+        flujoModo: "v2",
+        estado: "lista_vendedor",
+        pdfPendienteGeneracion: true
+      },
+
+      flowFicha: {
+        ...(state.group.flowFicha || {}),
+        modo: "v2",
+        legacy: false,
+        habilitada: true,
+        estado: "lista_vendedor",
+        bloqueadaParaVendedor: true,
+        requiereActualizacion: true,
+        requiereRefirmaAdministracion: true,
+
+        ultimaSolicitudActualizacion: {
+          asunto: asuntoFinal,
+          detalle,
+          solicitadaPor: getDisplayName(state.effectiveUser),
+          solicitadaPorCorreo: state.effectiveEmail,
+          fechaSolicitud: serverTimestamp(),
+          estado: "pendiente"
+        },
+
+        vendedor: {
+          ...(state.group.flowFicha?.vendedor || {}),
+          firmado: true,
+          firmadoPor: nombreVendedorFirmado,
+          firmadoPorCorreo: correoVendedorFirmado
+        },
+
+        jefaVentas: {
+          ...(state.group.flowFicha?.jefaVentas || {}),
+          firmado: false,
+          firmadoAt: null,
+          firmadoPor: "",
+          firmadoPorCorreo: "",
+          observacion: ""
+        },
+
+        administracion: {
+          ...(state.group.flowFicha?.administracion || {}),
+          firmado: false,
+          firmadoAt: null,
+          firmadoPor: "",
+          firmadoPorCorreo: "",
+          observacion: ""
+        }
+      },
+
+      documentos: {
+        ...(state.group.documentos || {}),
+        fichaGrupo: {
+          ...(state.group.documentos?.fichaGrupo || {}),
+          estado: "lista_vendedor"
+        }
+      }
+    },
+    {
+      tipoMovimiento: "solicitud_actualizacion_ficha",
+      modulo: "ficha",
+      titulo: "Solicitud de actualización de ficha",
+      mensaje: `${getDisplayName(state.effectiveUser)} solicitó actualización de la ficha y reinició el flujo de firmas.`,
+      cambios: [
+        {
+          campo: "autorizada",
+          anterior: !!state.group.autorizada,
+          nuevo: false
+        },
+        {
+          campo: "cerrada",
+          anterior: !!state.group.cerrada,
+          nuevo: false
+        },
+        {
+          campo: "cierre",
+          anterior: state.group.cierre || "",
+          nuevo: ""
+        },
+        {
+          campo: "fichaEstado",
+          anterior: state.group.fichaEstado || "",
+          nuevo: "lista_vendedor"
+        },
+        {
+          campo: "flowFicha.jefaVentas.firmado",
+          anterior: !!state.group.flowFicha?.jefaVentas?.firmado,
+          nuevo: false
+        },
+        {
+          campo: "flowFicha.administracion.firmado",
+          anterior: !!state.group.flowFicha?.administracion?.firmado,
+          nuevo: false
+        }
+      ]
+    }
+  );
+
+  closeModal("modalSolicitudFicha");
+}
+
 /* =========================================================
    SAVE
 ========================================================= */
