@@ -1977,3 +1977,43 @@ html, body{
     min-width:0;
   }
 }
+
+/* Selectores buscables dashboard */
+.filtro-bloque .ts-wrapper {
+  width: 100%;
+}
+
+.filtro-bloque .ts-wrapper.single .ts-control {
+  min-height: 48px;
+  border: 1px solid #d8d2df;
+  border-radius: 14px;
+  padding: 10px 14px;
+  background: #fff;
+  box-shadow: none;
+}
+
+.filtro-bloque .ts-wrapper.single .ts-control input {
+  font-size: 16px;
+}
+
+.filtro-bloque .ts-wrapper.single .item,
+.filtro-bloque .ts-dropdown .option {
+  font-size: 16px;
+  color: #2d1b46;
+}
+
+.filtro-bloque .ts-wrapper.focus .ts-control {
+  border-color: #5a2d82;
+  box-shadow: 0 0 0 3px rgba(90, 45, 130, 0.12);
+}
+
+.filtro-bloque .ts-dropdown {
+  border: 1px solid #d8d2df;
+  border-radius: 14px;
+  overflow: hidden;
+  margin-top: 6px;
+}
+
+.filtro-bloque .ts-dropdown .active {
+  background: #f3eef8;
+}
