@@ -265,7 +265,15 @@ function isJefaVentas() {
 }
 
 function isAdministracion() {
-  return normalizeEmail(state.effectiveEmail) === "yenny@raitrai.cl" || state.effectiveUser?.rol === "admin";
+  const email = normalizeEmail(state.effectiveEmail || "");
+  const rol = String(state.effectiveUser?.rol || "").toLowerCase();
+
+  if (rol === "admin") return true;
+
+  return (
+    email === "yenny@raitrai.cl" ||
+    email === "administracion@raitrai.cl"
+  );
 }
 
 function getFichaFlowMode(groupData = {}) {
