@@ -94,7 +94,9 @@ function initSearchableSelect(id, placeholder = "Escribe para buscar...") {
 ========================================================= */
 const state = {
   rows: [],
-  rowsById: new Map()
+  rowsById: new Map(),
+  scopedRows: [],
+  fichasPorFirmarRows: []
 };
 
 /* =========================================================
@@ -418,44 +420,72 @@ function isGanadaComercial(row = {}) {
   return resolveEstadoBucket(row) === "ganadas";
 }
 
+function hasAllThreeFichaFirmas(row = {}) {
+  const firmas = getFichaFirmas(row);
+  return !!(firmas.vendedor && firmas.jefa && firmas.admin);
+}
+
+function isCaroDashboardUser(user = {}) {
+  return normalizeEmail(user?.email || "") === "chernandez@raitrai.cl";
+}
+
+function isAdministracionDashboardUser(user = {}) {
+  const email = normalizeEmail(user?.email || "");
+  return (
+    email === "yenny@raitrai.cl" ||
+    email === "administracion@raitrai.cl"
+  );
+}
+
+function getFichaPendienteLabel(row = {}) {
+  const firmas = getFichaFirmas(row);
+
+  if (!firmas.vendedor) return "Falta firma vendedor(a)";
+  if (!firmas.jefa) return "Falta firma jefa de ventas";
+  if (!firmas.admin) return "Falta firma administración";
+  return "Firmas completas";
+}
+
 function isFichaPorFirmarSegunUsuario(row = {}, effectiveUser = null) {
   const user = effectiveUser || getEffectiveUser();
   if (!user) return false;
 
-  const email = normalizeEmail(user?.email || "");
-  const firmas = getFichaFirmas(row);
-  const fichaCreada = hasFichaCreada(row);
-  const cerrada = isFichaCerrada(row);
   const ganada = isGanadaComercial(row);
+  if (!ganada) return false;
 
-  if (cerrada) return false;
+  const firmas = getFichaFirmas(row);
 
   // VENDEDOR:
-  // solo cuenta grupos ganados donde todavía no se ha creado la ficha.
+  // ve las ganadas donde todavía falta su firma.
   if (isVendedorRole(user)) {
-    return ganada && !fichaCreada;
+    return !firmas.vendedor;
   }
 
-  // CHERNANDEZ:
-  // muestra las que ya firmó vendedor(a) y todavía no firma Yenny.
-  if (email === "chernandez@raitrai.cl") {
-    return ganada && firmas.vendedor && !firmas.admin;
+  // CARO:
+  // ve solo las que le toca firmar a ella.
+  if (isCaroDashboardUser(user)) {
+    return firmas.vendedor && !firmas.jefa;
   }
 
-  // YENNY:
-  // muestra las que ya firmó vendedor(a) y jefa de ventas,
-  // pero aún no firma administración.
-  if (email === "yenny@raitrai.cl") {
-    return ganada && firmas.vendedor && firmas.jefa && !firmas.admin;
+  // ADMINISTRACIÓN (YENNY / ADMINISTRACION@):
+  // ve solo las que le toca firmar a administración.
+  if (isAdministracionDashboardUser(user)) {
+    return firmas.vendedor && firmas.jefa && !firmas.admin;
   }
 
-  // ADMIN / SUPERVISIÓN GENERAL:
-  // todo lo que entró al flujo de ficha y aún no está cerrado.
-  if (isAdminDashboardRole(user) || isSupervisionDashboardRole(user)) {
-    return (ganada || fichaCreada || firmas.vendedor || firmas.jefa || firmas.admin) && !cerrada;
-  }
+  // RESTO:
+  // ve todas las ganadas que aún no tienen las 3 firmas completas.
+  return !hasAllThreeFichaFirmas(row);
+}
 
-  return false;
+function getFichasPorFirmarSegunUsuario(rows = [], effectiveUser = null) {
+  return dedupeRowsByGroup(rows)
+    .filter((row) => isFichaPorFirmarSegunUsuario(row, effectiveUser))
+    .sort((a, b) => {
+      const aliasA = getAliasColegioSortKey(getRowAlias(a));
+      const aliasB = getAliasColegioSortKey(getRowAlias(b));
+      return aliasA.localeCompare(aliasB, "es", { sensitivity: "base", numeric: true });
+    });
 }
 
 function setAlertRowVisibleByChild(childId, visible = true) {
@@ -472,10 +502,7 @@ function syncAlertRowsByRole(effectiveUser = null) {
   const canSeeSinAsignar =
     isAdminDashboardRole(user) || isSupervisionDashboardRole(user);
 
-  const canSeeFichas =
-    isVendedorRole(user) ||
-    isAdminDashboardRole(user) ||
-    isSupervisionDashboardRole(user);
+  const canSeeFichas = !!user;
 
   setAlertRowVisibleByChild("link-sin-asignar", canSeeSinAsignar);
   setAlertRowVisibleByChild("link-fichas-firmar", canSeeFichas);
@@ -495,6 +522,111 @@ function isReunionEnProximosTresDias(row = {}) {
   limit.setHours(23, 59, 59, 999);
 
   return fecha >= todayStart && fecha <= limit;
+}
+
+function getFichasPorFirmarSubtitulo(user = null) {
+  const effectiveUser = user || getEffectiveUser();
+  if (!effectiveUser) return "Listado de fichas pendientes según tu rol.";
+
+  if (isVendedorRole(effectiveUser)) {
+    return "Aquí ves las fichas ganadas donde todavía falta la firma del vendedor(a).";
+  }
+
+  if (isCaroDashboardUser(effectiveUser)) {
+    return "Aquí ves las fichas donde ya firmó vendedor(a) y todavía falta la firma de jefa de ventas.";
+  }
+
+  if (isAdministracionDashboardUser(effectiveUser)) {
+    return "Aquí ves las fichas donde ya firmó vendedor(a) y jefa de ventas, y todavía falta la firma de administración.";
+  }
+
+  return "Aquí ves todas las fichas ganadas que todavía no tienen las 3 firmas completas.";
+}
+
+function renderFichasPorFirmarModal(rows = [], effectiveUser = null) {
+  const titleEl = $("fichas-firmar-titulo");
+  const subtitleEl = $("fichas-firmar-subtitulo");
+  const summaryEl = $("fichas-firmar-resumen");
+  const listEl = $("fichas-firmar-lista");
+
+  if (!titleEl || !subtitleEl || !summaryEl || !listEl) return;
+
+  titleEl.textContent = "Fichas por firmar";
+  subtitleEl.textContent = getFichasPorFirmarSubtitulo(effectiveUser);
+  summaryEl.textContent = rows.length
+    ? `Hay ${rows.length} ficha(s) pendiente(s) en tu vista actual.`
+    : "No hay fichas pendientes para tu rol en esta vista.";
+
+  if (!rows.length) {
+    listEl.innerHTML = `
+      <div style="padding:16px 18px; border:1px solid rgba(60,40,90,.10); border-radius:16px; background:#faf8fd; color:#5d546d;">
+        No hay fichas por firmar.
+      </div>
+    `;
+    return;
+  }
+
+  listEl.innerHTML = rows.map((row) => {
+    const id = getRowId(row);
+    const alias = getRowAlias(row);
+    const apoderado = getRowApoderado(row);
+    const vendedor = getRowVendorName(row) || row.vendedoraCorreo || "Sin vendedor";
+    const pendiente = getFichaPendienteLabel(row);
+
+    return `
+      <div style="padding:14px 16px; border:1px solid rgba(60,40,90,.12); border-radius:16px; background:#fff; display:flex; justify-content:space-between; gap:14px; align-items:flex-start;">
+        <div style="min-width:0;">
+          <div style="font-weight:800; color:#31194b; font-size:16px; line-height:1.2;">
+            ${escapeHtml(alias)}
+          </div>
+
+          <div style="margin-top:6px; color:#6a6078; font-size:13px; line-height:1.45;">
+            Apoderado: ${escapeHtml(apoderado)}<br>
+            Vendedor(a): ${escapeHtml(vendedor)}<br>
+            Estado pendiente: ${escapeHtml(pendiente)}
+          </div>
+        </div>
+
+        <a
+          href="fichas.html?id=${encodeURIComponent(id)}"
+          target="_blank"
+          rel="noopener"
+          style="flex:0 0 auto; text-decoration:none; background:#3b2357; color:#fff; border-radius:999px; padding:10px 14px; font-weight:700; white-space:nowrap;"
+        >
+          Abrir ficha
+        </a>
+      </div>
+    `;
+  }).join("");
+}
+
+function openFichasPorFirmarModal() {
+  const dialog = $("modal-fichas-firmar");
+  if (!dialog) return;
+
+  const effectiveUser = getEffectiveUser();
+  const rows = Array.isArray(state.fichasPorFirmarRows) ? state.fichasPorFirmarRows : [];
+
+  renderFichasPorFirmarModal(rows, effectiveUser);
+
+  if (typeof dialog.showModal === "function") {
+    if (!dialog.open) dialog.showModal();
+    return;
+  }
+
+  dialog.setAttribute("open", "open");
+}
+
+function closeFichasPorFirmarModal() {
+  const dialog = $("modal-fichas-firmar");
+  if (!dialog) return;
+
+  if (typeof dialog.close === "function") {
+    dialog.close();
+    return;
+  }
+
+  dialog.removeAttribute("open");
 }
 
 /* =========================================================
@@ -647,6 +779,9 @@ function renderSingleTotalLink(targetId, bucket, count = 0) {
 }
 
 function inicializarDashboardEnCeros() {
+  state.scopedRows = [];
+  state.fichasPorFirmarRows = [];
+  
   const setText = (id, value) => {
     const el = $(id);
     if (el) el.textContent = value;
@@ -679,6 +814,8 @@ function renderDashboard(rows = []) {
     if (el) el.textContent = String(value);
   };
 
+  state.scopedRows = dedupeRowsByGroup(rows);
+
   const contactados = getBucketRows(rows, "contactados");
   const cotizando = getBucketRows(rows, "cotizando");
   const reunion = getBucketRows(rows, "reunion");
@@ -689,10 +826,10 @@ function renderDashboard(rows = []) {
   const cerradas = getBucketRows(rows, "cerradas");
 
   const effectiveUser = getEffectiveUser();
-  const fichasPorFirmar = rows.filter((row) =>
-    isFichaPorFirmarSegunUsuario(row, effectiveUser)
-  );
-  
+  const fichasPorFirmar = getFichasPorFirmarSegunUsuario(rows, effectiveUser);
+
+  state.fichasPorFirmarRows = fichasPorFirmar;
+
   // ALERTAS
   setText("count-sin-asignar", rows.filter(isSinAsignar).length);
   setSinAsignarManagementHref();
@@ -700,7 +837,7 @@ function renderDashboard(rows = []) {
   setAlertHref("link-a-contactar", "a_contactar");
   setText("count-fichas-firmar", fichasPorFirmar.length);
   setText("count-reunion-3dias", rows.filter(isReunionEnProximosTresDias).length);
-  
+
   syncAlertRowsByRole(effectiveUser);
 
   // FLUJO CON LINKS
@@ -713,7 +850,6 @@ function renderDashboard(rows = []) {
   renderBucketLinks("autorizadas-top", "autorizadas", autorizadas);
   renderSingleTotalLink("cerradas-top", "cerradas", cerradas.length);
 }
-
 /* =========================================================
    SELECTOR DE VENDEDORES
 ========================================================= */
@@ -890,7 +1026,7 @@ function poblarSelectorApoderados(rows = []) {
   select.disabled = !items.length;
   btn.disabled = !items.length;
 
-  initSearchableSelect("select-grupo", "Buscar grupo...");
+  initSearchableSelect("select-apoderado", "Buscar apoderado...");
 }
 
 /* =========================================================
@@ -1021,6 +1157,10 @@ async function initPage() {
   const btnIrGrupo = $("btn-ir-grupo");
   const btnIrApoderado = $("btn-ir-apoderado");
 
+  const linkFichasFirmar = $("link-fichas-firmar");
+  const btnCerrarFichasFirmar = $("btn-cerrar-fichas-firmar");
+  const modalFichasFirmar = $("modal-fichas-firmar");
+
   const selectGrupo = $("select-grupo");
   const selectApoderado = $("select-apoderado");
 
@@ -1085,6 +1225,33 @@ async function initPage() {
       }
       
       location.href = `grupo.html?id=${encodeURIComponent(apoderadoSeleccionado)}`;
+    });
+  }
+
+    if (linkFichasFirmar && !linkFichasFirmar.dataset.bound) {
+    linkFichasFirmar.dataset.bound = "1";
+
+    linkFichasFirmar.addEventListener("click", (e) => {
+      e.preventDefault();
+      openFichasPorFirmarModal();
+    });
+  }
+
+  if (btnCerrarFichasFirmar && !btnCerrarFichasFirmar.dataset.bound) {
+    btnCerrarFichasFirmar.dataset.bound = "1";
+
+    btnCerrarFichasFirmar.addEventListener("click", () => {
+      closeFichasPorFirmarModal();
+    });
+  }
+
+  if (modalFichasFirmar && !modalFichasFirmar.dataset.bound) {
+    modalFichasFirmar.dataset.bound = "1";
+
+    modalFichasFirmar.addEventListener("click", (e) => {
+      if (e.target === modalFichasFirmar) {
+        closeFichasPorFirmarModal();
+      }
     });
   }
 
