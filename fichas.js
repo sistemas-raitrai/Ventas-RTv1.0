@@ -1248,8 +1248,10 @@ async function saveFicha({ silent = false, reloadAfterSave = true } = {}) {
       actualizadoPorCorreo: state.effectiveEmail,
       fechaActualizacion: serverTimestamp()
     },
-
+  
     solicitudReserva: values.solicitudReserva,
+    categoriaHoteleraContratada: values.categoriaHoteleraContratada,
+    autorizacionGerencia: values.autorizacionGerencia,
     asistenciaMed: values.asistenciaEnViajes,
     liberados: values.liberados,
     valorPrograma: values.valorPrograma,
