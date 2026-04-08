@@ -45,6 +45,50 @@ import {
 const GITHUB_HOME_URL = "https://sistemas-raitrai.github.io/Ventas-RT/";
 const APODERADO_FILTER_KEY = "ventas_dashboard_apoderado";
 
+const searchableInstances = {};
+
+function destroySearchableSelect(id) {
+  const el = $(id);
+  if (!el) return;
+
+  if (el.tomselect) {
+    el.tomselect.destroy();
+  }
+
+  delete searchableInstances[id];
+}
+
+function initSearchableSelect(id, placeholder = "Escribe para buscar...") {
+  const el = $(id);
+  if (!el) return;
+
+  destroySearchableSelect(id);
+
+  if (typeof window.TomSelect === "undefined") return;
+
+  el.setAttribute("placeholder", placeholder);
+
+  const instance = new window.TomSelect(el, {
+    create: false,
+    allowEmptyOption: true,
+    maxOptions: 1000,
+    searchField: ["text"],
+    sortField: [
+      { field: "$score" },
+      { field: "$order" }
+    ],
+    openOnFocus: true,
+    closeAfterSelect: true,
+    placeholder
+  });
+
+  if (el.disabled) {
+    instance.disable();
+  }
+
+  searchableInstances[id] = instance;
+}
+
 /* =========================================================
    ESTADO LOCAL
 ========================================================= */
@@ -802,6 +846,8 @@ function poblarSelectorGrupos(effectiveUser, rows = []) {
 
   select.disabled = !items.length;
   btn.disabled = !items.length;
+
+  initSearchableSelect("select-grupo", "Buscar grupo...");
 }
 
 /* =========================================================
@@ -843,6 +889,8 @@ function poblarSelectorApoderados(rows = []) {
 
   select.disabled = !items.length;
   btn.disabled = !items.length;
+
+  initSearchableSelect("select-grupo", "Buscar grupo...");
 }
 
 /* =========================================================
