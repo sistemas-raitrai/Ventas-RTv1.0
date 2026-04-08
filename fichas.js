@@ -1590,9 +1590,10 @@ function isRichField(path = "") {
 /* =========================================================
    HELPERS
 ========================================================= */
-function buildFichaPdfHtmlUrl() {
+function buildFichaPdfHtmlUrl({ mode = "view" } = {}) {
   const id = encodeURIComponent(state.groupId || state.requestedId || "");
-  return `ficha-pdf.html?id=${id}`;
+  const m = encodeURIComponent(mode);
+  return `ficha-pdf.html?id=${id}&mode=${m}`;
 }
 
 function openFichaPdfHtml() {
@@ -1601,7 +1602,7 @@ function openFichaPdfHtml() {
     return;
   }
 
-  window.open(buildFichaPdfHtmlUrl(), "_blank", "noopener");
+  window.open(buildFichaPdfHtmlUrl({ mode: "view" }), "_blank", "noopener");
 }
 
 async function handleGenerarPdfVersion() {
@@ -1611,18 +1612,76 @@ async function handleGenerarPdfVersion() {
   }
 
   const result = await saveFicha({ silent: true, reloadAfterSave: false });
-
   if (!result?.ok) return;
 
-  window.open(buildFichaPdfHtmlUrl(), "_blank", "noopener");
+  const win = window.open(buildFichaPdfHtmlUrl({ mode: "save" }), "_blank", "noopener");
+  if (!win) {
+    alert("El navegador bloqueó la ventana del PDF. Debes permitir pop-ups para continuar.");
+    return;
+  }
+
+  const status = await waitForPdfPersistResult(win);
+
+  if (status?.ok) {
+    await loadAll();
+    alert("PDF generado y guardado correctamente en Firebase.");
+    return;
+  }
 
   await loadAll();
 
-  if (result.changed) {
-    alert("Ficha guardada. Se abrió la vista PDF para imprimir o guardar esta versión.");
-  } else {
-    alert("Se abrió la vista PDF actual para imprimir o guardar esta versión.");
+  if (status?.reason === "timeout") {
+    alert("La vista PDF se abrió, pero no llegó confirmación de guardado. Revisa si la página del PDF realmente subió el archivo.");
+    return;
   }
+
+  if (status?.reason === "error") {
+    alert(`La vista PDF se abrió, pero falló el guardado automático: ${status.message || "sin detalle"}`);
+    return;
+  }
+
+  alert("Se abrió la vista PDF, pero no se confirmó el guardado en Firebase.");
+}
+
+function waitForPdfPersistResult(win, timeoutMs = 90000) {
+  return new Promise((resolve) => {
+    let done = false;
+
+    const finish = (payload) => {
+      if (done) return;
+      done = true;
+      window.removeEventListener("message", onMessage);
+      clearTimeout(timer);
+      resolve(payload);
+    };
+
+    const onMessage = (event) => {
+      const data = event?.data || {};
+      if (!data || data.type !== "ficha-pdf-saved") return;
+
+      finish({
+        ok: !!data.ok,
+        reason: data.reason || "",
+        message: data.message || "",
+        pdfUrl: data.pdfUrl || "",
+        pdfNombre: data.pdfNombre || ""
+      });
+    };
+
+    const timer = setTimeout(() => {
+      try {
+        if (win && !win.closed) {
+          // dejamos la ventana abierta por si el usuario aún la está viendo
+        }
+      } catch (_) {
+        // sin acción
+      }
+
+      finish({ ok: false, reason: "timeout" });
+    }, timeoutMs);
+
+    window.addEventListener("message", onMessage);
+  });
 }
 
 function getBlockedEditMessage() {
