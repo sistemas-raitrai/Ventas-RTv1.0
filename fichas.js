@@ -630,14 +630,14 @@ function syncButtons() {
 
   const btnJefa = $("btnFirmarFichaJefa");
   if (btnJefa) {
-    btnJefa.classList.toggle("hidden", !isJefaVentas() || isLegacy);
-    btnJefa.disabled = !isJefaVentas() || !flow?.vendedor?.firmado || !!flow?.jefaVentas?.firmado || isLegacy;
+    btnJefa.classList.toggle("hidden", !isJefaVentas());
+    btnJefa.disabled = !isJefaVentas() || !flow?.vendedor?.firmado || !!flow?.jefaVentas?.firmado;
   }
-
+  
   const btnAdmin = $("btnFirmarFichaAdmin");
   if (btnAdmin) {
-    btnAdmin.classList.toggle("hidden", !isAdministracion() || isLegacy);
-    btnAdmin.disabled = !isAdministracion() || !flow?.jefaVentas?.firmado || !!flow?.administracion?.firmado || isLegacy;
+    btnAdmin.classList.toggle("hidden", !isAdministracion());
+    btnAdmin.disabled = !isAdministracion() || !flow?.jefaVentas?.firmado || !!flow?.administracion?.firmado;
   }
 
   const btnSolicitar = $("btnSolicitarActualizacionFicha");
