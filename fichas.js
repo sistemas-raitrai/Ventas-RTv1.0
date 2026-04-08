@@ -367,6 +367,18 @@ function canOpenFicha() {
   return normalizeState(state.group?.estado) === "ganada";
 }
 
+function canGeneratePdfVersionAsCurrentUser() {
+  const email = normalizeEmail(state.effectiveEmail || "");
+  const rol = String(state.effectiveUser?.rol || "").toLowerCase();
+
+  if (rol === "admin") return true;
+
+  return (
+    email === "yenny@raitrai.cl" ||
+    email === "administracion@raitrai.cl"
+  );
+}
+
 /* =========================================================
    RENDER
 ========================================================= */
@@ -575,11 +587,19 @@ function syncButtons() {
   const btnVerPdfBottom = $("btnVerFichaPdfHtmlBottom");
   if (btnVerPdfBottom) btnVerPdfBottom.disabled = !canOpenFicha();
   
+  const canGeneratePdf = canGeneratePdfVersionAsCurrentUser();
+
   const btnGenerarPdf = $("btnGenerarPdfVersion");
-  if (btnGenerarPdf) btnGenerarPdf.disabled = !editable || !canOpenFicha();
+  if (btnGenerarPdf) {
+    btnGenerarPdf.classList.toggle("hidden", !canGeneratePdf);
+    btnGenerarPdf.disabled = !canGeneratePdf || !canOpenFicha();
+  }
   
   const btnGenerarPdfBottom = $("btnGenerarPdfVersionBottom");
-  if (btnGenerarPdfBottom) btnGenerarPdfBottom.disabled = !editable || !canOpenFicha();
+  if (btnGenerarPdfBottom) {
+    btnGenerarPdfBottom.classList.toggle("hidden", !canGeneratePdf);
+    btnGenerarPdfBottom.disabled = !canGeneratePdf || !canOpenFicha();
+  }
   
   document.querySelectorAll("#formFicha input, #formFicha select, #formFicha textarea").forEach((el) => {
     el.disabled = !editable;
@@ -672,9 +692,32 @@ function bindEvents() {
     window.open(url, "_blank", "noopener");
   });
 
-  $("btnFirmarFichaVendedor")?.addEventListener("click", () => signFlowFromFicha("vendedor"));
-  $("btnFirmarFichaJefa")?.addEventListener("click", () => signFlowFromFicha("jefaVentas"));
-  $("btnFirmarFichaAdmin")?.addEventListener("click", () => signFlowFromFicha("administracion"));
+  $("btnFirmarFichaVendedor")?.addEventListener("click", async () => {
+    try {
+      await signFlowFromFicha("vendedor");
+    } catch (error) {
+      console.error("[fichas] firma vendedor", error);
+      alert("No se pudo registrar la firma de vendedor(a): " + (error?.message || error));
+    }
+  });
+
+  $("btnFirmarFichaJefa")?.addEventListener("click", async () => {
+    try {
+      await signFlowFromFicha("jefaVentas");
+    } catch (error) {
+      console.error("[fichas] firma jefa", error);
+      alert("No se pudo registrar la firma de jefa de ventas: " + (error?.message || error));
+    }
+  });
+
+  $("btnFirmarFichaAdmin")?.addEventListener("click", async () => {
+    try {
+      await signFlowFromFicha("administracion");
+    } catch (error) {
+      console.error("[fichas] firma administración", error);
+      alert("No se pudo registrar la firma de administración: " + (error?.message || error));
+    }
+  });
 
   $("btnSolicitarActualizacionFicha")?.addEventListener("click", openUpdateRequestModal);
   $("btnEnviarSolicitudFicha")?.addEventListener("click", saveUpdateRequest);
