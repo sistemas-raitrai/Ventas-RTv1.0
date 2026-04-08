@@ -408,6 +408,37 @@ function getCarteraBucket(row) {
   return origen === "cartera" ? "cartera" : "no_cartera";
 }
 
+function normalizeEstadoKey(value = "") {
+  const v = normalizeSearch(value);
+
+  if (!v) return "";
+  if (v.includes("reunion confirm")) return "reunion_confirmada";
+  if (v.includes("recot")) return "recotizando";
+  if (v.includes("cotiz")) return "cotizando";
+  if (v.includes("contactad")) return "contactado";
+  if (v.includes("ganad")) return "ganada";
+  if (v.includes("perdid")) return "perdida";
+  if (v.includes("a contactar") || v === "a_contactar" || v === "acontactar") return "a_contactar";
+
+  return v.replace(/\s+/g, "_");
+}
+
+function getEstadoLabel(value = "") {
+  const key = normalizeEstadoKey(value);
+
+  const map = {
+    a_contactar: "A contactar",
+    contactado: "Contactado",
+    cotizando: "Cotizando",
+    recotizando: "Re cotizando",
+    reunion_confirmada: "Reunión confirmada",
+    ganada: "Ganada",
+    perdida: "Perdida"
+  };
+
+  return map[key] || normalizeText(value);
+}
+
 function updateArchiveButton() {
   const btn = $("btnVerAnteriores");
   if (!btn) return;
@@ -2234,7 +2265,11 @@ function fillSelectOptions(selectId, options = [], placeholder = "Todos") {
 function populateFilterOptions() {
   fillSelectOptions(
     "filterEstado",
-    [...new Set(state.rowsFlat.map(r => normalizeText(r.estado)).filter(Boolean))].sort((a, b) => a.localeCompare(b, "es")),
+    [...new Set(
+      state.rowsFlat
+        .map(r => getEstadoLabel(r.estado))
+        .filter(Boolean)
+    )].sort((a, b) => a.localeCompare(b, "es")),
     "Todos"
   );
 
@@ -2269,7 +2304,7 @@ function applyFilters() {
   }
 
   if (state.filters.estado) {
-    rows = rows.filter(r => normalizeText(r.estado) === state.filters.estado);
+    rows = rows.filter(r => normalizeEstadoKey(r.estado) === state.filters.estado);
   }
 
   if (state.filters.vendedora) {
@@ -3200,7 +3235,7 @@ function bindPageEvents() {
   if (filterEstado && !filterEstado.dataset.bound) {
     filterEstado.dataset.bound = "1";
     filterEstado.addEventListener("change", (e) => {
-      state.filters.estado = normalizeText(e.target.value || "");
+      state.filters.estado = normalizeEstadoKey(e.target.value || "");
       applyFilters();
     });
   }
