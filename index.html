@@ -153,6 +153,24 @@
         </div>
       </div>
     </section>
+    <dialog id="modal-fichas-firmar" style="width:min(860px, calc(100vw - 32px)); border:none; border-radius:22px; padding:0; box-shadow:0 24px 64px rgba(24,16,36,.28);">
+      <div style="padding:20px 22px 16px; border-bottom:1px solid rgba(60,40,90,.12); display:flex; justify-content:space-between; align-items:flex-start; gap:16px;">
+        <div>
+          <h3 id="fichas-firmar-titulo" style="margin:0; font-size:24px; color:#31194b;">Fichas por firmar</h3>
+          <p id="fichas-firmar-subtitulo" style="margin:6px 0 0; color:#6a6078; font-size:14px;">Listado de fichas pendientes según tu rol.</p>
+        </div>
+    
+        <button id="btn-cerrar-fichas-firmar" type="button" style="border:none; background:#ece8f4; color:#31194b; border-radius:999px; padding:10px 14px; cursor:pointer; font-weight:700;">
+          Cerrar
+        </button>
+      </div>
+    
+      <div style="padding:18px 22px 22px;">
+        <div id="fichas-firmar-resumen" style="margin-bottom:14px; color:#4b405a; font-size:14px;"></div>
+    
+        <div id="fichas-firmar-lista" style="display:grid; gap:12px;"></div>
+      </div>
+    </dialog>
   </main>
 
   <script type="module" src="layout.js"></script>
