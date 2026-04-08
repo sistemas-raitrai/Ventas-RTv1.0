@@ -13,6 +13,13 @@ import {
 } from "https://www.gstatic.com/firebasejs/11.7.3/firebase-firestore.js";
 
 import {
+  getStorage,
+  ref,
+  uploadBytes,
+  getDownloadURL
+} from "https://www.gstatic.com/firebasejs/11.7.3/firebase-storage.js";
+
+import {
   auth,
   db,
   VENTAS_USERS,
@@ -290,13 +297,21 @@ async function handlePrintButtonClick() {
     return;
   }
 
-  if (isPdfOfficiallyConfirmed()) {
-    window.print();
+  const alreadyConfirmed = isPdfOfficiallyConfirmed();
+  const existingPdfUrl = getExistingPdfUrl();
+
+  if (alreadyConfirmed && existingPdfUrl) {
+    window.open(existingPdfUrl, "_blank", "noopener");
     return;
   }
 
-  if (!canFinalizeFichaPdf()) {
+  if (!alreadyConfirmed && !canFinalizeFichaPdf()) {
     alert(getFinalizeBlockedMessage());
+    return;
+  }
+
+  if (alreadyConfirmed && !canFinalizeFichaAsCurrentUser()) {
+    alert("Solo admin, yenny@raitrai.cl o administracion@raitrai.cl pueden regenerar este PDF real.");
     return;
   }
 
@@ -306,7 +321,9 @@ async function handlePrintButtonClick() {
     `Grupo ${state.groupId}`;
 
   const ok = window.confirm(
-    `Vas a confirmar oficialmente la ficha del grupo ${alias}. Esta acción dejará historial y luego abrirá la impresión.`
+    alreadyConfirmed
+      ? `La ficha ${alias} ya está confirmada. Vas a generar y guardar el PDF real en Storage usando la versión actual.`
+      : `Vas a confirmar oficialmente la ficha del grupo ${alias} y generar el PDF real en Storage.`
   );
 
   if (!ok) return;
@@ -315,17 +332,25 @@ async function handlePrintButtonClick() {
   syncPrintButton();
 
   try {
-    const result = await confirmOfficialPdfClosure();
+    const result = await confirmOfficialPdfClosure({
+      preserveCurrentVersion: alreadyConfirmed
+    });
+
     await loadAll();
 
-    if (result?.emailQueued === false) {
-      alert("La ficha se confirmó correctamente, pero el correo quedó pendiente de envío. Revisa la configuración de la colección mail / extensión de correo.");
+    if (result?.blob && result?.pdfNombre) {
+      downloadBlobLocally(result.blob, result.pdfNombre);
     }
 
-    window.print();
+    if (result?.emailQueued === false) {
+      alert("El PDF real se generó y guardó correctamente, pero el correo quedó pendiente de envío.");
+      return;
+    }
+
+    alert("PDF real generado, subido a Storage y enlazado correctamente.");
   } catch (error) {
     console.error("[ficha-pdf] confirmOfficialPdfClosure", error);
-    alert("No se pudo confirmar oficialmente la ficha: " + (error?.message || error));
+    alert("No se pudo generar el PDF real: " + (error?.message || error));
   } finally {
     state.isClosingPdf = false;
     syncPrintButton();
@@ -338,18 +363,20 @@ function syncPrintButton() {
 
   if (state.isClosingPdf) {
     btn.disabled = true;
-    btn.textContent = "Confirmando ficha...";
+    btn.textContent = "Generando PDF real...";
     return;
   }
 
+  const existingPdfUrl = getExistingPdfUrl();
+
   if (isPdfOfficiallyConfirmed()) {
     btn.disabled = !canFinalizeFichaAsCurrentUser();
-    btn.textContent = "Reimprimir / Guardar PDF";
+    btn.textContent = existingPdfUrl ? "Abrir PDF real" : "Generar PDF real";
     return;
   }
 
   btn.disabled = !canFinalizeFichaPdf();
-  btn.textContent = "Imprimir / Guardar PDF";
+  btn.textContent = "Confirmar y generar PDF real";
 }
 
 function canFinalizeFichaPdf() {
@@ -464,6 +491,138 @@ function getFichaVersionLabel(ficha = {}) {
   return version || "ORIGINAL";
 }
 
+function getExistingPdfUrl() {
+  return cleanText(
+    state.ficha?.pdfUrl ||
+    state.group?.fichaPdfUrl ||
+    getByPath(state.group, "ficha.pdfUrl") ||
+    ""
+  );
+}
+
+function getCurrentVersionData() {
+  const fichaActual = getByPath(state.group, "ficha") || {};
+
+  return {
+    tipoVersion: pick(
+      fichaActual.tipoVersion,
+      state.group?.tipoVersionFicha,
+      "original"
+    ),
+    version: pick(
+      fichaActual.version,
+      state.group?.versionFicha,
+      "ORIGINAL"
+    ),
+    versionNumero: Number(
+      pick(
+        fichaActual.versionNumero,
+        state.group?.versionFichaNumero,
+        1
+      )
+    ) || 1
+  };
+}
+
+function sanitizePdfFilePart(value = "") {
+  return String(value || "")
+    .replace(/[<>:"/\\|?*]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function buildConfirmedPdfName(versionLabel = "") {
+  const base =
+    sanitizePdfFilePart(
+      cleanText(state.group?.aliasGrupo) ||
+      cleanText(state.ficha?.nombreGrupo) ||
+      `Grupo ${state.groupId}`
+    ) || `Grupo ${state.groupId}`;
+
+  const version =
+    sanitizePdfFilePart(versionLabel || "ORIGINAL") || "ORIGINAL";
+
+  return `Ficha ${base} - ${version}.pdf`;
+}
+
+function buildStoragePdfPath(fileName = "") {
+  const ano = sanitizePdfFilePart(String(state.group?.anoViaje || "sin-ano"));
+  const id = sanitizePdfFilePart(String(state.groupId || "sin-id"));
+  const safeFile = sanitizePdfFilePart(fileName || "ficha.pdf");
+
+  return `ventas/fichas-pdf/${ano}/${id}/${safeFile}`;
+}
+
+function getPdfPageElement() {
+  const el = document.querySelector(".pdf-page");
+  if (!el) {
+    throw new Error("No encontré el contenedor .pdf-page para generar el PDF.");
+  }
+  return el;
+}
+
+async function generateRealPdfBlob(fileName = "ficha.pdf") {
+  if (typeof window.html2pdf !== "function") {
+    throw new Error("html2pdf.js no está cargado en la página.");
+  }
+
+  const element = getPdfPageElement();
+
+  const options = {
+    margin: 0,
+    filename: fileName,
+    image: { type: "jpeg", quality: 0.98 },
+    html2canvas: {
+      scale: 2,
+      useCORS: true,
+      backgroundColor: "#ffffff"
+    },
+    jsPDF: {
+      unit: "mm",
+      format: "a4",
+      orientation: "portrait"
+    },
+    pagebreak: {
+      mode: ["css", "legacy"]
+    }
+  };
+
+  return await window.html2pdf()
+    .set(options)
+    .from(element)
+    .outputPdf("blob");
+}
+
+async function uploadRealPdfToStorage(blob, fileName = "ficha.pdf") {
+  const storage = getStorage();
+  const storagePath = buildStoragePdfPath(fileName);
+  const storageRef = ref(storage, storagePath);
+
+  await uploadBytes(storageRef, blob, {
+    contentType: "application/pdf"
+  });
+
+  const downloadUrl = await getDownloadURL(storageRef);
+
+  return {
+    downloadUrl,
+    storagePath
+  };
+}
+
+function downloadBlobLocally(blob, fileName = "ficha.pdf") {
+  const localUrl = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+
+  a.href = localUrl;
+  a.download = fileName;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+
+  setTimeout(() => URL.revokeObjectURL(localUrl), 5000);
+}
+
 async function queueFichaConfirmationEmail({ versionLabel, nombre }) {
   const alias =
     cleanText(state.group?.aliasGrupo) ||
@@ -533,19 +692,34 @@ async function queueFichaConfirmationEmail({ versionLabel, nombre }) {
   return { subject };
 }
 
-async function confirmOfficialPdfClosure() {
+async function confirmOfficialPdfClosure({ preserveCurrentVersion = false } = {}) {
   const nombre = getDisplayName(state.effectiveUser);
   const fichaActual = getByPath(state.group, "ficha") || {};
   const flow = state.group.flowFicha || {};
   const groupRef = doc(db, "ventas_cotizaciones", state.groupDocId);
-  const versionData = resolveNextFichaVersion();
-  const versionLabel = getFichaVersionLabel(versionData);
 
+  const versionData = preserveCurrentVersion
+    ? getCurrentVersionData()
+    : resolveNextFichaVersion();
+
+  const versionLabel = getFichaVersionLabel(versionData);
+  const pdfNombre = buildConfirmedPdfName(versionLabel);
+
+  // 1) generar PDF binario real
+  const pdfBlob = await generateRealPdfBlob(pdfNombre);
+
+  // 2) subir a Firebase Storage
+  const { downloadUrl, storagePath } = await uploadRealPdfToStorage(pdfBlob, pdfNombre);
+
+  // 3) guardar URL real en Firestore
   await updateDoc(groupRef, {
     fichaEstado: "confirmada_pdf",
     autorizada: true,
     ultimaGestionAt: serverTimestamp(),
     ultimaGestionTipo: "confirmacion_ficha_pdf",
+
+    fichaPdfUrl: downloadUrl,
+    fichaPdfNombre: pdfNombre,
 
     versionFicha: versionData.version,
     tipoVersionFicha: versionData.tipoVersion,
@@ -557,7 +731,10 @@ async function confirmOfficialPdfClosure() {
     "ficha.confirmadaEl": serverTimestamp(),
     "ficha.confirmadaPor": nombre,
     "ficha.confirmadaPorCorreo": state.effectiveEmail,
-    "ficha.pdfPendienteGeneracion": true,
+    "ficha.pdfUrl": downloadUrl,
+    "ficha.pdfNombre": pdfNombre,
+    "ficha.storagePathPdf": storagePath,
+    "ficha.pdfPendienteGeneracion": false,
     "ficha.pendienteEnvioCorreo": true,
     "ficha.version": versionData.version,
     "ficha.tipoVersion": versionData.tipoVersion,
@@ -582,7 +759,7 @@ async function confirmOfficialPdfClosure() {
     tipoMovimiento: "confirmacion_ficha_pdf",
     titulo: "Confirmación oficial de ficha PDF",
     asunto: "Confirmación oficial de ficha PDF",
-    mensaje: `${nombre} confirmó oficialmente la ficha para impresión (${versionLabel}).`,
+    mensaje: `${nombre} confirmó oficialmente la ficha y generó el PDF real (${versionLabel}).`,
     fecha: serverTimestamp(),
     creadoPor: nombre,
     creadoPorCorreo: state.effectiveEmail,
@@ -612,6 +789,16 @@ async function confirmOfficialPdfClosure() {
           campo: "ficha.versionNumero",
           anterior: fichaActual?.versionNumero || state.group?.versionFichaNumero || "",
           nuevo: versionData.versionNumero
+        },
+        {
+          campo: "ficha.pdfUrl",
+          anterior: fichaActual?.pdfUrl || state.group?.fichaPdfUrl || "",
+          nuevo: downloadUrl
+        },
+        {
+          campo: "ficha.pdfNombre",
+          anterior: fichaActual?.pdfNombre || state.group?.fichaPdfNombre || "",
+          nuevo: pdfNombre
         },
         {
           campo: "ficha.pendienteEnvioCorreo",
@@ -648,7 +835,25 @@ async function confirmOfficialPdfClosure() {
     });
   }
 
-  return { emailQueued };
+  try {
+    if (window.opener && !window.opener.closed) {
+      window.opener.postMessage({
+        type: "ficha-pdf-saved",
+        ok: true,
+        pdfUrl: downloadUrl,
+        pdfNombre
+      }, "*");
+    }
+  } catch (postMessageError) {
+    console.warn("[ficha-pdf] postMessage", postMessageError);
+  }
+
+  return {
+    emailQueued,
+    pdfUrl: downloadUrl,
+    pdfNombre,
+    blob: pdfBlob
+  };
 }
 
 /* =========================================================
