@@ -1417,11 +1417,16 @@ function hydrateFicha(group = {}) {
       ficha.categoriaHoteleraContratada,
       group.categoriaHoteleraContratada,
       group.hotel,
+      group.Hotel,
+      group.solicitudHotel,
       ""
     ),
-
+    
     autorizacionGerencia: pick(
       ficha.autorizacionGerencia,
+      group.autorizacionGerencia,
+      group.Autorizacion,
+      group.autorizacion,
       situacion.resumen,
       ""
     ),
