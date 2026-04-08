@@ -825,6 +825,70 @@ async function signFlowFromFicha(step) {
     return;
   }
 
+  if (step === "jefaVentas") {
+    if (!isJefaVentas()) {
+      alert("Esta firma solo puede realizarla la jefa de ventas.");
+      return;
+    }
+
+    if (!flow?.vendedor?.firmado) {
+      alert("Primero debe firmar el vendedor(a).");
+      return;
+    }
+
+    if (flow?.jefaVentas?.firmado) {
+      alert("La firma de jefa de ventas ya está registrada.");
+      return;
+    }
+
+    const patch = {
+      fichaFlujoModo: "v2",
+      fichaEstado: "revisada_jefa_ventas",
+      firmaSupervision: nombre,
+
+      documentos: {
+        ...(state.group.documentos || {}),
+        fichaGrupo: {
+          ...(state.group.documentos?.fichaGrupo || {}),
+          estado: "revisada_jefa_ventas"
+        }
+      },
+
+      ficha: {
+        ...(state.group.ficha || {}),
+        flujoModo: "v2",
+        estado: "revisada_jefa_ventas"
+      },
+
+      flowFicha: {
+        ...(state.group.flowFicha || {}),
+        modo: "v2",
+        legacy: false,
+        estado: "revisada_jefa_ventas",
+        jefaVentas: {
+          ...(state.group.flowFicha?.jefaVentas || {}),
+          firmado: true,
+          firmadoAt: serverTimestamp(),
+          firmadoPor: nombre,
+          firmadoPorCorreo: state.effectiveEmail,
+          observacion: ""
+        }
+      }
+    };
+
+    await saveGroupPatch(patch, {
+      tipoMovimiento: "firma_jefa_ventas",
+      modulo: "ficha",
+      titulo: "Firma jefa de ventas",
+      mensaje: `${nombre} revisó la ficha como jefa de ventas.`,
+      cambios: [
+        { campo: "fichaEstado", anterior: state.group.fichaEstado || "", nuevo: "revisada_jefa_ventas" },
+        { campo: "firmaSupervision", anterior: state.group.firmaSupervision || "", nuevo: nombre }
+      ]
+    });
+    return;
+  }
+
   if (step === "administracion") {
     if (!isAdministracion()) {
       alert("Esta firma solo puede realizarla administración.");
@@ -897,6 +961,31 @@ async function signFlowFromFicha(step) {
 
       flowFicha: flowPatch
     };
+
+    await saveGroupPatch(patch, {
+      tipoMovimiento: "firma_administracion",
+      modulo: "ficha",
+      titulo: hadPendingRequest ? "Refirma administración" : "Firma administración",
+      mensaje: hadPendingRequest
+        ? `${nombre} aprobó nuevamente la ficha desde administración y cerró la solicitud de actualización.`
+        : `${nombre} autorizó el grupo desde administración.`,
+      cambios: [
+        { campo: "autorizada", anterior: !!state.group.autorizada, nuevo: true },
+        { campo: "fichaEstado", anterior: state.group.fichaEstado || "", nuevo: "autorizada_admin" }
+      ],
+      reloadAfterSave: false
+    });
+
+    if (hadPendingRequest) {
+      await markPendingFichaUpdateRequestsAsCompleted({
+        resolvedBy: nombre,
+        resolvedByCorreo: state.effectiveEmail
+      });
+    }
+
+    await loadAll();
+    return;
+  }
 
     await saveGroupPatch(patch, {
       tipoMovimiento: "firma_administracion",
