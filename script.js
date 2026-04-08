@@ -11,7 +11,8 @@ import { auth, db, VENTAS_USERS } from "./firebase-init.js";
 import {
   $,
   getNombreUsuario,
-  normalizeEmail
+  normalizeEmail,
+  escapeHtml
 } from "./utils.js";
 
 import {
