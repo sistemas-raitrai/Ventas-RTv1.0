@@ -974,33 +974,29 @@ async function saveUpdateRequest() {
     fechaSolicitud: serverTimestamp()
   });
 
-  const vendorSignatureName =
+  const nombreVendedorFirmado =
     cleanText(state.group?.flowFicha?.vendedor?.firmadoPor) ||
     cleanText(state.group?.firmaVendedor) ||
     getDisplayName(state.effectiveUser);
 
-  const vendorSignatureEmail = normalizeEmail(
-    state.group?.flowFicha?.vendedor?.firmadoPorCorreo ||
-    state.group?.vendedoraCorreo ||
-    state.effectiveEmail
-  );
+  const correoVendedorFirmado =
+    normalizeEmail(
+      state.group?.flowFicha?.vendedor?.firmadoPorCorreo ||
+      state.group?.vendedoraCorreo ||
+      state.effectiveEmail
+    );
 
   await saveGroupPatch(
     {
+      // Reabrimos flujo
       autorizada: false,
+      cerrada: false,
+      cierre: "",
+
       fichaFlujoModo: "v2",
       fichaEstado: "lista_vendedor",
-      firmaVendedor: vendorSignatureName,
       firmaSupervision: "",
       firmaAdministracion: "",
-
-      documentos: {
-        ...(state.group.documentos || {}),
-        fichaGrupo: {
-          ...(state.group.documentos?.fichaGrupo || {}),
-          estado: "lista_vendedor"
-        }
-      },
 
       ficha: {
         ...(state.group.ficha || {}),
@@ -1031,10 +1027,8 @@ async function saveUpdateRequest() {
         vendedor: {
           ...(state.group.flowFicha?.vendedor || {}),
           firmado: true,
-          firmadoAt: state.group.flowFicha?.vendedor?.firmadoAt || serverTimestamp(),
-          firmadoPor: vendorSignatureName,
-          firmadoPorCorreo: vendorSignatureEmail,
-          observacion: state.group.flowFicha?.vendedor?.observacion || ""
+          firmadoPor: nombreVendedorFirmado,
+          firmadoPorCorreo: correoVendedorFirmado
         },
 
         jefaVentas: {
@@ -1054,13 +1048,21 @@ async function saveUpdateRequest() {
           firmadoPorCorreo: "",
           observacion: ""
         }
+      },
+
+      documentos: {
+        ...(state.group.documentos || {}),
+        fichaGrupo: {
+          ...(state.group.documentos?.fichaGrupo || {}),
+          estado: "lista_vendedor"
+        }
       }
     },
     {
       tipoMovimiento: "solicitud_actualizacion_ficha",
       modulo: "ficha",
       titulo: "Solicitud de actualización de ficha",
-      mensaje: `${getDisplayName(state.effectiveUser)} solicitó actualización de la ficha y reinició el circuito de firmas.`,
+      mensaje: `${getDisplayName(state.effectiveUser)} solicitó actualización de la ficha y reinició el flujo de firmas.`,
       cambios: [
         {
           campo: "autorizada",
@@ -1068,8 +1070,18 @@ async function saveUpdateRequest() {
           nuevo: false
         },
         {
+          campo: "cerrada",
+          anterior: !!state.group.cerrada,
+          nuevo: false
+        },
+        {
+          campo: "cierre",
+          anterior: state.group.cierre || "",
+          nuevo: ""
+        },
+        {
           campo: "fichaEstado",
-          anterior: state.group.fichaEstado || state.ficha?.estado || "",
+          anterior: state.group.fichaEstado || "",
           nuevo: "lista_vendedor"
         },
         {
@@ -1088,7 +1100,6 @@ async function saveUpdateRequest() {
 
   closeModal("modalSolicitudFicha");
 }
-
 /* =========================================================
    SAVE
 ========================================================= */
