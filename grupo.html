@@ -1085,6 +1085,34 @@
       grid-column: 1 / -1;
     }
 
+    .situacion-ganada-grid{
+      grid-column: 1 / -1;
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 16px 18px;
+      min-width: 0;
+    }
+    
+    .situacion-ganada-grid .form-field{
+      min-width: 0;
+    }
+    
+    .situacion-ganada-grid .rich-field,
+    .situacion-ganada-grid .rich-toolbar,
+    .situacion-ganada-grid .rich-editor{
+      width: 100%;
+      max-width: 100%;
+      box-sizing: border-box;
+    }
+    
+    #modalSituacion .modal-card{
+      width: min(1180px, 100%);
+    }
+    
+    #modalSituacion .modal-body{
+      padding: 20px 24px;
+    }
+
     .form-field label{
       font-size: 12px;
       text-transform: uppercase;
@@ -1205,7 +1233,7 @@
     }
 
     .rich-editor{
-      min-height: 160px;
+      min-height: 190px;
       border: 1px solid rgba(58,42,82,.14);
       border-radius: 0 0 14px 14px;
       background: #fff;
@@ -1214,6 +1242,7 @@
       color: #261d33;
       outline: none;
       line-height: 1.55;
+      box-sizing: border-box;
     }
 
     .rich-editor:focus{
@@ -1657,7 +1686,7 @@
           <input id="s_fechaReunion" name="fechaReunion" type="datetime-local" />
         </div>
 
-        <div class="span-3 hidden" id="wrapSituacionGanadaFields">
+        <div class="situacion-ganada-grid hidden" id="wrapSituacionGanadaFields">
           <div class="form-field span-3">
             <label>Observaciones para administración</label>
 
