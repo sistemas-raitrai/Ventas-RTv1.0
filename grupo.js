@@ -1636,6 +1636,85 @@ function getSituacionMeetingBaseDate() {
   return null;
 }
 
+async function createMeetingFromSituacionChange({ fechaReunionRaw = "", mensajeHistorial = "" } = {}) {
+  const fechaInicioDate = new Date(fechaReunionRaw);
+
+  if (Number.isNaN(fechaInicioDate.getTime())) {
+    throw new Error("La fecha de la reunión no es válida.");
+  }
+
+  // Reunión de 1 hora por defecto
+  const fechaFinDate = new Date(fechaInicioDate.getTime() + (60 * 60 * 1000));
+
+  // Evita duplicar si ya existe una reunión activa exactamente en esa fecha/hora
+  const yaExiste = state.meetings.some((meeting) => {
+    const meetingDate = toDate(meeting.fechaInicio);
+    if (!meetingDate) return false;
+
+    const sameMoment = Math.abs(meetingDate.getTime() - fechaInicioDate.getTime()) < 60000;
+    const notCancelled = normalizeSearchLocal(meeting.estadoReunion || "agendada") !== "cancelada";
+
+    return sameMoment && notCancelled;
+  });
+
+  if (yaExiste) {
+    return {
+      created: false,
+      patch: {}
+    };
+  }
+
+  const meetingData = {
+    idGrupo: String(state.groupId),
+    codigoRegistro: cleanText(state.group.codigoRegistro),
+    aliasGrupo: cleanText(state.group.aliasGrupo),
+    colegio: cleanText(state.group.colegio),
+    vendedora: cleanText(state.group.vendedora),
+    vendedoraCorreo: normalizeEmail(state.group.vendedoraCorreo || ""),
+
+    titulo: "Primera reunión",
+    tipo: "por_definir",
+    modalidad: "por_definir",
+    fechaInicio: Timestamp.fromDate(fechaInicioDate),
+    fechaFin: Timestamp.fromDate(fechaFinDate),
+    direccion: "",
+    link: "",
+    estadoReunion: "agendada",
+    resultado: "",
+    observaciones: mensajeHistorial || "Primera reunión creada desde cambio de estado del grupo.",
+    creadaDesde: "situacion_grupo",
+    origenCalendario: true,
+
+    creadoPor: getDisplayName(state.effectiveUser),
+    creadoPorCorreo: state.effectiveEmail,
+    fechaCreacion: serverTimestamp(),
+    actualizadoPor: "",
+    actualizadoPorCorreo: "",
+    fechaActualizacion: null
+  };
+
+  await addDoc(collection(db, REUNIONES_COLLECTION), meetingData);
+
+  await createHistoryEntry({
+    tipoMovimiento: "reunion_creada",
+    modulo: "agenda",
+    titulo: "Primera reunión agendada",
+    mensaje: `${getDisplayName(state.effectiveUser)} agendó la primera reunión del grupo.`,
+    metadata: {
+      cambios: [
+        { campo: "reunion.titulo", anterior: "", nuevo: "Primera reunión" },
+        { campo: "reunion.fechaInicio", anterior: "", nuevo: fechaReunionRaw },
+        { campo: "reunion.tipo", anterior: "", nuevo: "por_definir" }
+      ]
+    }
+  });
+
+  return {
+    created: true,
+    patch: buildMeetingSummaryPatchAfterCreate(meetingData)
+  };
+}
+
 function openDatosModal() {
   if (!canEditGroup()) {
     alert(getBlockedEditMessage());
@@ -2194,6 +2273,7 @@ async function saveSituacion() {
   const isGanada = estadoNuevo === "ganada";
   const isReunionConfirmada = estadoNuevo === "reunion_confirmada";
 
+  // Siempre obligatorio
   if (!mensajeHistorial) {
     alert("Debes escribir un mensaje del cambio.");
     return;
@@ -2204,6 +2284,7 @@ async function saveSituacion() {
     return;
   }
 
+  // 1) Cambio de estado
   if (estadoNuevo !== estadoAnterior) {
     patch.estado = estadoNuevo;
     cambios.push({
@@ -2213,28 +2294,36 @@ async function saveSituacion() {
     });
   }
 
+  // 2) Si queda en reunión confirmada, además crear/agendar la primera reunión real
   if (isReunionConfirmada) {
-    const fechaAnteriorTxt = toDatetimeLocal(
-      toDate(state.group.proximaReunionFecha || getNextMeeting()?.fechaInicio || null)
-    );
+    try {
+      const meetingResult = await createMeetingFromSituacionChange({
+        fechaReunionRaw,
+        mensajeHistorial
+      });
 
-    if (fechaAnteriorTxt !== fechaReunionRaw) {
-      const fechaReunionDate = new Date(fechaReunionRaw);
-
-      if (isNaN(fechaReunionDate.getTime())) {
-        alert("La fecha de la reunión no es válida.");
-        return;
+      if (meetingResult?.patch) {
+        Object.assign(patch, meetingResult.patch);
       }
 
-      patch.proximaReunionFecha = Timestamp.fromDate(fechaReunionDate);
-      cambios.push({
-        campo: "proximaReunionFecha",
-        anterior: fechaAnteriorTxt || "",
-        nuevo: fechaReunionRaw
-      });
+      const fechaAnteriorTxt = toDatetimeLocal(
+        toDate(state.group.proximaReunionFecha || getNextMeeting()?.fechaInicio || null)
+      );
+
+      if (fechaAnteriorTxt !== fechaReunionRaw) {
+        cambios.push({
+          campo: "proximaReunionFecha",
+          anterior: fechaAnteriorTxt || "",
+          nuevo: fechaReunionRaw
+        });
+      }
+    } catch (error) {
+      alert(error.message || "No se pudo crear la reunión.");
+      return;
     }
   }
 
+  // 3) Si queda en ganada, guardar observaciones enriquecidas
   if (isGanada) {
     const adminNuevo = getRichEditorHtml("s_obsAdmin");
     const opsNuevo = getRichEditorHtml("s_obsOperaciones");
