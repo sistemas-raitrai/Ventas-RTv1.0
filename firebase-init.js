@@ -89,10 +89,11 @@ export const VENTAS_USERS = [
     rol: "vendedor"
   },
   {
-    email: "cgayoso@raitrai.cl",
+    email: "ccayoso@raitrai.cl",
+    emailsAlternativos: ["cgayoso@raitrai.cl"],
     nombre: "Carolina",
     apellido: "Gayoso",
-    aliasCartera: ["CAROLINA","Carolina","Carola","CAROLA"],
+    aliasCartera: ["CAROLINA", "CAROLINA GAYOSO", "CAROLA"],
     rol: "vendedor"
   },
   {
@@ -130,7 +131,37 @@ export function normalizeEmail(email = "") {
 
 export function getVentasUser(email = "") {
   const safeEmail = normalizeEmail(email);
-  return VENTAS_USERS.find(u => normalizeEmail(u.email) === safeEmail) || null;
+
+  return VENTAS_USERS.find((u) => {
+    const alternativos = Array.isArray(u.emailsAlternativos)
+      ? u.emailsAlternativos.map(normalizeEmail)
+      : [];
+
+    const emails = [
+      normalizeEmail(u.email || ""),
+      ...alternativos
+    ].filter(Boolean);
+
+    return emails.includes(safeEmail);
+  }) || null;
+}
+
+export function getVentasUserEmails(userOrEmail = "") {
+  const user =
+    typeof userOrEmail === "string"
+      ? getVentasUser(userOrEmail)
+      : userOrEmail;
+
+  if (!user) return [];
+
+  const alternativos = Array.isArray(user.emailsAlternativos)
+    ? user.emailsAlternativos.map(normalizeEmail)
+    : [];
+
+  return [...new Set([
+    normalizeEmail(user.email || ""),
+    ...alternativos
+  ].filter(Boolean))];
 }
 
 export function getRolVentas(email = "") {
