@@ -895,9 +895,7 @@ function getUserAliases(user) {
 }
 
 function resolveVentasUserByEmail(email = "") {
-  const target = normalizeEmail(email);
-  if (!target) return null;
-  return VENTAS_USERS.find(u => normalizeEmail(u.email) === target) || null;
+  return getVentasUser(email);
 }
 
 function resolveVentasUserByName(name = "") {
