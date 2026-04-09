@@ -910,6 +910,9 @@ function renderSituacion() {
     ? formatDateTime(fechaCambioEstado)
     : (stringValue(fechaCambioEstado) || "—");
 
+  const estadoNormalizado = normalizeState(state.group.estado);
+  const isGanada = estadoNormalizado === "ganada";
+
   setText("situacionEstado", getEstadoLabel(state.group.estado));
   setText("situacionAutorizacion", state.group.autorizada ? "Autorizada" : "No autorizada");
   setText("situacionCierre", state.group.cerrada ? "Cerrada" : "Abierta");
@@ -928,25 +931,34 @@ function renderSituacion() {
     ""
   ) || "—";
 
+  const adminWrap = $("situacionObsAdminWrap");
+  const opsWrap = $("situacionObsOperacionesWrap");
   const adminEl = $("situacionObsAdmin");
   const opsEl = $("situacionObsOperaciones");
 
+  adminWrap?.classList.toggle("hidden", !isGanada);
+  opsWrap?.classList.toggle("hidden", !isGanada);
+
   if (adminEl) {
-    adminEl.innerHTML = `
-      <div class="obs-box admin">
-        <div class="obs-title">Observaciones para administración</div>
-        <div class="obs-body">${obsAdmin}</div>
-      </div>
-    `;
+    adminEl.innerHTML = isGanada
+      ? `
+        <div class="obs-box admin">
+          <div class="obs-title">Observaciones para administración</div>
+          <div class="obs-body">${obsAdmin}</div>
+        </div>
+      `
+      : "";
   }
 
   if (opsEl) {
-    opsEl.innerHTML = `
-      <div class="obs-box ops">
-        <div class="obs-title">Observaciones para operaciones</div>
-        <div class="obs-body">${obsOps}</div>
-      </div>
-    `;
+    opsEl.innerHTML = isGanada
+      ? `
+        <div class="obs-box ops">
+          <div class="obs-title">Observaciones para operaciones</div>
+          <div class="obs-body">${obsOps}</div>
+        </div>
+      `
+      : "";
   }
 
   const box = $("panelProximaReunion");
@@ -1519,6 +1531,7 @@ function bindEvents() {
   $("btnGuardarDatos")?.addEventListener("click", saveDatos);
   $("btnGuardarSituacion")?.addEventListener("click", saveSituacion);
   $("btnGuardarDocumentos")?.addEventListener("click", saveDocumentos);
+  $("s_estado")?.addEventListener("change", syncSituacionStateUI);
   $("btnGuardarReunion")?.addEventListener("click", saveMeeting);
   $("btnGuardarAlerta")?.addEventListener("click", saveManualAlert);
   $("btnGuardarComentario")?.addEventListener("click", saveComment);
@@ -1594,6 +1607,28 @@ function closeModal(id) {
   $(id)?.classList.remove("show");
 }
 
+function showSaveNotice(message = "Cambios guardados correctamente.") {
+  alert(message);
+}
+
+function syncSituacionStateUI() {
+  const estado = normalizeState($("s_estado")?.value || "");
+
+  $("wrapSituacionGanadaFields")?.classList.toggle("hidden", estado !== "ganada");
+  $("wrapSituacionFechaReunion")?.classList.toggle("hidden", estado !== "reunion_confirmada");
+}
+
+function getSituacionMeetingBaseDate() {
+  const fromGroup = toDate(state.group?.proximaReunionFecha || null);
+  if (fromGroup) return fromGroup;
+
+  const nextMeeting = getNextMeeting();
+  const fromAgenda = toDate(nextMeeting?.fechaInicio || null);
+  if (fromAgenda) return fromAgenda;
+
+  return null;
+}
+
 function openDatosModal() {
   if (!canEditGroup()) {
     alert(getBlockedEditMessage());
@@ -1633,10 +1668,11 @@ function openSituacionModal() {
   setFormValue("s_estado", normalizeState(state.group.estado));
   setFormValue("s_autorizada", String(!!state.group.autorizada));
   setFormValue("s_cerrada", String(!!state.group.cerrada));
-  setFormValue("s_resumen", getByPath(state.group, "situacion.resumen"));
-  setFormValue("s_proximoPaso", getByPath(state.group, "situacion.proximoPaso"));
-  setFormValue("s_obsVentas", getByPath(state.group, "situacion.observacionVentas"));
-  setFormValue("s_obsJefa", getByPath(state.group, "situacion.observacionJefaVentas"));
+  setFormValue("s_proximoPaso", getByPath(state.group, "situacion.proximoPaso") || "");
+  setFormValue("s_mensajeHistorial", "");
+
+  const meetingBaseDate = getSituacionMeetingBaseDate();
+  setFormValue("s_fechaReunion", meetingBaseDate ? toDatetimeLocal(meetingBaseDate) : "");
 
   setRichEditorHtml(
     "s_obsAdmin",
@@ -1652,6 +1688,7 @@ function openSituacionModal() {
     ""
   );
 
+  syncSituacionStateUI();
   openModal("modalSituacion");
 }
 
@@ -1731,6 +1768,7 @@ async function saveComment() {
 
   closeModal("modalComentario");
   await loadAll();
+  showSaveNotice("Comentario guardado correctamente.");
 }
 
 function getHistoryTypeLabel(item = {}) {
@@ -2132,41 +2170,110 @@ async function saveDatos() {
   });
 
   closeModal("modalDatos");
+  showSaveNotice("Datos guardados correctamente.");
 }
 
 async function saveSituacion() {
+  if (!canEditGroup()) {
+    alert(getBlockedEditMessage());
+    return;
+  }
+
   const patch = {};
   const cambios = [];
 
-  const values = {
-    estado: $("s_estado")?.value || "a_contactar",
-    autorizada: String($("s_autorizada")?.value) === "true",
-    cerrada: String($("s_cerrada")?.value) === "true",
-    "situacion.resumen": $("s_resumen")?.value || "",
-    "situacion.proximoPaso": $("s_proximoPaso")?.value || "",
-    "situacion.observacionVentas": $("s_obsVentas")?.value || "",
-    "situacion.observacionJefaVentas": $("s_obsJefa")?.value || "",
-    "situacion.observacionAdministracion": getRichEditorHtml("s_obsAdmin"),
-    "situacion.observacionOperaciones": getRichEditorHtml("s_obsOperaciones")
+  const estadoAnterior = normalizeState(state.group.estado || "a_contactar");
+  const estadoNuevo = normalizeState($("s_estado")?.value || "a_contactar");
+  const autorizadaNueva = String($("s_autorizada")?.value) === "true";
+  const cerradaNueva = String($("s_cerrada")?.value) === "true";
+  const proximoPasoNuevo = $("s_proximoPaso")?.value || "";
+  const mensajeHistorial = cleanText($("s_mensajeHistorial")?.value || "");
+  const fechaReunionRaw = $("s_fechaReunion")?.value || "";
+
+  const cambioEstado = estadoNuevo !== estadoAnterior;
+  const isGanada = estadoNuevo === "ganada";
+  const isReunionConfirmada = estadoNuevo === "reunion_confirmada";
+
+  if (cambioEstado && !mensajeHistorial) {
+    alert("Debes escribir un mensaje para el historial cuando cambias el estado.");
+    return;
+  }
+
+  if (isReunionConfirmada && !fechaReunionRaw) {
+    alert("Debes indicar la fecha de la reunión cuando el estado es Reunión confirmada.");
+    return;
+  }
+
+  const simpleValues = {
+    estado: estadoNuevo,
+    autorizada: autorizadaNueva,
+    cerrada: cerradaNueva,
+    "situacion.proximoPaso": proximoPasoNuevo
   };
 
-  for (const path of SITUACION_FIELDS) {
-    const anterior =
-      path === "situacion.observacionAdministracion"
-        ? (getByPath(state.group, path) || state.group.observacionesAdministracion || "")
-        : path === "situacion.observacionOperaciones"
-          ? (getByPath(state.group, path) || state.group.observacionesOperaciones || "")
-          : getByPath(state.group, path);
+  for (const [path, nuevo] of Object.entries(simpleValues)) {
+    const anterior = getByPath(state.group, path);
 
-    const nuevo = values[path];
-
-    const changed = path === "situacion.observacionAdministracion" || path === "situacion.observacionOperaciones"
-      ? normalizeRichHtml(anterior) !== normalizeRichHtml(nuevo)
-      : !sameValue(anterior, nuevo);
-
-    if (changed) {
+    if (!sameValue(anterior, nuevo)) {
       setNestedValue(patch, path, nuevo);
       cambios.push({ campo: path, anterior, nuevo });
+    }
+  }
+
+  if (isGanada) {
+    const adminNuevo = getRichEditorHtml("s_obsAdmin");
+    const opsNuevo = getRichEditorHtml("s_obsOperaciones");
+
+    const adminAnterior =
+      getByPath(state.group, "situacion.observacionAdministracion") ||
+      state.group.observacionesAdministracion ||
+      "";
+
+    const opsAnterior =
+      getByPath(state.group, "situacion.observacionOperaciones") ||
+      state.group.observacionesOperaciones ||
+      "";
+
+    if (normalizeRichHtml(adminAnterior) !== normalizeRichHtml(adminNuevo)) {
+      setNestedValue(patch, "situacion.observacionAdministracion", adminNuevo);
+      patch.observacionesAdministracion = adminNuevo;
+      cambios.push({
+        campo: "situacion.observacionAdministracion",
+        anterior: adminAnterior,
+        nuevo: adminNuevo
+      });
+    }
+
+    if (normalizeRichHtml(opsAnterior) !== normalizeRichHtml(opsNuevo)) {
+      setNestedValue(patch, "situacion.observacionOperaciones", opsNuevo);
+      patch.observacionesOperaciones = opsNuevo;
+      cambios.push({
+        campo: "situacion.observacionOperaciones",
+        anterior: opsAnterior,
+        nuevo: opsNuevo
+      });
+    }
+  }
+
+  if (isReunionConfirmada) {
+    const fechaAnteriorTxt = toDatetimeLocal(
+      toDate(state.group.proximaReunionFecha || getNextMeeting()?.fechaInicio || null)
+    );
+
+    if (fechaAnteriorTxt !== fechaReunionRaw) {
+      const fechaReunionDate = new Date(fechaReunionRaw);
+
+      if (isNaN(fechaReunionDate.getTime())) {
+        alert("La fecha de reunión no es válida.");
+        return;
+      }
+
+      patch.proximaReunionFecha = Timestamp.fromDate(fechaReunionDate);
+      cambios.push({
+        campo: "proximaReunionFecha",
+        anterior: fechaAnteriorTxt || "",
+        nuevo: fechaReunionRaw
+      });
     }
   }
 
@@ -2175,19 +2282,30 @@ async function saveSituacion() {
     return;
   }
 
-  patch.observacionesAdministracion = values["situacion.observacionAdministracion"];
-  patch.observacionesOperaciones = values["situacion.observacionOperaciones"];
-
   await applyCriticalChangeRules(patch, cambios);
+
+  const asunto = cambioEstado
+    ? `Cambio de situación · ${getEstadoLabel(estadoAnterior)} → ${getEstadoLabel(estadoNuevo)}`
+    : "Actualización de situación";
+
+  const mensajeFinal = cambioEstado
+    ? mensajeHistorial
+    : (
+        mensajeHistorial ||
+        `${getDisplayName(state.effectiveUser)} actualizó la situación comercial del grupo.`
+      );
+
   await saveGroupPatch(patch, {
     tipoMovimiento: "cambio_estado",
     modulo: "grupo",
     titulo: "Actualización de situación",
-    mensaje: `${getDisplayName(state.effectiveUser)} actualizó la situación comercial del grupo.`,
+    asunto,
+    mensaje: mensajeFinal,
     cambios
   });
 
   closeModal("modalSituacion");
+  showSaveNotice("Situación guardada correctamente.");
 }
 
 async function saveDocumentos() {
@@ -2248,6 +2366,7 @@ async function saveDocumentos() {
   });
 
   closeModal("modalDocumentos");
+  showSaveNotice("Documentos guardados correctamente.");
 }
 
 async function saveMeeting() {
@@ -2349,6 +2468,7 @@ async function saveMeeting() {
 
   closeModal("modalReunion");
   await loadAll();
+  showSaveNotice("Reunión guardada correctamente.");
 }
 
 async function saveManualAlert() {
@@ -2404,6 +2524,7 @@ async function saveManualAlert() {
 
   closeModal("modalAlerta");
   await loadAll();
+  showSaveNotice("Alerta guardada correctamente.");
 }
 
 async function resolveManualAlert(alertId) {
