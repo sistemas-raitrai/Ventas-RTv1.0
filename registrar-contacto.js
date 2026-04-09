@@ -8,7 +8,7 @@ import {
   serverTimestamp
 } from "https://www.gstatic.com/firebasejs/11.7.3/firebase-firestore.js";
 
-import { auth, db, VENTAS_USERS } from "./firebase-init.js";
+import { auth, db, VENTAS_USERS, getVentasUserEmails } from "./firebase-init.js";
 
 import {
   $,
@@ -384,7 +384,7 @@ async function loadCarteraOptions() {
   let sellerEmails = [];
 
   if (state.effectiveUser?.rol === "vendedor") {
-    sellerEmails = [normalizeEmail(state.effectiveUser.email)];
+    sellerEmails = getVentasUserEmails(state.effectiveUser);
   } else {
     const sellersSnap = await getDocs(collection(db, "ventas_cartera"));
     sellerEmails = sellersSnap.docs.map(d => normalizeEmail(d.id));
