@@ -62,7 +62,12 @@ const state = {
   alertsManual: [],
   requests: [],
 
-  autoAlerts: []
+  autoAlerts: [],
+
+  historyUi: {
+    limit: 10,
+    showHidden: false
+  }
 };
 
 const ESTADO_META = {
@@ -390,6 +395,11 @@ function canEditGroup() {
 }
 
 function canEditDocuments() {
+  const rol = String(state.effectiveUser?.rol || "").toLowerCase();
+  return rol === "admin" || rol === "supervision";
+}
+
+function canManageHistoryItems() {
   const rol = String(state.effectiveUser?.rol || "").toLowerCase();
   return rol === "admin" || rol === "supervision";
 }
@@ -1073,46 +1083,120 @@ function renderAlerts() {
     return;
   }
 
-  list.innerHTML = merged.map((alertItem) => {
+  const levelOrder = { critica: 3, warning: 2, info: 1 };
+
+  const sorted = [...merged].sort((a, b) => {
+    const nivelA = normalizeSearchLocal(a.nivel || "info");
+    const nivelB = normalizeSearchLocal(b.nivel || "info");
+
+    const diffNivel = (levelOrder[nivelB] || 0) - (levelOrder[nivelA] || 0);
+    if (diffNivel !== 0) return diffNivel;
+
+    return dateValue(b.fechaCreacion || b.fecha || null) - dateValue(a.fechaCreacion || a.fecha || null);
+  });
+
+  list.innerHTML = sorted.map((alertItem) => {
     const isManual = alertItem.tipoLista === "manual";
-    const levelClass = alertItem.nivel === "critica" ? "alert-critical" : "";
+    const levelClass = normalizeSearchLocal(alertItem.nivel) === "critica" ? "alert-critical" : "";
     const baseClass = isManual ? "alert-manual" : "alert-auto";
 
+    const author = isManual
+      ? (alertItem.creadoPor || alertItem.creadoPorCorreo || "Sin autor")
+      : "Sistema";
+
+    const dateLabel = isManual && alertItem.fechaCreacion
+      ? formatDateTime(alertItem.fechaCreacion)
+      : "En tiempo real";
+
+    const levelLabel = normalizeSearchLocal(alertItem.nivel) === "critica"
+      ? "Crítica"
+      : normalizeSearchLocal(alertItem.nivel) === "warning"
+        ? "Pendiente"
+        : "Info";
+
     return `
-      <div class="list-card ${baseClass} ${levelClass}">
-        <div class="list-card-top">
-          <div>
-            <div class="list-card-title">${escapeHtml(alertItem.titulo || "Alerta")}</div>
-            <div class="list-card-meta">
-              ${escapeHtml(capitalize(alertItem.nivel || (isManual ? "warning" : "info")))}
-              ·
-              ${isManual ? "Manual" : "Automática"}
-            </div>
+      <article class="registro-card registro-alert-card ${baseClass} ${levelClass}">
+        <div class="registro-card-top">
+          <div class="registro-meta-row">
+            <span>${escapeHtml(author)}</span>
+            <span>·</span>
+            <span>${escapeHtml(dateLabel)}</span>
           </div>
 
-          ${
-            isManual && canEditGroup()
-              ? `<button class="btn-danger" type="button" data-action="resolver-alerta" data-id="${escapeHtml(alertItem.id)}">Resolver</button>`
-              : ""
-          }
+          <div class="registro-card-actions">
+            <span class="registro-tag">${isManual ? "Manual" : "Automática"}</span>
+            <span class="registro-tag is-soft">${escapeHtml(levelLabel)}</span>
+
+            ${
+              isManual && canEditGroup()
+                ? `<button class="btn-danger" type="button" data-action="resolver-alerta" data-id="${escapeHtml(alertItem.id)}">Resolver</button>`
+                : ""
+            }
+          </div>
         </div>
 
-        <div class="list-card-meta">${escapeHtml(alertItem.mensaje || "Sin mensaje")}</div>
-      </div>
+        <div class="registro-title">${escapeHtml(alertItem.titulo || "Alerta")}</div>
+        <div class="registro-message">${escapeHtml(alertItem.mensaje || "Sin mensaje")}</div>
+      </article>
     `;
   }).join("");
 }
 
 function renderHistory() {
   const list = $("historyList");
+  const note = $("historyToolbarNote");
+  const btnMore = $("btnHistoryMore");
+  const btnToggleHidden = $("btnHistoryToggleHidden");
+
   if (!list) return;
 
-  if (!state.history.length) {
-    list.innerHTML = `<div class="empty-box">Todavía no hay historial registrado para este grupo.</div>`;
+  const canManage = canManageHistoryItems();
+  const allItems = [...state.history];
+  const hiddenCount = allItems.filter((item) => item.oculto === true).length;
+
+  if (btnToggleHidden) {
+    btnToggleHidden.classList.toggle("hidden", !canManage);
+
+    if (canManage) {
+      btnToggleHidden.textContent = state.historyUi.showHidden
+        ? `Ocultar ocultos (${hiddenCount})`
+        : `Ver ocultos (${hiddenCount})`;
+
+      btnToggleHidden.disabled = hiddenCount === 0 && !state.historyUi.showHidden;
+    }
+  }
+
+  const visibleItems = allItems
+    .filter((item) => state.historyUi.showHidden || item.oculto !== true)
+    .sort((a, b) => {
+      const featuredDiff = Number(!!b.destacado) - Number(!!a.destacado);
+      if (featuredDiff !== 0) return featuredDiff;
+      return dateValue(b.fecha) - dateValue(a.fecha);
+    });
+
+  const shownItems = visibleItems.slice(0, state.historyUi.limit);
+
+  if (note) {
+    if (!visibleItems.length) {
+      note.textContent = hiddenCount > 0 && !state.historyUi.showHidden
+        ? `No hay registros visibles. Hay ${hiddenCount} oculto(s).`
+        : "Todavía no hay historial registrado para este grupo.";
+    } else {
+      note.textContent = `Mostrando ${shownItems.length} de ${visibleItems.length} registro(s)` +
+        (hiddenCount ? ` · ocultos: ${hiddenCount}` : "");
+    }
+  }
+
+  if (!shownItems.length) {
+    list.innerHTML = `<div class="empty-box">Todavía no hay historial visible para este grupo.</div>`;
+
+    if (btnMore) {
+      btnMore.classList.add("hidden");
+    }
     return;
   }
 
-  list.innerHTML = state.history.map((item) => {
+  list.innerHTML = shownItems.map((item) => {
     const cambiosDetallados =
       Array.isArray(item?.metadata?.cambiosDetallados) && item.metadata.cambiosDetallados.length
         ? item.metadata.cambiosDetallados
@@ -1120,36 +1204,112 @@ function renderHistory() {
             Array.isArray(item?.metadata?.cambios) ? item.metadata.cambios : []
           );
 
-    const cambiosHtml = cambiosDetallados.length
-      ? "\n" + cambiosDetallados.map((c) => {
-          if (c.tipoCambio === "agregado") {
-            return `• [Agregado] ${prettyLabel(c.campo)}: ${stringValue(c.nuevoPreview || "sin valor")}`;
-          }
-
-          if (c.tipoCambio === "eliminado") {
-            return `• [Eliminado] ${prettyLabel(c.campo)}: ${stringValue(c.anteriorPreview || "sin valor")}`;
-          }
-
-          return `• [Modificado] ${prettyLabel(c.campo)}: ${stringValue(c.anteriorPreview || "vacío")} → ${stringValue(c.nuevoPreview || "vacío")}`;
-        }).join("\n")
-      : "";
-
+    const tipo = getHistoryTypeLabel(item);
+    const cssType = getHistoryCardClass(item);
     const encabezado = item.asunto || item.titulo || "Movimiento";
-    const usuario = item.creadoPor || item.creadoPorCorreo || "Sin usuario";
+    const autor = item.creadoPor || item.creadoPorCorreo || "Sin usuario";
+    const fecha = item.fecha ? formatDateTime(item.fecha) : "Sin fecha";
+    const fullMessage = cleanText(item.mensaje || "Sin detalle");
+    const previewMessage = truncateHistoryMessage(fullMessage, 220);
+
+    const detailItems = cambiosDetallados.map((c) => {
+      if (c.tipoCambio === "agregado") {
+        return `<li><strong>Agregado</strong> · ${escapeHtml(prettyLabel(c.campo))}: ${escapeHtml(c.nuevoPreview || "sin valor")}</li>`;
+      }
+
+      if (c.tipoCambio === "eliminado") {
+        return `<li><strong>Eliminado</strong> · ${escapeHtml(prettyLabel(c.campo))}: ${escapeHtml(c.anteriorPreview || "sin valor")}</li>`;
+      }
+
+      return `<li><strong>Modificado</strong> · ${escapeHtml(prettyLabel(c.campo))}: ${escapeHtml(c.anteriorPreview || "vacío")} → ${escapeHtml(c.nuevoPreview || "vacío")}</li>`;
+    }).join("");
+
+    const hasLongMessage = fullMessage.length > 220;
+    const hasDetails = hasLongMessage || cambiosDetallados.length > 0;
 
     return `
-      <div class="timeline-item">
-        <div class="timeline-head">
-          <div class="timeline-title">${escapeHtml(encabezado)}</div>
-          <div class="timeline-date">${escapeHtml(formatDateTime(item.fecha))}</div>
+      <article class="registro-card ${cssType} ${item.destacado ? "is-featured" : ""} ${item.oculto ? "is-hidden-item" : ""}">
+        <div class="registro-card-top">
+          <div class="registro-meta-row">
+            <span>${escapeHtml(autor)}</span>
+            <span>·</span>
+            <span>${escapeHtml(fecha)}</span>
+          </div>
+
+          <div class="registro-card-actions">
+            <span class="registro-tag">${escapeHtml(tipo)}</span>
+            ${item.destacado ? `<span class="registro-tag is-featured">Destacado</span>` : ""}
+            ${item.oculto ? `<span class="registro-tag is-hidden">Oculto</span>` : ""}
+
+            ${
+              canManage
+                ? `<button class="btn-icon-lite" type="button" title="${item.destacado ? "Quitar destacado" : "Destacar"}" data-action="toggle-history-star" data-id="${escapeHtml(item.id)}">${item.destacado ? "★" : "☆"}</button>`
+                : ""
+            }
+
+            ${
+              canManage
+                ? `<button class="btn-icon-lite" type="button" title="${item.oculto ? "Mostrar" : "Ocultar"}" data-action="toggle-history-hidden" data-id="${escapeHtml(item.id)}">${item.oculto ? "👁" : "🙈"}</button>`
+                : ""
+            }
+          </div>
         </div>
 
-        <div class="timeline-body">${escapeHtml(item.mensaje || "Sin detalle")}
-${escapeHtml(`Usuario: ${usuario}`)}
-${escapeHtml(cambiosHtml)}</div>
-      </div>
+        <div class="registro-title">${escapeHtml(encabezado)}</div>
+        <div class="registro-message">${escapeHtml(previewMessage || "Sin detalle")}</div>
+
+        ${
+          hasDetails
+            ? `
+              <button
+                class="btn-link-lite"
+                type="button"
+                data-action="toggle-history-detail"
+                data-target="history-detail-${escapeHtml(item.id)}"
+              >
+                Ver más
+              </button>
+
+              <div class="registro-detail hidden" id="history-detail-${escapeHtml(item.id)}">
+                ${
+                  hasLongMessage
+                    ? `
+                      <div class="registro-detail-block">
+                        <div class="registro-detail-label">Mensaje completo</div>
+                        <div class="registro-detail-text">${escapeHtml(fullMessage)}</div>
+                      </div>
+                    `
+                    : ""
+                }
+
+                ${
+                  cambiosDetallados.length
+                    ? `
+                      <div class="registro-detail-block">
+                        <div class="registro-detail-label">Detalle</div>
+                        <ul class="registro-detail-list">${detailItems}</ul>
+                      </div>
+                    `
+                    : ""
+                }
+              </div>
+            `
+            : ""
+        }
+      </article>
     `;
   }).join("");
+
+  if (btnMore) {
+    const remaining = visibleItems.length - shownItems.length;
+
+    if (remaining > 0) {
+      btnMore.classList.remove("hidden");
+      btnMore.textContent = `Ver más (${remaining} restantes)`;
+    } else {
+      btnMore.classList.add("hidden");
+    }
+  }
 }
 
 function syncButtons() {
@@ -1336,6 +1496,9 @@ function bindEvents() {
   $("modalAlerta")?.addEventListener("click", (e) => {
     if (e.target === $("modalAlerta")) closeModal("modalAlerta");
   });
+  $("modalComentario")?.addEventListener("click", (e) => {
+    if (e.target === $("modalComentario")) closeModal("modalComentario");
+  });
 
   $("btnEditarDatosHero")?.addEventListener("click", openDatosModal);
   $("btnEditarDatos")?.addEventListener("click", openDatosModal);
@@ -1352,11 +1515,24 @@ function bindEvents() {
   $("btnNuevaAlertaHero")?.addEventListener("click", openAlertModal);
   $("btnNuevaAlerta")?.addEventListener("click", openAlertModal);
 
+  $("btnNuevoComentario")?.addEventListener("click", openCommentModal);
+
   $("btnGuardarDatos")?.addEventListener("click", saveDatos);
   $("btnGuardarSituacion")?.addEventListener("click", saveSituacion);
   $("btnGuardarDocumentos")?.addEventListener("click", saveDocumentos);
   $("btnGuardarReunion")?.addEventListener("click", saveMeeting);
   $("btnGuardarAlerta")?.addEventListener("click", saveManualAlert);
+  $("btnGuardarComentario")?.addEventListener("click", saveComment);
+
+  $("btnHistoryToggleHidden")?.addEventListener("click", () => {
+    state.historyUi.showHidden = !state.historyUi.showHidden;
+    renderHistory();
+  });
+
+  $("btnHistoryMore")?.addEventListener("click", () => {
+    state.historyUi.limit += 10;
+    renderHistory();
+  });
 
   $("r_tipo")?.addEventListener("change", syncMeetingTypeVisibility);
 
@@ -1378,8 +1554,36 @@ function bindEvents() {
   $("alertsList")?.addEventListener("click", async (e) => {
     const btn = e.target.closest("[data-action='resolver-alerta']");
     if (!btn) return;
+
     const id = btn.dataset.id || "";
     await resolveManualAlert(id);
+  });
+
+  $("historyList")?.addEventListener("click", async (e) => {
+    const detailBtn = e.target.closest("[data-action='toggle-history-detail']");
+    if (detailBtn) {
+      const targetId = detailBtn.dataset.target || "";
+      const target = $(targetId);
+      if (!target) return;
+
+      const isHidden = target.classList.contains("hidden");
+      target.classList.toggle("hidden", !isHidden);
+      detailBtn.textContent = isHidden ? "Ver menos" : "Ver más";
+      return;
+    }
+
+    const starBtn = e.target.closest("[data-action='toggle-history-star']");
+    if (starBtn) {
+      const id = starBtn.dataset.id || "";
+      await toggleHistoryStar(id);
+      return;
+    }
+
+    const hideBtn = e.target.closest("[data-action='toggle-history-hidden']");
+    if (hideBtn) {
+      const id = hideBtn.dataset.id || "";
+      await toggleHistoryHidden(id);
+    }
   });
 }
 
@@ -1489,6 +1693,127 @@ function openAlertModal() {
   $("formAlerta")?.reset();
   setFormValue("a_nivel", "warning");
   openModal("modalAlerta");
+}
+
+function openCommentModal() {
+  if (!canEditGroup()) {
+    alert(getBlockedEditMessage());
+    return;
+  }
+
+  $("formComentario")?.reset();
+  openModal("modalComentario");
+}
+
+async function saveComment() {
+  if (!canEditGroup()) {
+    alert(getBlockedEditMessage());
+    return;
+  }
+
+  const titulo = cleanText($("c_titulo")?.value);
+  const mensaje = cleanText($("c_mensaje")?.value);
+
+  if (!titulo || !mensaje) {
+    alert("Debes completar el título y el comentario.");
+    return;
+  }
+
+  await createHistoryEntry({
+    tipoMovimiento: "comentario",
+    modulo: "bitacora",
+    titulo: "Comentario",
+    asunto: titulo,
+    mensaje,
+    metadata: {
+      tipoRegistro: "comentario"
+    }
+  });
+
+  closeModal("modalComentario");
+  await loadAll();
+}
+
+function getHistoryTypeLabel(item = {}) {
+  const tipo = normalizeSearchLocal(item.tipoMovimiento || "");
+  const modulo = normalizeSearchLocal(item.modulo || "");
+
+  if (tipo.includes("comentario")) return "Comentario";
+  if (tipo.includes("alerta")) return "Alerta";
+  if (tipo.includes("reunion")) return "Reunión";
+  if (tipo.includes("firma")) return "Firma";
+  if (tipo.includes("estado")) return "Estado";
+  if (tipo.includes("document")) return "Documento";
+
+  if (modulo === "agenda") return "Reunión";
+  if (modulo === "alertas") return "Alerta";
+  if (modulo === "bitacora") return "Comentario";
+
+  return "Movimiento";
+}
+
+function getHistoryCardClass(item = {}) {
+  const tipo = getHistoryTypeLabel(item);
+
+  if (tipo === "Comentario") return "is-comment";
+  if (tipo === "Alerta") return "is-alert";
+  if (tipo === "Reunión") return "is-meeting";
+  if (tipo === "Firma") return "is-sign";
+  if (tipo === "Estado") return "is-status";
+
+  return "";
+}
+
+function truncateHistoryMessage(value = "", max = 220) {
+  const text = cleanText(value || "");
+  if (!text) return "";
+  if (text.length <= max) return text;
+  return `${text.slice(0, max - 3)}...`;
+}
+
+async function toggleHistoryStar(historyId) {
+  if (!canManageHistoryItems()) {
+    alert("Solo administración y supervisión pueden destacar elementos del historial.");
+    return;
+  }
+
+  const item = state.history.find((x) => x.id === historyId);
+  if (!item) return;
+
+  const nextValue = !item.destacado;
+
+  await setDoc(doc(db, HISTORIAL_COLLECTION, historyId), {
+    destacado: nextValue,
+    destacadoAt: nextValue ? serverTimestamp() : null,
+    destacadoPor: nextValue ? getDisplayName(state.effectiveUser) : "",
+    destacadoPorCorreo: nextValue ? state.effectiveEmail : ""
+  }, { merge: true });
+
+  await loadAll();
+}
+
+async function toggleHistoryHidden(historyId) {
+  if (!canManageHistoryItems()) {
+    alert("Solo administración y supervisión pueden ocultar elementos del historial.");
+    return;
+  }
+
+  const item = state.history.find((x) => x.id === historyId);
+  if (!item) return;
+
+  const nextValue = !item.oculto;
+  const actionLabel = nextValue ? "ocultar" : "volver a mostrar";
+  const ok = confirm(`¿Quieres ${actionLabel} este item del historial?`);
+  if (!ok) return;
+
+  await setDoc(doc(db, HISTORIAL_COLLECTION, historyId), {
+    oculto: nextValue,
+    ocultadoAt: nextValue ? serverTimestamp() : null,
+    ocultadoPor: nextValue ? getDisplayName(state.effectiveUser) : "",
+    ocultadoPorCorreo: nextValue ? state.effectiveEmail : ""
+  }, { merge: true });
+
+  await loadAll();
 }
 
 function syncMeetingTypeVisibility() {
@@ -2067,12 +2392,14 @@ async function saveManualAlert() {
   await createHistoryEntry({
     tipoMovimiento: "alerta_manual",
     modulo: "alertas",
-    titulo: "Nueva alerta manual",
-    mensaje: `${getDisplayName(state.effectiveUser)} creó una alerta manual para este grupo.`,
+    titulo: "Alerta manual",
+    asunto: titulo,
+    mensaje,
     metadata: {
       cambios: [
         { campo: "alerta.titulo", anterior: "", nuevo: titulo },
-        { campo: "alerta.nivel", anterior: "", nuevo: nivel }
+        { campo: "alerta.nivel", anterior: "", nuevo: nivel },
+        { campo: "alerta.mensaje", anterior: "", nuevo: mensaje }
       ]
     }
   });
@@ -2100,7 +2427,14 @@ async function resolveManualAlert(alertId) {
     tipoMovimiento: "alerta_manual",
     modulo: "alertas",
     titulo: "Alerta resuelta",
-    mensaje: `${getDisplayName(state.effectiveUser)} resolvió la alerta manual "${item.titulo}".`
+    asunto: item.titulo || "Alerta manual",
+    mensaje: `${getDisplayName(state.effectiveUser)} resolvió esta alerta manual.`,
+    metadata: {
+      cambios: [
+        { campo: "alerta.activa", anterior: true, nuevo: false },
+        { campo: "alerta.resuelta", anterior: false, nuevo: true }
+      ]
+    }
   });
 
   await loadAll();
@@ -2515,6 +2849,16 @@ async function createHistoryEntry({
       cambios: baseChanges,
       cambiosDetallados
     },
+
+    destacado: false,
+    destacadoAt: null,
+    destacadoPor: "",
+    destacadoPorCorreo: "",
+
+    oculto: false,
+    ocultadoAt: null,
+    ocultadoPor: "",
+    ocultadoPorCorreo: "",
 
     creadoPor: getDisplayName(state.effectiveUser),
     creadoPorCorreo: state.effectiveEmail,
