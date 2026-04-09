@@ -18,7 +18,7 @@ import {
   deleteObject
 } from "https://www.gstatic.com/firebasejs/11.7.3/firebase-storage.js";
 
-import { auth, db, VENTAS_USERS } from "./firebase-init.js";
+import { auth, db, VENTAS_USERS, getVentasUserEmails } from "./firebase-init.js";
 
 import {
   $,
@@ -781,16 +781,29 @@ function renderTable() {
    FIRESTORE
 ========================================================= */
 async function loadVendorItems(email) {
-  const sellerEmail = normalizeEmail(email);
+  const sellerEmails = getVentasUserEmails(email);
 
   setProgressStatus({
     text: "Cargando cartera...",
-    meta: `Vendedor(a): ${sellerEmail}`,
+    meta: `Vendedor(a): ${sellerEmails.join(" | ") || normalizeEmail(email)}`,
     progress: 10
   });
 
-  const snap = await getDocs(collection(db, "ventas_cartera", sellerEmail, "items"));
-  const rows = snap.docs.map(d => mapDocToRow(d.id, d.data()));
+  const rows = [];
+  const seen = new Set();
+
+  for (const sellerEmail of sellerEmails) {
+    const snap = await getDocs(collection(db, "ventas_cartera", sellerEmail, "items"));
+
+    snap.docs.forEach((d) => {
+      const row = mapDocToRow(d.id, d.data());
+      const key = `${normalizeEmail(row.correoVendedor)}__${String(row.numeroColegio)}`;
+
+      if (seen.has(key)) return;
+      seen.add(key);
+      rows.push(row);
+    });
+  }
 
   setProgressStatus({
     text: "Cartera cargada.",
@@ -856,7 +869,8 @@ async function loadAllItems() {
 async function loadData() {
   try {
     if (isVendedorRole(state.effectiveUser)) {
-      state.vendorFilter = normalizeEmail(state.effectiveUser.email);
+      const sellerEmails = getVentasUserEmails(state.effectiveUser);
+      state.vendorFilter = normalizeEmail(sellerEmails[0] || state.effectiveUser.email);
       state.rows = await loadVendorItems(state.effectiveUser.email);
     } else {
       state.rows = await loadAllItems();
