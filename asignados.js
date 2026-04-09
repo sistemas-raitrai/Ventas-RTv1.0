@@ -10,7 +10,7 @@ import {
   serverTimestamp
 } from "https://www.gstatic.com/firebasejs/11.7.3/firebase-firestore.js";
 
-import { auth, db, VENTAS_USERS, getVentasUser } from "./firebase-init.js";
+import { auth, db, VENTAS_USERS } from "./firebase-init.js";
 
 import {
   $,
