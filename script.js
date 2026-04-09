@@ -335,7 +335,8 @@ function getBucketRows(rows = [], bucket = "") {
 function isSinAsignar(row = {}) {
   return (
     isTruthyFlag(row.requiereAsignacion) ||
-    (!getRowVendorEmail(row) && !normalizeLoose(getRowVendorName(row)))
+    (!getRowVendorEmail(row) && !normalizeLoose(getRowVendorName(row))) ||
+    normalizeLoose(getRowVendorName(row)) === "sin asignar"
   );
 }
 
@@ -501,7 +502,9 @@ function syncAlertRowsByRole(effectiveUser = null) {
   const user = effectiveUser || getEffectiveUser();
 
   const canSeeSinAsignar =
-    isAdminDashboardRole(user) || isSupervisionDashboardRole(user);
+    isAdminDashboardRole(user) ||
+    isSupervisionDashboardRole(user) ||
+    isRegistroRole(user);
 
   const canSeeFichas = !!user;
 
@@ -815,29 +818,46 @@ function renderDashboard(rows = []) {
     if (el) el.textContent = String(value);
   };
 
-  state.scopedRows = dedupeRowsByGroup(rows);
-
-  const contactados = getBucketRows(rows, "contactados");
-  const cotizando = getBucketRows(rows, "cotizando");
-  const reunion = getBucketRows(rows, "reunion");
-  const perdidas = getBucketRows(rows, "perdidas");
-  const recotizando = getBucketRows(rows, "recotizando");
-  const ganadas = getBucketRows(rows, "ganadas");
-  const autorizadas = getBucketRows(rows, "autorizadas");
-  const cerradas = getBucketRows(rows, "cerradas");
-
   const effectiveUser = getEffectiveUser();
-  const fichasPorFirmar = getFichasPorFirmarSegunUsuario(rows, effectiveUser);
 
+  const scopedRows = dedupeRowsByGroup(rows);
+  const allRows = dedupeRowsByGroup(state.rows);
+
+  state.scopedRows = scopedRows;
+
+  const contactados = getBucketRows(scopedRows, "contactados");
+  const cotizando = getBucketRows(scopedRows, "cotizando");
+  const reunion = getBucketRows(scopedRows, "reunion");
+  const perdidas = getBucketRows(scopedRows, "perdidas");
+  const recotizando = getBucketRows(scopedRows, "recotizando");
+  const ganadas = getBucketRows(scopedRows, "ganadas");
+  const autorizadas = getBucketRows(scopedRows, "autorizadas");
+  const cerradas = getBucketRows(scopedRows, "cerradas");
+
+  const fichasPorFirmar = getFichasPorFirmarSegunUsuario(scopedRows, effectiveUser);
   state.fichasPorFirmarRows = fichasPorFirmar;
 
+  const canSeeGlobalSinAsignar =
+    isAdminDashboardRole(effectiveUser) ||
+    isSupervisionDashboardRole(effectiveUser) ||
+    isRegistroRole(effectiveUser);
+
+  const sinAsignarRows = canSeeGlobalSinAsignar
+    ? allRows.filter(isSinAsignar)
+    : scopedRows.filter(isSinAsignar);
+
+  const aContactarRows = scopedRows.filter(isAContactar);
+  const reuniones3DiasRows = scopedRows.filter(isReunionEnProximosTresDias);
+
   // ALERTAS
-  setText("count-sin-asignar", rows.filter(isSinAsignar).length);
+  setText("count-sin-asignar", sinAsignarRows.length);
   setSinAsignarManagementHref();
-  setAlertCountLink("count-a-contactar", rows.filter(isAContactar).length, "a_contactar");
+
+  setAlertCountLink("count-a-contactar", aContactarRows.length, "a_contactar");
   setAlertHref("link-a-contactar", "a_contactar");
+
   setText("count-fichas-firmar", fichasPorFirmar.length);
-  setText("count-reunion-3dias", rows.filter(isReunionEnProximosTresDias).length);
+  setText("count-reunion-3dias", reuniones3DiasRows.length);
 
   syncAlertRowsByRole(effectiveUser);
 
