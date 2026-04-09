@@ -3,7 +3,9 @@ import {
   db,
   puedeVerGeneral,
   normalizeEmail,
-  VENTAS_USERS
+  VENTAS_USERS,
+  getVentasUser,
+  getVentasUserEmails
 } from "./firebase-init.js";
 
 import {
@@ -103,6 +105,18 @@ async function initPage() {
 async function bootstrapFromSession() {
   state.realUser = getRealUser();
   state.currentUser = getEffectiveUser();
+  
+  const resolvedRealUser = getVentasUser(state.realUser?.email || auth.currentUser?.email || "");
+  const resolvedEffectiveUser = getVentasUser(state.currentUser?.email || state.realUser?.email || auth.currentUser?.email || "");
+  
+  if (resolvedRealUser) {
+    state.realUser = { ...state.realUser, ...resolvedRealUser };
+  }
+  
+  if (resolvedEffectiveUser) {
+    state.currentUser = { ...state.currentUser, ...resolvedEffectiveUser };
+  }
+  
   state.authEmail = normalizeEmail(state.realUser?.email || auth.currentUser?.email || "");
   state.effectiveEmail = normalizeEmail(state.currentUser?.email || state.authEmail);
 
@@ -449,9 +463,16 @@ function applyFiltersAndRender() {
     state.currentUser?.apellido
   ].filter(Boolean).join(" "));
 
-  const currentVendorAliases = Array.isArray(state.currentUser?.aliascartera)
-    ? state.currentUser.aliascartera.map(normalizeText)
-    : [];
+  const rawAliases =
+    state.currentUser?.aliasCartera ??
+    state.currentUser?.aliascartera ??
+    [];
+  
+  const currentVendorAliases = Array.isArray(rawAliases)
+    ? rawAliases.map(normalizeText)
+    : (rawAliases ? [normalizeText(rawAliases)] : []);
+  
+  const currentVendorEmails = getVentasUserEmails(state.currentUser);
 
   let rows = [...state.allRows];
 
@@ -462,7 +483,7 @@ function applyFiltersAndRender() {
     const rowVendorEmail = normalizeEmail(row.vendedoraCorreo);
     const rowVendorName = normalizeText(row.vendedora);
 
-    if (rowVendorEmail && rowVendorEmail === state.effectiveEmail) return true;
+    if (rowVendorEmail && currentVendorEmails.includes(rowVendorEmail)) return true;
 
     if (currentVendorFullName && rowVendorName.includes(currentVendorFullName)) return true;
 
