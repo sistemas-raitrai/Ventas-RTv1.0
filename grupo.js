@@ -400,8 +400,7 @@ function canEditDocuments() {
 }
 
 function canManageHistoryItems() {
-  const rol = String(state.effectiveUser?.rol || "").toLowerCase();
-  return rol === "admin" || rol === "supervision";
+  return canAccessGroup(state.group);
 }
 
 function isEffectiveVendorRole() {
@@ -1773,7 +1772,7 @@ function truncateHistoryMessage(value = "", max = 220) {
 
 async function toggleHistoryStar(historyId) {
   if (!canManageHistoryItems()) {
-    alert("Solo administración y supervisión pueden destacar elementos del historial.");
+    alert("No tienes permisos para destacar elementos del historial de este grupo.");
     return;
   }
 
@@ -1794,7 +1793,7 @@ async function toggleHistoryStar(historyId) {
 
 async function toggleHistoryHidden(historyId) {
   if (!canManageHistoryItems()) {
-    alert("Solo administración y supervisión pueden ocultar elementos del historial.");
+    alert("No tienes permisos para ocultar elementos del historial de este grupo.");
     return;
   }
 
@@ -1815,7 +1814,6 @@ async function toggleHistoryHidden(historyId) {
 
   await loadAll();
 }
-
 function syncMeetingTypeVisibility() {
   const type = String($("r_tipo")?.value || "presencial");
   $("wrapDireccion")?.classList.toggle("hidden", type !== "presencial");
