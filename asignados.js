@@ -386,6 +386,8 @@ function renderTable() {
 
   if (!tbody || !empty || !summary) return;
 
+  const canEdit = canEditAsignados(state.effectiveUser);
+
   summary.textContent = `${state.filteredRows.length} registro(s) en esta vista`;
 
   if (!state.filteredRows.length) {
@@ -421,18 +423,22 @@ function renderTable() {
           </div>
         </td>
         <td>
-          ${buildVendorSelect(row)}
+          ${canEdit
+            ? buildVendorSelect(row)
+            : `<span style="color:#6b6475;font-weight:600;">Solo lectura</span>`}
         </td>
         <td>
           <div class="table-actions">
-            <button class="btn-mini edit" data-action="save-assignment" data-id="${escapeHtml(idGrupo)}">
-              ${state.tab === "sin_asignar" ? "Asignar" : "Guardar"}
-            </button>
-
-            ${state.tab === "asignados" ? `
-              <button class="btn-mini warn" data-action="remove-assignment" data-id="${escapeHtml(idGrupo)}">
-                Quitar asignación
+            ${canEdit ? `
+              <button class="btn-mini edit" data-action="save-assignment" data-id="${escapeHtml(idGrupo)}">
+                ${state.tab === "sin_asignar" ? "Asignar" : "Guardar"}
               </button>
+
+              ${state.tab === "asignados" ? `
+                <button class="btn-mini warn" data-action="remove-assignment" data-id="${escapeHtml(idGrupo)}">
+                  Quitar asignación
+                </button>
+              ` : ""}
             ` : ""}
 
             <button class="btn-mini open" data-action="history" data-id="${escapeHtml(idGrupo)}">
@@ -556,6 +562,11 @@ function closeHistory() {
    GUARDAR / QUITAR ASIGNACIÓN
 ========================================================= */
 async function saveAssignment(idGrupo) {
+    if (!canEditAsignados(state.effectiveUser)) {
+    alert("No tienes permisos para asignar vendedores.");
+    return;
+  }
+  
   const row = state.rows.find((item) => getRowId(item) === String(idGrupo));
   if (!row) return;
 
@@ -643,6 +654,11 @@ async function saveAssignment(idGrupo) {
 }
 
 async function removeAssignment(idGrupo) {
+    if (!canEditAsignados(state.effectiveUser)) {
+    alert("No tienes permisos para quitar asignaciones.");
+    return;
+  }
+  
   const row = state.rows.find((item) => getRowId(item) === String(idGrupo));
   if (!row) return;
 
@@ -783,13 +799,22 @@ function bindPageEvents() {
 
       const action = btn.dataset.action || "";
       const id = btn.dataset.id || "";
+      const canEdit = canEditAsignados(state.effectiveUser);
 
       if (action === "save-assignment") {
+        if (!canEdit) {
+          alert("Estás en modo solo lectura.");
+          return;
+        }
         await saveAssignment(id);
         return;
       }
 
       if (action === "remove-assignment") {
+        if (!canEdit) {
+          alert("Estás en modo solo lectura.");
+          return;
+        }
         await removeAssignment(id);
         return;
       }
