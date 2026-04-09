@@ -1360,12 +1360,12 @@
                 </div>
               </div>
 
-              <div class="info-item">
+              <div class="info-item hidden" id="situacionObsAdminWrap">
                 <div class="info-label">Observaciones para Administración</div>
                 <div class="info-value" id="situacionObsAdmin">—</div>
               </div>
               
-              <div class="info-item">
+              <div class="info-item hidden" id="situacionObsOperacionesWrap">
                 <div class="info-label">Observaciones para Operaciones</div>
                 <div class="info-value" id="situacionObsOperaciones">—</div>
               </div>
@@ -1627,7 +1627,7 @@
         <h3 class="modal-title">Editar situación del grupo</h3>
         <button class="modal-close" type="button" data-close="modalSituacion">×</button>
       </div>
-
+  
       <div class="modal-body">
         <form id="formSituacion" class="form-grid">
           <div class="form-field">
@@ -1642,7 +1642,7 @@
               <option value="perdida">Perdida</option>
             </select>
           </div>
-
+  
           <div class="form-field">
             <label for="s_autorizada">Autorizada</label>
             <select id="s_autorizada" name="autorizada">
@@ -1650,7 +1650,7 @@
               <option value="true">Sí</option>
             </select>
           </div>
-
+  
           <div class="form-field">
             <label for="s_cerrada">Cerrada</label>
             <select id="s_cerrada" name="cerrada">
@@ -1658,57 +1658,78 @@
               <option value="true">Sí</option>
             </select>
           </div>
-
+  
           <div class="form-field span-3">
-            <label>Observaciones administración</label>
-          
-            <div class="rich-field">
-              <div class="rich-toolbar" data-editor-target="s_obsAdmin">
-                <button class="rich-tool-btn" type="button" data-rich-cmd="bold" data-editor-target="s_obsAdmin"><strong>B</strong></button>
-                <button class="rich-tool-btn" type="button" data-rich-cmd="italic" data-editor-target="s_obsAdmin"><em>I</em></button>
-                <button class="rich-tool-btn" type="button" data-rich-cmd="underline" data-editor-target="s_obsAdmin"><u>U</u></button>
-                <button class="rich-tool-btn" type="button" data-rich-cmd="insertUnorderedList" data-editor-target="s_obsAdmin">• Lista</button>
-                <button class="rich-tool-btn" type="button" data-rich-cmd="insertOrderedList" data-editor-target="s_obsAdmin">1. Lista</button>
-                <button class="rich-tool-btn" type="button" data-rich-cmd="removeFormat" data-editor-target="s_obsAdmin">Limpiar</button>
-                <input class="rich-tool-color" type="color" value="#000000" data-rich-color="foreColor" data-editor-target="s_obsAdmin" title="Color texto" />
-                <input class="rich-tool-color" type="color" value="#fff2a8" data-rich-color="hiliteColor" data-editor-target="s_obsAdmin" title="Resaltar" />
-              </div>
-          
-              <div
-                id="s_obsAdmin"
-                class="rich-editor"
-                contenteditable="true"
-                data-placeholder="Escribe aquí las observaciones de administración..."
-              ></div>
-            </div>
+            <label for="s_proximoPaso">Siguiente paso</label>
+            <input id="s_proximoPaso" name="proximoPaso" type="text" />
           </div>
-          
+  
           <div class="form-field span-3">
-            <label>Observaciones operaciones</label>
-          
-            <div class="rich-field">
-              <div class="rich-toolbar" data-editor-target="s_obsOperaciones">
-                <button class="rich-tool-btn" type="button" data-rich-cmd="bold" data-editor-target="s_obsOperaciones"><strong>B</strong></button>
-                <button class="rich-tool-btn" type="button" data-rich-cmd="italic" data-editor-target="s_obsOperaciones"><em>I</em></button>
-                <button class="rich-tool-btn" type="button" data-rich-cmd="underline" data-editor-target="s_obsOperaciones"><u>U</u></button>
-                <button class="rich-tool-btn" type="button" data-rich-cmd="insertUnorderedList" data-editor-target="s_obsOperaciones">• Lista</button>
-                <button class="rich-tool-btn" type="button" data-rich-cmd="insertOrderedList" data-editor-target="s_obsOperaciones">1. Lista</button>
-                <button class="rich-tool-btn" type="button" data-rich-cmd="removeFormat" data-editor-target="s_obsOperaciones">Limpiar</button>
-                <input class="rich-tool-color" type="color" value="#000000" data-rich-color="foreColor" data-editor-target="s_obsOperaciones" title="Color texto" />
-                <input class="rich-tool-color" type="color" value="#fff2a8" data-rich-color="hiliteColor" data-editor-target="s_obsOperaciones" title="Resaltar" />
+            <label for="s_mensajeHistorial">Mensaje del cambio</label>
+            <textarea
+              id="s_mensajeHistorial"
+              name="mensajeHistorial"
+              placeholder="Escribe aquí el motivo o comentario del cambio. Si cambias el estado, este mensaje será obligatorio y quedará en el historial."
+            ></textarea>
+          </div>
+  
+          <div class="form-field span-3 hidden" id="wrapSituacionFechaReunion">
+            <label for="s_fechaReunion">Fecha de la reunión</label>
+            <input id="s_fechaReunion" name="fechaReunion" type="datetime-local" />
+          </div>
+  
+          <div class="span-3 hidden" id="wrapSituacionGanadaFields">
+            <div class="form-field span-3">
+              <label>Observaciones administración</label>
+  
+              <div class="rich-field">
+                <div class="rich-toolbar" data-editor-target="s_obsAdmin">
+                  <button class="rich-tool-btn" type="button" data-rich-cmd="bold" data-editor-target="s_obsAdmin"><strong>B</strong></button>
+                  <button class="rich-tool-btn" type="button" data-rich-cmd="italic" data-editor-target="s_obsAdmin"><em>I</em></button>
+                  <button class="rich-tool-btn" type="button" data-rich-cmd="underline" data-editor-target="s_obsAdmin"><u>U</u></button>
+                  <button class="rich-tool-btn" type="button" data-rich-cmd="insertUnorderedList" data-editor-target="s_obsAdmin">• Lista</button>
+                  <button class="rich-tool-btn" type="button" data-rich-cmd="insertOrderedList" data-editor-target="s_obsAdmin">1. Lista</button>
+                  <button class="rich-tool-btn" type="button" data-rich-cmd="removeFormat" data-editor-target="s_obsAdmin">Limpiar</button>
+                  <input class="rich-tool-color" type="color" value="#000000" data-rich-color="foreColor" data-editor-target="s_obsAdmin" title="Color texto" />
+                  <input class="rich-tool-color" type="color" value="#fff2a8" data-rich-color="hiliteColor" data-editor-target="s_obsAdmin" title="Resaltar" />
+                </div>
+  
+                <div
+                  id="s_obsAdmin"
+                  class="rich-editor"
+                  contenteditable="true"
+                  data-placeholder="Escribe aquí las observaciones de administración."
+                ></div>
               </div>
-          
-              <div
-                id="s_obsOperaciones"
-                class="rich-editor"
-                contenteditable="true"
-                data-placeholder="Escribe aquí las observaciones de operaciones..."
-              ></div>
+            </div>
+  
+            <div class="form-field span-3">
+              <label>Observaciones operaciones</label>
+  
+              <div class="rich-field">
+                <div class="rich-toolbar" data-editor-target="s_obsOperaciones">
+                  <button class="rich-tool-btn" type="button" data-rich-cmd="bold" data-editor-target="s_obsOperaciones"><strong>B</strong></button>
+                  <button class="rich-tool-btn" type="button" data-rich-cmd="italic" data-editor-target="s_obsOperaciones"><em>I</em></button>
+                  <button class="rich-tool-btn" type="button" data-rich-cmd="underline" data-editor-target="s_obsOperaciones"><u>U</u></button>
+                  <button class="rich-tool-btn" type="button" data-rich-cmd="insertUnorderedList" data-editor-target="s_obsOperaciones">• Lista</button>
+                  <button class="rich-tool-btn" type="button" data-rich-cmd="insertOrderedList" data-editor-target="s_obsOperaciones">1. Lista</button>
+                  <button class="rich-tool-btn" type="button" data-rich-cmd="removeFormat" data-editor-target="s_obsOperaciones">Limpiar</button>
+                  <input class="rich-tool-color" type="color" value="#000000" data-rich-color="foreColor" data-editor-target="s_obsOperaciones" title="Color texto" />
+                  <input class="rich-tool-color" type="color" value="#fff2a8" data-rich-color="hiliteColor" data-editor-target="s_obsOperaciones" title="Resaltar" />
+                </div>
+  
+                <div
+                  id="s_obsOperaciones"
+                  class="rich-editor"
+                  contenteditable="true"
+                  data-placeholder="Escribe aquí las observaciones de operaciones."
+                ></div>
+              </div>
             </div>
           </div>
         </form>
       </div>
-
+  
       <div class="modal-actions">
         <button class="btn-pill" type="button" data-close="modalSituacion">Cancelar</button>
         <button class="btn-dark" type="button" id="btnGuardarSituacion">Guardar situación</button>
