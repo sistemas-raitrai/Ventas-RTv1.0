@@ -1613,9 +1613,16 @@ function showSaveNotice(message = "Cambios guardados correctamente.") {
 
 function syncSituacionStateUI() {
   const estado = normalizeState($("s_estado")?.value || "");
+  const isGanada = estado === "ganada";
+  const isReunion = estado === "reunion_confirmada";
 
-  $("wrapSituacionGanadaFields")?.classList.toggle("hidden", estado !== "ganada");
-  $("wrapSituacionFechaReunion")?.classList.toggle("hidden", estado !== "reunion_confirmada");
+  $("wrapSituacionGanadaFields")?.classList.toggle("hidden", !isGanada);
+  $("wrapSituacionFechaReunion")?.classList.toggle("hidden", !isReunion);
+
+  const fechaInput = $("s_fechaReunion");
+  if (fechaInput) {
+    fechaInput.required = isReunion;
+  }
 }
 
 function getSituacionMeetingBaseDate() {
@@ -1666,9 +1673,6 @@ function openSituacionModal() {
   }
 
   setFormValue("s_estado", normalizeState(state.group.estado));
-  setFormValue("s_autorizada", String(!!state.group.autorizada));
-  setFormValue("s_cerrada", String(!!state.group.cerrada));
-  setFormValue("s_proximoPaso", getByPath(state.group, "situacion.proximoPaso") || "");
   setFormValue("s_mensajeHistorial", "");
 
   const meetingBaseDate = getSituacionMeetingBaseDate();
@@ -2184,18 +2188,14 @@ async function saveSituacion() {
 
   const estadoAnterior = normalizeState(state.group.estado || "a_contactar");
   const estadoNuevo = normalizeState($("s_estado")?.value || "a_contactar");
-  const autorizadaNueva = String($("s_autorizada")?.value) === "true";
-  const cerradaNueva = String($("s_cerrada")?.value) === "true";
-  const proximoPasoNuevo = $("s_proximoPaso")?.value || "";
   const mensajeHistorial = cleanText($("s_mensajeHistorial")?.value || "");
   const fechaReunionRaw = $("s_fechaReunion")?.value || "";
 
-  const cambioEstado = estadoNuevo !== estadoAnterior;
   const isGanada = estadoNuevo === "ganada";
   const isReunionConfirmada = estadoNuevo === "reunion_confirmada";
 
-  if (cambioEstado && !mensajeHistorial) {
-    alert("Debes escribir un mensaje para el historial cuando cambias el estado.");
+  if (!mensajeHistorial) {
+    alert("Debes escribir un mensaje del cambio.");
     return;
   }
 
@@ -2204,19 +2204,34 @@ async function saveSituacion() {
     return;
   }
 
-  const simpleValues = {
-    estado: estadoNuevo,
-    autorizada: autorizadaNueva,
-    cerrada: cerradaNueva,
-    "situacion.proximoPaso": proximoPasoNuevo
-  };
+  if (estadoNuevo !== estadoAnterior) {
+    patch.estado = estadoNuevo;
+    cambios.push({
+      campo: "estado",
+      anterior: estadoAnterior,
+      nuevo: estadoNuevo
+    });
+  }
 
-  for (const [path, nuevo] of Object.entries(simpleValues)) {
-    const anterior = getByPath(state.group, path);
+  if (isReunionConfirmada) {
+    const fechaAnteriorTxt = toDatetimeLocal(
+      toDate(state.group.proximaReunionFecha || getNextMeeting()?.fechaInicio || null)
+    );
 
-    if (!sameValue(anterior, nuevo)) {
-      setNestedValue(patch, path, nuevo);
-      cambios.push({ campo: path, anterior, nuevo });
+    if (fechaAnteriorTxt !== fechaReunionRaw) {
+      const fechaReunionDate = new Date(fechaReunionRaw);
+
+      if (isNaN(fechaReunionDate.getTime())) {
+        alert("La fecha de la reunión no es válida.");
+        return;
+      }
+
+      patch.proximaReunionFecha = Timestamp.fromDate(fechaReunionDate);
+      cambios.push({
+        campo: "proximaReunionFecha",
+        anterior: fechaAnteriorTxt || "",
+        nuevo: fechaReunionRaw
+      });
     }
   }
 
@@ -2255,52 +2270,19 @@ async function saveSituacion() {
     }
   }
 
-  if (isReunionConfirmada) {
-    const fechaAnteriorTxt = toDatetimeLocal(
-      toDate(state.group.proximaReunionFecha || getNextMeeting()?.fechaInicio || null)
-    );
-
-    if (fechaAnteriorTxt !== fechaReunionRaw) {
-      const fechaReunionDate = new Date(fechaReunionRaw);
-
-      if (isNaN(fechaReunionDate.getTime())) {
-        alert("La fecha de reunión no es válida.");
-        return;
-      }
-
-      patch.proximaReunionFecha = Timestamp.fromDate(fechaReunionDate);
-      cambios.push({
-        campo: "proximaReunionFecha",
-        anterior: fechaAnteriorTxt || "",
-        nuevo: fechaReunionRaw
-      });
-    }
-  }
-
   if (!cambios.length) {
-    closeModal("modalSituacion");
+    alert("No hay cambios para guardar.");
     return;
   }
 
   await applyCriticalChangeRules(patch, cambios);
 
-  const asunto = cambioEstado
-    ? `Cambio de situación · ${getEstadoLabel(estadoAnterior)} → ${getEstadoLabel(estadoNuevo)}`
-    : "Actualización de situación";
-
-  const mensajeFinal = cambioEstado
-    ? mensajeHistorial
-    : (
-        mensajeHistorial ||
-        `${getDisplayName(state.effectiveUser)} actualizó la situación comercial del grupo.`
-      );
-
   await saveGroupPatch(patch, {
     tipoMovimiento: "cambio_estado",
     modulo: "grupo",
     titulo: "Actualización de situación",
-    asunto,
-    mensaje: mensajeFinal,
+    asunto: `Cambio de situación · ${getEstadoLabel(estadoAnterior)} → ${getEstadoLabel(estadoNuevo)}`,
+    mensaje: mensajeHistorial,
     cambios
   });
 
