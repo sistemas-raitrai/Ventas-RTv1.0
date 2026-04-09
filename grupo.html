@@ -795,6 +795,209 @@
       white-space: pre-line;
     }
 
+    .panel-toolbar{
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+    
+    .history-toolbar-note{
+      margin-bottom: 12px;
+      font-size: 13px;
+      color: #6a6075;
+      line-height: 1.45;
+    }
+    
+    .history-footer{
+      margin-top: 14px;
+      display: flex;
+      justify-content: center;
+    }
+    
+    .registro-card{
+      border: 1px solid rgba(58,42,82,.08);
+      border-left: 4px solid #5c45a6;
+      border-radius: 20px;
+      background: #fff;
+      padding: 14px 16px;
+      box-shadow: 0 4px 14px rgba(36,18,56,.04);
+    }
+    
+    .registro-card.is-featured{
+      background: linear-gradient(180deg, #fffdf4 0%, #fff8dc 100%);
+      border-color: rgba(173,132,34,.18);
+      box-shadow: 0 10px 24px rgba(128,96,18,.10);
+    }
+    
+    .registro-card.is-hidden-item{
+      opacity: .72;
+    }
+    
+    .registro-card.is-comment{
+      border-left-color: #6c4ccf;
+    }
+    
+    .registro-card.is-alert{
+      border-left-color: #d38d00;
+    }
+    
+    .registro-card.is-meeting{
+      border-left-color: #2f6fdb;
+    }
+    
+    .registro-card.is-sign{
+      border-left-color: #1f7a3d;
+    }
+    
+    .registro-card.is-status{
+      border-left-color: #9a5ce0;
+    }
+    
+    .registro-card-top{
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+      align-items: flex-start;
+    }
+    
+    .registro-meta-row{
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      align-items: center;
+      font-size: 12px;
+      color: #7b7086;
+      font-weight: 700;
+    }
+    
+    .registro-title{
+      margin-top: 6px;
+      font-size: 16px;
+      font-weight: 900;
+      color: #261d33;
+      line-height: 1.3;
+    }
+    
+    .registro-message{
+      margin-top: 6px;
+      font-size: 14px;
+      color: #5f566b;
+      line-height: 1.55;
+      white-space: pre-line;
+    }
+    
+    .registro-card-actions{
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+    
+    .registro-tag{
+      display: inline-flex;
+      align-items: center;
+      min-height: 30px;
+      padding: 0 10px;
+      border-radius: 999px;
+      background: #ece7f3;
+      color: #4a3564;
+      font-size: 12px;
+      font-weight: 900;
+      letter-spacing: .15px;
+    }
+    
+    .registro-tag.is-soft{
+      background: #f6f4f8;
+      color: #6a6075;
+    }
+    
+    .registro-tag.is-featured{
+      background: #fff1bf;
+      color: #7b5600;
+    }
+    
+    .registro-tag.is-hidden{
+      background: #eef1f5;
+      color: #5d6775;
+    }
+    
+    .btn-icon-lite{
+      width: 34px;
+      height: 34px;
+      border: none;
+      border-radius: 10px;
+      background: #efeaf5;
+      color: #40235f;
+      cursor: pointer;
+      font-size: 17px;
+      font-weight: 900;
+      transition: transform .18s ease, opacity .18s ease;
+    }
+    
+    .btn-icon-lite:hover{
+      transform: translateY(-1px);
+    }
+    
+    .btn-link-lite{
+      margin-top: 10px;
+      padding: 0;
+      border: none;
+      background: none;
+      color: #4a2570;
+      font-size: 13px;
+      font-weight: 900;
+      cursor: pointer;
+    }
+    
+    .registro-detail{
+      margin-top: 12px;
+      padding-top: 12px;
+      border-top: 1px dashed rgba(58,42,82,.14);
+    }
+    
+    .registro-detail-block + .registro-detail-block{
+      margin-top: 12px;
+    }
+    
+    .registro-detail-label{
+      margin-bottom: 6px;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: .35px;
+      color: #7a7185;
+      font-weight: 900;
+    }
+    
+    .registro-detail-text{
+      font-size: 13px;
+      color: #5f566b;
+      line-height: 1.5;
+      white-space: pre-line;
+    }
+    
+    .registro-detail-list{
+      margin: 8px 0 0 18px;
+      padding: 0;
+      color: #5f566b;
+    }
+    
+    .registro-detail-list li{
+      margin-bottom: 6px;
+      line-height: 1.45;
+    }
+    
+    @media (max-width: 700px){
+      .panel-toolbar{
+        width: 100%;
+      }
+    
+      .panel-toolbar .btn-pill{
+        flex: 1 1 auto;
+      }
+    }
+
     .empty-box{
       padding: 20px;
       border-radius: 18px;
@@ -1192,10 +1395,15 @@
           <div class="grupo-panel-head">
             <div>
               <h2 class="grupo-panel-title">Alertas del grupo</h2>
-              <p class="grupo-panel-sub">Automáticas y manuales</p>
+              <p class="grupo-panel-sub">Pendientes activos automáticos y manuales</p>
             </div>
-            <button class="btn-pill" id="btnNuevaAlerta" type="button">Nueva alerta</button>
+        
+            <div class="panel-toolbar">
+              <button class="btn-pill" id="btnNuevoComentario" type="button">Nuevo comentario</button>
+              <button class="btn-pill" id="btnNuevaAlerta" type="button">Nueva alerta</button>
+            </div>
           </div>
+        
           <div class="grupo-panel-body">
             <div class="list-clean" id="alertsList"></div>
           </div>
@@ -1264,11 +1472,21 @@
           <div class="grupo-panel-head">
             <div>
               <h2 class="grupo-panel-title">Historial</h2>
-              <p class="grupo-panel-sub">Trazabilidad del grupo</p>
+              <p class="grupo-panel-sub">Bitácora del grupo, comentarios y trazabilidad operativa</p>
+            </div>
+        
+            <div class="panel-toolbar">
+              <button class="btn-pill" id="btnHistoryToggleHidden" type="button">Ver ocultos</button>
             </div>
           </div>
+        
           <div class="grupo-panel-body">
+            <div class="history-toolbar-note" id="historyToolbarNote"></div>
             <div class="timeline" id="historyList"></div>
+        
+            <div class="history-footer">
+              <button class="btn-pill hidden" id="btnHistoryMore" type="button">Ver más</button>
+            </div>
           </div>
         </article>
       </section>
@@ -1658,6 +1876,35 @@
       <div class="modal-actions">
         <button class="btn-pill" type="button" data-close="modalAlerta">Cancelar</button>
         <button class="btn-dark" type="button" id="btnGuardarAlerta">Guardar alerta</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL COMENTARIO -->
+  <div class="modal" id="modalComentario">
+    <div class="modal-card">
+      <div class="modal-head">
+        <h3 class="modal-title">Nuevo comentario de bitácora</h3>
+        <button class="modal-close" type="button" data-close="modalComentario">×</button>
+      </div>
+  
+      <div class="modal-body">
+        <form id="formComentario" class="form-grid">
+          <div class="form-field span-3">
+            <label for="c_titulo">Título</label>
+            <input id="c_titulo" name="titulo" type="text" />
+          </div>
+  
+          <div class="form-field span-3">
+            <label for="c_mensaje">Comentario</label>
+            <textarea id="c_mensaje" name="mensaje"></textarea>
+          </div>
+        </form>
+      </div>
+  
+      <div class="modal-actions">
+        <button class="btn-pill" type="button" data-close="modalComentario">Cancelar</button>
+        <button class="btn-dark" type="button" id="btnGuardarComentario">Guardar comentario</button>
       </div>
     </div>
   </div>
