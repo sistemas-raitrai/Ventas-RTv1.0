@@ -3859,6 +3859,28 @@ async function saveGroupPatch(patch, {
   }
 }
 
+function sanitizeHistoryValue(value) {
+  if (value === undefined) return null;
+  if (value === null) return null;
+
+  if (value instanceof Date) return value;
+  if (isTimestampLike(value)) return value;
+
+  if (Array.isArray(value)) {
+    return value.map((item) => sanitizeHistoryValue(item));
+  }
+
+  if (value && typeof value === "object") {
+    const out = {};
+    Object.entries(value).forEach(([key, itemValue]) => {
+      out[key] = sanitizeHistoryValue(itemValue);
+    });
+    return out;
+  }
+
+  return value;
+}
+
 async function createHistoryEntry({
   tipoMovimiento = "movimiento",
   modulo = "grupo",
@@ -3868,12 +3890,21 @@ async function createHistoryEntry({
   cambios = [],
   metadata = {}
 } = {}) {
-  const baseChanges =
+  const rawChanges =
     Array.isArray(cambios) && cambios.length
       ? cambios
       : (Array.isArray(metadata?.cambios) ? metadata.cambios : []);
 
+  // Limpia undefined para que Firestore no rechace el historial
+  const baseChanges = rawChanges.map((item) => ({
+    campo: cleanText(item?.campo || ""),
+    anterior: sanitizeHistoryValue(item?.anterior),
+    nuevo: sanitizeHistoryValue(item?.nuevo)
+  }));
+
   const cambiosDetallados = buildDetailedChanges(baseChanges);
+  const metadataSafe = sanitizeHistoryValue(metadata || {});
+
   const asuntoFinal =
     cleanText(asunto) ||
     buildHistorySubject({ titulo, cambios: cambiosDetallados }) ||
@@ -3899,7 +3930,7 @@ async function createHistoryEntry({
     mensaje: mensajeFinal,
 
     metadata: {
-      ...metadata,
+      ...metadataSafe,
       totalCambios: cambiosDetallados.length,
       resumenCambios,
       cambios: baseChanges,
