@@ -1338,6 +1338,197 @@
         grid-column: auto;
       }
     }
+
+    /* =========================================================
+   HERO V2 · distribución nueva y tonos lilas
+    ========================================================= */
+    
+    .hero-v2{
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+    
+    .hero-v2-main{
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+    
+    .hero-v2-brand{
+      display: grid;
+      grid-template-columns: 86px minmax(0,1fr);
+      gap: 18px;
+      align-items: center;
+    }
+    
+    .hero-v2-copy{
+      min-width: 0;
+    }
+    
+    .hero-v2-meta{
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+    
+    .hero-meta-pill{
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      min-height: 36px;
+      padding: 0 14px;
+      border-radius: 999px;
+      background: rgba(255,255,255,.72);
+      border: 1px solid rgba(107, 77, 146, .14);
+      color: #35264a;
+      font-size: 13px;
+      font-weight: 700;
+      box-shadow: 0 4px 10px rgba(74, 42, 112, .05);
+    }
+    
+    .hero-meta-pill strong{
+      color: #241733;
+    }
+    
+    .hero-v2-cards{
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0,1fr));
+      gap: 12px;
+    }
+    
+    .grupo-hero{
+      background: linear-gradient(180deg, #f5effb 0%, #eee6f7 100%);
+      border: 1px solid rgba(117, 89, 150, .14);
+      box-shadow: 0 14px 30px rgba(74, 42, 112, .08);
+    }
+    
+    .grupo-hero::before{
+      background: radial-gradient(circle, rgba(129,95,170,.14) 0%, rgba(129,95,170,0) 72%);
+    }
+    
+    .grupo-logo{
+      background: linear-gradient(135deg, #6d5a85 0%, #59677a 100%);
+      border: 1px solid rgba(255,255,255,.35);
+      box-shadow: 0 10px 22px rgba(74,42,112,.14);
+    }
+    
+    .grupo-kicker{
+      color: #766686;
+    }
+    
+    .grupo-title{
+      color: #20172f;
+    }
+    
+    .grupo-comuna{
+      margin-top: 8px;
+      color: #6b5c7c;
+      font-size: 14px;
+      font-weight: 800;
+      letter-spacing: .25px;
+      text-transform: uppercase;
+    }
+    
+    .grupo-badges{
+      margin-top: 2px;
+    }
+    
+    .g-badge{
+      background: rgba(255,255,255,.78);
+      border: 1px solid rgba(107, 77, 146, .14);
+      color: #35264a;
+      box-shadow: 0 4px 10px rgba(74, 42, 112, .05);
+    }
+    
+    .g-badge.estado-a_contactar{
+      background: #fff2ea;
+      border-color: #f0d4bf;
+      color: #8a4f21;
+    }
+    
+    .g-badge.estado-contactado{
+      background: #fff7ea;
+      border-color: #efdbb9;
+      color: #8e6418;
+    }
+    
+    .g-badge.estado-cotizando{
+      background: #fff8e1;
+      border-color: #e8d59b;
+      color: #7f6508;
+    }
+    
+    .g-badge.estado-recotizando{
+      background: #fff8e1;
+      border-color: #e8d59b;
+      color: #7f6508;
+    }
+    
+    .g-badge.estado-reunion_confirmada{
+      background: #edf9f1;
+      border-color: #c9e6d2;
+      color: #2d6a45;
+    }
+    
+    .g-badge.estado-ganada{
+      background: #edf9f1;
+      border-color: #c9e6d2;
+      color: #2d6a45;
+    }
+    
+    .g-badge.estado-perdida{
+      background: #fff1f1;
+      border-color: #eccdcd;
+      color: #8a3434;
+    }
+    
+    .g-badge.is-ok{
+      background: #f4eef9;
+      border-color: rgba(107, 77, 146, .18);
+      color: #3f2d58;
+    }
+    
+    .g-badge.is-muted{
+      background: #faf7fd;
+      border-color: rgba(107, 77, 146, .12);
+      color: #645572;
+    }
+    
+    .grupo-quick-card{
+      background: rgba(255,255,255,.72);
+      border: 1px solid rgba(107, 77, 146, .12);
+      box-shadow: 0 6px 14px rgba(74,42,112,.05);
+    }
+    
+    .grupo-quick-label{
+      color: #756583;
+    }
+    
+    .grupo-quick-value{
+      color: #211830;
+    }
+    
+    .grupo-quick-sub{
+      color: #6b5d79;
+    }
+    
+    @media (max-width: 1100px){
+      .hero-v2-cards{
+        grid-template-columns: repeat(2, minmax(0,1fr));
+      }
+    }
+    
+    @media (max-width: 900px){
+      .hero-v2-brand{
+        grid-template-columns: 1fr;
+        gap: 12px;
+      }
+    
+      .hero-v2-cards{
+        grid-template-columns: 1fr;
+      }
+    }
   </style>
 </head>
 
@@ -1346,54 +1537,67 @@
 
   <main class="grupo-shell">
     <section class="grupo-hero">
-      <div class="grupo-hero-top">
-        <div class="grupo-hero-left">
-          <div class="grupo-logo" id="grupoLogoWrap">RT</div>
-
-          <div class="grupo-hero-text">
-            <div class="grupo-kicker">Portafolio del Grupo</div>
-            <h1 class="grupo-title" id="heroTitle">Cargando grupo...</h1>
-            
-            <div class="grupo-subtitle">
-              <span><strong>Colegio:</strong> <span id="heroColegio">—</span></span>
-              <span><strong>Año de viaje:</strong> <span id="heroAnoViaje">—</span></span>
-              <span><strong>Vendedor(a):</strong> <span id="heroVendedora">—</span></span>
-              <span><strong>ID Grupo:</strong> <span id="heroIdGrupo">—</span></span>
+      <div class="hero-v2">
+        <div class="hero-v2-main">
+          <div class="hero-v2-brand">
+            <div class="grupo-logo" id="grupoLogoWrap">RT</div>
+    
+            <div class="hero-v2-copy">
+              <div class="grupo-kicker">Portafolio del Grupo</div>
+              <h1 class="grupo-title" id="heroTitle">Cargando grupo...</h1>
+              <div class="grupo-comuna" id="heroComuna">—</div>
             </div>
-            
-            <div class="grupo-comuna" id="heroComuna">—</div>
-            
-            <div class="grupo-badges" id="heroBadges"></div>
           </div>
+    
+          <div class="hero-v2-meta">
+            <span class="hero-meta-pill">
+              <strong>ID Grupo:</strong>
+              <span id="heroIdGrupo">—</span>
+            </span>
+    
+            <span class="hero-meta-pill">
+              <strong>Colegio:</strong>
+              <span id="heroColegio">—</span>
+            </span>
+    
+            <span class="hero-meta-pill">
+              <strong>Año de viaje:</strong>
+              <span id="heroAnoViaje">—</span>
+            </span>
+    
+            <span class="hero-meta-pill">
+              <strong>Vendedor(a):</strong>
+              <span id="heroVendedora">—</span>
+            </span>
+          </div>
+    
+          <div class="grupo-badges" id="heroBadges"></div>
         </div>
-
-        <div class="grupo-hero-right">
-          <div class="grupo-quick-grid">
-            <div class="grupo-quick-card">
-              <div class="grupo-quick-label">Próxima reunión</div>
-              <div class="grupo-quick-value" id="heroProximaReunion">Sin reunión</div>
-              <div class="grupo-quick-sub" id="heroProximaReunionSub">—</div>
-            </div>
-
-            <div class="grupo-quick-card">
-              <div class="grupo-quick-label">Última gestión</div>
-              <div class="grupo-quick-value" id="heroUltimaGestion">—</div>
-              <div class="grupo-quick-sub" id="heroUltimaGestionSub">Sin historial reciente</div>
-            </div>
-
-            <div class="grupo-quick-card">
-              <div class="grupo-quick-label">Ficha</div>
-              <div class="grupo-quick-value" id="heroFichaEstado">Pendiente</div>
-              <div class="grupo-quick-sub" id="heroFichaEstadoSub">Sin firmas completas</div>
-            </div>
-
-            <div class="grupo-quick-card">
-              <div class="grupo-quick-label">Alertas activas</div>
-              <div class="grupo-quick-value" id="heroAlertasActivas">0</div>
-              <div class="grupo-quick-sub" id="heroAlertasActivasSub">0 automáticas / 0 manuales</div>
-            </div>
+    
+        <div class="hero-v2-cards">
+          <div class="grupo-quick-card">
+            <div class="grupo-quick-label">Próxima reunión</div>
+            <div class="grupo-quick-value" id="heroProximaReunion">Sin reunión</div>
+            <div class="grupo-quick-sub" id="heroProximaReunionSub">—</div>
           </div>
-
+    
+          <div class="grupo-quick-card">
+            <div class="grupo-quick-label">Última gestión</div>
+            <div class="grupo-quick-value" id="heroUltimaGestion">—</div>
+            <div class="grupo-quick-sub" id="heroUltimaGestionSub">Sin historial reciente</div>
+          </div>
+    
+          <div class="grupo-quick-card">
+            <div class="grupo-quick-label">Ficha</div>
+            <div class="grupo-quick-value" id="heroFichaEstado">Pendiente</div>
+            <div class="grupo-quick-sub" id="heroFichaEstadoSub">Sin firmas completas</div>
+          </div>
+    
+          <div class="grupo-quick-card">
+            <div class="grupo-quick-label">Alertas activas</div>
+            <div class="grupo-quick-value" id="heroAlertasActivas">0</div>
+            <div class="grupo-quick-sub" id="heroAlertasActivasSub">0 automáticas / 0 manuales</div>
+          </div>
         </div>
       </div>
     </section>
