@@ -12,6 +12,13 @@ import {
 } from "https://www.gstatic.com/firebasejs/11.7.3/firebase-firestore.js";
 
 import {
+  getStorage,
+  ref,
+  uploadBytes,
+  getDownloadURL
+} from "https://www.gstatic.com/firebasejs/11.7.3/firebase-storage.js";
+
+import {
   auth,
   db,
   VENTAS_USERS,
@@ -54,7 +61,9 @@ const state = {
   groupId: "",
   group: null,
   ficha: null,
-  requests: []
+  requests: [],
+
+  isUploadingProgramaPdf: false
 };
 
 const FICHA_FIELDS = [
@@ -64,6 +73,11 @@ const FICHA_FIELDS = [
   "telefono",
   "correo",
   "nombrePrograma",
+  "programaPdfUrl",
+  "programaPdfNombre",
+  "programaPdfStoragePath",
+  "programaPdfSubidoPor",
+  "programaPdfSubidoPorCorreo",
   "valorPrograma",
   "numeroPaxTotal",
   "tramo",
@@ -387,6 +401,170 @@ function canGeneratePdfVersionAsCurrentUser() {
   );
 }
 
+function getProgramaPdfUrl() {
+  return cleanText(
+    state.ficha?.programaPdfUrl ||
+    getByPath(state.group, "ficha.programaPdfUrl") ||
+    state.group?.programaPdfUrl ||
+    ""
+  );
+}
+
+function getProgramaPdfNombre() {
+  return cleanText(
+    state.ficha?.programaPdfNombre ||
+    getByPath(state.group, "ficha.programaPdfNombre") ||
+    state.group?.programaPdfNombre ||
+    ""
+  );
+}
+
+function hasProgramaPdf() {
+  return !!getProgramaPdfUrl();
+}
+
+function sanitizeFileNamePart(value = "") {
+  return String(value || "")
+    .replace(/[<>:"/\\|?*]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function buildProgramaPdfStoragePath(fileName = "") {
+  const ano = sanitizeFileNamePart(String(state.group?.anoViaje || "sin-ano"));
+  const id = sanitizeFileNamePart(String(state.groupId || "sin-id"));
+  const safeFile = sanitizeFileNamePart(fileName || "programa.pdf") || "programa.pdf";
+
+  return `ventas/programas/${ano}/${id}/${safeFile}`;
+}
+
+function updateProgramaPdfUi() {
+  const statusEl = $("programaPdfStatus");
+  const metaEl = $("programaPdfMeta");
+  const openBtn = $("btnAbrirProgramaPdf");
+  const input = $("f_programaPdfFile");
+
+  const hasPdf = hasProgramaPdf();
+  const fileName = getProgramaPdfNombre();
+
+  if (statusEl) {
+    if (state.isUploadingProgramaPdf) {
+      statusEl.textContent = "Subiendo Programa PDF...";
+    } else if (hasPdf) {
+      statusEl.textContent = "Programa PDF cargado";
+    } else {
+      statusEl.textContent = "Programa PDF pendiente";
+    }
+  }
+
+  if (metaEl) {
+    if (state.isUploadingProgramaPdf) {
+      metaEl.textContent = "Espera a que termine la subida del archivo.";
+    } else if (hasPdf) {
+      metaEl.textContent = fileName || "Archivo cargado correctamente.";
+    } else {
+      metaEl.textContent = "Debe subirse obligatoriamente antes de firmar como vendedor(a).";
+    }
+  }
+
+  if (openBtn) {
+    openBtn.disabled = !hasPdf || state.isUploadingProgramaPdf;
+  }
+
+  if (input) {
+    input.disabled = !canEditFicha() || state.isUploadingProgramaPdf;
+  }
+}
+
+async function handleProgramaPdfSelected(event) {
+  const input = event?.target;
+  const file = input?.files?.[0];
+
+  if (!file) return;
+
+  if (!canEditFicha()) {
+    alert(getBlockedEditMessage());
+    input.value = "";
+    return;
+  }
+
+  const isPdf =
+    file.type === "application/pdf" ||
+    /\.pdf$/i.test(file.name || "");
+
+  if (!isPdf) {
+    alert("Solo se permite subir archivos PDF para el programa.");
+    input.value = "";
+    return;
+  }
+
+  state.isUploadingProgramaPdf = true;
+  updateProgramaPdfUi();
+
+  try {
+    const storage = getStorage();
+    const storagePath = buildProgramaPdfStoragePath(file.name);
+    const storageRef = ref(storage, storagePath);
+
+    await uploadBytes(storageRef, file, {
+      contentType: "application/pdf"
+    });
+
+    const downloadUrl = await getDownloadURL(storageRef);
+    const displayName = getDisplayName(state.effectiveUser);
+
+    const patch = {
+      ficha: {
+        ...(state.group?.ficha || {}),
+        programaPdfUrl: downloadUrl,
+        programaPdfNombre: file.name,
+        programaPdfStoragePath: storagePath,
+        programaPdfSubidoPor: displayName,
+        programaPdfSubidoPorCorreo: state.effectiveEmail,
+        programaPdfSubidoEl: serverTimestamp(),
+        pdfPendienteGeneracion: true
+      },
+      actualizadoPor: displayName,
+      actualizadoPorCorreo: state.effectiveEmail,
+      fechaActualizacion: serverTimestamp(),
+      fechaActualizacionFicha: serverTimestamp()
+    };
+
+    await setDoc(doc(db, "ventas_cotizaciones", state.groupDocId), patch, { merge: true });
+
+    await createHistoryEntry({
+      tipoMovimiento: "programa_pdf_subido",
+      modulo: "ficha",
+      titulo: "Programa PDF subido",
+      mensaje: `${displayName} subió o reemplazó el Programa PDF del grupo.`,
+      metadata: {
+        cambios: [
+          {
+            campo: "ficha.programaPdfNombre",
+            anterior: state.group?.ficha?.programaPdfNombre || "",
+            nuevo: file.name
+          },
+          {
+            campo: "ficha.programaPdfUrl",
+            anterior: state.group?.ficha?.programaPdfUrl || "",
+            nuevo: downloadUrl
+          }
+        ]
+      }
+    });
+
+    await loadAll();
+    alert("Programa PDF subido correctamente.");
+  } catch (error) {
+    console.error("[fichas] handleProgramaPdfSelected", error);
+    alert("No se pudo subir el Programa PDF: " + (error?.message || error));
+  } finally {
+    state.isUploadingProgramaPdf = false;
+    if (input) input.value = "";
+    updateProgramaPdfUi();
+  }
+}
+
 /* =========================================================
    RENDER
 ========================================================= */
@@ -570,21 +748,24 @@ function fillForm() {
   setRichEditorHtml("f_infoOperaciones", f.infoOperacionesHtml);
   setRichEditorHtml("f_infoAdministracion", f.infoAdministracionHtml);
   setRichEditorHtml("f_observacionesHtml", f.observacionesHtml);
+
+  updateProgramaPdfUi();
 }
 
 function syncButtons() {
   const editable = canEditFicha();
   const tienePdf = !!cleanText(state.ficha?.pdfUrl || state.group?.fichaPdfUrl || "");
+  const tienePrograma = hasProgramaPdf();
   const flow = state.group?.flowFicha || {};
   const isGanada = normalizeState(state.group?.estado) === "ganada";
   const isLegacy = getFichaFlowMode(state.group) === "legacy";
   const pendingUpdate = hasPendingUpdateRequest();
 
   const btnGuardar = $("btnGuardarFicha");
-  if (btnGuardar) btnGuardar.disabled = !editable;
+  if (btnGuardar) btnGuardar.disabled = !editable || state.isUploadingProgramaPdf;
   
   const btnGuardarBottom = $("btnGuardarFichaBottom");
-  if (btnGuardarBottom) btnGuardarBottom.disabled = !editable;
+  if (btnGuardarBottom) btnGuardarBottom.disabled = !editable || state.isUploadingProgramaPdf;
   
   const btnAbrirPdf = $("btnAbrirPdfFicha");
   if (btnAbrirPdf) btnAbrirPdf.disabled = !tienePdf;
@@ -610,7 +791,7 @@ function syncButtons() {
   }
   
   document.querySelectorAll("#formFicha input, #formFicha select, #formFicha textarea").forEach((el) => {
-    el.disabled = !editable;
+    el.disabled = !editable || state.isUploadingProgramaPdf;
   });
 
   ["f_infoOperaciones", "f_infoAdministracion", "f_observacionesHtml"].forEach((id) => {
@@ -619,13 +800,20 @@ function syncButtons() {
   });
 
   document.querySelectorAll(".rich-btn, .rich-color").forEach((el) => {
-    el.disabled = !editable;
+    el.disabled = !editable || state.isUploadingProgramaPdf;
   });
 
   const btnVend = $("btnFirmarFichaVendedor");
   if (btnVend) {
     btnVend.classList.toggle("hidden", !isVendorRole() || isLegacy);
-    btnVend.disabled = !isVendorRole() || !editable || !isGanada || !!flow?.vendedor?.firmado || isLegacy;
+    btnVend.disabled =
+      !isVendorRole() ||
+      !editable ||
+      !isGanada ||
+      !tienePrograma ||
+      !!flow?.vendedor?.firmado ||
+      isLegacy ||
+      state.isUploadingProgramaPdf;
   }
 
   const btnJefa = $("btnFirmarFichaJefa");
@@ -647,6 +835,8 @@ function syncButtons() {
     btnSolicitar.disabled = !show || pendingUpdate;
     btnSolicitar.textContent = pendingUpdate ? "Actualización solicitada" : "Solicitar actualización";
   }
+
+  updateProgramaPdfUi();
 }
 
 function renderFatal(message) {
@@ -695,6 +885,17 @@ function bindEvents() {
     const url = cleanText(state.ficha?.pdfUrl || state.group?.fichaPdfUrl || "");
     if (!url) {
       alert("Esta ficha todavía no tiene PDF guardado.");
+      return;
+    }
+    window.open(url, "_blank", "noopener");
+  });
+
+  $("f_programaPdfFile")?.addEventListener("change", handleProgramaPdfSelected);
+
+  $("btnAbrirProgramaPdf")?.addEventListener("click", () => {
+    const url = getProgramaPdfUrl();
+    if (!url) {
+      alert("Todavía no hay un Programa PDF cargado.");
       return;
     }
     window.open(url, "_blank", "noopener");
@@ -791,6 +992,11 @@ async function signFlowFromFicha(step) {
 
     if (flow?.vendedor?.firmado) {
       alert("La firma de vendedor(a) ya está registrada.");
+      return;
+    }
+    
+    if (!hasProgramaPdf()) {
+      alert("Debes subir el Programa PDF antes de firmar la ficha.");
       return;
     }
 
@@ -1191,6 +1397,14 @@ async function saveFicha({ silent = false, reloadAfterSave = true } = {}) {
     telefono: getValue("f_telefono"),
     correo: getValue("f_correo"),
     nombrePrograma: getValue("f_nombrePrograma"),
+  
+    programaPdfUrl: cleanText(oldFicha.programaPdfUrl || ""),
+    programaPdfNombre: cleanText(oldFicha.programaPdfNombre || ""),
+    programaPdfStoragePath: cleanText(oldFicha.programaPdfStoragePath || ""),
+    programaPdfSubidoPor: cleanText(oldFicha.programaPdfSubidoPor || ""),
+    programaPdfSubidoPorCorreo: cleanText(oldFicha.programaPdfSubidoPorCorreo || ""),
+    programaPdfSubidoEl: oldFicha.programaPdfSubidoEl || null,
+  
     valorPrograma: getValue("f_valorPrograma"),
     numeroPaxTotal: getValue("f_numeroPaxTotal"),
     tramo: getValue("f_tramo"),
@@ -1212,7 +1426,7 @@ async function saveFicha({ silent = false, reloadAfterSave = true } = {}) {
     pdfUrl: cleanText(oldFicha.pdfUrl || ""),
     pdfNombre: cleanText(oldFicha.pdfNombre || "")
   };
-
+  
   const cambios = [];
 
   for (const path of FICHA_FIELDS) {
@@ -1388,6 +1602,34 @@ function hydrateFicha(group = {}) {
     nombrePrograma: pick(
       ficha.nombrePrograma,
       group.programa,
+      ""
+    ),
+
+    programaPdfUrl: pick(
+      ficha.programaPdfUrl,
+      group.programaPdfUrl,
+      ""
+    ),
+    
+    programaPdfNombre: pick(
+      ficha.programaPdfNombre,
+      group.programaPdfNombre,
+      ""
+    ),
+    
+    programaPdfStoragePath: pick(
+      ficha.programaPdfStoragePath,
+      group.programaPdfStoragePath,
+      ""
+    ),
+    
+    programaPdfSubidoPor: pick(
+      ficha.programaPdfSubidoPor,
+      ""
+    ),
+    
+    programaPdfSubidoPorCorreo: pick(
+      ficha.programaPdfSubidoPorCorreo,
       ""
     ),
 
