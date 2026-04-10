@@ -435,7 +435,8 @@ function isAdministracionDashboardUser(user = {}) {
   const email = normalizeEmail(user?.email || "");
   return (
     email === "yenny@raitrai.cl" ||
-    email === "administracion@raitrai.cl"
+    email === "administracion@raitrai.cl" ||
+    email === "raitrai@raitrai.cl"
   );
 }
 
