@@ -723,7 +723,7 @@ function renderWorkflowPanel() {
 function fillForm() {
   const f = state.ficha || {};
 
-  setValue("f_solicitudReserva", f.solicitudReserva);
+  setValue("f_solicitudReserva", toInputDateValue(f.solicitudReserva) || todayInputDate());
   setValue("f_nombreGrupo", f.nombreGrupo);
   setValue("f_apoderadoEncargado", f.apoderadoEncargado);
   setValue("f_telefono", f.telefono);
@@ -2115,6 +2115,39 @@ function setValue(id, value) {
   const el = $(id);
   if (!el) return;
   el.value = value == null ? "" : String(value);
+}
+
+function toInputDateValue(value) {
+  if (!value) return "";
+
+  if (typeof value?.toDate === "function") {
+    const d = value.toDate();
+    if (isNaN(d)) return "";
+    return d.toISOString().slice(0, 10);
+  }
+
+  if (value instanceof Date) {
+    if (isNaN(value)) return "";
+    return value.toISOString().slice(0, 10);
+  }
+
+  const raw = String(value).trim();
+  if (!raw) return "";
+
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+    return raw;
+  }
+
+  const parsed = new Date(raw);
+  if (!isNaN(parsed)) {
+    return parsed.toISOString().slice(0, 10);
+  }
+
+  return "";
+}
+
+function todayInputDate() {
+  return new Date().toISOString().slice(0, 10);
 }
 
 function getValue(id) {
