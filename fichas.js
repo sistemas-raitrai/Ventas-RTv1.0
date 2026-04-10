@@ -1383,6 +1383,56 @@ async function saveUpdateRequest() {
   closeModal("modalSolicitudFicha");
 }
 
+function isAdministrativeReviewEditor() {
+  return isJefaVentas() || isAdministracion();
+}
+
+function isEmptyFichaFieldValue(path = "", value = "") {
+  if (isRichField(path)) {
+    return !normalizeRichHtml(value || "");
+  }
+  return !cleanText(value || "");
+}
+
+function shouldIgnoreTrackedFichaChange(path = "", anterior = "", nuevo = "") {
+  if (!isAdministrativeReviewEditor()) return false;
+
+  const firstFillSafeFields = new Set([
+    "numeroNegocio",
+    "usuarioFicha",
+    "claveAdministrativa",
+    "observacionesHtml"
+  ]);
+
+  if (!firstFillSafeFields.has(path)) return false;
+
+  return (
+    isEmptyFichaFieldValue(path, anterior) &&
+    !isEmptyFichaFieldValue(path, nuevo)
+  );
+}
+
+function shouldReopenFlowAfterFichaSave(trackedChanges = []) {
+  if (!isAdministrativeReviewEditor()) return false;
+  if (!trackedChanges.length) return false;
+
+  const flow = state.group?.flowFicha || {};
+  const fichaEstado = normalizeSearchLocal(state.group?.fichaEstado || "");
+
+  const downstreamStarted =
+    !!flow?.jefaVentas?.firmado ||
+    !!flow?.administracion?.firmado ||
+    !!state.group?.autorizada ||
+    [
+      "revisada_jefa_ventas",
+      "autorizada_admin",
+      "confirmada_pdf",
+      "ok"
+    ].includes(fichaEstado);
+
+  return !!flow?.vendedor?.firmado && downstreamStarted;
+}
+
 /* =========================================================
    SAVE
 ========================================================= */
@@ -1393,6 +1443,7 @@ async function saveFicha({ silent = false, reloadAfterSave = true } = {}) {
   }
 
   const oldFicha = state.group?.ficha || {};
+  const flow = state.group?.flowFicha || {};
   const nowText = formatDateTime(new Date());
 
   const values = {
@@ -1402,14 +1453,14 @@ async function saveFicha({ silent = false, reloadAfterSave = true } = {}) {
     telefono: getValue("f_telefono"),
     correo: getValue("f_correo"),
     nombrePrograma: getValue("f_nombrePrograma"),
-  
+
     programaPdfUrl: cleanText(oldFicha.programaPdfUrl || ""),
     programaPdfNombre: cleanText(oldFicha.programaPdfNombre || ""),
     programaPdfStoragePath: cleanText(oldFicha.programaPdfStoragePath || ""),
     programaPdfSubidoPor: cleanText(oldFicha.programaPdfSubidoPor || ""),
     programaPdfSubidoPorCorreo: cleanText(oldFicha.programaPdfSubidoPorCorreo || ""),
     programaPdfSubidoEl: oldFicha.programaPdfSubidoEl || null,
-  
+
     valorPrograma: getValue("f_valorPrograma"),
     numeroPaxTotal: getValue("f_numeroPaxTotal"),
     tramo: getValue("f_tramo"),
@@ -1431,8 +1482,9 @@ async function saveFicha({ silent = false, reloadAfterSave = true } = {}) {
     pdfUrl: cleanText(oldFicha.pdfUrl || ""),
     pdfNombre: cleanText(oldFicha.pdfNombre || "")
   };
-  
-  const cambios = [];
+
+  const actualChanges = [];
+  const trackedChanges = [];
 
   for (const path of FICHA_FIELDS) {
     const anterior = oldFicha[path];
@@ -1442,32 +1494,44 @@ async function saveFicha({ silent = false, reloadAfterSave = true } = {}) {
       ? normalizeRichHtml(anterior) !== normalizeRichHtml(nuevo)
       : !sameValue(anterior, nuevo);
 
-    if (changed) {
-      cambios.push({ campo: `ficha.${path}`, anterior, nuevo });
+    if (!changed) continue;
+
+    actualChanges.push({ campo: `ficha.${path}`, anterior, nuevo });
+
+    if (!shouldIgnoreTrackedFichaChange(path, anterior, nuevo)) {
+      trackedChanges.push({ campo: `ficha.${path}`, anterior, nuevo });
     }
   }
 
   const fichaWasEmpty = !Object.keys(oldFicha || {}).length;
 
-  if (!cambios.length && !fichaWasEmpty) {
+  if (!actualChanges.length && !fichaWasEmpty) {
     if (!silent) {
       alert("No hay cambios para guardar.");
     }
     return { ok: true, changed: false };
   }
 
+  const reopenFlow = shouldReopenFlowAfterFichaSave(trackedChanges);
+
+  const nextFichaEstado = reopenFlow
+    ? "lista_vendedor"
+    : (
+        state.group?.fichaEstado && state.group.fichaEstado !== "pendiente"
+          ? state.group.fichaEstado
+          : "en_edicion"
+      );
+
   const patch = {
     ficha: {
       ...(oldFicha || {}),
       ...values,
-      estado: state.group?.fichaEstado && state.group.fichaEstado !== "pendiente"
-        ? state.group.fichaEstado
-        : "en_edicion",
+      estado: nextFichaEstado,
       actualizadoPor: getDisplayName(state.effectiveUser),
       actualizadoPorCorreo: state.effectiveEmail,
       fechaActualizacion: serverTimestamp()
     },
-  
+
     solicitudReserva: values.solicitudReserva,
     categoriaHoteleraContratada: values.categoriaHoteleraContratada,
     autorizacionGerencia: values.autorizacionGerencia,
@@ -1478,41 +1542,147 @@ async function saveFicha({ silent = false, reloadAfterSave = true } = {}) {
     versionFicha: values.version,
     fechaActualizacionFicha: serverTimestamp(),
     fechaViaje: values.fechaViajeTexto,
-    fichaEstado: state.group?.fichaEstado && state.group.fichaEstado !== "pendiente"
-      ? state.group.fichaEstado
-      : "en_edicion",
+    fichaEstado: nextFichaEstado,
 
     actualizadoPor: getDisplayName(state.effectiveUser),
     actualizadoPorCorreo: state.effectiveEmail,
     fechaActualizacion: serverTimestamp()
   };
 
+  if (reopenFlow) {
+    patch.autorizada = false;
+    patch.firmaSupervision = "";
+    patch.firmaAdministracion = "";
+    patch.fichaPdfUrl = "";
+    patch.fichaPdfNombre = "";
+
+    patch.ficha = {
+      ...patch.ficha,
+      flujoModo: "v2",
+      estado: "lista_vendedor",
+      confirmada: false,
+      pdfPendienteGeneracion: true,
+      pdfUrl: "",
+      pdfNombre: ""
+    };
+
+    patch.flowFicha = {
+      ...(state.group.flowFicha || {}),
+      modo: "v2",
+      legacy: false,
+      estado: "lista_vendedor",
+      requiereActualizacion: false,
+      requiereRefirmaAdministracion: true,
+
+      jefaVentas: {
+        ...(flow?.jefaVentas || {}),
+        firmado: false,
+        firmadoAt: null,
+        firmadoPor: "",
+        firmadoPorCorreo: "",
+        observacion: ""
+      },
+
+      administracion: {
+        ...(flow?.administracion || {}),
+        firmado: false,
+        firmadoAt: null,
+        firmadoPor: "",
+        firmadoPorCorreo: "",
+        observacion: ""
+      }
+    };
+
+    patch.documentos = {
+      ...(state.group.documentos || {}),
+      fichaGrupo: {
+        ...(state.group.documentos?.fichaGrupo || {}),
+        estado: "lista_vendedor"
+      }
+    };
+  }
+
   await setDoc(doc(db, "ventas_cotizaciones", state.groupDocId), patch, { merge: true });
 
-  await addDoc(collection(db, HISTORIAL_COLLECTION), {
-    idGrupo: String(state.groupId),
-    codigoRegistro: cleanText(state.group?.codigoRegistro),
-    aliasGrupo: cleanText(state.group?.aliasGrupo),
-    colegio: cleanText(state.group?.colegio),
-    tipoMovimiento: fichaWasEmpty ? "ficha_creada" : "ficha_actualizada",
-    modulo: "ficha",
-    titulo: fichaWasEmpty ? "Creación de ficha" : "Actualización de ficha",
-    mensaje: `${getDisplayName(state.effectiveUser)} ${fichaWasEmpty ? "creó" : "actualizó"} la ficha del grupo.`,
-    metadata: { cambios },
-    creadoPor: getDisplayName(state.effectiveUser),
-    creadoPorCorreo: state.effectiveEmail,
-    fecha: serverTimestamp()
-  });
+  const historyChanges = [...trackedChanges];
+
+  if (reopenFlow) {
+    historyChanges.push(
+      {
+        campo: "fichaEstado",
+        anterior: state.group?.fichaEstado || "",
+        nuevo: "lista_vendedor"
+      },
+      {
+        campo: "flowFicha.jefaVentas.firmado",
+        anterior: !!state.group?.flowFicha?.jefaVentas?.firmado,
+        nuevo: false
+      },
+      {
+        campo: "flowFicha.administracion.firmado",
+        anterior: !!state.group?.flowFicha?.administracion?.firmado,
+        nuevo: false
+      },
+      {
+        campo: "firmaSupervision",
+        anterior: state.group?.firmaSupervision || "",
+        nuevo: ""
+      },
+      {
+        campo: "firmaAdministracion",
+        anterior: state.group?.firmaAdministracion || "",
+        nuevo: ""
+      }
+    );
+  }
+
+  if (fichaWasEmpty || historyChanges.length) {
+    const editorLabel = isAdministracion()
+      ? "administración"
+      : isJefaVentas()
+        ? "jefa de ventas"
+        : "usuario";
+
+    await addDoc(collection(db, HISTORIAL_COLLECTION), {
+      idGrupo: String(state.groupId),
+      codigoRegistro: cleanText(state.group?.codigoRegistro),
+      aliasGrupo: cleanText(state.group?.aliasGrupo),
+      colegio: cleanText(state.group?.colegio),
+      tipoMovimiento: reopenFlow
+        ? "ficha_actualizada_reabre_flujo"
+        : (fichaWasEmpty ? "ficha_creada" : "ficha_actualizada"),
+      modulo: "ficha",
+      titulo: reopenFlow
+        ? "Actualización de ficha con reapertura de flujo"
+        : (fichaWasEmpty ? "Creación de ficha" : "Actualización de ficha"),
+      mensaje: reopenFlow
+        ? `${getDisplayName(state.effectiveUser)} actualizó la ficha desde ${editorLabel}. La revisión vuelve a jefa de ventas y luego a administración.`
+        : `${getDisplayName(state.effectiveUser)} ${fichaWasEmpty ? "creó" : "actualizó"} la ficha del grupo.`,
+      metadata: { cambios: historyChanges },
+      creadoPor: getDisplayName(state.effectiveUser),
+      creadoPorCorreo: state.effectiveEmail,
+      fecha: serverTimestamp()
+    });
+  }
 
   if (!silent) {
-    alert("Ficha guardada correctamente.");
+    alert(
+      reopenFlow
+        ? "Ficha guardada correctamente. El flujo volvió a revisión de jefa de ventas y luego administración."
+        : "Ficha guardada correctamente."
+    );
   }
 
   if (reloadAfterSave) {
     await loadAll();
   }
 
-  return { ok: true, changed: true };
+  return {
+    ok: true,
+    changed: true,
+    reopenFlow,
+    trackedChanges: trackedChanges.length
+  };
 }
 
 async function saveGroupPatch(patch, {
