@@ -552,16 +552,21 @@ async function handleProgramaPdfSelected(event) {
         ]
       }
     });
-
+    
+    // IMPORTANTE: apagar el flag antes de refrescar
+    state.isUploadingProgramaPdf = false;
+    
     await loadAll();
+    syncButtons();
+    
     alert("Programa PDF subido correctamente.");
   } catch (error) {
     console.error("[fichas] handleProgramaPdfSelected", error);
     alert("No se pudo subir el Programa PDF: " + (error?.message || error));
   } finally {
-    state.isUploadingProgramaPdf = false;
     if (input) input.value = "";
     updateProgramaPdfUi();
+    syncButtons();
   }
 }
 
