@@ -1149,6 +1149,26 @@
       box-shadow: 0 0 0 4px rgba(58,42,82,.08);
     }
 
+    .readonly-box{
+      min-height:48px;
+      border:2px dashed #c5b8d8;
+      border-radius:14px;
+      background:#faf8fd;
+      padding:10px 14px;
+      display:flex;
+      align-items:center;
+      color:#4a4760;
+      font-size:14px;
+      font-weight:700;
+      box-sizing:border-box;
+    }
+
+    .helper{
+      font-size:12px;
+      color:#6f657c;
+      line-height:1.4;
+    }
+
     .modal-actions{
       padding: 16px 20px 20px;
       border-top: 1px solid rgba(58,42,82,.08);
@@ -1533,111 +1553,157 @@
       <div class="modal-body">
         <form id="formDatos" class="form-grid">
           <div class="form-field">
-            <label for="d_aliasGrupo">Alias grupo</label>
-            <input id="d_aliasGrupo" name="aliasGrupo" type="text" />
+            <label>Alias grupo</label>
+            <div id="d_aliasPreview" class="readonly-box">—</div>
+            <div class="helper">
+              Se reconstruye automáticamente si cambias curso, colegio o año de viaje.
+            </div>
           </div>
-
+        
           <div class="form-field">
-            <label for="d_estado">Estado</label>
-            <select id="d_estado" name="estado">
-              <option value="a_contactar">A contactar</option>
-              <option value="contactado">Contactado</option>
-              <option value="cotizando">Cotizando</option>
-              <option value="recotizando">Recotizando</option>
-              <option value="reunion_confirmada">Reunión confirmada</option>
-              <option value="ganada">Ganada</option>
-              <option value="perdida">Perdida</option>
-            </select>
+            <label>Estado</label>
+            <div id="d_estadoPreview" class="readonly-box">—</div>
+            <div class="helper">
+              El estado se cambia solo en “Editar situación”.
+            </div>
           </div>
-
+        
           <div class="form-field">
-            <label for="d_vendedora">Vendedor(a)</label>
-            <input id="d_vendedora" name="vendedora" type="text" />
+            <label>Vendedor(a)</label>
+            <div id="d_vendedoraPreview" class="readonly-box">—</div>
           </div>
-
-          <div class="form-field">
+        
+          <div class="form-field span-2">
             <label for="d_colegio">Colegio</label>
             <input id="d_colegio" name="colegio" type="text" />
           </div>
-
+        
           <div class="form-field">
-            <label for="d_curso">Curso</label>
-            <input id="d_curso" name="curso" type="text" />
+            <label for="d_curso">Curso actual</label>
+            <input id="d_curso" name="curso" type="text" placeholder="Ej: 4C, 3DAVINCI, 2A" />
+            <div class="helper">
+              Debe llevar números y letras, sin espacios.
+            </div>
           </div>
-
+        
           <div class="form-field">
             <label for="d_anoViaje">Año viaje</label>
             <input id="d_anoViaje" name="anoViaje" type="number" />
           </div>
-
+        
           <div class="form-field">
             <label for="d_cantidadGrupo">Cantidad grupo</label>
-            <input id="d_cantidadGrupo" name="cantidadGrupo" type="number" />
+            <input id="d_cantidadGrupo" name="cantidadGrupo" type="number" min="1" />
           </div>
-
+        
           <div class="form-field span-2">
             <label for="d_destinoPrincipal">Destino principal</label>
-            <input id="d_destinoPrincipal" name="destinoPrincipal" type="text" />
+            <select id="d_destinoPrincipal" name="destinoPrincipal">
+              <option value="">Seleccionar</option>
+              <option value="Bariloche">Bariloche</option>
+              <option value="Sur de Chile">Sur de Chile</option>
+              <option value="Bariloche y Sur de Chile">Bariloche y Sur de Chile</option>
+              <option value="Brasil">Brasil</option>
+              <option value="Otro">Otro</option>
+            </select>
           </div>
-
-          <div class="form-field span-3">
+        
+          <div class="form-field span-3 hidden" id="wrapDatosDestinoPrincipalOtro">
+            <label for="d_destinoPrincipalOtro">Otro destino principal</label>
+            <input id="d_destinoPrincipalOtro" name="destinoPrincipalOtro" type="text" />
+          </div>
+        
+          <div class="form-field span-2">
             <label for="d_programa">Programa</label>
-            <input id="d_programa" name="programa" type="text" />
+            <select id="d_programa" name="programa">
+              <option value="">Seleccionar</option>
+            </select>
+            <div class="helper">
+              El listado se carga desde <strong>PROGRAMA_OPTIONS</strong> en <strong>grupo.js</strong>.
+            </div>
           </div>
-
+        
           <div class="form-field">
             <label for="d_tramo">Tramo</label>
-            <input id="d_tramo" name="tramo" type="text" />
+            <select id="d_tramo" name="tramo">
+              <option value="">Seleccionar</option>
+              <option value="36 – 39">36 – 39</option>
+              <option value="30 – 35">30 – 35</option>
+              <option value="26 – 29">26 – 29</option>
+              <option value="23 – 25">23 – 25</option>
+              <option value="20 – 22">20 – 22</option>
+              <option value="18 – 19">18 – 19</option>
+              <option value="15 – 17">15 – 17</option>
+            </select>
           </div>
-          
+        
           <div class="form-field">
-            <label for="d_semanaViaje">Semana de viaje</label>
-            <input id="d_semanaViaje" name="semanaViaje" type="text" />
+            <label for="d_fechaInicioViaje">Fecha inicio viaje</label>
+            <input id="d_fechaInicioViaje" name="fechaInicioViaje" type="date" />
           </div>
-          
-          <div class="form-field span-2">
+        
+          <div class="form-field">
+            <label for="d_fechaFinViaje">Fecha fin viaje</label>
+            <input id="d_fechaFinViaje" name="fechaFinViaje" type="date" />
+          </div>
+        
+          <div class="form-field span-3">
             <label for="d_comunaCiudad">Comuna / ciudad</label>
             <input id="d_comunaCiudad" name="comunaCiudad" type="text" />
           </div>
-
+        
           <div class="form-field">
             <label for="d_nombreCliente">1° Contacto</label>
             <input id="d_nombreCliente" name="nombreCliente" type="text" />
           </div>
-
+        
           <div class="form-field">
             <label for="d_rolCliente">Rol 1° Contacto</label>
-            <input id="d_rolCliente" name="rolCliente" type="text" />
+            <select id="d_rolCliente" name="rolCliente">
+              <option value="">Seleccionar</option>
+              <option value="Estudiante">Estudiante</option>
+              <option value="Apoderado(a)">Apoderado(a)</option>
+              <option value="Profesor(a)">Profesor(a)</option>
+              <option value="ComisionGira">Comisión gira</option>
+              <option value="Otro(a)">Otro(a)</option>
+            </select>
           </div>
-
+        
           <div class="form-field">
             <label for="d_correoCliente">Correo 1° Contacto</label>
             <input id="d_correoCliente" name="correoCliente" type="email" />
           </div>
-
+        
           <div class="form-field">
             <label for="d_celularCliente">Celular 1° Contacto</label>
-            <input id="d_celularCliente" name="celularCliente" type="text" />
+            <input id="d_celularCliente" name="celularCliente" type="text" placeholder="+56912345678" />
           </div>
-
+        
           <div class="form-field">
             <label for="d_nombreCliente2">2° Contacto</label>
             <input id="d_nombreCliente2" name="nombreCliente2" type="text" />
           </div>
-
+        
           <div class="form-field">
             <label for="d_rolCliente2">Rol 2° Contacto</label>
-            <input id="d_rolCliente2" name="rolCliente2" type="text" />
+            <select id="d_rolCliente2" name="rolCliente2">
+              <option value="">Seleccionar</option>
+              <option value="Estudiante">Estudiante</option>
+              <option value="Apoderado(a)">Apoderado(a)</option>
+              <option value="Profesor(a)">Profesor(a)</option>
+              <option value="ComisionGira">Comisión gira</option>
+              <option value="Otro(a)">Otro(a)</option>
+            </select>
           </div>
-
+        
           <div class="form-field">
             <label for="d_correoCliente2">Correo 2° Contacto</label>
             <input id="d_correoCliente2" name="correoCliente2" type="email" />
           </div>
-
+        
           <div class="form-field">
             <label for="d_celularCliente2">Celular 2° Contacto</label>
-            <input id="d_celularCliente2" name="celularCliente2" type="text" />
+            <input id="d_celularCliente2" name="celularCliente2" type="text" placeholder="+56912345678" />
           </div>
         </form>
       </div>
