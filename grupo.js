@@ -3264,7 +3264,7 @@ function docStateClass(value = "") {
 }
 
 function normalizeState(value = "") {
-  const v = normalizeSearchLocal(value);
+  const v = normalizeSearchLocal(value).replaceAll("_", " ");
   if (!v) return "a_contactar";
   if (v.includes("reunion confirm")) return "reunion_confirmada";
   if (v.includes("recot")) return "recotizando";
