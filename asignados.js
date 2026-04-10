@@ -91,13 +91,18 @@ function getRoleKey(user = {}) {
   return normalizeLoose(user?.rol || "");
 }
 
-function canAccessAsignados(user = {}) {
+function canViewAsignados(user = {}) {
+  const role = getRoleKey(user);
+  return role === "admin" || role === "supervision" || role === "registro";
+}
+
+function canEditAsignados(user = {}) {
   const role = getRoleKey(user);
   return role === "admin" || role === "supervision";
 }
 
 function assertAccess() {
-  if (!canAccessAsignados(state.effectiveUser)) {
+  if (!canViewAsignados(state.effectiveUser)) {
     location.href = "index.html";
     return false;
   }
