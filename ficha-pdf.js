@@ -244,7 +244,7 @@ function syncPdfTopActionsVisibility() {
 ========================================================= */
 function renderPage() {
   setText("pdfAnoTitulo", state.group?.anoViaje || "—");
-  setText("pdfSolicitudReserva", valueOrDash(state.ficha?.solicitudReserva).toUpperCase());
+  setText("pdfSolicitudReserva", formatDateForDisplay(state.ficha?.solicitudReserva));
   setText("pdfNombreGrupo", valueOrDash(state.ficha?.nombreGrupo).toUpperCase());
   setText("pdfApoderadoEncargado", valueOrDash(state.ficha?.apoderadoEncargado).toUpperCase());
   setText("pdfTelefono", valueOrDash(state.ficha?.telefono));
@@ -688,7 +688,10 @@ async function queueFichaConfirmationEmail({ versionLabel, nombre }) {
 
   const idGrupo = String(state.groupId || "");
   const numeroNegocio = cleanText(state.ficha?.numeroNegocio || state.group?.numeroNegocio || "");
-  const solicitudReserva = cleanText(state.ficha?.solicitudReserva || state.group?.solicitudReserva || "");
+  const solicitudReserva = formatDateForDisplay(
+    state.ficha?.solicitudReserva || state.group?.solicitudReserva || ""
+  );
+  
   const anoViaje = cleanText(state.group?.anoViaje || "");
   const subject = `Nueva versión de ficha | ID ${idGrupo} | ${alias}`;
 
@@ -1184,6 +1187,22 @@ function setText(id, value) {
 function valueOrDash(value) {
   const s = String(value ?? "").trim();
   return s || "—";
+}
+
+function formatDateForDisplay(value) {
+  if (!value) return "—";
+
+  const raw = String(value).trim();
+  if (!raw) return "—";
+
+  const d = new Date(raw);
+  if (isNaN(d)) return raw;
+
+  return d.toLocaleDateString("es-CL", {
+    day: "numeric",
+    month: "long",
+    year: "numeric"
+  });
 }
 
 function pick(...values) {
