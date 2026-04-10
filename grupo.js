@@ -955,17 +955,6 @@ function getSemanaViajeDisplay(groupData = {}) {
   );
 }
 
-function getDestinoPrincipalDisplay(groupData = {}) {
-  const principal = cleanText(groupData.destinoPrincipal || "");
-  const otro = cleanText(groupData.destinoPrincipalOtro || "");
-
-  if (normalizeSearchLocal(principal) === "otro" && otro) {
-    return `Otro · ${otro}`;
-  }
-
-  return principal || otro || "";
-}
-
 function fillSelectWithOptions(selectId, options = [], placeholder = "SELECCIONAR") {
   const select = $(selectId);
   if (!select) return;
