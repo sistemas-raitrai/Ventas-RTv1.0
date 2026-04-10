@@ -290,6 +290,11 @@ function isAdministracion() {
   );
 }
 
+function canActAsFichaAdministracion() {
+  const email = normalizeEmail(state.effectiveEmail || "");
+  return isAdministracion() || email === "raitrai@raitrai.cl";
+}
+
 function getFichaFlowMode(groupData = {}) {
   const flow = groupData.flowFicha || {};
   const ficha = groupData.ficha || {};
@@ -370,7 +375,8 @@ async function markPendingFichaUpdateRequestsAsCompleted({
 }
 
 function canEditFicha() {
-  if (!state.canModify) return false;
+  const canEditByContext = state.canModify || canActAsFichaAdministracion();
+  if (!canEditByContext) return false;
 
   const isVendor = isVendorRole();
 
@@ -390,15 +396,7 @@ function canOpenFicha() {
 }
 
 function canGeneratePdfVersionAsCurrentUser() {
-  const email = normalizeEmail(state.effectiveEmail || "");
-  const rol = String(state.effectiveUser?.rol || "").toLowerCase();
-
-  if (rol === "admin") return true;
-
-  return (
-    email === "yenny@raitrai.cl" ||
-    email === "administracion@raitrai.cl"
-  );
+  return canActAsFichaAdministracion();
 }
 
 function getProgramaPdfUrl() {
@@ -829,8 +827,8 @@ function syncButtons() {
   
   const btnAdmin = $("btnFirmarFichaAdmin");
   if (btnAdmin) {
-    btnAdmin.classList.toggle("hidden", !isAdministracion());
-    btnAdmin.disabled = !isAdministracion() || !flow?.jefaVentas?.firmado || !!flow?.administracion?.firmado;
+    btnAdmin.classList.toggle("hidden", !canActAsFichaAdministracion());
+    btnAdmin.disabled = !canActAsFichaAdministracion() || !flow?.jefaVentas?.firmado || !!flow?.administracion?.firmado;
   }
 
   const btnSolicitar = $("btnSolicitarActualizacionFicha");
@@ -1120,7 +1118,7 @@ async function signFlowFromFicha(step) {
   }
 
   if (step === "administracion") {
-    if (!isAdministracion()) {
+    if (!canActAsFichaAdministracion()) {
       alert("Esta firma solo puede realizarla administración.");
       return;
     }
@@ -1384,7 +1382,7 @@ async function saveUpdateRequest() {
 }
 
 function isAdministrativeReviewEditor() {
-  return isJefaVentas() || isAdministracion();
+  return isJefaVentas() || canActAsFichaAdministracion();
 }
 
 function isEmptyFichaFieldValue(path = "", value = "") {
