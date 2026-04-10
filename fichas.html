@@ -785,12 +785,32 @@
                 <label for="f_nombrePrograma">Nombre programa</label>
                 <input id="f_nombrePrograma" type="text" />
               </div>
-
+              
               <div class="field span-3">
                 <label for="f_valorPrograma">Valor programa</label>
                 <input id="f_valorPrograma" type="text" />
               </div>
-
+              
+              <div class="field span-4">
+                <label for="f_programaPdfFile">Programa PDF</label>
+                <input
+                  id="f_programaPdfFile"
+                  type="file"
+                  accept="application/pdf,.pdf"
+                />
+                <div style="display:flex; gap:8px; align-items:center; margin-top:8px; flex-wrap:wrap;">
+                  <button type="button" id="btnAbrirProgramaPdf" class="btn-pill">
+                    Abrir programa PDF
+                  </button>
+                </div>
+                <div id="programaPdfStatus" class="muted small" style="margin-top:8px;">
+                  Programa PDF pendiente
+                </div>
+                <div id="programaPdfMeta" class="muted small" style="margin-top:4px;">
+                  Debe subirse obligatoriamente antes de firmar como vendedor(a).
+                </div>
+              </div>
+              
               <div class="field span-3">
                 <label for="f_numeroPaxTotal">Número pax total</label>
                 <input id="f_numeroPaxTotal" type="text" />
