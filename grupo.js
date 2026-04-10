@@ -1532,6 +1532,7 @@ function bindEvents() {
   $("btnGuardarSituacion")?.addEventListener("click", saveSituacion);
   $("btnGuardarDocumentos")?.addEventListener("click", saveDocumentos);
   $("s_estado")?.addEventListener("change", syncSituacionStateUI);
+  $("s_estado")?.addEventListener("input", syncSituacionStateUI);
   $("btnGuardarReunion")?.addEventListener("click", saveMeeting);
   $("btnGuardarAlerta")?.addEventListener("click", saveManualAlert);
   $("btnGuardarComentario")?.addEventListener("click", saveComment);
@@ -1607,21 +1608,30 @@ function closeModal(id) {
   $(id)?.classList.remove("show");
 }
 
-function showSaveNotice(message = "Cambios guardados correctamente.") {
-  alert(message);
+function setSituacionBlockVisibility(id, shouldShow, displayValue = "block") {
+  const el = $(id);
+  if (!el) return;
+
+  el.classList.toggle("hidden", !shouldShow);
+  el.style.display = shouldShow ? displayValue : "none";
 }
 
 function syncSituacionStateUI() {
-  const estado = normalizeState($("s_estado")?.value || "");
+  const estadoRaw = $("s_estado")?.value || "";
+  const estado = normalizeState(estadoRaw);
   const isGanada = estado === "ganada";
   const isReunion = estado === "reunion_confirmada";
 
-  $("wrapSituacionGanadaFields")?.classList.toggle("hidden", !isGanada);
-  $("wrapSituacionFechaReunion")?.classList.toggle("hidden", !isReunion);
+  setSituacionBlockVisibility("wrapSituacionGanadaFields", isGanada, "grid");
+  setSituacionBlockVisibility("wrapSituacionFechaReunion", isReunion, "block");
 
   const fechaInput = $("s_fechaReunion");
   if (fechaInput) {
     fechaInput.required = isReunion;
+
+    if (!isReunion) {
+      fechaInput.value = "";
+    }
   }
 }
 
@@ -1771,8 +1781,15 @@ function openSituacionModal() {
     ""
   );
 
-  syncSituacionStateUI();
   openModal("modalSituacion");
+
+  requestAnimationFrame(() => {
+    syncSituacionStateUI();
+  });
+
+  setTimeout(() => {
+    syncSituacionStateUI();
+  }, 0);
 }
 
 function openDocsModal() {
