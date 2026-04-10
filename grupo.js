@@ -88,18 +88,50 @@ const DOC_LABELS = {
   cortesiaEstado: "Cortesías"
 };
 
+const DESTINO_PRINCIPAL_OPTIONS = [
+  "Bariloche",
+  "Sur de Chile",
+  "Bariloche y Sur de Chile",
+  "Brasil",
+  "Otro"
+];
+
+const ROL_CONTACTO_OPTIONS = [
+  "Estudiante",
+  "Apoderado(a)",
+  "Profesor(a)",
+  "ComisionGira",
+  "Otro(a)"
+];
+
+const TRAMO_OPTIONS = [
+  "36 – 39",
+  "30 – 35",
+  "26 – 29",
+  "23 – 25",
+  "20 – 22",
+  "18 – 19",
+  "15 – 17"
+];
+
+// Completa aquí tu listado real de programas.
+// Mientras no lo completes, el selector seguirá mostrando
+// el valor guardado actualmente en el grupo.
+const PROGRAMA_OPTIONS = [
+];
+
 const DATA_FIELDS = [
-  "aliasGrupo",
-  "estado",
-  "vendedora",
   "colegio",
   "curso",
   "anoViaje",
   "cantidadGrupo",
   "destinoPrincipal",
+  "destinoPrincipalOtro",
   "programa",
   "tramo",
   "semanaViaje",
+  "fechaInicioViaje",
+  "fechaFinViaje",
   "comunaCiudad",
   "nombreCliente",
   "rolCliente",
@@ -702,6 +734,338 @@ function renderFichaPanel() {
   `;
 }
 
+function getCurrentYear() {
+  return new Date().getFullYear();
+}
+
+function normalizeCursoInput(value = "") {
+  return cleanText(value)
+    .toUpperCase()
+    .replace(/\s+/g, "");
+}
+
+function hasValidCursoFormat(value = "") {
+  const curso = normalizeCursoInput(value);
+  return /^(?:11|10|[1-9])[A-Z]*$/.test(curso);
+}
+
+function extractCursoNumber(value = "") {
+  const match = normalizeCursoInput(value).match(/^(11|10|[1-9])/);
+  return match ? Number(match[1]) : null;
+}
+
+function extractCursoSuffix(value = "") {
+  const match = normalizeCursoInput(value).match(/^(?:11|10|[1-9])(.*)$/);
+  return match ? match[1] : "";
+}
+
+function getNextCursoNumber(currentNumber) {
+  if (currentNumber >= 1 && currentNumber <= 7) return currentNumber + 1;
+  if (currentNumber === 8) return 1;
+  if (currentNumber === 9) return 10;
+  if (currentNumber === 10) return 11;
+  if (currentNumber === 11) return 11;
+  return null;
+}
+
+function projectCursoToYear(cursoBase = "", anoBase = getCurrentYear(), anoViaje = getCurrentYear()) {
+  const baseCurso = normalizeCursoInput(cursoBase);
+  const baseNumber = extractCursoNumber(baseCurso);
+  const suffix = extractCursoSuffix(baseCurso);
+  const fromYear = Number(anoBase);
+  const toYear = Number(anoViaje);
+
+  if (!baseCurso || baseNumber === null) return "";
+  if (!Number.isFinite(fromYear) || !Number.isFinite(toYear) || toYear < fromYear) return "";
+
+  let projectedNumber = baseNumber;
+  const diff = toYear - fromYear;
+
+  for (let i = 0; i < diff; i += 1) {
+    const nextNumber = getNextCursoNumber(projectedNumber);
+    if (nextNumber === null) return "";
+    projectedNumber = nextNumber;
+  }
+
+  return `${projectedNumber}${suffix}`;
+}
+
+function buildAliasGrupo({ cursoBase = "", anoBase = "", cursoViaje = "", anoViaje = "", colegio = "" }) {
+  const base = normalizeCursoInput(cursoBase);
+  const trip = normalizeCursoInput(cursoViaje);
+  const school = normalizeTextUpper(colegio);
+
+  if (!base || !trip || !anoBase || !anoViaje || !school) return "";
+
+  const baseYear = String(anoBase).trim();
+  const tripYear = String(anoViaje).trim();
+
+  if (baseYear === tripYear) {
+    return `${base} (${baseYear}) ${school}`.trim();
+  }
+
+  return `${base} (${baseYear}) ${trip} (${tripYear}) ${school}`.trim();
+}
+
+function buildAliasTripKey({ colegio = "", cursoViaje = "", anoViaje = "" }) {
+  return normalizeSearchLocal(
+    `${normalizeTextUpper(colegio)}__${normalizeCursoInput(cursoViaje)}__${cleanText(anoViaje)}`
+  );
+}
+
+function getDocBaseYear(data = {}) {
+  const explicit = Number(data.anoBaseCurso || "");
+  if (Number.isFinite(explicit) && explicit > 0) return explicit;
+
+  const createdAt = toDate(data.fechaCreacion);
+  if (createdAt) return createdAt.getFullYear();
+
+  return getCurrentYear();
+}
+
+function normalizeTextUpper(value = "") {
+  return String(value || "").trim().toLocaleUpperCase("es-CL");
+}
+
+function normalizeChileMobile(value = "") {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+
+  let digits = raw.replace(/\D/g, "");
+
+  if (digits.startsWith("56")) digits = digits.slice(2);
+  if (digits.startsWith("9")) digits = digits.slice(1);
+
+  digits = digits.slice(0, 8);
+
+  return digits ? `+569${digits}` : "+569";
+}
+
+function sanitizeChileMobileForSave(value = "") {
+  const normalized = normalizeChileMobile(value);
+  return normalized === "+569" ? "" : normalized;
+}
+
+function formatChileMobileForInput(value = "") {
+  return value ? normalizeChileMobile(value) : "+569";
+}
+
+function buildSemanaViajeLabel(start = "", end = "") {
+  const startTxt = formatInputDate(start);
+  const endTxt = formatInputDate(end);
+
+  if (startTxt && endTxt) return `${startTxt} al ${endTxt}`;
+  return startTxt || endTxt || "";
+}
+
+function getSemanaViajeDisplay(groupData = {}) {
+  return cleanText(
+    groupData.semanaViaje ||
+    buildSemanaViajeLabel(groupData.fechaInicioViaje, groupData.fechaFinViaje)
+  );
+}
+
+function getDestinoPrincipalDisplay(groupData = {}) {
+  const principal = cleanText(groupData.destinoPrincipal || "");
+  const otro = cleanText(groupData.destinoPrincipalOtro || "");
+
+  if (normalizeSearchLocal(principal) === "otro" && otro) {
+    return `Otro · ${otro}`;
+  }
+
+  return principal || otro || "";
+}
+
+function fillSelectWithOptions(selectId, options = [], placeholder = "Seleccionar") {
+  const select = $(selectId);
+  if (!select) return;
+
+  select.innerHTML = "";
+  const first = document.createElement("option");
+  first.value = "";
+  first.textContent = placeholder;
+  select.appendChild(first);
+
+  options.forEach((value) => {
+    const opt = document.createElement("option");
+    opt.value = value;
+    opt.textContent = value;
+    select.appendChild(opt);
+  });
+}
+
+function ensureSelectHasValue(selectId, value = "") {
+  const select = $(selectId);
+  const finalValue = cleanText(value);
+  if (!select || !finalValue) return;
+
+  const exists = [...select.options].some((opt) => cleanText(opt.value) === finalValue);
+  if (exists) return;
+
+  const opt = document.createElement("option");
+  opt.value = finalValue;
+  opt.textContent = finalValue;
+  select.appendChild(opt);
+}
+
+function hydrateDatosSelects(groupData = {}) {
+  fillSelectWithOptions("d_programa", PROGRAMA_OPTIONS, "Seleccionar");
+  fillSelectWithOptions("d_tramo", TRAMO_OPTIONS, "Seleccionar");
+  fillSelectWithOptions("d_rolCliente", ROL_CONTACTO_OPTIONS, "Seleccionar");
+  fillSelectWithOptions("d_rolCliente2", ROL_CONTACTO_OPTIONS, "Seleccionar");
+
+  ensureSelectHasValue("d_programa", groupData.programa || "");
+  ensureSelectHasValue("d_tramo", groupData.tramo || "");
+  ensureSelectHasValue("d_rolCliente", groupData.rolCliente || "");
+  ensureSelectHasValue("d_rolCliente2", groupData.rolCliente2 || "");
+}
+
+function resolveDestinoPrincipalForm(groupData = {}) {
+  const principal = cleanText(groupData.destinoPrincipal || "");
+  const otro = cleanText(groupData.destinoPrincipalOtro || "");
+
+  if (!principal && !otro) {
+    return { selectValue: "", otherValue: "" };
+  }
+
+  if (DESTINO_PRINCIPAL_OPTIONS.includes(principal)) {
+    return {
+      selectValue: principal,
+      otherValue: principal === "Otro" ? otro : ""
+    };
+  }
+
+  return {
+    selectValue: "Otro",
+    otherValue: otro || principal
+  };
+}
+
+function syncDatosDestinoOtroVisibility() {
+  const selectValue = cleanText($("d_destinoPrincipal")?.value || "");
+  const isOther = selectValue === "Otro";
+
+  $("wrapDatosDestinoPrincipalOtro")?.classList.toggle("hidden", !isOther);
+
+  if (!isOther) {
+    setFormValue("d_destinoPrincipalOtro", "");
+  }
+}
+
+function buildDatosAliasPayload() {
+  const colegio = normalizeTextUpper($("d_colegio")?.value || "");
+  const cursoBase = normalizeCursoInput($("d_curso")?.value || "");
+  const anoViaje = cleanText($("d_anoViaje")?.value || "");
+  const anoBase = getDocBaseYear(state.group || {});
+
+  const cursoViaje = projectCursoToYear(cursoBase, anoBase, anoViaje);
+  const aliasGrupo = buildAliasGrupo({
+    cursoBase,
+    anoBase,
+    cursoViaje,
+    anoViaje,
+    colegio
+  });
+
+  const aliasTripKey = buildAliasTripKey({
+    colegio,
+    cursoViaje,
+    anoViaje
+  });
+
+  return {
+    colegio,
+    cursoBase,
+    anoBase,
+    anoViaje,
+    cursoViaje,
+    aliasGrupo,
+    aliasTripKey
+  };
+}
+
+function syncDatosAliasPreview() {
+  const { aliasGrupo } = buildDatosAliasPayload();
+  setText("d_aliasPreview", aliasGrupo || "—");
+}
+
+function bindUppercaseModalInput(id, afterChange = null) {
+  const el = $(id);
+  if (!el || el.dataset.upperBound === "1") return;
+
+  el.dataset.upperBound = "1";
+
+  const handler = () => {
+    el.value = normalizeTextUpper(el.value || "");
+    if (typeof afterChange === "function") afterChange();
+  };
+
+  el.addEventListener("input", handler);
+  el.addEventListener("change", handler);
+}
+
+function bindPhoneModalInput(id) {
+  const el = $(id);
+  if (!el || el.dataset.phoneBound === "1") return;
+
+  el.dataset.phoneBound = "1";
+
+  el.addEventListener("focus", () => {
+    if (!cleanText(el.value)) {
+      el.value = "+569";
+    }
+  });
+
+  el.addEventListener("input", () => {
+    el.value = normalizeChileMobile(el.value || "");
+    try {
+      el.setSelectionRange(el.value.length, el.value.length);
+    } catch {}
+  });
+
+  el.addEventListener("blur", () => {
+    const safe = sanitizeChileMobileForSave(el.value || "");
+    el.value = safe || "";
+  });
+}
+
+function bindDatosModalControls() {
+  bindUppercaseModalInput("d_colegio", syncDatosAliasPreview);
+  bindUppercaseModalInput("d_comunaCiudad");
+  bindUppercaseModalInput("d_nombreCliente");
+  bindUppercaseModalInput("d_nombreCliente2");
+  bindUppercaseModalInput("d_destinoPrincipalOtro");
+
+  const curso = $("d_curso");
+  if (curso && curso.dataset.cursoBound !== "1") {
+    curso.dataset.cursoBound = "1";
+
+    const handler = () => {
+      curso.value = normalizeCursoInput(curso.value || "");
+      syncDatosAliasPreview();
+    };
+
+    curso.addEventListener("input", handler);
+    curso.addEventListener("change", handler);
+  }
+
+  const anoViaje = $("d_anoViaje");
+  if (anoViaje && anoViaje.dataset.aliasBound !== "1") {
+    anoViaje.dataset.aliasBound = "1";
+    anoViaje.addEventListener("input", syncDatosAliasPreview);
+    anoViaje.addEventListener("change", syncDatosAliasPreview);
+  }
+
+  const destino = $("d_destinoPrincipal");
+  if (destino && destino.dataset.destinoBound !== "1") {
+    destino.dataset.destinoBound = "1";
+    destino.addEventListener("change", syncDatosDestinoOtroVisibility);
+  }
+
+  bindPhoneModalInput("d_celularCliente");
+  bindPhoneModalInput("d_celularCliente2");
+}
+
 function openFichaEditor() {
   if (!canCreateFichaFromEstado()) {
     alert("La ficha solo se habilita cuando el grupo está en estado GANADA.");
@@ -993,10 +1357,10 @@ function renderDatos() {
     itemData("Año viaje", state.group.anoViaje),
     itemData("Cantidad grupo", state.group.cantidadGrupo),
 
-    itemData("Destino principal", state.group.destinoPrincipal, true),
+    itemData("Destino principal", getDestinoPrincipalDisplay(state.group), true),
     itemData("Programa", state.group.programa, true),
     itemData("Tramo", state.group.tramo),
-    itemData("Semana viaje", state.group.semanaViaje),
+    itemData("Rango de viaje", getSemanaViajeDisplay(state.group)),
     itemData("Comuna / ciudad", state.group.comunaCiudad),
 
     itemData("Vendedor(a)", state.group.vendedora || state.group.vendedoraCorreo, true),
@@ -1487,6 +1851,7 @@ function buildAutomaticAlerts() {
 ========================================================= */
 function bindEvents() {
   bindRichEditors();
+  bindDatosModalControls();
 
   document.querySelectorAll("[data-close]").forEach((btn) => {
     btn.addEventListener("click", () => closeModal(btn.dataset.close));
@@ -1731,26 +2096,35 @@ function openDatosModal() {
     return;
   }
 
-  setFormValue("d_aliasGrupo", state.group.aliasGrupo);
-  setFormValue("d_estado", normalizeState(state.group.estado));
-  setFormValue("d_vendedora", state.group.vendedora);
-  setFormValue("d_colegio", state.group.colegio);
-  setFormValue("d_curso", state.group.curso);
-  setFormValue("d_anoViaje", state.group.anoViaje);
-  setFormValue("d_cantidadGrupo", state.group.cantidadGrupo);
-  setFormValue("d_destinoPrincipal", state.group.destinoPrincipal);
-  setFormValue("d_programa", state.group.programa);
-  setFormValue("d_tramo", state.group.tramo);
-  setFormValue("d_semanaViaje", state.group.semanaViaje);
-  setFormValue("d_comunaCiudad", state.group.comunaCiudad);
-  setFormValue("d_nombreCliente", state.group.nombreCliente);
-  setFormValue("d_rolCliente", state.group.rolCliente);
-  setFormValue("d_correoCliente", state.group.correoCliente);
-  setFormValue("d_celularCliente", state.group.celularCliente);
-  setFormValue("d_nombreCliente2", state.group.nombreCliente2);
-  setFormValue("d_rolCliente2", state.group.rolCliente2);
-  setFormValue("d_correoCliente2", state.group.correoCliente2);
-  setFormValue("d_celularCliente2", state.group.celularCliente2);
+  hydrateDatosSelects(state.group);
+
+  const destinoForm = resolveDestinoPrincipalForm(state.group);
+
+  setText("d_estadoPreview", getEstadoLabel(state.group.estado));
+  setText("d_vendedoraPreview", state.group.vendedora || state.group.vendedoraCorreo || "—");
+
+  setFormValue("d_colegio", state.group.colegio || "");
+  setFormValue("d_curso", state.group.curso || "");
+  setFormValue("d_anoViaje", state.group.anoViaje || "");
+  setFormValue("d_cantidadGrupo", state.group.cantidadGrupo || "");
+  setFormValue("d_destinoPrincipal", destinoForm.selectValue);
+  setFormValue("d_destinoPrincipalOtro", destinoForm.otherValue);
+  setFormValue("d_programa", state.group.programa || "");
+  setFormValue("d_tramo", state.group.tramo || "");
+  setFormValue("d_fechaInicioViaje", formatInputDate(state.group.fechaInicioViaje || ""));
+  setFormValue("d_fechaFinViaje", formatInputDate(state.group.fechaFinViaje || ""));
+  setFormValue("d_comunaCiudad", state.group.comunaCiudad || "");
+  setFormValue("d_nombreCliente", state.group.nombreCliente || "");
+  setFormValue("d_rolCliente", state.group.rolCliente || "");
+  setFormValue("d_correoCliente", state.group.correoCliente || "");
+  setFormValue("d_celularCliente", formatChileMobileForInput(state.group.celularCliente || ""));
+  setFormValue("d_nombreCliente2", state.group.nombreCliente2 || "");
+  setFormValue("d_rolCliente2", state.group.rolCliente2 || "");
+  setFormValue("d_correoCliente2", state.group.correoCliente2 || "");
+  setFormValue("d_celularCliente2", formatChileMobileForInput(state.group.celularCliente2 || ""));
+
+  syncDatosDestinoOtroVisibility();
+  syncDatosAliasPreview();
 
   openModal("modalDatos");
 }
@@ -2219,31 +2593,79 @@ function buildHistorySummary(cambios = []) {
    SAVE DATA
 ========================================================= */
 async function saveDatos() {
+  if (!canEditGroup()) {
+    alert(getBlockedEditMessage());
+    return;
+  }
+
   const patch = {};
   const cambios = [];
 
+  const { anoBase, cursoViaje, aliasGrupo, aliasTripKey } = buildDatosAliasPayload();
+
+  const destinoSeleccionado = cleanText($("d_destinoPrincipal")?.value || "");
+  const destinoPrincipalOtro = normalizeTextUpper($("d_destinoPrincipalOtro")?.value || "");
+
+  const fechaInicioViaje = formatInputDate($("d_fechaInicioViaje")?.value || "");
+  const fechaFinViaje = formatInputDate($("d_fechaFinViaje")?.value || "");
+
   const values = {
-    aliasGrupo: $("d_aliasGrupo")?.value || "",
-    estado: $("d_estado")?.value || "a_contactar",
-    vendedora: $("d_vendedora")?.value || "",
-    colegio: $("d_colegio")?.value || "",
-    curso: $("d_curso")?.value || "",
+    colegio: normalizeTextUpper($("d_colegio")?.value || ""),
+    curso: normalizeCursoInput($("d_curso")?.value || ""),
     anoViaje: parseNumberOrText($("d_anoViaje")?.value),
     cantidadGrupo: parseNumberOrText($("d_cantidadGrupo")?.value),
-    destinoPrincipal: $("d_destinoPrincipal")?.value || "",
-    programa: $("d_programa")?.value || "",
-    tramo: $("d_tramo")?.value || "",
-    semanaViaje: $("d_semanaViaje")?.value || "",
-    comunaCiudad: $("d_comunaCiudad")?.value || "",
-    nombreCliente: $("d_nombreCliente")?.value || "",
-    rolCliente: $("d_rolCliente")?.value || "",
-    correoCliente: $("d_correoCliente")?.value || "",
-    celularCliente: $("d_celularCliente")?.value || "",
-    nombreCliente2: $("d_nombreCliente2")?.value || "",
-    rolCliente2: $("d_rolCliente2")?.value || "",
-    correoCliente2: $("d_correoCliente2")?.value || "",
-    celularCliente2: $("d_celularCliente2")?.value || ""
+    destinoPrincipal: destinoSeleccionado === "Otro" ? "Otro" : destinoSeleccionado,
+    destinoPrincipalOtro: destinoSeleccionado === "Otro" ? destinoPrincipalOtro : "",
+    programa: cleanText($("d_programa")?.value || ""),
+    tramo: cleanText($("d_tramo")?.value || ""),
+    semanaViaje: buildSemanaViajeLabel(fechaInicioViaje, fechaFinViaje),
+    fechaInicioViaje,
+    fechaFinViaje,
+    comunaCiudad: normalizeTextUpper($("d_comunaCiudad")?.value || ""),
+    nombreCliente: normalizeTextUpper($("d_nombreCliente")?.value || ""),
+    rolCliente: cleanText($("d_rolCliente")?.value || ""),
+    correoCliente: normalizeEmail($("d_correoCliente")?.value || ""),
+    celularCliente: sanitizeChileMobileForSave($("d_celularCliente")?.value || ""),
+    nombreCliente2: normalizeTextUpper($("d_nombreCliente2")?.value || ""),
+    rolCliente2: cleanText($("d_rolCliente2")?.value || ""),
+    correoCliente2: normalizeEmail($("d_correoCliente2")?.value || ""),
+    celularCliente2: sanitizeChileMobileForSave($("d_celularCliente2")?.value || "")
   };
+
+  if (!values.colegio) {
+    alert("Debes indicar el colegio.");
+    return;
+  }
+
+  if (!values.curso) {
+    alert("Debes indicar el curso.");
+    return;
+  }
+
+  if (!hasValidCursoFormat(values.curso)) {
+    alert("El curso debe comenzar con un número válido (1 a 11) y luego puede llevar letras, todo junto y sin espacios. Ejemplo: 4C, 3DAVINCI, 10A.");
+    return;
+  }
+
+  if (!values.anoViaje) {
+    alert("Debes indicar el año del viaje.");
+    return;
+  }
+
+  if (destinoSeleccionado === "Otro" && !values.destinoPrincipalOtro) {
+    alert("Debes especificar el otro destino principal.");
+    return;
+  }
+
+  if ((fechaInicioViaje && !fechaFinViaje) || (!fechaInicioViaje && fechaFinViaje)) {
+    alert("Debes completar fecha de inicio y fecha final del viaje.");
+    return;
+  }
+
+  if (!cursoViaje || !aliasGrupo || !aliasTripKey) {
+    alert("No se pudo reconstruir el alias del grupo. Revisa curso, colegio y año de viaje.");
+    return;
+  }
 
   for (const path of DATA_FIELDS) {
     const nuevo = values[path];
@@ -2254,6 +2676,22 @@ async function saveDatos() {
       cambios.push({ campo: path, anterior, nuevo });
     }
   }
+
+  const derivedValues = {
+    anoBaseCurso: String(anoBase),
+    cursoViaje,
+    aliasGrupo,
+    aliasTripKey
+  };
+
+  Object.entries(derivedValues).forEach(([path, nuevo]) => {
+    const anterior = getByPath(state.group, path);
+
+    if (!sameValue(anterior, nuevo)) {
+      setNestedValue(patch, path, nuevo);
+      cambios.push({ campo: path, anterior, nuevo });
+    }
+  });
 
   if (!cambios.length) {
     closeModal("modalDatos");
@@ -3197,10 +3635,15 @@ function prettyLabel(path = "") {
     anoViaje: "Año viaje",
     cantidadGrupo: "Cantidad grupo",
     destinoPrincipal: "Destino principal",
+    destinoPrincipalOtro: "Otro destino principal",
     programa: "Programa",
     tramo: "Tramo",
     asistenciaMed: "Asistencia médica",
-    semanaViaje: "Semana viaje",
+    semanaViaje: "Rango de viaje",
+    fechaInicioViaje: "Fecha inicio viaje",
+    fechaFinViaje: "Fecha fin viaje",
+    cursoViaje: "Curso proyectado",
+    aliasTripKey: "Clave alias viaje",
     fechaViaje: "Fecha viaje",
     comunaCiudad: "Comuna / ciudad",
     nombreCliente: "1° Contacto",
