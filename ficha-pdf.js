@@ -434,7 +434,8 @@ function canFinalizeFichaAsCurrentUser() {
 
   return (
     email === "yenny@raitrai.cl" ||
-    email === "administracion@raitrai.cl"
+    email === "administracion@raitrai.cl" ||
+    email === "raitrai@raitrai.cl"
   );
 }
 
