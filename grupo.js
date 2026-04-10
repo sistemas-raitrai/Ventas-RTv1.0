@@ -1703,21 +1703,20 @@ function renderDatos() {
   if (!grid) return;
 
   const items = [
-    itemData("Cantidad grupo", state.group.cantidadGrupo),
-
-    itemData("Destino principal", normalizeTextUpper(getDestinoPrincipalDisplay(state.group)), true),
-    itemData("Programa", normalizeTextUpper(getProgramaDisplay(state.group)), true),
-
-    itemData("Tramo", normalizeTextUpper(getTramoDisplay(state.group))),
-    itemData("Mes de viaje", normalizeTextUpper(getMesViajeDisplay(state.group))),
-
     itemData("1° Contacto", normalizeTextUpper(state.group.nombreCliente || "")),
     itemData("Correo 1° Contacto", state.group.correoCliente),
     itemData("Celular 1° Contacto", state.group.celularCliente),
-
+  
     itemData("2° Contacto", normalizeTextUpper(state.group.nombreCliente2 || "")),
     itemData("Correo 2° Contacto", state.group.correoCliente2),
-    itemData("Celular 2° Contacto", state.group.celularCliente2)
+    itemData("Celular 2° Contacto", state.group.celularCliente2),
+  
+    itemData("Destino principal", normalizeTextUpper(getDestinoPrincipalDisplay(state.group)), true),
+    itemData("Programa", normalizeTextUpper(getProgramaDisplay(state.group)), true),
+  
+    itemData("Mes de viaje", normalizeTextUpper(getMesViajeDisplay(state.group))),
+    itemData("Cantidad grupo", state.group.cantidadGrupo),
+    itemData("Tramo", normalizeTextUpper(getTramoDisplay(state.group)))
   ];
 
   grid.className = "grupo-data-card-grid";
