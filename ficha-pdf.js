@@ -40,6 +40,8 @@ import {
   waitForLayoutReady
 } from "./ui.js";
 
+import { PDFDocument } from "https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/+esm";
+
 const $ = (id) => document.getElementById(id);
 const GITHUB_HOME_URL = "https://sistemas-raitrai.github.io/Ventas-RT/";
 const HISTORIAL_COLLECTION = "ventas_historial";
@@ -383,6 +385,7 @@ function canFinalizeFichaPdf() {
   if (!canFinalizeFichaAsCurrentUser()) return false;
   if (!state.group || !state.groupDocId) return false;
   if (!canAccessGroup(state.group)) return false;
+  if (!hasProgramaPdf()) return false;
 
   const flow = state.group.flowFicha || {};
   const fichaEstado = normalizeSearchLocal(state.group?.fichaEstado || "");
@@ -394,6 +397,10 @@ function canFinalizeFichaPdf() {
 function getFinalizeBlockedMessage() {
   if (!canFinalizeFichaAsCurrentUser()) {
     return "Solo admin, yenny@raitrai.cl o administracion@raitrai.cl pueden confirmar oficialmente esta ficha para impresión.";
+  }
+
+  if (!hasProgramaPdf()) {
+    return "Falta subir el Programa PDF obligatorio para cerrar la ficha.";
   }
 
   const flow = state.group?.flowFicha || {};
@@ -498,6 +505,56 @@ function getExistingPdfUrl() {
     getByPath(state.group, "ficha.pdfUrl") ||
     ""
   );
+}
+
+function getProgramaPdfUrl() {
+  return cleanText(
+    state.ficha?.programaPdfUrl ||
+    getByPath(state.group, "ficha.programaPdfUrl") ||
+    state.group?.programaPdfUrl ||
+    ""
+  );
+}
+
+function getProgramaPdfNombre() {
+  return cleanText(
+    state.ficha?.programaPdfNombre ||
+    getByPath(state.group, "ficha.programaPdfNombre") ||
+    state.group?.programaPdfNombre ||
+    ""
+  );
+}
+
+function hasProgramaPdf() {
+  return !!getProgramaPdfUrl();
+}
+
+async function fetchPdfBytesFromUrl(url = "") {
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(`No se pudo descargar el Programa PDF (${response.status}).`);
+  }
+  return new Uint8Array(await response.arrayBuffer());
+}
+
+async function mergeFichaAndProgramaPdf(fichaBlob, programaPdfUrl) {
+  const mergedPdf = await PDFDocument.create();
+
+  const fichaBytes = new Uint8Array(await fichaBlob.arrayBuffer());
+  const fichaPdf = await PDFDocument.load(fichaBytes);
+
+  const programaBytes = await fetchPdfBytesFromUrl(programaPdfUrl);
+  const programaPdf = await PDFDocument.load(programaBytes);
+
+  const fichaPages = await mergedPdf.copyPages(fichaPdf, fichaPdf.getPageIndices());
+  fichaPages.forEach((page) => mergedPdf.addPage(page));
+
+  const programaPages = await mergedPdf.copyPages(programaPdf, programaPdf.getPageIndices());
+  programaPages.forEach((page) => mergedPdf.addPage(page));
+
+  const mergedBytes = await mergedPdf.save();
+
+  return new Blob([mergedBytes], { type: "application/pdf" });
 }
 
 function getCurrentVersionData() {
@@ -705,10 +762,20 @@ async function confirmOfficialPdfClosure({ preserveCurrentVersion = false } = {}
   const versionLabel = getFichaVersionLabel(versionData);
   const pdfNombre = buildConfirmedPdfName(versionLabel);
 
-  // 1) generar PDF binario real
-  const pdfBlob = await generateRealPdfBlob(pdfNombre);
-
-  // 2) subir a Firebase Storage
+  const programaPdfUrl = getProgramaPdfUrl();
+  const programaPdfNombre = getProgramaPdfNombre();
+  
+  if (!programaPdfUrl) {
+    throw new Error("No existe Programa PDF cargado para esta ficha.");
+  }
+  
+  // 1) generar PDF base de la ficha
+  const fichaBlob = await generateRealPdfBlob(pdfNombre);
+  
+  // 2) unir físicamente la ficha + programa PDF
+  const pdfBlob = await mergeFichaAndProgramaPdf(fichaBlob, programaPdfUrl);
+  
+  // 3) subir PDF combinado a Firebase Storage
   const { downloadUrl, storagePath } = await uploadRealPdfToStorage(pdfBlob, pdfNombre);
 
   // 3) guardar URL real en Firestore
@@ -742,6 +809,8 @@ async function confirmOfficialPdfClosure({ preserveCurrentVersion = false } = {}
     "ficha.fechaActualizacion": serverTimestamp(),
     "ficha.actualizadoPor": nombre,
     "ficha.actualizadoPorCorreo": state.effectiveEmail,
+    "ficha.programaPdfIncluido": true,
+    "ficha.programaPdfIncluidoNombre": programaPdfNombre || "",
 
     "flowFicha.estado": "confirmada_pdf",
     "flowFicha.administracion.firmado": !!flow?.administracion?.firmado,
@@ -804,6 +873,16 @@ async function confirmOfficialPdfClosure({ preserveCurrentVersion = false } = {}
           campo: "ficha.pendienteEnvioCorreo",
           anterior: !!fichaActual?.pendienteEnvioCorreo,
           nuevo: true
+        },
+        {
+          campo: "ficha.programaPdfIncluido",
+          anterior: !!fichaActual?.programaPdfIncluido,
+          nuevo: true
+        },
+        {
+          campo: "ficha.programaPdfIncluidoNombre",
+          anterior: fichaActual?.programaPdfIncluidoNombre || "",
+          nuevo: programaPdfNombre || ""
         }
       ]
     }
@@ -898,6 +977,18 @@ function hydrateFicha(group = {}) {
     nombrePrograma: pick(
       ficha.nombrePrograma,
       group.programa,
+      ""
+    ),
+
+    programaPdfUrl: pick(
+      ficha.programaPdfUrl,
+      group.programaPdfUrl,
+      ""
+    ),
+    
+    programaPdfNombre: pick(
+      ficha.programaPdfNombre,
+      group.programaPdfNombre,
       ""
     ),
 
