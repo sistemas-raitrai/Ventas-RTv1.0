@@ -19,12 +19,13 @@
       overflow: hidden;
       padding: 26px 28px;
       border-radius: 26px;
-      background: linear-gradient(135deg, #241238 0%, #31194b 58%, #3c1d5a 100%);
-      color: #fff;
-      box-shadow: 0 18px 42px rgba(36,18,56,.20);
+      background: linear-gradient(135deg, #f4f6f8 0%, #eceff3 56%, #e6eaef 100%);
+      color: #18212f;
+      border: 1px solid #d9e0e7;
+      box-shadow: 0 16px 36px rgba(15,23,42,.08);
       margin-bottom: 24px;
     }
-
+    
     .grupo-hero::before{
       content: "";
       position: absolute;
@@ -32,53 +33,27 @@
       width: 220px;
       height: 220px;
       border-radius: 50%;
-      background: radial-gradient(circle, rgba(255,255,255,.18) 0%, rgba(255,255,255,0) 70%);
+      background: radial-gradient(circle, rgba(91,105,125,.10) 0%, rgba(91,105,125,0) 72%);
       pointer-events: none;
     }
-
-    .grupo-hero-top{
-      display: flex;
-      gap: 24px;
-      justify-content: space-between;
-      align-items: flex-start;
-      flex-wrap: wrap;
-    }
-
-    .grupo-hero-left{
-      display: flex;
-      gap: 18px;
-      align-items: flex-start;
-      min-width: 0;
-      flex: 1 1 620px;
-    }
-
+    
     .grupo-logo{
       width: 86px;
       height: 86px;
       border-radius: 22px;
-      background: rgba(255,255,255,.10);
-      border: 1px solid rgba(255,255,255,.18);
+      background: linear-gradient(135deg, #5a6472 0%, #434c59 100%);
+      border: 1px solid rgba(67,76,89,.18);
+      color: #fff;
       display: grid;
       place-items: center;
       overflow: hidden;
-      box-shadow: 0 12px 26px rgba(0,0,0,.16);
+      box-shadow: 0 10px 22px rgba(15,23,42,.12);
       flex: 0 0 auto;
       font-weight: 800;
       font-size: 26px;
       letter-spacing: .4px;
     }
-
-    .grupo-logo img{
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-      display: block;
-    }
-
-    .grupo-hero-text{
-      min-width: 0;
-    }
-
+    
     .grupo-kicker{
       display: inline-flex;
       align-items: center;
@@ -87,10 +62,10 @@
       font-weight: 800;
       letter-spacing: .5px;
       text-transform: uppercase;
-      color: rgba(255,255,255,.74);
+      color: #6b7280;
       margin-bottom: 6px;
     }
-
+    
     .grupo-title{
       margin: 0;
       font-size: clamp(28px, 4vw, 42px);
@@ -98,28 +73,50 @@
       font-weight: 900;
       letter-spacing: .2px;
       word-break: break-word;
+      color: #18212f;
     }
-
+    
     .grupo-subtitle{
-      margin-top: 8px;
+      margin-top: 10px;
       display: flex;
       flex-wrap: wrap;
-      gap: 10px 14px;
-      font-size: 15px;
-      color: rgba(255,255,255,.82);
+      gap: 10px 12px;
+      font-size: 14px;
+      color: #344054;
     }
-
+    
+    .grupo-subtitle span{
+      display: inline-flex;
+      align-items: center;
+      min-height: 34px;
+      padding: 0 12px;
+      border-radius: 999px;
+      background: rgba(255,255,255,.78);
+      border: 1px solid #d9e0e7;
+      box-shadow: 0 2px 8px rgba(15,23,42,.04);
+    }
+    
     .grupo-subtitle strong{
-      color: #fff;
+      color: #111827;
+      margin-right: 4px;
     }
-
+    
+    .grupo-comuna{
+      margin-top: 10px;
+      font-size: 14px;
+      font-weight: 700;
+      color: #556070;
+      letter-spacing: .2px;
+      text-transform: uppercase;
+    }
+    
     .grupo-badges{
       margin-top: 16px;
       display: flex;
       flex-wrap: wrap;
       gap: 10px;
     }
-
+    
     .g-badge{
       display: inline-flex;
       align-items: center;
@@ -130,74 +127,95 @@
       font-size: 13px;
       font-weight: 800;
       letter-spacing: .2px;
-      border: 1px solid rgba(255,255,255,.12);
-      background: rgba(255,255,255,.12);
-      color: #fff;
-      backdrop-filter: blur(5px);
+      border: 1px solid #d9e0e7;
+      background: #ffffff;
+      color: #243041;
+      box-shadow: 0 2px 8px rgba(15,23,42,.04);
     }
-
-    .g-badge.estado-a_contactar{ background: rgba(255,74,65,.18); }
-    .g-badge.estado-contactado{ background: rgba(255,142,60,.18); }
-    .g-badge.estado-cotizando{ background: rgba(241,169,41,.18); }
-    .g-badge.estado-recotizando{ background: rgba(233,183,42,.18); }
-    .g-badge.estado-reunion_confirmada{ background: rgba(78,194,120,.18); }
-    .g-badge.estado-ganada{ background: rgba(17,138,47,.18); }
-    .g-badge.estado-perdida{ background: rgba(255,74,65,.18); }
-
+    
+    .g-badge.estado-a_contactar{
+      background: #fff1f0;
+      border-color: #f2d0cd;
+      color: #8b3a32;
+    }
+    
+    .g-badge.estado-contactado{
+      background: #fff7ed;
+      border-color: #f3dcc2;
+      color: #9a5b16;
+    }
+    
+    .g-badge.estado-cotizando{
+      background: #fff9e8;
+      border-color: #efe0b1;
+      color: #8a6700;
+    }
+    
+    .g-badge.estado-recotizando{
+      background: #fffbea;
+      border-color: #efe4ad;
+      color: #856c00;
+    }
+    
+    .g-badge.estado-reunion_confirmada{
+      background: #ecfdf3;
+      border-color: #cfead8;
+      color: #1f6b47;
+    }
+    
+    .g-badge.estado-ganada{
+      background: #e9f8ee;
+      border-color: #cde6d4;
+      color: #20633a;
+    }
+    
+    .g-badge.estado-perdida{
+      background: #fff1f0;
+      border-color: #f2d0cd;
+      color: #8b3a32;
+    }
+    
     .g-badge.is-ok{
-      background: rgba(30,125,54,.22);
+      background: #eef7f0;
+      border-color: #d5e6d9;
+      color: #285a38;
     }
-
+    
     .g-badge.is-muted{
-      background: rgba(255,255,255,.08);
-      color: rgba(255,255,255,.85);
+      background: #f8fafc;
+      border-color: #dde3ea;
+      color: #445164;
     }
-
-    .grupo-hero-right{
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-      min-width: 300px;
-      flex: 0 1 360px;
-    }
-
-    .grupo-quick-grid{
-      display: grid;
-      grid-template-columns: repeat(2, minmax(0,1fr));
-      gap: 12px;
-    }
-
+    
     .grupo-quick-card{
       border-radius: 18px;
-      background: rgba(255,255,255,.10);
-      border: 1px solid rgba(255,255,255,.14);
+      background: rgba(255,255,255,.82);
+      border: 1px solid #d9e0e7;
       padding: 14px 14px 12px;
-      backdrop-filter: blur(4px);
-      box-shadow: 0 10px 20px rgba(0,0,0,.10);
+      box-shadow: 0 8px 18px rgba(15,23,42,.05);
     }
-
+    
     .grupo-quick-label{
       font-size: 12px;
       text-transform: uppercase;
       letter-spacing: .4px;
-      color: rgba(255,255,255,.72);
+      color: #6b7280;
       margin-bottom: 6px;
       font-weight: 800;
     }
-
+    
     .grupo-quick-value{
       font-size: 18px;
       font-weight: 900;
-      color: #fff;
+      color: #18212f;
       line-height: 1.15;
     }
-
+    
     .grupo-quick-sub{
       margin-top: 4px;
       font-size: 12px;
-      color: rgba(255,255,255,.76);
+      color: #5f6b7a;
     }
-
     .grupo-hero-actions{
       display: flex;
       flex-wrap: wrap;
@@ -1333,16 +1351,18 @@
           <div class="grupo-logo" id="grupoLogoWrap">RT</div>
 
           <div class="grupo-hero-text">
-            <div class="grupo-kicker">Portafolio comercial del grupo</div>
+            <div class="grupo-kicker">Portafolio del Grupo</div>
             <h1 class="grupo-title" id="heroTitle">Cargando grupo...</h1>
-
+            
             <div class="grupo-subtitle">
               <span><strong>Colegio:</strong> <span id="heroColegio">—</span></span>
               <span><strong>Año de viaje:</strong> <span id="heroAnoViaje">—</span></span>
               <span><strong>Vendedor(a):</strong> <span id="heroVendedora">—</span></span>
               <span><strong>ID Grupo:</strong> <span id="heroIdGrupo">—</span></span>
             </div>
-
+            
+            <div class="grupo-comuna" id="heroComuna">—</div>
+            
             <div class="grupo-badges" id="heroBadges"></div>
           </div>
         </div>
@@ -1556,7 +1576,7 @@
             <label>Alias grupo</label>
             <div id="d_aliasPreview" class="readonly-box">—</div>
             <div class="helper">
-              Se reconstruye automáticamente si cambias curso, colegio o año de viaje.
+              Se reconstruye automáticamente si cambias curso o año de viaje.
             </div>
           </div>
         
@@ -1575,7 +1595,10 @@
         
           <div class="form-field span-2">
             <label for="d_colegio">Colegio</label>
-            <input id="d_colegio" name="colegio" type="text" />
+            <input id="d_colegio" name="colegio" type="text" readonly />
+            <div class="helper">
+              El colegio no se edita aquí.
+            </div>
           </div>
         
           <div class="form-field">
@@ -1599,12 +1622,15 @@
           <div class="form-field span-2">
             <label for="d_destinoPrincipal">Destino principal</label>
             <select id="d_destinoPrincipal" name="destinoPrincipal">
-              <option value="">Seleccionar</option>
-              <option value="Bariloche">Bariloche</option>
-              <option value="Sur de Chile">Sur de Chile</option>
-              <option value="Bariloche y Sur de Chile">Bariloche y Sur de Chile</option>
-              <option value="Brasil">Brasil</option>
-              <option value="Otro">Otro</option>
+              <option value="">SELECCIONAR</option>
+              <option value="BARILOCHE">BARILOCHE</option>
+              <option value="SUR DE CHILE">SUR DE CHILE</option>
+              <option value="SUR DE CHILE Y BARILOCHE">SUR DE CHILE Y BARILOCHE</option>
+              <option value="BRASIL">BRASIL</option>
+              <option value="NORTE DE CHILE">NORTE DE CHILE</option>
+              <option value="MÉXICO">MÉXICO</option>
+              <option value="REPÚBLICA DOMINICANA">REPÚBLICA DOMINICANA</option>
+              <option value="OTRO">OTRO</option>
             </select>
           </div>
         
@@ -1616,17 +1642,22 @@
           <div class="form-field span-2">
             <label for="d_programa">Programa</label>
             <select id="d_programa" name="programa">
-              <option value="">Seleccionar</option>
+              <option value="">SELECCIONAR</option>
             </select>
             <div class="helper">
-              El listado se carga desde <strong>PROGRAMA_OPTIONS</strong> en <strong>grupo.js</strong>.
+              El programa depende del destino principal.
             </div>
+          </div>
+        
+          <div class="form-field span-3 hidden" id="wrapDatosProgramaOtro">
+            <label for="d_programaOtro">Otro programa</label>
+            <input id="d_programaOtro" name="programaOtro" type="text" />
           </div>
         
           <div class="form-field">
             <label for="d_tramo">Tramo</label>
             <select id="d_tramo" name="tramo">
-              <option value="">Seleccionar</option>
+              <option value="">SELECCIONAR</option>
               <option value="36 – 39">36 – 39</option>
               <option value="30 – 35">30 – 35</option>
               <option value="26 – 29">26 – 29</option>
@@ -1634,17 +1665,38 @@
               <option value="20 – 22">20 – 22</option>
               <option value="18 – 19">18 – 19</option>
               <option value="15 – 17">15 – 17</option>
+              <option value="OTRO">OTRO</option>
             </select>
           </div>
         
-          <div class="form-field">
-            <label for="d_fechaInicioViaje">Fecha inicio viaje</label>
-            <input id="d_fechaInicioViaje" name="fechaInicioViaje" type="date" />
+          <div class="form-field span-2 hidden" id="wrapDatosTramoOtro">
+            <label for="d_tramoOtro">Otro tramo</label>
+            <input id="d_tramoOtro" name="tramoOtro" type="text" />
           </div>
         
           <div class="form-field">
-            <label for="d_fechaFinViaje">Fecha fin viaje</label>
-            <input id="d_fechaFinViaje" name="fechaFinViaje" type="date" />
+            <label for="d_mesViaje">Mes de viaje</label>
+            <select id="d_mesViaje" name="mesViaje">
+              <option value="">SELECCIONAR</option>
+              <option value="ENERO">ENERO</option>
+              <option value="FEBRERO">FEBRERO</option>
+              <option value="MARZO">MARZO</option>
+              <option value="ABRIL">ABRIL</option>
+              <option value="MAYO">MAYO</option>
+              <option value="JUNIO">JUNIO</option>
+              <option value="JULIO">JULIO</option>
+              <option value="AGOSTO">AGOSTO</option>
+              <option value="SEPTIEMBRE">SEPTIEMBRE</option>
+              <option value="OCTUBRE">OCTUBRE</option>
+              <option value="NOVIEMBRE">NOVIEMBRE</option>
+              <option value="DICIEMBRE">DICIEMBRE</option>
+              <option value="OTRO">OTRO</option>
+            </select>
+          </div>
+        
+          <div class="form-field span-2 hidden" id="wrapDatosMesViajeOtro">
+            <label for="d_mesViajeOtro">Especificar mes de viaje</label>
+            <input id="d_mesViajeOtro" name="mesViajeOtro" type="text" placeholder="Ej: NOVIEMBRE-DICIEMBRE" />
           </div>
         
           <div class="form-field span-3">
@@ -1660,12 +1712,12 @@
           <div class="form-field">
             <label for="d_rolCliente">Rol 1° Contacto</label>
             <select id="d_rolCliente" name="rolCliente">
-              <option value="">Seleccionar</option>
-              <option value="Estudiante">Estudiante</option>
-              <option value="Apoderado(a)">Apoderado(a)</option>
-              <option value="Profesor(a)">Profesor(a)</option>
-              <option value="ComisionGira">Comisión gira</option>
-              <option value="Otro(a)">Otro(a)</option>
+              <option value="">SELECCIONAR</option>
+              <option value="ESTUDIANTE">ESTUDIANTE</option>
+              <option value="APODERADO(A)">APODERADO(A)</option>
+              <option value="PROFESOR(A)">PROFESOR(A)</option>
+              <option value="COMISION GIRA">COMISION GIRA</option>
+              <option value="OTRO(A)">OTRO(A)</option>
             </select>
           </div>
         
@@ -1687,12 +1739,12 @@
           <div class="form-field">
             <label for="d_rolCliente2">Rol 2° Contacto</label>
             <select id="d_rolCliente2" name="rolCliente2">
-              <option value="">Seleccionar</option>
-              <option value="Estudiante">Estudiante</option>
-              <option value="Apoderado(a)">Apoderado(a)</option>
-              <option value="Profesor(a)">Profesor(a)</option>
-              <option value="ComisionGira">Comisión gira</option>
-              <option value="Otro(a)">Otro(a)</option>
+              <option value="">SELECCIONAR</option>
+              <option value="ESTUDIANTE">ESTUDIANTE</option>
+              <option value="APODERADO(A)">APODERADO(A)</option>
+              <option value="PROFESOR(A)">PROFESOR(A)</option>
+              <option value="COMISION GIRA">COMISION GIRA</option>
+              <option value="OTRO(A)">OTRO(A)</option>
             </select>
           </div>
         
