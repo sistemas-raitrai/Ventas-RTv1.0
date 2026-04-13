@@ -613,7 +613,11 @@ function renderHero() {
       : "Se enlazará automáticamente en el siguiente paso"
   );
 
-  const ultimaActualizacion = state.group?.fechaActualizacionFicha || state.ficha?.fechaActualizacion || null;
+  const ultimaActualizacion =
+    state.ficha?.fechaActualizacionTexto ||
+    formatFichaDateTimeText(state.ficha?.fechaActualizacion) ||
+    formatFichaDateTimeText(state.group?.fechaActualizacionFicha) ||
+    null;
   setText("heroFechaActualizacion", formatDate(ultimaActualizacion));
   setText(
     "heroFechaActualizacionSub",
@@ -1441,6 +1445,7 @@ async function saveFicha({ silent = false, reloadAfterSave = true } = {}) {
   }
 
   const oldFicha = state.group?.ficha || {};
+  const previousFichaView = state.ficha || hydrateFicha(state.group || {});
   const flow = state.group?.flowFicha || {};
   const nowText = formatDateTime(new Date());
 
@@ -1481,11 +1486,12 @@ async function saveFicha({ silent = false, reloadAfterSave = true } = {}) {
     pdfNombre: cleanText(oldFicha.pdfNombre || "")
   };
 
+  const observacionesPlain = richHtmlToPlainText(values.observacionesHtml);
   const actualChanges = [];
   const trackedChanges = [];
 
   for (const path of FICHA_FIELDS) {
-    const anterior = oldFicha[path];
+    const anterior = previousFichaView[path];
     const nuevo = values[path];
 
     const changed = isRichField(path)
@@ -1529,7 +1535,7 @@ async function saveFicha({ silent = false, reloadAfterSave = true } = {}) {
       actualizadoPorCorreo: state.effectiveEmail,
       fechaActualizacion: serverTimestamp()
     },
-
+  
     solicitudReserva: values.solicitudReserva,
     categoriaHoteleraContratada: values.categoriaHoteleraContratada,
     autorizacionGerencia: values.autorizacionGerencia,
@@ -1537,11 +1543,15 @@ async function saveFicha({ silent = false, reloadAfterSave = true } = {}) {
     liberados: values.liberados,
     valorPrograma: values.valorPrograma,
     numeroNegocio: values.numeroNegocio,
+    usuarioProgramaAdm: values.usuarioFicha,
+    claveAdministrativa: values.claveAdministrativa,
     versionFicha: values.version,
     fechaActualizacionFicha: serverTimestamp(),
+    fechaDeViaje: values.fechaViajeTexto,
     fechaViaje: values.fechaViajeTexto,
+    observacionesFicha: observacionesPlain,
     fichaEstado: nextFichaEstado,
-
+  
     actualizadoPor: getDisplayName(state.effectiveUser),
     actualizadoPorCorreo: state.effectiveEmail,
     fechaActualizacion: serverTimestamp()
@@ -1640,7 +1650,19 @@ async function saveFicha({ silent = false, reloadAfterSave = true } = {}) {
       : isJefaVentas()
         ? "jefa de ventas"
         : "usuario";
-
+  
+    const observacionesChanged = historyChanges.some(
+      (item) => item.campo === "ficha.observacionesHtml"
+    );
+  
+    const observacionesMsg = observacionesChanged
+      ? (
+          observacionesPlain
+            ? ` Observaciones ficha: ${truncateForHistory(observacionesPlain)}.`
+            : " Observaciones ficha vaciadas."
+        )
+      : "";
+  
     await addDoc(collection(db, HISTORIAL_COLLECTION), {
       idGrupo: String(state.groupId),
       codigoRegistro: cleanText(state.group?.codigoRegistro),
@@ -1654,8 +1676,8 @@ async function saveFicha({ silent = false, reloadAfterSave = true } = {}) {
         ? "Actualización de ficha con reapertura de flujo"
         : (fichaWasEmpty ? "Creación de ficha" : "Actualización de ficha"),
       mensaje: reopenFlow
-        ? `${getDisplayName(state.effectiveUser)} actualizó la ficha desde ${editorLabel}. La revisión vuelve a jefa de ventas y luego a administración.`
-        : `${getDisplayName(state.effectiveUser)} ${fichaWasEmpty ? "creó" : "actualizó"} la ficha del grupo.`,
+        ? `${getDisplayName(state.effectiveUser)} actualizó la ficha desde ${editorLabel}. La revisión vuelve a jefa de ventas y luego a administración.${observacionesMsg}`
+        : `${getDisplayName(state.effectiveUser)} ${fichaWasEmpty ? "creó" : "actualizó"} la ficha del grupo.${observacionesMsg}`,
       metadata: { cambios: historyChanges },
       creadoPor: getDisplayName(state.effectiveUser),
       creadoPorCorreo: state.effectiveEmail,
@@ -1740,6 +1762,14 @@ function hydrateFicha(group = {}) {
   const ficha = getByPath(group, "ficha") || {};
   const situacion = getByPath(group, "situacion") || {};
 
+  const observacionesFallbackTexto =
+    pick(
+      group.observacionesFicha,
+      ficha.observacionesGenerales,
+      group.observacionesGenerales,
+      ""
+    ) || "";
+
   return {
     solicitudReserva: pick(
       ficha.solicitudReserva,
@@ -1774,6 +1804,7 @@ function hydrateFicha(group = {}) {
 
     nombrePrograma: pick(
       ficha.nombrePrograma,
+      group.programaOtro,
       group.programa,
       ""
     ),
@@ -1783,26 +1814,10 @@ function hydrateFicha(group = {}) {
       group.programaPdfUrl,
       ""
     ),
-    
+
     programaPdfNombre: pick(
       ficha.programaPdfNombre,
       group.programaPdfNombre,
-      ""
-    ),
-    
-    programaPdfStoragePath: pick(
-      ficha.programaPdfStoragePath,
-      group.programaPdfStoragePath,
-      ""
-    ),
-    
-    programaPdfSubidoPor: pick(
-      ficha.programaPdfSubidoPor,
-      ""
-    ),
-    
-    programaPdfSubidoPorCorreo: pick(
-      ficha.programaPdfSubidoPorCorreo,
       ""
     ),
 
@@ -1838,7 +1853,7 @@ function hydrateFicha(group = {}) {
       group.solicitudHotel,
       ""
     ),
-    
+
     autorizacionGerencia: pick(
       ficha.autorizacionGerencia,
       group.autorizacionGerencia,
@@ -1850,17 +1865,22 @@ function hydrateFicha(group = {}) {
 
     descuentoValorBase: pick(
       ficha.descuentoValorBase,
+      group.descuento,
       "NO"
     ),
 
     fechaViajeTexto: pick(
       ficha.fechaViajeTexto,
-      humanDateLong(group.fechaViaje),
+      group.fechaDeViaje,
+      group.fechaViaje,
+      group.semanaViaje,
+      group.mesViaje,
       ""
     ),
 
     asistenciaEnViajes: pick(
       ficha.asistenciaEnViajes,
+      group.asistenciaEnViajes,
       group.asistenciaMed,
       ""
     ),
@@ -1897,7 +1917,8 @@ function hydrateFicha(group = {}) {
 
     fechaActualizacionTexto: pick(
       ficha.fechaActualizacionTexto,
-      humanDateLong(group.fechaActualizacionFicha),
+      formatFichaDateTimeText(ficha.fechaActualizacion),
+      formatFichaDateTimeText(group.fechaActualizacionFicha),
       ""
     ),
 
@@ -1917,6 +1938,7 @@ function hydrateFicha(group = {}) {
 
     observacionesHtml: pick(
       ficha.observacionesHtml,
+      plainTextToRichHtml(observacionesFallbackTexto),
       ""
     ),
 
@@ -2082,6 +2104,52 @@ function normalizeRichHtml(html = "") {
     .replace(/<p><br><\/p>/gi, "")
     .replace(/>\s+</g, "><")
     .trim();
+}
+
+function formatFichaDateTimeText(value = "") {
+  if (!value) return "";
+
+  if (typeof value === "string") {
+    const raw = value.trim();
+    if (!raw) return "";
+
+    const parsed = toDate(raw);
+    return parsed ? formatDateTime(parsed) : raw;
+  }
+
+  const parsed = toDate(value);
+  return parsed ? formatDateTime(parsed) : "";
+}
+
+function plainTextToRichHtml(value = "") {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+
+  return raw
+    .split(/\n+/)
+    .map((line) => `<p>${escapeHtml(line.trim())}</p>`)
+    .join("");
+}
+
+function richHtmlToPlainText(html = "") {
+  const safe = sanitizeRichHtml(html || "");
+  if (!safe) return "";
+
+  const div = document.createElement("div");
+  div.innerHTML = safe;
+
+  return String(div.textContent || div.innerText || "")
+    .replace(/\u00a0/g, " ")
+    .replace(/\r/g, "")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+function truncateForHistory(value = "", max = 260) {
+  const text = String(value || "").trim();
+  if (!text) return "";
+  if (text.length <= max) return text;
+  return `${text.slice(0, max).trim()}...`;
 }
 
 function isRichField(path = "") {
