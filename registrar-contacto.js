@@ -173,9 +173,9 @@ function buildAliasGrupo({ cursoBase = "", anoBase = "", cursoViaje = "", anoVia
   return `${base} (${baseYear}) ${trip} (${tripYear}) ${school}`.trim();
 }
 
-function buildAliasTripKey({ colegio = "", cursoViaje = "", anoViaje = "" }) {
+function buildAliasTripKey({ colegio = "", comuna = "", cursoViaje = "", anoViaje = "" }) {
   return normalizeSearch(
-    `${normalizeText(colegio)}__${normalizeCursoInput(cursoViaje)}__${normalizeText(anoViaje)}`
+    `${normalizeText(colegio)}__${normalizeText(comuna)}__${normalizeCursoInput(cursoViaje)}__${normalizeText(anoViaje)}`
   );
 }
 
@@ -209,6 +209,7 @@ function buildTripKeyFromExistingDoc(data = {}) {
   if (explicit) return normalizeSearch(explicit);
 
   const colegio = normalizeText(data.colegio || "");
+  const comuna = normalizeText(data.comunaCiudad || data.comuna || "");
   const anoViaje = normalizeText(data.anoViaje || "");
 
   if (!colegio || !anoViaje) return "";
@@ -220,7 +221,7 @@ function buildTripKeyFromExistingDoc(data = {}) {
 
   if (!cursoViaje) return "";
 
-  return buildAliasTripKey({ colegio, cursoViaje, anoViaje });
+  return buildAliasTripKey({ colegio, comuna, cursoViaje, anoViaje });
 }
 
 async function findExistingAliasConflict(targetTripKey = "") {
@@ -269,15 +270,79 @@ function updateAliasPreview() {
   aliasPreview.textContent = alias || "—";
 }
 
-function getOptionKey(email, numeroColegio, colegio) {
-  return `${normalizeEmail(email)}__${normalizeText(numeroColegio)}__${normalizeText(colegio)}`;
+function getOptionKey(email, numeroColegio, colegio, comuna = "") {
+  return `${normalizeEmail(email)}__${normalizeText(numeroColegio)}__${normalizeText(colegio)}__${normalizeText(comuna)}`;
+}
+
+function getCarteraOptionsByColegioInput() {
+  const colegioInput = normalizeSearch($("inputColegio")?.value || "");
+  if (!colegioInput) return [];
+
+  return state.carteraOptions.filter(
+    opt => normalizeSearch(opt.colegio) === colegioInput
+  );
 }
 
 function getExactCarteraOptionByInput() {
-  const input = normalizeSearch($("inputColegio")?.value || "");
-  if (!input) return null;
+  const matches = getCarteraOptionsByColegioInput();
+  if (!matches.length) return null;
 
-  return state.carteraOptions.find(opt => normalizeSearch(opt.colegio) === input) || null;
+  const comunaInput = normalizeSearch($("comunaCiudad")?.value || "");
+
+  // Si solo existe un colegio con ese nombre, aceptamos match automático.
+  // Pero si el usuario escribió una comuna distinta, se rompe el match.
+  if (matches.length === 1) {
+    if (!comunaInput) return matches[0];
+
+    return normalizeSearch(matches[0].comuna || "") === comunaInput
+      ? matches[0]
+      : null;
+  }
+
+  // Si hay varios colegios con el mismo nombre,
+  // obligamos a resolver por comuna.
+  if (!comunaInput) return null;
+
+  return (
+    matches.find(opt => normalizeSearch(opt.comuna || "") === comunaInput) || null
+  );
+}
+
+function ensureComunaDatalist() {
+  const comunaInput = $("comunaCiudad");
+  if (!comunaInput) return null;
+
+  let list = $("listaComunasColegio");
+
+  if (!list) {
+    list = document.createElement("datalist");
+    list.id = "listaComunasColegio";
+    (comunaInput.form || document.body).appendChild(list);
+  }
+
+  comunaInput.setAttribute("list", "listaComunasColegio");
+  return list;
+}
+
+function updateComunaSuggestionsByColegio() {
+  const list = ensureComunaDatalist();
+  if (!list) return;
+
+  list.innerHTML = "";
+
+  const matches = getCarteraOptionsByColegioInput();
+
+  const comunas = [...new Set(
+    matches
+      .map(opt => normalizeText(opt.comuna || ""))
+      .filter(Boolean)
+  )].sort((a, b) => a.localeCompare(b, "es"));
+
+  comunas.forEach((comuna) => {
+    const option = document.createElement("option");
+    option.value = comuna;
+    list.appendChild(option);
+  });
 }
 
 function getCheckedValues(name) {
@@ -399,31 +464,33 @@ async function loadCarteraOptions() {
     itemsSnap.docs.forEach((d) => {
       const data = d.data() || {};
       const estatus = normalizeText(data.estatus || "");
-    
+
       // Solo colegios con estatus OK entran a la lista de cartera
       if (normalizeSearch(estatus) !== "ok") return;
-    
+
       const colegio =
         normalizeText(data.colegioBase || data.colegio || data.colegioOriginal || "");
-    
+
       if (!colegio) return;
-    
+
+      const comuna = normalizeText(data.comuna || "");
       const numeroColegio = normalizeText(data.numeroColegio || d.id || "");
       const vendedoraNombre = normalizeText(
         `${data.nombreVendedor || ""} ${data.apellidoVendedor || ""}`.trim()
       );
-    
-      const key = normalizeSearch(colegio);
-    
+
+      // Ahora la unicidad de cartera es colegio + comuna
+      const key = normalizeSearch(`${colegio}__${comuna}`);
+
       if (!map.has(key)) {
         map.set(key, {
-          key: getOptionKey(data.correoVendedor || sellerEmail, numeroColegio, colegio),
+          key: getOptionKey(data.correoVendedor || sellerEmail, numeroColegio, colegio, comuna),
           colegio,
           colegioBase: normalizeText(data.colegioBase || colegio),
           numeroColegio,
           vendedora: vendedoraNombre,
           vendedoraCorreo: normalizeEmail(data.correoVendedor || sellerEmail),
-          comuna: normalizeText(data.comuna || ""),
+          comuna,
           estatus
         });
       }
@@ -437,15 +504,17 @@ async function loadCarteraOptions() {
     });
   }
 
-  state.carteraOptions = [...map.values()].sort((a, b) =>
-    a.colegio.localeCompare(b.colegio, "es")
-  );
+  state.carteraOptions = [...map.values()].sort((a, b) => {
+    const bySchool = a.colegio.localeCompare(b.colegio, "es");
+    if (bySchool !== 0) return bySchool;
+    return (a.comuna || "").localeCompare(b.comuna || "", "es");
+  });
 
   renderCarteraSelect();
 
   setProgressStatus({
     text: "Cartera lista.",
-    meta: `${state.carteraOptions.length} colegio(s) disponibles.`,
+    meta: `${state.carteraOptions.length} combinación(es) colegio/comuna disponibles.`,
     progress: 100,
     type: "success"
   });
@@ -458,23 +527,32 @@ function renderCarteraSelect() {
 
   list.innerHTML = "";
 
+  const used = new Set();
+
   state.carteraOptions.forEach((opt) => {
+    const colegio = normalizeText(opt.colegio || "");
+    const key = normalizeSearch(colegio);
+
+    if (!colegio || used.has(key)) return;
+    used.add(key);
+
     const option = document.createElement("option");
-    option.value = opt.colegio;
+    option.value = colegio;
     list.appendChild(option);
   });
 }
 
-/* =========================================================
-   FORM UI
-========================================================= */
 function updateSchoolModeUI() {
   const matched = getExactCarteraOptionByInput();
+  const colegioMatches = getCarteraOptionsByColegioInput();
+
   const inputColegio = $("inputColegio");
   const vendedoraPreview = $("vendedoraPreview");
   const estadoPreview = $("estadoPreview");
   const comunaCiudad = $("comunaCiudad");
   const isVendor = state.effectiveUser?.rol === "vendedor";
+
+  updateComunaSuggestionsByColegio();
 
   if (!inputColegio || !vendedoraPreview || !estadoPreview) return;
 
@@ -484,10 +562,14 @@ function updateSchoolModeUI() {
 
     if (comunaCiudad && !normalizeText(comunaCiudad.value)) {
       comunaCiudad.value = matched.comuna || "";
+      updateComunaSuggestionsByColegio();
     }
   } else {
     if (normalizeText(inputColegio.value)) {
-      if (isVendor) {
+      if (colegioMatches.length > 1) {
+        vendedoraPreview.textContent = "Selecciona comuna";
+        estadoPreview.textContent = "Pendiente";
+      } else if (isVendor) {
         vendedoraPreview.textContent = "No permitido";
         estadoPreview.textContent = "No permitido";
       } else {
@@ -582,8 +664,15 @@ function validateForm(data) {
     return "No se pudo construir el alias del grupo.";
   }
 
-  // Si el colegio no está en cartera, la comuna/ciudad pasa a ser obligatoria
-  // porque no tenemos una referencia automática de ubicación.
+  if (data.colegioMatchesCount > 1 && !data.esCartera) {
+    return "Hay más de un colegio con ese nombre en cartera. Debes seleccionar una comuna válida para asignar correctamente la vendedora.";
+  }
+
+  if (data.colegioMatchesCount === 1 && !data.esCartera && data.comunaCiudad) {
+    return "La comuna ingresada no coincide con la comuna registrada para ese colegio en cartera. Corrígela para que la asignación automática sea correcta.";
+  }
+
+  // Si no está en cartera, igual la comuna sigue siendo obligatoria
   if (!data.esCartera && !data.comunaCiudad) {
     return "Debes indicar la comuna o ciudad cuando el colegio no pertenece a cartera.";
   }
@@ -633,10 +722,16 @@ function validateForm(data) {
 
 function readFormData() {
   const carteraOpt = getExactCarteraOptionByInput();
+  const colegioMatches = getCarteraOptionsByColegioInput();
   const esCartera = !!carteraOpt;
   const isVendor = state.effectiveUser?.rol === "vendedor";
 
   const colegio = normalizeText($("inputColegio")?.value || "");
+  const comunaInput = normalizeText($("comunaCiudad")?.value || "");
+  const comunaFinal = esCartera
+    ? normalizeText(carteraOpt?.comuna || comunaInput)
+    : comunaInput;
+
   const curso = normalizeCursoInput($("inputCurso")?.value || "");
   const anoBaseCurso = getCurrentYear();
   const anoViaje = normalizeText($("anoViaje")?.value || "");
@@ -652,8 +747,10 @@ function readFormData() {
     anoViaje,
     colegio
   });
+
   const aliasTripKey = buildAliasTripKey({
     colegio,
+    comuna: comunaFinal,
     cursoViaje,
     anoViaje
   });
@@ -664,6 +761,7 @@ function readFormData() {
 
   return {
     esCartera,
+    colegioMatchesCount: colegioMatches.length,
     tipoColegio: esCartera ? "Cartera" : "No cartera",
     colegio,
     colegioBase: esCartera ? normalizeText(carteraOpt?.colegioBase || carteraOpt?.colegio || "") : colegio,
@@ -683,7 +781,7 @@ function readFormData() {
     aliasTripKey,
     cantidadGrupo,
     anoViaje,
-    comunaCiudad: normalizeText($("comunaCiudad")?.value || ""),
+    comunaCiudad: comunaFinal,
     nombreCliente: normalizeText($("nombreCliente")?.value || ""),
     rolCliente: normalizeText($("rolCliente")?.value || ""),
     correoCliente: normalizeEmail($("correoCliente")?.value || ""),
@@ -801,13 +899,15 @@ async function saveRegistro(e) {
     if (conflict) {
       const conflictCode = normalizeText(conflict.data?.codigoRegistro || conflict.id || "");
       const conflictAlias = normalizeText(conflict.data?.aliasGrupo || "");
+      const conflictComuna = normalizeText(conflict.data?.comunaCiudad || conflict.data?.comuna || "");
       clearProgressStatus();
-
+      
       alert(
-        `Ya existe una cotización para ${data.cursoViaje} (${data.anoViaje}) en ${data.colegio}.\n\n` +
+        `Ya existe una cotización para ${data.cursoViaje} (${data.anoViaje}) en ${data.colegio}${data.comunaCiudad ? `, ${data.comunaCiudad}` : ""}.\n\n` +
         `Registro existente: ${conflictCode || "sin código"}\n` +
-        `${conflictAlias ? `Alias: ${conflictAlias}\n\n` : "\n"}` +
-        `No se puede crear otro grupo con el mismo curso proyectado, año de viaje y colegio.`
+        `${conflictAlias ? `Alias: ${conflictAlias}\n` : ""}` +
+        `${conflictComuna ? `Comuna: ${conflictComuna}\n\n` : "\n"}` +
+        `No se puede crear otro grupo con el mismo curso proyectado, año de viaje, colegio y comuna.`
       );
 
       return;
@@ -953,7 +1053,7 @@ function bindPageEvents() {
 
   // Campos de texto que deben ir en mayúscula
   bindUppercaseField(inputColegio, updateSchoolModeUI);
-  bindUppercaseField(comunaCiudad);
+  bindUppercaseField(comunaCiudad, updateSchoolModeUI);
   bindUppercaseField(nombreCliente);
   bindUppercaseField(celularCliente);
   bindUppercaseField(origenEspecificacionOtro);
