@@ -663,16 +663,9 @@ function validateForm(data) {
   if (!data.aliasGrupo || !data.aliasTripKey) {
     return "No se pudo construir el alias del grupo.";
   }
-
-  if (data.colegioMatchesCount > 1 && !data.esCartera) {
-    return "Hay más de un colegio con ese nombre en cartera. Debes seleccionar una comuna válida para asignar correctamente la vendedora.";
-  }
-
-  if (data.colegioMatchesCount === 1 && !data.esCartera && data.comunaCiudad) {
-    return "La comuna ingresada no coincide con la comuna registrada para ese colegio en cartera. Corrígela para que la asignación automática sea correcta.";
-  }
-
-  // Si no está en cartera, igual la comuna sigue siendo obligatoria
+  
+  // Si no quedó en cartera, igual debe poder guardarse,
+  // pero la comuna sigue siendo obligatoria para identificar bien el colegio.
   if (!data.esCartera && !data.comunaCiudad) {
     return "Debes indicar la comuna o ciudad cuando el colegio no pertenece a cartera.";
   }
