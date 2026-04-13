@@ -1064,13 +1064,13 @@ function hydrateFicha(group = {}) {
     ),
 
     usuarioFicha: pick(
+      group.usuarioProgramaAdm,
       ficha.usuarioFicha,
-      group.codigoRegistro,
-      group.idGrupo,
       ""
     ),
 
     claveAdministrativa: pick(
+      group.claveAdministrativa,
       ficha.claveAdministrativa,
       ""
     ),
