@@ -946,6 +946,14 @@ function hydrateFicha(group = {}) {
   const ficha = getByPath(group, "ficha") || {};
   const situacion = getByPath(group, "situacion") || {};
 
+  const observacionesFallbackTexto =
+    pick(
+      group.observacionesFicha,
+      ficha.observacionesGenerales,
+      group.observacionesGenerales,
+      ""
+    ) || "";
+
   return {
     solicitudReserva: pick(
       ficha.solicitudReserva,
@@ -980,6 +988,7 @@ function hydrateFicha(group = {}) {
 
     nombrePrograma: pick(
       ficha.nombrePrograma,
+      group.programaOtro,
       group.programa,
       ""
     ),
@@ -989,7 +998,7 @@ function hydrateFicha(group = {}) {
       group.programaPdfUrl,
       ""
     ),
-    
+
     programaPdfNombre: pick(
       ficha.programaPdfNombre,
       group.programaPdfNombre,
@@ -1024,29 +1033,38 @@ function hydrateFicha(group = {}) {
       ficha.categoriaHoteleraContratada,
       group.categoriaHoteleraContratada,
       group.hotel,
+      group.Hotel,
+      group.solicitudHotel,
       ""
     ),
 
     autorizacionGerencia: pick(
       ficha.autorizacionGerencia,
+      group.autorizacionGerencia,
+      group.Autorizacion,
+      group.autorizacion,
       situacion.resumen,
       ""
     ),
 
     descuentoValorBase: pick(
       ficha.descuentoValorBase,
+      group.descuento,
       "NO"
     ),
 
     fechaViajeTexto: pick(
       ficha.fechaViajeTexto,
+      group.fechaDeViaje,
+      group.fechaViaje,
       group.semanaViaje,
-      humanDateLong(group.fechaViaje),
+      group.mesViaje,
       ""
     ),
 
     asistenciaEnViajes: pick(
       ficha.asistenciaEnViajes,
+      group.asistenciaEnViajes,
       group.asistenciaMed,
       ""
     ),
@@ -1080,13 +1098,13 @@ function hydrateFicha(group = {}) {
       group.versionFicha,
       "ORIGINAL"
     ),
-    
+
     tipoVersion: pick(
       ficha.tipoVersion,
       group.tipoVersionFicha,
       "original"
     ),
-    
+
     versionNumero: Number(
       pick(
         ficha.versionNumero,
@@ -1094,10 +1112,11 @@ function hydrateFicha(group = {}) {
         1
       )
     ) || 1,
-    
+
     fechaActualizacionTexto: pick(
       ficha.fechaActualizacionTexto,
-      humanDateLong(group.fechaActualizacionFicha),
+      formatFichaDateText(ficha.fechaActualizacion),
+      formatFichaDateText(group.fechaActualizacionFicha),
       ""
     ),
 
@@ -1117,37 +1136,38 @@ function hydrateFicha(group = {}) {
 
     observacionesHtml: pick(
       ficha.observacionesHtml,
+      plainTextToRichHtml(observacionesFallbackTexto),
       ""
     ),
-    
+
     pdfUrl: pick(
       ficha.pdfUrl,
       group.fichaPdfUrl,
       ""
     ),
-    
+
     pdfNombre: pick(
       ficha.pdfNombre,
       group.fichaPdfNombre,
       ""
     ),
-    
+
     estado: pick(
       ficha.estado,
       group.fichaEstado,
       "pendiente"
     ),
-    
+
     actualizadoPor: pick(
       ficha.actualizadoPor,
       ""
     ),
-    
+
     actualizadoPorCorreo: pick(
       ficha.actualizadoPorCorreo,
       ""
     ),
-    
+
     fechaActualizacion: ficha.fechaActualizacion || group.fechaActualizacionFicha || null
   };
 }
@@ -1259,6 +1279,31 @@ function normalizeSearchLocal(value = "") {
 
 function cleanText(value = "") {
   return String(value || "").trim();
+}
+
+function formatFichaDateText(value = "") {
+  if (!value) return "";
+
+  if (typeof value === "string") {
+    const raw = value.trim();
+    if (!raw) return "";
+
+    const parsed = toDate(raw);
+    return parsed ? humanDateLong(parsed) : raw;
+  }
+
+  const parsed = toDate(value);
+  return parsed ? humanDateLong(parsed) : "";
+}
+
+function plainTextToRichHtml(value = "") {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+
+  return raw
+    .split(/\n+/)
+    .map((line) => `<p>${escapeHtml(line.trim())}</p>`)
+    .join("");
 }
 
 function toDate(value) {
