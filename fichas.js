@@ -1909,11 +1909,13 @@ function hydrateFicha(group = {}) {
       ""
     ),
 
-    version: pick(
-      ficha.version,
-      group.versionFicha,
-      "ORIGINAL"
-    ),
+    version: normalizePlainText(
+      pick(
+        ficha.version,
+        group.versionFicha,
+        "ORIGINAL"
+      )
+    ) || "ORIGINAL",
 
     fechaActualizacionTexto: pick(
       ficha.fechaActualizacionTexto,
@@ -2150,6 +2152,13 @@ function truncateForHistory(value = "", max = 260) {
   if (!text) return "";
   if (text.length <= max) return text;
   return `${text.slice(0, max).trim()}...`;
+}
+
+function normalizePlainText(value = "") {
+  return String(value ?? "")
+    .replace(/\u00a0/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 function isRichField(path = "") {
