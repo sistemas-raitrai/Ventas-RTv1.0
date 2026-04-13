@@ -917,6 +917,10 @@ function normalizeTextUpper(value = "") {
   return String(value || "").trim().toLocaleUpperCase("es-CL");
 }
 
+function normalizeTextUpperLive(value = "") {
+  return String(value || "").toLocaleUpperCase("es-CL");
+}
+
 function normalizeChileMobile(value = "") {
   const raw = String(value || "").trim();
   if (!raw) return "";
@@ -1321,13 +1325,24 @@ function bindUppercaseModalInput(id, afterChange = null) {
 
   el.dataset.upperBound = "1";
 
-  const handler = () => {
-    el.value = normalizeTextUpper(el.value || "");
-    if (typeof afterChange === "function") afterChange();
-  };
+  el.addEventListener("input", () => {
+    const start = el.selectionStart;
+    const end = el.selectionEnd;
 
-  el.addEventListener("input", handler);
-  el.addEventListener("change", handler);
+    el.value = normalizeTextUpperLive(el.value || "");
+
+    try {
+      el.setSelectionRange(start, end);
+    } catch {}
+
+    if (typeof afterChange === "function") afterChange();
+  });
+
+  el.addEventListener("change", () => {
+    el.value = normalizeTextUpper(el.value || "");
+
+    if (typeof afterChange === "function") afterChange();
+  });
 }
 
 function bindPhoneModalInput(id) {
