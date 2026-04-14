@@ -649,6 +649,16 @@ async function saveAssignment(idGrupo) {
     clearProgressStatus();
 
     await loadData();
+
+    alert(
+      isSinAsignar({
+        vendedora: anteriorVendedora,
+        vendedoraCorreo: anteriorVendedoraCorreo,
+        requiereAsignacion: true
+      })
+        ? `El grupo ${idGrupo} fue asignado a ${nuevaVendedora}.`
+        : `El grupo ${idGrupo} fue reasignado a ${nuevaVendedora}.`
+    );
   } catch (error) {
     console.error(error);
     setProgressStatus({
@@ -715,6 +725,8 @@ async function removeAssignment(idGrupo) {
     clearProgressStatus();
 
     await loadData();
+
+    alert(`El grupo ${idGrupo} quedó Sin asignar.`);
   } catch (error) {
     console.error(error);
     setProgressStatus({
