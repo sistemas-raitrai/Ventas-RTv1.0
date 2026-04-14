@@ -3199,6 +3199,113 @@ async function saveSituacion() {
     }
   }
 
+    // Si el grupo venía como legacy, pero recién ahora entra a GANADA
+  // y todavía no tiene firmas reales ni flujo avanzado,
+  // lo dejamos listo para iniciar el flujo nuevo desde cero.
+  if (isGanada) {
+    const flowActual = state.group.flowFicha || {};
+    const fichaEstadoActual = normalizeSearchLocal(
+      state.group?.fichaEstado ||
+      state.group?.ficha?.estado ||
+      ""
+    );
+
+    const hasRealFlowStarted =
+      !!flowActual?.vendedor?.firmado ||
+      !!flowActual?.jefaVentas?.firmado ||
+      !!flowActual?.administracion?.firmado ||
+      !!state.group?.autorizada ||
+      [
+        "lista_vendedor",
+        "revisada_jefa_ventas",
+        "autorizada_admin",
+        "confirmada_pdf",
+        "pdf_confirmado",
+        "ok"
+      ].includes(fichaEstadoActual);
+
+    const veniaLegacy = getFichaFlowMode(state.group) === "legacy";
+
+    if (veniaLegacy && !hasRealFlowStarted) {
+      patch.fichaFlujoModo = "";
+      patch.fichaEstado = "pendiente";
+      patch.firmaVendedor = "";
+      patch.firmaSupervision = "";
+      patch.firmaAdministracion = "";
+      patch.autorizada = false;
+
+      patch.ficha = {
+        ...(state.group.ficha || {}),
+        flujoModo: "",
+        estado: "pendiente",
+        confirmada: false,
+        pdfPendienteGeneracion: false,
+        pdfUrl: "",
+        pdfNombre: ""
+      };
+
+      patch.flowFicha = {
+        ...(state.group.flowFicha || {}),
+        modo: "",
+        legacy: false,
+        estado: "pendiente",
+        requiereActualizacion: false,
+        requiereRefirmaAdministracion: false,
+
+        vendedor: {
+          ...(flowActual.vendedor || {}),
+          firmado: false,
+          firmadoAt: null,
+          firmadoPor: "",
+          firmadoPorCorreo: "",
+          observacion: ""
+        },
+
+        jefaVentas: {
+          ...(flowActual.jefaVentas || {}),
+          firmado: false,
+          firmadoAt: null,
+          firmadoPor: "",
+          firmadoPorCorreo: "",
+          observacion: ""
+        },
+
+        administracion: {
+          ...(flowActual.administracion || {}),
+          firmado: false,
+          firmadoAt: null,
+          firmadoPor: "",
+          firmadoPorCorreo: "",
+          observacion: ""
+        }
+      };
+
+      patch.documentos = {
+        ...(state.group.documentos || {}),
+        fichaGrupo: {
+          ...(state.group.documentos?.fichaGrupo || {}),
+          estado: "pendiente"
+        }
+      };
+
+      if (!sameValue(state.group?.fichaFlujoModo || "", "")) {
+        cambios.push({
+          campo: "fichaFlujoModo",
+          anterior: state.group?.fichaFlujoModo || "",
+          nuevo: ""
+        });
+      }
+
+      if (!sameValue(state.group?.fichaEstado || "", "pendiente")) {
+        cambios.push({
+          campo: "fichaEstado",
+          anterior: state.group?.fichaEstado || "",
+          nuevo: "pendiente"
+        });
+      }
+    }
+  }
+
   // 3) Si queda en ganada, guardar observaciones enriquecidas
   if (isGanada) {
     const adminNuevo = getRichEditorHtml("s_obsAdmin");
