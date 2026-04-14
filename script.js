@@ -45,6 +45,7 @@ import {
 ========================================================= */
 const GITHUB_HOME_URL = "https://sistemas-raitrai.github.io/Ventas-RT/";
 const APODERADO_FILTER_KEY = "ventas_dashboard_apoderado";
+const ALERTAS_COLLECTION = "ventas_alertas";
 
 const searchableInstances = {};
 
@@ -96,8 +97,10 @@ function initSearchableSelect(id, placeholder = "Escribe para buscar...") {
 const state = {
   rows: [],
   rowsById: new Map(),
+  alertRows: [],
   scopedRows: [],
-  fichasPorFirmarRows: []
+  fichasPorFirmarRows: [],
+  alertasCriticasRows: []
 };
 
 /* =========================================================
@@ -508,9 +511,11 @@ function syncAlertRowsByRole(effectiveUser = null) {
     isRegistroRole(user);
 
   const canSeeFichas = !!user;
+  const canSeeAlertasCriticas = !!user;
 
   setAlertRowVisibleByChild("link-sin-asignar", canSeeSinAsignar);
   setAlertRowVisibleByChild("link-fichas-firmar", canSeeFichas);
+  setAlertRowVisibleByChild("link-alertas-criticas", canSeeAlertasCriticas);
   setAlertRowVisibleByChild("count-pendientes", false);
 }
 
@@ -634,13 +639,192 @@ function closeFichasPorFirmarModal() {
   dialog.removeAttribute("open");
 }
 
+function getAlertGroupId(alertRow = {}) {
+  return String(alertRow.idGrupo || alertRow.groupId || "").trim();
+}
+
+function getAlertGroupRow(alertRow = {}) {
+  const groupId = getAlertGroupId(alertRow);
+  if (!groupId) return null;
+  return state.rowsById.get(groupId) || null;
+}
+
+function isCriticalIndexAlert(alertRow = {}) {
+  const nivel = normalizeLoose(alertRow.nivel || "");
+
+  return (
+    nivel === "critica" &&
+    alertRow.activa !== false &&
+    alertRow.resuelta !== true &&
+    alertRow.visibleEnIndex !== false
+  );
+}
+
+function formatAlertDate(value) {
+  const d = timestampLikeToDate(value);
+  if (!d) return "Sin fecha";
+
+  return d.toLocaleString("es-CL", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false
+  });
+}
+
+function getCriticalAlertsForScope(rows = []) {
+  const scopedIds = new Set(
+    dedupeRowsByGroup(rows)
+      .map((row) => getRowId(row))
+      .filter(Boolean)
+  );
+
+  return (state.alertRows || [])
+    .filter((alertRow) => isCriticalIndexAlert(alertRow))
+    .map((alertRow) => ({
+      ...alertRow,
+      _groupRow: getAlertGroupRow(alertRow)
+    }))
+    .filter((alertRow) => {
+      const groupId = getAlertGroupId(alertRow);
+      return !!alertRow._groupRow && scopedIds.has(groupId);
+    })
+    .sort((a, b) => {
+      const diffFecha =
+        (timestampLikeToDate(b.fechaCreacion)?.getTime() || 0) -
+        (timestampLikeToDate(a.fechaCreacion)?.getTime() || 0);
+
+      if (diffFecha !== 0) return diffFecha;
+
+      const aliasA = getAliasColegioSortKey(getRowAlias(a._groupRow || {}));
+      const aliasB = getAliasColegioSortKey(getRowAlias(b._groupRow || {}));
+
+      return aliasA.localeCompare(aliasB, "es", {
+        sensitivity: "base",
+        numeric: true
+      });
+    });
+}
+
+function getAlertasCriticasSubtitulo(user = null) {
+  const effectiveUser = user || getEffectiveUser();
+  if (!effectiveUser) {
+    return "Listado de alertas críticas activas en la vista actual.";
+  }
+
+  if (isVendedorRole(effectiveUser)) {
+    return "Aquí ves solo las alertas críticas activas de tus grupos.";
+  }
+
+  return "Aquí ves las alertas críticas activas según la vista actual del dashboard.";
+}
+
+function renderAlertasCriticasModal(rows = [], effectiveUser = null) {
+  const titleEl = $("alertas-criticas-titulo");
+  const subtitleEl = $("alertas-criticas-subtitulo");
+  const summaryEl = $("alertas-criticas-resumen");
+  const listEl = $("alertas-criticas-lista");
+
+  if (!titleEl || !subtitleEl || !summaryEl || !listEl) return;
+
+  titleEl.textContent = "Alertas críticas";
+  subtitleEl.textContent = getAlertasCriticasSubtitulo(effectiveUser);
+  summaryEl.textContent = rows.length
+    ? `Hay ${rows.length} alerta(s) crítica(s) activa(s) en tu vista actual.`
+    : "No hay alertas críticas activas en esta vista.";
+
+  if (!rows.length) {
+    listEl.innerHTML = `
+      <div style="padding:16px 18px; border:1px solid rgba(60,40,90,.10); border-radius:16px; background:#faf8fd; color:#5d546d;">
+        No hay alertas críticas activas.
+      </div>
+    `;
+    return;
+  }
+
+  listEl.innerHTML = rows.map((alertRow) => {
+    const groupRow = alertRow._groupRow || getAlertGroupRow(alertRow) || {};
+    const idGrupo = getAlertGroupId(alertRow);
+    const alias = getRowAlias(groupRow) || alertRow.aliasGrupo || `Grupo ${idGrupo}`;
+    const vendedor = getRowVendorName(groupRow) || groupRow.vendedoraCorreo || "Sin vendedor";
+    const creadoPor = String(alertRow.creadoPor || alertRow.creadoPorCorreo || "Sin autor").trim() || "Sin autor";
+    const fecha = formatAlertDate(alertRow.fechaCreacion);
+    const titulo = String(alertRow.titulo || "Alerta crítica").trim();
+    const mensaje = String(alertRow.mensaje || "Sin detalle").trim();
+
+    return `
+      <div style="padding:14px 16px; border:1px solid rgba(60,40,90,.12); border-radius:16px; background:#fff; display:flex; justify-content:space-between; gap:14px; align-items:flex-start;">
+        <div style="min-width:0;">
+          <div style="font-weight:800; color:#31194b; font-size:16px; line-height:1.2;">
+            ${escapeHtml(alias)}
+          </div>
+
+          <div style="margin-top:6px; color:#6a6078; font-size:13px; line-height:1.45;">
+            Vendedor(a): ${escapeHtml(vendedor)}<br>
+            Título: ${escapeHtml(titulo)}<br>
+            Creada por: ${escapeHtml(creadoPor)}<br>
+            Fecha: ${escapeHtml(fecha)}
+          </div>
+
+          <div style="margin-top:10px; color:#3e3550; font-size:14px; line-height:1.5;">
+            ${escapeHtml(mensaje)}
+          </div>
+        </div>
+
+        <a
+          href="grupo.html?id=${encodeURIComponent(idGrupo)}"
+          target="_blank"
+          rel="noopener"
+          style="flex:0 0 auto; text-decoration:none; background:#3b2357; color:#fff; border-radius:999px; padding:10px 14px; font-weight:700; white-space:nowrap;"
+        >
+          Abrir grupo
+        </a>
+      </div>
+    `;
+  }).join("");
+}
+
+function openAlertasCriticasModal() {
+  const dialog = $("modal-alertas-criticas");
+  if (!dialog) return;
+
+  const effectiveUser = getEffectiveUser();
+  const rows = Array.isArray(state.alertasCriticasRows) ? state.alertasCriticasRows : [];
+
+  renderAlertasCriticasModal(rows, effectiveUser);
+
+  if (typeof dialog.showModal === "function") {
+    if (!dialog.open) dialog.showModal();
+    return;
+  }
+
+  dialog.setAttribute("open", "open");
+}
+
+function closeAlertasCriticasModal() {
+  const dialog = $("modal-alertas-criticas");
+  if (!dialog) return;
+
+  if (typeof dialog.close === "function") {
+    dialog.close();
+    return;
+  }
+
+  dialog.removeAttribute("open");
+}
+
 /* =========================================================
    CARGA DE DATOS
 ========================================================= */
 async function loadDashboardData() {
-  const snap = await getDocs(collection(db, "ventas_cotizaciones"));
+  const [groupsSnap, alertsSnap] = await Promise.all([
+    getDocs(collection(db, "ventas_cotizaciones")),
+    getDocs(collection(db, ALERTAS_COLLECTION))
+  ]);
 
-  state.rows = snap.docs.map((docSnap) => {
+  state.rows = groupsSnap.docs.map((docSnap) => {
     const data = docSnap.data() || {};
     return {
       id: docSnap.id,
@@ -652,6 +836,11 @@ async function loadDashboardData() {
   state.rowsById = new Map(
     state.rows.map((row) => [getRowId(row), row])
   );
+
+  state.alertRows = alertsSnap.docs.map((docSnap) => ({
+    id: docSnap.id,
+    ...docSnap.data()
+  }));
 }
 
 /* =========================================================
@@ -786,6 +975,7 @@ function renderSingleTotalLink(targetId, bucket, count = 0) {
 function inicializarDashboardEnCeros() {
   state.scopedRows = [];
   state.fichasPorFirmarRows = [];
+  state.alertasCriticasRows = [];
   
   const setText = (id, value) => {
     const el = $(id);
@@ -799,6 +989,7 @@ function inicializarDashboardEnCeros() {
   setAlertCountLink("count-a-contactar", 0, "a_contactar");
   setAlertHref("link-a-contactar", "a_contactar");
   setText("count-fichas-firmar", "0");
+  setText("count-alertas-criticas", "0");
   setText("count-reunion-3dias", "0");
   
   syncAlertRowsByRole(effectiveUser);
@@ -837,6 +1028,9 @@ function renderDashboard(rows = []) {
 
   const fichasPorFirmar = getFichasPorFirmarSegunUsuario(scopedRows, effectiveUser);
   state.fichasPorFirmarRows = fichasPorFirmar;
+  
+  const alertasCriticas = getCriticalAlertsForScope(scopedRows);
+  state.alertasCriticasRows = alertasCriticas;
 
   const canSeeGlobalSinAsignar =
     isAdminDashboardRole(effectiveUser) ||
@@ -858,6 +1052,7 @@ function renderDashboard(rows = []) {
   setAlertHref("link-a-contactar", "a_contactar");
 
   setText("count-fichas-firmar", fichasPorFirmar.length);
+  setText("count-alertas-criticas", alertasCriticas.length);
   setText("count-reunion-3dias", reuniones3DiasRows.length);
 
   syncAlertRowsByRole(effectiveUser);
@@ -1235,7 +1430,10 @@ async function initPage() {
   const linkFichasFirmar = $("link-fichas-firmar");
   const btnCerrarFichasFirmar = $("btn-cerrar-fichas-firmar");
   const modalFichasFirmar = $("modal-fichas-firmar");
-
+  
+  const linkAlertasCriticas = $("link-alertas-criticas");
+  const btnCerrarAlertasCriticas = $("btn-cerrar-alertas-criticas");
+  const modalAlertasCriticas = $("modal-alertas-criticas");
   const selectGrupo = $("select-grupo");
   const selectApoderado = $("select-apoderado");
 
@@ -1320,12 +1518,39 @@ async function initPage() {
     });
   }
 
+  if (linkAlertasCriticas && !linkAlertasCriticas.dataset.bound) {
+  linkAlertasCriticas.dataset.bound = "1";
+
+  linkAlertasCriticas.addEventListener("click", (e) => {
+    e.preventDefault();
+    openAlertasCriticasModal();
+    });
+  }
+  
+  if (btnCerrarAlertasCriticas && !btnCerrarAlertasCriticas.dataset.bound) {
+    btnCerrarAlertasCriticas.dataset.bound = "1";
+  
+    btnCerrarAlertasCriticas.addEventListener("click", () => {
+      closeAlertasCriticasModal();
+    });
+  }
+
   if (modalFichasFirmar && !modalFichasFirmar.dataset.bound) {
     modalFichasFirmar.dataset.bound = "1";
 
     modalFichasFirmar.addEventListener("click", (e) => {
       if (e.target === modalFichasFirmar) {
         closeFichasPorFirmarModal();
+      }
+    });
+  }
+
+  if (modalAlertasCriticas && !modalAlertasCriticas.dataset.bound) {
+    modalAlertasCriticas.dataset.bound = "1";
+  
+    modalAlertasCriticas.addEventListener("click", (e) => {
+      if (e.target === modalAlertasCriticas) {
+        closeAlertasCriticasModal();
       }
     });
   }
