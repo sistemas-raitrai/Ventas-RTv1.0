@@ -308,6 +308,39 @@ function getExactCarteraOptionByInput() {
   );
 }
 
+function getAssignmentDecision(carteraOpt = null) {
+  const isVendor = state.effectiveUser?.rol === "vendedor";
+  const ownerEmail = normalizeEmail(carteraOpt?.vendedoraCorreo || "");
+  const ownerName = normalizeText(carteraOpt?.vendedora || "");
+
+  const currentVendorEmails = isVendor
+    ? getVentasUserEmails(state.effectiveUser).map(normalizeEmail)
+    : [];
+
+  const belongsToEffectiveVendor =
+    !!carteraOpt &&
+    !!ownerEmail &&
+    currentVendorEmails.includes(ownerEmail);
+
+  if (carteraOpt) {
+    return {
+      vendedora: ownerName || "Sin asignar",
+      vendedoraCorreo: ownerEmail,
+      requiereAsignacion: false,
+      estado: belongsToEffectiveVendor ? "Contactado" : "A contactar",
+      esPropia: belongsToEffectiveVendor
+    };
+  }
+
+  return {
+    vendedora: "Sin asignar",
+    vendedoraCorreo: "",
+    requiereAsignacion: true,
+    estado: "A contactar",
+    esPropia: false
+  };
+}
+
 function ensureComunaDatalist() {
   const comunaInput = $("comunaCiudad");
   if (!comunaInput) return null;
@@ -446,14 +479,12 @@ async function loadCarteraOptions() {
     progress: 15
   });
 
-  let sellerEmails = [];
-
-  if (state.effectiveUser?.rol === "vendedor") {
-    sellerEmails = getVentasUserEmails(state.effectiveUser);
-  } else {
-    const sellersSnap = await getDocs(collection(db, "ventas_cartera"));
-    sellerEmails = sellersSnap.docs.map(d => normalizeEmail(d.id));
-  }
+  const sellersSnap = await getDocs(collection(db, "ventas_cartera"));
+  const sellerEmails = [...new Set(
+    sellersSnap.docs
+      .map(d => normalizeEmail(d.id))
+      .filter(Boolean)
+  )];
 
   const map = new Map();
 
@@ -550,15 +581,17 @@ function updateSchoolModeUI() {
   const vendedoraPreview = $("vendedoraPreview");
   const estadoPreview = $("estadoPreview");
   const comunaCiudad = $("comunaCiudad");
-  const isVendor = state.effectiveUser?.rol === "vendedor";
+  const comunaInput = normalizeSearch($("comunaCiudad")?.value || "");
 
   updateComunaSuggestionsByColegio();
 
   if (!inputColegio || !vendedoraPreview || !estadoPreview) return;
 
   if (matched) {
-    vendedoraPreview.textContent = matched.vendedora || "—";
-    estadoPreview.textContent = isVendor ? "Contactado" : "A contactar";
+    const assignment = getAssignmentDecision(matched);
+
+    vendedoraPreview.textContent = assignment.vendedora || "—";
+    estadoPreview.textContent = assignment.estado || "—";
 
     if (comunaCiudad && !normalizeText(comunaCiudad.value)) {
       comunaCiudad.value = matched.comuna || "";
@@ -566,15 +599,15 @@ function updateSchoolModeUI() {
     }
   } else {
     if (normalizeText(inputColegio.value)) {
-      if (colegioMatches.length > 1) {
+      // Solo obligamos a distinguir comuna si hay varios colegios con el mismo nombre
+      // y todavía no se ha indicado una comuna.
+      if (colegioMatches.length > 1 && !comunaInput) {
         vendedoraPreview.textContent = "Selecciona comuna";
         estadoPreview.textContent = "Pendiente";
-      } else if (isVendor) {
-        vendedoraPreview.textContent = "No permitido";
-        estadoPreview.textContent = "No permitido";
       } else {
-        vendedoraPreview.textContent = "Sin asignar";
-        estadoPreview.textContent = "A contactar";
+        const assignment = getAssignmentDecision(null);
+        vendedoraPreview.textContent = assignment.vendedora;
+        estadoPreview.textContent = assignment.estado;
       }
     } else {
       vendedoraPreview.textContent = "—";
@@ -663,7 +696,11 @@ function validateForm(data) {
   if (!data.aliasGrupo || !data.aliasTripKey) {
     return "No se pudo construir el alias del grupo.";
   }
-  
+
+  if (data.colegioMatchesCount > 1 && !data.esCartera && !data.comunaCiudad) {
+    return "Debes indicar la comuna o ciudad para distinguir colegios con el mismo nombre en cartera.";
+  }
+
   // Si no quedó en cartera, igual debe poder guardarse,
   // pero la comuna sigue siendo obligatoria para identificar bien el colegio.
   if (!data.esCartera && !data.comunaCiudad) {
@@ -727,10 +764,6 @@ function validateForm(data) {
     return "Debes especificar el otro destino secundario.";
   }
 
-  if (state.effectiveUser?.rol === "vendedor" && !data.esCartera) {
-    return "Como vendedor(a), solo puedes registrar cotizaciones de colegios que pertenezcan a tu cartera.";
-  }
-
   return "";
 }
 
@@ -738,7 +771,7 @@ function readFormData() {
   const carteraOpt = getExactCarteraOptionByInput();
   const colegioMatches = getCarteraOptionsByColegioInput();
   const esCartera = !!carteraOpt;
-  const isVendor = state.effectiveUser?.rol === "vendedor";
+  const assignment = getAssignmentDecision(carteraOpt);
 
   const colegio = normalizeText($("inputColegio")?.value || "");
   const comunaInput = normalizeText($("comunaCiudad")?.value || "");
@@ -781,12 +814,10 @@ function readFormData() {
     colegioBase: esCartera ? normalizeText(carteraOpt?.colegioBase || carteraOpt?.colegio || "") : colegio,
     carteraNumeroColegio: esCartera ? normalizeText(carteraOpt?.numeroColegio || "") : "",
     carteraCorreoVendedora: esCartera ? normalizeEmail(carteraOpt?.vendedoraCorreo || "") : "",
-    vendedora: esCartera ? normalizeText(carteraOpt?.vendedora || "") : "Sin asignar",
-    vendedoraCorreo: esCartera ? normalizeEmail(carteraOpt?.vendedoraCorreo || "") : "",
-    requiereAsignacion: !esCartera,
-    estado: esCartera
-      ? (isVendor ? "Contactado" : "A contactar")
-      : "A contactar",
+    vendedora: assignment.vendedora,
+    vendedoraCorreo: assignment.vendedoraCorreo,
+    requiereAsignacion: assignment.requiereAsignacion,
+    estado: assignment.estado,
 
     curso,
     anoBaseCurso: String(anoBaseCurso),
