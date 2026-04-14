@@ -6,6 +6,179 @@
   <title>Asignación Comercial | Sistema Ventas RT</title>
   <link rel="stylesheet" href="estilos.css" />
   <link rel="icon" type="image/png" href="IMG/logo-raitrai.png" />
+<style>
+  .assignment-alert-card{
+    width:min(980px, 100%);
+  }
+
+  .assignment-alert-body{
+    padding:18px;
+    display:flex;
+    flex-direction:column;
+    gap:12px;
+    max-height:72vh;
+    overflow:hidden;
+  }
+
+  .assignment-alert-summary{
+    background:#faf8fd;
+    border:1px solid #d8c9ef;
+    border-radius:12px;
+    padding:12px 14px;
+    color:#4a4760;
+    font-size:14px;
+    line-height:1.45;
+  }
+
+  .assignment-alert-list{
+    display:flex;
+    flex-direction:column;
+    gap:12px;
+    overflow:auto;
+    padding-right:4px;
+  }
+
+  .assignment-alert-empty{
+    border:1px dashed #d8c9ef;
+    border-radius:12px;
+    background:#faf8fd;
+    padding:16px;
+    color:#5b5866;
+    font-size:14px;
+  }
+
+  .assignment-alert-item{
+    border:1px solid #d8c9ef;
+    border-radius:14px;
+    background:#fff;
+    padding:14px;
+    box-shadow:0 8px 20px rgba(66, 36, 98, .06);
+  }
+
+  .assignment-alert-top{
+    display:flex;
+    align-items:flex-start;
+    justify-content:space-between;
+    gap:12px;
+    flex-wrap:wrap;
+    margin-bottom:8px;
+  }
+
+  .assignment-alert-title{
+    margin:0;
+    font-size:15px;
+    font-weight:700;
+    color:var(--header);
+  }
+
+  .assignment-alert-meta{
+    font-size:12px;
+    color:#6b6475;
+    margin-top:4px;
+  }
+
+  .assignment-alert-tags{
+    display:flex;
+    gap:8px;
+    flex-wrap:wrap;
+  }
+
+  .assignment-pill{
+    display:inline-flex;
+    align-items:center;
+    gap:6px;
+    padding:6px 10px;
+    border-radius:999px;
+    font-size:12px;
+    font-weight:700;
+    line-height:1;
+    white-space:nowrap;
+  }
+
+  .assignment-pill.high{
+    background:#fde7e7;
+    color:#a11d1d;
+    border:1px solid #efb0b0;
+  }
+
+  .assignment-pill.medium{
+    background:#fff3dd;
+    color:#8a5a00;
+    border:1px solid #f1d08a;
+  }
+
+  .assignment-pill.low{
+    background:#eaf3ff;
+    color:#1e4f91;
+    border:1px solid #bdd4f4;
+  }
+
+  .assignment-pill.other{
+    background:#f3e8ff;
+    color:#6e2bb8;
+    border:1px solid #d4b8f8;
+  }
+
+  .assignment-pill.unassigned{
+    background:#eef2f7;
+    color:#475467;
+    border:1px solid #d0d5dd;
+  }
+
+  .assignment-pill.same{
+    background:#e7f8ee;
+    color:#18794e;
+    border:1px solid #b7e3ca;
+  }
+
+  .assignment-alert-grid{
+    display:grid;
+    grid-template-columns:repeat(2, minmax(0, 1fr));
+    gap:8px 14px;
+    margin:10px 0 12px;
+  }
+
+  .assignment-alert-row{
+    font-size:13px;
+    color:#4f4b5f;
+    line-height:1.4;
+  }
+
+  .assignment-alert-row strong{
+    color:var(--header);
+  }
+
+  .assignment-alert-reasons{
+    margin:0 0 12px;
+    padding-left:18px;
+    color:#4f4b5f;
+    font-size:13px;
+  }
+
+  .assignment-alert-reasons li{
+    margin:0 0 4px;
+  }
+
+  .assignment-alert-link{
+    display:inline-flex;
+    align-items:center;
+    gap:6px;
+    color:var(--header);
+    font-weight:700;
+    text-decoration:none;
+  }
+
+  .assignment-alert-link:hover{
+    text-decoration:underline;
+  }
+
+  @media (max-width: 760px){
+    .assignment-alert-grid{
+      grid-template-columns:1fr;
+    }
+  }
+</style>
+  
 </head>
 <body class="ventas-body" data-page="asignados">
 
@@ -104,21 +277,6 @@
     </section>
   </main>
   
-  <div id="historyModal" class="simple-modal">
-    <div class="simple-modal-card">
-      <div class="simple-modal-head">
-        <h3 id="historyTitle">Historial de asignación</h3>
-        <button id="historyCloseBtn" type="button" class="modal-close-btn">✕</button>
-      </div>
-  
-      <div id="historyBody" class="history-body"></div>
-  
-      <div class="simple-modal-actions">
-        <button id="historyCloseBtn2" type="button" class="btn-page sec">Cerrar</button>
-      </div>
-    </div>
-  </div>
-
   <!-- MODAL HISTORIAL -->
   <div id="historyModal" class="simple-modal">
     <div class="simple-modal-card">
@@ -130,7 +288,32 @@
       <div id="historyBody" class="history-body"></div>
 
       <div class="simple-modal-actions">
-        <button id="historyCloseBtn2" type="button" class="btn-secondary">Cerrar</button>
+        <button id="historyCloseBtn2" type="button" class="btn-page sec">Cerrar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL ALERTA PREVIA DE ASIGNACIÓN -->
+  <div id="assignmentAlertModal" class="simple-modal">
+    <div class="simple-modal-card assignment-alert-card">
+      <div class="simple-modal-head">
+        <h3 id="assignmentAlertTitle">Posibles coincidencias comerciales</h3>
+        <button id="assignmentAlertCloseBtn" type="button" class="modal-close-btn">✕</button>
+      </div>
+
+      <div class="assignment-alert-body">
+        <div id="assignmentAlertSummary" class="assignment-alert-summary">
+          Se encontraron grupos parecidos antes de guardar la asignación.
+        </div>
+
+        <div id="assignmentAlertList" class="assignment-alert-list">
+          <div class="assignment-alert-empty">No hay coincidencias para mostrar.</div>
+        </div>
+      </div>
+
+      <div class="simple-modal-actions">
+        <button id="assignmentAlertBackBtn" type="button" class="btn-page sec">Volver y revisar</button>
+        <button id="assignmentAlertContinueBtn" type="button" class="btn-page">Asignar igualmente</button>
       </div>
     </div>
   </div>
