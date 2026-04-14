@@ -312,6 +312,137 @@
       cursor:not-allowed;
     }
 
+        .alert-review-summary{
+      margin-top:8px;
+      padding:12px 14px;
+      border:1px solid #d9cfee;
+      border-radius:12px;
+      background:#faf8fd;
+      color:#4a4760;
+      font-size:14px;
+      line-height:1.45;
+    }
+
+    .alert-review-list{
+      display:flex;
+      flex-direction:column;
+      gap:12px;
+      margin-top:14px;
+      max-height:46vh;
+      overflow:auto;
+      padding-right:4px;
+    }
+
+    .alert-review-empty{
+      border:1px dashed #cdbfe4;
+      border-radius:12px;
+      background:#faf8fd;
+      padding:16px;
+      color:#5b5866;
+      font-size:14px;
+    }
+
+    .alert-review-card{
+      border:1px solid #d8c9ef;
+      border-radius:14px;
+      background:#fff;
+      padding:14px;
+      box-shadow:0 8px 20px rgba(66, 36, 98, .06);
+    }
+
+    .alert-review-top{
+      display:flex;
+      align-items:flex-start;
+      justify-content:space-between;
+      gap:12px;
+      flex-wrap:wrap;
+      margin-bottom:8px;
+    }
+
+    .alert-review-title{
+      font-size:15px;
+      font-weight:700;
+      color:var(--header);
+      margin:0;
+    }
+
+    .alert-review-tags{
+      display:flex;
+      gap:8px;
+      flex-wrap:wrap;
+    }
+
+    .alert-pill{
+      display:inline-flex;
+      align-items:center;
+      gap:6px;
+      padding:6px 10px;
+      border-radius:999px;
+      font-size:12px;
+      font-weight:700;
+      line-height:1;
+      white-space:nowrap;
+    }
+
+    .alert-pill.high{
+      background:#fde7e7;
+      color:#a11d1d;
+      border:1px solid #efb0b0;
+    }
+
+    .alert-pill.medium{
+      background:#fff3dd;
+      color:#8a5a00;
+      border:1px solid #f1d08a;
+    }
+
+    .alert-pill.low{
+      background:#eaf3ff;
+      color:#1e4f91;
+      border:1px solid #bdd4f4;
+    }
+
+    .alert-review-grid{
+      display:grid;
+      grid-template-columns:repeat(2, minmax(0, 1fr));
+      gap:8px 14px;
+      margin:10px 0 12px;
+    }
+
+    .alert-review-row{
+      font-size:13px;
+      color:#4f4b5f;
+      line-height:1.4;
+    }
+
+    .alert-review-row strong{
+      color:var(--header);
+    }
+
+    .alert-review-reasons{
+      margin:0 0 12px;
+      padding-left:18px;
+      color:#4f4b5f;
+      font-size:13px;
+    }
+
+    .alert-review-reasons li{
+      margin:0 0 4px;
+    }
+
+    .alert-review-link{
+      display:inline-flex;
+      align-items:center;
+      gap:6px;
+      color:var(--header);
+      font-weight:700;
+      text-decoration:none;
+    }
+
+    .alert-review-link:hover{
+      text-decoration:underline;
+    }
+
     @media (max-width: 980px){
       .registro-form{
         grid-template-columns:repeat(6, minmax(0, 1fr));
@@ -600,7 +731,7 @@
       
           <div class="success-body modal-body modal-body-stack">
             <div class="success-row" style="margin-bottom:8px; font-weight:700;">
-              ¿Deseas registrar otro contacto o ir al archivo del grupo?
+              ¿Deseas registrar otro contacto o ir al Portafolio del Grupo?
             </div>
       
             <div class="success-row"><strong>Código:</strong> <span id="successCodigo">—</span></div>
@@ -612,7 +743,34 @@
       
           <div class="success-actions modal-foot">
             <button id="btnNuevoRegistro" class="btn-page sec" type="button">Registrar otro contacto</button>
-            <button id="btnIrRegistro" class="btn-page green" type="button">Ir al archivo del grupo</button>
+            <button id="btnIrRegistro" class="btn-page green" type="button">Ir al Portafolio del Grupo</button>
+          </div>
+        </div>
+      </div>
+
+            <div id="alertReviewModal" class="success-backdrop modal-backdrop">
+        <div class="success-card modal-card" style="width:min(980px, 100%);">
+          <div class="success-head modal-head" style="background:#6b4ea2;">
+            <h3>Posibles coincidencias encontradas</h3>
+          </div>
+
+          <div class="success-body modal-body modal-body-stack">
+            <div class="success-row" style="font-weight:700;">
+              Antes de registrar, revisa si este grupo podría ya existir o estar relacionado con otro.
+            </div>
+
+            <div id="alertReviewSummary" class="alert-review-summary">
+              Se encontraron posibles coincidencias.
+            </div>
+
+            <div id="alertReviewList" class="alert-review-list">
+              <div class="alert-review-empty">No hay coincidencias para mostrar.</div>
+            </div>
+          </div>
+
+          <div class="success-actions modal-foot">
+            <button id="btnAlertReviewBack" class="btn-page sec" type="button">No, volver y corregir</button>
+            <button id="btnAlertReviewContinue" class="btn-page green" type="button">Sí, registrar igualmente</button>
           </div>
         </div>
       </div>
