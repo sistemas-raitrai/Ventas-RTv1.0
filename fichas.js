@@ -519,22 +519,9 @@ function canRequestFichaUpdate() {
   if (!canAccessGroup(state.group)) return false;
   if (!canOpenFicha()) return false;
 
-  const fichaMode = getFichaFlowMode(state.group);
-  const fichaEstado = normalizeSearchLocal(state.group?.fichaEstado || state.ficha?.estado || "");
-  const finalStates = new Set([
-    "lista_vendedor",
-    "revisada_jefa_ventas",
-    "autorizada_admin",
-    "confirmada_pdf",
-    "ok"
-  ]);
-
-  return (
-    fichaMode === "legacy" ||
-    isVendorLockedByFlow(state.group) ||
-    !!state.group?.autorizada ||
-    finalStates.has(fichaEstado)
-  );
+  // Solo puede pedir actualización cuando ya existe
+  // una firma real de vendedor en este sistema.
+  return !!state.group?.flowFicha?.vendedor?.firmado;
 }
 
 async function markPendingFichaUpdateRequestsAsCompleted({
@@ -947,7 +934,6 @@ function syncButtons() {
   const tienePrograma = hasProgramaPdf();
   const flow = state.group?.flowFicha || {};
   const isGanada = normalizeState(state.group?.estado) === "ganada";
-  const isLegacy = getFichaFlowMode(state.group) === "legacy";
   const pendingUpdate = hasPendingUpdateRequest();
 
   const btnGuardar = $("btnGuardarFicha");
@@ -994,14 +980,13 @@ function syncButtons() {
 
   const btnVend = $("btnFirmarFichaVendedor");
   if (btnVend) {
-    btnVend.classList.toggle("hidden", !isVendorRole() || isLegacy);
+    btnVend.classList.toggle("hidden", !isVendorRole());
     btnVend.disabled =
       !isVendorRole() ||
       !editable ||
       !isGanada ||
       !tienePrograma ||
       !!flow?.vendedor?.firmado ||
-      isLegacy ||
       state.isUploadingProgramaPdf;
   }
 
