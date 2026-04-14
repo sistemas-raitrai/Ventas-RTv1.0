@@ -360,7 +360,7 @@ function toUppercaseLive(value = "") {
 }
 
 function forceUppercaseInputValue(el) {
-  if (!el || el.id === "correoCliente") return;
+  if (!el || el.id === "correoCliente" || el.id === "correoCliente2") return;
 
   const next = toUppercaseLive(el.value || "");
   if (el.value === next) return;
@@ -682,6 +682,27 @@ function validateForm(data) {
     return "Debes ingresar al menos correo o celular del cliente.";
   }
 
+    const hasSecondContactData = Boolean(
+    data.nombreCliente2 ||
+    data.rolCliente2 ||
+    data.correoCliente2 ||
+    data.celularCliente2
+  );
+
+  if (hasSecondContactData) {
+    if (!data.nombreCliente2) {
+      return "Si registras 2° contacto, debes indicar el nombre.";
+    }
+
+    if (!data.rolCliente2) {
+      return "Si registras 2° contacto, debes seleccionar el rol.";
+    }
+
+    if (!data.correoCliente2 && !data.celularCliente2) {
+      return "Si registras 2° contacto, debes ingresar correo o celular.";
+    }
+  }
+
   if (!data.origenCliente) {
     return "Debes seleccionar el origen del cliente.";
   }
@@ -779,6 +800,12 @@ function readFormData() {
     rolCliente: normalizeText($("rolCliente")?.value || ""),
     correoCliente: normalizeEmail($("correoCliente")?.value || ""),
     celularCliente: normalizeText($("celularCliente")?.value || ""),
+
+    nombreCliente2: normalizeText($("nombreCliente2")?.value || ""),
+    rolCliente2: normalizeText($("rolCliente2")?.value || ""),
+    correoCliente2: normalizeEmail($("correoCliente2")?.value || ""),
+    celularCliente2: normalizeText($("celularCliente2")?.value || ""),
+
     origenCliente: normalizeText($("origenCliente")?.value || ""),
     origenEspecificacion: normalizeText($("origenEspecificacion")?.value || ""),
     origenEspecificacionOtro: normalizeText($("origenEspecificacionOtro")?.value || ""),
@@ -944,7 +971,12 @@ async function saveRegistro(e) {
       rolCliente: data.rolCliente,
       correoCliente: data.correoCliente,
       celularCliente: data.celularCliente,
-    
+
+      nombreCliente2: data.nombreCliente2,
+      rolCliente2: data.rolCliente2,
+      correoCliente2: data.correoCliente2,
+      celularCliente2: data.celularCliente2,
+
       origenCliente: data.origenCliente,
       origenEspecificacion: data.origenEspecificacion,
       origenEspecificacionOtro: data.origenEspecificacionOtro,
@@ -1026,6 +1058,11 @@ function bindPageEvents() {
   const celularCliente = $("celularCliente");
   const correoCliente = $("correoCliente");
   const rolCliente = $("rolCliente");
+
+  const nombreCliente2 = $("nombreCliente2");
+  const celularCliente2 = $("celularCliente2");
+  const correoCliente2 = $("correoCliente2");
+  const rolCliente2 = $("rolCliente2");
   const origenCliente = $("origenCliente");
   const origenEspecificacion = $("origenEspecificacion");
   const origenEspecificacionOtro = $("origenEspecificacionOtro");
@@ -1040,6 +1077,7 @@ function bindPageEvents() {
 
   // Visualmente dejamos los selects en mayúscula, pero sin tocar sus values internos
   uppercaseSelectOptionLabels(rolCliente);
+  uppercaseSelectOptionLabels(rolCliente2);
   uppercaseSelectOptionLabels(origenCliente);
   uppercaseSelectOptionLabels(origenEspecificacion);
   uppercaseSelectOptionLabels(destinoPrincipal);
@@ -1049,6 +1087,8 @@ function bindPageEvents() {
   bindUppercaseField(comunaCiudad, updateSchoolModeUI);
   bindUppercaseField(nombreCliente);
   bindUppercaseField(celularCliente);
+  bindUppercaseField(nombreCliente2);
+  bindUppercaseField(celularCliente2);
   bindUppercaseField(origenEspecificacionOtro);
   bindUppercaseField(destinoPrincipalOtro);
   bindUppercaseField(destinoSecundarioOtro);
@@ -1104,6 +1144,16 @@ function bindPageEvents() {
     });
     correoCliente.addEventListener("change", () => {
       correoCliente.value = String(correoCliente.value || "").trim();
+    });
+  }
+
+    if (correoCliente2 && !correoCliente2.dataset.bound) {
+    correoCliente2.dataset.bound = "1";
+    correoCliente2.addEventListener("input", () => {
+      correoCliente2.value = String(correoCliente2.value || "").trim();
+    });
+    correoCliente2.addEventListener("change", () => {
+      correoCliente2.value = String(correoCliente2.value || "").trim();
     });
   }
 
