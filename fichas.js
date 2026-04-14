@@ -99,6 +99,189 @@ const FICHA_FIELDS = [
   "pdfNombre"
 ];
 
+const TOAST_HOST_ID = "appToastHost";
+let toastUiReady = false;
+
+function ensureToastUi() {
+  if (!toastUiReady) {
+    const style = document.createElement("style");
+    style.id = "app-toast-styles";
+    style.textContent = `
+      #${TOAST_HOST_ID}{
+        position: fixed;
+        top: 18px;
+        right: 18px;
+        z-index: 99999;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        pointer-events: none;
+      }
+
+      .app-toast{
+        --toast-accent: #6d5dfc;
+        min-width: 320px;
+        max-width: min(420px, calc(100vw - 36px));
+        display: grid;
+        grid-template-columns: auto 1fr auto;
+        gap: 10px;
+        align-items: start;
+        padding: 12px 12px 12px 12px;
+        border-radius: 16px;
+        border: 1px solid rgba(61, 41, 92, 0.10);
+        border-left: 5px solid var(--toast-accent);
+        background: #ffffff;
+        box-shadow: 0 14px 34px rgba(41, 27, 61, 0.18);
+        color: #2d1b45;
+        opacity: 0;
+        transform: translateY(-8px) scale(0.98);
+        transition: opacity .18s ease, transform .18s ease;
+        pointer-events: auto;
+        font-size: 14px;
+      }
+
+      .app-toast.show{
+        opacity: 1;
+        transform: translateY(0) scale(1);
+      }
+
+      .app-toast.success{
+        --toast-accent: #2ca56f;
+        background: #f3fcf7;
+      }
+
+      .app-toast.error{
+        --toast-accent: #d94b61;
+        background: #fff6f7;
+      }
+
+      .app-toast.warning{
+        --toast-accent: #d89b1d;
+        background: #fffaf1;
+      }
+
+      .app-toast.info{
+        --toast-accent: #7a5cf0;
+        background: #f7f4ff;
+      }
+
+      .app-toast__icon{
+        width: 26px;
+        height: 26px;
+        border-radius: 999px;
+        display: grid;
+        place-items: center;
+        font-size: 14px;
+        font-weight: 700;
+        background: rgba(109, 93, 252, 0.10);
+        color: var(--toast-accent);
+        margin-top: 1px;
+      }
+
+      .app-toast__message{
+        line-height: 1.35;
+        white-space: pre-wrap;
+        word-break: break-word;
+        padding-top: 2px;
+      }
+
+      .app-toast__close{
+        border: 0;
+        background: transparent;
+        color: #6f6484;
+        cursor: pointer;
+        font-size: 18px;
+        line-height: 1;
+        padding: 0 2px;
+      }
+
+      .app-toast__close:hover{
+        color: #2d1b45;
+      }
+
+      @media (max-width: 640px){
+        #${TOAST_HOST_ID}{
+          top: 12px;
+          right: 12px;
+          left: 12px;
+        }
+
+        .app-toast{
+          min-width: 0;
+          max-width: 100%;
+        }
+      }
+    `;
+    document.head.appendChild(style);
+    toastUiReady = true;
+  }
+
+  let host = document.getElementById(TOAST_HOST_ID);
+  if (!host) {
+    host = document.createElement("div");
+    host.id = TOAST_HOST_ID;
+    document.body.appendChild(host);
+  }
+
+  return host;
+}
+
+function removeToast(toastEl) {
+  if (!toastEl || toastEl.dataset.closing === "1") return;
+
+  toastEl.dataset.closing = "1";
+  toastEl.classList.remove("show");
+
+  setTimeout(() => {
+    toastEl.remove();
+  }, 220);
+}
+
+function showToast(message = "", type = "success", { duration = 3200 } = {}) {
+  const text = String(message || "").trim();
+  if (!text) return;
+
+  const host = ensureToastUi();
+
+  const iconMap = {
+    success: "✓",
+    error: "✕",
+    warning: "!",
+    info: "i"
+  };
+
+  const toast = document.createElement("div");
+  toast.className = `app-toast ${type}`;
+
+  const icon = document.createElement("div");
+  icon.className = "app-toast__icon";
+  icon.textContent = iconMap[type] || "i";
+
+  const body = document.createElement("div");
+  body.className = "app-toast__message";
+  body.textContent = text;
+
+  const closeBtn = document.createElement("button");
+  closeBtn.type = "button";
+  closeBtn.className = "app-toast__close";
+  closeBtn.setAttribute("aria-label", "Cerrar aviso");
+  closeBtn.textContent = "×";
+  closeBtn.addEventListener("click", () => removeToast(toast));
+
+  toast.appendChild(icon);
+  toast.appendChild(body);
+  toast.appendChild(closeBtn);
+  host.appendChild(toast);
+
+  requestAnimationFrame(() => {
+    toast.classList.add("show");
+  });
+
+  setTimeout(() => {
+    removeToast(toast);
+  }, duration);
+}
+
 initPage();
 
 async function initPage() {
@@ -481,7 +664,7 @@ async function handleProgramaPdfSelected(event) {
   if (!file) return;
 
   if (!canEditFicha()) {
-    alert(getBlockedEditMessage());
+    showToast(getBlockedEditMessage(), "warning");
     input.value = "";
     return;
   }
@@ -491,7 +674,7 @@ async function handleProgramaPdfSelected(event) {
     /\.pdf$/i.test(file.name || "");
 
   if (!isPdf) {
-    alert("Solo se permite subir archivos PDF para el programa.");
+    showToast("Solo se permite subir archivos PDF para el programa.", "warning");
     input.value = "";
     return;
   }
@@ -550,18 +733,17 @@ async function handleProgramaPdfSelected(event) {
         ]
       }
     });
-    
-    // IMPORTANTE: apagar el flag antes de refrescar
-    state.isUploadingProgramaPdf = false;
-    
+
     await loadAll();
     syncButtons();
-    
-    alert("Programa PDF subido correctamente.");
+
+    showToast("Programa PDF subido correctamente.", "success");
   } catch (error) {
     console.error("[fichas] handleProgramaPdfSelected", error);
-    alert("No se pudo subir el Programa PDF: " + (error?.message || error));
+    showToast("No se pudo subir el Programa PDF: " + (error?.message || error), "error", { duration: 5000 });
   } finally {
+    state.isUploadingProgramaPdf = false;
+
     if (input) input.value = "";
     updateProgramaPdfUi();
     syncButtons();
@@ -913,7 +1095,7 @@ function bindEvents() {
       await signFlowFromFicha("vendedor");
     } catch (error) {
       console.error("[fichas] firma vendedor", error);
-      alert("No se pudo registrar la firma de vendedor(a): " + (error?.message || error));
+      showToast("No se pudo registrar la firma de vendedor(a): " + (error?.message || error), "error", { duration: 5000 });
     }
   });
 
@@ -922,7 +1104,7 @@ function bindEvents() {
       await signFlowFromFicha("jefaVentas");
     } catch (error) {
       console.error("[fichas] firma jefa", error);
-      alert("No se pudo registrar la firma de jefa de ventas: " + (error?.message || error));
+      showToast("No se pudo registrar la firma de jefa de ventas: " + (error?.message || error), "error", { duration: 5000 });
     }
   });
 
@@ -931,7 +1113,7 @@ function bindEvents() {
       await signFlowFromFicha("administracion");
     } catch (error) {
       console.error("[fichas] firma administración", error);
-      alert("No se pudo registrar la firma de administración: " + (error?.message || error));
+      showToast("No se pudo registrar la firma de administración: " + (error?.message || error), "error", { duration: 5000 });
     }
   });
 
@@ -1052,7 +1234,8 @@ async function signFlowFromFicha(step) {
       mensaje: `${nombre} dejó la ficha lista como vendedor(a).`,
       cambios: [
         { campo: "fichaEstado", anterior: state.group.fichaEstado || "", nuevo: "lista_vendedor" }
-      ]
+      ],
+      successMessage: "Firma de vendedor(a) registrada correctamente."
     });
     return;
   }
@@ -1116,7 +1299,8 @@ async function signFlowFromFicha(step) {
       cambios: [
         { campo: "fichaEstado", anterior: state.group.fichaEstado || "", nuevo: "revisada_jefa_ventas" },
         { campo: "firmaSupervision", anterior: state.group.firmaSupervision || "", nuevo: nombre }
-      ]
+      ],
+      successMessage: "Firma de jefa de ventas registrada correctamente."
     });
     return;
   }
@@ -1205,7 +1389,10 @@ async function signFlowFromFicha(step) {
         { campo: "autorizada", anterior: !!state.group.autorizada, nuevo: true },
         { campo: "fichaEstado", anterior: state.group.fichaEstado || "", nuevo: "autorizada_admin" }
       ],
-      reloadAfterSave: false
+      reloadAfterSave: false,
+      successMessage: hadPendingRequest
+        ? "Refirma de administración registrada correctamente."
+        : "Firma de administración registrada correctamente."
     });
 
     if (hadPendingRequest) {
@@ -1222,12 +1409,12 @@ async function signFlowFromFicha(step) {
 
 async function saveUpdateRequest() {
   if (!canRequestFichaUpdate()) {
-    alert("No tienes permisos para solicitar actualización.");
+    showToast("No tienes permisos para solicitar actualización.", "warning");
     return;
   }
 
   if (hasPendingUpdateRequest()) {
-    alert("Ya existe una solicitud pendiente para este grupo.");
+    showToast("Ya existe una solicitud pendiente para este grupo.", "warning");
     closeModal("modalSolicitudFicha");
     return;
   }
@@ -1236,7 +1423,7 @@ async function saveUpdateRequest() {
   const detalle = getValue("sr_detalle");
 
   if (!detalle) {
-    alert("Debes explicar qué hay que cambiar.");
+    showToast("Debes explicar qué hay que cambiar.", "warning");
     return;
   }
 
@@ -1270,6 +1457,8 @@ async function saveUpdateRequest() {
       state.group?.vendedoraCorreo ||
       state.effectiveEmail
     );
+
+  closeModal("modalSolicitudFicha");
 
   await saveGroupPatch(
     {
@@ -1378,11 +1567,10 @@ async function saveUpdateRequest() {
           anterior: !!state.group.flowFicha?.administracion?.firmado,
           nuevo: false
         }
-      ]
+      ],
+      successMessage: "Solicitud de actualización enviada correctamente."
     }
   );
-
-  closeModal("modalSolicitudFicha");
 }
 
 function isAdministrativeReviewEditor() {
@@ -1440,7 +1628,7 @@ function shouldReopenFlowAfterFichaSave(trackedChanges = []) {
 ========================================================= */
 async function saveFicha({ silent = false, reloadAfterSave = true } = {}) {
   if (!canEditFicha()) {
-    alert(getBlockedEditMessage());
+    showToast(getBlockedEditMessage(), "warning");
     return { ok: false, reason: "blocked" };
   }
 
@@ -1511,7 +1699,7 @@ async function saveFicha({ silent = false, reloadAfterSave = true } = {}) {
 
   if (!actualChanges.length && !fichaWasEmpty) {
     if (!silent) {
-      alert("No hay cambios para guardar.");
+      showToast("No hay cambios para guardar.", "warning");
     }
     return { ok: true, changed: false };
   }
@@ -1685,16 +1873,17 @@ async function saveFicha({ silent = false, reloadAfterSave = true } = {}) {
     });
   }
 
-  if (!silent) {
-    alert(
-      reopenFlow
-        ? "Ficha guardada correctamente. El flujo volvió a revisión de jefa de ventas y luego administración."
-        : "Ficha guardada correctamente."
-    );
-  }
-
   if (reloadAfterSave) {
     await loadAll();
+  }
+  
+  if (!silent) {
+    showToast(
+      reopenFlow
+        ? "Ficha guardada correctamente. El flujo volvió a revisión de jefa de ventas y luego administración."
+        : "Ficha guardada correctamente.",
+      "success"
+    );
   }
 
   return {
@@ -1711,7 +1900,9 @@ async function saveGroupPatch(patch, {
   titulo = "Movimiento",
   mensaje = "",
   cambios = [],
-  reloadAfterSave = true
+  reloadAfterSave = true,
+  successMessage = "",
+  successType = "success"
 } = {}) {
   patch.actualizadoPor = getDisplayName(state.effectiveUser);
   patch.actualizadoPorCorreo = state.effectiveEmail;
@@ -1729,6 +1920,10 @@ async function saveGroupPatch(patch, {
 
   if (reloadAfterSave) {
     await loadAll();
+  }
+
+  if (successMessage) {
+    showToast(successMessage, successType);
   }
 }
 
