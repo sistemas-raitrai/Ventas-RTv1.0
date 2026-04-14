@@ -407,6 +407,7 @@ function renderTable() {
     const idGrupo = getRowId(row);
     const alias = getRowAlias(row);
     const colegio = normalizeText(row.colegio || "");
+    const comuna = normalizeText(row.comunaCiudad || row.comuna || "—");
     const anoViaje = normalizeText(row.anoViaje || "");
     const cliente = normalizeText(row.nombreCliente || "—");
     const estado = normalizeText(row.estado || "—");
@@ -418,6 +419,7 @@ function renderTable() {
         <td>${escapeHtml(idGrupo)}</td>
         <td>${escapeHtml(alias)}</td>
         <td>${escapeHtml(colegio)}</td>
+        <td>${escapeHtml(comuna)}</td>
         <td>${escapeHtml(anoViaje)}</td>
         <td>${escapeHtml(cliente)}</td>
         <td>${escapeHtml(estado)}</td>
