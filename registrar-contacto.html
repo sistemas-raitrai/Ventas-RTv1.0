@@ -159,7 +159,8 @@
     }
     
     /* El correo electrónico debe mantenerse tal cual */
-    #correoCliente{
+    #correoCliente,
+    #correoCliente2{
       text-transform:none;
     }
 
@@ -550,6 +551,40 @@
         <div id="wrapOrigenEspecificacionOtro" class="field col-12 hidden">
           <label for="origenEspecificacionOtro">Detalle del origen</label>
           <input id="origenEspecificacionOtro" type="text" placeholder="Especifica el origen" />
+        </div>
+
+                <div class="field col-12">
+          <label>2° contacto (opcional)</label>
+          <div class="helper">
+            Si completas este bloque, debes ingresar al menos nombre, rol y correo o celular.
+          </div>
+        </div>
+
+        <div class="field col-3">
+          <label for="nombreCliente2">Nombre 2° contacto</label>
+          <input id="nombreCliente2" type="text" placeholder="Segundo contacto" />
+        </div>
+
+        <div class="field col-2">
+          <label for="rolCliente2">Rol 2° contacto</label>
+          <select id="rolCliente2">
+            <option value="">SELECCIONAR</option>
+            <option value="Estudiante">ESTUDIANTE</option>
+            <option value="Apoderado(a)">APODERADO(A)</option>
+            <option value="Profesor(a)">PROFESOR(A)</option>
+            <option value="ComisionGira">COMISIÓN GIRA</option>
+            <option value="Otro(a)">OTRO(A)</option>
+          </select>
+        </div>
+
+        <div class="field col-3">
+          <label for="correoCliente2">Correo 2° contacto</label>
+          <input id="correoCliente2" type="email" placeholder="contacto2@correo.com" />
+        </div>
+
+        <div class="field col-3">
+          <label for="celularCliente2">Celular 2° contacto</label>
+          <input id="celularCliente2" type="text" placeholder="+569..." />
         </div>
 
         <div class="form-actions page-actions page-actions-right">
