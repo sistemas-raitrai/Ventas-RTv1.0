@@ -917,21 +917,79 @@ function poblarSelectorVendedores(effectiveUser) {
   btn.classList.remove("ui-hidden");
 }
 
-function getAliasColegioSortKey(alias = "") {
+function extraerBloquesCursoAnoDesdeAlias(alias = "") {
+  let text = String(alias || "").trim();
+  const bloques = [];
+
+  while (bloques.length < 2) {
+    const match = text.match(/^([0-9A-Z]+(?:\s*[A-Z]+)?\s*\(\d{4}\))\s*/i);
+    if (!match) break;
+
+    bloques.push(match[1].replace(/\s+/g, " ").trim());
+    text = text.slice(match[0].length).trim();
+  }
+
+  return bloques;
+}
+
+function extraerColegioDesdeAlias(alias = "") {
   let text = String(alias || "").trim();
 
-  // Quita el primer bloque tipo: 1C (2025)
-  text = text.replace(/^[0-9A-Z]+(?:\s*[A-Z]+)?\s*\(\d{4}\)\s*/i, "");
+  text = text.replace(/^([0-9A-Z]+(?:\s*[A-Z]+)?\s*\(\d{4}\)\s*){1,2}/i, "").trim();
+  text = text.replace(/^\s*[—\-|,:]+\s*/g, "").trim();
 
-  // Quita un segundo bloque si existe, por ejemplo:
-  // 1C (2026) 2C (2027) COLEGIO...
-  text = text.replace(/^[0-9A-Z]+(?:\s*[A-Z]+)?\s*\(\d{4}\)\s*/i, "");
+  return text;
+}
 
-  return text
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
-    .trim();
+function construirCursoAnoParaSelector(row = {}) {
+  const alias = getRowAlias(row);
+  const bloquesAlias = extraerBloquesCursoAnoDesdeAlias(alias);
+
+  if (bloquesAlias.length) {
+    return bloquesAlias.join(" ");
+  }
+
+  const curso = String(row.curso || "").trim();
+  const anoMatch = String(row.anoViaje || "").match(/\d{4}/);
+  const ano = anoMatch ? anoMatch[0] : "";
+
+  if (curso && ano) return `${curso} (${ano})`;
+  if (curso) return curso;
+  if (ano) return `(${ano})`;
+
+  return "";
+}
+
+function construirColegioParaSelector(row = {}) {
+  const colegio = String(row.colegio || "").trim();
+  if (colegio) return colegio;
+
+  const alias = getRowAlias(row);
+  const colegioDesdeAlias = extraerColegioDesdeAlias(alias);
+
+  return colegioDesdeAlias || alias;
+}
+
+function construirLabelGrupoSelector(row = {}) {
+  const colegio = construirColegioParaSelector(row);
+  const cursoAno = construirCursoAnoParaSelector(row);
+  const apoderado = getRowApoderado(row);
+
+  return [colegio, cursoAno, apoderado]
+    .filter((parte) => String(parte || "").trim())
+    .join(" — ");
+}
+
+function construirSortKeyGrupoSelector(row = {}) {
+  const colegio = construirColegioParaSelector(row);
+  const cursoAno = construirCursoAnoParaSelector(row);
+  const apoderado = getRowApoderado(row);
+
+  return [
+    normalizeLoose(colegio),
+    normalizeLoose(cursoAno),
+    normalizeLoose(apoderado)
+  ].join(" | ");
 }
 
 /* =========================================================
@@ -968,16 +1026,11 @@ function poblarSelectorGrupos(effectiveUser, rows = []) {
   select.appendChild(defaultOption);
 
   const items = rows
-    .map((row) => {
-      const alias = getRowAlias(row);
-      const apoderado = getRowApoderado(row);
-  
-      return {
-        value: getRowId(row),
-        label: `${alias} — ${apoderado}`,
-        sortKey: `${getAliasColegioSortKey(alias)} ${alias} ${apoderado}`
-      };
-    })
+    .map((row) => ({
+      value: getRowId(row),
+      label: construirLabelGrupoSelector(row),
+      sortKey: construirSortKeyGrupoSelector(row)
+    }))
     .filter((item) => item.value)
     .sort((a, b) =>
       a.sortKey.localeCompare(b.sortKey, "es", {
@@ -1005,7 +1058,7 @@ function poblarSelectorGrupos(effectiveUser, rows = []) {
   select.disabled = !items.length;
   btn.disabled = !items.length;
 
-  initSearchableSelect("select-grupo", "Buscar grupo...");
+  initSearchableSelect("select-grupo", "Buscar por colegio, curso, año o apoderado...");
 }
 
 /* =========================================================
