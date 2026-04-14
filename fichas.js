@@ -1681,17 +1681,28 @@ async function saveFicha({ silent = false, reloadAfterSave = true } = {}) {
   for (const path of FICHA_FIELDS) {
     const anterior = previousFichaView[path];
     const nuevo = values[path];
-
+  
     const changed = isRichField(path)
-      ? normalizeRichHtml(anterior) !== normalizeRichHtml(nuevo)
+      ? normalizeRichHtml(anterior || "") !== normalizeRichHtml(nuevo || "")
       : !sameValue(anterior, nuevo);
-
+  
     if (!changed) continue;
-
-    actualChanges.push({ campo: `ficha.${path}`, anterior, nuevo });
-
-    if (!shouldIgnoreTrackedFichaChange(path, anterior, nuevo)) {
-      trackedChanges.push({ campo: `ficha.${path}`, anterior, nuevo });
+  
+    const anteriorSafe = anterior ?? "";
+    const nuevoSafe = nuevo ?? "";
+  
+    actualChanges.push({
+      campo: `ficha.${path}`,
+      anterior: anteriorSafe,
+      nuevo: nuevoSafe
+    });
+  
+    if (!shouldIgnoreTrackedFichaChange(path, anteriorSafe, nuevoSafe)) {
+      trackedChanges.push({
+        campo: `ficha.${path}`,
+        anterior: anteriorSafe,
+        nuevo: nuevoSafe
+      });
     }
   }
 
@@ -1927,6 +1938,31 @@ async function saveGroupPatch(patch, {
   }
 }
 
+function sanitizeForFirestore(value) {
+  if (value === undefined) return "";
+
+  if (value === null) return null;
+
+  if (Array.isArray(value)) {
+    return value.map((item) => sanitizeForFirestore(item));
+  }
+
+  if (
+    typeof value === "object" &&
+    value !== null &&
+    !(value instanceof Date) &&
+    typeof value?.toDate !== "function"
+  ) {
+    const out = {};
+    for (const [key, val] of Object.entries(value)) {
+      out[key] = sanitizeForFirestore(val);
+    }
+    return out;
+  }
+
+  return value;
+}
+
 async function createHistoryEntry({
   tipoMovimiento = "movimiento",
   modulo = "ficha",
@@ -1943,7 +1979,7 @@ async function createHistoryEntry({
     modulo,
     titulo,
     mensaje,
-    metadata,
+    metadata: sanitizeForFirestore(metadata),
     creadoPor: getDisplayName(state.effectiveUser),
     creadoPorCorreo: state.effectiveEmail,
     fecha: serverTimestamp()
@@ -2013,6 +2049,24 @@ function hydrateFicha(group = {}) {
     programaPdfNombre: pick(
       ficha.programaPdfNombre,
       group.programaPdfNombre,
+      ""
+    ),
+
+    programaPdfStoragePath: pick(
+      ficha.programaPdfStoragePath,
+      group.programaPdfStoragePath,
+      ""
+    ),
+    
+    programaPdfSubidoPor: pick(
+      ficha.programaPdfSubidoPor,
+      group.programaPdfSubidoPor,
+      ""
+    ),
+    
+    programaPdfSubidoPorCorreo: pick(
+      ficha.programaPdfSubidoPorCorreo,
+      group.programaPdfSubidoPorCorreo,
       ""
     ),
 
