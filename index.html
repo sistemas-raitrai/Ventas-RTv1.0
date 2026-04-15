@@ -69,11 +69,74 @@
         </div>-->
       </div>
 
-      <div class="panel panel-importante">
-        <div class="importante-icon">✎</div>
-        <div>
-          <h2>IMPORTANTE</h2>
-          <p>Espacio reservado para avisos comerciales y observaciones generales.</p>
+      <div class="panel panel-importante" id="panel-private-note">
+        <div style="display:flex; gap:14px; align-items:flex-start;">
+          <div class="importante-icon">✎</div>
+      
+          <div style="flex:1; min-width:0;">
+            <h2 style="margin-bottom:4px;">IMPORTANTE</h2>
+            <p style="margin:0 0 10px; color:#6a6078; font-size:13px;">
+              Nota privada. Solo la ves tú.
+            </p>
+      
+            <textarea
+              id="private-note-text"
+              placeholder="Escribe aquí tus recordatorios, pendientes o ideas..."
+              style="
+                width:100%;
+                min-height:180px;
+                resize:vertical;
+                border:1px solid rgba(72,48,110,.16);
+                border-radius:16px;
+                padding:14px 16px;
+                font:inherit;
+                color:#2f2340;
+                background:#fffdfd;
+                outline:none;
+                box-shadow: inset 0 1px 2px rgba(34, 20, 51, .04);
+              "
+            ></textarea>
+      
+            <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; margin-top:10px; flex-wrap:wrap;">
+              <span id="private-note-status" style="font-size:12px; color:#6a6078;">
+                Cargando nota privada...
+              </span>
+      
+              <div style="display:flex; gap:10px; flex-wrap:wrap;">
+                <button
+                  id="btn-private-note-clear"
+                  type="button"
+                  style="
+                    border:none;
+                    background:#ece8f4;
+                    color:#31194b;
+                    border-radius:999px;
+                    padding:10px 14px;
+                    cursor:pointer;
+                    font-weight:700;
+                  "
+                >
+                  Limpiar
+                </button>
+      
+                <button
+                  id="btn-private-note-save"
+                  type="button"
+                  style="
+                    border:none;
+                    background:#3b2357;
+                    color:#fff;
+                    border-radius:999px;
+                    padding:10px 16px;
+                    cursor:pointer;
+                    font-weight:700;
+                  "
+                >
+                  Guardar
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </section>
