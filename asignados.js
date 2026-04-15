@@ -239,6 +239,9 @@ const GENERIC_SCHOOL_TOKENS = new Set([
   "liceo",
   "escuela",
   "school",
+  "college",
+  "academy",
+  "academia",
   "instituto",
   "institucion",
   "centro",
@@ -336,6 +339,29 @@ function containsLooseRatio(a = "", b = "") {
     return Math.min(a.length, b.length) / Math.max(a.length, b.length);
   }
   return 0;
+}
+
+function getMeaningfulSchoolTokens(value = "") {
+  return uniqueLooseTokens(value)
+    .filter((token) => !GENERIC_SCHOOL_TOKENS.has(token));
+}
+
+function getSharedSchoolTokens(a = "", b = "") {
+  const tokensA = getMeaningfulSchoolTokens(a);
+  const tokensB = getMeaningfulSchoolTokens(b);
+  const setB = new Set(tokensB);
+
+  return tokensA.filter((token) => setB.has(token));
+}
+
+function hasStrongSchoolNameMatch(a = "", b = "") {
+  const shared = getSharedSchoolTokens(a, b);
+
+  // Caso fuerte: comparten 2 o más tokens relevantes
+  if (shared.length >= 2) return true;
+
+  // Caso adicional: comparten 1 token largo/importante
+  return shared.some((token) => token.length >= 6);
 }
 
 function getSchoolSimilarity(a = "", b = "") {
@@ -439,6 +465,9 @@ function getSchoolMatchInfo(sourceRow = {}, candidate = {}) {
   const sameExactSchool = Boolean(sourceSchool && candidateSchool && sourceSchool === candidateSchool);
   const sameComuna = Boolean(sourceComuna && candidateComuna && sourceComuna === candidateComuna);
 
+  const sharedTokens = getSharedSchoolTokens(sourceSchoolRaw, candidateSchoolRaw);
+  const strongNameMatch = hasStrongSchoolNameMatch(sourceSchoolRaw, candidateSchoolRaw);
+
   let matchType = "none";
   let label = "Sin coincidencia relevante";
 
@@ -448,6 +477,9 @@ function getSchoolMatchInfo(sourceRow = {}, candidate = {}) {
   } else if (sameExactSchool) {
     matchType = "same_school";
     label = "Mismo colegio";
+  } else if (strongNameMatch && sameComuna) {
+    matchType = "strong_name_same_comuna";
+    label = "Nombre muy relacionado + misma comuna";
   } else if (schoolSimilarity >= 0.90 && sameComuna) {
     matchType = "similar_school_same_comuna";
     label = "Colegio similar + misma comuna";
@@ -465,7 +497,9 @@ function getSchoolMatchInfo(sourceRow = {}, candidate = {}) {
     label,
     schoolSimilarity,
     sameExactSchool,
-    sameComuna
+    sameComuna,
+    strongNameMatch,
+    sharedTokens
   };
 }
 
@@ -497,6 +531,7 @@ function createVendorRecommendationBase(vendor = {}) {
     relatedGroupsCount: 0,
     sameSchoolSameComunaCount: 0,
     sameSchoolExactCount: 0,
+    strongNameSameComunaCount: 0,
     similarSchoolSameComunaCount: 0,
     similarSchoolCount: 0,
     sameComunaOnlyCount: 0,
@@ -555,9 +590,10 @@ function pushRelatedExample(rec = {}, candidate = {}, matchInfo = {}) {
 function getRelatedMatchPriority(matchType = "") {
   if (matchType === "same_school_same_comuna") return 1;
   if (matchType === "same_school") return 2;
-  if (matchType === "similar_school_same_comuna") return 3;
-  if (matchType === "similar_school") return 4;
-  if (matchType === "same_comuna_only") return 5;
+  if (matchType === "strong_name_same_comuna") return 3;
+  if (matchType === "similar_school_same_comuna") return 4;
+  if (matchType === "similar_school") return 5;
+  if (matchType === "same_comuna_only") return 6;
   return 9;
 }
 
@@ -655,10 +691,11 @@ function calculateContinuityScore(rec = {}) {
     score += 22 + Math.min(6, (rec.sameSchoolExactCount - 1) * 2);
   }
 
+  score += Math.min(12, (rec.strongNameSameComunaCount || 0) * 5);
   score += Math.min(10, rec.similarSchoolSameComunaCount * 4);
   score += Math.min(6, rec.similarSchoolCount * 2);
 
-  // NUEVO: si el colegio es nuevo, importa mucho quién trabaja esa comuna
+  // si el colegio es nuevo, importa quién trabaja la comuna
   score += Math.min(12, rec.sameComunaOnlyCount * 3);
 
   score += Math.min(5, rec.sameYearCount * 2);
@@ -718,6 +755,13 @@ function buildVendorRecommendationReasons(rec = {}, averages = {}) {
 
   if (rec.sameComunaOnlyCount > 0) {
     pushUniqueReason(reasons, `Trabaja ${rec.sameComunaOnlyCount} grupo(s) de otros colegios en la misma comuna`);
+  }
+
+  if ((rec.strongNameSameComunaCount || 0) > 0) {
+    pushUniqueReason(
+      reasons,
+      `Tiene ${rec.strongNameSameComunaCount} grupo(s) con nombre muy relacionado en la misma comuna`
+    );
   }
 
   if (rec.similarSchoolSameComunaCount > 0) {
@@ -915,6 +959,7 @@ function analyzeVendorAssignmentRecommendation(sourceRow = {}, selectedVendor = 
 
     if (matchInfo.matchType === "same_school_same_comuna") rec.sameSchoolSameComunaCount += 1;
     else if (matchInfo.matchType === "same_school") rec.sameSchoolExactCount += 1;
+    else if (matchInfo.matchType === "strong_name_same_comuna") rec.strongNameSameComunaCount += 1;
     else if (matchInfo.matchType === "similar_school_same_comuna") rec.similarSchoolSameComunaCount += 1;
     else if (matchInfo.matchType === "similar_school") rec.similarSchoolCount += 1;
     else if (matchInfo.matchType === "same_comuna_only") rec.sameComunaOnlyCount += 1;
@@ -1410,6 +1455,7 @@ const recommendationsHtml = recommendations.map((item, index) => {
 
           <div class="assignment-alert-row"><strong>Mismo colegio + comuna:</strong> ${escapeHtml(String(item.sameSchoolSameComunaCount || 0))}</div>
           <div class="assignment-alert-row"><strong>Mismo colegio:</strong> ${escapeHtml(String(item.sameSchoolExactCount || 0))}</div>
+          <div class="assignment-alert-row"><strong>Nombre fuerte + comuna:</strong> ${escapeHtml(String(item.strongNameSameComunaCount || 0))}</div>
           <div class="assignment-alert-row"><strong>Misma comuna (otros colegios):</strong> ${escapeHtml(String(item.sameComunaOnlyCount || 0))}</div>
           <div class="assignment-alert-row"><strong>Colegios similares:</strong> ${escapeHtml(String((item.similarSchoolSameComunaCount || 0) + (item.similarSchoolCount || 0)))}</div>
 
