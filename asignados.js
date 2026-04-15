@@ -274,6 +274,20 @@ function getSchoolMeaningfulTokens(value = "") {
     .filter((token) => !GENERIC_SCHOOL_TOKENS.has(token));
 }
 
+function detectSchoolDescriptor(value = "") {
+  const tokens = uniqueLooseTokens(value);
+
+  if (tokens.includes("college")) return "college";
+  if (tokens.includes("academy") || tokens.includes("academia")) return "academy";
+  if (tokens.includes("school")) return "school";
+  if (tokens.includes("liceo")) return "liceo";
+  if (tokens.includes("colegio")) return "colegio";
+  if (tokens.includes("escuela")) return "escuela";
+  if (tokens.includes("instituto") || tokens.includes("institucion")) return "instituto";
+
+  return "";
+}
+
 function isExactSchoolNameMatch(a = "", b = "") {
   const tokensA = getSchoolMeaningfulTokens(a);
   const tokensB = getSchoolMeaningfulTokens(b);
@@ -284,7 +298,18 @@ function isExactSchoolNameMatch(a = "", b = "") {
   const sortedA = [...tokensA].sort().join(" ");
   const sortedB = [...tokensB].sort().join(" ");
 
-  return sortedA === sortedB;
+  if (sortedA !== sortedB) return false;
+
+  // Si el "apellido comercial" del colegio cambia
+  // (ej: COLLEGE vs ACADEMY), NO lo tomamos como certeza.
+  const descriptorA = detectSchoolDescriptor(a);
+  const descriptorB = detectSchoolDescriptor(b);
+
+  if (descriptorA && descriptorB && descriptorA !== descriptorB) {
+    return false;
+  }
+
+  return true;
 }
 
 function normalizePersonLoose(value = "") {
