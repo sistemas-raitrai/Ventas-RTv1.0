@@ -414,6 +414,16 @@ function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value));
 }
 
+function getCurrentCommercialYear() {
+  return new Date().getFullYear();
+}
+
+function isCurrentOrFutureTravelYear(row = {}) {
+  const year = getAnoViajeNumber(row);
+  if (!year) return false;
+  return year >= getCurrentCommercialYear();
+}
+
 function getSchoolMatchInfo(sourceRow = {}, candidate = {}) {
   const sourceSchoolRaw = sourceRow.colegio || sourceRow.colegioBase || "";
   const candidateSchoolRaw = candidate.colegio || candidate.colegioBase || "";
@@ -444,6 +454,9 @@ function getSchoolMatchInfo(sourceRow = {}, candidate = {}) {
   } else if (schoolSimilarity >= 0.82) {
     matchType = "similar_school";
     label = "Colegio similar";
+  } else if (sameComuna) {
+    matchType = "same_comuna_only";
+    label = "Otro colegio en la misma comuna";
   }
 
   return {
@@ -471,12 +484,22 @@ function createVendorRecommendationBase(vendor = {}) {
     totalGanadaCount: 0,
     totalPerdidaCount: 0,
 
-    // Relación con el colegio / grupos comparables
+    // Cartera actual (año actual hacia futuro)
+    currentPortfolioCount: 0,
+    currentAContactarCount: 0,
+    currentContactadoCount: 0,
+    currentCotizandoCount: 0,
+    currentReunionCount: 0,
+    currentGanadaCount: 0,
+    currentPerdidaCount: 0,
+
+    // Relación con colegio/comuna
     relatedGroupsCount: 0,
     sameSchoolSameComunaCount: 0,
     sameSchoolExactCount: 0,
     similarSchoolSameComunaCount: 0,
     similarSchoolCount: 0,
+    sameComunaOnlyCount: 0,
     sameYearCount: 0,
 
     relatedActiveCount: 0,
@@ -487,15 +510,26 @@ function createVendorRecommendationBase(vendor = {}) {
     relatedGanadaCount: 0,
     relatedPerdidaCount: 0,
 
-    // Resultado calculado
+    // Ratios cartera actual
+    reunionRateCurrent: 0,
+    ganadaRateCurrent: 0,
+    cotizandoRateCurrent: 0,
+    aContactarRateCurrent: 0,
+
+    // Scores
     continuityScore: 0,
     performanceScore: 0,
     workloadScore: 0,
     totalScore: 0,
+
+    // Perfil
+    profileType: "",
+    profileLabel: "",
     level: "Leve",
     levelClass: "low",
     hasStrongSchoolContinuity: false,
     selected: false,
+
     reasons: [],
     relatedExamples: []
   };
@@ -519,27 +553,35 @@ function pushRelatedExample(rec = {}, candidate = {}, matchInfo = {}) {
 }
 
 function getRecommendationLevel(totalScore = 0, continuityScore = 0) {
-  if (continuityScore >= 22 || totalScore >= 70) {
+  if (continuityScore >= 24 || totalScore >= 72) {
     return { level: "Alta", levelClass: "high" };
   }
-  if (continuityScore >= 10 || totalScore >= 45) {
+  if (continuityScore >= 12 || totalScore >= 48) {
     return { level: "Media", levelClass: "medium" };
   }
   return { level: "Leve", levelClass: "low" };
+}
+
+function safeRate(numerator = 0, denominator = 0) {
+  if (!denominator) return 0;
+  return numerator / denominator;
 }
 
 function calculateContinuityScore(rec = {}) {
   let score = 0;
 
   if (rec.sameSchoolSameComunaCount > 0) {
-    score += 30 + Math.min(10, (rec.sameSchoolSameComunaCount - 1) * 4);
+    score += 30 + Math.min(8, (rec.sameSchoolSameComunaCount - 1) * 3);
   } else if (rec.sameSchoolExactCount > 0) {
-    score += 18 + Math.min(6, (rec.sameSchoolExactCount - 1) * 3);
+    score += 22 + Math.min(6, (rec.sameSchoolExactCount - 1) * 2);
   }
 
-  score += Math.min(10, rec.similarSchoolSameComunaCount * 5);
+  score += Math.min(10, rec.similarSchoolSameComunaCount * 4);
   score += Math.min(6, rec.similarSchoolCount * 2);
-  score += Math.min(6, rec.relatedActiveCount * 2);
+
+  // NUEVO: si el colegio es nuevo, importa mucho quién trabaja esa comuna
+  score += Math.min(12, rec.sameComunaOnlyCount * 3);
+
   score += Math.min(5, rec.sameYearCount * 2);
 
   return clamp(Math.round(score), 0, 45);
@@ -548,13 +590,19 @@ function calculateContinuityScore(rec = {}) {
 function calculatePerformanceScore(rec = {}) {
   let score = 0;
 
-  score += Math.min(16, rec.relatedReunionCount * 8);
-  score += Math.min(10, rec.relatedCotizandoCount * 5);
-  score += Math.min(6, rec.relatedContactadoCount * 3);
-  score += Math.min(6, rec.relatedGanadaCount * 3);
+  // volumen en cartera actual
+  score += Math.min(8, rec.currentReunionCount * 1.5);
+  score += Math.min(7, rec.currentGanadaCount * 1.5);
+  score += Math.min(5, rec.currentCotizandoCount * 1.2);
 
-  score -= Math.min(4, rec.relatedPerdidaCount * 2);
-  score -= Math.min(8, rec.relatedAContactarCount * 4);
+  // proporción en cartera actual
+  score += rec.reunionRateCurrent * 12;
+  score += rec.ganadaRateCurrent * 10;
+  score += rec.cotizandoRateCurrent * 5;
+
+  // castigo por disciplina pobre
+  score -= rec.aContactarRateCurrent * 12;
+  score -= Math.min(4, rec.currentAContactarCount * 0.8);
 
   return clamp(Math.round(score), 0, 30);
 }
@@ -562,27 +610,20 @@ function calculatePerformanceScore(rec = {}) {
 function calculateWorkloadScore(rec = {}, averages = {}) {
   let score = 12;
 
-  // Premio por no tener grupos botados en "A contactar"
-  if (rec.totalAContactarCount === 0) score += 10;
-  else if (rec.totalAContactarCount <= 2) score += 5;
+  // disciplina operativa
+  if (rec.totalAContactarCount === 0) score += 8;
+  else if (rec.totalAContactarCount <= 2) score += 4;
   else if (rec.totalAContactarCount <= 4) score += 1;
   else score -= 6;
 
-  // Balance de carga activa
+  // balance de activos
   const avgActive = Number(averages.activeCount || 0);
   const diffActive = rec.totalActiveCount - avgActive;
 
-  if (diffActive <= -2) score += 6;
-  else if (diffActive < 0) score += 3;
-  else if (diffActive >= 3) score -= 6;
-  else if (diffActive > 0) score -= 3;
-
-  // Balance de cotizaciones
-  const avgCotizando = Number(averages.cotizandoCount || 0);
-  const diffCotizando = rec.totalCotizandoCount - avgCotizando;
-
-  if (diffCotizando <= -1) score += 3;
-  else if (diffCotizando >= 2) score -= 3;
+  if (diffActive <= -2) score += 5;
+  else if (diffActive < 0) score += 2;
+  else if (diffActive >= 4) score -= 5;
+  else if (diffActive > 1) score -= 2;
 
   return clamp(Math.round(score), 0, 25);
 }
@@ -591,105 +632,96 @@ function buildVendorRecommendationReasons(rec = {}, averages = {}) {
   const reasons = [];
 
   if (rec.sameSchoolSameComunaCount > 0) {
-    pushUniqueReason(
-      reasons,
-      `Ya trabaja ${rec.sameSchoolSameComunaCount} grupo(s) del mismo colegio en la misma comuna`
-    );
+    pushUniqueReason(reasons, `Ya trabaja ${rec.sameSchoolSameComunaCount} grupo(s) del mismo colegio en la misma comuna`);
   } else if (rec.sameSchoolExactCount > 0) {
-    pushUniqueReason(
-      reasons,
-      `Ya trabaja ${rec.sameSchoolExactCount} grupo(s) del mismo colegio`
-    );
+    pushUniqueReason(reasons, `Ya trabaja ${rec.sameSchoolExactCount} grupo(s) del mismo colegio`);
+  }
+
+  if (rec.sameComunaOnlyCount > 0) {
+    pushUniqueReason(reasons, `Trabaja ${rec.sameComunaOnlyCount} grupo(s) de otros colegios en la misma comuna`);
   }
 
   if (rec.similarSchoolSameComunaCount > 0) {
-    pushUniqueReason(
-      reasons,
-      `Tiene ${rec.similarSchoolSameComunaCount} grupo(s) de colegio similar en la misma comuna`
-    );
+    pushUniqueReason(reasons, `Tiene ${rec.similarSchoolSameComunaCount} grupo(s) de colegio similar en la misma comuna`);
   } else if (rec.similarSchoolCount > 0) {
+    pushUniqueReason(reasons, `Tiene ${rec.similarSchoolCount} grupo(s) de colegio similar`);
+  }
+
+  if (rec.currentPortfolioCount > 0) {
     pushUniqueReason(
       reasons,
-      `Tiene ${rec.similarSchoolCount} grupo(s) de colegio similar`
+      `En su cartera actual: ${Math.round(rec.reunionRateCurrent * 100)}% llega a reunión, ${Math.round(rec.ganadaRateCurrent * 100)}% llega a ganada`
     );
   }
 
-  if (rec.sameYearCount > 0) {
+  if (rec.currentReunionCount > 0 || rec.currentGanadaCount > 0) {
     pushUniqueReason(
       reasons,
-      `Tiene ${rec.sameYearCount} grupo(s) relacionados del mismo año de viaje`
-    );
-  }
-
-  if (rec.relatedReunionCount > 0) {
-    pushUniqueReason(
-      reasons,
-      `Registra ${rec.relatedReunionCount} reunión(es) confirmada(s) en grupos comparables`
-    );
-  }
-
-  if (rec.relatedCotizandoCount > 0) {
-    pushUniqueReason(
-      reasons,
-      `Mantiene ${rec.relatedCotizandoCount} cotización(es) activa(s) en grupos comparables`
+      `Volumen actual: ${rec.currentReunionCount} reunión(es) y ${rec.currentGanadaCount} ganada(s)`
     );
   }
 
   if (rec.totalAContactarCount === 0) {
-    pushUniqueReason(
-      reasons,
-      "No tiene grupos pendientes en 'A contactar'"
-    );
+    pushUniqueReason(reasons, "No tiene grupos pendientes en 'A contactar'");
   } else if (rec.totalAContactarCount >= 3) {
-    pushUniqueReason(
-      reasons,
-      `Tiene ${rec.totalAContactarCount} grupo(s) aún en 'A contactar'`
-    );
+    pushUniqueReason(reasons, `Tiene ${rec.totalAContactarCount} grupo(s) aún en 'A contactar'`);
   }
 
   if (rec.totalActiveCount < Number(averages.activeCount || 0)) {
-    pushUniqueReason(
-      reasons,
-      "Tiene una carga activa por debajo del promedio del equipo"
-    );
+    pushUniqueReason(reasons, "Tiene una carga activa por debajo del promedio del equipo");
   } else if (rec.totalActiveCount > Number(averages.activeCount || 0) + 1) {
-    pushUniqueReason(
-      reasons,
-      "Tiene una carga activa por sobre el promedio del equipo"
-    );
+    pushUniqueReason(reasons, "Tiene una carga activa por sobre el promedio del equipo");
   }
 
   if (!reasons.length) {
-    pushUniqueReason(
-      reasons,
-      "Sin señales fuertes de continuidad; el criterio principal aquí es balance de carga"
-    );
+    pushUniqueReason(reasons, "Sin señales fuertes de continuidad; aquí pesa más la gestión actual y la carga");
   }
 
   return reasons;
 }
 
-function buildAssignmentRecommendationSummary(analysis = {}) {
-  const top = analysis.topRecommendation;
-  const selected = analysis.selectedRecommendation;
-  const schoolLabel = analysis.sourceSchoolLabel || "este colegio";
+function assignProfileToRecommendation(rec = {}) {
+  if (rec.continuityScore >= rec.performanceScore && rec.continuityScore >= rec.workloadScore) {
+    rec.profileType = "continuidad";
+    rec.profileLabel = "Continuidad comercial";
+    return;
+  }
 
+  if (rec.performanceScore >= rec.workloadScore) {
+    rec.profileType = "desempeno";
+    rec.profileLabel = "Mejor desempeño";
+    return;
+  }
+
+  rec.profileType = "disponibilidad";
+  rec.profileLabel = "Mejor disponibilidad";
+}
+
+function buildAssignmentRecommendationSummary(analysis = {}) {
+  const schoolLabel = analysis.sourceSchoolLabel || "este colegio";
+  const top = analysis.topRecommendation;
   const parts = [];
 
   parts.push(
     `Para ${schoolLabel} se encontraron ${analysis.totalRelatedGroups} grupo(s) relacionado(s): ${analysis.relatedAssignedCount} asignado(s) y ${analysis.relatedUnassignedCount} sin asignar.`
   );
 
-  if (top) {
-    parts.push(`Recomendación principal: ${top.vendorName} con ${top.totalScore} pts.`);
+  if (analysis.totalSameComunaTerritory > 0) {
+    parts.push(
+      `Además hay ${analysis.totalSameComunaTerritory} grupo(s) en la misma comuna, lo que ayuda a sugerir territorio cuando el colegio es nuevo.`
+    );
   }
 
-  if (selected && top) {
-    if (selected.vendorEmail === top.vendorEmail) {
-      parts.push("La selección actual coincide con la mejor recomendación.");
+  if (top) {
+    parts.push(`La mejor sugerencia general es ${top.vendorName} con ${top.totalScore} pts.`);
+  }
+
+  if (analysis.selectedRecommendation && top) {
+    if (analysis.selectedRecommendation.vendorEmail === top.vendorEmail) {
+      parts.push("La selección actual coincide con la mejor sugerencia general.");
     } else {
       parts.push(
-        `La selección actual es ${selected.vendorName} (${selected.totalScore} pts), pero hay otro vendedor mejor posicionado por continuidad, progreso y/o carga.`
+        `La selección actual es ${analysis.selectedRecommendation.vendorName} (${analysis.selectedRecommendation.totalScore} pts), pero hay otras opciones más fuertes por continuidad, desempeño o disponibilidad.`
       );
     }
   }
@@ -698,17 +730,38 @@ function buildAssignmentRecommendationSummary(analysis = {}) {
 }
 
 function shouldOpenVendorRecommendationModal(analysis = {}) {
-  const top = analysis.topRecommendation;
-  const selected = analysis.selectedRecommendation;
-
-  if (!top || !selected) return false;
+  if (!analysis.topRecommendation || !analysis.selectedRecommendation) return false;
 
   if (analysis.totalRelatedGroups > 0) return true;
+  if (analysis.totalSameComunaTerritory > 0) return true;
 
   return (
-    top.vendorEmail !== selected.vendorEmail &&
-    (top.totalScore - selected.totalScore) >= 10
+    analysis.topRecommendation.vendorEmail !== analysis.selectedRecommendation.vendorEmail &&
+    (analysis.topRecommendation.totalScore - analysis.selectedRecommendation.totalScore) >= 10
   );
+}
+
+function getTopProfileRecommendations(allRecommendations = [], selectedVendorEmail = "") {
+  const selected = allRecommendations.find((item) => item.vendorEmail === selectedVendorEmail) || null;
+
+  const bestContinuity = [...allRecommendations]
+    .sort((a, b) => b.continuityScore - a.continuityScore || b.totalScore - a.totalScore)[0] || null;
+
+  const bestPerformance = [...allRecommendations]
+    .sort((a, b) => b.performanceScore - a.performanceScore || b.totalScore - a.totalScore)[0] || null;
+
+  const bestWorkload = [...allRecommendations]
+    .sort((a, b) => b.workloadScore - a.workloadScore || b.totalScore - a.totalScore)[0] || null;
+
+  const picks = [];
+  [bestContinuity, bestPerformance, bestWorkload, selected].forEach((item) => {
+    if (!item) return;
+    if (!picks.some((x) => x.vendorEmail === item.vendorEmail)) {
+      picks.push(item);
+    }
+  });
+
+  return picks.slice(0, 4);
 }
 
 function analyzeVendorAssignmentRecommendation(sourceRow = {}, selectedVendor = {}) {
@@ -723,6 +776,7 @@ function analyzeVendorAssignmentRecommendation(sourceRow = {}, selectedVendor = 
   let totalRelatedGroups = 0;
   let relatedAssignedCount = 0;
   let relatedUnassignedCount = 0;
+  let totalSameComunaTerritory = 0;
 
   state.rows.forEach((candidate) => {
     if (getRowId(candidate) === currentId) return;
@@ -730,8 +784,9 @@ function analyzeVendorAssignmentRecommendation(sourceRow = {}, selectedVendor = 
     const candidateVendorEmail = getRowVendorEmail(candidate);
     const candidateVendorKnown = candidateVendorEmail && vendorMap.has(candidateVendorEmail);
     const candidateStage = normalizeStage(candidate.estado || "");
+    const candidateCurrentPortfolio = isCurrentOrFutureTravelYear(candidate);
 
-    // 1) Siempre acumulamos carga global del vendedor
+    // SIEMPRE acumulamos carga global del vendedor
     if (candidateVendorKnown && !isSinAsignar(candidate)) {
       const rec = vendorMap.get(candidateVendorEmail);
 
@@ -744,13 +799,27 @@ function analyzeVendorAssignmentRecommendation(sourceRow = {}, selectedVendor = 
       if (candidateStage === "reunion_confirmada") rec.totalReunionCount += 1;
       if (candidateStage === "ganada") rec.totalGanadaCount += 1;
       if (candidateStage === "perdida") rec.totalPerdidaCount += 1;
+
+      // cartera actual año actual/futuro
+      if (candidateCurrentPortfolio) {
+        rec.currentPortfolioCount += 1;
+        if (candidateStage === "a_contactar") rec.currentAContactarCount += 1;
+        if (candidateStage === "contactado") rec.currentContactadoCount += 1;
+        if (candidateStage === "cotizando") rec.currentCotizandoCount += 1;
+        if (candidateStage === "reunion_confirmada") rec.currentReunionCount += 1;
+        if (candidateStage === "ganada") rec.currentGanadaCount += 1;
+        if (candidateStage === "perdida") rec.currentPerdidaCount += 1;
+      }
     }
 
-    // 2) Solo algunos grupos cuentan como "relacionados" con el colegio actual
     const matchInfo = getSchoolMatchInfo(sourceRow, candidate);
     if (!matchInfo.isRelevant) return;
 
     totalRelatedGroups += 1;
+
+    if (matchInfo.matchType === "same_comuna_only") {
+      totalSameComunaTerritory += 1;
+    }
 
     if (isSinAsignar(candidate) || !candidateVendorKnown) {
       relatedUnassignedCount += 1;
@@ -763,15 +832,11 @@ function analyzeVendorAssignmentRecommendation(sourceRow = {}, selectedVendor = 
 
     rec.relatedGroupsCount += 1;
 
-    if (matchInfo.matchType === "same_school_same_comuna") {
-      rec.sameSchoolSameComunaCount += 1;
-    } else if (matchInfo.matchType === "same_school") {
-      rec.sameSchoolExactCount += 1;
-    } else if (matchInfo.matchType === "similar_school_same_comuna") {
-      rec.similarSchoolSameComunaCount += 1;
-    } else if (matchInfo.matchType === "similar_school") {
-      rec.similarSchoolCount += 1;
-    }
+    if (matchInfo.matchType === "same_school_same_comuna") rec.sameSchoolSameComunaCount += 1;
+    else if (matchInfo.matchType === "same_school") rec.sameSchoolExactCount += 1;
+    else if (matchInfo.matchType === "similar_school_same_comuna") rec.similarSchoolSameComunaCount += 1;
+    else if (matchInfo.matchType === "similar_school") rec.similarSchoolCount += 1;
+    else if (matchInfo.matchType === "same_comuna_only") rec.sameComunaOnlyCount += 1;
 
     if (sourceYear && getAnoViajeNumber(candidate) === sourceYear) {
       rec.sameYearCount += 1;
@@ -793,72 +858,48 @@ function analyzeVendorAssignmentRecommendation(sourceRow = {}, selectedVendor = 
   const averages = {
     activeCount: allRecommendations.length
       ? allRecommendations.reduce((sum, item) => sum + item.totalActiveCount, 0) / allRecommendations.length
-      : 0,
-    cotizandoCount: allRecommendations.length
-      ? allRecommendations.reduce((sum, item) => sum + item.totalCotizandoCount, 0) / allRecommendations.length
       : 0
   };
 
   const selectedVendorEmail = normalizeEmail(selectedVendor.email || "");
 
   allRecommendations.forEach((rec) => {
+    rec.reunionRateCurrent = safeRate(rec.currentReunionCount, rec.currentPortfolioCount);
+    rec.ganadaRateCurrent = safeRate(rec.currentGanadaCount, rec.currentPortfolioCount);
+    rec.cotizandoRateCurrent = safeRate(rec.currentCotizandoCount, rec.currentPortfolioCount);
+    rec.aContactarRateCurrent = safeRate(rec.currentAContactarCount, rec.currentPortfolioCount);
+
     rec.continuityScore = calculateContinuityScore(rec);
     rec.performanceScore = calculatePerformanceScore(rec);
     rec.workloadScore = calculateWorkloadScore(rec, averages);
-    rec.totalScore = clamp(
-      rec.continuityScore + rec.performanceScore + rec.workloadScore,
-      0,
-      100
-    );
+    rec.totalScore = clamp(rec.continuityScore + rec.performanceScore + rec.workloadScore, 0, 100);
 
     const level = getRecommendationLevel(rec.totalScore, rec.continuityScore);
     rec.level = level.level;
     rec.levelClass = level.levelClass;
 
     rec.hasStrongSchoolContinuity =
-      rec.sameSchoolSameComunaCount > 0 || rec.sameSchoolExactCount > 0;
+      rec.sameSchoolSameComunaCount > 0 ||
+      rec.sameSchoolExactCount > 0 ||
+      rec.sameComunaOnlyCount > 0;
 
     rec.selected = rec.vendorEmail === selectedVendorEmail;
     rec.reasons = buildVendorRecommendationReasons(rec, averages);
+    assignProfileToRecommendation(rec);
   });
 
-  allRecommendations.sort((a, b) => {
-    return (
-      b.totalScore - a.totalScore ||
-      b.continuityScore - a.continuityScore ||
-      b.performanceScore - a.performanceScore ||
-      a.vendorName.localeCompare(b.vendorName, "es", { sensitivity: "base" })
-    );
-  });
+  allRecommendations.sort((a, b) =>
+    b.totalScore - a.totalScore ||
+    b.continuityScore - a.continuityScore ||
+    b.performanceScore - a.performanceScore ||
+    a.vendorName.localeCompare(b.vendorName, "es", { sensitivity: "base" })
+  );
 
   const topRecommendation = allRecommendations[0] || null;
   const selectedRecommendation =
     allRecommendations.find((item) => item.vendorEmail === selectedVendorEmail) || null;
 
-  const recommendationsToShow = [];
-  allRecommendations.forEach((item) => {
-    const isTop = topRecommendation && item.vendorEmail === topRecommendation.vendorEmail;
-    const shouldShow =
-      isTop ||
-      item.selected ||
-      item.relatedGroupsCount > 0;
-
-    if (shouldShow && !recommendationsToShow.some((x) => x.vendorEmail === item.vendorEmail)) {
-      recommendationsToShow.push(item);
-    }
-  });
-
-  if (selectedRecommendation && !recommendationsToShow.some((x) => x.vendorEmail === selectedRecommendation.vendorEmail)) {
-    recommendationsToShow.push(selectedRecommendation);
-  }
-
-  recommendationsToShow.sort((a, b) => {
-    return (
-      b.totalScore - a.totalScore ||
-      b.continuityScore - a.continuityScore ||
-      b.performanceScore - a.performanceScore
-    );
-  });
+  const recommendations = getTopProfileRecommendations(allRecommendations, selectedVendorEmail);
 
   const analysis = {
     sourceSchoolLabel: normalizeText(sourceRow.colegio || sourceRow.colegioBase || "este colegio"),
@@ -867,7 +908,8 @@ function analyzeVendorAssignmentRecommendation(sourceRow = {}, selectedVendor = 
     totalRelatedGroups,
     relatedAssignedCount,
     relatedUnassignedCount,
-    recommendations: recommendationsToShow.slice(0, 6),
+    totalSameComunaTerritory,
+    recommendations,
     topRecommendation,
     selectedRecommendation,
     summaryText: ""
@@ -1149,13 +1191,13 @@ function renderAssignmentAlertModal({ row = {}, vendor = {}, analysis = {} } = {
   const selected = analysis.selectedRecommendation || null;
 
   if (title) {
-    title.textContent = `Recomendación antes de asignar a ${vendor.nombre || "la vendedora seleccionada"}`;
+    title.textContent = `Sugerencias antes de asignar a ${vendor.nombre || "la vendedora seleccionada"}`;
   }
 
   if (summary) {
     summary.textContent =
       analysis.summaryText ||
-      "Se generó una recomendación comercial antes de guardar la asignación.";
+      "Se generaron sugerencias comerciales antes de guardar la asignación.";
   }
 
   if (continueBtn) {
@@ -1170,7 +1212,7 @@ function renderAssignmentAlertModal({ row = {}, vendor = {}, analysis = {} } = {
   const recommendations = analysis.recommendations || [];
 
   if (!recommendations.length) {
-    list.innerHTML = `<div class="assignment-alert-empty">No hay recomendaciones para mostrar.</div>`;
+    list.innerHTML = `<div class="assignment-alert-empty">No hay sugerencias para mostrar.</div>`;
     return;
   }
 
@@ -1189,31 +1231,30 @@ function renderAssignmentAlertModal({ row = {}, vendor = {}, analysis = {} } = {
           </div>
 
           <div class="assignment-alert-tags">
-            ${isTop ? `<span class="assignment-pill same">Recomendación principal</span>` : ""}
+            ${isTop ? `<span class="assignment-pill same">Sugerencia general</span>` : ""}
             ${isSelected ? `<span class="assignment-pill other">Selección actual</span>` : ""}
             <span class="assignment-pill ${escapeHtml(item.levelClass)}">${escapeHtml(item.level)}</span>
-            ${
-              item.hasStrongSchoolContinuity
-                ? `<span class="assignment-pill medium">Tiene continuidad con el colegio</span>`
-                : `<span class="assignment-pill unassigned">Sin continuidad fuerte</span>`
-            }
+            <span class="assignment-pill medium">${escapeHtml(item.profileLabel || "Perfil")}</span>
           </div>
         </div>
 
         <div class="assignment-alert-grid">
-          <div class="assignment-alert-row"><strong>Continuidad:</strong> ${escapeHtml(String(item.continuityScore || 0))}/45</div>
-          <div class="assignment-alert-row"><strong>Progreso comparable:</strong> ${escapeHtml(String(item.performanceScore || 0))}/30</div>
-          <div class="assignment-alert-row"><strong>Carga actual:</strong> ${escapeHtml(String(item.workloadScore || 0))}/25</div>
-          <div class="assignment-alert-row"><strong>Grupos relacionados:</strong> ${escapeHtml(String(item.relatedGroupsCount || 0))}</div>
+          <div class="assignment-alert-row"><strong>Continuidad / territorio:</strong> ${escapeHtml(String(item.continuityScore || 0))}/45</div>
+          <div class="assignment-alert-row"><strong>Desempeño actual:</strong> ${escapeHtml(String(item.performanceScore || 0))}/30</div>
+          <div class="assignment-alert-row"><strong>Disponibilidad:</strong> ${escapeHtml(String(item.workloadScore || 0))}/25</div>
+
           <div class="assignment-alert-row"><strong>Mismo colegio + comuna:</strong> ${escapeHtml(String(item.sameSchoolSameComunaCount || 0))}</div>
           <div class="assignment-alert-row"><strong>Mismo colegio:</strong> ${escapeHtml(String(item.sameSchoolExactCount || 0))}</div>
-          <div class="assignment-alert-row"><strong>Similares + comuna:</strong> ${escapeHtml(String(item.similarSchoolSameComunaCount || 0))}</div>
-          <div class="assignment-alert-row"><strong>Similares:</strong> ${escapeHtml(String(item.similarSchoolCount || 0))}</div>
-          <div class="assignment-alert-row"><strong>Reunión confirmada:</strong> ${escapeHtml(String(item.relatedReunionCount || 0))}</div>
-          <div class="assignment-alert-row"><strong>Cotizando:</strong> ${escapeHtml(String(item.relatedCotizandoCount || 0))}</div>
-          <div class="assignment-alert-row"><strong>Contactado:</strong> ${escapeHtml(String(item.relatedContactadoCount || 0))}</div>
-          <div class="assignment-alert-row"><strong>Ganada / Perdida:</strong> ${escapeHtml(String(item.relatedGanadaCount || 0))} / ${escapeHtml(String(item.relatedPerdidaCount || 0))}</div>
-          <div class="assignment-alert-row"><strong>Total activos:</strong> ${escapeHtml(String(item.totalActiveCount || 0))}</div>
+          <div class="assignment-alert-row"><strong>Misma comuna (otros colegios):</strong> ${escapeHtml(String(item.sameComunaOnlyCount || 0))}</div>
+          <div class="assignment-alert-row"><strong>Colegios similares:</strong> ${escapeHtml(String((item.similarSchoolSameComunaCount || 0) + (item.similarSchoolCount || 0)))}</div>
+
+          <div class="assignment-alert-row"><strong>Cartera actual:</strong> ${escapeHtml(String(item.currentPortfolioCount || 0))}</div>
+          <div class="assignment-alert-row"><strong>Reuniones actuales:</strong> ${escapeHtml(String(item.currentReunionCount || 0))}</div>
+          <div class="assignment-alert-row"><strong>Ganadas actuales:</strong> ${escapeHtml(String(item.currentGanadaCount || 0))}</div>
+          <div class="assignment-alert-row"><strong>Cotizando actual:</strong> ${escapeHtml(String(item.currentCotizandoCount || 0))}</div>
+          <div class="assignment-alert-row"><strong>% reunión actual:</strong> ${escapeHtml(String(Math.round((item.reunionRateCurrent || 0) * 100)))}%</div>
+          <div class="assignment-alert-row"><strong>% ganada actual:</strong> ${escapeHtml(String(Math.round((item.ganadaRateCurrent || 0) * 100)))}%</div>
+          <div class="assignment-alert-row"><strong>% A contactar actual:</strong> ${escapeHtml(String(Math.round((item.aContactarRateCurrent || 0) * 100)))}%</div>
           <div class="assignment-alert-row"><strong>Total en A contactar:</strong> ${escapeHtml(String(item.totalAContactarCount || 0))}</div>
         </div>
 
@@ -1290,12 +1331,20 @@ async function writeAssignmentAlertReviewHistory({
       continuityScore: item.continuityScore,
       performanceScore: item.performanceScore,
       workloadScore: item.workloadScore,
+      profileType: item.profileType,
+      profileLabel: item.profileLabel,
       sameSchoolSameComunaCount: item.sameSchoolSameComunaCount,
       sameSchoolExactCount: item.sameSchoolExactCount,
+      sameComunaOnlyCount: item.sameComunaOnlyCount,
       similarSchoolSameComunaCount: item.similarSchoolSameComunaCount,
       similarSchoolCount: item.similarSchoolCount,
-      relatedReunionCount: item.relatedReunionCount,
-      relatedCotizandoCount: item.relatedCotizandoCount,
+      currentPortfolioCount: item.currentPortfolioCount,
+      currentReunionCount: item.currentReunionCount,
+      currentGanadaCount: item.currentGanadaCount,
+      currentCotizandoCount: item.currentCotizandoCount,
+      reunionRateCurrent: item.reunionRateCurrent,
+      ganadaRateCurrent: item.ganadaRateCurrent,
+      aContactarRateCurrent: item.aContactarRateCurrent,
       totalAContactarCount: item.totalAContactarCount,
       selected: Boolean(item.selected),
       reasons: item.reasons || []
