@@ -3,7 +3,12 @@
 import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.7.3/firebase-auth.js";
 import {
   collection,
-  getDocs
+  getDocs,
+  doc,
+  getDoc,
+  setDoc,
+  deleteDoc,
+  serverTimestamp
 } from "https://www.gstatic.com/firebasejs/11.7.3/firebase-firestore.js";
 
 import { auth, db, VENTAS_USERS } from "./firebase-init.js";
@@ -46,6 +51,8 @@ import {
 const GITHUB_HOME_URL = "https://sistemas-raitrai.github.io/Ventas-RT/";
 const APODERADO_FILTER_KEY = "ventas_dashboard_apoderado";
 const ALERTAS_COLLECTION = "ventas_alertas";
+const PRIVATE_NOTES_COLLECTION = "ventas_notas_privadas";
+const PRIVATE_NOTE_PAGE = "index";
 
 const searchableInstances = {};
 
@@ -233,6 +240,168 @@ function setApoderadoFilter(value = "") {
 
 function clearApoderadoFilter() {
   sessionStorage.removeItem(APODERADO_FILTER_KEY);
+}
+
+function getPrivateNoteDocId() {
+  const uid = String(auth.currentUser?.uid || "").trim();
+  if (!uid) return "";
+  return `${uid}_${PRIVATE_NOTE_PAGE}`;
+}
+
+function getPrivateNoteRef() {
+  const docId = getPrivateNoteDocId();
+  if (!docId) return null;
+  return doc(db, PRIVATE_NOTES_COLLECTION, docId);
+}
+
+function setPrivateNoteStatus(message = "", tone = "muted") {
+  const el = $("private-note-status");
+  if (!el) return;
+
+  const colors = {
+    muted: "#6a6078",
+    loading: "#6a6078",
+    ok: "#2f7a4b",
+    error: "#b33a3a"
+  };
+
+  el.textContent = message;
+  el.style.color = colors[tone] || colors.muted;
+}
+
+function setPrivateNoteBusy(isBusy = false) {
+  const textarea = $("private-note-text");
+  const btnSave = $("btn-private-note-save");
+  const btnClear = $("btn-private-note-clear");
+
+  if (textarea) textarea.disabled = isBusy;
+  if (btnSave) btnSave.disabled = isBusy;
+  if (btnClear) btnClear.disabled = isBusy;
+}
+
+async function loadPrivateNote() {
+  const textarea = $("private-note-text");
+  if (!textarea) return;
+
+  const ref = getPrivateNoteRef();
+  if (!ref) {
+    textarea.value = "";
+    setPrivateNoteStatus("No se pudo identificar tu cuenta.", "error");
+    return;
+  }
+
+  setPrivateNoteBusy(true);
+  setPrivateNoteStatus("Cargando nota privada...", "loading");
+
+  try {
+    const snap = await getDoc(ref);
+    const data = snap.exists() ? (snap.data() || {}) : {};
+
+    textarea.value = String(data.contenido || "");
+    setPrivateNoteStatus("Nota privada. Solo la ves tú.", "muted");
+  } catch (error) {
+    console.error("Error cargando nota privada:", error);
+    setPrivateNoteStatus("No se pudo cargar la nota.", "error");
+  } finally {
+    setPrivateNoteBusy(false);
+  }
+}
+
+async function savePrivateNote() {
+  const textarea = $("private-note-text");
+  const ref = getPrivateNoteRef();
+
+  if (!textarea || !ref) {
+    setPrivateNoteStatus("No se pudo guardar la nota.", "error");
+    return;
+  }
+
+  const contenido = String(textarea.value || "");
+
+  setPrivateNoteBusy(true);
+  setPrivateNoteStatus("Guardando...", "loading");
+
+  try {
+    await setDoc(
+      ref,
+      {
+        uid: String(auth.currentUser?.uid || ""),
+        pagina: PRIVATE_NOTE_PAGE,
+        contenido,
+        actualizadoEn: serverTimestamp(),
+        actualizadoPorCorreo: normalizeEmail(
+          auth.currentUser?.email || getRealUser()?.email || ""
+        )
+      },
+      { merge: true }
+    );
+
+    setPrivateNoteStatus("Guardado.", "ok");
+  } catch (error) {
+    console.error("Error guardando nota privada:", error);
+    setPrivateNoteStatus("No se pudo guardar la nota.", "error");
+  } finally {
+    setPrivateNoteBusy(false);
+  }
+}
+
+async function clearPrivateNote() {
+  const textarea = $("private-note-text");
+  const ref = getPrivateNoteRef();
+
+  if (!textarea || !ref) {
+    setPrivateNoteStatus("No se pudo limpiar la nota.", "error");
+    return;
+  }
+
+  const confirmed = window.confirm("¿Quieres borrar por completo tu nota privada?");
+  if (!confirmed) return;
+
+  setPrivateNoteBusy(true);
+  setPrivateNoteStatus("Borrando...", "loading");
+
+  try {
+    await deleteDoc(ref);
+    textarea.value = "";
+    setPrivateNoteStatus("Nota eliminada.", "ok");
+  } catch (error) {
+    console.error("Error borrando nota privada:", error);
+    setPrivateNoteStatus("No se pudo borrar la nota.", "error");
+  } finally {
+    setPrivateNoteBusy(false);
+  }
+}
+
+function bindPrivateNotePanel() {
+  const textarea = $("private-note-text");
+  const btnSave = $("btn-private-note-save");
+  const btnClear = $("btn-private-note-clear");
+
+  if (btnSave && !btnSave.dataset.bound) {
+    btnSave.dataset.bound = "1";
+    btnSave.addEventListener("click", async () => {
+      await savePrivateNote();
+    });
+  }
+
+  if (btnClear && !btnClear.dataset.bound) {
+    btnClear.dataset.bound = "1";
+    btnClear.addEventListener("click", async () => {
+      await clearPrivateNote();
+    });
+  }
+
+  if (textarea && !textarea.dataset.boundShortcut) {
+    textarea.dataset.boundShortcut = "1";
+
+    textarea.addEventListener("keydown", async (e) => {
+      const saveShortcut = (e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s";
+      if (!saveShortcut) return;
+
+      e.preventDefault();
+      await savePrivateNote();
+    });
+  }
 }
 
 function getRowId(row = {}) {
@@ -1476,10 +1645,13 @@ async function renderPantalla() {
   inicializarDashboardEnCeros();
 
   try {
-    await loadDashboardData();
-
+    await Promise.all([
+      loadDashboardData(),
+      loadPrivateNote()
+    ]);
+  
     const rowsScope = getRowsForCurrentScope(effectiveUser);
-
+  
     poblarSelectorVendedores(effectiveUser);
     poblarSelectorGrupos(effectiveUser, rowsScope);
     poblarSelectorApoderados(rowsScope);
@@ -1495,6 +1667,8 @@ async function renderPantalla() {
 ========================================================= */
 async function initPage() {
   await waitForLayoutReady();
+
+  bindPrivateNotePanel();
 
   bindLayoutButtons({
     homeUrl: GITHUB_HOME_URL,
