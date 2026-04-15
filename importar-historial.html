@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Importar Historial | Sistema Ventas RT</title>
+  <link rel="stylesheet" href="estilos.css" />
+  <link rel="icon" type="image/png" href="IMG/logo-raitrai.png" />
+
+  <style>
+    .import-shell{
+      padding:24px;
+      max-width:1200px;
+      margin:0 auto;
+    }
+
+    .import-hero{
+      background:#fff;
+      border:1px solid #e7def3;
+      border-radius:20px;
+      padding:20px;
+      box-shadow:0 10px 28px rgba(49, 22, 84, 0.08);
+      margin-bottom:18px;
+    }
+
+    .import-hero h1{
+      margin:0 0 8px;
+      font-size:28px;
+      color:#43215f;
+    }
+
+    .import-hero p{
+      margin:0;
+      color:#5f5870;
+      line-height:1.5;
+    }
+
+    .import-grid{
+      display:grid;
+      grid-template-columns:1.2fr 0.8fr;
+      gap:18px;
+      align-items:start;
+    }
+
+    .import-card{
+      background:#fff;
+      border:1px solid #e7def3;
+      border-radius:20px;
+      padding:20px;
+      box-shadow:0 10px 28px rgba(49, 22, 84, 0.08);
+    }
+
+    .import-card h2{
+      margin:0 0 14px;
+      font-size:20px;
+      color:#43215f;
+    }
+
+    .import-actions{
+      display:flex;
+      flex-wrap:wrap;
+      gap:10px;
+      margin-top:14px;
+    }
+
+    .import-help{
+      font-size:14px;
+      color:#6e6780;
+      line-height:1.5;
+      margin-top:12px;
+    }
+
+    .import-input{
+      width:100%;
+      padding:12px 14px;
+      border-radius:12px;
+      border:1px solid #d8cde8;
+      background:#fff;
+      font:inherit;
+    }
+
+    .import-stats{
+      display:grid;
+      grid-template-columns:repeat(2, minmax(0, 1fr));
+      gap:12px;
+    }
+
+    .stat-box{
+      border:1px solid #eadff7;
+      background:#faf7ff;
+      border-radius:16px;
+      padding:14px;
+    }
+
+    .stat-box .label{
+      font-size:12px;
+      color:#766e88;
+      text-transform:uppercase;
+      letter-spacing:0.04em;
+      margin-bottom:6px;
+    }
+
+    .stat-box .value{
+      font-size:24px;
+      font-weight:700;
+      color:#37184f;
+    }
+
+    .import-progress-wrap{
+      margin-top:16px;
+    }
+
+    .import-progress-label{
+      display:flex;
+      justify-content:space-between;
+      gap:12px;
+      margin-bottom:8px;
+      font-size:14px;
+      color:#5f5870;
+    }
+
+    .import-progress{
+      width:100%;
+      height:14px;
+      border-radius:999px;
+      overflow:hidden;
+      background:#eee8f8;
+      border:1px solid #ddd0ef;
+    }
+
+    .import-progress-bar{
+      height:100%;
+      width:0%;
+      background:linear-gradient(90deg, #7f55b1 0%, #b07cff 100%);
+      transition:width .2s ease;
+    }
+
+    .import-log{
+      margin-top:16px;
+      border:1px solid #eadff7;
+      border-radius:16px;
+      background:#fcfbff;
+      min-height:220px;
+      max-height:420px;
+      overflow:auto;
+      padding:14px;
+      font-family:Consolas, Monaco, monospace;
+      font-size:13px;
+      white-space:pre-wrap;
+      line-height:1.5;
+    }
+
+    .preview-table-wrap{
+      margin-top:14px;
+      border:1px solid #eadff7;
+      border-radius:16px;
+      overflow:auto;
+      max-height:360px;
+    }
+
+    .preview-table{
+      width:100%;
+      border-collapse:collapse;
+      background:#fff;
+      min-width:880px;
+    }
+
+    .preview-table th,
+    .preview-table td{
+      padding:10px 12px;
+      border-bottom:1px solid #f0e9fa;
+      text-align:left;
+      font-size:13px;
+      vertical-align:top;
+    }
+
+    .preview-table th{
+      position:sticky;
+      top:0;
+      background:#f7f1ff;
+      color:#4c2d68;
+      z-index:1;
+    }
+
+    .status-pill{
+      display:inline-flex;
+      align-items:center;
+      padding:4px 10px;
+      border-radius:999px;
+      font-size:12px;
+      font-weight:700;
+      border:1px solid transparent;
+    }
+
+    .status-pill.ok{
+      background:#eef9f0;
+      color:#1f6a34;
+      border-color:#cdecd5;
+    }
+
+    .status-pill.warn{
+      background:#fff7ea;
+      color:#8a5a00;
+      border-color:#f3ddb0;
+    }
+
+    .status-pill.info{
+      background:#f1efff;
+      color:#5d37a2;
+      border-color:#ddd4fb;
+    }
+
+    .danger-note{
+      margin-top:12px;
+      padding:12px 14px;
+      border-radius:14px;
+      background:#fff3f3;
+      border:1px solid #f0c5c5;
+      color:#8f2e2e;
+      font-size:14px;
+      line-height:1.5;
+    }
+
+    .success-note{
+      margin-top:12px;
+      padding:12px 14px;
+      border-radius:14px;
+      background:#eef9f0;
+      border:1px solid #cdecd5;
+      color:#1f6a34;
+      font-size:14px;
+      line-height:1.5;
+    }
+
+    .hidden{
+      display:none !important;
+    }
+
+    @media (max-width: 980px){
+      .import-grid{
+        grid-template-columns:1fr;
+      }
+
+      .import-stats{
+        grid-template-columns:1fr 1fr;
+      }
+    }
+
+    @media (max-width: 640px){
+      .import-shell{
+        padding:16px;
+      }
+
+      .import-stats{
+        grid-template-columns:1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div id="appLayout"></div>
+
+  <main class="import-shell">
+    <section class="import-hero">
+      <h1>Importar historial antiguo</h1>
+      <p>
+        Esta herramienta importa historial antiguo desde CSV a <strong>ventas_historial</strong>.
+        Las filas sin coincidencia por <strong>codigoRegistro</strong> se guardan automáticamente en
+        <strong>ventas_historial_fallidas</strong>.
+      </p>
+    </section>
+
+    <section class="import-grid">
+      <div class="import-card">
+        <h2>Archivo y control</h2>
+
+        <input
+          id="fileCsv"
+          class="import-input"
+          type="file"
+          accept=".csv,text/csv"
+        />
+
+        <div class="import-help">
+          Columnas esperadas:
+          <strong>fecha</strong>,
+          <strong>nombreUsuario</strong>,
+          <strong>codigoRegistro</strong>,
+          <strong>mensaje</strong>,
+          <strong>Asunto</strong>.
+          <br />
+          El sistema detecta automáticamente si el CSV usa <strong>,</strong> o <strong>;</strong>.
+        </div>
+
+        <div class="import-actions">
+          <button id="btnAnalizar" class="btn-primary" type="button">Analizar archivo</button>
+          <button id="btnImportar" class="btn-primary" type="button" disabled>Importar a Firestore</button>
+          <button id="btnLimpiar" class="btn-secondary" type="button">Limpiar</button>
+        </div>
+
+        <div id="dangerBox" class="danger-note hidden"></div>
+        <div id="successBox" class="success-note hidden"></div>
+
+        <div class="import-progress-wrap">
+          <div class="import-progress-label">
+            <span id="progressText">Sin proceso en curso</span>
+            <span id="progressPercent">0%</span>
+          </div>
+          <div class="import-progress">
+            <div id="progressBar" class="import-progress-bar"></div>
+          </div>
+        </div>
+
+        <div id="importLog" class="import-log">Esperando archivo...</div>
+      </div>
+
+      <div class="import-card">
+        <h2>Resumen</h2>
+
+        <div class="import-stats">
+          <div class="stat-box">
+            <div class="label">Filas leídas</div>
+            <div id="statRows" class="value">0</div>
+          </div>
+
+          <div class="stat-box">
+            <div class="label">Válidas</div>
+            <div id="statValid" class="value">0</div>
+          </div>
+
+          <div class="stat-box">
+            <div class="label">Coincidencias</div>
+            <div id="statMatched" class="value">0</div>
+          </div>
+
+          <div class="stat-box">
+            <div class="label">Sin coincidencia</div>
+            <div id="statUnmatched" class="value">0</div>
+          </div>
+
+          <div class="stat-box">
+            <div class="label">Importadas</div>
+            <div id="statImported" class="value">0</div>
+          </div>
+
+          <div class="stat-box">
+            <div class="label">Falladas guardadas</div>
+            <div id="statFailedSaved" class="value">0</div>
+          </div>
+        </div>
+
+        <div class="import-help" style="margin-top:14px;">
+          La importación usa un ID determinístico por fila legacy, para evitar duplicados si vuelves
+          a cargar el mismo archivo.
+        </div>
+      </div>
+    </section>
+
+    <section class="import-card" style="margin-top:18px;">
+      <h2>Previsualización</h2>
+
+      <div class="preview-table-wrap">
+        <table class="preview-table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Fecha</th>
+              <th>Usuario</th>
+              <th>Código</th>
+              <th>Asunto</th>
+              <th>Mensaje limpio</th>
+              <th>Estado</th>
+            </tr>
+          </thead>
+          <tbody id="previewBody">
+            <tr>
+              <td colspan="7" style="text-align:center; color:#7a738c;">Sin datos aún</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <script type="module" src="importar-historial.js"></script>
+</body>
+</html>
