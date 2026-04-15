@@ -64,10 +64,13 @@ const state = {
   realUser: null,
   effectiveUser: null,
   rows: [],
+  quoteRows: [],
   filteredRows: [],
   pageRows: [],
   vendorFilter: "",
   statusFilter: "ok",
+  trabajoFilter: "all",
+  includePastYears: false,
   search: "",
   modalMode: "create",
   editingOriginal: null,
@@ -96,6 +99,300 @@ function getRoleHintText() {
 function getVendorNameByEmail(email = "") {
   const seller = state.vendors.find(v => normalizeEmail(v.email) === normalizeEmail(email));
   return seller ? `${seller.nombre} ${seller.apellido}`.trim() : email;
+}
+
+function toDateValue(value) {
+  if (!value) return null;
+  if (value instanceof Date) return Number.isNaN(value.getTime()) ? null : value;
+  if (typeof value?.toDate === "function") {
+    const d = value.toDate();
+    return Number.isNaN(d.getTime()) ? null : d;
+  }
+  if (typeof value === "string") {
+    const d = new Date(value);
+    return Number.isNaN(d.getTime()) ? null : d;
+  }
+  return null;
+}
+
+function formatDateOnly(value) {
+  const d = toDateValue(value);
+  if (!d) return "";
+  return d.toLocaleDateString("es-CL");
+}
+
+function normalizeSchoolKey(value = "") {
+  return normalizeSearch(value)
+    .replace(/\b(colegio|liceo|escuela|school|instituto|centro|educacional)\b/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function parseMaybeJson(value, fallback = null) {
+  if (Array.isArray(value)) return value;
+  if (value && typeof value === "object") return value;
+  const raw = String(value || "").trim();
+  if (!raw) return fallback;
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return fallback;
+  }
+}
+
+function normalizePhoneLoose(value = "") {
+  let digits = String(value || "").replace(/\D/g, "");
+  if (digits.startsWith("56")) digits = digits.slice(2);
+  if (digits.startsWith("9")) digits = digits.slice(1);
+  return digits.slice(-8);
+}
+
+function stringifyContact(contact = {}) {
+  const parts = [
+    normalizeText(contact.nombre || ""),
+    normalizeText(contact.rol || ""),
+    normalizeText(contact.correo || ""),
+    normalizeText(contact.telefono || "")
+  ].filter(Boolean);
+  return parts.join(" · ");
+}
+
+function buildContact(nombre = "", rol = "", correo = "", telefono = "") {
+  return {
+    nombre: normalizeText(nombre),
+    rol: normalizeText(rol),
+    correo: normalizeEmail(correo),
+    telefono: normalizeText(telefono)
+  };
+}
+
+function normalizeCourseToken(value = "") {
+  return normalizeText(value).toUpperCase().replace(/\s+/g, "");
+}
+
+function parseCursoDescriptor(rawValue = "") {
+  const raw = normalizeCourseToken(rawValue);
+  if (!raw) return null;
+
+  const match = raw.match(/^(11|10|[1-9])(.*)$/);
+  if (!match) return null;
+
+  const nivel = String(match[1]);
+  const suffix = String(match[2] || "").trim();
+
+  if (!suffix) {
+    return { nivel, mode: "unknown", sections: [], raw };
+  }
+
+  if (suffix === "COMPLETO") {
+    return { nivel, mode: "full", sections: [], raw };
+  }
+
+  if (suffix === "SINDETALLE") {
+    return { nivel, mode: "unknown", sections: [], raw };
+  }
+
+  if (/^[A-Z]{1,4}$/.test(suffix) && suffix.length > 1 && suffix.length <= 4) {
+    return { nivel, mode: "sections", sections: suffix.split(""), raw };
+  }
+
+  return { nivel, mode: "sections", sections: [suffix], raw };
+}
+
+function parseNivelesText(text = "") {
+  const lines = String(text || "")
+    .split(/\n|;/)
+    .map((line) => normalizeText(line))
+    .filter(Boolean);
+
+  const out = [];
+
+  lines.forEach((line) => {
+    const normalized = line.toUpperCase();
+
+    if (normalized.includes(":")) {
+      const [nivelRaw, restRaw] = normalized.split(":");
+      const nivelMatch = normalizeText(nivelRaw).match(/^(11|10|[1-9])$/);
+      if (!nivelMatch) return;
+
+      const nivel = nivelMatch[1];
+      const rest = normalizeText(restRaw || "");
+
+      if (!rest || rest === "SINDETALLE" || rest === "SIN DETALLE") {
+        out.push({ nivel, mode: "unknown", sections: [], raw: line });
+        return;
+      }
+
+      if (rest === "COMPLETO") {
+        out.push({ nivel, mode: "full", sections: [], raw: line });
+        return;
+      }
+
+      const sections = rest
+        .split(/,|\//)
+        .map((item) => normalizeCourseToken(item))
+        .filter(Boolean);
+
+      out.push({
+        nivel,
+        mode: sections.length ? "sections" : "unknown",
+        sections,
+        raw: line
+      });
+      return;
+    }
+
+    const parsed = parseCursoDescriptor(line);
+    if (parsed) out.push(parsed);
+  });
+
+  return out;
+}
+
+function summarizeNiveles(niveles = []) {
+  return niveles.map((item) => {
+    if (item.mode === "full") return `${item.nivel} completo`;
+    if (item.mode === "unknown") return `${item.nivel} sin detalle`;
+    return `${item.nivel} (${item.sections.join(", ")})`;
+  }).join(" · ");
+}
+
+function parseStoredNiveles(data = {}) {
+  const direct = parseMaybeJson(data.nivelesColegio, null);
+  if (Array.isArray(direct)) return direct;
+  return parseNivelesText(data.resumenNiveles || data.nivelesTexto || "");
+}
+
+function getDefaultCurrentDateInput() {
+  const now = new Date();
+  const yyyy = now.getFullYear();
+  const mm = String(now.getMonth() + 1).padStart(2, "0");
+  const dd = String(now.getDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+function getHistoryCollectionRef(correoVendedor = "", numeroColegio = "") {
+  return collection(
+    db,
+    "ventas_cartera",
+    normalizeEmail(correoVendedor),
+    "items",
+    String(numeroColegio),
+    "historial"
+  );
+}
+
+function canEditCarteraRow(row = null) {
+  if (canManageVentasRole(state.effectiveUser)) return true;
+  if (!isVendedorRole(state.effectiveUser)) return false;
+  if (!row) return false;
+  return normalizeEmail(row.correoVendedor) === normalizeEmail(state.effectiveUser?.email || "");
+}
+
+function canDeleteCarteraRow() {
+  return canManageVentasRole(state.effectiveUser);
+}
+
+function canCreateCarteraRow() {
+  return canManageVentasRole(state.effectiveUser);
+}
+
+function buildHistorySummaryForChanges(changes = []) {
+  return changes
+    .map((item) => `${item.label}: ${item.before || "vacío"} → ${item.after || "vacío"}`)
+    .join(" | ");
+}
+
+function normalizeQuoteSchoolMatch(row = {}, quote = {}) {
+  const schoolOk = normalizeSchoolKey(row.colegio) === normalizeSchoolKey(quote.colegio || quote.colegioBase || "");
+  if (!schoolOk) return false;
+
+  const rowComuna = normalizeSearch(row.comuna || "");
+  const quoteComuna = normalizeSearch(quote.comunaCiudad || quote.comuna || "");
+
+  if (!rowComuna || !quoteComuna) return true;
+  return rowComuna === quoteComuna;
+}
+
+function getQuotesForRow(row = {}) {
+  return state.quoteRows.filter((quote) => normalizeQuoteSchoolMatch(row, quote));
+}
+
+function parseQuoteCoverage(quote = {}) {
+  return parseCursoDescriptor(quote.cursoViaje || quote.curso || "");
+}
+
+function computeRowMetrics(row = {}) {
+  const currentYear = new Date().getFullYear();
+
+  const quotes = getQuotesForRow(row).filter((quote) => {
+    const year = Number(String(quote.anoViaje || "").match(/\d{4}/)?.[0] || "");
+    if (!Number.isFinite(year)) return state.includePastYears;
+    return state.includePastYears ? true : year >= currentYear;
+  });
+
+  const byYear = new Map();
+  quotes.forEach((quote) => {
+    const year = String(quote.anoViaje || "Sin año");
+    byYear.set(year, (byYear.get(year) || 0) + 1);
+  });
+
+  const yearlySummary = [...byYear.entries()]
+    .sort((a, b) => String(a[0]).localeCompare(String(b[0]), "es", { numeric: true }))
+    .map(([year, count]) => `${year}: ${count}`)
+    .join(" · ");
+
+  const niveles = Array.isArray(row.nivelesColegio) ? row.nivelesColegio : [];
+  const faltantes = [];
+  const trabajadoSinDetalle = [];
+
+  niveles.forEach((nivelItem) => {
+    const sameLevelQuotes = quotes
+      .map((quote) => parseQuoteCoverage(quote))
+      .filter((parsed) => parsed && parsed.nivel === nivelItem.nivel);
+
+    if (!sameLevelQuotes.length) {
+      if (nivelItem.mode === "sections" && nivelItem.sections.length) {
+        nivelItem.sections.forEach((section) => faltantes.push(`${nivelItem.nivel}${section}`));
+      } else {
+        faltantes.push(`${nivelItem.nivel}`);
+      }
+      return;
+    }
+
+    if (nivelItem.mode === "full") return;
+    if (nivelItem.mode === "unknown") return;
+
+    const covered = new Set();
+
+    sameLevelQuotes.forEach((parsed) => {
+      if (parsed.mode === "full") {
+        nivelItem.sections.forEach((section) => covered.add(section));
+        return;
+      }
+
+      if (parsed.mode === "unknown") {
+        trabajadoSinDetalle.push(nivelItem.nivel);
+        return;
+      }
+
+      parsed.sections.forEach((section) => {
+        if (nivelItem.sections.includes(section)) covered.add(section);
+      });
+    });
+
+    nivelItem.sections.forEach((section) => {
+      if (!covered.has(section)) faltantes.push(`${nivelItem.nivel}${section}`);
+    });
+  });
+
+  return {
+    totalQuotes: quotes.length,
+    yearlySummary: yearlySummary || "—",
+    faltantes,
+    trabajadoSinDetalle: [...new Set(trabajadoSinDetalle)],
+    quotes
+  };
 }
 
 function getAliasList(user) {
@@ -160,7 +457,11 @@ function buildScopeText() {
 }
 
 function mapDocToRow(docId, data) {
-  return {
+  const contactosDirect = parseMaybeJson(data.contactosColegio, []) || [];
+  const contactos = Array.isArray(contactosDirect) ? contactosDirect : [];
+  const nivelesColegio = parseStoredNiveles(data);
+
+  const row = {
     numeroColegio: normalizeText(data.numeroColegio || docId),
     colegio: normalizeText(data.colegio),
     nombreVendedor: normalizeText(data.nombreVendedor),
@@ -171,14 +472,26 @@ function mapDocToRow(docId, data) {
     estatus: normalizeText(data.estatus),
     observaciones: normalizeText(data.observaciones),
 
-    // Compatibilidad:
-    // seguimos usando logoUrl/logoPath en la vista actual de cartera,
-    // pero además exponemos logoColegioUrl/logoColegioPath.
     logoUrl: String(data.logoColegioUrl || data.logoUrl || "").trim(),
     logoPath: String(data.logoColegioPath || data.logoPath || "").trim(),
     logoColegioUrl: String(data.logoColegioUrl || data.logoUrl || "").trim(),
-    logoColegioPath: String(data.logoColegioPath || data.logoPath || "").trim()
+    logoColegioPath: String(data.logoColegioPath || data.logoPath || "").trim(),
+
+    nivelesColegio,
+    resumenNiveles: normalizeText(data.resumenNiveles || summarizeNiveles(nivelesColegio)),
+    contactosColegio: contactos,
+    trabajado: !!data.trabajado,
+    visitado: !!data.visitado,
+    fechaUltimaVisita: normalizeText(data.fechaUltimaVisita || ""),
+    ultimaGestionTipo: normalizeText(data.ultimaGestionTipo || ""),
+    ultimaGestionAsunto: normalizeText(data.ultimaGestionAsunto || ""),
+    ultimaGestionMensaje: normalizeText(data.ultimaGestionMensaje || ""),
+    ultimaGestionFechaText: normalizeText(data.ultimaGestionFechaText || ""),
+    ultimaGestionAt: data.ultimaGestionAt || null
   };
+
+  row.metrics = computeRowMetrics(row);
+  return row;
 }
 
 function buildItemPayload(input, existing = null) {
@@ -191,6 +504,22 @@ function buildItemPayload(input, existing = null) {
     input.logoPath !== undefined && input.logoPath !== null
       ? String(input.logoPath).trim()
       : String(input.logoColegioPath ?? existing?.logoPath ?? existing?.logoColegioPath ?? "").trim();
+
+  const nivelesColegio = Array.isArray(input.nivelesColegio)
+    ? input.nivelesColegio
+    : (Array.isArray(existing?.nivelesColegio) ? existing.nivelesColegio : []);
+
+  const contactosColegio = Array.isArray(input.contactosColegio)
+    ? input.contactosColegio
+    : (Array.isArray(existing?.contactosColegio) ? existing.contactosColegio : []);
+
+  const trabajado = input.trabajado !== undefined
+    ? !!input.trabajado
+    : !!(existing?.trabajado);
+
+  const visitado = input.visitado !== undefined
+    ? !!input.visitado
+    : !!(existing?.visitado);
 
   return {
     numeroColegio: normalizeText(input.numeroColegio),
@@ -212,7 +541,21 @@ function buildItemPayload(input, existing = null) {
         : existing?.observaciones || ""
     ),
 
-    // Se guardan ambos nombres en paralelo
+    nivelesColegio,
+    resumenNiveles: normalizeText(input.resumenNiveles || summarizeNiveles(nivelesColegio)),
+    contactosColegio,
+    trabajado,
+    visitado,
+    fechaUltimaVisita: normalizeText(input.fechaUltimaVisita || existing?.fechaUltimaVisita || ""),
+    ultimaGestionTipo: normalizeText(input.ultimaGestionTipo || existing?.ultimaGestionTipo || ""),
+    ultimaGestionAsunto: normalizeText(input.ultimaGestionAsunto || existing?.ultimaGestionAsunto || ""),
+    ultimaGestionMensaje: normalizeText(input.ultimaGestionMensaje || existing?.ultimaGestionMensaje || ""),
+    ultimaGestionFechaText: normalizeText(input.ultimaGestionFechaText || existing?.ultimaGestionFechaText || ""),
+    ultimaGestionAt:
+      input.ultimaGestionTipo || input.ultimaGestionAsunto || input.ultimaGestionMensaje || input.fechaUltimaVisita
+        ? serverTimestamp()
+        : (existing?.ultimaGestionAt || null),
+
     logoUrl: nextLogoUrl,
     logoPath: nextLogoPath,
     logoColegioUrl:
@@ -436,6 +779,8 @@ function renderRoleButtons() {
     deleteSelectedBtn.classList.toggle("hidden", !allowManage);
     deleteSelectedBtn.disabled = !allowManage || state.selectedKeys.size === 0;
   }
+
+  $("vendorEditHint")?.classList.toggle("hidden", !isVendedorRole(state.effectiveUser));
 }
 
 function renderVendorFilter() {
@@ -470,7 +815,16 @@ function getSearchTarget(row) {
     row.comuna,
     row.ciudad,
     row.estatus,
-    row.observaciones
+    row.observaciones,
+    row.resumenNiveles,
+    stringifyContact(row.contactosColegio?.[0] || {}),
+    stringifyContact(row.contactosColegio?.[1] || {}),
+    row.ultimaGestionTipo,
+    row.ultimaGestionAsunto,
+    row.ultimaGestionMensaje,
+    row.fechaUltimaVisita,
+    row.metrics?.yearlySummary,
+    (row.metrics?.faltantes || []).join(" ")
   ].join(" "));
 }
 
@@ -479,8 +833,11 @@ const SORTABLE_COLUMNS = [
   "vendedor",
   "colegio",
   "comuna",
-  "estatus",
-  "observaciones"
+  "niveles",
+  "trabajo",
+  "cotizaciones",
+  "faltantes",
+  "estatus"
 ];
 
 const COLUMN_LABELS = {
@@ -488,8 +845,11 @@ const COLUMN_LABELS = {
   vendedor: "Vendedor(a)",
   colegio: "Colegio",
   comuna: "Comuna",
-  estatus: "Estatus",
-  observaciones: "Observaciones"
+  niveles: "Niveles",
+  trabajo: "Seguimiento",
+  cotizaciones: "Cotizaciones",
+  faltantes: "Faltantes",
+  estatus: "Estatus"
 };
 
 function getColumnLabel(key = "") {
@@ -500,6 +860,17 @@ function getCellValue(row, key) {
   if (key === "vendedor") {
     return normalizeText(`${row.nombreVendedor || ""} ${row.apellidoVendedor || ""}`.trim());
   }
+  if (key === "niveles") return normalizeText(row.resumenNiveles || "");
+  if (key === "trabajo") {
+    return normalizeText([
+      row.trabajado ? "TRABAJADO" : "PENDIENTE",
+      row.visitado ? "VISITADO" : "",
+      row.ultimaGestionTipo || "",
+      row.ultimaGestionAsunto || ""
+    ].join(" "));
+  }
+  if (key === "cotizaciones") return String(row.metrics?.totalQuotes || 0);
+  if (key === "faltantes") return normalizeText((row.metrics?.faltantes || []).join(" "));
   return normalizeText(row?.[key] ?? "");
 }
 
@@ -653,7 +1024,14 @@ function applyFilters() {
   } else if (state.statusFilter === "pending") {
     rows = rows.filter(r => normalizeText(r.estatus) !== "OK");
   }
-  // "all" no filtra por estatus
+
+  if (state.trabajoFilter === "pendiente") {
+    rows = rows.filter((r) => !r.trabajado);
+  } else if (state.trabajoFilter === "trabajado") {
+    rows = rows.filter((r) => !!r.trabajado);
+  } else if (state.trabajoFilter === "visitado") {
+    rows = rows.filter((r) => !!r.visitado);
+  }
 
   const q = normalizeSearch(state.search);
   if (q) {
@@ -692,8 +1070,11 @@ function renderTable() {
       <th class="logo-col logo-head">Logo</th>
       <th>${renderSortButton("colegio")}</th>
       <th>${renderSortButton("comuna")}</th>
+      <th>${renderSortButton("niveles")}</th>
+      <th>${renderSortButton("trabajo")}</th>
+      <th>${renderSortButton("cotizaciones")}</th>
+      <th>${renderSortButton("faltantes")}</th>
       <th>${renderSortButton("estatus")}</th>
-      <th>${renderSortButton("observaciones")}</th>
       <th class="actions-col actions-head">Acciones</th>
     </tr>
   `;
@@ -720,23 +1101,38 @@ function renderTable() {
     const sellerName = `${row.nombreVendedor} ${row.apellidoVendedor}`.trim();
     const rowKey = `${normalizeEmail(row.correoVendedor)}__${String(row.numeroColegio)}`;
     const checked = state.selectedKeys.has(rowKey) ? "checked" : "";
+    const canEdit = canEditCarteraRow(row);
+    const canDelete = canDeleteCarteraRow();
+    const metrics = row.metrics || { totalQuotes: 0, yearlySummary: "—", faltantes: [], trabajadoSinDetalle: [] };
 
-    const actions = allowManage
-      ? `
-        <div class="table-actions">
-          <button class="btn-mini edit" data-action="edit" data-id="${escapeHtml(row.numeroColegio)}" data-email="${escapeHtml(row.correoVendedor)}">Editar</button>
-          <button class="btn-mini delete" data-action="delete" data-id="${escapeHtml(row.numeroColegio)}" data-email="${escapeHtml(row.correoVendedor)}">Eliminar</button>
-        </div>
-      `
-      : `
-        <div class="table-actions">
-          <button class="btn-mini view" type="button" disabled>Observador</button>
-        </div>
-      `;
+    const actions = `
+      <div class="table-actions">
+        ${canEdit ? `<button class="btn-mini edit" data-action="edit" data-id="${escapeHtml(row.numeroColegio)}" data-email="${escapeHtml(row.correoVendedor)}">Editar</button>` : ""}
+        ${canDelete ? `<button class="btn-mini delete" data-action="delete" data-id="${escapeHtml(row.numeroColegio)}" data-email="${escapeHtml(row.correoVendedor)}">Eliminar</button>` : ""}
+        <button class="btn-mini view" data-action="history" data-id="${escapeHtml(row.numeroColegio)}" data-email="${escapeHtml(row.correoVendedor)}">Historial</button>
+      </div>
+    `;
 
     const logoHtml = row.logoUrl
       ? `<img class="school-logo-thumb" src="${escapeHtml(row.logoUrl)}" alt="Logo ${escapeHtml(row.colegio || row.numeroColegio)}" loading="lazy" />`
       : `<div class="school-logo-empty">—</div>`;
+
+    const trabajoChips = [
+      row.trabajado ? `<span class="metric-chip ok">Trabajado</span>` : `<span class="metric-chip warn">Pendiente</span>`,
+      row.visitado ? `<span class="metric-chip">Visitado</span>` : ""
+    ].filter(Boolean).join("");
+
+    const ultimaGestionTxt = [row.ultimaGestionTipo, row.ultimaGestionAsunto, row.ultimaGestionFechaText || row.fechaUltimaVisita]
+      .filter(Boolean)
+      .join(" · ");
+
+    const faltantesTxt = metrics.faltantes.length
+      ? metrics.faltantes.join(", ")
+      : "Sin faltantes detectados";
+
+    const sinDetalleTxt = metrics.trabajadoSinDetalle.length
+      ? `Trabajado sin detalle: ${metrics.trabajadoSinDetalle.join(", ")}`
+      : "";
 
     return `
       <tr>
@@ -754,10 +1150,37 @@ function renderTable() {
         <td>${escapeHtml(row.numeroColegio)}</td>
         <td>${escapeHtml(sellerName)}</td>
         <td class="logo-col">${logoHtml}</td>
-        <td>${escapeHtml(row.colegio)}</td>
-        <td>${escapeHtml(row.comuna)}</td>
+        <td>
+          <div class="stack-tight">
+            <strong>${escapeHtml(row.colegio)}</strong>
+            <div class="table-note">${escapeHtml((row.contactosColegio || []).map(c => c.nombre).filter(Boolean).join(" · ") || "Sin contactos cargados")}</div>
+          </div>
+        </td>
+        <td>${escapeHtml(row.comuna || row.ciudad || "—")}</td>
+        <td>
+          <div class="stack-tight">
+            <strong>${escapeHtml(row.resumenNiveles || "Sin definir")}</strong>
+            <div class="table-note">${escapeHtml(sinDetalleTxt || "—")}</div>
+          </div>
+        </td>
+        <td>
+          <div class="stack-tight">
+            <div>${trabajoChips}</div>
+            <div class="table-note">${escapeHtml(ultimaGestionTxt || "Sin gestión registrada")}</div>
+          </div>
+        </td>
+        <td>
+          <div class="stack-tight">
+            <strong>${escapeHtml(String(metrics.totalQuotes || 0))}</strong>
+            <div class="table-note">${escapeHtml(metrics.yearlySummary || "—")}</div>
+          </div>
+        </td>
+        <td>
+          <div class="stack-tight">
+            <strong>${escapeHtml(faltantesTxt)}</strong>
+          </div>
+        </td>
         <td>${escapeHtml(row.estatus)}</td>
-        <td>${escapeHtml(row.observaciones)}</td>
         <td class="actions-col">${actions}</td>
       </tr>
     `;
@@ -866,8 +1289,18 @@ async function loadAllItems() {
   return rows;
 }
 
+async function loadQuoteRows() {
+  const snap = await getDocs(collection(db, "ventas_cotizaciones"));
+  state.quoteRows = snap.docs.map((docSnap) => ({
+    id: docSnap.id,
+    ...(docSnap.data() || {})
+  }));
+}
+
 async function loadData() {
   try {
+    await loadQuoteRows();
+
     if (isVendedorRole(state.effectiveUser)) {
       const sellerEmails = getVentasUserEmails(state.effectiveUser);
       state.vendorFilter = normalizeEmail(sellerEmails[0] || state.effectiveUser.email);
@@ -875,6 +1308,11 @@ async function loadData() {
     } else {
       state.rows = await loadAllItems();
     }
+
+    state.rows = state.rows.map((row) => ({
+      ...row,
+      metrics: computeRowMetrics(row)
+    }));
 
     renderRoleButtons();
     renderVendorFilter();
@@ -990,8 +1428,134 @@ function validateRowInput(input) {
   return "";
 }
 
+function buildHistoryChanges(oldRow = {}, input = {}) {
+  const fields = [
+    ["colegio", "Colegio"],
+    ["comuna", "Comuna"],
+    ["ciudad", "Ciudad"],
+    ["estatus", "Estatus"],
+    ["observaciones", "Observaciones"],
+    ["resumenNiveles", "Niveles"],
+    ["ultimaGestionTipo", "Tipo gestión"],
+    ["ultimaGestionAsunto", "Asunto gestión"],
+    ["ultimaGestionMensaje", "Mensaje gestión"],
+    ["fechaUltimaVisita", "Fecha visita"]
+  ];
+
+  const changes = [];
+
+  fields.forEach(([key, label]) => {
+    const before = normalizeText(oldRow?.[key] || "");
+    const after = normalizeText(input?.[key] || "");
+    if (before !== after) {
+      changes.push({ key, label, before, after });
+    }
+  });
+
+  const contactsBefore = (oldRow?.contactosColegio || []).map(stringifyContact).join(" | ");
+  const contactsAfter = (input?.contactosColegio || []).map(stringifyContact).join(" | ");
+  if (contactsBefore !== contactsAfter) {
+    changes.push({
+      key: "contactosColegio",
+      label: "Contactos",
+      before: contactsBefore,
+      after: contactsAfter
+    });
+  }
+
+  return changes;
+}
+
+async function writeCarteraHistory({
+  correoVendedor,
+  numeroColegio,
+  tipo = "Actualización",
+  asunto = "",
+  mensaje = "",
+  metadata = {}
+}) {
+  const historyRef = doc(getHistoryCollectionRef(correoVendedor, numeroColegio));
+
+  await setDoc(historyRef, {
+    tipo: normalizeText(tipo),
+    asunto: normalizeText(asunto),
+    mensaje: normalizeText(mensaje),
+    metadata,
+    hechoPor: getNombreUsuario(state.effectiveUser),
+    hechoPorCorreo: normalizeEmail(state.realUser?.email || ""),
+    fecha: serverTimestamp()
+  });
+}
+
+async function openHistoryModal(row) {
+  const modal = $("historyModal");
+  const body = $("historyBody");
+  const title = $("historyTitle");
+
+  if (!modal || !body || !title || !row) return;
+
+  title.textContent = `Historial · ${row.colegio || row.numeroColegio}`;
+  body.innerHTML = `<div class="history-empty">Cargando historial...</div>`;
+  modal.classList.add("show");
+
+  try {
+    const qy = query(
+      getHistoryCollectionRef(row.correoVendedor, row.numeroColegio),
+      orderBy("fecha", "desc"),
+      limit(30)
+    );
+
+    const snap = await getDocs(qy);
+
+    if (snap.empty) {
+      body.innerHTML = `<div class="history-empty">No hay historial para este colegio todavía.</div>`;
+      return;
+    }
+
+    body.innerHTML = snap.docs.map((docSnap) => {
+      const item = docSnap.data() || {};
+      const changes = Array.isArray(item.metadata?.changes) ? item.metadata.changes : [];
+
+      return `
+        <div class="history-item">
+          <div class="history-top">
+            <strong>${escapeHtml(normalizeText(item.tipo || "Movimiento"))}</strong>
+            <span>${escapeHtml(formatDateOnly(item.fecha) || "")}</span>
+          </div>
+
+          ${item.asunto ? `<div class="history-line"><strong>Asunto:</strong> ${escapeHtml(item.asunto)}</div>` : ""}
+          ${item.mensaje ? `<div class="history-line"><strong>Detalle:</strong> ${escapeHtml(item.mensaje)}</div>` : ""}
+
+          ${changes.length ? `
+            <div class="history-line"><strong>Cambios:</strong></div>
+            ${changes.map((change) => `
+              <div class="history-line">• <strong>${escapeHtml(change.label || change.key || "Campo")}:</strong> ${escapeHtml(change.before || "vacío")} → ${escapeHtml(change.after || "vacío")}</div>
+            `).join("")}
+          ` : ""}
+
+          <div class="history-line">
+            <strong>Hecho por:</strong>
+            ${escapeHtml(normalizeText(item.hechoPor || "—"))}
+            ${item.hechoPorCorreo ? ` · ${escapeHtml(normalizeEmail(item.hechoPorCorreo))}` : ""}
+          </div>
+        </div>
+      `;
+    }).join("");
+  } catch (error) {
+    console.error(error);
+    body.innerHTML = `<div class="history-empty">No se pudo cargar el historial.</div>`;
+  }
+}
+
+function closeHistoryModal() {
+  $("historyModal")?.classList.remove("show");
+}
+
 async function saveModal() {
-  if (!canManageVentasRole(state.effectiveUser)) return;
+  const canCreate = state.modalMode === "create" && canCreateCarteraRow();
+  const canEdit = state.modalMode === "edit" && canEditCarteraRow(state.editingOriginal);
+
+  if (!canCreate && !canEdit) return;
 
   const input = readModalInput();
   const validation = validateRowInput(input);
@@ -1011,6 +1575,7 @@ async function saveModal() {
     });
 
     let oldLogoPathToDelete = "";
+    let historyPayload = null;
 
     if (state.modalMode === "create") {
       const exists = await getDoc(newItemRef);
@@ -1038,6 +1603,19 @@ async function saveModal() {
         fechaCreacion: serverTimestamp()
       }, { merge: true });
 
+      historyPayload = {
+        tipo: "Creación",
+        asunto: "Colegio agregado a cartera",
+        mensaje: input.ultimaGestionAsunto || input.ultimaGestionMensaje || "Se creó el colegio en cartera.",
+        metadata: {
+          changes: [
+            { key: "colegio", label: "Colegio", before: "", after: input.colegio },
+            { key: "niveles", label: "Niveles", before: "", after: input.resumenNiveles || "" },
+            { key: "contactos", label: "Contactos", before: "", after: (input.contactosColegio || []).map(stringifyContact).join(" | ") }
+          ]
+        }
+      };
+
       setProgressStatus({
         text: "Registro guardado.",
         meta: "Colegio agregado correctamente.",
@@ -1052,40 +1630,37 @@ async function saveModal() {
         normalizeEmail(old.correoVendedor) === normalizeEmail(input.correoVendedor) &&
         normalizeText(old.numeroColegio) === normalizeText(input.numeroColegio);
 
+      const existingData = samePath
+        ? ((await getDoc(newItemRef)).data() || {})
+        : ((await getDoc(oldItemRef)).data() || {});
+
+      let logoUrl = String(existingData?.logoUrl || "").trim();
+      let logoPath = String(existingData?.logoPath || "").trim();
+
+      if (state.removeCurrentLogo) {
+        oldLogoPathToDelete = logoPath || "";
+        logoUrl = "";
+        logoPath = "";
+      }
+
+      if (state.pendingLogoFile) {
+        setProgressStatus({
+          text: "Guardando registro...",
+          meta: "Subiendo logo...",
+          progress: 50
+        });
+
+        const uploadedLogo = await uploadSchoolLogo(state.pendingLogoFile, input);
+        oldLogoPathToDelete = logoPath || "";
+        logoUrl = uploadedLogo.logoUrl;
+        logoPath = uploadedLogo.logoPath;
+      }
+
       if (samePath) {
-        const existingSnap = await getDoc(newItemRef);
-        const existingData = existingSnap.exists() ? existingSnap.data() : null;
-
-        let logoUrl = String(existingData?.logoUrl || "").trim();
-        let logoPath = String(existingData?.logoPath || "").trim();
-
-        if (state.removeCurrentLogo) {
-          oldLogoPathToDelete = logoPath || "";
-          logoUrl = "";
-          logoPath = "";
-        }
-
-        if (state.pendingLogoFile) {
-          setProgressStatus({
-            text: "Guardando registro...",
-            meta: "Subiendo nuevo logo...",
-            progress: 50
-          });
-
-          const uploadedLogo = await uploadSchoolLogo(state.pendingLogoFile, input);
-          oldLogoPathToDelete = logoPath || "";
-          logoUrl = uploadedLogo.logoUrl;
-          logoPath = uploadedLogo.logoPath;
-        }
-
         await setDoc(newParentRef, buildParentVendorPayload(input), { merge: true });
         await setDoc(newItemRef, {
           ...buildItemPayload({ ...input, logoUrl, logoPath }, existingData)
         }, { merge: true });
-
-        if (oldLogoPathToDelete && oldLogoPathToDelete !== logoPath) {
-          await deleteLogoFromStorage(oldLogoPathToDelete);
-        }
       } else {
         const targetExists = await getDoc(newItemRef);
         if (targetExists.exists()) {
@@ -1093,51 +1668,54 @@ async function saveModal() {
           return;
         }
 
-        const oldSnap = await getDoc(oldItemRef);
-        const oldData = oldSnap.exists() ? oldSnap.data() : null;
-
-        let logoUrl = String(oldData?.logoUrl || "").trim();
-        let logoPath = String(oldData?.logoPath || "").trim();
-
-        if (state.removeCurrentLogo) {
-          oldLogoPathToDelete = logoPath || "";
-          logoUrl = "";
-          logoPath = "";
-        }
-
-        if (state.pendingLogoFile) {
-          setProgressStatus({
-            text: "Guardando registro...",
-            meta: "Subiendo nuevo logo...",
-            progress: 50
-          });
-
-          const uploadedLogo = await uploadSchoolLogo(state.pendingLogoFile, input);
-          oldLogoPathToDelete = logoPath || "";
-          logoUrl = uploadedLogo.logoUrl;
-          logoPath = uploadedLogo.logoPath;
-        }
-
         const batch = writeBatch(db);
         batch.set(newParentRef, buildParentVendorPayload(input), { merge: true });
         batch.set(newItemRef, {
-          ...buildItemPayload({ ...input, logoUrl, logoPath }, oldData),
-          creadoPor: oldData?.creadoPor || normalizeEmail(state.realUser?.email || ""),
-          fechaCreacion: oldData?.fechaCreacion || serverTimestamp()
+          ...buildItemPayload({ ...input, logoUrl, logoPath }, existingData),
+          creadoPor: existingData?.creadoPor || normalizeEmail(state.realUser?.email || ""),
+          fechaCreacion: existingData?.fechaCreacion || serverTimestamp()
         }, { merge: true });
         batch.delete(oldItemRef);
         await batch.commit();
-
-        if (oldLogoPathToDelete && oldLogoPathToDelete !== logoPath) {
-          await deleteLogoFromStorage(oldLogoPathToDelete);
-        }
       }
+
+      if (oldLogoPathToDelete && oldLogoPathToDelete !== logoPath) {
+        await deleteLogoFromStorage(oldLogoPathToDelete);
+      }
+
+      const changes = buildHistoryChanges(old, input);
+      if (input.trabajado && (input.ultimaGestionTipo || input.ultimaGestionAsunto || input.ultimaGestionMensaje || input.fechaUltimaVisita)) {
+        changes.push({
+          key: "seguimiento",
+          label: "Seguimiento",
+          before: normalizeText(old.ultimaGestionTipo || ""),
+          after: [input.ultimaGestionTipo, input.ultimaGestionAsunto, input.fechaUltimaVisita].filter(Boolean).join(" · ")
+        });
+      }
+
+      historyPayload = {
+        tipo: input.visitado ? "Seguimiento / visita" : "Edición",
+        asunto: input.ultimaGestionAsunto || "Actualización de colegio en cartera",
+        mensaje:
+          input.ultimaGestionMensaje ||
+          buildHistorySummaryForChanges(changes) ||
+          "Se actualizó la información del colegio.",
+        metadata: { changes }
+      };
 
       setProgressStatus({
         text: "Registro guardado.",
         meta: "Colegio actualizado correctamente.",
         progress: 100,
         type: "success"
+      });
+    }
+
+    if (historyPayload) {
+      await writeCarteraHistory({
+        correoVendedor: input.correoVendedor,
+        numeroColegio: input.numeroColegio,
+        ...historyPayload
       });
     }
 
@@ -1586,6 +2164,11 @@ async function exportXlsx() {
    EVENTOS
 ========================================================= */
 function bindPageEvents() {
+  const trabajoFilter = $("trabajoFilter");
+  const toggleIncludePast = $("toggleIncludePast");
+  const historyModal = $("historyModal");
+  const historyCloseBtn = $("historyCloseBtn");
+  const historyCloseBtn2 = $("historyCloseBtn2");
   const searchInput = $("searchInput");
   const vendorFilter = $("vendorFilter");
   const statusFilter = $("statusFilter");
@@ -1831,6 +2414,7 @@ function bindPageEvents() {
 
       if (action === "edit") openEditModal(row);
       if (action === "delete") await deleteRow(numeroColegio, correoVendedor);
+      if (action === "history") await openHistoryModal(row);
     });
   }
 
@@ -1838,6 +2422,42 @@ function bindPageEvents() {
     modalBackdrop.dataset.bound = "1";
     modalBackdrop.addEventListener("click", (e) => {
       if (e.target === modalBackdrop) closeModal();
+    });
+  }
+  if (trabajoFilter && !trabajoFilter.dataset.bound) {
+    trabajoFilter.dataset.bound = "1";
+    trabajoFilter.addEventListener("change", (e) => {
+      state.trabajoFilter = e.target.value || "all";
+      applyFilters();
+    });
+  }
+  
+  if (toggleIncludePast && !toggleIncludePast.dataset.bound) {
+    toggleIncludePast.dataset.bound = "1";
+    toggleIncludePast.addEventListener("change", (e) => {
+      state.includePastYears = !!e.target.checked;
+      state.rows = state.rows.map((row) => ({
+        ...row,
+        metrics: computeRowMetrics(row)
+      }));
+      applyFilters();
+    });
+  }
+  
+  if (historyCloseBtn && !historyCloseBtn.dataset.bound) {
+    historyCloseBtn.dataset.bound = "1";
+    historyCloseBtn.addEventListener("click", closeHistoryModal);
+  }
+  
+  if (historyCloseBtn2 && !historyCloseBtn2.dataset.bound) {
+    historyCloseBtn2.dataset.bound = "1";
+    historyCloseBtn2.addEventListener("click", closeHistoryModal);
+  }
+  
+  if (historyModal && !historyModal.dataset.bound) {
+    historyModal.dataset.bound = "1";
+    historyModal.addEventListener("click", (e) => {
+      if (e.target === historyModal) closeHistoryModal();
     });
   }
 }
