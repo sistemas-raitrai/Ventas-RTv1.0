@@ -849,7 +849,7 @@ function buildVendorRecommendationReasons(rec = {}, averages = {}) {
   if (rec.currentPortfolioCount > 0) {
     pushUniqueReason(
       reasons,
-      `En suS grupos actuales: ${Math.round(rec.reunionRateCurrent * 100)}% llega a reunión, ${Math.round(rec.ganadaRateCurrent * 100)}% llega a ganada`
+      `En sus grupos actuales: ${Math.round(rec.reunionRateCurrent * 100)}% llega a reunión, ${Math.round(rec.ganadaRateCurrent * 100)}% llega a ganada`
     );
   }
 
