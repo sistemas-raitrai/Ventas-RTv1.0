@@ -1016,11 +1016,25 @@ async function loadData() {
   try {
     setProgressStatus({
       text: "Cargando asignaciones...",
-      meta: "Leyendo grupos comerciales...",
+      meta: "Preparando vista comercial...",
+      progress: 10
+    });
+
+    const vendorOptions = getVendorOptions();
+
+    setProgressStatus({
+      text: "Cargando asignaciones...",
+      meta: `Vendedoras detectadas: ${vendorOptions.length}`,
       progress: 20
     });
 
     const snap = await getDocs(collection(db, "ventas_cotizaciones"));
+
+    setProgressStatus({
+      text: "Procesando grupos...",
+      meta: `Documentos recibidos: ${snap.size}`,
+      progress: 55
+    });
 
     state.rows = snap.docs.map((docSnap) => {
       const data = docSnap.data() || {};
@@ -1031,15 +1045,29 @@ async function loadData() {
       };
     });
 
+    setProgressStatus({
+      text: "Aplicando filtros...",
+      meta: `Total grupos cargados: ${state.rows.length}`,
+      progress: 78
+    });
+
     populateFilters();
+
+    setProgressStatus({
+      text: "Renderizando tabla...",
+      meta: "Preparando resumen, tabs y filas...",
+      progress: 90
+    });
+
     applyFilters();
 
     setProgressStatus({
       text: "Asignaciones cargadas.",
-      meta: `${state.rows.length} grupo(s) encontrados.`,
+      meta: `${state.filteredRows.length} grupo(s) visibles en la vista actual.`,
       progress: 100,
       type: "success"
     });
+
     clearProgressStatus();
   } catch (error) {
     console.error(error);
@@ -1555,7 +1583,13 @@ async function continueAssignmentAfterAlertReview() {
       pending.vendor;
 
     closeAssignmentAlertModal();
-
+    
+    setProgressStatus({
+      text: "Confirmando asignación...",
+      meta: `Guardando selección para grupo ${pending.idGrupo}`,
+      progress: 82
+    });
+    
     await persistAssignment({
       row: currentRow,
       vendor: currentVendor,
@@ -1763,11 +1797,17 @@ async function saveAssignment(idGrupo) {
   try {
     setProgressStatus({
       text: `Analizando ${tipo.toLowerCase()}...`,
-      meta: `Evaluando continuidad, progreso y carga para ${idGrupo}`,
-      progress: 28
+      meta: `Leyendo continuidad, territorio y desempeño para grupo ${idGrupo}`,
+      progress: 18
     });
 
     const analysis = analyzeVendorAssignmentRecommendation(row, vendor);
+
+    setProgressStatus({
+      text: `Análisis listo`,
+      meta: `${analysis.totalRelatedGroups || 0} relacionado(s) detectado(s) para ${idGrupo}`,
+      progress: 72
+    });
 
     if (analysis.shouldReview) {
       clearProgressStatus();
