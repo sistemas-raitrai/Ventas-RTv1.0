@@ -597,6 +597,19 @@ function createVendorRecommendationBase(vendor = {}) {
     cotizandoRateCurrent: 0,
     aContactarRateCurrent: 0,
 
+    // Histórico comercial (TODOS los años)
+    historicalPortfolioCount: 0,
+    historicalGanadaCount: 0,
+    historicalPerdidaCount: 0,
+    historicalReunionCount: 0,
+    historicalClosedCount: 0,
+    
+    historicalWinRate: 0,
+    historicalLossRate: 0,
+    historicalMeetingRate: 0,
+    
+    historicalScore: 0,
+
     // Scores
     continuityScore: 0,
     performanceScore: 0,
@@ -769,6 +782,23 @@ function calculatePerformanceScore(rec = {}) {
   return clamp(Math.round(score), 0, 30);
 }
 
+function calculateHistoricalScore(rec = {}) {
+  let score = 0;
+
+  // volumen real
+  score += Math.min(10, rec.historicalGanadaCount * 0.8);
+  score += Math.min(6, rec.historicalReunionCount * 0.4);
+
+  // proporciones (muy importante)
+  score += rec.historicalWinRate * 12;
+  score += rec.historicalMeetingRate * 8;
+
+  // castigo leve por pérdidas
+  score -= rec.historicalLossRate * 4;
+
+  return clamp(Math.round(score), 0, 25);
+}
+
 function calculateWorkloadScore(rec = {}, averages = {}) {
   let score = 12;
 
@@ -840,6 +870,13 @@ function buildVendorRecommendationReasons(rec = {}, averages = {}) {
     pushUniqueReason(reasons, "Tiene una carga activa por debajo del promedio del equipo");
   } else if (rec.totalActiveCount > Number(averages.activeCount || 0) + 1) {
     pushUniqueReason(reasons, "Tiene una carga activa por sobre el promedio del equipo");
+  }
+
+  if (rec.historicalClosedCount > 0) {
+    pushUniqueReason(
+      reasons,
+      `Histórico: ${rec.historicalGanadaCount} ganada(s), ${rec.historicalPerdidaCount} perdida(s), ${Math.round(rec.historicalWinRate * 100)}% de efectividad`
+    );
   }
 
   if (!reasons.length) {
@@ -962,6 +999,15 @@ function analyzeVendorAssignmentRecommendation(sourceRow = {}, selectedVendor = 
 
       rec.totalAssignedCount += 1;
 
+      // =========================
+      // HISTÓRICO (todos los años)
+      // =========================
+      rec.historicalPortfolioCount += 1;
+      
+      if (candidateStage === "ganada") rec.historicalGanadaCount += 1;
+      if (candidateStage === "perdida") rec.historicalPerdidaCount += 1;
+      if (candidateStage === "reunion_confirmada") rec.historicalReunionCount += 1;
+
       if (isActiveStage(candidateStage)) rec.totalActiveCount += 1;
       if (candidateStage === "a_contactar") rec.totalAContactarCount += 1;
       if (candidateStage === "contactado") rec.totalContactadoCount += 1;
@@ -1036,6 +1082,14 @@ function analyzeVendorAssignmentRecommendation(sourceRow = {}, selectedVendor = 
   const selectedVendorEmail = normalizeEmail(selectedVendor.email || "");
 
   allRecommendations.forEach((rec) => {
+    // =========================
+    // MÉTRICAS HISTÓRICAS
+    // =========================
+    rec.historicalClosedCount = rec.historicalGanadaCount + rec.historicalPerdidaCount;
+    
+    rec.historicalWinRate = safeRate(rec.historicalGanadaCount, rec.historicalClosedCount);
+    rec.historicalLossRate = safeRate(rec.historicalPerdidaCount, rec.historicalClosedCount);
+    rec.historicalMeetingRate = safeRate(rec.historicalReunionCount, rec.historicalPortfolioCount);
     rec.reunionRateCurrent = safeRate(rec.currentReunionCount, rec.currentPortfolioCount);
     rec.ganadaRateCurrent = safeRate(rec.currentGanadaCount, rec.currentPortfolioCount);
     rec.cotizandoRateCurrent = safeRate(rec.currentCotizandoCount, rec.currentPortfolioCount);
@@ -1043,8 +1097,17 @@ function analyzeVendorAssignmentRecommendation(sourceRow = {}, selectedVendor = 
 
     rec.continuityScore = calculateContinuityScore(rec);
     rec.performanceScore = calculatePerformanceScore(rec);
+    rec.historicalScore = calculateHistoricalScore(rec);
     rec.workloadScore = calculateWorkloadScore(rec, averages);
-    rec.totalScore = clamp(rec.continuityScore + rec.performanceScore + rec.workloadScore, 0, 100);
+    
+    rec.totalScore = clamp(
+      rec.continuityScore +
+      rec.performanceScore +
+      rec.historicalScore +
+      rec.workloadScore,
+      0,
+      100
+    );
 
     const level = getRecommendationLevel(rec.totalScore, rec.continuityScore);
     rec.level = level.level;
@@ -1497,6 +1560,7 @@ const recommendationsHtml = recommendations.map((item, index) => {
         <div class="assignment-alert-grid">
           <div class="assignment-alert-row"><strong>Continuidad / territorio:</strong> ${escapeHtml(String(item.continuityScore || 0))}/45</div>
           <div class="assignment-alert-row"><strong>Desempeño actual:</strong> ${escapeHtml(String(item.performanceScore || 0))}/30</div>
+          <div class="assignment-alert-row"><strong>Éxito histórico:</strong> ${escapeHtml(String(item.historicalScore || 0))}/25</div>
           <div class="assignment-alert-row"><strong>Disponibilidad:</strong> ${escapeHtml(String(item.workloadScore || 0))}/25</div>
 
           <div class="assignment-alert-row"><strong>Mismo colegio + comuna:</strong> ${escapeHtml(String(item.sameSchoolSameComunaCount || 0))}</div>
@@ -1507,6 +1571,10 @@ const recommendationsHtml = recommendations.map((item, index) => {
 
           <div class="assignment-alert-row"><strong>Cant. Grupos hoy:</strong> ${escapeHtml(String(item.currentPortfolioCount || 0))}</div>
           <div class="assignment-alert-row"><strong>Reuniones actuales:</strong> ${escapeHtml(String(item.currentReunionCount || 0))}</div>
+          <div class="assignment-alert-row"><strong>Ganadas históricas:</strong> ${escapeHtml(String(item.historicalGanadaCount || 0))}</div>
+          <div class="assignment-alert-row"><strong>Perdidas históricas:</strong> ${escapeHtml(String(item.historicalPerdidaCount || 0))}</div>
+          <div class="assignment-alert-row"><strong>% ganada histórica:</strong> ${escapeHtml(String(Math.round((item.historicalWinRate || 0) * 100)))}%</div>
+          <div class="assignment-alert-row"><strong>% reunión histórica:</strong> ${escapeHtml(String(Math.round((item.historicalMeetingRate || 0) * 100)))}%</div>
           <div class="assignment-alert-row"><strong>Ganadas actuales:</strong> ${escapeHtml(String(item.currentGanadaCount || 0))}</div>
           <div class="assignment-alert-row"><strong>Cotizando actual:</strong> ${escapeHtml(String(item.currentCotizandoCount || 0))}</div>
           <div class="assignment-alert-row"><strong>% reunión actual:</strong> ${escapeHtml(String(Math.round((item.reunionRateCurrent || 0) * 100)))}%</div>
