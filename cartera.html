@@ -557,6 +557,159 @@
       margin:0;
     }
 
+    .metric-chip{
+      display:inline-flex;
+      align-items:center;
+      gap:6px;
+      padding:4px 8px;
+      border-radius:999px;
+      background:#f3ebff;
+      color:#5b3a8e;
+      font-size:12px;
+      font-weight:700;
+      white-space:nowrap;
+    }
+    
+    .metric-chip.warn{
+      background:#fff3dd;
+      color:#8a5a00;
+    }
+    
+    .metric-chip.ok{
+      background:#e7f8ee;
+      color:#18794e;
+    }
+    
+    .stack-tight{
+      display:flex;
+      flex-direction:column;
+      gap:6px;
+      min-width:0;
+    }
+    
+    .table-note{
+      font-size:12px;
+      color:#6b6475;
+      line-height:1.35;
+      white-space:normal;
+      text-transform:none;
+    }
+    
+    .year-toggle-wrap{
+      display:flex;
+      align-items:center;
+      gap:8px;
+      min-height:42px;
+      padding:0 10px;
+      border:2px solid var(--line);
+      border-radius:8px;
+      background:#fff;
+      box-sizing:border-box;
+    }
+    
+    .year-toggle-wrap input{
+      width:16px;
+      height:16px;
+      margin:0;
+    }
+    
+    .history-modal-card{
+      width:min(900px, 100%);
+      background:#fff;
+      border-radius:16px;
+      box-shadow:0 24px 60px rgba(0,0,0,.22);
+      overflow:hidden;
+    }
+    
+    .history-body{
+      max-height:60vh;
+      overflow:auto;
+      padding:18px;
+      display:flex;
+      flex-direction:column;
+      gap:12px;
+    }
+    
+    .history-item{
+      border:1px solid #d8c9ef;
+      border-radius:12px;
+      background:#faf8fd;
+      padding:12px 14px;
+    }
+    
+    .history-top{
+      display:flex;
+      justify-content:space-between;
+      gap:12px;
+      flex-wrap:wrap;
+      margin-bottom:8px;
+      font-size:13px;
+      color:#5a5862;
+    }
+    
+    .history-line{
+      font-size:13px;
+      color:#433f52;
+      line-height:1.45;
+      margin-bottom:4px;
+    }
+    
+    .history-empty{
+      padding:14px;
+      border:1px dashed #d8c9ef;
+      border-radius:12px;
+      color:#666;
+      background:#faf8fd;
+    }
+    
+    .simple-modal{
+      position:fixed;
+      inset:0;
+      background:rgba(0,0,0,.45);
+      display:none;
+      align-items:center;
+      justify-content:center;
+      padding:18px;
+      z-index:2100;
+    }
+    
+    .simple-modal.show{
+      display:flex;
+    }
+    
+    .simple-modal-head{
+      background:var(--header);
+      color:#fff;
+      padding:16px 18px;
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      gap:12px;
+    }
+    
+    .simple-modal-head h3{
+      margin:0;
+      font-size:22px;
+    }
+    
+    .modal-close-btn{
+      border:none;
+      background:transparent;
+      color:#fff;
+      font-size:28px;
+      cursor:pointer;
+      line-height:1;
+    }
+    
+    .simple-modal-actions{
+      padding:16px 18px 18px;
+      display:flex;
+      justify-content:flex-end;
+      gap:10px;
+      flex-wrap:wrap;
+      background:#fff;
+    }
+
     @media (max-width: 900px){
       .cartera-page{
         padding:16px;
@@ -647,130 +800,281 @@
               <option value="all">Todos</option>
             </select>
           </div>
-
-          <div id="vendorFilterWrap" class="field-wrap">
-            <label for="vendorFilter">Vendedor(a)</label>
-            <select id="vendorFilter"></select>
+        
+          <div class="field-wrap status-wrap">
+            <label for="trabajoFilter">Trabajo</label>
+            <select id="trabajoFilter">
+              <option value="all" selected>Todos</option>
+              <option value="pendiente">No trabajados</option>
+              <option value="trabajado">Trabajados</option>
+              <option value="visitado">Visitados</option>
+            </select>
           </div>
-
-          <button id="btnRecargar" class="btn-page" type="button">Recargar</button>
-        </div>
-      </div>
-
-      <div class="table-meta">
-        <div id="tableSummary">0 registros</div>
-      
-        <div class="table-pager">
-          <label class="pager-label" for="pageSizeSelect">Ver</label>
-      
-          <select id="pageSizeSelect">
-            <option value="8" selected>8</option>
-            <option value="16">16</option>
-            <option value="24">24</option>
-            <option value="all">Todos</option>
-          </select>
-      
-          <button id="btnPrevPage" class="btn-page sec btn-pager" type="button">←</button>
-          <div id="pageIndicator" class="page-indicator">Página 1 de 1</div>
-          <button id="btnNextPage" class="btn-page sec btn-pager" type="button">→</button>
-        </div>
-      </div>
-
-      <div class="table-wrap table-card">
-        <table class="cartera-table">
-          <thead id="theadCartera"></thead>
-          <tbody id="tbodyCartera"></tbody>
-        </table>
-
-        <div id="emptyState" class="empty-state hidden">
-          No hay registros para mostrar.
-        </div>
-      </div>
-    </section>
-  </main>
-
-  <div id="modalForm" class="modal-backdrop">
-    <div class="modal-card">
-      <div class="modal-head">
-        <h3 id="modalTitle">Agregar colegio</h3>
-        <button id="modalCloseBtn" class="modal-close" type="button" aria-label="Cerrar">×</button>
-      </div>
-
-      <div class="modal-body">
-        <div class="modal-field">
-          <label for="numeroColegioInput">N° Colegio *</label>
-          <input id="numeroColegioInput" type="text" />
-          <div class="help-note">Será también el ID del documento dentro de la cartera del vendedor.</div>
-        </div>
-
-        <div class="modal-field">
-          <label for="colegioInput">Colegio *</label>
-          <input id="colegioInput" type="text" />
-        </div>
-
-        <div class="modal-field full">
-          <label for="logoInput">Logo del colegio</label>
-          <input id="logoInput" type="file" accept="image/*" />
-          <div class="help-note">Opcional. Puedes subir JPG, PNG o WEBP.</div>
-
-          <div class="logo-modal-preview">
-            <img id="logoPreviewImg" class="hidden" alt="Vista previa del logo" />
-            <div id="logoPreviewEmpty" class="logo-preview-empty">Sin logo cargado</div>
+          
+            <div class="field-wrap">
+              <label for="toggleIncludePast">Cotizaciones</label>
+              <label class="year-toggle-wrap">
+                <input id="toggleIncludePast" type="checkbox" />
+                <span>Incluir 2025 y pasados</span>
+              </label>
+            </div>
+          
+            <div id="vendorFilterWrap" class="field-wrap">
+              <label for="vendorFilter">Vendedor(a)</label>
+              <select id="vendorFilter"></select>
+            </div>
+          
+            <button id="btnRecargar" class="btn-page" type="button">Recargar</button>
           </div>
-
-          <label id="quitarLogoWrap" class="logo-remove-row hidden">
-            <input id="quitarLogoCheck" type="checkbox" />
-            Quitar logo actual
-          </label>
         </div>
-
-        <div class="modal-field full">
-          <label for="vendedorSelectModal">Vendedor(a) *</label>
-          <select id="vendedorSelectModal"></select>
+  
+        <div class="table-meta">
+          <div id="tableSummary">0 registros</div>
+        
+          <div class="table-pager">
+            <label class="pager-label" for="pageSizeSelect">Ver</label>
+        
+            <select id="pageSizeSelect">
+              <option value="8" selected>8</option>
+              <option value="16">16</option>
+              <option value="24">24</option>
+              <option value="all">Todos</option>
+            </select>
+        
+            <button id="btnPrevPage" class="btn-page sec btn-pager" type="button">←</button>
+            <div id="pageIndicator" class="page-indicator">Página 1 de 1</div>
+            <button id="btnNextPage" class="btn-page sec btn-pager" type="button">→</button>
+          </div>
         </div>
-
-        <div class="modal-field">
-          <label>Nombre vendedor(a)</label>
-          <div id="nombrePreview" class="readonly-box"></div>
+  
+        <div class="table-wrap table-card">
+          <table class="cartera-table">
+            <thead id="theadCartera"></thead>
+            <tbody id="tbodyCartera"></tbody>
+          </table>
+  
+          <div id="emptyState" class="empty-state hidden">
+            No hay registros para mostrar.
+          </div>
         </div>
-
-        <div class="modal-field">
-          <label>Apellido vendedor(a)</label>
-          <div id="apellidoPreview" class="readonly-box"></div>
+      </section>
+    </main>
+  
+    <div id="modalForm" class="modal-backdrop">
+      <div class="modal-card">
+        <div class="modal-head">
+          <h3 id="modalTitle">Agregar colegio</h3>
+          <button id="modalCloseBtn" class="modal-close" type="button" aria-label="Cerrar">×</button>
         </div>
-
-        <div class="modal-field full">
-          <label>Correo vendedor(a)</label>
-          <div id="correoPreview" class="readonly-box"></div>
+  
+        <div class="modal-body">
+          <div class="modal-field">
+            <label for="numeroColegioInput">N° Colegio *</label>
+            <input id="numeroColegioInput" type="text" />
+            <div class="help-note">Será también el ID del documento dentro de la cartera del vendedor.</div>
+          </div>
+        
+          <div class="modal-field">
+            <label for="colegioInput">Colegio *</label>
+            <input id="colegioInput" type="text" />
+          </div>
+        
+          <div class="modal-field full">
+            <label for="logoInput">Logo del colegio</label>
+            <input id="logoInput" type="file" accept="image/*" />
+            <div class="help-note">Opcional. Puedes subir JPG, PNG o WEBP.</div>
+        
+            <div class="logo-modal-preview">
+              <img id="logoPreviewImg" class="hidden" alt="Vista previa del logo" />
+              <div id="logoPreviewEmpty" class="logo-preview-empty">Sin logo cargado</div>
+            </div>
+        
+            <label id="quitarLogoWrap" class="logo-remove-row hidden">
+              <input id="quitarLogoCheck" type="checkbox" />
+              Quitar logo actual
+            </label>
+          </div>
+        
+          <div class="modal-field full">
+            <label for="vendedorSelectModal">Vendedor(a) *</label>
+            <select id="vendedorSelectModal"></select>
+            <div id="vendorEditHint" class="help-note hidden">
+              Como vendedor(a), puedes editar seguimiento de tus colegios, pero no reasignarlos.
+            </div>
+          </div>
+        
+          <div class="modal-field">
+            <label>Nombre vendedor(a)</label>
+            <div id="nombrePreview" class="readonly-box"></div>
+          </div>
+        
+          <div class="modal-field">
+            <label>Apellido vendedor(a)</label>
+            <div id="apellidoPreview" class="readonly-box"></div>
+          </div>
+        
+          <div class="modal-field full">
+            <label>Correo vendedor(a)</label>
+            <div id="correoPreview" class="readonly-box"></div>
+          </div>
+        
+          <div class="modal-field">
+            <label for="comunaInput">Comuna</label>
+            <input id="comunaInput" type="text" />
+          </div>
+        
+          <div class="modal-field">
+            <label for="ciudadInput">Ciudad</label>
+            <input id="ciudadInput" type="text" />
+          </div>
+        
+          <div class="modal-field">
+            <label for="estatusInput">Estatus</label>
+            <input id="estatusInput" type="text" />
+          </div>
+        
+          <div class="modal-field full">
+            <label for="nivelesInput">Niveles del colegio</label>
+            <textarea id="nivelesInput" placeholder="Ejemplos:
+        3:A,B,C
+        2:DAVINCI,LEONARDO
+        1:COMPLETO
+        4:SINDETALLE"></textarea>
+            <div class="help-note">
+              Una línea por nivel. También acepta formatos como 3AB, 3A, 2DAVINCI o 3.
+            </div>
+          </div>
+        
+          <div class="modal-field full">
+            <label for="observacionesInput">Observaciones</label>
+            <textarea id="observacionesInput"></textarea>
+          </div>
+        
+          <div class="modal-field full">
+            <label>Contacto 1</label>
+          </div>
+        
+          <div class="modal-field">
+            <label for="contacto1NombreInput">Nombre</label>
+            <input id="contacto1NombreInput" type="text" />
+          </div>
+        
+          <div class="modal-field">
+            <label for="contacto1RolInput">Rol</label>
+            <select id="contacto1RolInput">
+              <option value="">Seleccionar</option>
+              <option value="APODERADO">APODERADO</option>
+              <option value="PROFESOR">PROFESOR</option>
+              <option value="DIRECTIVO">DIRECTIVO</option>
+              <option value="OTRO">OTRO</option>
+            </select>
+          </div>
+        
+          <div class="modal-field">
+            <label for="contacto1CorreoInput">Correo</label>
+            <input id="contacto1CorreoInput" type="email" />
+          </div>
+        
+          <div class="modal-field">
+            <label for="contacto1TelefonoInput">Teléfono</label>
+            <input id="contacto1TelefonoInput" type="text" />
+          </div>
+        
+          <div class="modal-field full">
+            <label>Contacto 2</label>
+          </div>
+        
+          <div class="modal-field">
+            <label for="contacto2NombreInput">Nombre</label>
+            <input id="contacto2NombreInput" type="text" />
+          </div>
+        
+          <div class="modal-field">
+            <label for="contacto2RolInput">Rol</label>
+            <select id="contacto2RolInput">
+              <option value="">Seleccionar</option>
+              <option value="APODERADO">APODERADO</option>
+              <option value="PROFESOR">PROFESOR</option>
+              <option value="DIRECTIVO">DIRECTIVO</option>
+              <option value="OTRO">OTRO</option>
+            </select>
+          </div>
+        
+          <div class="modal-field">
+            <label for="contacto2CorreoInput">Correo</label>
+            <input id="contacto2CorreoInput" type="email" />
+          </div>
+        
+          <div class="modal-field">
+            <label for="contacto2TelefonoInput">Teléfono</label>
+            <input id="contacto2TelefonoInput" type="text" />
+          </div>
+        
+          <div class="modal-field full">
+            <label>Seguimiento comercial</label>
+          </div>
+        
+          <div class="modal-field">
+            <label for="gestionTipoInput">Tipo de gestión</label>
+            <select id="gestionTipoInput">
+              <option value="">Sin registrar</option>
+              <option value="LLAMADA">LLAMADA</option>
+              <option value="CORREO">CORREO</option>
+              <option value="VISITA">VISITA</option>
+              <option value="REUNION">REUNIÓN</option>
+              <option value="OTRO">OTRO</option>
+            </select>
+          </div>
+        
+          <div class="modal-field">
+            <label for="gestionFechaInput">Fecha gestión</label>
+            <input id="gestionFechaInput" type="date" />
+          </div>
+        
+          <div class="modal-field full">
+            <label for="gestionAsuntoInput">Asunto</label>
+            <input id="gestionAsuntoInput" type="text" />
+          </div>
+        
+          <div class="modal-field full">
+            <label for="gestionMensajeInput">Mensaje / detalle</label>
+            <textarea id="gestionMensajeInput"></textarea>
+          </div>
+        
+          <div class="modal-field">
+            <label class="logo-remove-row" style="margin-top:0;">
+              <input id="visitadoCheck" type="checkbox" />
+              Marcar colegio como visitado / trabajado
+            </label>
+          </div>
+        
+          <div class="modal-field">
+            <label for="fechaVisitaInput">Fecha visita / trabajo</label>
+            <input id="fechaVisitaInput" type="date" />
+          </div>
         </div>
-
-        <div class="modal-field">
-          <label for="comunaInput">Comuna</label>
-          <input id="comunaInput" type="text" />
+  
+        <div class="modal-foot">
+          <button id="btnCancelarModal" class="btn-page sec" type="button">Cancelar</button>
+          <button id="btnGuardarModal" class="btn-page green" type="button">Guardar</button>
         </div>
-
-        <div class="modal-field">
-          <label for="ciudadInput">Ciudad</label>
-          <input id="ciudadInput" type="text" />
-        </div>
-
-        <div class="modal-field">
-          <label for="estatusInput">Estatus</label>
-          <input id="estatusInput" type="text" />
-        </div>
-
-        <div class="modal-field full">
-          <label for="observacionesInput">Observaciones</label>
-          <textarea id="observacionesInput"></textarea>
-        </div>
-      </div>
-
-      <div class="modal-foot">
-        <button id="btnCancelarModal" class="btn-page sec" type="button">Cancelar</button>
-        <button id="btnGuardarModal" class="btn-page green" type="button">Guardar</button>
       </div>
     </div>
-  </div>
+  
+    <div id="historyModal" class="simple-modal">
+      <div class="history-modal-card">
+        <div class="simple-modal-head">
+          <h3 id="historyTitle">Historial cartera</h3>
+          <button id="historyCloseBtn" type="button" class="modal-close-btn">✕</button>
+        </div>
+    
+        <div id="historyBody" class="history-body"></div>
+    
+        <div class="simple-modal-actions">
+          <button id="historyCloseBtn2" type="button" class="btn-page sec">Cerrar</button>
+        </div>
+      </div>
+    </div>
 
   <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
   <script type="module" src="layout.js"></script>
