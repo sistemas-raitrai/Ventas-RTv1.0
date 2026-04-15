@@ -269,6 +269,24 @@ function normalizeSchoolLoose(value = "") {
     .join(" ");
 }
 
+function getSchoolMeaningfulTokens(value = "") {
+  return uniqueLooseTokens(value)
+    .filter((token) => !GENERIC_SCHOOL_TOKENS.has(token));
+}
+
+function isExactSchoolNameMatch(a = "", b = "") {
+  const tokensA = getSchoolMeaningfulTokens(a);
+  const tokensB = getSchoolMeaningfulTokens(b);
+
+  if (!tokensA.length || !tokensB.length) return false;
+  if (tokensA.length !== tokensB.length) return false;
+
+  const sortedA = [...tokensA].sort().join(" ");
+  const sortedB = [...tokensB].sort().join(" ");
+
+  return sortedA === sortedB;
+}
+
 function normalizePersonLoose(value = "") {
   return uniqueLooseTokens(value).join(" ");
 }
@@ -462,7 +480,7 @@ function getSchoolMatchInfo(sourceRow = {}, candidate = {}) {
   const sourceComuna = normalizeSearch(sourceRow.comunaCiudad || sourceRow.comuna || "");
   const candidateComuna = normalizeSearch(candidate.comunaCiudad || candidate.comuna || "");
 
-  const sameExactSchool = Boolean(sourceSchool && candidateSchool && sourceSchool === candidateSchool);
+  const exactSchoolNameMatch = isExactSchoolNameMatch(sourceSchoolRaw, candidateSchoolRaw);
   const sameComuna = Boolean(sourceComuna && candidateComuna && sourceComuna === candidateComuna);
 
   const sharedTokens = getSharedSchoolTokens(sourceSchoolRaw, candidateSchoolRaw);
@@ -470,16 +488,18 @@ function getSchoolMatchInfo(sourceRow = {}, candidate = {}) {
 
   let matchType = "none";
   let label = "Sin coincidencia relevante";
+  let isPossibleSameSchool = false;
 
-  if (sameExactSchool && sameComuna) {
+  if (exactSchoolNameMatch && sameComuna) {
     matchType = "same_school_same_comuna";
     label = "Mismo colegio + misma comuna";
-  } else if (sameExactSchool) {
+  } else if (exactSchoolNameMatch) {
     matchType = "same_school";
     label = "Mismo colegio";
   } else if (strongNameMatch && sameComuna) {
     matchType = "strong_name_same_comuna";
-    label = "Nombre muy relacionado + misma comuna";
+    label = "Posible mismo colegio / nombre muy relacionado + misma comuna";
+    isPossibleSameSchool = true;
   } else if (schoolSimilarity >= 0.90 && sameComuna) {
     matchType = "similar_school_same_comuna";
     label = "Colegio similar + misma comuna";
@@ -496,10 +516,11 @@ function getSchoolMatchInfo(sourceRow = {}, candidate = {}) {
     matchType,
     label,
     schoolSimilarity,
-    sameExactSchool,
+    sameExactSchool: exactSchoolNameMatch,
     sameComuna,
     strongNameMatch,
-    sharedTokens
+    sharedTokens,
+    isPossibleSameSchool
   };
 }
 
@@ -760,7 +781,7 @@ function buildVendorRecommendationReasons(rec = {}, averages = {}) {
   if ((rec.strongNameSameComunaCount || 0) > 0) {
     pushUniqueReason(
       reasons,
-      `Tiene ${rec.strongNameSameComunaCount} grupo(s) con nombre muy relacionado en la misma comuna`
+      `Tiene ${rec.strongNameSameComunaCount} grupo(s) que podrían corresponder al mismo colegio por nombre muy relacionado en la misma comuna`
     );
   }
 
@@ -1455,7 +1476,7 @@ const recommendationsHtml = recommendations.map((item, index) => {
 
           <div class="assignment-alert-row"><strong>Mismo colegio + comuna:</strong> ${escapeHtml(String(item.sameSchoolSameComunaCount || 0))}</div>
           <div class="assignment-alert-row"><strong>Mismo colegio:</strong> ${escapeHtml(String(item.sameSchoolExactCount || 0))}</div>
-          <div class="assignment-alert-row"><strong>Nombre fuerte + comuna:</strong> ${escapeHtml(String(item.strongNameSameComunaCount || 0))}</div>
+          <div class="assignment-alert-row"><strong>Posible mismo colegio + comuna:</strong> ${escapeHtml(String(item.strongNameSameComunaCount || 0))}</div>
           <div class="assignment-alert-row"><strong>Misma comuna (otros colegios):</strong> ${escapeHtml(String(item.sameComunaOnlyCount || 0))}</div>
           <div class="assignment-alert-row"><strong>Colegios similares:</strong> ${escapeHtml(String((item.similarSchoolSameComunaCount || 0) + (item.similarSchoolCount || 0)))}</div>
 
