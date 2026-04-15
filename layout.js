@@ -16,7 +16,7 @@ const menuItems = [
   {
     key: "buscar",
     href: "seguimiento.html",
-    label: "Buscar",
+    label: "Buscar / Seguimiento",
     roles: ["admin", "supervision", "registro", "vendedor"]
   },
   {
@@ -35,7 +35,7 @@ const menuItems = [
     key: "clientes",
     href: "clientes.html",
     label: "Clientes",
-    roles: ["admin", "supervision"]
+    roles: ["admin"]
   },
   {
     key: "informe-excel",
