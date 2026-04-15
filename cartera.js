@@ -322,6 +322,68 @@ function parseQuoteCoverage(quote = {}) {
   return parseCursoDescriptor(quote.cursoViaje || quote.curso || "");
 }
 
+function getVisitSeasonRange() {
+  const now = new Date();
+  const year = now.getFullYear();
+
+  // Año comercial:
+  // si estamos desde marzo en adelante, la temporada parte este año
+  // si estamos en enero/febrero, la temporada partió el año anterior
+  const seasonStartYear = now.getMonth() >= 2 ? year : year - 1;
+
+  const start = new Date(seasonStartYear, 2, 1, 0, 0, 0, 0); // 1 marzo
+  const end = new Date(seasonStartYear + 1, 2, 1, 0, 0, 0, 0); // 1 marzo siguiente
+
+  return { start, end, label: `${seasonStartYear}-${seasonStartYear + 1}` };
+}
+
+function isDateWithinVisitSeason(value) {
+  const d = toDateValue(value);
+  if (!d) return false;
+
+  const { start, end } = getVisitSeasonRange();
+  return d >= start && d < end;
+}
+
+function historyItemCountsAsVisit(item = {}) {
+  const tipo = normalizeSearch(item.tipo || "");
+  const asunto = normalizeSearch(item.asunto || "");
+  const mensaje = normalizeSearch(item.mensaje || "");
+  const changes = Array.isArray(item.metadata?.changes) ? item.metadata.changes : [];
+
+  // 1) caso directo: historial marcado como visita
+  if (tipo.includes("visita")) return true;
+
+  // 2) caso indirecto: hubo cambio en fechaUltimaVisita
+  if (changes.some(change => String(change?.key || "") === "fechaUltimaVisita")) return true;
+
+  // 3) respaldo por texto libre
+  const joined = `${tipo} ${asunto} ${mensaje}`;
+  if (joined.includes("visita") || joined.includes("visitado")) return true;
+
+  return false;
+}
+
+async function countVisitsForRowInSeason(row = {}) {
+  try {
+    const snap = await getDocs(getHistoryCollectionRef(row.correoVendedor, row.numeroColegio));
+
+    let count = 0;
+
+    snap.forEach((docSnap) => {
+      const item = docSnap.data() || {};
+      if (!historyItemCountsAsVisit(item)) return;
+      if (!isDateWithinVisitSeason(item.fecha)) return;
+      count += 1;
+    });
+
+    return count;
+  } catch (error) {
+    console.warn("No se pudo contar visitas del colegio:", row.numeroColegio, error);
+    return 0;
+  }
+}
+
 function computeRowMetrics(row = {}) {
   const currentYear = new Date().getFullYear();
 
@@ -391,7 +453,12 @@ function computeRowMetrics(row = {}) {
     yearlySummary: yearlySummary || "—",
     faltantes,
     trabajadoSinDetalle: [...new Set(trabajadoSinDetalle)],
-    quotes
+    quotes,
+
+    // NUEVO: visitas temporada comercial
+    visitCountSeason: 0,
+    wasVisitedInSeason: false,
+    visitSeasonLabel: getVisitSeasonRange().label
   };
 }
 
@@ -835,6 +902,7 @@ const SORTABLE_COLUMNS = [
   "comuna",
   "niveles",
   "trabajo",
+  "visitasTemporada",
   "cotizaciones",
   "faltantes",
   "estatus"
@@ -847,6 +915,7 @@ const COLUMN_LABELS = {
   comuna: "Comuna",
   niveles: "Niveles",
   trabajo: "Seguimiento",
+  visitasTemporada: "Visitado",
   cotizaciones: "Cotizaciones",
   faltantes: "Faltantes",
   estatus: "Estatus"
@@ -860,7 +929,9 @@ function getCellValue(row, key) {
   if (key === "vendedor") {
     return normalizeText(`${row.nombreVendedor || ""} ${row.apellidoVendedor || ""}`.trim());
   }
+
   if (key === "niveles") return normalizeText(row.resumenNiveles || "");
+
   if (key === "trabajo") {
     return normalizeText([
       row.trabajado ? "TRABAJADO" : "PENDIENTE",
@@ -869,8 +940,14 @@ function getCellValue(row, key) {
       row.ultimaGestionAsunto || ""
     ].join(" "));
   }
+
+  if (key === "visitasTemporada") {
+    return String(row.metrics?.visitCountSeason || 0);
+  }
+
   if (key === "cotizaciones") return String(row.metrics?.totalQuotes || 0);
   if (key === "faltantes") return normalizeText((row.metrics?.faltantes || []).join(" "));
+
   return normalizeText(row?.[key] ?? "");
 }
 
@@ -1072,6 +1149,7 @@ function renderTable() {
       <th>${renderSortButton("comuna")}</th>
       <th>${renderSortButton("niveles")}</th>
       <th>${renderSortButton("trabajo")}</th>
+      <th>${renderSortButton("visitasTemporada")}</th>
       <th>${renderSortButton("cotizaciones")}</th>
       <th>${renderSortButton("faltantes")}</th>
       <th>${renderSortButton("estatus")}</th>
@@ -1103,7 +1181,15 @@ function renderTable() {
     const checked = state.selectedKeys.has(rowKey) ? "checked" : "";
     const canEdit = canEditCarteraRow(row);
     const canDelete = canDeleteCarteraRow();
-    const metrics = row.metrics || { totalQuotes: 0, yearlySummary: "—", faltantes: [], trabajadoSinDetalle: [] };
+    const metrics = row.metrics || {
+      totalQuotes: 0,
+      yearlySummary: "—",
+      faltantes: [],
+      trabajadoSinDetalle: [],
+      visitCountSeason: 0,
+      wasVisitedInSeason: false,
+      visitSeasonLabel: getVisitSeasonRange().label
+    };
 
     const actions = `
       <div class="table-actions">
@@ -1125,6 +1211,14 @@ function renderTable() {
     const ultimaGestionTxt = [row.ultimaGestionTipo, row.ultimaGestionAsunto, row.ultimaGestionFechaText || row.fechaUltimaVisita]
       .filter(Boolean)
       .join(" · ");
+
+    const visitadoTxt = metrics.wasVisitedInSeason
+      ? `SÍ · ${metrics.visitCountSeason}`
+      : "NO";
+    
+    const visitadoDetalleTxt = metrics.wasVisitedInSeason
+      ? `Temporada ${metrics.visitSeasonLabel}`
+      : `Sin visitas en ${metrics.visitSeasonLabel}`;
 
     const faltantesTxt = metrics.faltantes.length
       ? metrics.faltantes.join(", ")
@@ -1167,6 +1261,12 @@ function renderTable() {
           <div class="stack-tight">
             <div>${trabajoChips}</div>
             <div class="table-note">${escapeHtml(ultimaGestionTxt || "Sin gestión registrada")}</div>
+          </div>
+        </td>
+        <td>
+          <div class="stack-tight">
+            <strong>${escapeHtml(visitadoTxt)}</strong>
+            <div class="table-note">${escapeHtml(visitadoDetalleTxt)}</div>
           </div>
         </td>
         <td>
@@ -1309,10 +1409,21 @@ async function loadData() {
       state.rows = await loadAllItems();
     }
 
-    state.rows = state.rows.map((row) => ({
-      ...row,
-      metrics: computeRowMetrics(row)
-    }));
+    state.rows = await Promise.all(
+      state.rows.map(async (row) => {
+        const metrics = computeRowMetrics(row);
+        const visitCountSeason = await countVisitsForRowInSeason(row);
+    
+        return {
+          ...row,
+          metrics: {
+            ...metrics,
+            visitCountSeason,
+            wasVisitedInSeason: visitCountSeason > 0
+          }
+        };
+      })
+    );
 
     renderRoleButtons();
     renderVendorFilter();
