@@ -7,8 +7,290 @@
   <link rel="stylesheet" href="estilos.css" />
   <link rel="icon" type="image/png" href="IMG/logo-raitrai.png" />
 <style>
+  .asignados-page{
+    padding:18px 30px 30px;
+  }
+
+  .asignados-panel-main{
+    background:#efefef;
+    border:3px dashed var(--line);
+    padding:20px 22px;
+  }
+
+  .asignados-topbar{
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-start;
+    gap:18px;
+    flex-wrap:wrap;
+    margin-bottom:18px;
+  }
+
+  .asignados-title-wrap h2{
+    margin:0 0 6px;
+    font-size:30px;
+    color:var(--header);
+  }
+
+  .asignados-title-wrap p{
+    margin:0;
+    color:#5a5862;
+    font-size:14px;
+  }
+
+  .asignados-toolbar{
+    display:grid;
+    grid-template-columns:1fr;
+    gap:14px;
+    margin-bottom:18px;
+  }
+
+  .toolbar-left{
+    display:grid;
+    grid-template-columns:repeat(4, minmax(0, 1fr));
+    gap:10px;
+    align-items:end;
+    width:100%;
+  }
+
+  .toolbar-right{
+    display:grid;
+    grid-template-columns:minmax(0, 1fr) auto;
+    gap:10px;
+    align-items:end;
+    width:100%;
+    margin-left:0;
+  }
+
+  .field-wrap{
+    display:flex;
+    flex-direction:column;
+    gap:6px;
+    min-width:0;
+  }
+
+  .field-wrap label{
+    font-size:13px;
+    font-weight:700;
+    color:var(--header);
+  }
+
+  .asignados-toolbar input[type="text"],
+  .asignados-toolbar select{
+    width:100%;
+    min-width:0;
+    height:42px;
+    border:2px solid var(--line);
+    border-radius:8px;
+    padding:0 12px;
+    font-size:14px;
+    background:#fff;
+    color:var(--header);
+  }
+
+  .field-wrap.search-wide{
+    min-width:0;
+  }
+
+  .field-wrap.search-wide input{
+    width:100%;
+    min-width:0;
+  }
+
+  .asignados-top-actions{
+    display:flex;
+    gap:10px;
+    align-items:end;
+    justify-content:flex-end;
+    flex-wrap:nowrap;
+  }
+
+  .btn-page{
+    min-width:150px;
+    height:44px;
+    border:none;
+    border-radius:8px;
+    background:var(--header);
+    color:#fff;
+    font-size:15px;
+    font-weight:700;
+    cursor:pointer;
+    padding:0 16px;
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    text-decoration:none;
+  }
+
+  .btn-page.sec{
+    background:#6b6178;
+  }
+
+  .asignados-tabs{
+    display:flex;
+    gap:8px;
+    flex-wrap:wrap;
+  }
+
+  .scope-tab{
+    min-height:42px;
+    border:2px solid #d7dde6;
+    background:#fff;
+    color:#534a63;
+    border-radius:10px;
+    padding:0 14px;
+    font-size:13px;
+    font-weight:800;
+    cursor:pointer;
+    transition:all .15s ease;
+  }
+
+  .scope-tab.active{
+    background:var(--header);
+    color:#fff;
+    border-color:var(--header);
+  }
+
+  .asignados-summary-inline{
+    min-height:42px;
+    border:2px solid var(--line);
+    border-radius:8px;
+    background:#fff;
+    padding:0 12px;
+    display:flex;
+    align-items:center;
+    color:#4f4b5f;
+    font-size:13px;
+    font-weight:700;
+  }
+
+  .asignados-table-card{
+    background:#fff;
+    border:2px solid #d7dde6;
+    border-radius:12px;
+    overflow:hidden;
+  }
+
+  .asignados-table-wrap{
+    width:100%;
+    overflow:auto;
+  }
+
+  .asignados-table{
+    width:max-content;
+    min-width:100%;
+    border-collapse:collapse;
+  }
+
+  .asignados-table thead th{
+    position:sticky;
+    top:0;
+    background:var(--header);
+    color:#fff;
+    text-align:left;
+    padding:12px 10px;
+    font-size:13px;
+    letter-spacing:.2px;
+    z-index:1;
+    white-space:nowrap;
+    text-transform:uppercase;
+  }
+
+  .asignados-table tbody td{
+    border-bottom:1px solid #e5e7eb;
+    padding:12px 10px;
+    font-size:14px;
+    vertical-align:middle;
+    color:#2f2b3a;
+    white-space:nowrap;
+    background:#fff;
+  }
+
+  .asignados-table tbody tr:hover td{
+    background:#faf8fd;
+  }
+
+  .assignment-current{
+    display:flex;
+    flex-direction:column;
+    gap:3px;
+    min-width:180px;
+  }
+
+  .assignment-current strong{
+    color:var(--header);
+    font-size:14px;
+  }
+
+  .assignment-current small{
+    color:#6d6480;
+    font-size:12px;
+  }
+
+  .assign-select{
+    min-width:220px;
+    height:40px;
+    border:2px solid var(--line);
+    border-radius:8px;
+    padding:0 10px;
+    font-size:14px;
+    background:#fff;
+    color:var(--header);
+  }
+
+  .table-actions{
+    display:flex;
+    gap:8px;
+    flex-wrap:wrap;
+  }
+
+  .btn-mini{
+    min-height:34px;
+    border:none;
+    border-radius:8px;
+    padding:0 12px;
+    font-size:12px;
+    font-weight:800;
+    cursor:pointer;
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    text-decoration:none;
+  }
+
+  .btn-mini.edit{
+    background:var(--header);
+    color:#fff;
+  }
+
+  .btn-mini.warn{
+    background:#fff3dd;
+    color:#8a5a00;
+    border:1px solid #f1d08a;
+  }
+
+  .btn-mini.open{
+    background:#eef2ff;
+    color:#4338ca;
+    border:1px solid #c7d2fe;
+  }
+
+  .asignados-empty{
+    padding:28px 16px;
+    text-align:center;
+    color:#666;
+    font-weight:700;
+  }
+
+  .hidden{
+    display:none !important;
+  }
+
+  /* =========================
+     MODALES
+  ========================= */
   .assignment-alert-card{
-    width:min(980px, 100%);
+    width:min(1080px, 100%);
   }
 
   .assignment-alert-body{
@@ -174,17 +456,77 @@
 
   .assignment-related-toggle{
     margin-top:8px;
+    align-self:flex-start;
+    min-width:0;
+    height:36px;
+    padding:0 12px;
+    border:none;
+    border-radius:8px;
+    background:#6b6178;
+    color:#fff;
+    font-size:12px;
+    font-weight:800;
+    cursor:pointer;
   }
-  
+
   .assignment-related-list-wrap{
     display:flex;
     flex-direction:column;
     gap:8px;
   }
 
+  @media (max-width: 1280px){
+    .toolbar-left{
+      grid-template-columns:repeat(4, minmax(0, 1fr));
+    }
+
+    .toolbar-right{
+      grid-template-columns:minmax(0, 1fr) auto;
+    }
+  }
+
+  @media (max-width: 980px){
+    .toolbar-left{
+      grid-template-columns:repeat(2, minmax(0, 1fr));
+    }
+
+    .toolbar-right{
+      grid-template-columns:1fr;
+    }
+  }
+
   @media (max-width: 760px){
+    .asignados-page{
+      padding:16px;
+    }
+
+    .toolbar-left,
+    .toolbar-right{
+      grid-template-columns:1fr;
+    }
+
+    .asignados-top-actions{
+      width:100%;
+      justify-content:stretch;
+    }
+
+    .btn-page{
+      width:100%;
+      min-width:0;
+    }
+
     .assignment-alert-grid{
       grid-template-columns:1fr;
+    }
+
+    .table-actions{
+      flex-direction:column;
+      align-items:stretch;
+    }
+
+    .assign-select{
+      min-width:0;
+      width:100%;
     }
   }
 </style>
