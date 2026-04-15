@@ -552,6 +552,38 @@ function pushRelatedExample(rec = {}, candidate = {}, matchInfo = {}) {
   });
 }
 
+function getRelatedMatchPriority(matchType = "") {
+  if (matchType === "same_school_same_comuna") return 1;
+  if (matchType === "same_school") return 2;
+  if (matchType === "similar_school_same_comuna") return 3;
+  if (matchType === "similar_school") return 4;
+  if (matchType === "same_comuna_only") return 5;
+  return 9;
+}
+
+function buildRelatedGroupDetail(candidate = {}, matchInfo = {}) {
+  const vendorName = getRowVendorName(candidate) || "Sin asignar";
+  const vendorEmail = getRowVendorEmail(candidate) || "";
+  const assigned = !isSinAsignar(candidate);
+
+  return {
+    idGrupo: getRowId(candidate),
+    aliasGrupo: getRowAlias(candidate),
+    colegio: normalizeText(candidate.colegio || ""),
+    comunaCiudad: normalizeText(candidate.comunaCiudad || candidate.comuna || ""),
+    anoViaje: normalizeText(candidate.anoViaje || ""),
+    curso: normalizeText(candidate.cursoViaje || candidate.curso || ""),
+    estado: normalizeText(candidate.estado || "—"),
+    vendedora: vendorName,
+    vendedoraCorreo: vendorEmail,
+    assigned,
+    matchType: matchInfo.matchType || "none",
+    matchLabel: matchInfo.label || "Relacionado",
+    matchPriority: getRelatedMatchPriority(matchInfo.matchType || ""),
+    url: `${DETALLE_GRUPO_URL}?id=${encodeURIComponent(getRowId(candidate))}`
+  };
+}
+
 function getRecommendationLevel(totalScore = 0, continuityScore = 0) {
   if (continuityScore >= 24 || totalScore >= 72) {
     return { level: "Alta", levelClass: "high" };
@@ -777,6 +809,7 @@ function analyzeVendorAssignmentRecommendation(sourceRow = {}, selectedVendor = 
   let relatedAssignedCount = 0;
   let relatedUnassignedCount = 0;
   let totalSameComunaTerritory = 0;
+  const relatedGroupDetails = [];
 
   state.rows.forEach((candidate) => {
     if (getRowId(candidate) === currentId) return;
@@ -814,8 +847,9 @@ function analyzeVendorAssignmentRecommendation(sourceRow = {}, selectedVendor = 
 
     const matchInfo = getSchoolMatchInfo(sourceRow, candidate);
     if (!matchInfo.isRelevant) return;
-
+    
     totalRelatedGroups += 1;
+    relatedGroupDetails.push(buildRelatedGroupDetail(candidate, matchInfo));
 
     if (matchInfo.matchType === "same_comuna_only") {
       totalSameComunaTerritory += 1;
@@ -909,6 +943,13 @@ function analyzeVendorAssignmentRecommendation(sourceRow = {}, selectedVendor = 
     relatedAssignedCount,
     relatedUnassignedCount,
     totalSameComunaTerritory,
+    relatedGroupDetails: relatedGroupDetails.sort((a, b) => {
+      return (
+        a.matchPriority - b.matchPriority ||
+        Number(b.assigned) - Number(a.assigned) ||
+        (Number(b.idGrupo) || 0) - (Number(a.idGrupo) || 0)
+      );
+    }),
     recommendations,
     topRecommendation,
     selectedRecommendation,
@@ -1209,14 +1250,55 @@ function renderAssignmentAlertModal({ row = {}, vendor = {}, analysis = {} } = {
 
   if (!list) return;
 
-  const recommendations = analysis.recommendations || [];
+const recommendations = analysis.recommendations || [];
+const relatedGroups = analysis.relatedGroupDetails || [];
 
-  if (!recommendations.length) {
-    list.innerHTML = `<div class="assignment-alert-empty">No hay sugerencias para mostrar.</div>`;
-    return;
-  }
+if (!recommendations.length && !relatedGroups.length) {
+  list.innerHTML = `<div class="assignment-alert-empty">No hay sugerencias para mostrar.</div>`;
+  return;
+}
 
-  list.innerHTML = recommendations.map((item, index) => {
+const relatedGroupsHtml = relatedGroups.length
+  ? `
+    <article class="assignment-alert-item">
+      <div class="assignment-alert-top">
+        <div>
+          <h4 class="assignment-alert-title">Grupos relacionados detectados (${relatedGroups.length})</h4>
+          <div class="assignment-alert-meta">
+            ${escapeHtml(String(analysis.relatedAssignedCount || 0))} asignado(s) ·
+            ${escapeHtml(String(analysis.relatedUnassignedCount || 0))} sin asignar
+          </div>
+        </div>
+
+        <div class="assignment-alert-tags">
+          <span class="assignment-pill same">Lista completa</span>
+        </div>
+      </div>
+
+      <ul class="assignment-alert-reasons">
+        ${relatedGroups.map((item) => `
+          <li>
+            <a class="assignment-alert-link" href="${item.url}" target="_blank" rel="noopener">
+              ${escapeHtml(item.aliasGrupo || `Grupo ${item.idGrupo}`)}
+            </a>
+            · ID ${escapeHtml(item.idGrupo || "—")}
+            · ${escapeHtml(item.matchLabel || "Relacionado")}
+            · ${escapeHtml(item.colegio || "—")}
+            · ${escapeHtml(item.comunaCiudad || "—")}
+            · ${escapeHtml(item.estado || "—")}
+            · ${item.assigned
+              ? `Asignado a ${escapeHtml(item.vendedora || "—")}`
+              : "Sin asignar"}
+          </li>
+        `).join("")}
+      </ul>
+    </article>
+  `
+  : `
+    <div class="assignment-alert-empty">No se encontraron grupos relacionados para listar.</div>
+  `;
+
+const recommendationsHtml = recommendations.map((item, index) => {
     const isTop = top && item.vendorEmail === top.vendorEmail;
     const isSelected = item.selected;
 
@@ -1284,6 +1366,8 @@ function renderAssignmentAlertModal({ row = {}, vendor = {}, analysis = {} } = {
       </article>
     `;
   }).join("");
+
+list.innerHTML = relatedGroupsHtml + recommendationsHtml;
 }
 
 function openAssignmentAlertModal(payload = {}) {
