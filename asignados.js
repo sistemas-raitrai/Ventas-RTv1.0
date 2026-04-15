@@ -650,7 +650,7 @@ function buildVendorRecommendationReasons(rec = {}, averages = {}) {
   if (rec.currentPortfolioCount > 0) {
     pushUniqueReason(
       reasons,
-      `En su cartera actual: ${Math.round(rec.reunionRateCurrent * 100)}% llega a reunión, ${Math.round(rec.ganadaRateCurrent * 100)}% llega a ganada`
+      `En suS grupos actuales: ${Math.round(rec.reunionRateCurrent * 100)}% llega a reunión, ${Math.round(rec.ganadaRateCurrent * 100)}% llega a ganada`
     );
   }
 
@@ -1248,7 +1248,7 @@ function renderAssignmentAlertModal({ row = {}, vendor = {}, analysis = {} } = {
           <div class="assignment-alert-row"><strong>Misma comuna (otros colegios):</strong> ${escapeHtml(String(item.sameComunaOnlyCount || 0))}</div>
           <div class="assignment-alert-row"><strong>Colegios similares:</strong> ${escapeHtml(String((item.similarSchoolSameComunaCount || 0) + (item.similarSchoolCount || 0)))}</div>
 
-          <div class="assignment-alert-row"><strong>Cartera actual:</strong> ${escapeHtml(String(item.currentPortfolioCount || 0))}</div>
+          <div class="assignment-alert-row"><strong>Cant. Grupos hoy:</strong> ${escapeHtml(String(item.currentPortfolioCount || 0))}</div>
           <div class="assignment-alert-row"><strong>Reuniones actuales:</strong> ${escapeHtml(String(item.currentReunionCount || 0))}</div>
           <div class="assignment-alert-row"><strong>Ganadas actuales:</strong> ${escapeHtml(String(item.currentGanadaCount || 0))}</div>
           <div class="assignment-alert-row"><strong>Cotizando actual:</strong> ${escapeHtml(String(item.currentCotizandoCount || 0))}</div>
