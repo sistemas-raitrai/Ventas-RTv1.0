@@ -1202,6 +1202,23 @@ function poblarSelectorVendedores(effectiveUser) {
   btn.classList.remove("ui-hidden");
 }
 
+function getAliasColegioSortKey(alias = "") {
+  let text = String(alias || "").trim();
+
+  // Quita el primer bloque tipo: 1C (2025)
+  text = text.replace(/^[0-9A-Z]+(?:\s*[A-Z]+)?\s*\(\d{4}\)\s*/i, "");
+
+  // Quita un segundo bloque si existe, por ejemplo:
+  // 1C (2026) 2C (2027) COLEGIO...
+  text = text.replace(/^[0-9A-Z]+(?:\s*[A-Z]+)?\s*\(\d{4}\)\s*/i, "");
+
+  return text
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
+}
+
 function extraerBloquesCursoAnoDesdeAlias(alias = "") {
   let text = String(alias || "").trim();
   const bloques = [];
