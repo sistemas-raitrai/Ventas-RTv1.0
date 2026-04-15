@@ -388,203 +388,495 @@ function pushUniqueReason(reasons = [], text = "") {
   if (!reasons.includes(text)) reasons.push(text);
 }
 
-function getAssignmentAlertLevel(score = 0, hardSignals = 0) {
-  if (hardSignals > 0 || score >= 78) return "Alta";
-  if (score >= 52) return "Media";
-  return "Leve";
+function normalizeStage(value = "") {
+  const raw = normalizeLoose(value);
+
+  if (!raw) return "";
+  if (raw.includes("reunion")) return "reunion_confirmada";
+  if (raw.includes("cotiz")) return "cotizando";
+  if (raw.includes("contactad")) return "contactado";
+  if (raw.includes("ganad")) return "ganada";
+  if (raw.includes("perdid")) return "perdida";
+  if (raw.includes("a contactar")) return "a_contactar";
+
+  return raw;
 }
 
-function getAssignmentAlertLevelClass(level = "") {
-  if (level === "Alta") return "high";
-  if (level === "Media") return "medium";
-  return "low";
+function isFinalStage(stage = "") {
+  return stage === "ganada" || stage === "perdida";
 }
 
-function summarizeAssignmentAlerts(alerts = [], targetVendorName = "") {
-  const high = alerts.filter((item) => item.level === "Alta").length;
-  const medium = alerts.filter((item) => item.level === "Media").length;
-  const low = alerts.filter((item) => item.level === "Leve").length;
-
-  return `Vas a asignar este grupo a ${targetVendorName || "la vendedora seleccionada"}. Se encontraron ${alerts.length} coincidencia(s): ${high} alta(s), ${medium} media(s) y ${low} leve(s). Revisa especialmente los grupos que hoy pertenecen a otro vendedor o siguen sin asignar.`;
+function isActiveStage(stage = "") {
+  return !isFinalStage(stage);
 }
 
-function findPotentialAssignmentAlerts(sourceRow = {}, targetVendor = {}) {
-  const currentId = getRowId(sourceRow);
-  const targetEmail = normalizeEmail(targetVendor.email || "");
-  const sourceYear = getAnoViajeNumber(sourceRow);
+function clamp(value, min, max) {
+  return Math.max(min, Math.min(max, value));
+}
+
+function getSchoolMatchInfo(sourceRow = {}, candidate = {}) {
+  const sourceSchoolRaw = sourceRow.colegio || sourceRow.colegioBase || "";
+  const candidateSchoolRaw = candidate.colegio || candidate.colegioBase || "";
+
+  const sourceSchool = normalizeSchoolLoose(sourceSchoolRaw);
+  const candidateSchool = normalizeSchoolLoose(candidateSchoolRaw);
+
+  const schoolSimilarity = getSchoolSimilarity(sourceSchoolRaw, candidateSchoolRaw);
+
   const sourceComuna = normalizeSearch(sourceRow.comunaCiudad || sourceRow.comuna || "");
+  const candidateComuna = normalizeSearch(candidate.comunaCiudad || candidate.comuna || "");
 
-  const sourceNames = [sourceRow.nombreCliente, sourceRow.nombreCliente2]
-    .map((value) => normalizeText(value))
-    .filter(Boolean);
+  const sameExactSchool = Boolean(sourceSchool && candidateSchool && sourceSchool === candidateSchool);
+  const sameComuna = Boolean(sourceComuna && candidateComuna && sourceComuna === candidateComuna);
 
-  const sourceEmails = [sourceRow.correoCliente, sourceRow.correoCliente2]
-    .map((value) => normalizeEmail(value))
-    .filter(Boolean);
+  let matchType = "none";
+  let label = "Sin coincidencia relevante";
 
-  const sourcePhones = [sourceRow.celularCliente, sourceRow.celularCliente2]
-    .map((value) => normalizePhoneLoose(value))
-    .filter(Boolean);
+  if (sameExactSchool && sameComuna) {
+    matchType = "same_school_same_comuna";
+    label = "Mismo colegio + misma comuna";
+  } else if (sameExactSchool) {
+    matchType = "same_school";
+    label = "Mismo colegio";
+  } else if (schoolSimilarity >= 0.90 && sameComuna) {
+    matchType = "similar_school_same_comuna";
+    label = "Colegio similar + misma comuna";
+  } else if (schoolSimilarity >= 0.82) {
+    matchType = "similar_school";
+    label = "Colegio similar";
+  }
 
-  const results = [];
+  return {
+    isRelevant: matchType !== "none",
+    matchType,
+    label,
+    schoolSimilarity,
+    sameExactSchool,
+    sameComuna
+  };
+}
+
+function createVendorRecommendationBase(vendor = {}) {
+  return {
+    vendorEmail: normalizeEmail(vendor.email || ""),
+    vendorName: normalizeText(vendor.nombre || ""),
+
+    // Carga global del vendedor
+    totalAssignedCount: 0,
+    totalActiveCount: 0,
+    totalAContactarCount: 0,
+    totalContactadoCount: 0,
+    totalCotizandoCount: 0,
+    totalReunionCount: 0,
+    totalGanadaCount: 0,
+    totalPerdidaCount: 0,
+
+    // Relación con el colegio / grupos comparables
+    relatedGroupsCount: 0,
+    sameSchoolSameComunaCount: 0,
+    sameSchoolExactCount: 0,
+    similarSchoolSameComunaCount: 0,
+    similarSchoolCount: 0,
+    sameYearCount: 0,
+
+    relatedActiveCount: 0,
+    relatedAContactarCount: 0,
+    relatedContactadoCount: 0,
+    relatedCotizandoCount: 0,
+    relatedReunionCount: 0,
+    relatedGanadaCount: 0,
+    relatedPerdidaCount: 0,
+
+    // Resultado calculado
+    continuityScore: 0,
+    performanceScore: 0,
+    workloadScore: 0,
+    totalScore: 0,
+    level: "Leve",
+    levelClass: "low",
+    hasStrongSchoolContinuity: false,
+    selected: false,
+    reasons: [],
+    relatedExamples: []
+  };
+}
+
+function pushRelatedExample(rec = {}, candidate = {}, matchInfo = {}) {
+  if (!rec.relatedExamples) rec.relatedExamples = [];
+  if (rec.relatedExamples.length >= 4) return;
+
+  rec.relatedExamples.push({
+    idGrupo: getRowId(candidate),
+    aliasGrupo: getRowAlias(candidate),
+    colegio: normalizeText(candidate.colegio || ""),
+    comunaCiudad: normalizeText(candidate.comunaCiudad || candidate.comuna || ""),
+    estado: normalizeText(candidate.estado || "—"),
+    curso: normalizeText(candidate.cursoViaje || candidate.curso || ""),
+    anoViaje: normalizeText(candidate.anoViaje || ""),
+    matchLabel: matchInfo.label || "Relacionado",
+    url: `${DETALLE_GRUPO_URL}?id=${encodeURIComponent(getRowId(candidate))}`
+  });
+}
+
+function getRecommendationLevel(totalScore = 0, continuityScore = 0) {
+  if (continuityScore >= 22 || totalScore >= 70) {
+    return { level: "Alta", levelClass: "high" };
+  }
+  if (continuityScore >= 10 || totalScore >= 45) {
+    return { level: "Media", levelClass: "medium" };
+  }
+  return { level: "Leve", levelClass: "low" };
+}
+
+function calculateContinuityScore(rec = {}) {
+  let score = 0;
+
+  if (rec.sameSchoolSameComunaCount > 0) {
+    score += 30 + Math.min(10, (rec.sameSchoolSameComunaCount - 1) * 4);
+  } else if (rec.sameSchoolExactCount > 0) {
+    score += 18 + Math.min(6, (rec.sameSchoolExactCount - 1) * 3);
+  }
+
+  score += Math.min(10, rec.similarSchoolSameComunaCount * 5);
+  score += Math.min(6, rec.similarSchoolCount * 2);
+  score += Math.min(6, rec.relatedActiveCount * 2);
+  score += Math.min(5, rec.sameYearCount * 2);
+
+  return clamp(Math.round(score), 0, 45);
+}
+
+function calculatePerformanceScore(rec = {}) {
+  let score = 0;
+
+  score += Math.min(16, rec.relatedReunionCount * 8);
+  score += Math.min(10, rec.relatedCotizandoCount * 5);
+  score += Math.min(6, rec.relatedContactadoCount * 3);
+  score += Math.min(6, rec.relatedGanadaCount * 3);
+
+  score -= Math.min(4, rec.relatedPerdidaCount * 2);
+  score -= Math.min(8, rec.relatedAContactarCount * 4);
+
+  return clamp(Math.round(score), 0, 30);
+}
+
+function calculateWorkloadScore(rec = {}, averages = {}) {
+  let score = 12;
+
+  // Premio por no tener grupos botados en "A contactar"
+  if (rec.totalAContactarCount === 0) score += 10;
+  else if (rec.totalAContactarCount <= 2) score += 5;
+  else if (rec.totalAContactarCount <= 4) score += 1;
+  else score -= 6;
+
+  // Balance de carga activa
+  const avgActive = Number(averages.activeCount || 0);
+  const diffActive = rec.totalActiveCount - avgActive;
+
+  if (diffActive <= -2) score += 6;
+  else if (diffActive < 0) score += 3;
+  else if (diffActive >= 3) score -= 6;
+  else if (diffActive > 0) score -= 3;
+
+  // Balance de cotizaciones
+  const avgCotizando = Number(averages.cotizandoCount || 0);
+  const diffCotizando = rec.totalCotizandoCount - avgCotizando;
+
+  if (diffCotizando <= -1) score += 3;
+  else if (diffCotizando >= 2) score -= 3;
+
+  return clamp(Math.round(score), 0, 25);
+}
+
+function buildVendorRecommendationReasons(rec = {}, averages = {}) {
+  const reasons = [];
+
+  if (rec.sameSchoolSameComunaCount > 0) {
+    pushUniqueReason(
+      reasons,
+      `Ya trabaja ${rec.sameSchoolSameComunaCount} grupo(s) del mismo colegio en la misma comuna`
+    );
+  } else if (rec.sameSchoolExactCount > 0) {
+    pushUniqueReason(
+      reasons,
+      `Ya trabaja ${rec.sameSchoolExactCount} grupo(s) del mismo colegio`
+    );
+  }
+
+  if (rec.similarSchoolSameComunaCount > 0) {
+    pushUniqueReason(
+      reasons,
+      `Tiene ${rec.similarSchoolSameComunaCount} grupo(s) de colegio similar en la misma comuna`
+    );
+  } else if (rec.similarSchoolCount > 0) {
+    pushUniqueReason(
+      reasons,
+      `Tiene ${rec.similarSchoolCount} grupo(s) de colegio similar`
+    );
+  }
+
+  if (rec.sameYearCount > 0) {
+    pushUniqueReason(
+      reasons,
+      `Tiene ${rec.sameYearCount} grupo(s) relacionados del mismo año de viaje`
+    );
+  }
+
+  if (rec.relatedReunionCount > 0) {
+    pushUniqueReason(
+      reasons,
+      `Registra ${rec.relatedReunionCount} reunión(es) confirmada(s) en grupos comparables`
+    );
+  }
+
+  if (rec.relatedCotizandoCount > 0) {
+    pushUniqueReason(
+      reasons,
+      `Mantiene ${rec.relatedCotizandoCount} cotización(es) activa(s) en grupos comparables`
+    );
+  }
+
+  if (rec.totalAContactarCount === 0) {
+    pushUniqueReason(
+      reasons,
+      "No tiene grupos pendientes en 'A contactar'"
+    );
+  } else if (rec.totalAContactarCount >= 3) {
+    pushUniqueReason(
+      reasons,
+      `Tiene ${rec.totalAContactarCount} grupo(s) aún en 'A contactar'`
+    );
+  }
+
+  if (rec.totalActiveCount < Number(averages.activeCount || 0)) {
+    pushUniqueReason(
+      reasons,
+      "Tiene una carga activa por debajo del promedio del equipo"
+    );
+  } else if (rec.totalActiveCount > Number(averages.activeCount || 0) + 1) {
+    pushUniqueReason(
+      reasons,
+      "Tiene una carga activa por sobre el promedio del equipo"
+    );
+  }
+
+  if (!reasons.length) {
+    pushUniqueReason(
+      reasons,
+      "Sin señales fuertes de continuidad; el criterio principal aquí es balance de carga"
+    );
+  }
+
+  return reasons;
+}
+
+function buildAssignmentRecommendationSummary(analysis = {}) {
+  const top = analysis.topRecommendation;
+  const selected = analysis.selectedRecommendation;
+  const schoolLabel = analysis.sourceSchoolLabel || "este colegio";
+
+  const parts = [];
+
+  parts.push(
+    `Para ${schoolLabel} se encontraron ${analysis.totalRelatedGroups} grupo(s) relacionado(s): ${analysis.relatedAssignedCount} asignado(s) y ${analysis.relatedUnassignedCount} sin asignar.`
+  );
+
+  if (top) {
+    parts.push(`Recomendación principal: ${top.vendorName} con ${top.totalScore} pts.`);
+  }
+
+  if (selected && top) {
+    if (selected.vendorEmail === top.vendorEmail) {
+      parts.push("La selección actual coincide con la mejor recomendación.");
+    } else {
+      parts.push(
+        `La selección actual es ${selected.vendorName} (${selected.totalScore} pts), pero hay otro vendedor mejor posicionado por continuidad, progreso y/o carga.`
+      );
+    }
+  }
+
+  return parts.join(" ");
+}
+
+function shouldOpenVendorRecommendationModal(analysis = {}) {
+  const top = analysis.topRecommendation;
+  const selected = analysis.selectedRecommendation;
+
+  if (!top || !selected) return false;
+
+  if (analysis.totalRelatedGroups > 0) return true;
+
+  return (
+    top.vendorEmail !== selected.vendorEmail &&
+    (top.totalScore - selected.totalScore) >= 10
+  );
+}
+
+function analyzeVendorAssignmentRecommendation(sourceRow = {}, selectedVendor = {}) {
+  const vendors = getVendorOptions();
+  const vendorMap = new Map(
+    vendors.map((vendor) => [normalizeEmail(vendor.email || ""), createVendorRecommendationBase(vendor)])
+  );
+
+  const currentId = getRowId(sourceRow);
+  const sourceYear = getAnoViajeNumber(sourceRow);
+
+  let totalRelatedGroups = 0;
+  let relatedAssignedCount = 0;
+  let relatedUnassignedCount = 0;
 
   state.rows.forEach((candidate) => {
     if (getRowId(candidate) === currentId) return;
 
-    let score = 0;
-    let hardSignals = 0;
-    const reasons = [];
-
-    const schoolSimilarity = getSchoolSimilarity(
-      sourceRow.colegio || sourceRow.colegioBase || "",
-      candidate.colegio || candidate.colegioBase || ""
-    );
-
-    if (schoolSimilarity >= 0.95) {
-      score += 30;
-      pushUniqueReason(reasons, "Colegio muy parecido");
-    } else if (schoolSimilarity >= 0.82) {
-      score += 18;
-      pushUniqueReason(reasons, "Colegio parecido");
-    }
-
-    const candidateComuna = normalizeSearch(candidate.comunaCiudad || candidate.comuna || "");
-    if (sourceComuna && candidateComuna && sourceComuna === candidateComuna) {
-      score += 10;
-      pushUniqueReason(reasons, "Misma comuna/ciudad");
-    }
-
-    const candidateYear = getAnoViajeNumber(candidate);
-    if (sourceYear && candidateYear) {
-      if (candidateYear === sourceYear) {
-        score += 18;
-        pushUniqueReason(reasons, `Mismo año de viaje (${candidateYear})`);
-      } else if (candidateYear >= sourceYear && candidateYear <= sourceYear + 1) {
-        score += 8;
-        pushUniqueReason(reasons, `Año de viaje cercano (${candidateYear})`);
-      }
-    }
-
-    const courseSimilarity = Math.max(
-      getCourseSimilarity(sourceRow.curso || "", candidate.curso || ""),
-      getCourseSimilarity(sourceRow.cursoViaje || "", candidate.cursoViaje || "")
-    );
-
-    if (courseSimilarity >= 1) {
-      score += 16;
-      pushUniqueReason(reasons, "Mismo curso");
-    } else if (courseSimilarity >= 0.88) {
-      score += 10;
-      pushUniqueReason(reasons, "Curso parecido / misma numeración con otra letra");
-    }
-
-    const candidateNames = [candidate.nombreCliente, candidate.nombreCliente2]
-      .map((value) => normalizeText(value))
-      .filter(Boolean);
-
-    let bestNameMatch = { score: 0, value: "" };
-
-    sourceNames.forEach((inputName) => {
-      candidateNames.forEach((candidateName) => {
-        const sim = getNameSimilarity(inputName, candidateName);
-        if (sim > bestNameMatch.score) {
-          bestNameMatch = { score: sim, value: candidateName };
-        }
-      });
-    });
-
-    if (bestNameMatch.score >= 0.97) {
-      score += 30;
-      hardSignals += 1;
-      pushUniqueReason(reasons, `Contacto muy parecido: ${bestNameMatch.value}`);
-    } else if (bestNameMatch.score >= 0.88) {
-      score += 18;
-      pushUniqueReason(reasons, `Contacto parecido: ${bestNameMatch.value}`);
-    }
-
-    const candidateEmails = [candidate.correoCliente, candidate.correoCliente2]
-      .map((value) => normalizeEmail(value))
-      .filter(Boolean);
-
-    const matchedEmail = sourceEmails.find((email) => email && candidateEmails.includes(email));
-    if (matchedEmail) {
-      score += 60;
-      hardSignals += 1;
-      pushUniqueReason(reasons, `Mismo correo: ${matchedEmail}`);
-    }
-
-    const candidatePhones = [candidate.celularCliente, candidate.celularCliente2]
-      .map((value) => normalizePhoneLoose(value))
-      .filter(Boolean);
-
-    const matchedPhone = sourcePhones.find((phone) => phone && candidatePhones.includes(phone));
-    if (matchedPhone) {
-      score += 55;
-      hardSignals += 1;
-      pushUniqueReason(reasons, `Mismo celular terminado en ${matchedPhone}`);
-    }
-
     const candidateVendorEmail = getRowVendorEmail(candidate);
-    const candidateVendorName = getRowVendorName(candidate) || "Sin asignar";
+    const candidateVendorKnown = candidateVendorEmail && vendorMap.has(candidateVendorEmail);
+    const candidateStage = normalizeStage(candidate.estado || "");
 
-    let relationship = "same";
-    let relationshipLabel = "Mismo vendedor destino";
-    let relationshipClass = "same";
+    // 1) Siempre acumulamos carga global del vendedor
+    if (candidateVendorKnown && !isSinAsignar(candidate)) {
+      const rec = vendorMap.get(candidateVendorEmail);
 
-    if (isSinAsignar(candidate)) {
-      relationship = "unassigned";
-      relationshipLabel = "Hoy está Sin asignar";
-      relationshipClass = "unassigned";
-      score += 14;
-      pushUniqueReason(reasons, "El grupo parecido hoy está Sin asignar");
-    } else if (candidateVendorEmail && candidateVendorEmail !== targetEmail) {
-      relationship = "other";
-      relationshipLabel = `Hoy pertenece a ${candidateVendorName}`;
-      relationshipClass = "other";
-      score += 24;
-      if (schoolSimilarity >= 0.82 || bestNameMatch.score >= 0.88 || matchedEmail || matchedPhone) {
-        hardSignals += 1;
-      }
-      pushUniqueReason(reasons, `Hoy pertenece a otro vendedor: ${candidateVendorName}`);
-    } else if (candidateVendorEmail === targetEmail) {
-      score += 4;
-      pushUniqueReason(reasons, "Ya existe un grupo parecido del mismo vendedor destino");
+      rec.totalAssignedCount += 1;
+
+      if (isActiveStage(candidateStage)) rec.totalActiveCount += 1;
+      if (candidateStage === "a_contactar") rec.totalAContactarCount += 1;
+      if (candidateStage === "contactado") rec.totalContactadoCount += 1;
+      if (candidateStage === "cotizando") rec.totalCotizandoCount += 1;
+      if (candidateStage === "reunion_confirmada") rec.totalReunionCount += 1;
+      if (candidateStage === "ganada") rec.totalGanadaCount += 1;
+      if (candidateStage === "perdida") rec.totalPerdidaCount += 1;
     }
 
-    const shouldKeep =
-      hardSignals > 0 ||
-      score >= 42 ||
-      ((schoolSimilarity >= 0.82 || bestNameMatch.score >= 0.88) && candidateYear && sourceYear && candidateYear === sourceYear);
+    // 2) Solo algunos grupos cuentan como "relacionados" con el colegio actual
+    const matchInfo = getSchoolMatchInfo(sourceRow, candidate);
+    if (!matchInfo.isRelevant) return;
 
-    if (!shouldKeep) return;
+    totalRelatedGroups += 1;
 
-    const level = getAssignmentAlertLevel(score, hardSignals);
+    if (isSinAsignar(candidate) || !candidateVendorKnown) {
+      relatedUnassignedCount += 1;
+      return;
+    }
 
-    results.push({
-      idGrupo: getRowId(candidate),
-      codigoRegistro: normalizeText(candidate.codigoRegistro || ""),
-      aliasGrupo: getRowAlias(candidate),
-      colegio: normalizeText(candidate.colegio || ""),
-      comunaCiudad: normalizeText(candidate.comunaCiudad || candidate.comuna || ""),
-      anoViaje: normalizeText(candidate.anoViaje || ""),
-      curso: normalizeText(candidate.cursoViaje || candidate.curso || ""),
-      cliente: normalizeText(candidate.nombreCliente || candidate.nombreCliente2 || "—"),
-      estado: normalizeText(candidate.estado || "—"),
-      vendedora: candidateVendorName,
-      level,
-      levelClass: getAssignmentAlertLevelClass(level),
-      relationship,
-      relationshipLabel,
-      relationshipClass,
-      score,
-      reasons,
-      url: `${DETALLE_GRUPO_URL}?id=${encodeURIComponent(getRowId(candidate))}`
-    });
+    relatedAssignedCount += 1;
+
+    const rec = vendorMap.get(candidateVendorEmail);
+
+    rec.relatedGroupsCount += 1;
+
+    if (matchInfo.matchType === "same_school_same_comuna") {
+      rec.sameSchoolSameComunaCount += 1;
+    } else if (matchInfo.matchType === "same_school") {
+      rec.sameSchoolExactCount += 1;
+    } else if (matchInfo.matchType === "similar_school_same_comuna") {
+      rec.similarSchoolSameComunaCount += 1;
+    } else if (matchInfo.matchType === "similar_school") {
+      rec.similarSchoolCount += 1;
+    }
+
+    if (sourceYear && getAnoViajeNumber(candidate) === sourceYear) {
+      rec.sameYearCount += 1;
+    }
+
+    if (isActiveStage(candidateStage)) rec.relatedActiveCount += 1;
+    if (candidateStage === "a_contactar") rec.relatedAContactarCount += 1;
+    if (candidateStage === "contactado") rec.relatedContactadoCount += 1;
+    if (candidateStage === "cotizando") rec.relatedCotizandoCount += 1;
+    if (candidateStage === "reunion_confirmada") rec.relatedReunionCount += 1;
+    if (candidateStage === "ganada") rec.relatedGanadaCount += 1;
+    if (candidateStage === "perdida") rec.relatedPerdidaCount += 1;
+
+    pushRelatedExample(rec, candidate, matchInfo);
   });
 
-  return results
-    .sort((a, b) => b.score - a.score)
-    .slice(0, 12);
+  const allRecommendations = Array.from(vendorMap.values());
+
+  const averages = {
+    activeCount: allRecommendations.length
+      ? allRecommendations.reduce((sum, item) => sum + item.totalActiveCount, 0) / allRecommendations.length
+      : 0,
+    cotizandoCount: allRecommendations.length
+      ? allRecommendations.reduce((sum, item) => sum + item.totalCotizandoCount, 0) / allRecommendations.length
+      : 0
+  };
+
+  const selectedVendorEmail = normalizeEmail(selectedVendor.email || "");
+
+  allRecommendations.forEach((rec) => {
+    rec.continuityScore = calculateContinuityScore(rec);
+    rec.performanceScore = calculatePerformanceScore(rec);
+    rec.workloadScore = calculateWorkloadScore(rec, averages);
+    rec.totalScore = clamp(
+      rec.continuityScore + rec.performanceScore + rec.workloadScore,
+      0,
+      100
+    );
+
+    const level = getRecommendationLevel(rec.totalScore, rec.continuityScore);
+    rec.level = level.level;
+    rec.levelClass = level.levelClass;
+
+    rec.hasStrongSchoolContinuity =
+      rec.sameSchoolSameComunaCount > 0 || rec.sameSchoolExactCount > 0;
+
+    rec.selected = rec.vendorEmail === selectedVendorEmail;
+    rec.reasons = buildVendorRecommendationReasons(rec, averages);
+  });
+
+  allRecommendations.sort((a, b) => {
+    return (
+      b.totalScore - a.totalScore ||
+      b.continuityScore - a.continuityScore ||
+      b.performanceScore - a.performanceScore ||
+      a.vendorName.localeCompare(b.vendorName, "es", { sensitivity: "base" })
+    );
+  });
+
+  const topRecommendation = allRecommendations[0] || null;
+  const selectedRecommendation =
+    allRecommendations.find((item) => item.vendorEmail === selectedVendorEmail) || null;
+
+  const recommendationsToShow = [];
+  allRecommendations.forEach((item) => {
+    const isTop = topRecommendation && item.vendorEmail === topRecommendation.vendorEmail;
+    const shouldShow =
+      isTop ||
+      item.selected ||
+      item.relatedGroupsCount > 0;
+
+    if (shouldShow && !recommendationsToShow.some((x) => x.vendorEmail === item.vendorEmail)) {
+      recommendationsToShow.push(item);
+    }
+  });
+
+  if (selectedRecommendation && !recommendationsToShow.some((x) => x.vendorEmail === selectedRecommendation.vendorEmail)) {
+    recommendationsToShow.push(selectedRecommendation);
+  }
+
+  recommendationsToShow.sort((a, b) => {
+    return (
+      b.totalScore - a.totalScore ||
+      b.continuityScore - a.continuityScore ||
+      b.performanceScore - a.performanceScore
+    );
+  });
+
+  const analysis = {
+    sourceSchoolLabel: normalizeText(sourceRow.colegio || sourceRow.colegioBase || "este colegio"),
+    selectedVendorEmail,
+    selectedVendorName: normalizeText(selectedVendor.nombre || ""),
+    totalRelatedGroups,
+    relatedAssignedCount,
+    relatedUnassignedCount,
+    recommendations: recommendationsToShow.slice(0, 6),
+    topRecommendation,
+    selectedRecommendation,
+    summaryText: ""
+  };
+
+  analysis.summaryText = buildAssignmentRecommendationSummary(analysis);
+  analysis.shouldReview = shouldOpenVendorRecommendationModal(analysis);
+
+  return analysis;
 }
 
 /* =========================================================
@@ -847,62 +1139,110 @@ async function writeAssignmentHistory({
   });
 }
 
-function renderAssignmentAlertModal({ row = {}, vendor = {}, alerts = [] } = {}) {
+function renderAssignmentAlertModal({ row = {}, vendor = {}, analysis = {} } = {}) {
   const title = $("assignmentAlertTitle");
   const summary = $("assignmentAlertSummary");
   const list = $("assignmentAlertList");
+  const continueBtn = $("assignmentAlertContinueBtn");
+
+  const top = analysis.topRecommendation || null;
+  const selected = analysis.selectedRecommendation || null;
 
   if (title) {
-    title.textContent = `Posibles coincidencias antes de asignar a ${vendor.nombre || "la vendedora seleccionada"}`;
+    title.textContent = `Recomendación antes de asignar a ${vendor.nombre || "la vendedora seleccionada"}`;
   }
 
   if (summary) {
-    summary.textContent = summarizeAssignmentAlerts(alerts, vendor.nombre || "");
+    summary.textContent =
+      analysis.summaryText ||
+      "Se generó una recomendación comercial antes de guardar la asignación.";
+  }
+
+  if (continueBtn) {
+    continueBtn.textContent =
+      selected && top && selected.vendorEmail === top.vendorEmail
+        ? "Confirmar asignación"
+        : "Asignar igualmente";
   }
 
   if (!list) return;
 
-  if (!alerts.length) {
-    list.innerHTML = `<div class="assignment-alert-empty">No hay coincidencias para revisar.</div>`;
+  const recommendations = analysis.recommendations || [];
+
+  if (!recommendations.length) {
+    list.innerHTML = `<div class="assignment-alert-empty">No hay recomendaciones para mostrar.</div>`;
     return;
   }
 
-  list.innerHTML = alerts.map((item) => `
-    <article class="assignment-alert-item">
-      <div class="assignment-alert-top">
-        <div>
-          <h4 class="assignment-alert-title">${escapeHtml(item.aliasGrupo || "Grupo sin alias")}</h4>
-          <div class="assignment-alert-meta">
-            ${escapeHtml(item.codigoRegistro || "Sin código")} · ID ${escapeHtml(item.idGrupo || "—")}
+  list.innerHTML = recommendations.map((item, index) => {
+    const isTop = top && item.vendorEmail === top.vendorEmail;
+    const isSelected = item.selected;
+
+    return `
+      <article class="assignment-alert-item">
+        <div class="assignment-alert-top">
+          <div>
+            <h4 class="assignment-alert-title">${index + 1}. ${escapeHtml(item.vendorName || "Vendedor(a)")}</h4>
+            <div class="assignment-alert-meta">
+              ${escapeHtml(item.vendorEmail || "Sin correo")} · Puntaje total ${escapeHtml(String(item.totalScore || 0))}/100
+            </div>
+          </div>
+
+          <div class="assignment-alert-tags">
+            ${isTop ? `<span class="assignment-pill same">Recomendación principal</span>` : ""}
+            ${isSelected ? `<span class="assignment-pill other">Selección actual</span>` : ""}
+            <span class="assignment-pill ${escapeHtml(item.levelClass)}">${escapeHtml(item.level)}</span>
+            ${
+              item.hasStrongSchoolContinuity
+                ? `<span class="assignment-pill medium">Tiene continuidad con el colegio</span>`
+                : `<span class="assignment-pill unassigned">Sin continuidad fuerte</span>`
+            }
           </div>
         </div>
 
-        <div class="assignment-alert-tags">
-          <span class="assignment-pill ${escapeHtml(item.levelClass)}">${escapeHtml(item.level)}</span>
-          <span class="assignment-pill ${escapeHtml(item.relationshipClass)}">${escapeHtml(item.relationshipLabel)}</span>
+        <div class="assignment-alert-grid">
+          <div class="assignment-alert-row"><strong>Continuidad:</strong> ${escapeHtml(String(item.continuityScore || 0))}/45</div>
+          <div class="assignment-alert-row"><strong>Progreso comparable:</strong> ${escapeHtml(String(item.performanceScore || 0))}/30</div>
+          <div class="assignment-alert-row"><strong>Carga actual:</strong> ${escapeHtml(String(item.workloadScore || 0))}/25</div>
+          <div class="assignment-alert-row"><strong>Grupos relacionados:</strong> ${escapeHtml(String(item.relatedGroupsCount || 0))}</div>
+          <div class="assignment-alert-row"><strong>Mismo colegio + comuna:</strong> ${escapeHtml(String(item.sameSchoolSameComunaCount || 0))}</div>
+          <div class="assignment-alert-row"><strong>Mismo colegio:</strong> ${escapeHtml(String(item.sameSchoolExactCount || 0))}</div>
+          <div class="assignment-alert-row"><strong>Similares + comuna:</strong> ${escapeHtml(String(item.similarSchoolSameComunaCount || 0))}</div>
+          <div class="assignment-alert-row"><strong>Similares:</strong> ${escapeHtml(String(item.similarSchoolCount || 0))}</div>
+          <div class="assignment-alert-row"><strong>Reunión confirmada:</strong> ${escapeHtml(String(item.relatedReunionCount || 0))}</div>
+          <div class="assignment-alert-row"><strong>Cotizando:</strong> ${escapeHtml(String(item.relatedCotizandoCount || 0))}</div>
+          <div class="assignment-alert-row"><strong>Contactado:</strong> ${escapeHtml(String(item.relatedContactadoCount || 0))}</div>
+          <div class="assignment-alert-row"><strong>Ganada / Perdida:</strong> ${escapeHtml(String(item.relatedGanadaCount || 0))} / ${escapeHtml(String(item.relatedPerdidaCount || 0))}</div>
+          <div class="assignment-alert-row"><strong>Total activos:</strong> ${escapeHtml(String(item.totalActiveCount || 0))}</div>
+          <div class="assignment-alert-row"><strong>Total en A contactar:</strong> ${escapeHtml(String(item.totalAContactarCount || 0))}</div>
         </div>
-      </div>
 
-      <div class="assignment-alert-grid">
-        <div class="assignment-alert-row"><strong>Colegio:</strong> ${escapeHtml(item.colegio || "—")}</div>
-        <div class="assignment-alert-row"><strong>Curso:</strong> ${escapeHtml(item.curso || "—")}</div>
-        <div class="assignment-alert-row"><strong>Año viaje:</strong> ${escapeHtml(item.anoViaje || "—")}</div>
-        <div class="assignment-alert-row"><strong>Comuna:</strong> ${escapeHtml(item.comunaCiudad || "—")}</div>
-        <div class="assignment-alert-row"><strong>Cliente:</strong> ${escapeHtml(item.cliente || "—")}</div>
-        <div class="assignment-alert-row"><strong>Estado:</strong> ${escapeHtml(item.estado || "—")}</div>
-        <div class="assignment-alert-row"><strong>Vendedor actual:</strong> ${escapeHtml(item.vendedora || "Sin asignar")}</div>
-        <div class="assignment-alert-row"><strong>Puntaje:</strong> ${escapeHtml(String(item.score || 0))}</div>
-      </div>
+        <ul class="assignment-alert-reasons">
+          ${(item.reasons || []).map((reason) => `<li>${escapeHtml(reason)}</li>`).join("")}
+        </ul>
 
-      <ul class="assignment-alert-reasons">
-        ${item.reasons.map((reason) => `<li>${escapeHtml(reason)}</li>`).join("")}
-      </ul>
-
-      <a class="assignment-alert-link" href="${item.url}" target="_blank" rel="noopener">
-        Abrir grupo
-      </a>
-    </article>
-  `).join("");
+        ${
+          (item.relatedExamples || []).length
+            ? `
+              <div class="assignment-alert-row"><strong>Ejemplos relacionados:</strong></div>
+              <ul class="assignment-alert-reasons">
+                ${(item.relatedExamples || []).map((example) => `
+                  <li>
+                    <a class="assignment-alert-link" href="${example.url}" target="_blank" rel="noopener">
+                      ${escapeHtml(example.aliasGrupo || `Grupo ${example.idGrupo}`)}
+                    </a>
+                    · ${escapeHtml(example.matchLabel || "Relacionado")}
+                    · ${escapeHtml(example.estado || "—")}
+                    · ${escapeHtml(example.comunaCiudad || "—")}
+                  </li>
+                `).join("")}
+              </ul>
+            `
+            : ""
+        }
+      </article>
+    `;
+  }).join("");
 }
 
 function openAssignmentAlertModal(payload = {}) {
@@ -922,33 +1262,43 @@ function clearAssignmentAlertReviewState() {
 async function writeAssignmentAlertReviewHistory({
   idGrupo,
   vendor = {},
-  alerts = []
+  analysis = null
 } = {}) {
-  if (!alerts.length) return;
+  if (!analysis) return;
 
   const ref = doc(collection(db, "ventas_cotizaciones", String(idGrupo), "historialAsignaciones"));
 
+  const top = analysis.topRecommendation || null;
+
   await setDoc(ref, {
     idGrupo: String(idGrupo),
-    tipo: "Alerta previa de asignación",
+    tipo: "Recomendación previa de asignación",
     campo: "vendedora",
-    vendedorObjetivo: normalizeText(vendor.nombre || ""),
-    vendedorObjetivoCorreo: normalizeEmail(vendor.email || ""),
-    totalCoincidencias: alerts.length,
-    coincidencias: alerts.map((item) => ({
-      idGrupo: item.idGrupo,
-      codigoRegistro: item.codigoRegistro,
-      aliasGrupo: item.aliasGrupo,
-      colegio: item.colegio,
-      curso: item.curso,
-      anoViaje: item.anoViaje,
-      cliente: item.cliente,
-      estado: item.estado,
-      vendedora: item.vendedora,
-      level: item.level,
-      score: item.score,
-      relationship: item.relationship,
-      reasons: item.reasons
+    colegio: normalizeText(analysis.sourceSchoolLabel || ""),
+    vendedorElegido: normalizeText(vendor.nombre || ""),
+    vendedorElegidoCorreo: normalizeEmail(vendor.email || ""),
+    vendedorSugerido: normalizeText(top?.vendorName || ""),
+    vendedorSugeridoCorreo: normalizeEmail(top?.vendorEmail || ""),
+    totalGruposRelacionados: Number(analysis.totalRelatedGroups || 0),
+    gruposRelacionadosAsignados: Number(analysis.relatedAssignedCount || 0),
+    gruposRelacionadosSinAsignar: Number(analysis.relatedUnassignedCount || 0),
+    resumen: normalizeText(analysis.summaryText || ""),
+    ranking: (analysis.recommendations || []).map((item) => ({
+      vendorName: item.vendorName,
+      vendorEmail: item.vendorEmail,
+      totalScore: item.totalScore,
+      continuityScore: item.continuityScore,
+      performanceScore: item.performanceScore,
+      workloadScore: item.workloadScore,
+      sameSchoolSameComunaCount: item.sameSchoolSameComunaCount,
+      sameSchoolExactCount: item.sameSchoolExactCount,
+      similarSchoolSameComunaCount: item.similarSchoolSameComunaCount,
+      similarSchoolCount: item.similarSchoolCount,
+      relatedReunionCount: item.relatedReunionCount,
+      relatedCotizandoCount: item.relatedCotizandoCount,
+      totalAContactarCount: item.totalAContactarCount,
+      selected: Boolean(item.selected),
+      reasons: item.reasons || []
     })),
     hechoPor: getNombreUsuario(state.effectiveUser),
     hechoPorCorreo: normalizeEmail(state.realUser?.email || ""),
@@ -960,7 +1310,7 @@ async function persistAssignment({
   row,
   vendor,
   tipo,
-  alerts = [],
+  reviewAnalysis = null,
   confirmedAfterReview = false
 } = {}) {
   const idGrupo = getRowId(row);
@@ -999,11 +1349,11 @@ async function persistAssignment({
     estadoNuevo: "A contactar"
   });
 
-  if (confirmedAfterReview && alerts.length) {
+  if (confirmedAfterReview && reviewAnalysis) {
     await writeAssignmentAlertReviewHistory({
       idGrupo,
       vendor,
-      alerts
+      analysis: reviewAnalysis
     });
   }
 
@@ -1046,7 +1396,7 @@ async function continueAssignmentAfterAlertReview() {
       row: currentRow,
       vendor: currentVendor,
       tipo: pending.tipo,
-      alerts: pending.alerts,
+      reviewAnalysis: pending.analysis,
       confirmedAfterReview: true
     });
 
@@ -1091,33 +1441,99 @@ async function openHistory(idGrupo) {
 
     body.innerHTML = snap.docs.map((docSnap) => {
       const row = docSnap.data() || {};
-
+      const tipoNorm = normalizeLoose(row.tipo || "");
+      const isRecommendation =
+        tipoNorm === "recomendacion previa de asignacion" ||
+        tipoNorm === "recomendación previa de asignación";
+    
+      if (isRecommendation) {
+        const ranking = Array.isArray(row.ranking) ? row.ranking : [];
+    
+        return `
+          <div class="history-item">
+            <div class="history-top">
+              <strong>${escapeHtml(normalizeText(row.tipo || "Recomendación"))}</strong>
+              <span>${escapeHtml(formatDateTime(row.fecha) || "Fecha pendiente")}</span>
+            </div>
+    
+            <div class="history-line">
+              <strong>Colegio:</strong>
+              ${escapeHtml(normalizeText(row.colegio || "—"))}
+            </div>
+    
+            <div class="history-line">
+              <strong>Vendedor sugerido:</strong>
+              ${escapeHtml(normalizeText(row.vendedorSugerido || "—"))}
+              ${row.vendedorSugeridoCorreo ? ` · ${escapeHtml(normalizeEmail(row.vendedorSugeridoCorreo))}` : ""}
+            </div>
+    
+            <div class="history-line">
+              <strong>Vendedor elegido:</strong>
+              ${escapeHtml(normalizeText(row.vendedorElegido || "—"))}
+              ${row.vendedorElegidoCorreo ? ` · ${escapeHtml(normalizeEmail(row.vendedorElegidoCorreo))}` : ""}
+            </div>
+    
+            <div class="history-line">
+              <strong>Relacionados:</strong>
+              ${escapeHtml(String(row.totalGruposRelacionados || 0))}
+              · asignados ${escapeHtml(String(row.gruposRelacionadosAsignados || 0))}
+              · sin asignar ${escapeHtml(String(row.gruposRelacionadosSinAsignar || 0))}
+            </div>
+    
+            <div class="history-line">
+              <strong>Resumen:</strong>
+              ${escapeHtml(normalizeText(row.resumen || "—"))}
+            </div>
+    
+            ${
+              ranking.length
+                ? `
+                  <div class="history-line">
+                    <strong>Ranking:</strong>
+                    ${ranking.slice(0, 3).map((item) => {
+                      const label = `${item.vendorName || "Vendedor"} (${item.totalScore || 0} pts)`;
+                      return escapeHtml(label);
+                    }).join(" · ")}
+                  </div>
+                `
+                : ""
+            }
+    
+            <div class="history-line">
+              <strong>Hecho por:</strong>
+              ${escapeHtml(normalizeText(row.hechoPor || "—"))}
+              ${row.hechoPorCorreo ? ` · ${escapeHtml(normalizeEmail(row.hechoPorCorreo))}` : ""}
+            </div>
+          </div>
+        `;
+      }
+    
       return `
         <div class="history-item">
           <div class="history-top">
             <strong>${escapeHtml(normalizeText(row.tipo || "Cambio"))}</strong>
             <span>${escapeHtml(formatDateTime(row.fecha) || "Fecha pendiente")}</span>
           </div>
-
+    
           <div class="history-line">
             <strong>Antes:</strong>
             ${escapeHtml(normalizeText(row.anteriorVendedora || "Sin asignar"))}
             ${row.anteriorVendedoraCorreo ? ` · ${escapeHtml(normalizeEmail(row.anteriorVendedoraCorreo))}` : ""}
           </div>
-
+    
           <div class="history-line">
             <strong>Después:</strong>
             ${escapeHtml(normalizeText(row.nuevaVendedora || "Sin asignar"))}
             ${row.nuevaVendedoraCorreo ? ` · ${escapeHtml(normalizeEmail(row.nuevaVendedoraCorreo))}` : ""}
           </div>
-
+    
           <div class="history-line">
             <strong>Estado:</strong>
             ${escapeHtml(normalizeText(row.estadoAnterior || "—"))}
-            → 
+            →
             ${escapeHtml(normalizeText(row.estadoNuevo || "—"))}
           </div>
-
+    
           <div class="history-line">
             <strong>Hecho por:</strong>
             ${escapeHtml(normalizeText(row.hechoPor || "—"))}
@@ -1182,27 +1598,28 @@ async function saveAssignment(idGrupo) {
 
   try {
     setProgressStatus({
-      text: `Revisando ${tipo.toLowerCase()}...`,
-      meta: `Buscando grupos parecidos para ${idGrupo}`,
+      text: `Analizando ${tipo.toLowerCase()}...`,
+      meta: `Evaluando continuidad, progreso y carga para ${idGrupo}`,
       progress: 28
     });
 
-    const alerts = findPotentialAssignmentAlerts(row, vendor);
+    const analysis = analyzeVendorAssignmentRecommendation(row, vendor);
 
-    if (alerts.length) {
+    if (analysis.shouldReview) {
       clearProgressStatus();
+
       state.pendingAssignmentReview = {
         idGrupo: getRowId(row),
         row,
         vendor,
         tipo,
-        alerts
+        analysis
       };
 
       openAssignmentAlertModal({
         row,
         vendor,
-        alerts
+        analysis
       });
       return;
     }
@@ -1211,14 +1628,14 @@ async function saveAssignment(idGrupo) {
       row,
       vendor,
       tipo,
-      alerts: [],
+      reviewAnalysis: null,
       confirmedAfterReview: false
     });
   } catch (error) {
     console.error(error);
     setProgressStatus({
       text: `Error en ${tipo.toLowerCase()}.`,
-      meta: error.message || "No se pudo preparar la asignación.",
+      meta: error.message || "No se pudo preparar la recomendación de asignación.",
       progress: 100,
       type: "error"
     });
