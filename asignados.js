@@ -1020,6 +1020,10 @@ async function loadData() {
       progress: 10
     });
 
+    if ($("asignadosLoadHint")) {
+      $("asignadosLoadHint").textContent = "Preparando vista comercial...";
+    }
+
     const vendorOptions = getVendorOptions();
 
     setProgressStatus({
@@ -1028,6 +1032,10 @@ async function loadData() {
       progress: 20
     });
 
+    if ($("asignadosLoadHint")) {
+      $("asignadosLoadHint").textContent = `Vendedoras detectadas: ${vendorOptions.length}`;
+    }
+
     const snap = await getDocs(collection(db, "ventas_cotizaciones"));
 
     setProgressStatus({
@@ -1035,6 +1043,10 @@ async function loadData() {
       meta: `Documentos recibidos: ${snap.size}`,
       progress: 55
     });
+
+    if ($("asignadosLoadHint")) {
+      $("asignadosLoadHint").textContent = `Procesando ${snap.size} grupo(s)...`;
+    }
 
     state.rows = snap.docs.map((docSnap) => {
       const data = docSnap.data() || {};
@@ -1053,6 +1065,10 @@ async function loadData() {
 
     populateFilters();
 
+    if ($("asignadosLoadHint")) {
+      $("asignadosLoadHint").textContent = "Aplicando filtros y renderizando tabla...";
+    }
+
     setProgressStatus({
       text: "Renderizando tabla...",
       meta: "Preparando resumen, tabs y filas...",
@@ -1068,6 +1084,10 @@ async function loadData() {
       type: "success"
     });
 
+    if ($("asignadosLoadHint")) {
+      $("asignadosLoadHint").textContent = `${state.filteredRows.length} grupo(s) listos en la vista actual.`;
+    }
+
     clearProgressStatus();
   } catch (error) {
     console.error(error);
@@ -1077,6 +1097,10 @@ async function loadData() {
       progress: 100,
       type: "error"
     });
+
+    if ($("asignadosLoadHint")) {
+      $("asignadosLoadHint").textContent = "Error al cargar la vista comercial.";
+    }
   }
 }
 
