@@ -584,6 +584,53 @@ function buildRelatedGroupDetail(candidate = {}, matchInfo = {}) {
   };
 }
 
+function renderRelatedGroupsListHtml(relatedGroups = []) {
+  if (!relatedGroups.length) {
+    return `<div class="assignment-alert-empty">No se encontraron grupos relacionados para listar.</div>`;
+  }
+
+  const initialVisible = 3;
+  const hasMore = relatedGroups.length > initialVisible;
+
+  const itemsHtml = relatedGroups.map((item, index) => `
+    <li
+      class="assignment-related-item ${index >= initialVisible ? "is-collapsed" : ""}"
+      style="${index >= initialVisible ? "display:none;" : ""}"
+    >
+      <a class="assignment-alert-link" href="${item.url}" target="_blank" rel="noopener">
+        ${escapeHtml(item.aliasGrupo || `Grupo ${item.idGrupo}`)}
+      </a>
+      · ID ${escapeHtml(item.idGrupo || "—")}
+      · ${escapeHtml(item.matchLabel || "Relacionado")}
+      · ${escapeHtml(item.colegio || "—")}
+      · ${escapeHtml(item.comunaCiudad || "—")}
+      · ${escapeHtml(item.estado || "—")}
+      · ${item.assigned
+        ? `Asignado a ${escapeHtml(item.vendedora || "—")}`
+        : "Sin asignar"}
+    </li>
+  `).join("");
+
+  return `
+    <div class="assignment-related-list-wrap" data-role="related-list-wrap">
+      <ul class="assignment-alert-reasons assignment-related-list" data-role="related-list">
+        ${itemsHtml}
+      </ul>
+
+      ${hasMore ? `
+        <button
+          type="button"
+          class="btn-page sec assignment-related-toggle"
+          data-role="toggle-related-list"
+          data-expanded="0"
+        >
+          Ver más (${relatedGroups.length - initialVisible})
+        </button>
+      ` : ""}
+    </div>
+  `;
+}
+
 function getRecommendationLevel(totalScore = 0, continuityScore = 0) {
   if (continuityScore >= 24 || totalScore >= 72) {
     return { level: "Alta", levelClass: "high" };
@@ -1275,23 +1322,7 @@ const relatedGroupsHtml = relatedGroups.length
         </div>
       </div>
 
-      <ul class="assignment-alert-reasons">
-        ${relatedGroups.map((item) => `
-          <li>
-            <a class="assignment-alert-link" href="${item.url}" target="_blank" rel="noopener">
-              ${escapeHtml(item.aliasGrupo || `Grupo ${item.idGrupo}`)}
-            </a>
-            · ID ${escapeHtml(item.idGrupo || "—")}
-            · ${escapeHtml(item.matchLabel || "Relacionado")}
-            · ${escapeHtml(item.colegio || "—")}
-            · ${escapeHtml(item.comunaCiudad || "—")}
-            · ${escapeHtml(item.estado || "—")}
-            · ${item.assigned
-              ? `Asignado a ${escapeHtml(item.vendedora || "—")}`
-              : "Sin asignar"}
-          </li>
-        `).join("")}
-      </ul>
+      ${renderRelatedGroupsListHtml(relatedGroups)}
     </article>
   `
   : `
@@ -1997,7 +2028,25 @@ function bindPageEvents() {
     assignmentAlertModal.addEventListener("click", (e) => {
       if (e.target === assignmentAlertModal) {
         clearAssignmentAlertReviewState();
+        return;
       }
+  
+      const toggleBtn = e.target.closest('[data-role="toggle-related-list"]');
+      if (!toggleBtn) return;
+  
+      const wrap = toggleBtn.closest('[data-role="related-list-wrap"]');
+      const list = wrap?.querySelector('[data-role="related-list"]');
+      if (!wrap || !list) return;
+  
+      const expanded = toggleBtn.dataset.expanded === "1";
+      const hiddenItems = list.querySelectorAll('.assignment-related-item.is-collapsed');
+  
+      hiddenItems.forEach((item) => {
+        item.style.display = expanded ? "none" : "list-item";
+      });
+  
+      toggleBtn.dataset.expanded = expanded ? "0" : "1";
+      toggleBtn.textContent = expanded ? `Ver más (${hiddenItems.length})` : "Ver menos";
     });
   }
 }
