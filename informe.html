@@ -400,6 +400,176 @@
       font-weight:700;
     }
 
+    .evidence-modal.hidden{
+      display:none !important;
+    }
+    
+    .evidence-modal{
+      position:fixed;
+      inset:0;
+      z-index:9999;
+    }
+    
+    .evidence-backdrop{
+      position:absolute;
+      inset:0;
+      background:rgba(24, 13, 38, 0.45);
+      backdrop-filter:blur(2px);
+    }
+    
+    .evidence-dialog{
+      position:relative;
+      z-index:2;
+      width:min(980px, calc(100vw - 32px));
+      max-height:calc(100vh - 40px);
+      margin:20px auto;
+      background:#fff;
+      border:2px solid #d7dde6;
+      border-radius:16px;
+      overflow:hidden;
+      box-shadow:0 24px 70px rgba(33, 18, 52, 0.28);
+      display:flex;
+      flex-direction:column;
+    }
+    
+    .evidence-head{
+      display:flex;
+      align-items:flex-start;
+      justify-content:space-between;
+      gap:16px;
+      padding:16px 18px;
+      border-bottom:1px solid #e5e7eb;
+      background:#faf8fd;
+    }
+    
+    .evidence-head h3{
+      margin:0 0 4px;
+      color:var(--header);
+      font-size:22px;
+    }
+    
+    .evidence-head p{
+      margin:0;
+      color:#6d6480;
+      font-size:13px;
+      font-weight:700;
+    }
+    
+    .evidence-close{
+      min-width:38px;
+      width:38px;
+      height:38px;
+      border:none;
+      border-radius:10px;
+      background:#ece8f4;
+      color:var(--header);
+      font-size:24px;
+      line-height:1;
+      cursor:pointer;
+      font-weight:800;
+    }
+    
+    .evidence-body{
+      padding:16px 18px 18px;
+      overflow:auto;
+    }
+    
+    .evidence-meta{
+      margin-bottom:14px;
+      display:flex;
+      flex-wrap:wrap;
+      gap:8px;
+    }
+    
+    .evidence-chip{
+      display:inline-flex;
+      align-items:center;
+      min-height:30px;
+      padding:0 10px;
+      border-radius:999px;
+      background:#f1ebfa;
+      color:var(--header);
+      font-size:12px;
+      font-weight:800;
+    }
+    
+    .evidence-content{
+      display:grid;
+      gap:10px;
+    }
+    
+    .evidence-row{
+      border:1px solid #e7e0f2;
+      border-radius:12px;
+      padding:12px 14px;
+      background:#fff;
+    }
+    
+    .evidence-row-top{
+      display:flex;
+      justify-content:space-between;
+      gap:12px;
+      align-items:flex-start;
+      flex-wrap:wrap;
+      margin-bottom:6px;
+    }
+    
+    .evidence-row-title{
+      color:var(--header);
+      font-weight:800;
+      font-size:14px;
+    }
+    
+    .evidence-row-sub{
+      color:#6d6480;
+      font-size:12px;
+      line-height:1.35;
+    }
+    
+    .evidence-row-link{
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      min-height:32px;
+      padding:0 12px;
+      border-radius:999px;
+      background:#ece8f4;
+      color:var(--header);
+      text-decoration:none;
+      font-size:12px;
+      font-weight:800;
+    }
+    
+    .evidence-row-link:hover{
+      background:#dfd4f1;
+    }
+    
+    .alert-item .alert-main{
+      display:flex;
+      justify-content:space-between;
+      gap:12px;
+      align-items:flex-start;
+      flex-wrap:wrap;
+    }
+    
+    .alert-item .alert-actions{
+      display:flex;
+      justify-content:flex-end;
+      margin-top:10px;
+    }
+    
+    .alert-item .alert-open-btn{
+      min-height:32px;
+      padding:0 12px;
+      border:none;
+      border-radius:999px;
+      background:#ece8f4;
+      color:var(--header);
+      font-size:12px;
+      font-weight:800;
+      cursor:pointer;
+    }
+
     @media print {
       .page-toolbar,
       .informe-actions,
@@ -730,6 +900,27 @@
 
       <div class="footer-note">
         Informe generado desde ventas_cotizaciones y ventas_historial. Exportación PDF mediante impresión del navegador.
+      </div>
+
+      <div id="evidenceModal" class="evidence-modal hidden">
+        <div class="evidence-backdrop" data-close-evidence="1"></div>
+      
+        <div class="evidence-dialog" role="dialog" aria-modal="true" aria-labelledby="evidenceTitle">
+          <div class="evidence-head">
+            <div>
+              <h3 id="evidenceTitle">Detalle</h3>
+              <p id="evidenceSubtitle">Fundamento del análisis</p>
+            </div>
+            <button id="btnCloseEvidence" class="evidence-close" type="button" aria-label="Cerrar">×</button>
+          </div>
+      
+          <div class="evidence-body">
+            <div id="evidenceMeta" class="evidence-meta"></div>
+            <div id="evidenceContent" class="evidence-content">
+              <div class="empty">Sin datos.</div>
+            </div>
+          </div>
+        </div>
       </div>
 
     </section>
