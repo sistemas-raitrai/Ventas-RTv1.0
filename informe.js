@@ -1,8 +1,5 @@
 import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.7.3/firebase-auth.js";
-import {
-  collection,
-  getDocs
-} from "https://www.gstatic.com/firebasejs/11.7.3/firebase-firestore.js";
+import { collection, getDocs } from "https://www.gstatic.com/firebasejs/11.7.3/firebase-firestore.js";
 
 import { auth, db, VENTAS_USERS } from "./firebase-init.js";
 
@@ -58,7 +55,8 @@ const state = {
     winsByVendor: null,
     meetingsByVendor: null,
     backlogByVendor: null
-  }
+  },
+  lastRender: null
 };
 
 /* =========================================================
@@ -477,7 +475,6 @@ function buildVendorKpis(rows = [], historyRows = []) {
       if (events.wonAfterMeeting) rec.historicalWonAfterMeetingCount += 1;
     }
 
-    // actualizar nombre si viene del row
     if (!rec.vendorName && vendorName) {
       rec.vendorName = vendorName;
     }
@@ -584,52 +581,52 @@ function renderCards(globalKpis, vendorKpis) {
   const bestMeeting = [...vendorKpis].sort((a, b) => b.historicalMeetingCount - a.historicalMeetingCount)[0];
 
   el.innerHTML = `
-    <div class="card">
-      <div class="kpi-label">Grupos activos</div>
-      <div class="kpi-value">${globalKpis.activos}</div>
-      <div class="kpi-meta">Sin ganada / perdida</div>
+    <div class="seguimiento-summary-card">
+      <div class="label">Total</div>
+      <div class="value">${globalKpis.total}</div>
+      <div class="meta">Grupos filtrados</div>
     </div>
 
-    <div class="card">
-      <div class="kpi-label">Reunión confirmada</div>
-      <div class="kpi-value">${globalKpis.reunion}</div>
-      <div class="kpi-meta">${Math.round(globalKpis.reunionRate * 100)}% del total filtrado</div>
+    <div class="seguimiento-summary-card">
+      <div class="label">Activos</div>
+      <div class="value">${globalKpis.activos}</div>
+      <div class="meta">Sin ganada / perdida</div>
     </div>
 
-    <div class="card">
-      <div class="kpi-label">Ganadas</div>
-      <div class="kpi-value">${globalKpis.ganada}</div>
-      <div class="kpi-meta">${Math.round(globalKpis.winAfterMeetingApprox * 100)}% vs reuniones actuales</div>
+    <div class="seguimiento-summary-card">
+      <div class="label">A contactar</div>
+      <div class="value">${globalKpis.aContactar}</div>
+      <div class="meta">Pendientes por gestionar</div>
     </div>
 
-    <div class="card">
-      <div class="kpi-label">A contactar</div>
-      <div class="kpi-value">${globalKpis.aContactar}</div>
-      <div class="kpi-meta">Pendientes por gestionar</div>
+    <div class="seguimiento-summary-card">
+      <div class="label">Reunión</div>
+      <div class="value">${globalKpis.reunion}</div>
+      <div class="meta">${Math.round(globalKpis.reunionRate * 100)}% del total</div>
     </div>
 
-    <div class="card">
-      <div class="kpi-label">Sin asignar</div>
-      <div class="kpi-value">${globalKpis.sinAsignar}</div>
-      <div class="kpi-meta">Oportunidades por distribuir</div>
+    <div class="seguimiento-summary-card">
+      <div class="label">Ganadas</div>
+      <div class="value">${globalKpis.ganada}</div>
+      <div class="meta">${Math.round(globalKpis.winAfterMeetingApprox * 100)}% vs reuniones actuales</div>
     </div>
 
-    <div class="card">
-      <div class="kpi-label">Mejor score general</div>
-      <div class="kpi-value">${bestCloser ? bestCloser.vendorName : "—"}</div>
-      <div class="kpi-meta">${bestCloser ? `${bestCloser.totalScore} pts` : "Sin datos"}</div>
+    <div class="seguimiento-summary-card">
+      <div class="label">Sin asignar</div>
+      <div class="value">${globalKpis.sinAsignar}</div>
+      <div class="meta">Oportunidades por distribuir</div>
     </div>
 
-    <div class="card">
-      <div class="kpi-label">Más reuniones históricas</div>
-      <div class="kpi-value">${bestMeeting ? bestMeeting.vendorName : "—"}</div>
-      <div class="kpi-meta">${bestMeeting ? `${bestMeeting.historicalMeetingCount} detectadas` : "Sin datos"}</div>
+    <div class="seguimiento-summary-card">
+      <div class="label">Mejor score</div>
+      <div class="value">${bestCloser ? bestCloser.totalScore : 0}</div>
+      <div class="meta">${bestCloser ? bestCloser.vendorName : "Sin datos"}</div>
     </div>
 
-    <div class="card">
-      <div class="kpi-label">Vendedoras medidas</div>
-      <div class="kpi-value">${vendorKpis.length}</div>
-      <div class="kpi-meta">Con datos en esta vista</div>
+    <div class="seguimiento-summary-card">
+      <div class="label">Más reuniones</div>
+      <div class="value">${bestMeeting ? bestMeeting.historicalMeetingCount : 0}</div>
+      <div class="meta">${bestMeeting ? bestMeeting.vendorName : "Sin datos"}</div>
     </div>
   `;
 }
@@ -642,13 +639,18 @@ function renderVendorTable(vendorKpis = []) {
   summary.textContent = `${vendorKpis.length} vendedora(s) analizadas`;
 
   if (!vendorKpis.length) {
-    tbody.innerHTML = `<tr><td colspan="18"><div class="empty">No hay datos para mostrar.</div></td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="18" class="empty">No hay datos para mostrar.</td></tr>`;
     return;
   }
 
   tbody.innerHTML = vendorKpis.map((item) => `
     <tr>
-      <td><strong>${item.vendorName || item.vendorEmail}</strong></td>
+      <td>
+        <div class="vendor-cell">
+          <strong>${item.vendorName || item.vendorEmail}</strong>
+          <small>${item.vendorEmail || "—"}</small>
+        </div>
+      </td>
       <td>${item.activeCount}</td>
       <td>${item.aContactarCount}</td>
       <td>${item.cotizandoCount}</td>
@@ -665,7 +667,7 @@ function renderVendorTable(vendorKpis = []) {
       <td>${item.performanceScore}</td>
       <td>${item.historicalFunnelScore}</td>
       <td>${item.workloadScore}</td>
-      <td><strong>${item.totalScore}</strong></td>
+      <td><span class="score-badge">${item.totalScore}</span></td>
     </tr>
   `).join("");
 }
