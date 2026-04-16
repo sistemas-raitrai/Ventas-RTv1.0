@@ -3,7 +3,10 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Informe Comercial · Ventas RT</title>
+  <title>Informe | Sistema Ventas RT</title>
+
+  <link rel="stylesheet" href="estilos.css" />
+  <link rel="icon" type="image/png" href="IMG/logo-raitrai.png" />
 
   <!-- SheetJS -->
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -12,33 +15,17 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
 
   <style>
-    :root{
-      --bg:#f5f3f8;
-      --card:#ffffff;
-      --line:#d8c9ef;
-      --header:#5f3b8c;
-      --text:#2f2b3a;
-      --muted:#6b6475;
-      --success:#1f8f5f;
-      --warn:#a86b00;
-      --danger:#b42318;
-      --chip:#f3ecfb;
+    .informe-page{
+      padding:18px 30px 30px;
     }
 
-    *{ box-sizing:border-box; }
-    html,body{ margin:0; padding:0; background:var(--bg); color:var(--text); font-family:Arial, Helvetica, sans-serif; }
-
-    .page{
-      padding:18px 28px 28px;
-    }
-
-    .panel{
+    .informe-panel-main{
       background:#efefef;
       border:3px dashed var(--line);
       padding:20px 22px;
     }
 
-    .topbar{
+    .informe-topbar{
       display:flex;
       justify-content:space-between;
       align-items:flex-start;
@@ -47,34 +34,34 @@
       margin-bottom:18px;
     }
 
-    .title-wrap h1{
+    .informe-title-wrap h2{
       margin:0 0 6px;
       font-size:30px;
       color:var(--header);
     }
 
-    .title-wrap p{
+    .informe-title-wrap p{
       margin:0;
-      color:var(--muted);
+      color:#5a5862;
       font-size:14px;
     }
 
-    .toolbar{
+    .informe-toolbar{
       display:grid;
       grid-template-columns:repeat(6, minmax(0, 1fr));
       gap:10px;
-      margin:16px 0 18px;
       align-items:end;
+      margin:16px 0 18px;
     }
 
-    .field{
+    .field-wrap{
       display:flex;
       flex-direction:column;
       gap:6px;
       min-width:0;
     }
 
-    .field label{
+    .field-wrap label{
       font-size:12px;
       font-weight:800;
       color:var(--header);
@@ -82,8 +69,8 @@
       letter-spacing:.2px;
     }
 
-    .field input,
-    .field select{
+    .field-wrap input,
+    .field-wrap select{
       width:100%;
       min-width:0;
       height:42px;
@@ -95,14 +82,14 @@
       font-size:14px;
     }
 
-    .actions{
+    .informe-actions{
       display:flex;
       flex-wrap:wrap;
       gap:10px;
       margin:10px 0 20px;
     }
 
-    .btn{
+    .btn-page{
       min-height:42px;
       border:none;
       border-radius:10px;
@@ -114,14 +101,66 @@
       cursor:pointer;
     }
 
-    .btn.sec{
+    .btn-page.sec{
       background:#6b6178;
     }
 
-    .btn.light{
+    .btn-page.light{
       background:#fff;
       color:var(--header);
       border:2px solid var(--line);
+    }
+
+    .status-card{
+      display:flex;
+      flex-direction:column;
+      gap:8px;
+      background:#fff;
+      border:2px solid #ddd7e8;
+      border-radius:14px;
+      padding:14px 16px;
+      margin:0 0 18px;
+      box-shadow:0 8px 20px rgba(66,36,98,.05);
+    }
+
+    .status-card.hidden{
+      display:none !important;
+    }
+
+    .status-card.success{
+      border-color:#b9e3c9;
+      background:#f4fcf7;
+    }
+
+    .status-card.error{
+      border-color:#efc7c7;
+      background:#fff6f6;
+    }
+
+    .status-text{
+      font-size:15px;
+      font-weight:800;
+      color:var(--header);
+    }
+
+    .status-meta{
+      font-size:13px;
+      color:#6b6475;
+    }
+
+    .progress-track{
+      width:100%;
+      height:10px;
+      border-radius:999px;
+      background:#ece7f4;
+      overflow:hidden;
+    }
+
+    .progress-bar{
+      width:0%;
+      height:100%;
+      background:var(--header);
+      transition:width .25s ease;
     }
 
     .cards{
@@ -132,7 +171,7 @@
     }
 
     .card{
-      background:var(--card);
+      background:#fff;
       border:2px solid #ddd7e8;
       border-radius:16px;
       padding:16px;
@@ -144,7 +183,7 @@
       font-weight:800;
       text-transform:uppercase;
       letter-spacing:.3px;
-      color:var(--muted);
+      color:#6b6475;
       margin-bottom:8px;
     }
 
@@ -158,7 +197,7 @@
 
     .kpi-meta{
       font-size:12px;
-      color:var(--muted);
+      color:#6b6475;
     }
 
     .grid-2{
@@ -180,7 +219,7 @@
     }
 
     .table-card{
-      background:var(--card);
+      background:#fff;
       border:2px solid #ddd7e8;
       border-radius:16px;
       overflow:hidden;
@@ -199,7 +238,7 @@
 
     .table-summary{
       font-size:13px;
-      color:var(--muted);
+      color:#6b6475;
       font-weight:700;
     }
 
@@ -208,14 +247,14 @@
       overflow:auto;
     }
 
-    table{
+    .informe-table{
       width:max-content;
       min-width:100%;
       border-collapse:collapse;
       background:#fff;
     }
 
-    thead th{
+    .informe-table thead th{
       position:sticky;
       top:0;
       background:var(--header);
@@ -226,9 +265,10 @@
       text-transform:uppercase;
       letter-spacing:.3px;
       white-space:nowrap;
+      z-index:1;
     }
 
-    tbody td{
+    .informe-table tbody td{
       padding:11px 10px;
       border-bottom:1px solid #ece7f4;
       font-size:13px;
@@ -236,37 +276,8 @@
       vertical-align:top;
     }
 
-    tbody tr:hover td{
+    .informe-table tbody tr:hover td{
       background:#faf8fd;
-    }
-
-    .metric-chip{
-      display:inline-flex;
-      align-items:center;
-      gap:6px;
-      min-height:28px;
-      padding:0 10px;
-      border-radius:999px;
-      background:var(--chip);
-      color:var(--header);
-      font-weight:800;
-      font-size:12px;
-      margin:0 6px 6px 0;
-    }
-
-    .metric-chip.ok{
-      background:#e7f8ee;
-      color:var(--success);
-    }
-
-    .metric-chip.warn{
-      background:#fff4de;
-      color:var(--warn);
-    }
-
-    .metric-chip.danger{
-      background:#fdecec;
-      color:var(--danger);
     }
 
     .alerts{
@@ -301,22 +312,24 @@
     .empty{
       padding:22px;
       text-align:center;
-      color:var(--muted);
+      color:#6b6475;
       font-weight:700;
     }
 
     .footer-note{
       margin-top:16px;
       font-size:12px;
-      color:var(--muted);
+      color:#6b6475;
       font-weight:700;
     }
 
     @media print {
-      .toolbar,
-      .actions,
-      #layoutActingUserWrap,
-      .footer-note{
+      .informe-toolbar,
+      .informe-actions,
+      .footer-note,
+      .header-tools-wrap,
+      .ventas-menu,
+      .ventas-header-right{
         display:none !important;
       }
 
@@ -324,18 +337,19 @@
         background:#fff;
       }
 
-      .page{
+      .informe-page{
         padding:0;
       }
 
-      .panel{
+      .informe-panel-main{
         border:none;
         padding:0;
         background:#fff;
       }
 
       .card,
-      .table-card{
+      .table-card,
+      .status-card{
         box-shadow:none;
       }
 
@@ -347,71 +361,84 @@
     }
 
     @media (max-width: 1200px){
-      .toolbar{ grid-template-columns:repeat(3, minmax(0, 1fr)); }
+      .informe-toolbar{ grid-template-columns:repeat(3, minmax(0, 1fr)); }
       .cards{ grid-template-columns:repeat(2, minmax(0, 1fr)); }
       .grid-2,
       .alerts{ grid-template-columns:1fr; }
     }
 
     @media (max-width: 760px){
-      .page{ padding:14px; }
-      .toolbar{ grid-template-columns:1fr; }
+      .informe-page{ padding:16px; }
+      .informe-toolbar{ grid-template-columns:1fr; }
       .cards{ grid-template-columns:1fr; }
-      .title-wrap h1{ font-size:24px; }
+      .informe-title-wrap h2{ font-size:24px; }
     }
   </style>
 </head>
-<body>
-  <div id="appShell">
-    <div class="page">
-      <div class="panel">
-        <div class="topbar">
-          <div class="title-wrap">
-            <h1>Informe Comercial</h1>
-            <p id="informeScope">Resumen comercial de vendedores, grupos y embudo de ventas.</p>
+
+<body class="ventas-body" data-page="informe-excel">
+  <!-- LAYOUT GLOBAL -->
+  <div id="layout-top"></div>
+
+  <!-- CONTENIDO -->
+  <main class="ventas-main">
+    <section class="informe-page">
+      <div class="informe-panel-main">
+        <div class="informe-topbar">
+          <div class="informe-title-wrap">
+            <h2>Informe Comercial</h2>
+            <p id="informeScope">Resumen comercial de vendedores, grupos, embudo y oportunidades.</p>
             <p id="informeLoadHint" style="margin:6px 0 0;color:#6b6475;font-size:12px;font-weight:700;">
               Cargando informe...
             </p>
           </div>
-
-          <div id="layoutActingUserWrap"></div>
         </div>
 
-        <div class="toolbar">
-          <div class="field">
+        <!-- STATUS / PROGRESS -->
+        <div id="statusCard" class="status-card hidden">
+          <div id="statusText" class="status-text">Cargando...</div>
+          <div id="statusMeta" class="status-meta"></div>
+          <div class="progress-track">
+            <div id="progressBar" class="progress-bar"></div>
+          </div>
+        </div>
+
+        <!-- FILTROS -->
+        <div class="informe-toolbar">
+          <div class="field-wrap">
             <label for="filterAnoViaje">Año de viaje</label>
             <select id="filterAnoViaje">
               <option value="">Todos</option>
             </select>
           </div>
 
-          <div class="field">
+          <div class="field-wrap">
             <label for="filterVendedora">Vendedora</label>
             <select id="filterVendedora">
               <option value="">Todas</option>
             </select>
           </div>
 
-          <div class="field">
+          <div class="field-wrap">
             <label for="filterComuna">Comuna</label>
             <select id="filterComuna">
               <option value="">Todas</option>
             </select>
           </div>
 
-          <div class="field">
+          <div class="field-wrap">
             <label for="filterEstado">Estado actual</label>
             <select id="filterEstado">
               <option value="">Todos</option>
             </select>
           </div>
 
-          <div class="field">
+          <div class="field-wrap">
             <label for="filterSearch">Buscar</label>
             <input id="filterSearch" type="text" placeholder="Grupo, colegio, cliente..." />
           </div>
 
-          <div class="field">
+          <div class="field-wrap">
             <label for="filterPastYears">Histórico</label>
             <select id="filterPastYears">
               <option value="0">Solo vigentes</option>
@@ -420,16 +447,19 @@
           </div>
         </div>
 
-        <div class="actions">
-          <button id="btnActualizar" class="btn">Actualizar</button>
-          <button id="btnExportXlsx" class="btn sec">Exportar XLSX</button>
-          <button id="btnExportPdf" class="btn light">Exportar PDF</button>
+        <!-- ACCIONES -->
+        <div class="informe-actions">
+          <button id="btnActualizar" class="btn-page">Actualizar</button>
+          <button id="btnExportXlsx" class="btn-page sec">Exportar XLSX</button>
+          <button id="btnExportPdf" class="btn-page light">Exportar PDF</button>
         </div>
 
+        <!-- KPI CARDS -->
         <section class="cards" id="kpiCards">
           <div class="card"><div class="empty">Cargando KPIs...</div></div>
         </section>
 
+        <!-- GRÁFICOS -->
         <section class="grid-2">
           <div class="card">
             <h2 class="section-title">Embudo comercial</h2>
@@ -462,6 +492,7 @@
           </div>
         </section>
 
+        <!-- TABLA KPI -->
         <section class="table-card">
           <div class="table-head">
             <h2 class="section-title" style="margin:0;">KPIs por vendedor(a)</h2>
@@ -469,7 +500,7 @@
           </div>
 
           <div class="table-wrap">
-            <table>
+            <table class="informe-table">
               <thead>
                 <tr>
                   <th>Vendedor(a)</th>
@@ -499,6 +530,7 @@
           </div>
         </section>
 
+        <!-- ALERTAS -->
         <section class="alerts">
           <div class="card">
             <h2 class="section-title">Alertas de gestión</h2>
@@ -519,9 +551,10 @@
           Informe generado desde ventas_cotizaciones y ventas_historial. Exportación PDF mediante impresión del navegador.
         </div>
       </div>
-    </div>
-  </div>
+    </section>
+  </main>
 
-  <script type="module" src="./informe.js"></script>
+  <script type="module" src="layout.js"></script>
+  <script type="module" src="informe.js"></script>
 </body>
 </html>
