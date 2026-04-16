@@ -564,17 +564,56 @@
               <option value="1">Incluir años anteriores</option>
             </select>
           </div>
+      
+          <div class="field-wrap">
+            <label for="analysisMode">Modo de análisis</label>
+            <select id="analysisMode">
+              <option value="actual">Gestión actual</option>
+              <option value="historico">Histórico comercial</option>
+              <option value="asignacion">Asignación inteligente</option>
+              <option value="personalizado">Personalizado</option>
+            </select>
+          </div>
+      
+          <div class="field-wrap">
+            <label for="weightContinuity">Peso continuidad</label>
+            <input id="weightContinuity" type="number" min="0" max="100" step="5" value="20" />
+          </div>
+      
+          <div class="field-wrap">
+            <label for="weightPerformance">Peso desempeño</label>
+            <input id="weightPerformance" type="number" min="0" max="100" step="5" value="40" />
+          </div>
         </div>
-
+      
         <div class="toolbar-right">
-          <div></div>
+          <div class="field-wrap search-wide">
+            <label for="weightHistorical">Peso embudo histórico</label>
+            <input id="weightHistorical" type="number" min="0" max="100" step="5" value="25" />
+          </div>
+      
           <div class="informe-actions">
+            <input id="weightWorkload" type="hidden" value="15" />
+            <button id="btnExplainScoring" class="btn-page sec" type="button">Explicar score</button>
             <button id="btnExportPdf" class="btn-page light" type="button">Exportar PDF</button>
           </div>
         </div>
       </div>
 
       <section class="seguimiento-summary" id="kpiCards">
+        <div class="card" id="scoringExplanationCard" style="margin-bottom:18px;">
+          <div class="card-head">
+            <h3 class="section-title">Cómo leer este informe</h3>
+          </div>
+          <div style="padding:14px 16px; display:grid; gap:10px;">
+            <div id="scoringModeText" style="font-size:14px; color:#534a63; line-height:1.45;">
+              Cargando explicación del score...
+            </div>
+            <div id="scoringWeightsText" style="font-size:13px; color:#6d6480; font-weight:700;">
+              Ponderación actual: —
+            </div>
+          </div>
+        </div>
         <div class="seguimiento-summary-card">
           <div class="label">Total</div>
           <div class="value">0</div>
