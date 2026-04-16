@@ -785,7 +785,7 @@ function renderVendorTable(vendorKpis = []) {
   summary.textContent = `${vendorKpis.length} vendedora(s) analizadas`;
 
   if (!vendorKpis.length) {
-    tbody.innerHTML = `<tr><td colspan="18" class="empty">No hay datos para mostrar.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="17" class="empty">No hay datos para mostrar.</td></tr>`;
     return;
   }
 
@@ -817,7 +817,6 @@ function renderVendorTable(vendorKpis = []) {
       <td>${item.continuityScore}</td>
       <td>${item.performanceScore}</td>
       <td>${item.historicalFunnelScore}</td>
-      <td>${item.workloadScore}</td>
       <td>
         <div class="vendor-cell">
           <span class="score-badge">${item.totalScore}</span>
