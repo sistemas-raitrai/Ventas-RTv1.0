@@ -433,176 +433,26 @@ function summarizeAlertMatches(matches = []) {
   const medias = matches.filter((item) => item.level === "Media").length;
   const leves = matches.filter((item) => item.level === "Leve").length;
 
-  return `Se encontraron ${matches.length} posible(s) coincidencia(s): ${altas} alta(s), ${medias} media(s) y ${leves} leve(s). Revisa antes de continuar.`;
-}
-
-async function findPotentialDuplicateAlerts(data = {}) {
-  const snap = await getDocs(collection(db, "ventas_cotizaciones"));
-  const currentYear = getCurrentYear();
-  const inputYear = Number(data.anoViaje || "");
-  const inputComuna = normalizeSearch(data.comunaCiudad || "");
-  const inputNames = [data.nombreCliente, data.nombreCliente2]
-    .map((value) => normalizeText(value))
-    .filter(Boolean);
-  const inputEmails = [data.correoCliente, data.correoCliente2]
-    .map((value) => normalizeEmail(value))
-    .filter(Boolean);
-  const inputPhones = [data.celularCliente, data.celularCliente2]
-    .map((value) => normalizePhoneLoose(value))
-    .filter(Boolean);
-
-  const results = [];
-
-  snap.docs.forEach((row) => {
-    const rowData = row.data() || {};
-    const rowId = normalizeText(rowData.idGrupo || row.id || "");
-    const rowYear = Number(rowData.anoViaje || "");
-
-    if (Number.isFinite(rowYear) && rowYear && rowYear < currentYear) {
-      return;
-    }
-
-    let score = 0;
-    let hardSignals = 0;
-    const reasons = [];
-
-    const schoolSimilarity = getSchoolSimilarity(
-      data.colegio || data.colegioBase || "",
-      rowData.colegio || rowData.colegioBase || ""
-    );
-
-    if (schoolSimilarity >= 0.95) {
-      score += 28;
-      pushUniqueReason(reasons, "Colegio muy parecido");
-    } else if (schoolSimilarity >= 0.82) {
-      score += 18;
-      pushUniqueReason(reasons, "Colegio parecido");
-    }
-
-    const rowComuna = normalizeSearch(rowData.comunaCiudad || rowData.comuna || "");
-    if (inputComuna && rowComuna && inputComuna === rowComuna) {
-      score += 10;
-      pushUniqueReason(reasons, "Misma comuna/ciudad");
-    }
-
-    if (inputYear && Number.isFinite(rowYear) && rowYear) {
-      if (rowYear === inputYear) {
-        score += 18;
-        pushUniqueReason(reasons, `Mismo año de viaje (${rowYear})`);
-      } else if (rowYear > inputYear) {
-        score += 8;
-        pushUniqueReason(reasons, `Año de viaje futuro (${rowYear})`);
-      }
-    }
-
-    const courseSimilarity = Math.max(
-      getCourseSimilarity(data.curso, rowData.curso || ""),
-      getCourseSimilarity(data.cursoViaje, rowData.cursoViaje || "")
-    );
-
-    if (courseSimilarity >= 1) {
-      score += 18;
-      pushUniqueReason(reasons, "Mismo curso");
-    } else if (courseSimilarity >= 0.88) {
-      score += 12;
-      pushUniqueReason(reasons, "Curso parecido / misma numeración con otra letra");
-    }
-
-    const rowNames = [rowData.nombreCliente, rowData.nombreCliente2]
-      .map((value) => normalizeText(value))
-      .filter(Boolean);
-
-    let bestNameMatch = { score: 0, value: "" };
-
-    inputNames.forEach((inputName) => {
-      rowNames.forEach((rowName) => {
-        const sim = getNameSimilarity(inputName, rowName);
-        if (sim > bestNameMatch.score) {
-          bestNameMatch = { score: sim, value: rowName };
-        }
-      });
-    });
-
-    if (bestNameMatch.score >= 0.97) {
-      score += 34;
-      hardSignals += 1;
-      pushUniqueReason(reasons, `Nombre de contacto muy parecido: ${bestNameMatch.value}`);
-    } else if (bestNameMatch.score >= 0.88) {
-      score += 22;
-      pushUniqueReason(reasons, `Nombre de contacto parecido: ${bestNameMatch.value}`);
-    }
-
-    const rowEmails = [rowData.correoCliente, rowData.correoCliente2]
-      .map((value) => normalizeEmail(value))
-      .filter(Boolean);
-
-    const matchedEmail = inputEmails.find((email) => email && rowEmails.includes(email));
-    if (matchedEmail) {
-      score += 60;
-      hardSignals += 1;
-      pushUniqueReason(reasons, `Mismo correo: ${matchedEmail}`);
-    }
-
-    const rowPhones = [rowData.celularCliente, rowData.celularCliente2]
-      .map((value) => normalizePhoneLoose(value))
-      .filter(Boolean);
-
-    const matchedPhone = inputPhones.find((phone) => phone && rowPhones.includes(phone));
-    if (matchedPhone) {
-      score += 55;
-      hardSignals += 1;
-      pushUniqueReason(reasons, `Mismo celular terminado en ${matchedPhone}`);
-    }
-
-    const shouldKeep =
-      hardSignals > 0 ||
-      score >= 35 ||
-      (schoolSimilarity >= 0.82 && courseSimilarity >= 0.88 && rowYear === inputYear) ||
-      (bestNameMatch.score >= 0.88 && schoolSimilarity >= 0.78);
-
-    if (!shouldKeep) return;
-
-    const level = getAlertLevel(score, hardSignals);
-
-    results.push({
-      relatedIdGrupo: rowId,
-      codigoRegistro: normalizeText(rowData.codigoRegistro || ""),
-      aliasGrupo: normalizeText(rowData.aliasGrupo || rowData.nombreGrupo || rowData.colegio || rowId),
-      colegio: normalizeText(rowData.colegio || ""),
-      curso: normalizeText(rowData.cursoViaje || rowData.curso || ""),
-      anoViaje: normalizeText(rowData.anoViaje || ""),
-      comunaCiudad: normalizeText(rowData.comunaCiudad || rowData.comuna || ""),
-      vendedora: normalizeText(rowData.vendedora || "") || "Sin asignar",
-      estado: normalizeText(rowData.estado || "") || "A contactar",
-      level,
-      levelClass: getAlertLevelClass(level),
-      score,
-      reasons,
-      url: `${DETALLE_GRUPO_URL}?id=${encodeURIComponent(rowId)}`
-    });
-  });
-
-  return results
-    .sort((a, b) => b.score - a.score)
-    .slice(0, 12);
-}
-
-function renderAlertReviewModal(matches = []) {
-  const summary = $("alertReviewSummary");
-  const list = $("alertReviewList");
-
-  if (summary) {
-    summary.textContent = summarizeAlertMatches(matches);
-  }
-
-  if (!list) return;
-
   if (!matches.length) {
-    list.innerHTML = `<div class="alert-review-empty">No se encontraron coincidencias para revisar.</div>`;
-    return;
+    return "No se encontraron coincidencias para revisar.";
   }
 
-  list.innerHTML = matches.map((item) => `
+  return `Se encontraron ${matches.length} posible(s) coincidencia(s). Se muestran primero las de alta coincidencia: ${altas} alta(s), ${medias} media(s) y ${leves} leve(s). Puedes volver a editar o registrar igualmente.`;
+}
+
+function splitAlertMatches(matches = []) {
+  return {
+    altas: matches.filter((item) => item.level === "Alta"),
+    otras: matches.filter((item) => item.level !== "Alta")
+  };
+}
+
+function buildAlertReviewCardsHtml(matches = []) {
+  if (!matches.length) {
+    return `<div class="alert-review-empty">No hay coincidencias para mostrar.</div>`;
+  }
+
+  return matches.map((item) => `
     <article class="alert-review-card">
       <div class="alert-review-top">
         <div>
@@ -630,10 +480,53 @@ function renderAlertReviewModal(matches = []) {
       </ul>
 
       <a class="alert-review-link" href="${item.url}" target="_blank" rel="noopener">
-        Abrir Portafolio del Grupo
+        Abrir grupo en nueva pestaña
       </a>
     </article>
   `).join("");
+}
+
+function renderAlertReviewModal(matches = []) {
+  const summary = $("alertReviewSummary");
+  const primaryList = $("alertReviewPrimaryList");
+  const moreWrap = $("alertReviewMoreWrap");
+  const moreList = $("alertReviewMoreList");
+  const toggleMoreBtn = $("btnAlertReviewToggleMore");
+
+  const { altas, otras } = splitAlertMatches(matches);
+
+  if (summary) {
+    summary.textContent = summarizeAlertMatches(matches);
+  }
+
+  if (primaryList) {
+    if (altas.length) {
+      primaryList.innerHTML = buildAlertReviewCardsHtml(altas);
+    } else {
+      primaryList.innerHTML = `
+        <div class="alert-review-empty">
+          No se encontraron coincidencias de alta prioridad.
+          Puedes desplegar abajo las coincidencias medias y bajas si quieres revisarlas.
+        </div>
+      `;
+    }
+  }
+
+  if (moreWrap && moreList && toggleMoreBtn) {
+    if (otras.length) {
+      moreWrap.classList.remove("hidden");
+      moreList.classList.add("hidden");
+      moreList.innerHTML = buildAlertReviewCardsHtml(otras);
+      toggleMoreBtn.dataset.total = String(otras.length);
+      toggleMoreBtn.textContent = `Ver coincidencias medias y bajas (${otras.length})`;
+    } else {
+      moreWrap.classList.add("hidden");
+      moreList.classList.add("hidden");
+      moreList.innerHTML = "";
+      toggleMoreBtn.dataset.total = "0";
+      toggleMoreBtn.textContent = "Ver coincidencias medias y bajas";
+    }
+  }
 }
 
 function openAlertReviewModal(matches = []) {
@@ -1620,6 +1513,7 @@ function bindPageEvents() {
   const alertReviewModal = $("alertReviewModal");
   const btnAlertReviewBack = $("btnAlertReviewBack");
   const btnAlertReviewContinue = $("btnAlertReviewContinue");
+  const btnAlertReviewToggleMore = $("btnAlertReviewToggleMore");
   const form = $("registroForm");
 
   // Visualmente dejamos los selects en mayúscula, pero sin tocar sus values internos
@@ -1749,6 +1643,23 @@ function bindPageEvents() {
     btnAlertReviewBack.addEventListener("click", () => {
       clearAlertReviewState();
       $("inputColegio")?.focus();
+    });
+  }
+
+    if (btnAlertReviewToggleMore && !btnAlertReviewToggleMore.dataset.bound) {
+    btnAlertReviewToggleMore.dataset.bound = "1";
+    btnAlertReviewToggleMore.addEventListener("click", () => {
+      const moreList = $("alertReviewMoreList");
+      if (!moreList) return;
+
+      const total = Number(btnAlertReviewToggleMore.dataset.total || "0");
+      const wasHidden = moreList.classList.contains("hidden");
+
+      moreList.classList.toggle("hidden");
+
+      btnAlertReviewToggleMore.textContent = wasHidden
+        ? `Ocultar coincidencias medias y bajas (${total})`
+        : `Ver coincidencias medias y bajas (${total})`;
     });
   }
 
