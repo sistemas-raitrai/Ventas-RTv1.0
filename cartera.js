@@ -1575,6 +1575,17 @@ async function openEditModal(row) {
   await syncNumeroColegioInputForSelectedVendor();
 }
 
+function closeModal() {
+  revokeLogoPreviewObjectUrl();
+  state.pendingLogoFile = null;
+  state.removeCurrentLogo = false;
+
+  if ($("logoInput")) $("logoInput").value = "";
+  if ($("quitarLogoCheck")) $("quitarLogoCheck").checked = false;
+
+  $("modalForm")?.classList.remove("show");
+}
+
 function readModalInput() {
   const sellerEmail = normalizeEmail($("vendedorSelectModal")?.value || "");
   const vendor = state.vendors.find(v => normalizeEmail(v.email) === sellerEmail);
