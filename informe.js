@@ -368,22 +368,20 @@ function calculateWeightedTotal(rec = {}, weights = {}) {
   const continuityWeight = Number(weights.continuity || 0);
   const performanceWeight = Number(weights.performance || 0);
   const historicalWeight = Number(weights.historical || 0) * coverageFactor;
-  const workloadWeight = Number(weights.workload || 0);
-
-  const totalWeight = continuityWeight + performanceWeight + historicalWeight + workloadWeight;
-
+  
+  // En informe comercial, disponibilidad NO influye en el score
+  const totalWeight = continuityWeight + performanceWeight + historicalWeight;
+  
   if (!totalWeight) return 0;
-
+  
   const continuityNorm = safeRate(rec.continuityScore, 45);
   const performanceNorm = safeRate(rec.performanceScore, 30);
   const historicalNorm = safeRate(rec.historicalFunnelScore, 35);
-  const workloadNorm = safeRate(rec.workloadScore, 25);
-
+  
   const weighted =
     (continuityNorm * continuityWeight) +
     (performanceNorm * performanceWeight) +
-    (historicalNorm * historicalWeight) +
-    (workloadNorm * workloadWeight);
+    (historicalNorm * historicalWeight);
 
   return Math.round((weighted / totalWeight) * 100);
 }
@@ -421,8 +419,7 @@ function renderScoringExplanation() {
     `Modo: ${getScoringModeLabel(mode)} · ` +
     `Continuidad ${w.continuity}% · ` +
     `Desempeño ${w.performance}% · ` +
-    `Embudo histórico ${w.historical}% · ` +
-    `Disponibilidad ${w.workload}%`;
+    `Embudo histórico ${w.historical}%`;
 
   modeText.textContent = explanation;
 }
@@ -1253,11 +1250,11 @@ function bindPageEvents() {
   $("btnExplainScoring")?.addEventListener("click", () => {
     renderScoringExplanation();
     alert(
-      "Continuidad: instalación/comercialidad general.\n" +
-      "Desempeño: cómo mueve hoy su cartera vigente.\n" +
-      "Embudo histórico: cuántos grupos llegaron a reunión y luego a ganada.\n" +
-      "Disponibilidad: carga actual y backlog.\n\n" +
-      "El total score usa la ponderación seleccionada y ajusta el peso histórico si la cobertura es baja."
+      "Continuidad: instalación/comercialidad general y presencia comercial.\n" +
+      "Desempeño: cómo mueve hoy su cartera vigente, especialmente reuniones, avance y backlog.\n" +
+      "Embudo histórico: cuántos grupos llegaron a reunión y luego a ganada.\n\n" +
+      "En este informe, la disponibilidad no suma puntaje. El score prioriza desempeño y resultado comercial. " +
+      "El peso histórico además se ajusta automáticamente si la cobertura del vendedor es baja."
     );
   });
 }
