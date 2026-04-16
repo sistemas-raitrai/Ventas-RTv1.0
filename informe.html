@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Informe Comercial · Ventas RT</title>
+
+  <!-- SheetJS -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+
+  <style>
+    :root{
+      --bg:#f5f3f8;
+      --card:#ffffff;
+      --line:#d8c9ef;
+      --header:#5f3b8c;
+      --text:#2f2b3a;
+      --muted:#6b6475;
+      --success:#1f8f5f;
+      --warn:#a86b00;
+      --danger:#b42318;
+      --chip:#f3ecfb;
+    }
+
+    *{ box-sizing:border-box; }
+    html,body{ margin:0; padding:0; background:var(--bg); color:var(--text); font-family:Arial, Helvetica, sans-serif; }
+
+    .page{
+      padding:18px 28px 28px;
+    }
+
+    .panel{
+      background:#efefef;
+      border:3px dashed var(--line);
+      padding:20px 22px;
+    }
+
+    .topbar{
+      display:flex;
+      justify-content:space-between;
+      align-items:flex-start;
+      gap:18px;
+      flex-wrap:wrap;
+      margin-bottom:18px;
+    }
+
+    .title-wrap h1{
+      margin:0 0 6px;
+      font-size:30px;
+      color:var(--header);
+    }
+
+    .title-wrap p{
+      margin:0;
+      color:var(--muted);
+      font-size:14px;
+    }
+
+    .toolbar{
+      display:grid;
+      grid-template-columns:repeat(6, minmax(0, 1fr));
+      gap:10px;
+      margin:16px 0 18px;
+      align-items:end;
+    }
+
+    .field{
+      display:flex;
+      flex-direction:column;
+      gap:6px;
+      min-width:0;
+    }
+
+    .field label{
+      font-size:12px;
+      font-weight:800;
+      color:var(--header);
+      text-transform:uppercase;
+      letter-spacing:.2px;
+    }
+
+    .field input,
+    .field select{
+      width:100%;
+      min-width:0;
+      height:42px;
+      border:2px solid var(--line);
+      border-radius:10px;
+      background:#fff;
+      color:var(--text);
+      padding:0 12px;
+      font-size:14px;
+    }
+
+    .actions{
+      display:flex;
+      flex-wrap:wrap;
+      gap:10px;
+      margin:10px 0 20px;
+    }
+
+    .btn{
+      min-height:42px;
+      border:none;
+      border-radius:10px;
+      background:var(--header);
+      color:#fff;
+      font-size:14px;
+      font-weight:800;
+      padding:0 16px;
+      cursor:pointer;
+    }
+
+    .btn.sec{
+      background:#6b6178;
+    }
+
+    .btn.light{
+      background:#fff;
+      color:var(--header);
+      border:2px solid var(--line);
+    }
+
+    .cards{
+      display:grid;
+      grid-template-columns:repeat(4, minmax(0, 1fr));
+      gap:12px;
+      margin-bottom:18px;
+    }
+
+    .card{
+      background:var(--card);
+      border:2px solid #ddd7e8;
+      border-radius:16px;
+      padding:16px;
+      box-shadow:0 8px 20px rgba(66,36,98,.05);
+    }
+
+    .kpi-label{
+      font-size:12px;
+      font-weight:800;
+      text-transform:uppercase;
+      letter-spacing:.3px;
+      color:var(--muted);
+      margin-bottom:8px;
+    }
+
+    .kpi-value{
+      font-size:30px;
+      font-weight:900;
+      color:var(--header);
+      line-height:1;
+      margin-bottom:6px;
+    }
+
+    .kpi-meta{
+      font-size:12px;
+      color:var(--muted);
+    }
+
+    .grid-2{
+      display:grid;
+      grid-template-columns:repeat(2, minmax(0, 1fr));
+      gap:14px;
+      margin-bottom:18px;
+    }
+
+    .section-title{
+      margin:0 0 12px;
+      font-size:18px;
+      color:var(--header);
+    }
+
+    .chart-wrap{
+      min-height:340px;
+      position:relative;
+    }
+
+    .table-card{
+      background:var(--card);
+      border:2px solid #ddd7e8;
+      border-radius:16px;
+      overflow:hidden;
+      box-shadow:0 8px 20px rgba(66,36,98,.05);
+    }
+
+    .table-head{
+      padding:14px 16px;
+      border-bottom:1px solid #ece7f4;
+      display:flex;
+      justify-content:space-between;
+      gap:12px;
+      align-items:center;
+      flex-wrap:wrap;
+    }
+
+    .table-summary{
+      font-size:13px;
+      color:var(--muted);
+      font-weight:700;
+    }
+
+    .table-wrap{
+      width:100%;
+      overflow:auto;
+    }
+
+    table{
+      width:max-content;
+      min-width:100%;
+      border-collapse:collapse;
+      background:#fff;
+    }
+
+    thead th{
+      position:sticky;
+      top:0;
+      background:var(--header);
+      color:#fff;
+      text-align:left;
+      padding:12px 10px;
+      font-size:12px;
+      text-transform:uppercase;
+      letter-spacing:.3px;
+      white-space:nowrap;
+    }
+
+    tbody td{
+      padding:11px 10px;
+      border-bottom:1px solid #ece7f4;
+      font-size:13px;
+      white-space:nowrap;
+      vertical-align:top;
+    }
+
+    tbody tr:hover td{
+      background:#faf8fd;
+    }
+
+    .metric-chip{
+      display:inline-flex;
+      align-items:center;
+      gap:6px;
+      min-height:28px;
+      padding:0 10px;
+      border-radius:999px;
+      background:var(--chip);
+      color:var(--header);
+      font-weight:800;
+      font-size:12px;
+      margin:0 6px 6px 0;
+    }
+
+    .metric-chip.ok{
+      background:#e7f8ee;
+      color:var(--success);
+    }
+
+    .metric-chip.warn{
+      background:#fff4de;
+      color:var(--warn);
+    }
+
+    .metric-chip.danger{
+      background:#fdecec;
+      color:var(--danger);
+    }
+
+    .alerts{
+      display:grid;
+      grid-template-columns:repeat(2, minmax(0, 1fr));
+      gap:14px;
+      margin-top:18px;
+    }
+
+    .alert-list{
+      list-style:none;
+      margin:0;
+      padding:0;
+      display:flex;
+      flex-direction:column;
+      gap:10px;
+    }
+
+    .alert-item{
+      padding:12px 14px;
+      border:1px solid #e7e0f2;
+      border-radius:12px;
+      background:#fff;
+      font-size:13px;
+      line-height:1.4;
+    }
+
+    .alert-item strong{
+      color:var(--header);
+    }
+
+    .empty{
+      padding:22px;
+      text-align:center;
+      color:var(--muted);
+      font-weight:700;
+    }
+
+    .footer-note{
+      margin-top:16px;
+      font-size:12px;
+      color:var(--muted);
+      font-weight:700;
+    }
+
+    @media print {
+      .toolbar,
+      .actions,
+      #layoutActingUserWrap,
+      .footer-note{
+        display:none !important;
+      }
+
+      body{
+        background:#fff;
+      }
+
+      .page{
+        padding:0;
+      }
+
+      .panel{
+        border:none;
+        padding:0;
+        background:#fff;
+      }
+
+      .card,
+      .table-card{
+        box-shadow:none;
+      }
+
+      .grid-2,
+      .alerts,
+      .cards{
+        page-break-inside:avoid;
+      }
+    }
+
+    @media (max-width: 1200px){
+      .toolbar{ grid-template-columns:repeat(3, minmax(0, 1fr)); }
+      .cards{ grid-template-columns:repeat(2, minmax(0, 1fr)); }
+      .grid-2,
+      .alerts{ grid-template-columns:1fr; }
+    }
+
+    @media (max-width: 760px){
+      .page{ padding:14px; }
+      .toolbar{ grid-template-columns:1fr; }
+      .cards{ grid-template-columns:1fr; }
+      .title-wrap h1{ font-size:24px; }
+    }
+  </style>
+</head>
+<body>
+  <div id="appShell">
+    <div class="page">
+      <div class="panel">
+        <div class="topbar">
+          <div class="title-wrap">
+            <h1>Informe Comercial</h1>
+            <p id="informeScope">Resumen comercial de vendedores, grupos y embudo de ventas.</p>
+            <p id="informeLoadHint" style="margin:6px 0 0;color:#6b6475;font-size:12px;font-weight:700;">
+              Cargando informe...
+            </p>
+          </div>
+
+          <div id="layoutActingUserWrap"></div>
+        </div>
+
+        <div class="toolbar">
+          <div class="field">
+            <label for="filterAnoViaje">Año de viaje</label>
+            <select id="filterAnoViaje">
+              <option value="">Todos</option>
+            </select>
+          </div>
+
+          <div class="field">
+            <label for="filterVendedora">Vendedora</label>
+            <select id="filterVendedora">
+              <option value="">Todas</option>
+            </select>
+          </div>
+
+          <div class="field">
+            <label for="filterComuna">Comuna</label>
+            <select id="filterComuna">
+              <option value="">Todas</option>
+            </select>
+          </div>
+
+          <div class="field">
+            <label for="filterEstado">Estado actual</label>
+            <select id="filterEstado">
+              <option value="">Todos</option>
+            </select>
+          </div>
+
+          <div class="field">
+            <label for="filterSearch">Buscar</label>
+            <input id="filterSearch" type="text" placeholder="Grupo, colegio, cliente..." />
+          </div>
+
+          <div class="field">
+            <label for="filterPastYears">Histórico</label>
+            <select id="filterPastYears">
+              <option value="0">Solo vigentes</option>
+              <option value="1">Incluir años anteriores</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="actions">
+          <button id="btnActualizar" class="btn">Actualizar</button>
+          <button id="btnExportXlsx" class="btn sec">Exportar XLSX</button>
+          <button id="btnExportPdf" class="btn light">Exportar PDF</button>
+        </div>
+
+        <section class="cards" id="kpiCards">
+          <div class="card"><div class="empty">Cargando KPIs...</div></div>
+        </section>
+
+        <section class="grid-2">
+          <div class="card">
+            <h2 class="section-title">Embudo comercial</h2>
+            <div class="chart-wrap">
+              <canvas id="chartFunnel"></canvas>
+            </div>
+          </div>
+
+          <div class="card">
+            <h2 class="section-title">Ganadas por vendedor(a)</h2>
+            <div class="chart-wrap">
+              <canvas id="chartWinsByVendor"></canvas>
+            </div>
+          </div>
+        </section>
+
+        <section class="grid-2">
+          <div class="card">
+            <h2 class="section-title">Reuniones por vendedor(a)</h2>
+            <div class="chart-wrap">
+              <canvas id="chartMeetingsByVendor"></canvas>
+            </div>
+          </div>
+
+          <div class="card">
+            <h2 class="section-title">A contactar por vendedor(a)</h2>
+            <div class="chart-wrap">
+              <canvas id="chartBacklogByVendor"></canvas>
+            </div>
+          </div>
+        </section>
+
+        <section class="table-card">
+          <div class="table-head">
+            <h2 class="section-title" style="margin:0;">KPIs por vendedor(a)</h2>
+            <div id="vendorTableSummary" class="table-summary">Cargando...</div>
+          </div>
+
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Vendedor(a)</th>
+                  <th>Activos</th>
+                  <th>A contactar</th>
+                  <th>Cotizando</th>
+                  <th>Reunión actual</th>
+                  <th>Ganada actual</th>
+                  <th>% reunión actual</th>
+                  <th>% ganada actual</th>
+                  <th>Historial analizado</th>
+                  <th>Llegaron a reunión</th>
+                  <th>Ganadas post-reunión</th>
+                  <th>% llegada a reunión</th>
+                  <th>% cierre tras reunión</th>
+                  <th>Continuidad / territorio</th>
+                  <th>Desempeño actual</th>
+                  <th>Embudo histórico</th>
+                  <th>Disponibilidad</th>
+                  <th>Total score</th>
+                </tr>
+              </thead>
+              <tbody id="tbodyVendors">
+                <tr><td colspan="18"><div class="empty">Cargando vendedores...</div></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="alerts">
+          <div class="card">
+            <h2 class="section-title">Alertas de gestión</h2>
+            <ul id="alertList" class="alert-list">
+              <li class="alert-item">Cargando alertas...</li>
+            </ul>
+          </div>
+
+          <div class="card">
+            <h2 class="section-title">Oportunidades comerciales</h2>
+            <ul id="opportunityList" class="alert-list">
+              <li class="alert-item">Cargando oportunidades...</li>
+            </ul>
+          </div>
+        </section>
+
+        <div class="footer-note">
+          Informe generado desde ventas_cotizaciones y ventas_historial. Exportación PDF mediante impresión del navegador.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./informe.js"></script>
+</body>
+</html>
