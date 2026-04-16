@@ -2344,6 +2344,44 @@ function closeModal(id) {
   $(id)?.classList.remove("show");
 }
 
+function showSaveNotice(message = "Guardado correctamente.") {
+  const old = document.getElementById("saveNoticeToast");
+  if (old) old.remove();
+
+  const toast = document.createElement("div");
+  toast.id = "saveNoticeToast";
+  toast.textContent = message;
+
+  toast.style.position = "fixed";
+  toast.style.right = "20px";
+  toast.style.bottom = "20px";
+  toast.style.zIndex = "99999";
+  toast.style.background = "linear-gradient(135deg, #2b1145 0%, #4a2570 100%)";
+  toast.style.color = "#fff";
+  toast.style.padding = "12px 16px";
+  toast.style.borderRadius = "14px";
+  toast.style.boxShadow = "0 12px 28px rgba(43,17,69,.28)";
+  toast.style.fontSize = "14px";
+  toast.style.fontWeight = "800";
+  toast.style.letterSpacing = ".15px";
+  toast.style.opacity = "0";
+  toast.style.transform = "translateY(8px)";
+  toast.style.transition = "opacity .2s ease, transform .2s ease";
+
+  document.body.appendChild(toast);
+
+  requestAnimationFrame(() => {
+    toast.style.opacity = "1";
+    toast.style.transform = "translateY(0)";
+  });
+
+  setTimeout(() => {
+    toast.style.opacity = "0";
+    toast.style.transform = "translateY(8px)";
+    setTimeout(() => toast.remove(), 220);
+  }, 2200);
+}
+
 function setSituacionBlockVisibility(id, shouldShow, displayValue = "block") {
   const el = $(id);
   if (!el) return;
@@ -2482,8 +2520,19 @@ function openDatosModal() {
 
   setFormValue("d_colegio", normalizeTextUpper(state.group.colegio || ""));
   const colegioInput = $("d_colegio");
+  const colegioHelper = $("d_colegioHelper");
+  
   if (colegioInput) {
-    colegioInput.disabled = !canEditSchoolName();
+    const canEditColegio = canEditSchoolName();
+  
+    colegioInput.disabled = !canEditColegio;
+    colegioInput.readOnly = !canEditColegio;
+  }
+  
+  if (colegioHelper) {
+    colegioHelper.textContent = canEditSchoolName()
+      ? "Admin y supervisión pueden editar el colegio. El cambio quedará registrado en el historial."
+      : "Solo admin y supervisión pueden editar el colegio.";
   }
   setFormValue("d_curso", state.group.curso || "");
   setFormValue("d_anoViaje", state.group.anoViaje || "");
