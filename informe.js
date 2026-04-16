@@ -56,6 +56,15 @@ const state = {
     meetingsByVendor: null,
     backlogByVendor: null
   },
+  scoring: {
+    mode: "actual",
+    weights: {
+      continuity: 20,
+      performance: 40,
+      historical: 25,
+      workload: 15
+    }
+  },
   lastRender: null
 };
 
@@ -297,6 +306,126 @@ function buildHistoryMap(rows = []) {
   return map;
 }
 
+function getScoringPreset(mode = "actual") {
+  if (mode === "historico") {
+    return { continuity: 20, performance: 20, historical: 45, workload: 15 };
+  }
+
+  if (mode === "asignacion") {
+    return { continuity: 35, performance: 30, historical: 20, workload: 15 };
+  }
+
+  if (mode === "actual") {
+    return { continuity: 20, performance: 45, historical: 25, workload: 10 };
+  }
+
+  return { continuity: 20, performance: 40, historical: 25, workload: 15 };
+}
+
+function readScoringInputs() {
+  const mode = $("analysisMode")?.value || "actual";
+
+  if (mode !== "personalizado") {
+    const preset = getScoringPreset(mode);
+    state.scoring.mode = mode;
+    state.scoring.weights = { ...preset };
+
+    if ($("weightContinuity")) $("weightContinuity").value = String(preset.continuity);
+    if ($("weightPerformance")) $("weightPerformance").value = String(preset.performance);
+    if ($("weightHistorical")) $("weightHistorical").value = String(preset.historical);
+    if ($("weightWorkload")) $("weightWorkload").value = String(preset.workload);
+
+    return;
+  }
+
+  const continuity = Number($("weightContinuity")?.value || 0);
+  const performance = Number($("weightPerformance")?.value || 0);
+  const historical = Number($("weightHistorical")?.value || 0);
+  const workload = Number($("weightWorkload")?.value || 0);
+
+  state.scoring.mode = "personalizado";
+  state.scoring.weights = {
+    continuity: Math.max(0, continuity),
+    performance: Math.max(0, performance),
+    historical: Math.max(0, historical),
+    workload: Math.max(0, workload)
+  };
+}
+
+function getCoverageFactor(rec = {}) {
+  // Si el vendedor tiene poco histórico analizado, reducimos el peso histórico
+  if (rec.historicalGroupsAnalyzed >= 8) return 1;
+  if (rec.historicalGroupsAnalyzed >= 5) return 0.8;
+  if (rec.historicalGroupsAnalyzed >= 3) return 0.6;
+  if (rec.historicalGroupsAnalyzed >= 1) return 0.4;
+  return 0;
+}
+
+function calculateWeightedTotal(rec = {}, weights = {}) {
+  const coverageFactor = getCoverageFactor(rec);
+
+  const continuityWeight = Number(weights.continuity || 0);
+  const performanceWeight = Number(weights.performance || 0);
+  const historicalWeight = Number(weights.historical || 0) * coverageFactor;
+  const workloadWeight = Number(weights.workload || 0);
+
+  const totalWeight = continuityWeight + performanceWeight + historicalWeight + workloadWeight;
+
+  if (!totalWeight) return 0;
+
+  const continuityNorm = safeRate(rec.continuityScore, 45);
+  const performanceNorm = safeRate(rec.performanceScore, 30);
+  const historicalNorm = safeRate(rec.historicalFunnelScore, 35);
+  const workloadNorm = safeRate(rec.workloadScore, 25);
+
+  const weighted =
+    (continuityNorm * continuityWeight) +
+    (performanceNorm * performanceWeight) +
+    (historicalNorm * historicalWeight) +
+    (workloadNorm * workloadWeight);
+
+  return Math.round((weighted / totalWeight) * 100);
+}
+
+function getScoringModeLabel(mode = "") {
+  if (mode === "actual") return "Gestión actual";
+  if (mode === "historico") return "Histórico comercial";
+  if (mode === "asignacion") return "Asignación inteligente";
+  if (mode === "personalizado") return "Personalizado";
+  return "Actual";
+}
+
+function renderScoringExplanation() {
+  const modeText = $("scoringModeText");
+  const weightsText = $("scoringWeightsText");
+
+  if (!modeText || !weightsText) return;
+
+  const mode = state.scoring.mode;
+  const w = state.scoring.weights;
+
+  let explanation = "";
+
+  if (mode === "actual") {
+    explanation = "Este modo prioriza cómo viene trabajando hoy cada vendedor: reuniones actuales, ganadas actuales, cotizaciones activas y backlog.";
+  } else if (mode === "historico") {
+    explanation = "Este modo prioriza el historial comercial: cuántos grupos llegan a reunión y cuántos terminan ganados después de reunión.";
+  } else if (mode === "asignacion") {
+    explanation = "Este modo está pensado para decidir asignaciones: da más peso a continuidad, desempeño actual y capacidad operativa.";
+  } else {
+    explanation = "Este modo usa una ponderación manual definida por quien analiza. Sirve para justificar decisiones según el criterio del momento.";
+  }
+
+  weightsText.textContent =
+    `Modo: ${getScoringModeLabel(mode)} · ` +
+    `Continuidad ${w.continuity}% · ` +
+    `Desempeño ${w.performance}% · ` +
+    `Embudo histórico ${w.historical}% · ` +
+    `Disponibilidad ${w.workload}%`;
+
+  modeText.textContent = explanation;
+}
+
 /* =========================================================
    KPI ENGINE
 ========================================================= */
@@ -499,14 +628,8 @@ function buildVendorKpis(rows = [], historyRows = []) {
     rec.historicalFunnelScore = calculateHistoricalFunnelScore(rec);
     rec.workloadScore = calculateWorkloadScore(rec, avgActive);
 
-    rec.totalScore = clamp(
-      rec.continuityScore +
-      rec.performanceScore +
-      rec.historicalFunnelScore +
-      rec.workloadScore,
-      0,
-      100
-    );
+    rec.historyCoverageFactor = getCoverageFactor(rec);
+    rec.totalScore = calculateWeightedTotal(rec, state.scoring.weights);
   });
 
   return list.sort((a, b) => {
@@ -580,6 +703,7 @@ function renderCards(globalKpis, vendorKpis) {
   const bestCloser = vendorKpis[0];
   const bestMeeting = [...vendorKpis].sort((a, b) => b.historicalMeetingCount - a.historicalMeetingCount)[0];
 
+  renderScoringExplanation();
   el.innerHTML = `
     <div class="seguimiento-summary-card">
       <div class="label">Total</div>
@@ -667,7 +791,12 @@ function renderVendorTable(vendorKpis = []) {
       <td>${item.performanceScore}</td>
       <td>${item.historicalFunnelScore}</td>
       <td>${item.workloadScore}</td>
-      <td><span class="score-badge">${item.totalScore}</span></td>
+      <td>
+        <div class="vendor-cell">
+          <span class="score-badge">${item.totalScore}</span>
+          <small>Cobertura hist.: ${Math.round((item.historyCoverageFactor || 0) * 100)}%</small>
+        </div>
+      </td>
     </tr>
   `).join("");
 }
@@ -995,6 +1124,8 @@ function applyFilters() {
    RENDER ALL
 ========================================================= */
 function renderAll() {
+  readScoringInputs();
+  
   const globalKpis = computeGlobalKpis(state.filteredRows);
   const vendorKpis = buildVendorKpis(state.filteredRows, state.historyRows);
   const alerts = buildAlerts(state.filteredRows, vendorKpis);
@@ -1064,6 +1195,40 @@ function bindPageEvents() {
 
   $("btnExportPdf")?.addEventListener("click", () => {
     exportPdf();
+  });
+
+    $("analysisMode")?.addEventListener("change", () => {
+    readScoringInputs();
+    renderAll();
+  });
+
+  $("weightContinuity")?.addEventListener("input", () => {
+    if (($("analysisMode")?.value || "") !== "personalizado") return;
+    readScoringInputs();
+    renderAll();
+  });
+
+  $("weightPerformance")?.addEventListener("input", () => {
+    if (($("analysisMode")?.value || "") !== "personalizado") return;
+    readScoringInputs();
+    renderAll();
+  });
+
+  $("weightHistorical")?.addEventListener("input", () => {
+    if (($("analysisMode")?.value || "") !== "personalizado") return;
+    readScoringInputs();
+    renderAll();
+  });
+
+  $("btnExplainScoring")?.addEventListener("click", () => {
+    renderScoringExplanation();
+    alert(
+      "Continuidad: instalación/comercialidad general.\n" +
+      "Desempeño: cómo mueve hoy su cartera vigente.\n" +
+      "Embudo histórico: cuántos grupos llegaron a reunión y luego a ganada.\n" +
+      "Disponibilidad: carga actual y backlog.\n\n" +
+      "El total score usa la ponderación seleccionada y ajusta el peso histórico si la cobertura es baja."
+    );
   });
 }
 
