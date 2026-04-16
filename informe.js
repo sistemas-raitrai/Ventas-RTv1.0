@@ -293,6 +293,9 @@ function destroyChart(chart) {
   if (chart) chart.destroy();
 }
 
+const CHART_PURPLE = "rgba(123, 87, 196, 0.72)";
+const CHART_PURPLE_BORDER = "rgba(95, 59, 140, 1)";
+
 function buildHistoryMap(rows = []) {
   const map = new Map();
 
@@ -889,12 +892,48 @@ function renderCharts(globalKpis, vendorKpis) {
           globalKpis.cotizando,
           globalKpis.reunion,
           globalKpis.ganada
-        ]
+        ],
+        backgroundColor: CHART_PURPLE,
+        borderColor: CHART_PURPLE_BORDER,
+        borderWidth: 1,
+        borderRadius: 8
       }]
     },
     options: {
       responsive: true,
-      maintainAspectRatio: false
+      maintainAspectRatio: false,
+      plugins: {
+        legend: {
+          labels: {
+            color: "#4a3b63",
+            font: {
+              weight: "700"
+            }
+          }
+        }
+      },
+      scales: {
+        x: {
+          ticks: {
+            color: "#5f556f",
+            font: {
+              size: 12
+            }
+          },
+          grid: {
+            color: "rgba(95, 59, 140, 0.08)"
+          }
+        },
+        y: {
+          beginAtZero: true,
+          ticks: {
+            color: "#5f556f"
+          },
+          grid: {
+            color: "rgba(95, 59, 140, 0.08)"
+          }
+        }
+      }
     }
   });
 
@@ -904,13 +943,49 @@ function renderCharts(globalKpis, vendorKpis) {
       labels: vendorKpis.map((v) => v.vendorName),
       datasets: [{
         label: "Ganadas actuales",
-        data: vendorKpis.map((v) => v.currentGanadaCount)
+        data: vendorKpis.map((v) => v.currentGanadaCount),
+        backgroundColor: CHART_PURPLE,
+        borderColor: CHART_PURPLE_BORDER,
+        borderWidth: 1,
+        borderRadius: 8
       }]
     },
     options: {
       indexAxis: "y",
       responsive: true,
-      maintainAspectRatio: false
+      maintainAspectRatio: false,
+      plugins: {
+        legend: {
+          labels: {
+            color: "#4a3b63",
+            font: {
+              weight: "700"
+            }
+          }
+        }
+      },
+      scales: {
+        x: {
+          beginAtZero: true,
+          ticks: {
+            color: "#5f556f"
+          },
+          grid: {
+            color: "rgba(95, 59, 140, 0.08)"
+          }
+        },
+        y: {
+          ticks: {
+            color: "#5f556f",
+            font: {
+              size: 12
+            }
+          },
+          grid: {
+            display: false
+          }
+        }
+      }
     }
   });
 
@@ -920,13 +995,49 @@ function renderCharts(globalKpis, vendorKpis) {
       labels: vendorKpis.map((v) => v.vendorName),
       datasets: [{
         label: "Grupos que llegaron a reunión",
-        data: vendorKpis.map((v) => v.historicalMeetingCount)
+        data: vendorKpis.map((v) => v.historicalMeetingCount),
+        backgroundColor: CHART_PURPLE,
+        borderColor: CHART_PURPLE_BORDER,
+        borderWidth: 1,
+        borderRadius: 8
       }]
     },
     options: {
       indexAxis: "y",
       responsive: true,
-      maintainAspectRatio: false
+      maintainAspectRatio: false,
+      plugins: {
+        legend: {
+          labels: {
+            color: "#4a3b63",
+            font: {
+              weight: "700"
+            }
+          }
+        }
+      },
+      scales: {
+        x: {
+          beginAtZero: true,
+          ticks: {
+            color: "#5f556f"
+          },
+          grid: {
+            color: "rgba(95, 59, 140, 0.08)"
+          }
+        },
+        y: {
+          ticks: {
+            color: "#5f556f",
+            font: {
+              size: 12
+            }
+          },
+          grid: {
+            display: false
+          }
+        }
+      }
     }
   });
 
@@ -936,13 +1047,49 @@ function renderCharts(globalKpis, vendorKpis) {
       labels: vendorKpis.map((v) => v.vendorName),
       datasets: [{
         label: "A contactar",
-        data: vendorKpis.map((v) => v.aContactarCount)
+        data: vendorKpis.map((v) => v.aContactarCount),
+        backgroundColor: CHART_PURPLE,
+        borderColor: CHART_PURPLE_BORDER,
+        borderWidth: 1,
+        borderRadius: 8
       }]
     },
     options: {
       indexAxis: "y",
       responsive: true,
-      maintainAspectRatio: false
+      maintainAspectRatio: false,
+      plugins: {
+        legend: {
+          labels: {
+            color: "#4a3b63",
+            font: {
+              weight: "700"
+            }
+          }
+        }
+      },
+      scales: {
+        x: {
+          beginAtZero: true,
+          ticks: {
+            color: "#5f556f"
+          },
+          grid: {
+            color: "rgba(95, 59, 140, 0.08)"
+          }
+        },
+        y: {
+          ticks: {
+            color: "#5f556f",
+            font: {
+              size: 12
+            }
+          },
+          grid: {
+            display: false
+          }
+        }
+      }
     }
   });
 }
