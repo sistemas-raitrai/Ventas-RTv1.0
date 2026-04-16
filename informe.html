@@ -1,17 +1,14 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Informe | Sistema Ventas RT</title>
 
   <link rel="stylesheet" href="estilos.css" />
   <link rel="icon" type="image/png" href="IMG/logo-raitrai.png" />
 
-  <!-- SheetJS -->
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-
-  <!-- Chart.js -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
 
   <style>
@@ -48,10 +45,26 @@
 
     .informe-toolbar{
       display:grid;
-      grid-template-columns:repeat(6, minmax(0, 1fr));
+      grid-template-columns:1fr;
+      gap:14px;
+      margin-bottom:18px;
+    }
+
+    .toolbar-left{
+      display:grid;
+      grid-template-columns:repeat(4, minmax(0, 1fr));
       gap:10px;
       align-items:end;
-      margin:16px 0 18px;
+      width:100%;
+    }
+
+    .toolbar-right{
+      display:grid;
+      grid-template-columns:minmax(0, 1fr) auto;
+      gap:10px;
+      align-items:end;
+      width:100%;
+      margin-left:0;
     }
 
     .field-wrap{
@@ -62,43 +75,56 @@
     }
 
     .field-wrap label{
-      font-size:12px;
-      font-weight:800;
+      font-size:13px;
+      font-weight:700;
       color:var(--header);
-      text-transform:uppercase;
-      letter-spacing:.2px;
     }
 
-    .field-wrap input,
-    .field-wrap select{
+    .informe-toolbar input[type="text"],
+    .informe-toolbar select{
       width:100%;
       min-width:0;
       height:42px;
       border:2px solid var(--line);
-      border-radius:10px;
-      background:#fff;
-      color:var(--text);
+      border-radius:8px;
       padding:0 12px;
       font-size:14px;
+      background:#fff;
+      color:var(--header);
+    }
+
+    .field-wrap.search-wide{
+      min-width:0;
+    }
+
+    .field-wrap.search-wide input{
+      width:100%;
+      min-width:0;
     }
 
     .informe-actions{
       display:flex;
-      flex-wrap:wrap;
       gap:10px;
-      margin:10px 0 20px;
+      align-items:end;
+      justify-content:flex-end;
+      flex-wrap:nowrap;
     }
 
     .btn-page{
-      min-height:42px;
+      min-width:150px;
+      height:44px;
       border:none;
-      border-radius:10px;
+      border-radius:8px;
       background:var(--header);
       color:#fff;
-      font-size:14px;
-      font-weight:800;
-      padding:0 16px;
+      font-size:15px;
+      font-weight:700;
       cursor:pointer;
+      padding:0 16px;
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      text-decoration:none;
     }
 
     .btn-page.sec{
@@ -116,11 +142,10 @@
       flex-direction:column;
       gap:8px;
       background:#fff;
-      border:2px solid #ddd7e8;
-      border-radius:14px;
+      border:2px solid #d7dde6;
+      border-radius:12px;
       padding:14px 16px;
-      margin:0 0 18px;
-      box-shadow:0 8px 20px rgba(66,36,98,.05);
+      margin-bottom:18px;
     }
 
     .status-card.hidden{
@@ -128,13 +153,13 @@
     }
 
     .status-card.success{
-      border-color:#b9e3c9;
-      background:#f4fcf7;
+      border-color:#b7e3ca;
+      background:#f3fff7;
     }
 
     .status-card.error{
-      border-color:#efc7c7;
-      background:#fff6f6;
+      border-color:#efb0b0;
+      background:#fff5f5;
     }
 
     .status-text{
@@ -145,7 +170,7 @@
 
     .status-meta{
       font-size:13px;
-      color:#6b6475;
+      color:#6d6480;
     }
 
     .progress-track{
@@ -160,44 +185,48 @@
       width:0%;
       height:100%;
       background:var(--header);
-      transition:width .25s ease;
+      transition:width .2s ease;
     }
 
-    .cards{
+    .seguimiento-summary{
       display:grid;
-      grid-template-columns:repeat(4, minmax(0, 1fr));
+      grid-template-columns:repeat(8, minmax(120px, 1fr));
       gap:12px;
       margin-bottom:18px;
     }
 
-    .card{
+    .seguimiento-summary-card{
       background:#fff;
-      border:2px solid #ddd7e8;
-      border-radius:16px;
-      padding:16px;
-      box-shadow:0 8px 20px rgba(66,36,98,.05);
+      border:2px solid #d7dde6;
+      border-radius:12px;
+      padding:14px 16px;
+      min-height:86px;
+      display:flex;
+      flex-direction:column;
+      justify-content:center;
     }
 
-    .kpi-label{
+    .seguimiento-summary-card .label{
       font-size:12px;
       font-weight:800;
+      letter-spacing:.04em;
       text-transform:uppercase;
-      letter-spacing:.3px;
-      color:#6b6475;
-      margin-bottom:8px;
-    }
-
-    .kpi-value{
-      font-size:30px;
-      font-weight:900;
-      color:var(--header);
-      line-height:1;
+      color:#6d6480;
       margin-bottom:6px;
     }
 
-    .kpi-meta{
+    .seguimiento-summary-card .value{
+      font-size:30px;
+      font-weight:800;
+      color:var(--header);
+      line-height:1;
+    }
+
+    .seguimiento-summary-card .meta{
+      margin-top:6px;
       font-size:12px;
-      color:#6b6475;
+      color:#7b748a;
+      line-height:1.25;
     }
 
     .grid-2{
@@ -207,28 +236,43 @@
       margin-bottom:18px;
     }
 
+    .card{
+      background:#fff;
+      border:2px solid #d7dde6;
+      border-radius:12px;
+      overflow:hidden;
+    }
+
+    .card-head{
+      padding:14px 16px;
+      border-bottom:1px solid #e5e7eb;
+      background:#fff;
+    }
+
     .section-title{
-      margin:0 0 12px;
+      margin:0;
       font-size:18px;
       color:var(--header);
     }
 
     .chart-wrap{
-      min-height:340px;
       position:relative;
+      min-height:340px;
+      padding:14px 16px 16px;
+      background:#fff;
     }
 
     .table-card{
       background:#fff;
-      border:2px solid #ddd7e8;
-      border-radius:16px;
+      border:2px solid #d7dde6;
+      border-radius:12px;
       overflow:hidden;
-      box-shadow:0 8px 20px rgba(66,36,98,.05);
+      margin-bottom:18px;
     }
 
     .table-head{
       padding:14px 16px;
-      border-bottom:1px solid #ece7f4;
+      border-bottom:1px solid #e5e7eb;
       display:flex;
       justify-content:space-between;
       gap:12px;
@@ -238,7 +282,7 @@
 
     .table-summary{
       font-size:13px;
-      color:#6b6475;
+      color:#534a63;
       font-weight:700;
     }
 
@@ -251,7 +295,6 @@
       width:max-content;
       min-width:100%;
       border-collapse:collapse;
-      background:#fff;
     }
 
     .informe-table thead th{
@@ -261,23 +304,56 @@
       color:#fff;
       text-align:left;
       padding:12px 10px;
-      font-size:12px;
-      text-transform:uppercase;
-      letter-spacing:.3px;
-      white-space:nowrap;
+      font-size:13px;
+      letter-spacing:.2px;
       z-index:1;
+      white-space:nowrap;
+      text-transform:uppercase;
     }
 
     .informe-table tbody td{
-      padding:11px 10px;
-      border-bottom:1px solid #ece7f4;
-      font-size:13px;
+      border-bottom:1px solid #e5e7eb;
+      padding:12px 10px;
+      font-size:14px;
+      vertical-align:middle;
+      color:#2f2b3a;
       white-space:nowrap;
-      vertical-align:top;
+      background:#fff;
     }
 
     .informe-table tbody tr:hover td{
       background:#faf8fd;
+    }
+
+    .vendor-cell{
+      display:flex;
+      flex-direction:column;
+      gap:4px;
+      min-width:180px;
+    }
+
+    .vendor-cell strong{
+      color:var(--header);
+      font-size:14px;
+    }
+
+    .vendor-cell small{
+      color:#6d6480;
+      font-size:12px;
+    }
+
+    .score-badge{
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      min-height:26px;
+      padding:0 10px;
+      border-radius:999px;
+      font-size:12px;
+      font-weight:800;
+      white-space:nowrap;
+      background:#ece8f4;
+      color:#31194b;
     }
 
     .alerts{
@@ -290,10 +366,11 @@
     .alert-list{
       list-style:none;
       margin:0;
-      padding:0;
+      padding:14px 16px 16px;
       display:flex;
       flex-direction:column;
       gap:10px;
+      background:#fff;
     }
 
     .alert-item{
@@ -310,31 +387,24 @@
     }
 
     .empty{
-      padding:22px;
+      padding:28px 16px;
       text-align:center;
-      color:#6b6475;
+      color:#666;
       font-weight:700;
     }
 
     .footer-note{
       margin-top:16px;
       font-size:12px;
-      color:#6b6475;
+      color:#6d6480;
       font-weight:700;
     }
 
     @media print {
-      .informe-toolbar,
+      .page-toolbar,
       .informe-actions,
-      .footer-note,
-      .header-tools-wrap,
-      .ventas-menu,
-      .ventas-header-right{
+      .footer-note{
         display:none !important;
-      }
-
-      body{
-        background:#fff;
       }
 
       .informe-page{
@@ -352,68 +422,113 @@
       .status-card{
         box-shadow:none;
       }
+    }
 
-      .grid-2,
-      .alerts,
-      .cards{
-        page-break-inside:avoid;
+    @media (max-width: 1280px){
+      .toolbar-left{
+        grid-template-columns:repeat(4, minmax(0, 1fr));
+      }
+
+      .toolbar-right{
+        grid-template-columns:minmax(0, 1fr) auto;
+      }
+
+      .seguimiento-summary{
+        grid-template-columns:repeat(4, minmax(120px, 1fr));
       }
     }
 
-    @media (max-width: 1200px){
-      .informe-toolbar{ grid-template-columns:repeat(3, minmax(0, 1fr)); }
-      .cards{ grid-template-columns:repeat(2, minmax(0, 1fr)); }
+    @media (max-width: 980px){
+      .toolbar-left{
+        grid-template-columns:repeat(2, minmax(0, 1fr));
+      }
+
+      .toolbar-right{
+        grid-template-columns:1fr;
+      }
+
       .grid-2,
-      .alerts{ grid-template-columns:1fr; }
+      .alerts{
+        grid-template-columns:1fr;
+      }
     }
 
     @media (max-width: 760px){
-      .informe-page{ padding:16px; }
-      .informe-toolbar{ grid-template-columns:1fr; }
-      .cards{ grid-template-columns:1fr; }
-      .informe-title-wrap h2{ font-size:24px; }
+      .informe-page{
+        padding:16px;
+      }
+
+      .toolbar-left,
+      .toolbar-right{
+        grid-template-columns:1fr;
+      }
+
+      .informe-actions{
+        display:grid;
+        grid-template-columns:1fr;
+        width:100%;
+      }
+
+      .btn-page{
+        width:100%;
+        min-width:0;
+      }
+
+      .seguimiento-summary{
+        grid-template-columns:repeat(2, minmax(120px, 1fr));
+      }
+    }
+
+    @media (max-width: 520px){
+      .seguimiento-summary{
+        grid-template-columns:1fr;
+      }
     }
   </style>
 </head>
 
 <body class="ventas-body" data-page="informe-excel">
-  <!-- LAYOUT GLOBAL -->
   <div id="layout-top"></div>
 
-  <!-- CONTENIDO -->
-  <main class="ventas-main">
-    <section class="informe-page">
-      <div class="informe-panel-main">
-        <div class="informe-topbar">
-          <div class="informe-title-wrap">
-            <h2>Informe Comercial</h2>
-            <p id="informeScope">Resumen comercial de vendedores, grupos, embudo y oportunidades.</p>
-            <p id="informeLoadHint" style="margin:6px 0 0;color:#6b6475;font-size:12px;font-weight:700;">
-              Cargando informe...
-            </p>
-          </div>
-        </div>
+  <main class="page-shell informe-page">
+    <section class="page-card panel informe-panel-main">
 
-        <!-- STATUS / PROGRESS -->
-        <div id="statusCard" class="status-card hidden">
-          <div id="statusText" class="status-text">Cargando...</div>
-          <div id="statusMeta" class="status-meta"></div>
-          <div class="progress-track">
-            <div id="progressBar" class="progress-bar"></div>
-          </div>
+      <div class="page-header informe-topbar">
+        <div class="page-title-wrap informe-title-wrap">
+          <h2>Informe Comercial</h2>
+          <p id="informeScope">Resumen comercial de vendedores, grupos, embudo, alertas y oportunidades.</p>
+          <p id="informeLoadHint" style="margin:6px 0 0;color:#6b6475;font-size:12px;font-weight:700;">
+            Cargando informe...
+          </p>
         </div>
+      </div>
 
-        <!-- FILTROS -->
-        <div class="informe-toolbar">
+      <div id="statusCard" class="status-card hidden">
+        <div id="statusText" class="status-text">Cargando...</div>
+        <div id="statusMeta" class="status-meta"></div>
+        <div class="progress-track">
+          <div id="progressBar" class="progress-bar"></div>
+        </div>
+      </div>
+
+      <div class="page-toolbar informe-toolbar">
+        <div class="toolbar-left">
           <div class="field-wrap">
-            <label for="filterAnoViaje">Año de viaje</label>
+            <label for="filterAnoViaje">Año</label>
             <select id="filterAnoViaje">
               <option value="">Todos</option>
             </select>
           </div>
 
           <div class="field-wrap">
-            <label for="filterVendedora">Vendedora</label>
+            <label for="filterEstado">Estado</label>
+            <select id="filterEstado">
+              <option value="">Todos</option>
+            </select>
+          </div>
+
+          <div class="field-wrap">
+            <label for="filterVendedora">Vendedor(a)</label>
             <select id="filterVendedora">
               <option value="">Todas</option>
             </select>
@@ -425,19 +540,23 @@
               <option value="">Todas</option>
             </select>
           </div>
+        </div>
 
-          <div class="field-wrap">
-            <label for="filterEstado">Estado actual</label>
-            <select id="filterEstado">
-              <option value="">Todos</option>
-            </select>
-          </div>
-
-          <div class="field-wrap">
+        <div class="toolbar-right">
+          <div class="field-wrap search-wide">
             <label for="filterSearch">Buscar</label>
             <input id="filterSearch" type="text" placeholder="Grupo, colegio, cliente..." />
           </div>
 
+          <div class="informe-actions">
+            <button id="btnExportXlsx" class="btn-page sec" type="button">Exportar XLSX</button>
+            <button id="btnActualizar" class="btn-page" type="button">Actualizar</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="page-toolbar informe-toolbar" style="margin-top:-8px;">
+        <div class="toolbar-left">
           <div class="field-wrap">
             <label for="filterPastYears">Histórico</label>
             <select id="filterPastYears">
@@ -447,110 +566,125 @@
           </div>
         </div>
 
-        <!-- ACCIONES -->
-        <div class="informe-actions">
-          <button id="btnActualizar" class="btn-page">Actualizar</button>
-          <button id="btnExportXlsx" class="btn-page sec">Exportar XLSX</button>
-          <button id="btnExportPdf" class="btn-page light">Exportar PDF</button>
-        </div>
-
-        <!-- KPI CARDS -->
-        <section class="cards" id="kpiCards">
-          <div class="card"><div class="empty">Cargando KPIs...</div></div>
-        </section>
-
-        <!-- GRÁFICOS -->
-        <section class="grid-2">
-          <div class="card">
-            <h2 class="section-title">Embudo comercial</h2>
-            <div class="chart-wrap">
-              <canvas id="chartFunnel"></canvas>
-            </div>
+        <div class="toolbar-right">
+          <div></div>
+          <div class="informe-actions">
+            <button id="btnExportPdf" class="btn-page light" type="button">Exportar PDF</button>
           </div>
-
-          <div class="card">
-            <h2 class="section-title">Ganadas por vendedor(a)</h2>
-            <div class="chart-wrap">
-              <canvas id="chartWinsByVendor"></canvas>
-            </div>
-          </div>
-        </section>
-
-        <section class="grid-2">
-          <div class="card">
-            <h2 class="section-title">Reuniones por vendedor(a)</h2>
-            <div class="chart-wrap">
-              <canvas id="chartMeetingsByVendor"></canvas>
-            </div>
-          </div>
-
-          <div class="card">
-            <h2 class="section-title">A contactar por vendedor(a)</h2>
-            <div class="chart-wrap">
-              <canvas id="chartBacklogByVendor"></canvas>
-            </div>
-          </div>
-        </section>
-
-        <!-- TABLA KPI -->
-        <section class="table-card">
-          <div class="table-head">
-            <h2 class="section-title" style="margin:0;">KPIs por vendedor(a)</h2>
-            <div id="vendorTableSummary" class="table-summary">Cargando...</div>
-          </div>
-
-          <div class="table-wrap">
-            <table class="informe-table">
-              <thead>
-                <tr>
-                  <th>Vendedor(a)</th>
-                  <th>Activos</th>
-                  <th>A contactar</th>
-                  <th>Cotizando</th>
-                  <th>Reunión actual</th>
-                  <th>Ganada actual</th>
-                  <th>% reunión actual</th>
-                  <th>% ganada actual</th>
-                  <th>Historial analizado</th>
-                  <th>Llegaron a reunión</th>
-                  <th>Ganadas post-reunión</th>
-                  <th>% llegada a reunión</th>
-                  <th>% cierre tras reunión</th>
-                  <th>Continuidad / territorio</th>
-                  <th>Desempeño actual</th>
-                  <th>Embudo histórico</th>
-                  <th>Disponibilidad</th>
-                  <th>Total score</th>
-                </tr>
-              </thead>
-              <tbody id="tbodyVendors">
-                <tr><td colspan="18"><div class="empty">Cargando vendedores...</div></td></tr>
-              </tbody>
-            </table>
-          </div>
-        </section>
-
-        <!-- ALERTAS -->
-        <section class="alerts">
-          <div class="card">
-            <h2 class="section-title">Alertas de gestión</h2>
-            <ul id="alertList" class="alert-list">
-              <li class="alert-item">Cargando alertas...</li>
-            </ul>
-          </div>
-
-          <div class="card">
-            <h2 class="section-title">Oportunidades comerciales</h2>
-            <ul id="opportunityList" class="alert-list">
-              <li class="alert-item">Cargando oportunidades...</li>
-            </ul>
-          </div>
-        </section>
-
-        <div class="footer-note">
-          Informe generado desde ventas_cotizaciones y ventas_historial. Exportación PDF mediante impresión del navegador.
         </div>
       </div>
+
+      <section class="seguimiento-summary" id="kpiCards">
+        <div class="seguimiento-summary-card">
+          <div class="label">Total</div>
+          <div class="value">0</div>
+          <div class="meta">Cargando KPIs...</div>
+        </div>
+      </section>
+
+      <section class="grid-2">
+        <div class="card">
+          <div class="card-head">
+            <h3 class="section-title">Embudo comercial</h3>
+          </div>
+          <div class="chart-wrap">
+            <canvas id="chartFunnel"></canvas>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-head">
+            <h3 class="section-title">Ganadas por vendedor(a)</h3>
+          </div>
+          <div class="chart-wrap">
+            <canvas id="chartWinsByVendor"></canvas>
+          </div>
+        </div>
+      </section>
+
+      <section class="grid-2">
+        <div class="card">
+          <div class="card-head">
+            <h3 class="section-title">Reuniones por vendedor(a)</h3>
+          </div>
+          <div class="chart-wrap">
+            <canvas id="chartMeetingsByVendor"></canvas>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-head">
+            <h3 class="section-title">A contactar por vendedor(a)</h3>
+          </div>
+          <div class="chart-wrap">
+            <canvas id="chartBacklogByVendor"></canvas>
+          </div>
+        </div>
+      </section>
+
+      <section class="table-card">
+        <div class="table-head">
+          <h3 class="section-title">KPIs por vendedor(a)</h3>
+          <div id="vendorTableSummary" class="table-summary">Cargando...</div>
+        </div>
+
+        <div class="table-wrap">
+          <table class="informe-table">
+            <thead>
+              <tr>
+                <th>Vendedor(a)</th>
+                <th>Activos</th>
+                <th>A contactar</th>
+                <th>Cotizando</th>
+                <th>Reunión actual</th>
+                <th>Ganada actual</th>
+                <th>% reunión actual</th>
+                <th>% ganada actual</th>
+                <th>Historial analizado</th>
+                <th>Llegaron a reunión</th>
+                <th>Ganadas post-reunión</th>
+                <th>% llegada a reunión</th>
+                <th>% cierre tras reunión</th>
+                <th>Continuidad</th>
+                <th>Desempeño</th>
+                <th>Embudo histórico</th>
+                <th>Disponibilidad</th>
+                <th>Total score</th>
+              </tr>
+            </thead>
+            <tbody id="tbodyVendors">
+              <tr>
+                <td colspan="18" class="empty">Cargando vendedores...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="alerts">
+        <div class="card">
+          <div class="card-head">
+            <h3 class="section-title">Alertas de gestión</h3>
+          </div>
+          <ul id="alertList" class="alert-list">
+            <li class="alert-item">Cargando alertas...</li>
+          </ul>
+        </div>
+
+        <div class="card">
+          <div class="card-head">
+            <h3 class="section-title">Oportunidades comerciales</h3>
+          </div>
+          <ul id="opportunityList" class="alert-list">
+            <li class="alert-item">Cargando oportunidades...</li>
+          </ul>
+        </div>
+      </section>
+
+      <div class="footer-note">
+        Informe generado desde ventas_cotizaciones y ventas_historial. Exportación PDF mediante impresión del navegador.
+      </div>
+
     </section>
   </main>
 
