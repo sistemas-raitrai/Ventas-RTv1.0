@@ -307,6 +307,20 @@ function buildHistoryMap(rows = []) {
   return map;
 }
 
+function getYearsSummary(rows = []) {
+  const years = [...new Set(
+    rows
+      .map((row) => getAnoViajeNumber(row))
+      .filter((year) => Number.isFinite(year))
+  )].sort((a, b) => a - b);
+
+  if (!years.length) {
+    return "Años analizados: sin año de viaje detectado";
+  }
+
+  return `Años analizados: ${years.join(", ")}`;
+}
+
 function getScoringPreset(mode = "actual") {
   if (mode === "historico") {
     return { continuity: 20, performance: 20, historical: 45, workload: 15 };
@@ -943,8 +957,10 @@ function exportXlsx(globalKpis, vendorKpis, rows, alerts, opportunities) {
   }
 
   const wb = XLSX.utils.book_new();
+  const yearsSummary = getYearsSummary(rows);
 
   const resumenData = [
+    { KPI: "Años analizados", Valor: yearsSummary.replace("Años analizados: ", "") },
     { KPI: "Total grupos", Valor: globalKpis.total },
     { KPI: "Activos", Valor: globalKpis.activos },
     { KPI: "A contactar", Valor: globalKpis.aContactar },
@@ -1156,6 +1172,10 @@ function renderAll() {
   const vendorKpis = buildVendorKpis(state.filteredRows, state.historyRows);
   const alerts = buildAlerts(state.filteredRows, vendorKpis);
   const opportunities = buildOpportunities(state.filteredRows, vendorKpis);
+  const yearsSummary = getYearsSummary(state.filteredRows);
+  if ($("informeYearsSummary")) {
+    $("informeYearsSummary").textContent = yearsSummary;
+  }
 
   renderCards(globalKpis, vendorKpis);
   renderVendorTable(vendorKpis);
