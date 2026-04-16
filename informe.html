@@ -497,11 +497,11 @@
         <div class="page-title-wrap informe-title-wrap">
           <h2>Informe Comercial</h2>
           <p id="informeScope">Resumen comercial de vendedores, grupos, embudo, alertas y oportunidades.</p>
-          <p id="informeLoadHint" style="margin:6px 0 0;color:#6b6475;font-size:12px;font-weight:700;">
-            Cargando informe...
-          </p>
           <p id="informeYearsSummary" style="margin:6px 0 0;color:#6b6475;font-size:12px;font-weight:700;">
             Años analizados: —
+          </p>
+          <p id="informeLoadHint" style="margin:6px 0 0;color:#6b6475;font-size:12px;font-weight:700;">
+            Cargando informe...
           </p>
         </div>
       </div>
@@ -647,7 +647,7 @@
       <section class="grid-2">
         <div class="card">
           <div class="card-head">
-            <h3 class="section-title">Reuniones por vendedor(a)</h3>
+            <h3 class="section-title">Grupos que llegaron a reunión</h3>
           </div>
           <div class="chart-wrap">
             <canvas id="chartMeetingsByVendor"></canvas>
@@ -695,7 +695,7 @@
             </thead>
             <tbody id="tbodyVendors">
               <tr>
-                <td colspan="18" class="empty">Cargando vendedores...</td>
+                <td colspan="17" class="empty">Cargando vendedores...</td>
               </tr>
             </tbody>
           </table>
@@ -706,6 +706,9 @@
         <div class="card">
           <div class="card-head">
             <h3 class="section-title">Alertas de gestión</h3>
+            <p style="margin:6px 0 0;font-size:12px;color:#6d6480;font-weight:700;">
+              Backlog alto y grupos que podrían estar estancados en cotización.
+            </p>
           </div>
           <ul id="alertList" class="alert-list">
             <li class="alert-item">Cargando alertas...</li>
@@ -715,6 +718,9 @@
         <div class="card">
           <div class="card-head">
             <h3 class="section-title">Oportunidades comerciales</h3>
+            <p style="margin:6px 0 0;font-size:12px;color:#6d6480;font-weight:700;">
+              Cierre post-reunión y grupos sin asignar con potencial de acción.
+            </p>
           </div>
           <ul id="opportunityList" class="alert-list">
             <li class="alert-item">Cargando oportunidades...</li>
