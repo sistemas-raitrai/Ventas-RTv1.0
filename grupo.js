@@ -524,7 +524,13 @@ function canEditDocuments() {
 
 function canEditSchoolName() {
   const rol = String(state.effectiveUser?.rol || "").toLowerCase();
-  return rol === "admin" || rol === "supervision";
+
+  // Regla real de negocio:
+  // solo vendedor no puede cambiar el colegio.
+  if (rol === "vendedor") return false;
+
+  // Si puede modificar el grupo, puede cambiar el colegio.
+  return canEditGroup();
 }
 
 function canManageHistoryItems() {
