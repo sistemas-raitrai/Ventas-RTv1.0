@@ -60,8 +60,8 @@ const state = {
     mode: "actual",
     weights: {
       continuity: 20,
-      performance: 40,
-      historical: 25,
+      performance: 35,
+      historical: 30,
       workload: 15
     }
   },
