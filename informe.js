@@ -183,7 +183,8 @@ function getAnoViajeNumber(row = {}) {
 }
 
 function getCurrentCommercialYear() {
-  return new Date().getFullYear();
+  // Año comercial fijo o configurable
+  return 2026;
 }
 
 function isCurrentOrFutureTravelYear(row = {}) {
@@ -316,7 +317,7 @@ function getScoringPreset(mode = "actual") {
   }
 
   if (mode === "actual") {
-    return { continuity: 20, performance: 45, historical: 25, workload: 10 };
+    explanation = "Este modo analiza el desempeño actual considerando SOLO grupos con año de viaje 2026 en adelante. Prioriza reuniones, avance comercial y conversión a ganadas.";
   }
 
   return { continuity: 20, performance: 40, historical: 25, workload: 15 };
@@ -485,15 +486,19 @@ function calculateContinuityScorePlaceholder(rec = {}) {
 function calculatePerformanceScore(rec = {}) {
   let score = 0;
 
-  score += Math.min(8, rec.currentReunionCount * 1.5);
-  score += Math.min(7, rec.currentGanadaCount * 1.5);
-  score += Math.min(5, rec.currentCotizandoCount * 1.2);
+  // 🔹 Volumen de avance
+  score += Math.min(8, rec.currentReunionCount * 1.8);
+  score += Math.min(7, rec.currentGanadaCount * 2);
 
-  score += rec.reunionRateCurrent * 12;
-  score += rec.ganadaRateCurrent * 10;
+  // 🔹 Calidad de avance (LO MÁS IMPORTANTE)
+  score += rec.reunionRateCurrent * 18;
+  score += rec.ganadaRateCurrent * 12;
 
-  score -= rec.aContactarRateCurrent * 12;
-  score -= Math.min(4, rec.currentAContactarCount * 0.8);
+  // 🔹 Cotizando suma pero menos
+  score += Math.min(4, rec.currentCotizandoCount * 0.8);
+
+  // 🔻 Penalización SOLO por abandono (A contactar)
+  score -= rec.aContactarRateCurrent * 15;
 
   return clamp(Math.round(score), 0, 30);
 }
@@ -501,10 +506,17 @@ function calculatePerformanceScore(rec = {}) {
 function calculateHistoricalFunnelScore(rec = {}) {
   let score = 0;
 
-  score += rec.meetingRateHistorical * 15;
-  score += rec.winAfterMeetingRate * 20;
-  score += Math.min(10, rec.historicalMeetingCount * 0.5);
-  score += Math.min(10, rec.historicalWonAfterMeetingCount * 1);
+  // 🔹 Lo MÁS importante: llegar a reunión
+  score += rec.meetingRateHistorical * 20;
+
+  // 🔹 Segundo: cerrar después de reunión
+  score += rec.winAfterMeetingRate * 25;
+
+  // 🔹 Volumen real trabajado
+  score += Math.min(10, rec.historicalMeetingCount * 0.7);
+
+  // 🔹 Ganadas post reunión
+  score += Math.min(8, rec.historicalWonAfterMeetingCount * 1);
 
   return clamp(Math.round(score), 0, 35);
 }
@@ -616,9 +628,21 @@ function buildVendorKpis(rows = [], historyRows = []) {
     : 0;
 
   list.forEach((rec) => {
-    rec.reunionRateCurrent = safeRate(rec.currentReunionCount, rec.currentPortfolioCount);
+    // Base real del flujo (excluye perdidas)
+    const baseFlujoActual =
+      rec.currentPortfolioCount - rec.currentGanadaCount - rec.perdidaCount;
+    
+    // Evitar negativos
+    const base = Math.max(1, baseFlujoActual);
+    
+    // % que avanzan a reunión
+    rec.reunionRateCurrent = safeRate(rec.currentReunionCount, base);
+    
+    // % que terminan ganados (respecto a cartera total)
     rec.ganadaRateCurrent = safeRate(rec.currentGanadaCount, rec.currentPortfolioCount);
-    rec.aContactarRateCurrent = safeRate(rec.currentAContactarCount, rec.currentPortfolioCount);
+    
+    // backlog
+    rec.aContactarRateCurrent = safeRate(rec.currentAContactarCount, base);
 
     rec.meetingRateHistorical = safeRate(rec.historicalMeetingCount, rec.historicalGroupsAnalyzed);
     rec.winAfterMeetingRate = safeRate(rec.historicalWonAfterMeetingCount, rec.historicalMeetingCount);
@@ -780,7 +804,12 @@ function renderVendorTable(vendorKpis = []) {
       <td>${item.cotizandoCount}</td>
       <td>${item.currentReunionCount}</td>
       <td>${item.currentGanadaCount}</td>
-      <td>${Math.round(item.reunionRateCurrent * 100)}%</td>
+      <td>
+        ${Math.round(item.reunionRateCurrent * 100)}%
+        <small style="display:block;color:#6d6480;">
+          ${item.currentReunionCount} / flujo
+        </small>
+      </td>
       <td>${Math.round(item.ganadaRateCurrent * 100)}%</td>
       <td>${item.historicalGroupsAnalyzed}</td>
       <td>${item.historicalMeetingCount}</td>
