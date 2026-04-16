@@ -457,6 +457,67 @@ function pushUniqueReason(reasons = [], text = "") {
   if (!reasons.includes(text)) reasons.push(text);
 }
 
+function normalizeHistoryText(value = "") {
+  return String(value || "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+}
+
+function extractHistoryDate(item = {}) {
+  const raw = item.fecha || item.fechaOriginal || null;
+
+  if (!raw) return null;
+  if (typeof raw?.toDate === "function") return raw.toDate();
+
+  const d = new Date(raw);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+function detectHistoryEvents(historyItems = []) {
+  let hasMeeting = false;
+  let hasWon = false;
+
+  let meetingDate = null;
+  let wonDate = null;
+
+  historyItems.forEach((item) => {
+    const text = normalizeHistoryText(
+      `${item.asunto || ""} ${item.mensajeLimpio || item.mensaje || ""}`
+    );
+
+    const fecha = extractHistoryDate(item);
+
+    if (text.includes("reunion confirmada")) {
+      hasMeeting = true;
+      if (fecha && (!meetingDate || fecha < meetingDate)) {
+        meetingDate = fecha;
+      }
+    }
+
+    if (text.includes("ganada")) {
+      hasWon = true;
+      if (fecha && (!wonDate || fecha < wonDate)) {
+        wonDate = fecha;
+      }
+    }
+  });
+
+  const wonAfterMeeting = Boolean(
+    hasMeeting &&
+    hasWon &&
+    meetingDate &&
+    wonDate &&
+    wonDate > meetingDate
+  );
+
+  return {
+    hasMeeting,
+    hasWon,
+    wonAfterMeeting
+  };
+}
+
 function normalizeStage(value = "") {
   const raw = normalizeLoose(value);
 
@@ -608,7 +669,15 @@ function createVendorRecommendationBase(vendor = {}) {
     historicalLossRate: 0,
     historicalMeetingRate: 0,
     
+    historicalGroupsAnalyzed: 0,
+    historicalMeetingCount: 0,
+    historicalWonCount: 0,
+    historicalWonAfterMeetingCount: 0,
+    meetingRateHistorical: 0,
+    winAfterMeetingRate: 0,
+    
     historicalScore: 0,
+    historicalFunnelScore: 0,
 
     // Scores
     continuityScore: 0,
@@ -799,6 +868,22 @@ function calculateHistoricalScore(rec = {}) {
   return clamp(Math.round(score), 0, 25);
 }
 
+function calculateHistoricalFunnelScore(rec = {}) {
+  let score = 0;
+
+  // Llegar a reunión pesa mucho
+  score += rec.meetingRateHistorical * 15;
+
+  // De reunión a ganada pesa aún más
+  score += rec.winAfterMeetingRate * 20;
+
+  // Volumen real
+  score += Math.min(10, rec.historicalMeetingCount * 0.5);
+  score += Math.min(10, rec.historicalWonAfterMeetingCount * 1);
+
+  return clamp(Math.round(score), 0, 35);
+}
+
 function calculateWorkloadScore(rec = {}, averages = {}) {
   let score = 12;
 
@@ -876,6 +961,13 @@ function buildVendorRecommendationReasons(rec = {}, averages = {}) {
     pushUniqueReason(
       reasons,
       `Histórico: ${rec.historicalGanadaCount} ganada(s), ${rec.historicalPerdidaCount} perdida(s), ${Math.round(rec.historicalWinRate * 100)}% de efectividad`
+    );
+  }
+
+  if (rec.historicalGroupsAnalyzed > 0) {
+    pushUniqueReason(
+      reasons,
+      `Embudo histórico: ${rec.historicalMeetingCount} grupo(s) llegaron a reunión y ${rec.historicalWonAfterMeetingCount} terminaron ganados después de reunión`
     );
   }
 
@@ -970,12 +1062,27 @@ function getTopProfileRecommendations(allRecommendations = [], selectedVendorEma
   return picks.slice(0, 4);
 }
 
-function analyzeVendorAssignmentRecommendation(sourceRow = {}, selectedVendor = {}) {
+async function analyzeVendorAssignmentRecommendation(sourceRow = {}, selectedVendor = {}) {
   const vendors = getVendorOptions();
   const vendorMap = new Map(
     vendors.map((vendor) => [normalizeEmail(vendor.email || ""), createVendorRecommendationBase(vendor)])
   );
-
+  
+  const historialSnap = await getDocs(collection(db, "ventas_historial"));
+  const historialPorGrupo = new Map();
+  
+  historialSnap.docs.forEach((docSnap) => {
+    const data = docSnap.data() || {};
+    const idGrupo = String(data.idGrupo || "").trim();
+    if (!idGrupo) return;
+  
+    if (!historialPorGrupo.has(idGrupo)) {
+      historialPorGrupo.set(idGrupo, []);
+    }
+  
+    historialPorGrupo.get(idGrupo).push(data);
+  });
+  
   const currentId = getRowId(sourceRow);
   const sourceYear = getAnoViajeNumber(sourceRow);
 
@@ -996,17 +1103,27 @@ function analyzeVendorAssignmentRecommendation(sourceRow = {}, selectedVendor = 
     // SIEMPRE acumulamos carga global del vendedor
     if (candidateVendorKnown && !isSinAsignar(candidate)) {
       const rec = vendorMap.get(candidateVendorEmail);
-
+    
       rec.totalAssignedCount += 1;
-
+    
       // =========================
       // HISTÓRICO (todos los años)
       // =========================
       rec.historicalPortfolioCount += 1;
-      
+    
       if (candidateStage === "ganada") rec.historicalGanadaCount += 1;
       if (candidateStage === "perdida") rec.historicalPerdidaCount += 1;
       if (candidateStage === "reunion_confirmada") rec.historicalReunionCount += 1;
+    
+      const grupoHistorial = historialPorGrupo.get(String(getRowId(candidate))) || [];
+      if (grupoHistorial.length > 0) {
+        const events = detectHistoryEvents(grupoHistorial);
+    
+        rec.historicalGroupsAnalyzed += 1;
+        if (events.hasMeeting) rec.historicalMeetingCount += 1;
+        if (events.hasWon) rec.historicalWonCount += 1;
+        if (events.wonAfterMeeting) rec.historicalWonAfterMeetingCount += 1;
+      }
 
       if (isActiveStage(candidateStage)) rec.totalActiveCount += 1;
       if (candidateStage === "a_contactar") rec.totalAContactarCount += 1;
@@ -1090,7 +1207,21 @@ function analyzeVendorAssignmentRecommendation(sourceRow = {}, selectedVendor = 
     rec.historicalWinRate = safeRate(rec.historicalGanadaCount, rec.historicalClosedCount);
     rec.historicalLossRate = safeRate(rec.historicalPerdidaCount, rec.historicalClosedCount);
     rec.historicalMeetingRate = safeRate(rec.historicalReunionCount, rec.historicalPortfolioCount);
+    
+    rec.meetingRateHistorical = safeRate(
+      rec.historicalMeetingCount,
+      rec.historicalGroupsAnalyzed
+    );
+    
+    rec.winAfterMeetingRate = safeRate(
+      rec.historicalWonAfterMeetingCount,
+      rec.historicalMeetingCount
+    );
+    
     rec.reunionRateCurrent = safeRate(rec.currentReunionCount, rec.currentPortfolioCount);
+    rec.ganadaRateCurrent = safeRate(rec.currentGanadaCount, rec.currentPortfolioCount);
+    rec.cotizandoRateCurrent = safeRate(rec.currentCotizandoCount, rec.currentPortfolioCount);
+    rec.aContactarRateCurrent = safeRate(rec.currentAContactarCount, rec.currentPortfolioCount);
     rec.ganadaRateCurrent = safeRate(rec.currentGanadaCount, rec.currentPortfolioCount);
     rec.cotizandoRateCurrent = safeRate(rec.currentCotizandoCount, rec.currentPortfolioCount);
     rec.aContactarRateCurrent = safeRate(rec.currentAContactarCount, rec.currentPortfolioCount);
@@ -1098,12 +1229,14 @@ function analyzeVendorAssignmentRecommendation(sourceRow = {}, selectedVendor = 
     rec.continuityScore = calculateContinuityScore(rec);
     rec.performanceScore = calculatePerformanceScore(rec);
     rec.historicalScore = calculateHistoricalScore(rec);
+    rec.historicalFunnelScore = calculateHistoricalFunnelScore(rec);
     rec.workloadScore = calculateWorkloadScore(rec, averages);
     
     rec.totalScore = clamp(
       rec.continuityScore +
       rec.performanceScore +
       rec.historicalScore +
+      rec.historicalFunnelScore +
       rec.workloadScore,
       0,
       100
@@ -1561,6 +1694,7 @@ const recommendationsHtml = recommendations.map((item, index) => {
           <div class="assignment-alert-row"><strong>Continuidad / territorio:</strong> ${escapeHtml(String(item.continuityScore || 0))}/45</div>
           <div class="assignment-alert-row"><strong>Desempeño actual:</strong> ${escapeHtml(String(item.performanceScore || 0))}/30</div>
           <div class="assignment-alert-row"><strong>Éxito histórico:</strong> ${escapeHtml(String(item.historicalScore || 0))}/25</div>
+          <div class="assignment-alert-row"><strong>Embudo reunión → ganada:</strong> ${escapeHtml(String(item.historicalFunnelScore || 0))}/35</div>
           <div class="assignment-alert-row"><strong>Disponibilidad:</strong> ${escapeHtml(String(item.workloadScore || 0))}/25</div>
 
           <div class="assignment-alert-row"><strong>Mismo colegio + comuna:</strong> ${escapeHtml(String(item.sameSchoolSameComunaCount || 0))}</div>
@@ -1575,6 +1709,11 @@ const recommendationsHtml = recommendations.map((item, index) => {
           <div class="assignment-alert-row"><strong>Perdidas históricas:</strong> ${escapeHtml(String(item.historicalPerdidaCount || 0))}</div>
           <div class="assignment-alert-row"><strong>% ganada histórica:</strong> ${escapeHtml(String(Math.round((item.historicalWinRate || 0) * 100)))}%</div>
           <div class="assignment-alert-row"><strong>% reunión histórica:</strong> ${escapeHtml(String(Math.round((item.historicalMeetingRate || 0) * 100)))}%</div>
+          <div class="assignment-alert-row"><strong>Grupos con historial analizado:</strong> ${escapeHtml(String(item.historicalGroupsAnalyzed || 0))}</div>
+          <div class="assignment-alert-row"><strong>Llegaron a reunión:</strong> ${escapeHtml(String(item.historicalMeetingCount || 0))}</div>
+          <div class="assignment-alert-row"><strong>Ganadas post-reunión:</strong> ${escapeHtml(String(item.historicalWonAfterMeetingCount || 0))}</div>
+          <div class="assignment-alert-row"><strong>% llegada a reunión:</strong> ${escapeHtml(String(Math.round((item.meetingRateHistorical || 0) * 100)))}%</div>
+          <div class="assignment-alert-row"><strong>% cierre tras reunión:</strong> ${escapeHtml(String(Math.round((item.winAfterMeetingRate || 0) * 100)))}%</div>
           <div class="assignment-alert-row"><strong>Ganadas actuales:</strong> ${escapeHtml(String(item.currentGanadaCount || 0))}</div>
           <div class="assignment-alert-row"><strong>Cotizando actual:</strong> ${escapeHtml(String(item.currentCotizandoCount || 0))}</div>
           <div class="assignment-alert-row"><strong>% reunión actual:</strong> ${escapeHtml(String(Math.round((item.reunionRateCurrent || 0) * 100)))}%</div>
@@ -1985,7 +2124,7 @@ async function saveAssignment(idGrupo) {
       progress: 18
     });
 
-    const analysis = analyzeVendorAssignmentRecommendation(row, vendor);
+    const analysis = await analyzeVendorAssignmentRecommendation(row, vendor);
 
     setProgressStatus({
       text: `Análisis listo`,
