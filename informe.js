@@ -420,7 +420,7 @@ function renderScoringExplanation() {
   let explanation = "";
 
   if (mode === "actual") {
-    explanation = "Este modo analiza el desempeño actual considerando solo grupos con año de viaje 2026 en adelante. Prioriza reuniones, avance comercial, conversión a ganadas y backlog.";
+    explanation = "Este modo analiza el desempeño actual considerando solo grupos con año de viaje 2026 en adelante. Prioriza avance comercial, llegada a reunión, conversión a ganadas y backlog.";
   } else if (mode === "historico") {
     explanation = "Este modo prioriza el historial comercial: cuántos grupos llegan a reunión y cuántos terminan ganados después de reunión.";
   } else if (mode === "asignacion") {
@@ -687,7 +687,7 @@ function buildAlerts(rows = [], vendorKpis = []) {
     .forEach((item) => {
       alerts.push({
         title: `${item.vendorName} tiene backlog alto`,
-        body: `${item.aContactarCount} grupo(s) en "A contactar". Conviene revisar disciplina comercial y priorización.`
+        body: `${item.aContactarCount} grupo(s) siguen en "A contactar". Esto puede indicar falta de gestión o atraso comercial.`
       });
     });
 
@@ -698,7 +698,7 @@ function buildAlerts(rows = [], vendorKpis = []) {
   stagnantCotizando.forEach((row) => {
     alerts.push({
       title: `${row.aliasGrupo || row.colegio || row.idGrupo} sigue cotizando`,
-      body: `Grupo ${row.idGrupo || "—"} · ${row.colegio || "—"} · ${row.vendedora || "Sin asignar"}`
+      body: `Grupo ${row.idGrupo || "—"} · ${row.colegio || "—"} · ${row.vendedora || "Sin asignar"} · Puede requerir seguimiento o definición.`
     });
   });
 
@@ -714,7 +714,7 @@ function buildOpportunities(rows = [], vendorKpis = []) {
     .forEach((item) => {
       opportunities.push({
         title: `${item.vendorName} destaca en cierre post-reunión`,
-        body: `${Math.round(item.winAfterMeetingRate * 100)}% de cierre después de reunión sobre ${item.historicalMeetingCount} grupo(s) con reunión detectada.`
+        body: `${Math.round(item.winAfterMeetingRate * 100)}% de cierre después de reunión sobre ${item.historicalMeetingCount} grupo(s) que llegaron a reunión.`
       });
     });
 
@@ -722,7 +722,7 @@ function buildOpportunities(rows = [], vendorKpis = []) {
   noAssigned.forEach((row) => {
     opportunities.push({
       title: `Grupo sin asignar: ${row.aliasGrupo || row.colegio || row.idGrupo}`,
-      body: `${row.colegio || "—"} · ${row.comunaCiudad || row.comuna || "—"} · Año ${row.anoViaje || "—"}`
+      body: `${row.colegio || "—"} · ${row.comunaCiudad || row.comuna || "—"} · Año ${row.anoViaje || "—"} · Oportunidad de acción comercial inmediata.`
     });
   });
 
@@ -919,7 +919,7 @@ function renderCharts(globalKpis, vendorKpis) {
     data: {
       labels: vendorKpis.map((v) => v.vendorName),
       datasets: [{
-        label: "Reuniones históricas",
+        label: "Grupos que llegaron a reunión",
         data: vendorKpis.map((v) => v.historicalMeetingCount)
       }]
     },
@@ -982,14 +982,14 @@ function exportXlsx(globalKpis, vendorKpis, rows, alerts, opportunities) {
     reunionRateActual: Math.round(v.reunionRateCurrent * 100),
     ganadaRateActual: Math.round(v.ganadaRateCurrent * 100),
     historialAnalizado: v.historicalGroupsAnalyzed,
-    llegaronReunion: v.historicalMeetingCount,
+    coberturaHistorica: Math.round((v.historyCoverageFactor || 0) * 100),
+    gruposQueLlegaronAReunion: v.historicalMeetingCount,
     ganadasPostReunion: v.historicalWonAfterMeetingCount,
     reunionRateHistorico: Math.round(v.meetingRateHistorical * 100),
     cierreTrasReunion: Math.round(v.winAfterMeetingRate * 100),
     continuityScore: v.continuityScore,
     performanceScore: v.performanceScore,
     historicalFunnelScore: v.historicalFunnelScore,
-    workloadScore: v.workloadScore,
     totalScore: v.totalScore
   }));
 
@@ -1167,11 +1167,12 @@ function applyFilters() {
 ========================================================= */
 function renderAll() {
   readScoringInputs();
-  
+
   const globalKpis = computeGlobalKpis(state.filteredRows);
   const vendorKpis = buildVendorKpis(state.filteredRows, state.historyRows);
   const alerts = buildAlerts(state.filteredRows, vendorKpis);
   const opportunities = buildOpportunities(state.filteredRows, vendorKpis);
+
   const yearsSummary = getYearsSummary(state.filteredRows);
   if ($("informeYearsSummary")) {
     $("informeYearsSummary").textContent = yearsSummary;
@@ -1186,7 +1187,8 @@ function renderAll() {
     globalKpis,
     vendorKpis,
     alerts,
-    opportunities
+    opportunities,
+    yearsSummary
   };
 }
 
@@ -1269,8 +1271,8 @@ function bindPageEvents() {
   $("btnExplainScoring")?.addEventListener("click", () => {
     renderScoringExplanation();
     alert(
-      "Continuidad: instalación/comercialidad general y presencia comercial.\n" +
-      "Desempeño: cómo mueve hoy su cartera vigente, especialmente reuniones, avance y backlog.\n" +
+      "Continuidad: instalación y presencia comercial general.\n" +
+      "Desempeño: cómo mueve hoy su cartera vigente, especialmente avance a reunión, ganadas y backlog.\n" +
       "Embudo histórico: cuántos grupos llegaron a reunión y luego a ganada.\n\n" +
       "En este informe, la disponibilidad no suma puntaje. El score prioriza desempeño y resultado comercial. " +
       "El peso histórico además se ajusta automáticamente si la cobertura del vendedor es baja."
