@@ -2983,8 +2983,6 @@ async function saveDatos() {
   const patch = {};
   const cambios = [];
 
-  const { anoBase, cursoViaje, aliasGrupo, aliasTripKey, colegio } = buildDatosAliasPayload();
-
   const destinoSeleccionado = normalizeDestinoCanonical($("d_destinoPrincipal")?.value || "");
   const destinoPrincipalOtro = normalizeTextUpper($("d_destinoPrincipalOtro")?.value || "");
 
@@ -3006,104 +3004,41 @@ async function saveDatos() {
     curso: normalizeCursoInput($("d_curso")?.value || ""),
     anoViaje: parseNumberOrText($("d_anoViaje")?.value),
     cantidadGrupo: parseNumberOrText($("d_cantidadGrupo")?.value),
-  
+
     destinoPrincipal: destinoSeleccionado === "OTRO" ? "OTRO" : normalizeTextUpper(destinoSeleccionado),
     destinoPrincipalOtro: destinoSeleccionado === "OTRO" ? destinoPrincipalOtro : "",
-  
+
     programa: programaSeleccionado === "OTRO" ? "OTRO" : normalizeTextUpper(programaSeleccionado),
     programaOtro: programaSeleccionado === "OTRO" ? programaOtro : "",
-  
+
     tramo: tramoSeleccionado === "OTRO" ? "OTRO" : normalizeTextUpper(tramoSeleccionado),
     tramoOtro: tramoSeleccionado === "OTRO" ? tramoOtro : "",
-  
+
     mesViaje: mesViajeSeleccionado === "OTRO" ? "OTRO" : normalizeTextUpper(mesViajeSeleccionado),
     mesViajeOtro: mesViajeSeleccionado === "OTRO" ? mesViajeOtro : "",
     semanaViaje: mesViajeSeleccionado === "OTRO"
       ? mesViajeOtro
       : normalizeTextUpper(mesViajeSeleccionado),
-  
+
     comunaCiudad: normalizeTextUpper($("d_comunaCiudad")?.value || ""),
-  
+
     nombreCliente: normalizeTextUpper($("d_nombreCliente")?.value || ""),
     rolCliente: normalizeTextUpper($("d_rolCliente")?.value || ""),
     correoCliente: normalizeEmail($("d_correoCliente")?.value || ""),
     celularCliente: sanitizeChileMobileForSave($("d_celularCliente")?.value || ""),
-  
+
     nombreCliente2: normalizeTextUpper($("d_nombreCliente2")?.value || ""),
     rolCliente2: normalizeTextUpper($("d_rolCliente2")?.value || ""),
     correoCliente2: normalizeEmail($("d_correoCliente2")?.value || ""),
     celularCliente2: sanitizeChileMobileForSave($("d_celularCliente2")?.value || "")
   };
 
+  // Blindaje: vendedor puede abrir editar datos, pero no cambiar el nombre del colegio.
   if (!canEditSchoolName()) {
     values.colegio = normalizeTextUpper(state.group?.colegio || "");
   }
 
-  if (!colegio) {
-    alert("No se encontró el colegio del grupo.");
-    return;
-  }
-
-  if (!values.curso) {
-    alert("Debes indicar el curso.");
-    return;
-  }
-
-  if (!hasValidCursoFormat(values.curso)) {
-    alert("El curso debe comenzar con un número válido (1 a 11) y luego puede llevar letras, todo junto y sin espacios. Ejemplo: 4C, 3DAVINCI, 10A.");
-    return;
-  }
-
-  if (!values.anoViaje) {
-    alert("Debes indicar el año del viaje.");
-    return;
-  }
-
-  if (!values.destinoPrincipal) {
-    alert("Debes seleccionar el destino principal.");
-    return;
-  }
-
-  if (values.destinoPrincipal === "OTRO" && !values.destinoPrincipalOtro) {
-    alert("Debes especificar el otro destino principal.");
-    return;
-  }
-
-  if (!values.programa) {
-    alert("Debes seleccionar el programa.");
-    return;
-  }
-
-  if (values.programa === "OTRO" && !values.programaOtro) {
-    alert("Debes especificar el otro programa.");
-    return;
-  }
-
-  if (!values.tramo) {
-    alert("Debes seleccionar el tramo.");
-    return;
-  }
-
-  if (values.tramo === "OTRO" && !values.tramoOtro) {
-    alert("Debes especificar el otro tramo.");
-    return;
-  }
-
-  if (!values.mesViaje) {
-    alert("Debes seleccionar el mes de viaje.");
-    return;
-  }
-
-  if (values.mesViaje === "OTRO" && !values.mesViajeOtro) {
-    alert("Debes especificar el otro mes de viaje.");
-    return;
-  }
-
-  if (!cursoViaje || !aliasGrupo || !aliasTripKey) {
-    alert("No se pudo reconstruir el alias del grupo. Revisa curso y año de viaje.");
-    return;
-  }
-
+  // Detectar cambios reales primero
   for (const path of DATA_FIELDS) {
     const nuevo = values[path];
     const anterior = getByPath(state.group, path);
@@ -3114,28 +3049,168 @@ async function saveDatos() {
     }
   }
 
-  const derivedValues = {
-    anoBaseCurso: String(anoBase),
-    cursoViaje,
-    aliasGrupo,
-    aliasTripKey
-  };
-
-  Object.entries(derivedValues).forEach(([path, nuevo]) => {
-    const anterior = getByPath(state.group, path);
-
-    if (!sameValue(anterior, nuevo)) {
-      setNestedValue(patch, path, nuevo);
-      cambios.push({ campo: path, anterior, nuevo });
-    }
-  });
-
+  // Si no cambió nada, no forzar validaciones ni guardado
   if (!cambios.length) {
     closeModal("modalDatos");
     return;
   }
 
+  const changedFields = new Set(cambios.map((c) => c.campo));
+
+  // Helpers de validación parcial
+  const changed = (field) => changedFields.has(field);
+
+  const changedAny = (...fields) => fields.some((field) => changedFields.has(field));
+
+  // Validar solo lo tocado y sus dependencias directas
+
+  if (changed("colegio") && !values.colegio) {
+    alert("El nombre del colegio no puede quedar vacío.");
+    return;
+  }
+
+  if (changed("curso")) {
+    if (!values.curso) {
+      alert("Si modificas el curso, no puede quedar vacío.");
+      return;
+    }
+
+    if (!hasValidCursoFormat(values.curso)) {
+      alert("El curso debe comenzar con un número válido (1 a 11) y luego puede llevar letras, todo junto y sin espacios. Ejemplo: 4C, 3DAVINCI, 10A.");
+      return;
+    }
+  }
+
+  if (changed("anoViaje") && !values.anoViaje) {
+    alert("Si modificas el año de viaje, no puede quedar vacío.");
+    return;
+  }
+
+  if (changed("destinoPrincipal")) {
+    if (!values.destinoPrincipal) {
+      alert("Si modificas el destino principal, debes seleccionar uno.");
+      return;
+    }
+
+    if (values.destinoPrincipal === "OTRO" && !values.destinoPrincipalOtro) {
+      alert("Debes especificar el otro destino principal.");
+      return;
+    }
+  }
+
+  if (changed("destinoPrincipalOtro")) {
+    const destinoFinal = values.destinoPrincipal;
+    if (destinoFinal === "OTRO" && !values.destinoPrincipalOtro) {
+      alert("Debes especificar el otro destino principal.");
+      return;
+    }
+  }
+
+  if (changed("programa")) {
+    if (!values.programa) {
+      alert("Si modificas el programa, debes seleccionar uno.");
+      return;
+    }
+
+    if (values.programa === "OTRO" && !values.programaOtro) {
+      alert("Debes especificar el otro programa.");
+      return;
+    }
+  }
+
+  if (changed("programaOtro")) {
+    if (values.programa === "OTRO" && !values.programaOtro) {
+      alert("Debes especificar el otro programa.");
+      return;
+    }
+  }
+
+  if (changed("tramo")) {
+    if (!values.tramo) {
+      alert("Si modificas el tramo, debes seleccionar uno.");
+      return;
+    }
+
+    if (values.tramo === "OTRO" && !values.tramoOtro) {
+      alert("Debes especificar el otro tramo.");
+      return;
+    }
+  }
+
+  if (changed("tramoOtro")) {
+    if (values.tramo === "OTRO" && !values.tramoOtro) {
+      alert("Debes especificar el otro tramo.");
+      return;
+    }
+  }
+
+  if (changed("mesViaje")) {
+    if (!values.mesViaje) {
+      alert("Si modificas el mes de viaje, debes seleccionar uno.");
+      return;
+    }
+
+    if (values.mesViaje === "OTRO" && !values.mesViajeOtro) {
+      alert("Debes especificar el otro mes de viaje.");
+      return;
+    }
+  }
+
+  if (changed("mesViajeOtro")) {
+    if (values.mesViaje === "OTRO" && !values.mesViajeOtro) {
+      alert("Debes especificar el otro mes de viaje.");
+      return;
+    }
+  }
+
+  // Recalcular alias solo si cambió alguno de los campos que lo afectan
+  if (changedAny("colegio", "curso", "anoViaje")) {
+    const { anoBase, cursoViaje, aliasGrupo, aliasTripKey } = buildDatosAliasPayload();
+
+    if (!values.colegio) {
+      alert("No se encontró el colegio del grupo.");
+      return;
+    }
+
+    if (!values.curso) {
+      alert("Para reconstruir el alias, el curso no puede quedar vacío.");
+      return;
+    }
+
+    if (!hasValidCursoFormat(values.curso)) {
+      alert("El curso debe comenzar con un número válido (1 a 11) y luego puede llevar letras, todo junto y sin espacios. Ejemplo: 4C, 3DAVINCI, 10A.");
+      return;
+    }
+
+    if (!values.anoViaje) {
+      alert("Para reconstruir el alias, el año de viaje no puede quedar vacío.");
+      return;
+    }
+
+    if (!cursoViaje || !aliasGrupo || !aliasTripKey) {
+      alert("No se pudo reconstruir el alias del grupo. Revisa colegio, curso y año de viaje.");
+      return;
+    }
+
+    const derivedValues = {
+      anoBaseCurso: String(anoBase),
+      cursoViaje,
+      aliasGrupo,
+      aliasTripKey
+    };
+
+    Object.entries(derivedValues).forEach(([path, nuevo]) => {
+      const anterior = getByPath(state.group, path);
+
+      if (!sameValue(anterior, nuevo)) {
+        setNestedValue(patch, path, nuevo);
+        cambios.push({ campo: path, anterior, nuevo });
+      }
+    });
+  }
+
   await applyCriticalChangeRules(patch, cambios);
+
   await saveGroupPatch(patch, {
     tipoMovimiento: "edicion_datos",
     modulo: "grupo",
