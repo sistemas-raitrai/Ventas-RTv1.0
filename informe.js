@@ -65,6 +65,10 @@ const state = {
       workload: 15
     }
   },
+  evidences: {
+    alerts: [],
+    opportunities: []
+  },
   lastRender: null
 };
 
@@ -291,6 +295,60 @@ function fillSelect(selectId, values = [], placeholder = "Todos") {
 
 function destroyChart(chart) {
   if (chart) chart.destroy();
+}
+
+function getGrupoHref(row = {}) {
+  const idGrupo = getRowId(row);
+  return idGrupo ? `grupo.html?id=${encodeURIComponent(idGrupo)}` : "#";
+}
+
+function openEvidenceModal({ title = "", subtitle = "", meta = [], rows = [] } = {}) {
+  const modal = $("evidenceModal");
+  const titleEl = $("evidenceTitle");
+  const subtitleEl = $("evidenceSubtitle");
+  const metaEl = $("evidenceMeta");
+  const contentEl = $("evidenceContent");
+
+  if (!modal || !titleEl || !subtitleEl || !metaEl || !contentEl) return;
+
+  titleEl.textContent = title || "Detalle";
+  subtitleEl.textContent = subtitle || "Fundamento del análisis";
+
+  metaEl.innerHTML = (meta || [])
+    .filter(Boolean)
+    .map((item) => `<span class="evidence-chip">${item}</span>`)
+    .join("");
+
+  if (!rows.length) {
+    contentEl.innerHTML = `<div class="empty">No hay grupos para mostrar.</div>`;
+  } else {
+    contentEl.innerHTML = rows.map((row) => `
+      <div class="evidence-row">
+        <div class="evidence-row-top">
+          <div>
+            <div class="evidence-row-title">${row.aliasGrupo || row.colegio || row.idGrupo || "Grupo sin nombre"}</div>
+            <div class="evidence-row-sub">
+              ID ${row.idGrupo || "—"} · ${row.colegio || "—"} · ${row.comunaCiudad || row.comuna || "—"} · Año ${row.anoViaje || "—"}
+            </div>
+            <div class="evidence-row-sub">
+              Estado: ${row.estado || "—"} · Vendedora: ${row.vendedora || "Sin asignar"}
+            </div>
+          </div>
+          <a class="evidence-row-link" href="${getGrupoHref(row)}">Abrir grupo</a>
+        </div>
+      </div>
+    `).join("");
+  }
+
+  modal.classList.remove("hidden");
+  document.body.style.overflow = "hidden";
+}
+
+function closeEvidenceModal() {
+  const modal = $("evidenceModal");
+  if (!modal) return;
+  modal.classList.add("hidden");
+  document.body.style.overflow = "";
 }
 
 const CHART_PURPLE = "rgba(123, 87, 196, 0.72)";
@@ -688,9 +746,21 @@ function buildAlerts(rows = [], vendorKpis = []) {
     .filter((item) => item.aContactarCount >= 5)
     .slice(0, 5)
     .forEach((item) => {
+      const evidenceRows = rows.filter((row) => {
+        return normalizeText(row.vendedora) === normalizeText(item.vendorName) &&
+          normalizeStage(row.estado || "") === "a_contactar";
+      });
+
       alerts.push({
         title: `${item.vendorName} tiene backlog alto`,
-        body: `${item.aContactarCount} grupo(s) siguen en "A contactar". Esto puede indicar falta de gestión o atraso comercial.`
+        body: `${item.aContactarCount} grupo(s) siguen en "A contactar". Esto puede indicar falta de gestión o atraso comercial.`,
+        subtitle: "Fundamento: grupos actuales filtrados con estado A contactar para esta vendedora.",
+        meta: [
+          `Regla: backlog alto`,
+          `Vendedora: ${item.vendorName}`,
+          `Total: ${item.aContactarCount}`
+        ],
+        evidenceRows
       });
     });
 
@@ -701,7 +771,14 @@ function buildAlerts(rows = [], vendorKpis = []) {
   stagnantCotizando.forEach((row) => {
     alerts.push({
       title: `${row.aliasGrupo || row.colegio || row.idGrupo} sigue cotizando`,
-      body: `Grupo ${row.idGrupo || "—"} · ${row.colegio || "—"} · ${row.vendedora || "Sin asignar"} · Puede requerir seguimiento o definición.`
+      body: `Grupo ${row.idGrupo || "—"} · ${row.colegio || "—"} · ${row.vendedora || "Sin asignar"} · Puede requerir seguimiento o definición.`,
+      subtitle: "Fundamento: grupo filtrado cuyo estado actual es Cotizando.",
+      meta: [
+        `Regla: posible estancamiento`,
+        `Estado: Cotizando`,
+        `Vendedora: ${row.vendedora || "Sin asignar"}`
+      ],
+      evidenceRows: [row]
     });
   });
 
@@ -715,9 +792,21 @@ function buildOpportunities(rows = [], vendorKpis = []) {
     .filter((item) => item.winAfterMeetingRate >= 0.4 && item.historicalMeetingCount >= 2)
     .slice(0, 5)
     .forEach((item) => {
+      const evidenceRows = rows.filter((row) => {
+        return normalizeText(row.vendedora) === normalizeText(item.vendorName);
+      });
+
       opportunities.push({
         title: `${item.vendorName} destaca en cierre post-reunión`,
-        body: `${Math.round(item.winAfterMeetingRate * 100)}% de cierre después de reunión sobre ${item.historicalMeetingCount} grupo(s) que llegaron a reunión.`
+        body: `${Math.round(item.winAfterMeetingRate * 100)}% de cierre después de reunión sobre ${item.historicalMeetingCount} grupo(s) que llegaron a reunión.`,
+        subtitle: "Fundamento: KPI histórico construido desde ventas_historial detectando paso por Reunión confirmada y luego Ganada.",
+        meta: [
+          `Regla: cierre post-reunión`,
+          `Vendedora: ${item.vendorName}`,
+          `% cierre: ${Math.round(item.winAfterMeetingRate * 100)}%`,
+          `Base: ${item.historicalMeetingCount} grupo(s)`
+        ],
+        evidenceRows
       });
     });
 
@@ -725,7 +814,14 @@ function buildOpportunities(rows = [], vendorKpis = []) {
   noAssigned.forEach((row) => {
     opportunities.push({
       title: `Grupo sin asignar: ${row.aliasGrupo || row.colegio || row.idGrupo}`,
-      body: `${row.colegio || "—"} · ${row.comunaCiudad || row.comuna || "—"} · Año ${row.anoViaje || "—"} · Oportunidad de acción comercial inmediata.`
+      body: `${row.colegio || "—"} · ${row.comunaCiudad || row.comuna || "—"} · Año ${row.anoViaje || "—"} · Oportunidad de acción comercial inmediata.`,
+      subtitle: "Fundamento: grupo filtrado sin vendedora asignada o marcado como requiere asignación.",
+      meta: [
+        `Regla: sin asignar`,
+        `Comuna: ${row.comunaCiudad || row.comuna || "—"}`,
+        `Año: ${row.anoViaje || "—"}`
+      ],
+      evidenceRows: [row]
     });
   });
 
@@ -848,12 +944,29 @@ function renderAlerts(alerts = [], opportunities = []) {
   const alertList = $("alertList");
   const opportunityList = $("opportunityList");
 
+  state.evidences.alerts = alerts;
+  state.evidences.opportunities = opportunities;
+
   if (alertList) {
     alertList.innerHTML = alerts.length
-      ? alerts.map((item) => `
+      ? alerts.map((item, index) => `
           <li class="alert-item">
-            <strong>${item.title}</strong><br />
-            ${item.body}
+            <div class="alert-main">
+              <div>
+                <strong>${item.title}</strong><br />
+                ${item.body}
+              </div>
+            </div>
+            <div class="alert-actions">
+              <button
+                class="alert-open-btn"
+                type="button"
+                data-evidence-type="alert"
+                data-evidence-index="${index}"
+              >
+                Ver grupos
+              </button>
+            </div>
           </li>
         `).join("")
       : `<li class="alert-item">Sin alertas destacadas.</li>`;
@@ -861,14 +974,49 @@ function renderAlerts(alerts = [], opportunities = []) {
 
   if (opportunityList) {
     opportunityList.innerHTML = opportunities.length
-      ? opportunities.map((item) => `
+      ? opportunities.map((item, index) => `
           <li class="alert-item">
-            <strong>${item.title}</strong><br />
-            ${item.body}
+            <div class="alert-main">
+              <div>
+                <strong>${item.title}</strong><br />
+                ${item.body}
+              </div>
+            </div>
+            <div class="alert-actions">
+              <button
+                class="alert-open-btn"
+                type="button"
+                data-evidence-type="opportunity"
+                data-evidence-index="${index}"
+              >
+                Ver grupos
+              </button>
+            </div>
           </li>
         `).join("")
       : `<li class="alert-item">Sin oportunidades destacadas.</li>`;
   }
+
+  document.querySelectorAll("[data-evidence-type]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const type = btn.getAttribute("data-evidence-type");
+      const index = Number(btn.getAttribute("data-evidence-index") || -1);
+
+      const source =
+        type === "alert"
+          ? state.evidences.alerts[index]
+          : state.evidences.opportunities[index];
+
+      if (!source) return;
+
+      openEvidenceModal({
+        title: source.title,
+        subtitle: source.subtitle,
+        meta: source.meta,
+        rows: source.evidenceRows || []
+      });
+    });
+  });
 }
 
 function renderChart(chartKey, canvasId, config) {
@@ -1424,6 +1572,20 @@ function bindPageEvents() {
       "En este informe, la disponibilidad no suma puntaje. El score prioriza desempeño y resultado comercial. " +
       "El peso histórico además se ajusta automáticamente si la cobertura del vendedor es baja."
     );
+  });
+
+  $("btnCloseEvidence")?.addEventListener("click", () => {
+    closeEvidenceModal();
+  });
+
+  document.querySelectorAll("[data-close-evidence='1']").forEach((el) => {
+    el.addEventListener("click", () => {
+      closeEvidenceModal();
+    });
+  });
+
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") closeEvidenceModal();
   });
 }
 
