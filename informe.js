@@ -67,7 +67,10 @@ const state = {
   },
   evidences: {
     alerts: [],
-    opportunities: []
+    opportunities: [],
+    kpis: {},
+    vendors: {},
+    charts: {}
   },
   lastRender: null
 };
@@ -349,6 +352,70 @@ function closeEvidenceModal() {
   if (!modal) return;
   modal.classList.add("hidden");
   document.body.style.overflow = "";
+}
+
+function getVendorRows(rows = [], vendorName = "") {
+  return rows.filter((row) => normalizeText(row.vendedora) === normalizeText(vendorName));
+}
+
+function getRowsByStage(rows = [], stageKey = "") {
+  return rows.filter((row) => normalizeStage(row.estado || "") === stageKey);
+}
+
+function getRowsWithMeetingHistory(rows = [], historyRows = [], vendorName = "") {
+  const historyMap = buildHistoryMap(historyRows);
+
+  return rows.filter((row) => {
+    if (vendorName && normalizeText(row.vendedora) !== normalizeText(vendorName)) return false;
+    const groupHistory = historyMap.get(String(getRowId(row))) || [];
+    const events = detectHistoryEvents(groupHistory);
+    return events.hasMeeting;
+  });
+}
+
+function getRowsWonAfterMeeting(rows = [], historyRows = [], vendorName = "") {
+  const historyMap = buildHistoryMap(historyRows);
+
+  return rows.filter((row) => {
+    if (vendorName && normalizeText(row.vendedora) !== normalizeText(vendorName)) return false;
+    const groupHistory = historyMap.get(String(getRowId(row))) || [];
+    const events = detectHistoryEvents(groupHistory);
+    return events.wonAfterMeeting;
+  });
+}
+
+function registerKpiEvidence(key, payload) {
+  state.evidences.kpis[key] = payload;
+}
+
+function registerVendorEvidence(vendorName, payload) {
+  state.evidences.vendors[normalizeText(vendorName)] = payload;
+}
+
+function registerChartEvidence(chartKey, payloads = []) {
+  state.evidences.charts[chartKey] = payloads;
+}
+
+function openRegisteredKpiEvidence(key) {
+  const payload = state.evidences.kpis[key];
+  if (!payload) return;
+
+  openEvidenceModal(payload);
+}
+
+function openRegisteredVendorEvidence(vendorName = "") {
+  const payload = state.evidences.vendors[normalizeText(vendorName)];
+  if (!payload) return;
+
+  openEvidenceModal(payload);
+}
+
+function openRegisteredChartEvidence(chartKey, index) {
+  const payloads = state.evidences.charts[chartKey] || [];
+  const payload = payloads[index];
+  if (!payload) return;
+
+  openEvidenceModal(payload);
 }
 
 const CHART_PURPLE = "rgba(123, 87, 196, 0.72)";
@@ -838,56 +905,155 @@ function renderCards(globalKpis, vendorKpis) {
   const bestCloser = vendorKpis[0];
   const bestMeeting = [...vendorKpis].sort((a, b) => b.historicalMeetingCount - a.historicalMeetingCount)[0];
 
+  const allRows = state.filteredRows;
+  const historyRows = state.historyRows;
+
+  registerKpiEvidence("total", {
+    title: "Total de grupos filtrados",
+    subtitle: "Fundamento: todas las filas que cumplen los filtros actuales.",
+    meta: [
+      `Regla: total filtrado`,
+      `${allRows.length} grupo(s)`,
+      getYearsSummary(allRows)
+    ],
+    rows: allRows
+  });
+
+  registerKpiEvidence("activos", {
+    title: "Grupos activos",
+    subtitle: "Fundamento: grupos cuyo estado actual no es Ganada ni Perdida.",
+    meta: [
+      `Regla: activos`,
+      `${globalKpis.activos} grupo(s)`
+    ],
+    rows: allRows.filter((row) => {
+      const stage = normalizeStage(row.estado || "");
+      return stage !== "ganada" && stage !== "perdida";
+    })
+  });
+
+  registerKpiEvidence("a_contactar", {
+    title: "Grupos en A contactar",
+    subtitle: "Fundamento: grupos filtrados cuyo estado actual es A contactar.",
+    meta: [
+      `Regla: A contactar`,
+      `${globalKpis.aContactar} grupo(s)`
+    ],
+    rows: getRowsByStage(allRows, "a_contactar")
+  });
+
+  registerKpiEvidence("reunion", {
+    title: "Grupos en Reunión confirmada",
+    subtitle: "Fundamento: grupos filtrados cuyo estado actual es Reunión confirmada.",
+    meta: [
+      `Regla: Reunión confirmada`,
+      `${globalKpis.reunion} grupo(s)`
+    ],
+    rows: getRowsByStage(allRows, "reunion_confirmada")
+  });
+
+  registerKpiEvidence("ganada", {
+    title: "Grupos ganados",
+    subtitle: "Fundamento: grupos filtrados cuyo estado actual es Ganada.",
+    meta: [
+      `Regla: Ganada`,
+      `${globalKpis.ganada} grupo(s)`
+    ],
+    rows: getRowsByStage(allRows, "ganada")
+  });
+
+  registerKpiEvidence("sin_asignar", {
+    title: "Grupos sin asignar",
+    subtitle: "Fundamento: grupos filtrados sin vendedora o marcados como requiere asignación.",
+    meta: [
+      `Regla: sin asignar`,
+      `${globalKpis.sinAsignar} grupo(s)`
+    ],
+    rows: allRows.filter((row) => isSinAsignar(row))
+  });
+
+  if (bestCloser) {
+    registerKpiEvidence("mejor_score", {
+      title: `Mejor score: ${bestCloser.vendorName}`,
+      subtitle: "Fundamento: mejor total score bajo la ponderación actual.",
+      meta: [
+        `Vendedora: ${bestCloser.vendorName}`,
+        `Score: ${bestCloser.totalScore}`,
+        `Cobertura hist.: ${Math.round((bestCloser.historyCoverageFactor || 0) * 100)}%`
+      ],
+      rows: getVendorRows(allRows, bestCloser.vendorName)
+    });
+  }
+
+  if (bestMeeting) {
+    registerKpiEvidence("mas_reuniones", {
+      title: `Más grupos que llegaron a reunión: ${bestMeeting.vendorName}`,
+      subtitle: "Fundamento: grupos cuyo historial muestra paso por Reunión confirmada.",
+      meta: [
+        `Vendedora: ${bestMeeting.vendorName}`,
+        `Total: ${bestMeeting.historicalMeetingCount} grupo(s)`
+      ],
+      rows: getRowsWithMeetingHistory(allRows, historyRows, bestMeeting.vendorName)
+    });
+  }
+
   renderScoringExplanation();
+
   el.innerHTML = `
-    <div class="seguimiento-summary-card">
+    <div class="seguimiento-summary-card clickable" data-kpi-key="total">
       <div class="label">Total</div>
       <div class="value">${globalKpis.total}</div>
       <div class="meta">Grupos filtrados</div>
     </div>
 
-    <div class="seguimiento-summary-card">
+    <div class="seguimiento-summary-card clickable" data-kpi-key="activos">
       <div class="label">Activos</div>
       <div class="value">${globalKpis.activos}</div>
       <div class="meta">Sin ganada / perdida</div>
     </div>
 
-    <div class="seguimiento-summary-card">
+    <div class="seguimiento-summary-card clickable" data-kpi-key="a_contactar">
       <div class="label">A contactar</div>
       <div class="value">${globalKpis.aContactar}</div>
       <div class="meta">Pendientes por gestionar</div>
     </div>
 
-    <div class="seguimiento-summary-card">
+    <div class="seguimiento-summary-card clickable" data-kpi-key="reunion">
       <div class="label">Reunión</div>
       <div class="value">${globalKpis.reunion}</div>
       <div class="meta">${Math.round(globalKpis.reunionRate * 100)}% del total</div>
     </div>
 
-    <div class="seguimiento-summary-card">
+    <div class="seguimiento-summary-card clickable" data-kpi-key="ganada">
       <div class="label">Ganadas</div>
       <div class="value">${globalKpis.ganada}</div>
       <div class="meta">${Math.round(globalKpis.winAfterMeetingApprox * 100)}% vs reuniones actuales</div>
     </div>
 
-    <div class="seguimiento-summary-card">
+    <div class="seguimiento-summary-card clickable" data-kpi-key="sin_asignar">
       <div class="label">Sin asignar</div>
       <div class="value">${globalKpis.sinAsignar}</div>
       <div class="meta">Oportunidades por distribuir</div>
     </div>
 
-    <div class="seguimiento-summary-card">
+    <div class="seguimiento-summary-card clickable" data-kpi-key="mejor_score">
       <div class="label">Mejor score</div>
       <div class="value">${bestCloser ? bestCloser.totalScore : 0}</div>
       <div class="meta">${bestCloser ? bestCloser.vendorName : "Sin datos"}</div>
     </div>
 
-    <div class="seguimiento-summary-card">
+    <div class="seguimiento-summary-card clickable" data-kpi-key="mas_reuniones">
       <div class="label">Más reuniones</div>
       <div class="value">${bestMeeting ? bestMeeting.historicalMeetingCount : 0}</div>
       <div class="meta">${bestMeeting ? bestMeeting.vendorName : "Sin datos"}</div>
     </div>
   `;
+
+  el.querySelectorAll("[data-kpi-key]").forEach((card) => {
+    card.addEventListener("click", () => {
+      openRegisteredKpiEvidence(card.getAttribute("data-kpi-key") || "");
+    });
+  });
 }
 
 function renderVendorTable(vendorKpis = []) {
@@ -902,8 +1068,24 @@ function renderVendorTable(vendorKpis = []) {
     return;
   }
 
+  vendorKpis.forEach((item) => {
+    registerVendorEvidence(item.vendorName, {
+      title: `Detalle de ${item.vendorName}`,
+      subtitle: "Fundamento: grupos filtrados asignados a esta vendedora y KPIs calculados sobre ellos.",
+      meta: [
+        `Activos: ${item.activeCount}`,
+        `A contactar: ${item.aContactarCount}`,
+        `Cotizando: ${item.cotizandoCount}`,
+        `Reunión hist.: ${item.historicalMeetingCount}`,
+        `Ganadas post-reunión: ${item.historicalWonAfterMeetingCount}`,
+        `Score: ${item.totalScore}`
+      ],
+      rows: getVendorRows(state.filteredRows, item.vendorName)
+    });
+  });
+
   tbody.innerHTML = vendorKpis.map((item) => `
-    <tr>
+    <tr class="vendor-clickable" data-vendor-name="${item.vendorName}">
       <td>
         <div class="vendor-cell">
           <strong>${item.vendorName || item.vendorEmail}</strong>
@@ -938,6 +1120,12 @@ function renderVendorTable(vendorKpis = []) {
       </td>
     </tr>
   `).join("");
+
+  tbody.querySelectorAll("[data-vendor-name]").forEach((row) => {
+    row.addEventListener("click", () => {
+      openRegisteredVendorEvidence(row.getAttribute("data-vendor-name") || "");
+    });
+  });
 }
 
 function renderAlerts(alerts = [], opportunities = []) {
@@ -1028,6 +1216,72 @@ function renderChart(chartKey, canvasId, config) {
 }
 
 function renderCharts(globalKpis, vendorKpis) {
+  const allRows = state.filteredRows;
+  const historyRows = state.historyRows;
+
+  registerChartEvidence("funnel", [
+    {
+      title: "Embudo · A contactar",
+      subtitle: "Fundamento: grupos filtrados cuyo estado actual es A contactar.",
+      meta: [`Regla: A contactar`, `${globalKpis.aContactar} grupo(s)`],
+      rows: getRowsByStage(allRows, "a_contactar")
+    },
+    {
+      title: "Embudo · Contactado",
+      subtitle: "Fundamento: grupos filtrados cuyo estado actual es Contactado.",
+      meta: [`Regla: Contactado`, `${globalKpis.contactado} grupo(s)`],
+      rows: getRowsByStage(allRows, "contactado")
+    },
+    {
+      title: "Embudo · Cotizando",
+      subtitle: "Fundamento: grupos filtrados cuyo estado actual es Cotizando.",
+      meta: [`Regla: Cotizando`, `${globalKpis.cotizando} grupo(s)`],
+      rows: getRowsByStage(allRows, "cotizando")
+    },
+    {
+      title: "Embudo · Reunión confirmada",
+      subtitle: "Fundamento: grupos filtrados cuyo estado actual es Reunión confirmada.",
+      meta: [`Regla: Reunión confirmada`, `${globalKpis.reunion} grupo(s)`],
+      rows: getRowsByStage(allRows, "reunion_confirmada")
+    },
+    {
+      title: "Embudo · Ganada",
+      subtitle: "Fundamento: grupos filtrados cuyo estado actual es Ganada.",
+      meta: [`Regla: Ganada`, `${globalKpis.ganada} grupo(s)`],
+      rows: getRowsByStage(allRows, "ganada")
+    }
+  ]);
+
+  registerChartEvidence("winsByVendor", vendorKpis.map((item) => ({
+    title: `Ganadas actuales · ${item.vendorName}`,
+    subtitle: "Fundamento: grupos actuales filtrados en estado Ganada para esta vendedora.",
+    meta: [
+      `Vendedora: ${item.vendorName}`,
+      `Ganadas actuales: ${item.currentGanadaCount}`
+    ],
+    rows: getVendorRows(allRows, item.vendorName).filter((row) => normalizeStage(row.estado || "") === "ganada")
+  })));
+
+  registerChartEvidence("meetingsByVendor", vendorKpis.map((item) => ({
+    title: `Grupos que llegaron a reunión · ${item.vendorName}`,
+    subtitle: "Fundamento: grupos cuyo historial contiene paso por Reunión confirmada.",
+    meta: [
+      `Vendedora: ${item.vendorName}`,
+      `Total: ${item.historicalMeetingCount} grupo(s)`
+    ],
+    rows: getRowsWithMeetingHistory(allRows, historyRows, item.vendorName)
+  })));
+
+  registerChartEvidence("backlogByVendor", vendorKpis.map((item) => ({
+    title: `A contactar · ${item.vendorName}`,
+    subtitle: "Fundamento: grupos filtrados cuyo estado actual es A contactar para esta vendedora.",
+    meta: [
+      `Vendedora: ${item.vendorName}`,
+      `Total: ${item.aContactarCount} grupo(s)`
+    ],
+    rows: getVendorRows(allRows, item.vendorName).filter((row) => normalizeStage(row.estado || "") === "a_contactar")
+  })));
+
   renderChart("funnel", "chartFunnel", {
     type: "bar",
     data: {
@@ -1050,13 +1304,15 @@ function renderCharts(globalKpis, vendorKpis) {
     options: {
       responsive: true,
       maintainAspectRatio: false,
+      onClick: (_, elements) => {
+        if (!elements?.length) return;
+        openRegisteredChartEvidence("funnel", elements[0].index);
+      },
       plugins: {
         legend: {
           labels: {
             color: "#4a3b63",
-            font: {
-              weight: "700"
-            }
+            font: { weight: "700" }
           }
         }
       },
@@ -1064,9 +1320,7 @@ function renderCharts(globalKpis, vendorKpis) {
         x: {
           ticks: {
             color: "#5f556f",
-            font: {
-              size: 12
-            }
+            font: { size: 12 }
           },
           grid: {
             color: "rgba(95, 59, 140, 0.08)"
@@ -1074,9 +1328,7 @@ function renderCharts(globalKpis, vendorKpis) {
         },
         y: {
           beginAtZero: true,
-          ticks: {
-            color: "#5f556f"
-          },
+          ticks: { color: "#5f556f" },
           grid: {
             color: "rgba(95, 59, 140, 0.08)"
           }
@@ -1102,22 +1354,22 @@ function renderCharts(globalKpis, vendorKpis) {
       indexAxis: "y",
       responsive: true,
       maintainAspectRatio: false,
+      onClick: (_, elements) => {
+        if (!elements?.length) return;
+        openRegisteredChartEvidence("winsByVendor", elements[0].index);
+      },
       plugins: {
         legend: {
           labels: {
             color: "#4a3b63",
-            font: {
-              weight: "700"
-            }
+            font: { weight: "700" }
           }
         }
       },
       scales: {
         x: {
           beginAtZero: true,
-          ticks: {
-            color: "#5f556f"
-          },
+          ticks: { color: "#5f556f" },
           grid: {
             color: "rgba(95, 59, 140, 0.08)"
           }
@@ -1125,13 +1377,9 @@ function renderCharts(globalKpis, vendorKpis) {
         y: {
           ticks: {
             color: "#5f556f",
-            font: {
-              size: 12
-            }
+            font: { size: 12 }
           },
-          grid: {
-            display: false
-          }
+          grid: { display: false }
         }
       }
     }
@@ -1154,22 +1402,22 @@ function renderCharts(globalKpis, vendorKpis) {
       indexAxis: "y",
       responsive: true,
       maintainAspectRatio: false,
+      onClick: (_, elements) => {
+        if (!elements?.length) return;
+        openRegisteredChartEvidence("meetingsByVendor", elements[0].index);
+      },
       plugins: {
         legend: {
           labels: {
             color: "#4a3b63",
-            font: {
-              weight: "700"
-            }
+            font: { weight: "700" }
           }
         }
       },
       scales: {
         x: {
           beginAtZero: true,
-          ticks: {
-            color: "#5f556f"
-          },
+          ticks: { color: "#5f556f" },
           grid: {
             color: "rgba(95, 59, 140, 0.08)"
           }
@@ -1177,13 +1425,9 @@ function renderCharts(globalKpis, vendorKpis) {
         y: {
           ticks: {
             color: "#5f556f",
-            font: {
-              size: 12
-            }
+            font: { size: 12 }
           },
-          grid: {
-            display: false
-          }
+          grid: { display: false }
         }
       }
     }
@@ -1206,22 +1450,22 @@ function renderCharts(globalKpis, vendorKpis) {
       indexAxis: "y",
       responsive: true,
       maintainAspectRatio: false,
+      onClick: (_, elements) => {
+        if (!elements?.length) return;
+        openRegisteredChartEvidence("backlogByVendor", elements[0].index);
+      },
       plugins: {
         legend: {
           labels: {
             color: "#4a3b63",
-            font: {
-              weight: "700"
-            }
+            font: { weight: "700" }
           }
         }
       },
       scales: {
         x: {
           beginAtZero: true,
-          ticks: {
-            color: "#5f556f"
-          },
+          ticks: { color: "#5f556f" },
           grid: {
             color: "rgba(95, 59, 140, 0.08)"
           }
@@ -1229,13 +1473,9 @@ function renderCharts(globalKpis, vendorKpis) {
         y: {
           ticks: {
             color: "#5f556f",
-            font: {
-              size: 12
-            }
+            font: { size: 12 }
           },
-          grid: {
-            display: false
-          }
+          grid: { display: false }
         }
       }
     }
