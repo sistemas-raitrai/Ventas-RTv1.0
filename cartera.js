@@ -7,7 +7,10 @@ import {
   setDoc,
   deleteDoc,
   writeBatch,
-  serverTimestamp
+  serverTimestamp,
+  query,
+  orderBy,
+  limit
 } from "https://www.gstatic.com/firebasejs/11.7.3/firebase-firestore.js";
 
 import {
@@ -280,6 +283,63 @@ function getHistoryCollectionRef(correoVendedor = "", numeroColegio = "") {
     String(numeroColegio),
     "historial"
   );
+}
+
+async function getNextNumeroColegioForVendor(correoVendedor = "") {
+  const email = normalizeEmail(correoVendedor);
+  if (!email) return "";
+
+  const snap = await getDocs(collection(db, "ventas_cartera", email, "items"));
+
+  let maxNumero = 0;
+
+  snap.forEach((docSnap) => {
+    const data = docSnap.data() || {};
+    const raw = String(data.numeroColegio || docSnap.id || "").trim();
+    const num = Number(raw.replace(/[^\d]/g, ""));
+    if (Number.isFinite(num) && num > maxNumero) {
+      maxNumero = num;
+    }
+  });
+
+  return String(maxNumero + 1);
+}
+
+function buildVendorDisplayNameFromRow(row = {}) {
+  return normalizeText(
+    `${row.nombreVendedor || ""} ${row.apellidoVendedor || ""}`.trim()
+  );
+}
+
+async function syncNumeroColegioInputForSelectedVendor() {
+  const numeroInput = $("numeroColegioInput");
+  const vendedorSelect = $("vendedorSelectModal");
+
+  if (!numeroInput || !vendedorSelect) return;
+
+  const selectedEmail = normalizeEmail(vendedorSelect.value || "");
+  if (!selectedEmail) {
+    if (state.modalMode === "create") numeroInput.value = "";
+    return;
+  }
+
+  // En creación: siempre se calcula automáticamente
+  if (state.modalMode === "create") {
+    const nextNumero = await getNextNumeroColegioForVendor(selectedEmail);
+    numeroInput.value = nextNumero || "";
+    return;
+  }
+
+  // En edición: si cambia de vendedor, mostrar el nuevo número destino
+  const oldEmail = normalizeEmail(state.editingOriginal?.correoVendedor || "");
+  if (oldEmail && oldEmail !== selectedEmail) {
+    const nextNumero = await getNextNumeroColegioForVendor(selectedEmail);
+    numeroInput.value = nextNumero || "";
+    return;
+  }
+
+  // Si sigue en el mismo vendedor, mantiene su número
+  numeroInput.value = normalizeText(state.editingOriginal?.numeroColegio || "");
 }
 
 function canEditCarteraRow(row = null) {
@@ -1461,7 +1521,7 @@ function fillVendorSelectModal(selectedEmail = "") {
   updateVendorPreview();
 }
 
-function updateVendorPreview() {
+async function updateVendorPreview() {
   const select = $("vendedorSelectModal");
   const vendor = state.vendors.find(
     v => normalizeEmail(v.email) === normalizeEmail(select?.value || "")
@@ -1470,14 +1530,17 @@ function updateVendorPreview() {
   $("nombrePreview").textContent = vendor?.nombre || "—";
   $("apellidoPreview").textContent = vendor?.apellido || "—";
   $("correoPreview").textContent = vendor?.email || "—";
+
+  await syncNumeroColegioInputForSelectedVendor();
 }
 
-function openCreateModal() {
+async function openCreateModal() {
   state.modalMode = "create";
   state.editingOriginal = null;
 
   $("modalTitle").textContent = "Agregar colegio";
   $("numeroColegioInput").value = "";
+  $("numeroColegioInput").readOnly = true;
   $("colegioInput").value = "";
   $("comunaInput").value = "";
   $("ciudadInput").value = "";
@@ -1487,14 +1550,17 @@ function openCreateModal() {
   fillVendorSelectModal("");
   resetLogoModalState();
   $("modalForm").classList.add("show");
+
+  await syncNumeroColegioInputForSelectedVendor();
 }
 
-function openEditModal(row) {
+async function openEditModal(row) {
   state.modalMode = "edit";
   state.editingOriginal = { ...row };
 
   $("modalTitle").textContent = "Editar colegio";
   $("numeroColegioInput").value = row.numeroColegio || "";
+  $("numeroColegioInput").readOnly = true;
   $("colegioInput").value = row.colegio || "";
   $("comunaInput").value = row.comuna || "";
   $("ciudadInput").value = row.ciudad || "";
@@ -1505,13 +1571,8 @@ function openEditModal(row) {
   resetLogoModalState();
   refreshLogoPreview();
   $("modalForm").classList.add("show");
-}
 
-function closeModal() {
-  revokeLogoPreviewObjectUrl();
-  state.pendingLogoFile = null;
-  state.removeCurrentLogo = false;
-  $("modalForm").classList.remove("show");
+  await syncNumeroColegioInputForSelectedVendor();
 }
 
 function readModalInput() {
@@ -1532,7 +1593,6 @@ function readModalInput() {
 }
 
 function validateRowInput(input) {
-  if (!input.numeroColegio) return "Debes indicar el N° Colegio.";
   if (!input.colegio) return "Debes indicar el nombre del colegio.";
   if (!input.correoVendedor) return "Debes seleccionar un vendedor(a).";
   if (!input.nombreVendedor) return "No se pudo determinar el nombre del vendedor(a).";
@@ -1541,6 +1601,7 @@ function validateRowInput(input) {
 
 function buildHistoryChanges(oldRow = {}, input = {}) {
   const fields = [
+    ["numeroColegio", "N° Colegio"],
     ["colegio", "Colegio"],
     ["comuna", "Comuna"],
     ["ciudad", "Ciudad"],
@@ -1562,6 +1623,23 @@ function buildHistoryChanges(oldRow = {}, input = {}) {
       changes.push({ key, label, before, after });
     }
   });
+
+  const oldVendorName = buildVendorDisplayNameFromRow(oldRow);
+  const newVendorName = normalizeText(
+    `${input?.nombreVendedor || ""} ${input?.apellidoVendedor || ""}`.trim()
+  );
+
+  if (
+    normalizeEmail(oldRow?.correoVendedor || "") !== normalizeEmail(input?.correoVendedor || "") ||
+    oldVendorName !== newVendorName
+  ) {
+    changes.push({
+      key: "vendedor",
+      label: "Vendedor(a)",
+      before: oldVendorName || normalizeEmail(oldRow?.correoVendedor || ""),
+      after: newVendorName || normalizeEmail(input?.correoVendedor || "")
+    });
+  }
 
   const contactsBefore = (oldRow?.contactosColegio || []).map(stringifyContact).join(" | ");
   const contactsAfter = (input?.contactosColegio || []).map(stringifyContact).join(" | ");
@@ -1675,9 +1753,6 @@ async function saveModal() {
     return;
   }
 
-  const newItemRef = doc(db, "ventas_cartera", input.correoVendedor, "items", input.numeroColegio);
-  const newParentRef = doc(db, "ventas_cartera", input.correoVendedor);
-
   try {
     setProgressStatus({
       text: "Guardando registro...",
@@ -1689,6 +1764,17 @@ async function saveModal() {
     let historyPayload = null;
 
     if (state.modalMode === "create") {
+      // El número SIEMPRE se construye según el vendedor elegido
+      input.numeroColegio = await getNextNumeroColegioForVendor(input.correoVendedor);
+
+      if (!input.numeroColegio) {
+        alert("No se pudo generar el número consecutivo del vendedor.");
+        return;
+      }
+
+      const newItemRef = doc(db, "ventas_cartera", input.correoVendedor, "items", input.numeroColegio);
+      const newParentRef = doc(db, "ventas_cartera", input.correoVendedor);
+
       const exists = await getDoc(newItemRef);
       if (exists.exists()) {
         alert("Ya existe un colegio con ese N° dentro de la cartera de ese vendedor(a).");
@@ -1717,15 +1803,24 @@ async function saveModal() {
       historyPayload = {
         tipo: "Creación",
         asunto: "Colegio agregado a cartera",
-        mensaje: input.ultimaGestionAsunto || input.ultimaGestionMensaje || "Se creó el colegio en cartera.",
+        mensaje: `Se creó el colegio ${input.colegio} para ${buildVendorDisplayNameFromRow(input)} con el N° ${input.numeroColegio}.`,
         metadata: {
           changes: [
+            { key: "numeroColegio", label: "N° Colegio", before: "", after: input.numeroColegio },
+            { key: "vendedor", label: "Vendedor(a)", before: "", after: buildVendorDisplayNameFromRow(input) },
             { key: "colegio", label: "Colegio", before: "", after: input.colegio },
-            { key: "niveles", label: "Niveles", before: "", after: input.resumenNiveles || "" },
-            { key: "contactos", label: "Contactos", before: "", after: (input.contactosColegio || []).map(stringifyContact).join(" | ") }
+            { key: "comuna", label: "Comuna", before: "", after: input.comuna || "" },
+            { key: "ciudad", label: "Ciudad", before: "", after: input.ciudad || "" },
+            { key: "estatus", label: "Estatus", before: "", after: input.estatus || "" }
           ]
         }
       };
+
+      await writeCarteraHistory({
+        correoVendedor: input.correoVendedor,
+        numeroColegio: input.numeroColegio,
+        ...historyPayload
+      });
 
       setProgressStatus({
         text: "Registro guardado.",
@@ -1734,8 +1829,26 @@ async function saveModal() {
         type: "success"
       });
     } else {
-      const old = state.editingOriginal;
+      const old = { ...state.editingOriginal };
       const oldItemRef = doc(db, "ventas_cartera", old.correoVendedor, "items", old.numeroColegio);
+
+      const movingToAnotherVendor =
+        normalizeEmail(old.correoVendedor) !== normalizeEmail(input.correoVendedor);
+
+      // Si cambia de vendedor, el número cambia al siguiente de ese vendedor
+      if (movingToAnotherVendor) {
+        input.numeroColegio = await getNextNumeroColegioForVendor(input.correoVendedor);
+      } else {
+        input.numeroColegio = normalizeText(old.numeroColegio || input.numeroColegio || "");
+      }
+
+      if (!input.numeroColegio) {
+        alert("No se pudo determinar el N° Colegio destino.");
+        return;
+      }
+
+      const newItemRef = doc(db, "ventas_cartera", input.correoVendedor, "items", input.numeroColegio);
+      const newParentRef = doc(db, "ventas_cartera", input.correoVendedor);
 
       const samePath =
         normalizeEmail(old.correoVendedor) === normalizeEmail(input.correoVendedor) &&
@@ -1767,34 +1880,8 @@ async function saveModal() {
         logoPath = uploadedLogo.logoPath;
       }
 
-      if (samePath) {
-        await setDoc(newParentRef, buildParentVendorPayload(input), { merge: true });
-        await setDoc(newItemRef, {
-          ...buildItemPayload({ ...input, logoUrl, logoPath }, existingData)
-        }, { merge: true });
-      } else {
-        const targetExists = await getDoc(newItemRef);
-        if (targetExists.exists()) {
-          alert("Ya existe un colegio con ese N° en la cartera destino.");
-          return;
-        }
-
-        const batch = writeBatch(db);
-        batch.set(newParentRef, buildParentVendorPayload(input), { merge: true });
-        batch.set(newItemRef, {
-          ...buildItemPayload({ ...input, logoUrl, logoPath }, existingData),
-          creadoPor: existingData?.creadoPor || normalizeEmail(state.realUser?.email || ""),
-          fechaCreacion: existingData?.fechaCreacion || serverTimestamp()
-        }, { merge: true });
-        batch.delete(oldItemRef);
-        await batch.commit();
-      }
-
-      if (oldLogoPathToDelete && oldLogoPathToDelete !== logoPath) {
-        await deleteLogoFromStorage(oldLogoPathToDelete);
-      }
-
       const changes = buildHistoryChanges(old, input);
+
       if (input.trabajado && (input.ultimaGestionTipo || input.ultimaGestionAsunto || input.ultimaGestionMensaje || input.fechaUltimaVisita)) {
         changes.push({
           key: "seguimiento",
@@ -1804,29 +1891,73 @@ async function saveModal() {
         });
       }
 
-      historyPayload = {
-        tipo: input.visitado ? "Seguimiento / visita" : "Edición",
-        asunto: input.ultimaGestionAsunto || "Actualización de colegio en cartera",
-        mensaje:
-          input.ultimaGestionMensaje ||
-          buildHistorySummaryForChanges(changes) ||
-          "Se actualizó la información del colegio.",
-        metadata: { changes }
-      };
+      if (samePath) {
+        await setDoc(newParentRef, buildParentVendorPayload(input), { merge: true });
+        await setDoc(newItemRef, {
+          ...buildItemPayload({ ...input, logoUrl, logoPath }, existingData)
+        }, { merge: true });
+
+        await writeCarteraHistory({
+          correoVendedor: input.correoVendedor,
+          numeroColegio: input.numeroColegio,
+          tipo: input.visitado ? "Seguimiento / visita" : "Edición",
+          asunto: input.ultimaGestionAsunto || "Actualización de colegio en cartera",
+          mensaje:
+            input.ultimaGestionMensaje ||
+            buildHistorySummaryForChanges(changes) ||
+            "Se actualizó la información del colegio.",
+          metadata: { changes }
+        });
+      } else {
+        const targetExists = await getDoc(newItemRef);
+        if (targetExists.exists()) {
+          alert("Ya existe un colegio con ese N° en la cartera destino.");
+          return;
+        }
+
+        // 1) registrar en historial origen ANTES de mover
+        await writeCarteraHistory({
+          correoVendedor: old.correoVendedor,
+          numeroColegio: old.numeroColegio,
+          tipo: "Reasignación",
+          asunto: "Colegio movido de vendedor",
+          mensaje: `Se movió el colegio ${old.colegio} desde ${buildVendorDisplayNameFromRow(old)} (${old.numeroColegio}) hacia ${buildVendorDisplayNameFromRow(input)} (${input.numeroColegio}).`,
+          metadata: { changes }
+        });
+
+        // 2) mover documento
+        const batch = writeBatch(db);
+
+        batch.set(newParentRef, buildParentVendorPayload(input), { merge: true });
+        batch.set(newItemRef, {
+          ...buildItemPayload({ ...input, logoUrl, logoPath }, existingData),
+          creadoPor: existingData?.creadoPor || normalizeEmail(state.realUser?.email || ""),
+          fechaCreacion: existingData?.fechaCreacion || serverTimestamp()
+        }, { merge: true });
+
+        batch.delete(oldItemRef);
+        await batch.commit();
+
+        // 3) registrar en historial destino DESPUÉS de mover
+        await writeCarteraHistory({
+          correoVendedor: input.correoVendedor,
+          numeroColegio: input.numeroColegio,
+          tipo: "Reasignación",
+          asunto: "Colegio recibido desde otro vendedor",
+          mensaje: `Se recibió el colegio ${input.colegio} desde ${buildVendorDisplayNameFromRow(old)} (${old.numeroColegio}) hacia ${buildVendorDisplayNameFromRow(input)} (${input.numeroColegio}).`,
+          metadata: { changes }
+        });
+      }
+
+      if (oldLogoPathToDelete && oldLogoPathToDelete !== logoPath) {
+        await deleteLogoFromStorage(oldLogoPathToDelete);
+      }
 
       setProgressStatus({
         text: "Registro guardado.",
         meta: "Colegio actualizado correctamente.",
         progress: 100,
         type: "success"
-      });
-    }
-
-    if (historyPayload) {
-      await writeCarteraHistory({
-        correoVendedor: input.correoVendedor,
-        numeroColegio: input.numeroColegio,
-        ...historyPayload
       });
     }
 
@@ -2364,7 +2495,9 @@ function bindPageEvents() {
 
   if (vendedorSelectModal && !vendedorSelectModal.dataset.bound) {
     vendedorSelectModal.dataset.bound = "1";
-    vendedorSelectModal.addEventListener("change", updateVendorPreview);
+    vendedorSelectModal.addEventListener("change", async () => {
+      await updateVendorPreview();
+    });
   }
 
   if (logoInput && !logoInput.dataset.bound) {
