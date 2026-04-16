@@ -210,6 +210,7 @@ const PROGRAM_OPTIONS_BY_DESTINO = {
 };
 
 const DATA_FIELDS = [
+  "colegio",
   "curso",
   "anoViaje",
   "cantidadGrupo",
@@ -517,6 +518,11 @@ function canEditGroup() {
 }
 
 function canEditDocuments() {
+  const rol = String(state.effectiveUser?.rol || "").toLowerCase();
+  return rol === "admin" || rol === "supervision";
+}
+
+function canEditSchoolName() {
   const rol = String(state.effectiveUser?.rol || "").toLowerCase();
   return rol === "admin" || rol === "supervision";
 }
@@ -1371,6 +1377,7 @@ function bindPhoneModalInput(id) {
 }
 
 function bindDatosModalControls() {
+  bindUppercaseModalInput("d_colegio", syncDatosAliasPreview);
   bindUppercaseModalInput("d_comunaCiudad");
   bindUppercaseModalInput("d_nombreCliente");
   bindUppercaseModalInput("d_nombreCliente2");
@@ -2468,6 +2475,10 @@ function openDatosModal() {
   setText("d_vendedoraPreview", state.group.vendedora || state.group.vendedoraCorreo || "—");
 
   setFormValue("d_colegio", normalizeTextUpper(state.group.colegio || ""));
+  const colegioInput = $("d_colegio");
+  if (colegioInput) {
+    colegioInput.disabled = !canEditSchoolName();
+  }
   setFormValue("d_curso", state.group.curso || "");
   setFormValue("d_anoViaje", state.group.anoViaje || "");
   setFormValue("d_cantidadGrupo", state.group.cantidadGrupo || "");
@@ -2991,37 +3002,42 @@ async function saveDatos() {
   const mesViajeOtro = normalizeTextUpper($("d_mesViajeOtro")?.value || "");
 
   const values = {
+    colegio: normalizeTextUpper($("d_colegio")?.value || state.group?.colegio || ""),
     curso: normalizeCursoInput($("d_curso")?.value || ""),
     anoViaje: parseNumberOrText($("d_anoViaje")?.value),
     cantidadGrupo: parseNumberOrText($("d_cantidadGrupo")?.value),
-
+  
     destinoPrincipal: destinoSeleccionado === "OTRO" ? "OTRO" : normalizeTextUpper(destinoSeleccionado),
     destinoPrincipalOtro: destinoSeleccionado === "OTRO" ? destinoPrincipalOtro : "",
-
+  
     programa: programaSeleccionado === "OTRO" ? "OTRO" : normalizeTextUpper(programaSeleccionado),
     programaOtro: programaSeleccionado === "OTRO" ? programaOtro : "",
-
+  
     tramo: tramoSeleccionado === "OTRO" ? "OTRO" : normalizeTextUpper(tramoSeleccionado),
     tramoOtro: tramoSeleccionado === "OTRO" ? tramoOtro : "",
-
+  
     mesViaje: mesViajeSeleccionado === "OTRO" ? "OTRO" : normalizeTextUpper(mesViajeSeleccionado),
     mesViajeOtro: mesViajeSeleccionado === "OTRO" ? mesViajeOtro : "",
     semanaViaje: mesViajeSeleccionado === "OTRO"
       ? mesViajeOtro
       : normalizeTextUpper(mesViajeSeleccionado),
-
+  
     comunaCiudad: normalizeTextUpper($("d_comunaCiudad")?.value || ""),
-
+  
     nombreCliente: normalizeTextUpper($("d_nombreCliente")?.value || ""),
     rolCliente: normalizeTextUpper($("d_rolCliente")?.value || ""),
     correoCliente: normalizeEmail($("d_correoCliente")?.value || ""),
     celularCliente: sanitizeChileMobileForSave($("d_celularCliente")?.value || ""),
-
+  
     nombreCliente2: normalizeTextUpper($("d_nombreCliente2")?.value || ""),
     rolCliente2: normalizeTextUpper($("d_rolCliente2")?.value || ""),
     correoCliente2: normalizeEmail($("d_correoCliente2")?.value || ""),
     celularCliente2: sanitizeChileMobileForSave($("d_celularCliente2")?.value || "")
   };
+
+  if (!canEditSchoolName()) {
+    values.colegio = normalizeTextUpper(state.group?.colegio || "");
+  }
 
   if (!colegio) {
     alert("No se encontró el colegio del grupo.");
