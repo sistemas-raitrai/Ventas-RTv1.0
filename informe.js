@@ -317,7 +317,7 @@ function getScoringPreset(mode = "actual") {
   }
 
   if (mode === "actual") {
-    explanation = "Este modo analiza el desempeño actual considerando SOLO grupos con año de viaje 2026 en adelante. Prioriza reuniones, avance comercial y conversión a ganadas.";
+    return { continuity: 20, performance: 45, historical: 25, workload: 10 };
   }
 
   return { continuity: 20, performance: 40, historical: 25, workload: 15 };
@@ -408,7 +408,7 @@ function renderScoringExplanation() {
   let explanation = "";
 
   if (mode === "actual") {
-    explanation = "Este modo prioriza cómo viene trabajando hoy cada vendedor: reuniones actuales, ganadas actuales, cotizaciones activas y backlog.";
+    explanation = "Este modo analiza el desempeño actual considerando solo grupos con año de viaje 2026 en adelante. Prioriza reuniones, avance comercial, conversión a ganadas y backlog.";
   } else if (mode === "historico") {
     explanation = "Este modo prioriza el historial comercial: cuántos grupos llegan a reunión y cuántos terminan ganados después de reunión.";
   } else if (mode === "asignacion") {
@@ -628,11 +628,12 @@ function buildVendorKpis(rows = [], historyRows = []) {
     : 0;
 
   list.forEach((rec) => {
-    // Base real del flujo (excluye perdidas)
+    // Base real del flujo ACTUAL (solo grupos en proceso del año actual)
+    // = cartera actual - ganadas (las pérdidas ya no están en juego)
     const baseFlujoActual =
-      rec.currentPortfolioCount - rec.currentGanadaCount - rec.perdidaCount;
+      rec.currentPortfolioCount - rec.currentGanadaCount;
     
-    // Evitar negativos
+    // Evitar negativos o división por 0
     const base = Math.max(1, baseFlujoActual);
     
     // % que avanzan a reunión
