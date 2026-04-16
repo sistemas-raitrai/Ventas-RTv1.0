@@ -229,6 +229,29 @@
       line-height:1.25;
     }
 
+    .seguimiento-summary-card.clickable{
+      cursor:pointer;
+      transition:transform .15s ease, box-shadow .15s ease, border-color .15s ease;
+    }
+    
+    .seguimiento-summary-card.clickable:hover{
+      transform:translateY(-2px);
+      border-color:#c7b6e7;
+      box-shadow:0 10px 22px rgba(58, 31, 91, 0.10);
+    }
+    
+    .informe-table tbody tr.vendor-clickable{
+      cursor:pointer;
+    }
+    
+    .informe-table tbody tr.vendor-clickable:hover td{
+      background:#f6f1fc !important;
+    }
+    
+    .chart-wrap canvas{
+      cursor:pointer;
+    }
+
     .grid-2{
       display:grid;
       grid-template-columns:repeat(2, minmax(0, 1fr));
