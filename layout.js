@@ -39,8 +39,8 @@ const menuItems = [
   },
   {
     key: "informe-excel",
-    href: "informe-excel.html",
-    label: "Informe Excel",
+    href: "informe.html",
+    label: "Informe",
     roles: ["admin", "supervision"]
   }
 ];
