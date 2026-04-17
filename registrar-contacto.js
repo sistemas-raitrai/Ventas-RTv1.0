@@ -486,6 +486,157 @@ function buildAlertReviewCardsHtml(matches = []) {
   `).join("");
 }
 
+async function findPotentialDuplicateAlerts(data = {}) {
+  const snap = await getDocs(collection(db, "ventas_cotizaciones"));
+  const currentYear = getCurrentYear();
+  const inputYear = Number(data.anoViaje || "");
+  const inputComuna = normalizeSearch(data.comunaCiudad || "");
+  const inputNames = [data.nombreCliente, data.nombreCliente2]
+    .map((value) => normalizeText(value))
+    .filter(Boolean);
+  const inputEmails = [data.correoCliente, data.correoCliente2]
+    .map((value) => normalizeEmail(value))
+    .filter(Boolean);
+  const inputPhones = [data.celularCliente, data.celularCliente2]
+    .map((value) => normalizePhoneLoose(value))
+    .filter(Boolean);
+
+  const results = [];
+
+  snap.docs.forEach((row) => {
+    const rowData = row.data() || {};
+    const rowId = normalizeText(rowData.idGrupo || row.id || "");
+    const rowYear = Number(rowData.anoViaje || "");
+
+    if (Number.isFinite(rowYear) && rowYear && rowYear < currentYear) {
+      return;
+    }
+
+    let score = 0;
+    let hardSignals = 0;
+    const reasons = [];
+
+    const schoolSimilarity = getSchoolSimilarity(
+      data.colegio || data.colegioBase || "",
+      rowData.colegio || rowData.colegioBase || ""
+    );
+
+    if (schoolSimilarity >= 0.95) {
+      score += 28;
+      pushUniqueReason(reasons, "Colegio muy parecido");
+    } else if (schoolSimilarity >= 0.82) {
+      score += 18;
+      pushUniqueReason(reasons, "Colegio parecido");
+    }
+
+    const rowComuna = normalizeSearch(rowData.comunaCiudad || rowData.comuna || "");
+    if (inputComuna && rowComuna && inputComuna === rowComuna) {
+      score += 10;
+      pushUniqueReason(reasons, "Misma comuna/ciudad");
+    }
+
+    if (inputYear && Number.isFinite(rowYear) && rowYear) {
+      if (rowYear === inputYear) {
+        score += 18;
+        pushUniqueReason(reasons, `Mismo año de viaje (${rowYear})`);
+      } else if (rowYear > inputYear) {
+        score += 8;
+        pushUniqueReason(reasons, `Año de viaje futuro (${rowYear})`);
+      }
+    }
+
+    const courseSimilarity = Math.max(
+      getCourseSimilarity(data.curso, rowData.curso || ""),
+      getCourseSimilarity(data.cursoViaje, rowData.cursoViaje || "")
+    );
+
+    if (courseSimilarity >= 1) {
+      score += 18;
+      pushUniqueReason(reasons, "Mismo curso");
+    } else if (courseSimilarity >= 0.88) {
+      score += 12;
+      pushUniqueReason(reasons, "Curso parecido / misma numeración con otra letra");
+    }
+
+    const rowNames = [rowData.nombreCliente, rowData.nombreCliente2]
+      .map((value) => normalizeText(value))
+      .filter(Boolean);
+
+    let bestNameMatch = { score: 0, value: "" };
+
+    inputNames.forEach((inputName) => {
+      rowNames.forEach((rowName) => {
+        const sim = getNameSimilarity(inputName, rowName);
+        if (sim > bestNameMatch.score) {
+          bestNameMatch = { score: sim, value: rowName };
+        }
+      });
+    });
+
+    if (bestNameMatch.score >= 0.97) {
+      score += 34;
+      hardSignals += 1;
+      pushUniqueReason(reasons, `Nombre de contacto muy parecido: ${bestNameMatch.value}`);
+    } else if (bestNameMatch.score >= 0.88) {
+      score += 22;
+      pushUniqueReason(reasons, `Nombre de contacto parecido: ${bestNameMatch.value}`);
+    }
+
+    const rowEmails = [rowData.correoCliente, rowData.correoCliente2]
+      .map((value) => normalizeEmail(value))
+      .filter(Boolean);
+
+    const matchedEmail = inputEmails.find((email) => email && rowEmails.includes(email));
+    if (matchedEmail) {
+      score += 60;
+      hardSignals += 1;
+      pushUniqueReason(reasons, `Mismo correo: ${matchedEmail}`);
+    }
+
+    const rowPhones = [rowData.celularCliente, rowData.celularCliente2]
+      .map((value) => normalizePhoneLoose(value))
+      .filter(Boolean);
+
+    const matchedPhone = inputPhones.find((phone) => phone && rowPhones.includes(phone));
+    if (matchedPhone) {
+      score += 55;
+      hardSignals += 1;
+      pushUniqueReason(reasons, `Mismo celular terminado en ${matchedPhone}`);
+    }
+
+    const shouldKeep =
+      hardSignals > 0 ||
+      score >= 35 ||
+      (schoolSimilarity >= 0.82 && courseSimilarity >= 0.88 && rowYear === inputYear) ||
+      (bestNameMatch.score >= 0.88 && schoolSimilarity >= 0.78);
+
+    if (!shouldKeep) return;
+
+    const level = getAlertLevel(score, hardSignals);
+
+    results.push({
+      relatedIdGrupo: rowId,
+      codigoRegistro: normalizeText(rowData.codigoRegistro || ""),
+      aliasGrupo: normalizeText(rowData.aliasGrupo || rowData.nombreGrupo || rowData.colegio || rowId),
+      colegio: normalizeText(rowData.colegio || ""),
+      curso: normalizeText(rowData.cursoViaje || rowData.curso || ""),
+      anoViaje: normalizeText(rowData.anoViaje || ""),
+      comunaCiudad: normalizeText(rowData.comunaCiudad || rowData.comuna || ""),
+      vendedora: normalizeText(rowData.vendedora || "") || "Sin asignar",
+      estado: normalizeText(rowData.estado || "") || "A contactar",
+      level,
+      levelClass: getAlertLevelClass(level),
+      score,
+      reasons,
+      url: `${DETALLE_GRUPO_URL}?id=${encodeURIComponent(rowId)}`
+    });
+  });
+
+  return results
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 12);
+}
+
 function renderAlertReviewModal(matches = []) {
   const summary = $("alertReviewSummary");
   const primaryList = $("alertReviewPrimaryList");
