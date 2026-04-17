@@ -732,6 +732,9 @@ function closeAlertReviewModal() {
 function clearAlertReviewState() {
   state.pendingAlertReview = null;
   closeAlertReviewModal();
+
+  const btn = $("btnGuardarRegistro");
+  if (btn) btn.disabled = false;
 }
 
 async function createRegistroAlertReviewEntry({
@@ -1164,6 +1167,10 @@ function resetForm() {
   $("registroForm")?.reset();
   $("anoViaje").value = getCurrentYear();
   clearAlertReviewState();
+
+  const btn = $("btnGuardarRegistro");
+  if (btn) btn.disabled = false;
+
   updateSchoolModeUI();
   updateConditionalFields();
   updateAliasPreview();
