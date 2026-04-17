@@ -1275,11 +1275,16 @@ function validateForm(data) {
     return "Debes ingresar al menos correo o celular del cliente.";
   }
 
-    const hasSecondContactData = Boolean(
+  const secondPhoneMeaningful = Boolean(
+    data.celularCliente2 &&
+    data.celularCliente2 !== "+569"
+  );
+
+  const hasSecondContactData = Boolean(
     data.nombreCliente2 ||
     data.rolCliente2 ||
     data.correoCliente2 ||
-    data.celularCliente2
+    secondPhoneMeaningful
   );
 
   if (hasSecondContactData) {
@@ -1386,12 +1391,18 @@ function readFormData() {
     nombreCliente: normalizeText($("nombreCliente")?.value || ""),
     rolCliente: normalizeText($("rolCliente")?.value || ""),
     correoCliente: normalizeEmail($("correoCliente")?.value || ""),
-    celularCliente: normalizeText($("celularCliente")?.value || ""),
+    celularCliente: (() => {
+      const phone = normalizeText($("celularCliente")?.value || "");
+      return phone === "+569" ? "" : phone;
+    })(),
 
     nombreCliente2: normalizeText($("nombreCliente2")?.value || ""),
     rolCliente2: normalizeText($("rolCliente2")?.value || ""),
     correoCliente2: normalizeEmail($("correoCliente2")?.value || ""),
-    celularCliente2: normalizeText($("celularCliente2")?.value || ""),
+    celularCliente2: (() => {
+      const phone = normalizeText($("celularCliente2")?.value || "");
+      return phone === "+569" ? "" : phone;
+    })(),
 
     origenCliente: normalizeText($("origenCliente")?.value || ""),
     origenEspecificacion: normalizeText($("origenEspecificacion")?.value || ""),
