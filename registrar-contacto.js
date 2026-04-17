@@ -416,8 +416,8 @@ function pushUniqueReason(reasons = [], text = "") {
   if (!reasons.includes(text)) reasons.push(text);
 }
 
-function getAlertLevel(score = 0, hardSignals = 0) {
-  if (hardSignals > 0 || score >= 75) return "Alta";
+function getAlertLevel(score = 0, hardSignals = 0, businessCritical = false) {
+  if (businessCritical || hardSignals > 0 || score >= 75) return "Alta";
   if (score >= 48) return "Media";
   return "Leve";
 }
@@ -514,6 +514,7 @@ async function findPotentialDuplicateAlerts(data = {}) {
 
     let score = 0;
     let hardSignals = 0;
+    let businessCritical = false;
     const reasons = [];
 
     const schoolSimilarity = getSchoolSimilarity(
@@ -612,7 +613,19 @@ async function findPotentialDuplicateAlerts(data = {}) {
 
     if (!shouldKeep) return;
 
-    const level = getAlertLevel(score, hardSignals);
+    const sameComuna = inputComuna && rowComuna && inputComuna === rowComuna;
+    const sameYear = inputYear && Number.isFinite(rowYear) && rowYear === inputYear;
+    const nearBusinessMatch =
+      schoolSimilarity >= 0.95 &&
+      sameComuna &&
+      (courseSimilarity >= 0.88 || sameYear);
+    
+    if (nearBusinessMatch) {
+      businessCritical = true;
+      pushUniqueReason(reasons, "Posible conflicto comercial crítico: mismo colegio/comuna y curso o año relacionado");
+    }
+
+    const level = getAlertLevel(score, hardSignals, businessCritical);
 
     results.push({
       relatedIdGrupo: rowId,
