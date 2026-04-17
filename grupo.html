@@ -568,7 +568,7 @@
     }
     
     #modalCorreo textarea,
-    #modalPlantillaCorreo textarea{
+    #modalTemplateEmail textarea{
       min-height: 220px;
     }
     
@@ -2374,22 +2374,24 @@
         <form id="formCorreo" class="form-grid">
           <div class="form-field span-3">
             <label for="mail_para">Para</label>
-            <input id="mail_para" name="para" type="email" />
+            <input id="email_to" name="para" type="email" />
           </div>
+
+          <input id="email_contact_label" type="hidden" />
 
           <div class="form-field span-3">
             <label>Plantillas</label>
 
             <div class="email-template-toolbar">
               <div class="form-field">
-                <select id="mail_templateSelect" name="templateSelect">
+                <select id="email_template" name="templateSelect">
                   <option value="">SELECCIONAR PLANTILLA</option>
                 </select>
               </div>
 
-              <button class="btn-pill" type="button" id="btnNuevaPlantillaCorreo">Nueva plantilla</button>
-              <button class="btn-pill" type="button" id="btnEditarPlantillaCorreo">Editar plantilla</button>
-              <button class="btn-danger" type="button" id="btnEliminarPlantillaCorreo">Eliminar plantilla</button>
+              <button class="btn-pill" type="button" id="btnNewEmailTemplate">Nueva plantilla</button>
+              <button class="btn-pill" type="button" id="btnEditEmailTemplate">Editar plantilla</button>
+              <button class="btn-danger" type="button" id="btnDeleteEmailTemplate">Eliminar plantilla</button>
             </div>
 
             <div class="helper">
@@ -2399,12 +2401,12 @@
 
           <div class="form-field span-3">
             <label for="mail_asunto">Asunto</label>
-            <input id="mail_asunto" name="asunto" type="text" />
+            <input id="email_subject" name="asunto" type="text" />
           </div>
 
           <div class="form-field span-3">
             <label for="mail_cuerpo">Cuerpo</label>
-            <textarea id="mail_cuerpo" name="cuerpo"></textarea>
+            <textarea id="email_body" name="cuerpo"></textarea>
           </div>
 
           <div class="form-field span-3">
@@ -2418,17 +2420,17 @@
 
       <div class="modal-actions">
         <button class="btn-pill" type="button" data-close="modalCorreo">Cancelar</button>
-        <button class="btn-dark" type="button" id="btnIrGmailCorreo">Ir a Gmail</button>
+        <button class="btn-dark" type="button" id="btnGoGmail">Ir a Gmail</button>
       </div>
     </div>
   </div>
 
     <!-- MODAL PLANTILLA CORREO -->
-  <div class="modal" id="modalPlantillaCorreo">
+  <div class="modal" id="modalTemplateEmail">
     <div class="modal-card">
       <div class="modal-head">
-        <h3 class="modal-title" id="plantillaCorreoTitulo">Nueva plantilla</h3>
-        <button class="modal-close" type="button" data-close="modalPlantillaCorreo">×</button>
+        <h3 class="modal-title" id="emailTemplateModalTitle">Nueva plantilla</h3>
+        <button class="modal-close" type="button" data-close="modalTemplateEmail">×</button>
       </div>
 
       <div class="modal-body">
@@ -2436,6 +2438,13 @@
           <div class="form-field span-3">
             <label for="tpl_nombre">Nombre plantilla</label>
             <input id="tpl_nombre" name="nombre" type="text" />
+          </div>
+
+          <div class="form-field span-3">
+            <label for="tpl_categoria">Categoría</label>
+            <select id="tpl_categoria" name="categoria">
+              <option value="grupo">Grupo</option>
+            </select>
           </div>
 
           <div class="form-field span-3">
@@ -2459,7 +2468,7 @@
 
       <div class="modal-actions">
         <button class="btn-pill" type="button" data-close="modalPlantillaCorreo">Cancelar</button>
-        <button class="btn-dark" type="button" id="btnGuardarPlantillaCorreo">Guardar plantilla</button>
+        <button class="btn-dark" type="button" id="btnSaveEmailTemplate">Guardar plantilla</button>
       </div>
     </div>
   </div>
