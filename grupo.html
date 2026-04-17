@@ -525,6 +525,59 @@
     .contact-action-link:visited{
       color: #4a2570;
     }
+
+    .email-template-toolbar{
+      display:flex;
+      flex-wrap:wrap;
+      gap:10px;
+      align-items:center;
+    }
+    
+    .email-template-toolbar .form-field{
+      flex:1 1 280px;
+      min-width:220px;
+      margin:0;
+    }
+    
+    .email-preview-box{
+      min-height: 48px;
+      border-radius: 14px;
+      border: 1px solid rgba(58,42,82,.14);
+      background: #faf8fd;
+      padding: 12px 14px;
+      font-size: 14px;
+      color: #4a4760;
+      line-height: 1.45;
+    }
+    
+    .email-template-chip{
+      display:inline-flex;
+      align-items:center;
+      min-height:30px;
+      padding:0 10px;
+      border-radius:999px;
+      background:#efe7f8;
+      border:1px solid rgba(75,42,122,.12);
+      color:#4a2570;
+      font-size:12px;
+      font-weight:900;
+    }
+    
+    #modalCorreo .modal-card{
+      width: min(1080px, 100%);
+    }
+    
+    #modalCorreo textarea,
+    #modalPlantillaCorreo textarea{
+      min-height: 220px;
+    }
+    
+    @media (max-width: 900px){
+      .email-template-toolbar{
+        flex-direction:column;
+        align-items:stretch;
+      }
+    }
     
     .obs-box{
       margin-top: 14px;
@@ -2305,6 +2358,108 @@
       <div class="modal-actions">
         <button class="btn-pill" type="button" data-close="modalComentario">Cancelar</button>
         <button class="btn-dark" type="button" id="btnGuardarComentario">Guardar comentario</button>
+      </div>
+    </div>
+  </div>
+
+    <!-- MODAL CORREO -->
+  <div class="modal" id="modalCorreo">
+    <div class="modal-card">
+      <div class="modal-head">
+        <h3 class="modal-title">Redactar correo</h3>
+        <button class="modal-close" type="button" data-close="modalCorreo">×</button>
+      </div>
+
+      <div class="modal-body">
+        <form id="formCorreo" class="form-grid">
+          <div class="form-field span-3">
+            <label for="mail_para">Para</label>
+            <input id="mail_para" name="para" type="email" />
+          </div>
+
+          <div class="form-field span-3">
+            <label>Plantillas</label>
+
+            <div class="email-template-toolbar">
+              <div class="form-field">
+                <select id="mail_templateSelect" name="templateSelect">
+                  <option value="">SELECCIONAR PLANTILLA</option>
+                </select>
+              </div>
+
+              <button class="btn-pill" type="button" id="btnNuevaPlantillaCorreo">Nueva plantilla</button>
+              <button class="btn-pill" type="button" id="btnEditarPlantillaCorreo">Editar plantilla</button>
+              <button class="btn-danger" type="button" id="btnEliminarPlantillaCorreo">Eliminar plantilla</button>
+            </div>
+
+            <div class="helper">
+              Puedes usar plantillas y luego ajustar el texto antes de abrir Gmail.
+            </div>
+          </div>
+
+          <div class="form-field span-3">
+            <label for="mail_asunto">Asunto</label>
+            <input id="mail_asunto" name="asunto" type="text" />
+          </div>
+
+          <div class="form-field span-3">
+            <label for="mail_cuerpo">Cuerpo</label>
+            <textarea id="mail_cuerpo" name="cuerpo"></textarea>
+          </div>
+
+          <div class="form-field span-3">
+            <label>Variables disponibles</label>
+            <div class="email-preview-box" id="mail_variablesInfo">
+              {{nombreContacto}}, {{nombreGrupo}}, {{colegio}}, {{curso}}, {{anoViaje}}, {{destinoPrincipal}}, {{programa}}, {{vendedora}}
+            </div>
+          </div>
+        </form>
+      </div>
+
+      <div class="modal-actions">
+        <button class="btn-pill" type="button" data-close="modalCorreo">Cancelar</button>
+        <button class="btn-dark" type="button" id="btnIrGmailCorreo">Ir a Gmail</button>
+      </div>
+    </div>
+  </div>
+
+    <!-- MODAL PLANTILLA CORREO -->
+  <div class="modal" id="modalPlantillaCorreo">
+    <div class="modal-card">
+      <div class="modal-head">
+        <h3 class="modal-title" id="plantillaCorreoTitulo">Nueva plantilla</h3>
+        <button class="modal-close" type="button" data-close="modalPlantillaCorreo">×</button>
+      </div>
+
+      <div class="modal-body">
+        <form id="formPlantillaCorreo" class="form-grid">
+          <div class="form-field span-3">
+            <label for="tpl_nombre">Nombre plantilla</label>
+            <input id="tpl_nombre" name="nombre" type="text" />
+          </div>
+
+          <div class="form-field span-3">
+            <label for="tpl_asunto">Asunto</label>
+            <input id="tpl_asunto" name="asunto" type="text" />
+          </div>
+
+          <div class="form-field span-3">
+            <label for="tpl_cuerpo">Cuerpo</label>
+            <textarea id="tpl_cuerpo" name="cuerpo"></textarea>
+          </div>
+
+          <div class="form-field span-3">
+            <label>Tip</label>
+            <div class="email-preview-box">
+              Puedes usar: {{nombreContacto}}, {{nombreGrupo}}, {{colegio}}, {{curso}}, {{anoViaje}}, {{destinoPrincipal}}, {{programa}}, {{vendedora}}
+            </div>
+          </div>
+        </form>
+      </div>
+
+      <div class="modal-actions">
+        <button class="btn-pill" type="button" data-close="modalPlantillaCorreo">Cancelar</button>
+        <button class="btn-dark" type="button" id="btnGuardarPlantillaCorreo">Guardar plantilla</button>
       </div>
     </div>
   </div>
