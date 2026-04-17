@@ -285,6 +285,28 @@ const GENERIC_SCHOOL_TOKENS = new Set([
   "municipal"
 ]);
 
+const SCHOOL_PREFIX_TOKENS = new Set([
+  "colegio",
+  "liceo",
+  "instituto",
+  "institute",
+  "college",
+  "school",
+  "escuela"
+]);
+
+function normalizeSchoolCommercialName(value = "") {
+  const tokens = normalizeLooseText(value)
+    .split(" ")
+    .filter(Boolean);
+
+  while (tokens.length && SCHOOL_PREFIX_TOKENS.has(tokens[0])) {
+    tokens.shift();
+  }
+
+  return tokens.join(" ").trim();
+}
+
 function normalizeLooseText(value = "") {
   return normalizeSearch(value)
     .replace(/[^a-z0-9\s]/g, " ")
@@ -789,12 +811,21 @@ function getOptionKey(email, numeroColegio, colegio, comuna = "") {
 }
 
 function getCarteraOptionsByColegioInput() {
-  const colegioInput = normalizeSearch($("inputColegio")?.value || "");
-  if (!colegioInput) return [];
+  const rawInput = $("inputColegio")?.value || "";
+  const colegioInput = normalizeSearch(rawInput);
+  const colegioInputCommercial = normalizeSchoolCommercialName(rawInput);
 
-  return state.carteraOptions.filter(
-    opt => normalizeSearch(opt.colegio) === colegioInput
-  );
+  if (!colegioInput && !colegioInputCommercial) return [];
+
+  return state.carteraOptions.filter((opt) => {
+    const optSchool = normalizeSearch(opt.colegio || "");
+    const optSchoolCommercial = normalizeSchoolCommercialName(opt.colegio || "");
+
+    return (
+      (colegioInput && optSchool === colegioInput) ||
+      (colegioInputCommercial && optSchoolCommercial === colegioInputCommercial)
+    );
+  });
 }
 
 function getExactCarteraOptionByInput() {
@@ -1170,6 +1201,12 @@ function resetForm() {
 
   const btn = $("btnGuardarRegistro");
   if (btn) btn.disabled = false;
+
+  const tel1 = $("celularCliente");
+  const tel2 = $("celularCliente2");
+
+  if (tel1) tel1.value = "+569";
+  if (tel2) tel2.value = "+569";
 
   updateSchoolModeUI();
   updateConditionalFields();
@@ -1720,9 +1757,7 @@ function bindPageEvents() {
   bindUppercaseField(inputColegio, updateSchoolModeUI);
   bindUppercaseField(comunaCiudad, updateSchoolModeUI);
   bindUppercaseField(nombreCliente);
-  bindUppercaseField(celularCliente);
   bindUppercaseField(nombreCliente2);
-  bindUppercaseField(celularCliente2);
   bindUppercaseField(origenEspecificacionOtro);
   bindUppercaseField(destinoPrincipalOtro);
   bindUppercaseField(destinoSecundarioOtro);
@@ -1790,6 +1825,25 @@ function bindPageEvents() {
       correoCliente2.value = String(correoCliente2.value || "").trim();
     });
   }
+
+    [celularCliente, celularCliente2].forEach((input) => {
+    if (!input || input.dataset.boundPhone === "1") return;
+
+    input.dataset.boundPhone = "1";
+
+    input.addEventListener("focus", () => {
+      if (!String(input.value || "").trim()) {
+        input.value = "+569";
+      }
+    });
+
+    input.addEventListener("blur", () => {
+      const value = String(input.value || "").trim();
+      if (!value) {
+        input.value = "+569";
+      }
+    });
+  });
 
   if (btnLimpiar && !btnLimpiar.dataset.bound) {
     btnLimpiar.dataset.bound = "1";
