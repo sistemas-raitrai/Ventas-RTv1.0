@@ -8,6 +8,8 @@ import {
   addDoc,
   doc,
   setDoc,
+  updateDoc,
+  deleteDoc,
   serverTimestamp,
   Timestamp
 } from "https://www.gstatic.com/firebasejs/11.7.3/firebase-firestore.js";
@@ -41,6 +43,7 @@ const REUNIONES_COLLECTION = "ventas_reuniones";
 const HISTORIAL_COLLECTION = "ventas_historial";
 const ALERTAS_COLLECTION = "ventas_alertas";
 const SOLICITUDES_COLLECTION = "ventas_solicitudes_actualizacion";
+const EMAIL_TEMPLATES_COLLECTION = "ventas_email_templates";
 
 const richSelectionByEditor = new Map();
 let richEditorsBound = false;
@@ -63,6 +66,13 @@ const state = {
   requests: [],
 
   autoAlerts: [],
+
+  emailTemplates: [],
+  emailUi: {
+    selectedTemplateId: "",
+    editingTemplateId: "",
+    activeTargetEmail: ""
+  },
 
   historyUi: {
     limit: 10,
@@ -996,7 +1006,7 @@ function buildPhoneValueHtml(value = "") {
   `;
 }
 
-function buildEmailValueHtml(value = "") {
+function buildEmailValueHtml(value = "", contactLabel = "") {
   const email = normalizeEmail(value || "");
   if (!email) return "—";
 
@@ -1004,11 +1014,21 @@ function buildEmailValueHtml(value = "") {
     <div class="contact-value-stack">
       <div class="contact-main-value">${escapeHtml(email)}</div>
       <div class="contact-actions">
-        <a class="contact-action-link" href="mailto:${escapeHtml(email)}">Enviar correo</a>
+        <button
+          class="contact-action-link"
+          type="button"
+          data-action="open-email-modal"
+          data-email="${escapeHtml(email)}"
+          data-contact-label="${escapeHtml(contactLabel || "")}"
+        >
+          Enviar correo
+        </button>
       </div>
     </div>
   `;
 }
+
+
 
 function buildSemanaViajeLabel(start = "", end = "") {
   const startTxt = formatInputDate(start);
@@ -1784,14 +1804,17 @@ function renderDatos() {
   const grid = $("datosGrupoGrid");
   if (!grid) return;
 
+  const nombre1 = normalizeTextUpper(state.group.nombreCliente || "");
+  const nombre2 = normalizeTextUpper(state.group.nombreCliente2 || "");
+
   const items = [
     {
       label: "1° Contacto",
-      valueHtml: escapeHtml(normalizeTextUpper(state.group.nombreCliente || "") || "—")
+      valueHtml: escapeHtml(nombre1 || "—")
     },
     {
       label: "Correo 1° Contacto",
-      valueHtml: buildEmailValueHtml(state.group.correoCliente)
+      valueHtml: buildEmailValueHtml(state.group.correoCliente, nombre1 || "1° CONTACTO")
     },
     {
       label: "Celular 1° Contacto",
@@ -1800,11 +1823,11 @@ function renderDatos() {
 
     {
       label: "2° Contacto",
-      valueHtml: escapeHtml(normalizeTextUpper(state.group.nombreCliente2 || "") || "—")
+      valueHtml: escapeHtml(nombre2 || "—")
     },
     {
       label: "Correo 2° Contacto",
-      valueHtml: buildEmailValueHtml(state.group.correoCliente2)
+      valueHtml: buildEmailValueHtml(state.group.correoCliente2, nombre2 || "2° CONTACTO")
     },
     {
       label: "Celular 2° Contacto",
