@@ -4121,8 +4121,8 @@ async function saveMeeting() {
 
   const titulo = cleanText($("r_titulo")?.value);
   const tipo = String($("r_tipo")?.value || "presencial");
-  const fechaInicio = $("r_fechaInicio")?.value || "";
-  const fechaFin = $("r_fechaFin")?.value || "";
+  const fecha = $("r_fecha")?.value || "";
+  const horaInicio = $("r_horaInicio")?.value || "";
   const direccion = cleanText($("r_direccion")?.value);
   const link = cleanText($("r_link")?.value);
   const observaciones = cleanText($("r_observaciones")?.value);
@@ -4132,13 +4132,8 @@ async function saveMeeting() {
     return;
   }
 
-  if (!fechaInicio || !fechaFin) {
-    alert("Debes ingresar fecha y hora de inicio y fin.");
-    return;
-  }
-
-  if (new Date(fechaFin).getTime() <= new Date(fechaInicio).getTime()) {
-    alert("La fecha/hora de fin debe ser mayor a la de inicio.");
+  if (!fecha || !horaInicio) {
+    alert("Debes ingresar la fecha y la hora de inicio.");
     return;
   }
 
@@ -4152,6 +4147,16 @@ async function saveMeeting() {
     return;
   }
 
+  const fechaInicio = new Date(`${fecha}T${horaInicio}`);
+
+  if (Number.isNaN(fechaInicio.getTime())) {
+    alert("La fecha u hora ingresada no es válida.");
+    return;
+  }
+
+  // Dejamos una duración referencial de 1 hora para agenda interna
+  const fechaFin = new Date(fechaInicio.getTime() + 60 * 60 * 1000);
+
   const data = {
     idGrupo: String(state.groupId),
     codigoRegistro: cleanText(state.group.codigoRegistro),
@@ -4163,8 +4168,8 @@ async function saveMeeting() {
     titulo,
     tipo,
     modalidad: tipo,
-    fechaInicio: Timestamp.fromDate(new Date(fechaInicio)),
-    fechaFin: Timestamp.fromDate(new Date(fechaFin)),
+    fechaInicio: Timestamp.fromDate(fechaInicio),
+    fechaFin: Timestamp.fromDate(fechaFin),
     direccion: tipo === "presencial" ? direccion : "",
     link: tipo === "virtual" ? link : "",
     estadoReunion: "agendada",
@@ -4190,7 +4195,7 @@ async function saveMeeting() {
     titulo: "Nueva reunión agendada",
     mensaje: `${getDisplayName(state.effectiveUser)} agendó una reunión ${tipo}.`,
     cambios: [
-      { campo: "proximaReunionFecha", anterior: state.group.proximaReunionFecha || "", nuevo: fechaInicio },
+      { campo: "proximaReunionFecha", anterior: state.group.proximaReunionFecha || "", nuevo: fechaInicio.toISOString() },
       { campo: "proximaReunionTipo", anterior: state.group.proximaReunionTipo || "", nuevo: tipo }
     ],
     reloadAfterSave: false
@@ -4204,7 +4209,7 @@ async function saveMeeting() {
     metadata: {
       cambios: [
         { campo: "reunion.tipo", anterior: "", nuevo: tipo },
-        { campo: "reunion.fechaInicio", anterior: "", nuevo: fechaInicio },
+        { campo: "reunion.fechaInicio", anterior: "", nuevo: fechaInicio.toISOString() },
         { campo: "reunion.lugar", anterior: "", nuevo: tipo === "presencial" ? direccion : link }
       ]
     }
@@ -4810,16 +4815,19 @@ function getEarliestUpcomingMeeting(list = []) {
 
 function setDefaultMeetingDates() {
   const now = new Date();
-  now.setMinutes(0, 0, 0);
+  now.setSeconds(0, 0);
 
   const start = new Date(now);
   start.setHours(start.getHours() + 2);
 
-  const end = new Date(start);
-  end.setHours(end.getHours() + 1);
+  const yyyy = start.getFullYear();
+  const mm = String(start.getMonth() + 1).padStart(2, "0");
+  const dd = String(start.getDate()).padStart(2, "0");
+  const hh = String(start.getHours()).padStart(2, "0");
+  const mi = String(start.getMinutes()).padStart(2, "0");
 
-  setFormValue("r_fechaInicio", toDatetimeLocal(start));
-  setFormValue("r_fechaFin", toDatetimeLocal(end));
+  setFormValue("r_fecha", `${yyyy}-${mm}-${dd}`);
+  setFormValue("r_horaInicio", `${hh}:${mi}`);
 }
 
 function itemData(label, value, full = false) {
