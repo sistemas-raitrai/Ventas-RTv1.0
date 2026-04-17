@@ -605,26 +605,53 @@ async function findPotentialDuplicateAlerts(data = {}) {
       pushUniqueReason(reasons, `Mismo celular terminado en ${matchedPhone}`);
     }
 
+    const hasAssignedVendor =
+      !!normalizeEmail(rowData.vendedoraCorreo || "") ||
+      normalizeSearch(rowData.vendedora || "") !== "sin asignar";
+    
+    const isFromCartera =
+      normalizeSearch(rowData.origenColegio || "") === "cartera" ||
+      !!normalizeText(rowData.carteraNumeroColegio || "") ||
+      !!normalizeEmail(rowData.carteraCorreoVendedora || "");
+    
+    const sameComuna = inputComuna && rowComuna && inputComuna === rowComuna;
+    const sameYear = inputYear && Number.isFinite(rowYear) && rowYear === inputYear;
+    
+    const nearBusinessMatch =
+      schoolSimilarity >= 0.95 &&
+      sameComuna &&
+      (
+        courseSimilarity >= 0.88 ||
+        sameYear ||
+        hasAssignedVendor ||
+        isFromCartera
+      );
+    
+    if (nearBusinessMatch) {
+      businessCritical = true;
+      pushUniqueReason(
+        reasons,
+        "Posible conflicto comercial crítico: mismo colegio/comuna y grupo ya asignado o relacionado comercialmente"
+      );
+    }
+    
+    if (hasAssignedVendor && schoolSimilarity >= 0.95 && sameComuna) {
+      pushUniqueReason(reasons, "El grupo ya tiene vendedor/a asignado(a)");
+    }
+    
+    if (isFromCartera && schoolSimilarity >= 0.95 && sameComuna) {
+      pushUniqueReason(reasons, "El colegio ya existe en cartera");
+    }
+    
     const shouldKeep =
+      businessCritical ||
       hardSignals > 0 ||
       score >= 35 ||
       (schoolSimilarity >= 0.82 && courseSimilarity >= 0.88 && rowYear === inputYear) ||
       (bestNameMatch.score >= 0.88 && schoolSimilarity >= 0.78);
-
-    if (!shouldKeep) return;
-
-    const sameComuna = inputComuna && rowComuna && inputComuna === rowComuna;
-    const sameYear = inputYear && Number.isFinite(rowYear) && rowYear === inputYear;
-    const nearBusinessMatch =
-      schoolSimilarity >= 0.95 &&
-      sameComuna &&
-      (courseSimilarity >= 0.88 || sameYear);
     
-    if (nearBusinessMatch) {
-      businessCritical = true;
-      pushUniqueReason(reasons, "Posible conflicto comercial crítico: mismo colegio/comuna y curso o año relacionado");
-    }
-
+    if (!shouldKeep) return;
+    
     const level = getAlertLevel(score, hardSignals, businessCritical);
 
     results.push({
@@ -1316,11 +1343,6 @@ function readFormData() {
     rolCliente: normalizeText($("rolCliente")?.value || ""),
     correoCliente: normalizeEmail($("correoCliente")?.value || ""),
     celularCliente: normalizeText($("celularCliente")?.value || ""),
-
-    nombreCliente2: normalizeText($("nombreCliente2")?.value || ""),
-    rolCliente2: normalizeText($("rolCliente2")?.value || ""),
-    correoCliente2: normalizeEmail($("correoCliente2")?.value || ""),
-    celularCliente2: normalizeText($("celularCliente2")?.value || ""),
 
     nombreCliente2: normalizeText($("nombreCliente2")?.value || ""),
     rolCliente2: normalizeText($("rolCliente2")?.value || ""),
