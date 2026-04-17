@@ -2733,6 +2733,15 @@ function bindEvents() {
     btn.addEventListener("click", () => closeModal(btn.dataset.close));
   });
 
+  $("btnAbrirPdfFicha")?.addEventListener("click", () => {
+    const url = cleanText(state.ficha?.pdfUrl || state.group?.fichaPdfUrl || "");
+    if (!url) {
+      alert("Esta ficha todavía no tiene PDF guardado.");
+      return;
+    }
+    window.open(url, "_blank", "noopener");
+  });
+
   $("modalDatos")?.addEventListener("click", (e) => {
     if (e.target === $("modalDatos")) closeModal("modalDatos");
   });
