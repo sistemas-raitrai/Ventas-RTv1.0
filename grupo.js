@@ -493,7 +493,15 @@ async function loadEmailTemplates() {
   state.emailTemplates = [];
 
   try {
-    const snap = await getDocs(collection(db, EMAIL_TEMPLATES_COLLECTION));
+    const currentEmail = normalizeEmail(state.effectiveEmail || "");
+    if (!currentEmail) return;
+
+    const snap = await getDocs(
+      query(
+        collection(db, EMAIL_TEMPLATES_COLLECTION),
+        where("ownerEmail", "==", currentEmail)
+      )
+    );
 
     state.emailTemplates = snap.docs
       .map((d) => ({
@@ -512,8 +520,7 @@ async function loadEmailTemplates() {
 }
 
 function canManageEmailTemplates() {
-  const rol = String(state.effectiveUser?.rol || "").toLowerCase();
-  return rol === "admin" || rol === "supervision";
+  return !!normalizeEmail(state.effectiveEmail || "");
 }
 
 function getEmailVariableMap({ email = "", contactLabel = "" } = {}) {
@@ -680,6 +687,12 @@ function openEmailTemplateModal(mode = "create") {
   if (mode === "edit") {
     const tpl = getSelectedEmailTemplate();
 
+    const currentEmail = normalizeEmail(state.effectiveEmail || "");
+    if (normalizeEmail(tpl?.ownerEmail || "") !== currentEmail) {
+      alert("Solo puedes editar tus propias plantillas.");
+      return;
+    }
+
     if (!tpl) {
       alert("Debes seleccionar una plantilla.");
       return;
@@ -735,6 +748,10 @@ async function saveEmailTemplate() {
     asuntoTemplate,
     cuerpoTemplate,
     activa: true,
+
+    ownerEmail: normalizeEmail(state.effectiveEmail || ""),
+    ownerName: getDisplayName(state.effectiveUser),
+
     actualizadoPor: getDisplayName(state.effectiveUser),
     actualizadoPorCorreo: state.effectiveEmail,
     fechaActualizacion: serverTimestamp()
@@ -784,6 +801,12 @@ async function deleteSelectedEmailTemplate() {
   const tpl = getSelectedEmailTemplate();
   if (!tpl) {
     alert("Debes seleccionar una plantilla.");
+    return;
+  }
+
+  const currentEmail = normalizeEmail(state.effectiveEmail || "");
+  if (normalizeEmail(tpl.ownerEmail || "") !== currentEmail) {
+    alert("Solo puedes eliminar tus propias plantillas.");
     return;
   }
 
