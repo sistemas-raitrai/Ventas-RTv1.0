@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Contrato PDF</title>
+
+  <style>
+    :root {
+      --bg: #f6f2fb;
+      --paper: #ffffff;
+      --ink: #2f2340;
+      --muted: #6d6280;
+      --line: rgba(58, 42, 82, 0.16);
+      --accent: #6f4bd8;
+      --accent-soft: rgba(111, 75, 216, 0.12);
+      --danger: #b42318;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: Arial, Helvetica, sans-serif;
+    }
+
+    .topbar {
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: center;
+      padding: 14px 16px;
+      background: rgba(246, 242, 251, 0.96);
+      backdrop-filter: blur(6px);
+      border-bottom: 1px solid var(--line);
+    }
+
+    .btn {
+      border: 0;
+      border-radius: 12px;
+      padding: 10px 14px;
+      font-weight: 700;
+      cursor: pointer;
+      color: #fff;
+      background: var(--accent);
+    }
+
+    .btn.sec {
+      background: #fff;
+      color: var(--ink);
+      border: 1px solid var(--line);
+    }
+
+    .btn:disabled {
+      opacity: .65;
+      cursor: not-allowed;
+    }
+
+    .page-wrap {
+      padding: 24px 16px 40px;
+      display: flex;
+      justify-content: center;
+    }
+
+    .pdf-page {
+      width: 210mm;
+      min-height: 297mm;
+      background: var(--paper);
+      color: #222;
+      padding: 18mm 16mm 18mm;
+      box-shadow: 0 12px 30px rgba(23, 16, 34, .12);
+    }
+
+    .doc-head {
+      text-align: center;
+      margin-bottom: 18px;
+    }
+
+    .doc-head h1 {
+      margin: 0 0 8px;
+      font-size: 22px;
+      line-height: 1.2;
+      text-transform: uppercase;
+    }
+
+    .doc-head .sub {
+      font-size: 12px;
+      color: #555;
+    }
+
+    .doc-meta {
+      margin: 16px 0 22px;
+      font-size: 13px;
+      line-height: 1.6;
+    }
+
+    .clause {
+      margin-bottom: 16px;
+      font-size: 13px;
+      line-height: 1.65;
+      text-align: justify;
+    }
+
+    .clause h2 {
+      margin: 0 0 8px;
+      font-size: 14px;
+      text-transform: uppercase;
+    }
+
+    .box {
+      border: 1px solid #d9d3e6;
+      border-radius: 10px;
+      padding: 10px 12px;
+      background: #fcfbfe;
+    }
+
+    .signatures {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 28px;
+      margin-top: 42px;
+      padding-top: 14px;
+    }
+
+    .sign-box {
+      text-align: center;
+      font-size: 13px;
+    }
+
+    .sign-line {
+      border-top: 1px solid #333;
+      margin: 40px 0 8px;
+      height: 1px;
+      width: 100%;
+    }
+
+    .muted {
+      color: #666;
+    }
+
+    .empty {
+      color: #999;
+      font-style: italic;
+    }
+
+    .pdf-rich p {
+      margin: 0 0 8px;
+    }
+
+    @media print {
+      body {
+        background: #fff;
+      }
+
+      .topbar {
+        display: none !important;
+      }
+
+      .page-wrap {
+        padding: 0;
+      }
+
+      .pdf-page {
+        box-shadow: none;
+        width: 100%;
+        min-height: auto;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="topbar">
+    <button id="btnVolverFicha" class="btn sec">Volver a ficha</button>
+    <button id="btnVolverGrupo" class="btn sec">Volver a grupo</button>
+    <button id="btnGuardarContratoPdf" class="btn">Generar contrato PDF</button>
+  </div>
+
+  <div class="page-wrap">
+    <main class="pdf-page" id="contratoPage">
+      <section class="doc-head">
+        <h1>Contrato de prestación de servicios turísticos</h1>
+        <div class="sub" id="contratoSubtitulo">Documento generado automáticamente desde la ficha</div>
+      </section>
+
+      <section class="doc-meta">
+        <div><strong>Grupo:</strong> <span id="ctNombreGrupo">—</span></div>
+        <div><strong>Programa:</strong> <span id="ctPrograma">—</span></div>
+        <div><strong>Fecha de viaje:</strong> <span id="ctFechaViaje">—</span></div>
+        <div><strong>N° Negocio:</strong> <span id="ctNumeroNegocio">—</span></div>
+      </section>
+
+      <section class="clause">
+        <p>
+          En <strong>Santiago de Chile</strong>, se celebra el presente contrato entre
+          <strong>RAI TRAI SPA</strong>, en adelante la <strong>EMPRESA</strong>, y
+          <strong id="ctApoderadoInline">—</strong>, en representación del grupo
+          <strong id="ctGrupoInline">—</strong>, en adelante el <strong>CLIENTE</strong>,
+          de conformidad a las cláusulas que siguen.
+        </p>
+      </section>
+
+      <section class="clause">
+        <h2>Primero: Objeto del contrato</h2>
+        <p>
+          La EMPRESA se obliga a organizar y prestar al CLIENTE los servicios turísticos
+          correspondientes al programa <strong id="ctProgramaInline">—</strong>,
+          para el grupo <strong id="ctGrupoInline2">—</strong>, conforme a las condiciones
+          comerciales aprobadas y al programa adjunto que forma parte integrante del presente contrato.
+        </p>
+      </section>
+
+      <section class="clause">
+        <h2>Segundo: Datos del servicio contratado</h2>
+        <div class="box">
+          <div><strong>Responsable del grupo:</strong> <span id="ctApoderado">—</span></div>
+          <div><strong>Teléfono:</strong> <span id="ctTelefono">—</span></div>
+          <div><strong>Correo:</strong> <span id="ctCorreo">—</span></div>
+          <div><strong>Cantidad de pasajeros:</strong> <span id="ctPax">—</span></div>
+          <div><strong>Liberados:</strong> <span id="ctLiberados">—</span></div>
+          <div><strong>Tramo:</strong> <span id="ctTramo">—</span></div>
+          <div><strong>Categoría hotelera:</strong> <span id="ctHotel">—</span></div>
+          <div><strong>Asistencia en viajes:</strong> <span id="ctAsistencia">—</span></div>
+          <div><strong>Valor del programa:</strong> <span id="ctValor">—</span></div>
+        </div>
+      </section>
+
+      <section class="clause">
+        <h2>Tercero: Programa y servicios</h2>
+        <p>
+          El CLIENTE declara conocer y aceptar que el detalle de destinos, actividades,
+          servicios incluidos, condiciones operativas, categorías, tiempos de viaje y demás
+          aspectos específicos se encuentran contenidos en el programa entregado por la EMPRESA,
+          el cual se entiende incorporado íntegramente al presente contrato.
+        </p>
+      </section>
+
+      <section class="clause">
+        <h2>Cuarto: Precio y forma de pago</h2>
+        <p>
+          El valor referencial del programa asciende a <strong id="ctValorInline">—</strong>,
+          sin perjuicio de las condiciones de pago, cuotas, reajustes, saldos, vencimientos
+          y modalidades específicas que hayan sido aceptadas comercialmente entre las partes.
+        </p>
+      </section>
+
+      <section class="clause">
+        <h2>Quinto: Condiciones generales</h2>
+        <p>
+          El CLIENTE declara haber recibido información suficiente respecto del programa contratado,
+          sus condiciones, servicios, limitaciones, requisitos de participación y demás antecedentes
+          relevantes. Asimismo, acepta que toda modificación posterior solicitada por el CLIENTE podrá
+          implicar ajustes operativos, económicos o documentales.
+        </p>
+        <p>
+          La EMPRESA podrá coordinar con terceros la ejecución de ciertos servicios incluidos en el programa,
+          tales como transporte, hotelería, alimentación, actividades y asistencia, manteniendo la coordinación general
+          del viaje conforme a lo contratado.
+        </p>
+      </section>
+
+      <section class="clause">
+        <h2>Sexto: Observaciones operativas y administrativas</h2>
+        <div class="box">
+          <div style="margin-bottom:10px;">
+            <strong>Operaciones</strong>
+            <div id="ctInfoOperaciones" class="pdf-rich empty">Sin observaciones de operaciones.</div>
+          </div>
+
+          <div style="margin-bottom:10px;">
+            <strong>Administración</strong>
+            <div id="ctInfoAdministracion" class="pdf-rich empty">Sin observaciones de administración.</div>
+          </div>
+
+          <div>
+            <strong>Observaciones generales</strong>
+            <div id="ctObservaciones" class="pdf-rich empty">Sin observaciones generales.</div>
+          </div>
+        </div>
+      </section>
+
+      <section class="clause">
+        <h2>Séptimo: Identificación comercial</h2>
+        <p>
+          El presente contrato se asocia al número de negocio
+          <strong id="ctNumeroNegocioInline">—</strong>,
+          siendo el ejecutivo responsable <strong id="ctVendedor">—</strong>.
+        </p>
+      </section>
+
+      <section class="clause">
+        <h2>Octavo: Aceptación</h2>
+        <p>
+          Leído el presente instrumento, las partes firman en señal de conformidad,
+          dejando constancia de que el programa adjunto forma parte integrante del presente contrato.
+        </p>
+      </section>
+
+      <section class="signatures">
+        <div class="sign-box">
+          <div class="sign-line"></div>
+          <div><strong>RAI TRAI SPA</strong></div>
+          <div class="muted">EMPRESA</div>
+        </div>
+
+        <div class="sign-box">
+          <div class="sign-line"></div>
+          <div><strong id="ctApoderadoFirma">—</strong></div>
+          <div class="muted">CLIENTE / RESPONSABLE DEL GRUPO</div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+  <script type="module" src="./contrato-pdf.js"></script>
+</body>
+</html>
