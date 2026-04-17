@@ -1826,21 +1826,32 @@ function bindPageEvents() {
     });
   }
 
-    [celularCliente, celularCliente2].forEach((input) => {
+  [celularCliente, celularCliente2].forEach((input) => {
     if (!input || input.dataset.boundPhone === "1") return;
 
     input.dataset.boundPhone = "1";
 
     input.addEventListener("focus", () => {
-      if (!String(input.value || "").trim()) {
+      const value = String(input.value || "").trim();
+      if (!value) {
         input.value = "+569";
       }
     });
 
     input.addEventListener("blur", () => {
       const value = String(input.value || "").trim();
+      if (!value || value === "+56" || value === "+5" || value === "+") {
+        input.value = "+569";
+      }
+    });
+
+    input.addEventListener("input", () => {
+      const value = String(input.value || "");
+
+      // Si el usuario borra todo, volvemos a la base chilena
       if (!value) {
         input.value = "+569";
+        return;
       }
     });
   });
