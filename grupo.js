@@ -956,6 +956,60 @@ function formatChileMobileForInput(value = "") {
   return value ? normalizeChileMobile(value) : "+569";
 }
 
+function getChileMobileDigits(value = "") {
+  const normalized = normalizeChileMobile(value);
+  return String(normalized || "").replace(/\D/g, "");
+}
+
+function formatChileMobileDisplay(value = "") {
+  const digits = getChileMobileDigits(value);
+
+  // Esperado: 569 + 8 dígitos
+  if (digits.length >= 11) {
+    const countryAndPrefix = digits.slice(0, 3); // 569
+    const part1 = digits.slice(3, 7);            // 4 dígitos
+    const part2 = digits.slice(7, 11);           // 4 dígitos
+    return `(+${countryAndPrefix}) ${part1} ${part2}`;
+  }
+
+  // Fallback por si viene incompleto
+  const normalized = normalizeChileMobile(value);
+  return normalized || "—";
+}
+
+function buildPhoneValueHtml(value = "") {
+  const digits = getChileMobileDigits(value);
+  if (!digits || digits.length < 11) return "—";
+
+  const display = formatChileMobileDisplay(value);
+  const telHref = `tel:+${digits}`;
+  const waHref = `https://wa.me/${digits}`;
+
+  return `
+    <div class="contact-value-stack">
+      <div class="contact-main-value">${escapeHtml(display)}</div>
+      <div class="contact-actions">
+        <a class="contact-action-link" href="${escapeHtml(telHref)}">Llamar</a>
+        <a class="contact-action-link" href="${escapeHtml(waHref)}" target="_blank" rel="noopener">WhatsApp</a>
+      </div>
+    </div>
+  `;
+}
+
+function buildEmailValueHtml(value = "") {
+  const email = normalizeEmail(value || "");
+  if (!email) return "—";
+
+  return `
+    <div class="contact-value-stack">
+      <div class="contact-main-value">${escapeHtml(email)}</div>
+      <div class="contact-actions">
+        <a class="contact-action-link" href="mailto:${escapeHtml(email)}">Enviar correo</a>
+      </div>
+    </div>
+  `;
+}
+
 function buildSemanaViajeLabel(start = "", end = "") {
   const startTxt = formatInputDate(start);
   const endTxt = formatInputDate(end);
@@ -1731,20 +1785,55 @@ function renderDatos() {
   if (!grid) return;
 
   const items = [
-    itemData("1° Contacto", normalizeTextUpper(state.group.nombreCliente || "")),
-    itemData("Correo 1° Contacto", state.group.correoCliente),
-    itemData("Celular 1° Contacto", state.group.celularCliente),
-  
-    itemData("2° Contacto", normalizeTextUpper(state.group.nombreCliente2 || "")),
-    itemData("Correo 2° Contacto", state.group.correoCliente2),
-    itemData("Celular 2° Contacto", state.group.celularCliente2),
-  
-    itemData("Destino principal", normalizeTextUpper(getDestinoPrincipalDisplay(state.group)), true),
-    itemData("Programa", normalizeTextUpper(getProgramaDisplay(state.group)), true),
-  
-    itemData("Mes de viaje", normalizeTextUpper(getMesViajeDisplay(state.group))),
-    itemData("Cantidad grupo", state.group.cantidadGrupo),
-    itemData("Tramo", normalizeTextUpper(getTramoDisplay(state.group)))
+    {
+      label: "1° Contacto",
+      valueHtml: escapeHtml(normalizeTextUpper(state.group.nombreCliente || "") || "—")
+    },
+    {
+      label: "Correo 1° Contacto",
+      valueHtml: buildEmailValueHtml(state.group.correoCliente)
+    },
+    {
+      label: "Celular 1° Contacto",
+      valueHtml: buildPhoneValueHtml(state.group.celularCliente)
+    },
+
+    {
+      label: "2° Contacto",
+      valueHtml: escapeHtml(normalizeTextUpper(state.group.nombreCliente2 || "") || "—")
+    },
+    {
+      label: "Correo 2° Contacto",
+      valueHtml: buildEmailValueHtml(state.group.correoCliente2)
+    },
+    {
+      label: "Celular 2° Contacto",
+      valueHtml: buildPhoneValueHtml(state.group.celularCliente2)
+    },
+
+    {
+      label: "Destino principal",
+      valueHtml: escapeHtml(normalizeTextUpper(getDestinoPrincipalDisplay(state.group)) || "—"),
+      full: true
+    },
+    {
+      label: "Programa",
+      valueHtml: escapeHtml(normalizeTextUpper(getProgramaDisplay(state.group)) || "—"),
+      full: true
+    },
+
+    {
+      label: "Mes de viaje",
+      valueHtml: escapeHtml(normalizeTextUpper(getMesViajeDisplay(state.group)) || "—")
+    },
+    {
+      label: "Cantidad grupo",
+      valueHtml: escapeHtml(String(state.group.cantidadGrupo || "—"))
+    },
+    {
+      label: "Tramo",
+      valueHtml: escapeHtml(normalizeTextUpper(getTramoDisplay(state.group)) || "—")
+    }
   ];
 
   grid.className = "grupo-data-card-grid";
@@ -1752,7 +1841,7 @@ function renderDatos() {
   grid.innerHTML = items.map((item) => `
     <div class="grupo-data-card ${item.full ? "full is-strong" : ""}">
       <div class="info-label">${escapeHtml(item.label)}</div>
-      <div class="info-value">${escapeHtml(item.value || "—")}</div>
+      <div class="info-value contact-info-value">${item.valueHtml || "—"}</div>
     </div>
   `).join("");
 }
