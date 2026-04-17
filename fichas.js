@@ -1064,6 +1064,16 @@ function bindEvents() {
     window.open(url, "_blank", "noopener");
   });
 
+  $("btnAbrirContratoPdf")?.addEventListener("click", () => {
+    const id = state.groupId || state.requestedId || state.group?.idGrupo || "";
+    if (!id) {
+      alert("No encontré el ID del grupo para abrir el contrato.");
+      return;
+    }
+  
+    window.open(`contrato-pdf.html?id=${encodeURIComponent(id)}`, "_blank", "noopener");
+  });
+
   $("f_programaPdfFile")?.addEventListener("change", handleProgramaPdfSelected);
 
   $("btnAbrirProgramaPdf")?.addEventListener("click", () => {
