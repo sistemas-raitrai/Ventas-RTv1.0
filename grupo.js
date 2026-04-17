@@ -376,7 +376,8 @@ async function loadAll() {
     loadMeetings(),
     loadHistory(),
     loadManualAlerts(),
-    loadRequests()
+    loadRequests(),
+    loadEmailTemplates()
   ]);
 
   state.autoAlerts = buildAutomaticAlerts();
@@ -486,6 +487,375 @@ async function loadRequests() {
   } catch (error) {
     console.error("[grupo] loadRequests", error);
   }
+}
+
+async function loadEmailTemplates() {
+  state.emailTemplates = [];
+
+  try {
+    const snap = await getDocs(collection(db, EMAIL_TEMPLATES_COLLECTION));
+
+    state.emailTemplates = snap.docs
+      .map((d) => ({
+        id: d.id,
+        ...d.data()
+      }))
+      .filter((item) => item.activa !== false)
+      .sort((a, b) => {
+        const aName = cleanText(a.nombre || "").toLowerCase();
+        const bName = cleanText(b.nombre || "").toLowerCase();
+        return aName.localeCompare(bName, "es");
+      });
+  } catch (error) {
+    console.error("[grupo] loadEmailTemplates", error);
+  }
+}
+
+function canManageEmailTemplates() {
+  const rol = String(state.effectiveUser?.rol || "").toLowerCase();
+  return rol === "admin" || rol === "supervision";
+}
+
+function getEmailVariableMap({ email = "", contactLabel = "" } = {}) {
+  const nombre1 = normalizeTextUpper(state.group?.nombreCliente || "");
+  const nombre2 = normalizeTextUpper(state.group?.nombreCliente2 || "");
+
+  const email1 = normalizeEmail(state.group?.correoCliente || "");
+  const email2 = normalizeEmail(state.group?.correoCliente2 || "");
+  const emailNorm = normalizeEmail(email || "");
+
+  const contactName =
+    emailNorm === email1
+      ? (nombre1 || contactLabel || "")
+      : emailNorm === email2
+        ? (nombre2 || contactLabel || "")
+        : (contactLabel || "");
+
+  return {
+    contacto: contactName || "",
+    nombreContacto: contactName || "",
+    email: emailNorm || "",
+    correo: emailNorm || "",
+
+    idGrupo: String(state.groupId || ""),
+    aliasGrupo: cleanText(state.group?.aliasGrupo || ""),
+    nombreGrupo: cleanText(state.group?.nombreGrupo || ""),
+    colegio: normalizeTextUpper(state.group?.colegio || ""),
+    curso: normalizeTextUpper(state.group?.curso || ""),
+    anoViaje: cleanText(state.group?.anoViaje || ""),
+    comunaCiudad: normalizeTextUpper(state.group?.comunaCiudad || ""),
+    destinoPrincipal: normalizeTextUpper(getDestinoPrincipalDisplay(state.group) || ""),
+    programa: normalizeTextUpper(getProgramaDisplay(state.group) || ""),
+    tramo: normalizeTextUpper(getTramoDisplay(state.group) || ""),
+    mesViaje: normalizeTextUpper(getMesViajeDisplay(state.group) || ""),
+    cantidadGrupo: cleanText(state.group?.cantidadGrupo || ""),
+    vendedora: cleanText(state.group?.vendedora || state.group?.vendedoraCorreo || ""),
+    numeroNegocio: cleanText(state.group?.numeroNegocio || ""),
+
+    firmaUsuario: getDisplayName(state.effectiveUser),
+    firmaCorreo: state.effectiveEmail || ""
+  };
+}
+
+function replaceTemplateVariables(text = "", variables = {}) {
+  return String(text || "").replace(/\{\{\s*([a-zA-Z0-9_]+)\s*\}\}/g, (_, key) => {
+    return String(variables[key] ?? "");
+  });
+}
+
+function getSelectedEmailTemplate() {
+  return state.emailTemplates.find((item) => item.id === state.emailUi.selectedTemplateId) || null;
+}
+
+function renderEmailTemplateOptions() {
+  const select = $("email_template");
+  if (!select) return;
+
+  const current = state.emailUi.selectedTemplateId || "";
+
+  select.innerHTML = `
+    <option value="">Sin plantilla</option>
+    ${state.emailTemplates.map((tpl) => `
+      <option value="${escapeHtml(tpl.id)}">${escapeHtml(tpl.nombre || "Plantilla")}</option>
+    `).join("")}
+  `;
+
+  select.value = current;
+}
+
+function buildDefaultEmailDraft({ email = "", contactLabel = "" } = {}) {
+  const vars = getEmailVariableMap({ email, contactLabel });
+
+  return {
+    asunto: `Viaje de estudios ${vars.colegio || vars.aliasGrupo || ""}`.trim(),
+    cuerpo:
+`Hola ${vars.nombreContacto || ""},
+
+Te escribo por el grupo ${vars.aliasGrupo || vars.nombreGrupo || vars.colegio || ""}${vars.anoViaje ? `, viaje ${vars.anoViaje}` : ""}.
+
+Quedo atento(a) a tus comentarios.
+
+Saludos,
+${vars.firmaUsuario || ""}`.trim()
+  };
+}
+
+function applyEmailTemplateSelection() {
+  const para = normalizeEmail($("email_to")?.value || "");
+  const contactLabel = cleanText($("email_contact_label")?.value || "");
+  const tpl = getSelectedEmailTemplate();
+
+  if (!tpl) {
+    const draft = buildDefaultEmailDraft({ email: para, contactLabel });
+    setFormValue("email_subject", draft.asunto);
+    setFormValue("email_body", draft.cuerpo);
+    return;
+  }
+
+  const vars = getEmailVariableMap({ email: para, contactLabel });
+
+  setFormValue(
+    "email_subject",
+    replaceTemplateVariables(tpl.asuntoTemplate || "", vars)
+  );
+
+  setFormValue(
+    "email_body",
+    replaceTemplateVariables(tpl.cuerpoTemplate || "", vars)
+  );
+}
+
+function syncEmailTemplateButtons() {
+  const canManage = canManageEmailTemplates();
+  const hasSelected = !!state.emailUi.selectedTemplateId;
+
+  const btnNew = $("btnNewEmailTemplate");
+  const btnEdit = $("btnEditEmailTemplate");
+  const btnDelete = $("btnDeleteEmailTemplate");
+
+  if (btnNew) {
+    btnNew.disabled = !canManage;
+    btnNew.classList.toggle("hidden", !canManage);
+  }
+
+  if (btnEdit) {
+    btnEdit.disabled = !canManage || !hasSelected;
+    btnEdit.classList.toggle("hidden", !canManage);
+  }
+
+  if (btnDelete) {
+    btnDelete.disabled = !canManage || !hasSelected;
+    btnDelete.classList.toggle("hidden", !canManage);
+  }
+}
+
+async function openEmailModal({ email = "", contactLabel = "" } = {}) {
+  const normalizedEmail = normalizeEmail(email || "");
+  if (!normalizedEmail) {
+    alert("Este contacto no tiene correo disponible.");
+    return;
+  }
+
+  state.emailUi.activeTargetEmail = normalizedEmail;
+  state.emailUi.selectedTemplateId = "";
+
+  setFormValue("email_to", normalizedEmail);
+  setFormValue("email_contact_label", contactLabel || "");
+  setFormValue("email_subject", "");
+  setFormValue("email_body", "");
+
+  renderEmailTemplateOptions();
+  syncEmailTemplateButtons();
+  applyEmailTemplateSelection();
+
+  openModal("modalCorreo");
+}
+
+function openEmailTemplateModal(mode = "create") {
+  if (!canManageEmailTemplates()) {
+    alert("Solo admin y supervisión pueden administrar plantillas.");
+    return;
+  }
+
+  if (mode === "edit") {
+    const tpl = getSelectedEmailTemplate();
+
+    if (!tpl) {
+      alert("Debes seleccionar una plantilla.");
+      return;
+    }
+
+    state.emailUi.editingTemplateId = tpl.id;
+    setText("emailTemplateModalTitle", "Editar plantilla");
+    setFormValue("tpl_nombre", tpl.nombre || "");
+    setFormValue("tpl_asunto", tpl.asuntoTemplate || "");
+    setFormValue("tpl_cuerpo", tpl.cuerpoTemplate || "");
+    setFormValue("tpl_categoria", tpl.categoria || "grupo");
+  } else {
+    state.emailUi.editingTemplateId = "";
+    setText("emailTemplateModalTitle", "Nueva plantilla");
+    setFormValue("tpl_nombre", "");
+    setFormValue("tpl_asunto", "");
+    setFormValue("tpl_cuerpo", "");
+    setFormValue("tpl_categoria", "grupo");
+  }
+
+  openModal("modalTemplateEmail");
+}
+
+async function saveEmailTemplate() {
+  if (!canManageEmailTemplates()) {
+    alert("Solo admin y supervisión pueden administrar plantillas.");
+    return;
+  }
+
+  const nombre = cleanText($("tpl_nombre")?.value || "");
+  const asuntoTemplate = String($("tpl_asunto")?.value || "").trim();
+  const cuerpoTemplate = String($("tpl_cuerpo")?.value || "").trim();
+  const categoria = cleanText($("tpl_categoria")?.value || "grupo") || "grupo";
+
+  if (!nombre) {
+    alert("Debes ingresar un nombre para la plantilla.");
+    return;
+  }
+
+  if (!asuntoTemplate) {
+    alert("Debes ingresar un asunto para la plantilla.");
+    return;
+  }
+
+  if (!cuerpoTemplate) {
+    alert("Debes ingresar un cuerpo para la plantilla.");
+    return;
+  }
+
+  const payload = {
+    nombre,
+    categoria,
+    asuntoTemplate,
+    cuerpoTemplate,
+    activa: true,
+    actualizadoPor: getDisplayName(state.effectiveUser),
+    actualizadoPorCorreo: state.effectiveEmail,
+    fechaActualizacion: serverTimestamp()
+  };
+
+  if (state.emailUi.editingTemplateId) {
+    await updateDoc(doc(db, EMAIL_TEMPLATES_COLLECTION, state.emailUi.editingTemplateId), payload);
+
+    await createHistoryEntry({
+      tipoMovimiento: "plantilla_correo_editada",
+      modulo: "correo",
+      titulo: "Plantilla de correo editada",
+      asunto: nombre,
+      mensaje: `${getDisplayName(state.effectiveUser)} editó la plantilla "${nombre}".`
+    });
+  } else {
+    await addDoc(collection(db, EMAIL_TEMPLATES_COLLECTION), {
+      ...payload,
+      creadoPor: getDisplayName(state.effectiveUser),
+      creadoPorCorreo: state.effectiveEmail,
+      fechaCreacion: serverTimestamp()
+    });
+
+    await createHistoryEntry({
+      tipoMovimiento: "plantilla_correo_creada",
+      modulo: "correo",
+      titulo: "Plantilla de correo creada",
+      asunto: nombre,
+      mensaje: `${getDisplayName(state.effectiveUser)} creó la plantilla "${nombre}".`
+    });
+  }
+
+  await loadEmailTemplates();
+  renderEmailTemplateOptions();
+  syncEmailTemplateButtons();
+
+  closeModal("modalTemplateEmail");
+  showSaveNotice("Plantilla guardada correctamente.");
+}
+
+async function deleteSelectedEmailTemplate() {
+  if (!canManageEmailTemplates()) {
+    alert("Solo admin y supervisión pueden administrar plantillas.");
+    return;
+  }
+
+  const tpl = getSelectedEmailTemplate();
+  if (!tpl) {
+    alert("Debes seleccionar una plantilla.");
+    return;
+  }
+
+  const ok = confirm(`¿Eliminar la plantilla "${tpl.nombre}"?`);
+  if (!ok) return;
+
+  await deleteDoc(doc(db, EMAIL_TEMPLATES_COLLECTION, tpl.id));
+
+  await createHistoryEntry({
+    tipoMovimiento: "plantilla_correo_eliminada",
+    modulo: "correo",
+    titulo: "Plantilla de correo eliminada",
+    asunto: tpl.nombre || "Plantilla",
+    mensaje: `${getDisplayName(state.effectiveUser)} eliminó la plantilla "${tpl.nombre || "Plantilla"}".`
+  });
+
+  state.emailUi.selectedTemplateId = "";
+  await loadEmailTemplates();
+  renderEmailTemplateOptions();
+  syncEmailTemplateButtons();
+  applyEmailTemplateSelection();
+
+  showSaveNotice("Plantilla eliminada correctamente.");
+}
+
+async function goToGmailWithDraft() {
+  const para = normalizeEmail($("email_to")?.value || "");
+  const asunto = String($("email_subject")?.value || "").trim();
+  const cuerpo = String($("email_body")?.value || "").trim();
+  const contactLabel = cleanText($("email_contact_label")?.value || "");
+  const tpl = getSelectedEmailTemplate();
+
+  if (!para) {
+    alert("Debes indicar un destinatario.");
+    return;
+  }
+
+  if (!asunto) {
+    alert("Debes indicar un asunto.");
+    return;
+  }
+
+  if (!cuerpo) {
+    alert("Debes indicar el cuerpo del correo.");
+    return;
+  }
+
+  const baseUrl = "https://mail.google.com/mail/u/0/?view=cm&fs=1";
+  const params = [
+    `to=${encodeURIComponent(para)}`,
+    `su=${encodeURIComponent(asunto)}`,
+    `body=${encodeURIComponent(cuerpo)}`
+  ].join("&");
+
+  window.open(`${baseUrl}&${params}`, "_blank", "noopener");
+
+  await createHistoryEntry({
+    tipoMovimiento: "correo_preparado",
+    modulo: "correo",
+    titulo: "Correo preparado",
+    asunto: asunto,
+    mensaje: `${getDisplayName(state.effectiveUser)} preparó un correo para ${contactLabel || para}${tpl ? ` usando la plantilla "${tpl.nombre}"` : ""}.`,
+    metadata: {
+      destinatario: para,
+      plantillaId: tpl?.id || "",
+      plantillaNombre: tpl?.nombre || "",
+      asuntoCorreo: asunto
+    }
+  });
+
+  closeModal("modalCorreo");
+  showSaveNotice("Se abrió Gmail con el borrador listo.");
 }
 
 /* =========================================================
@@ -2359,6 +2729,14 @@ function bindEvents() {
     if (e.target === $("modalComentario")) closeModal("modalComentario");
   });
 
+    $("modalCorreo")?.addEventListener("click", (e) => {
+    if (e.target === $("modalCorreo")) closeModal("modalCorreo");
+  });
+
+  $("modalTemplateEmail")?.addEventListener("click", (e) => {
+    if (e.target === $("modalTemplateEmail")) closeModal("modalTemplateEmail");
+  });
+
   $("btnEditarDatosHero")?.addEventListener("click", openDatosModal);
   $("btnEditarDatos")?.addEventListener("click", openDatosModal);
 
@@ -2384,6 +2762,18 @@ function bindEvents() {
   $("btnGuardarReunion")?.addEventListener("click", saveMeeting);
   $("btnGuardarAlerta")?.addEventListener("click", saveManualAlert);
   $("btnGuardarComentario")?.addEventListener("click", saveComment);
+
+  $("email_template")?.addEventListener("change", () => {
+    state.emailUi.selectedTemplateId = $("email_template")?.value || "";
+    syncEmailTemplateButtons();
+    applyEmailTemplateSelection();
+  });
+
+  $("btnGoGmail")?.addEventListener("click", goToGmailWithDraft);
+  $("btnNewEmailTemplate")?.addEventListener("click", () => openEmailTemplateModal("create"));
+  $("btnEditEmailTemplate")?.addEventListener("click", () => openEmailTemplateModal("edit"));
+  $("btnDeleteEmailTemplate")?.addEventListener("click", deleteSelectedEmailTemplate);
+  $("btnSaveEmailTemplate")?.addEventListener("click", saveEmailTemplate);
 
   $("btnHistoryToggleHidden")?.addEventListener("click", () => {
     state.historyUi.showHidden = !state.historyUi.showHidden;
@@ -2418,6 +2808,16 @@ function bindEvents() {
 
     const id = btn.dataset.id || "";
     await resolveManualAlert(id);
+  });
+
+  $("datosGrupoGrid")?.addEventListener("click", async (e) => {
+    const btn = e.target.closest("[data-action='open-email-modal']");
+    if (!btn) return;
+
+    await openEmailModal({
+      email: btn.dataset.email || "",
+      contactLabel: btn.dataset.contactLabel || ""
+    });
   });
 
   $("historyList")?.addEventListener("click", async (e) => {
