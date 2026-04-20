@@ -3211,8 +3211,8 @@ function openMeetingModal() {
 }
 
 function openAlertModal() {
-  if (!canEditGroup()) {
-    alert(getBlockedEditMessage());
+  if (!canCreateAlertsAndComments()) {
+    alert("No tienes permisos para crear alertas en este grupo.");
     return;
   }
 
