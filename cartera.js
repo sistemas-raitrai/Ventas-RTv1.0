@@ -215,37 +215,43 @@ function renderContactos(contactos = []) {
       </div>
 
       <div class="contacto-grid">
-        <div class="form-group">
+        <div class="modal-field">
           <label>Nombre</label>
           <input type="text" class="contacto-nombre" value="${escapeHtml(contact.nombre)}" />
         </div>
 
-        <div class="form-group">
+        <div class="modal-field">
           <label>Rol / cargo</label>
-          <input type="text" class="contacto-rol" value="${escapeHtml(contact.rol)}" />
+          <select class="contacto-rol">
+            <option value="">Seleccionar</option>
+            <option value="APODERADO" ${contact.rol === "APODERADO" ? "selected" : ""}>APODERADO</option>
+            <option value="PROFESOR" ${contact.rol === "PROFESOR" ? "selected" : ""}>PROFESOR</option>
+            <option value="DIRECTIVO" ${contact.rol === "DIRECTIVO" ? "selected" : ""}>DIRECTIVO</option>
+            <option value="OTRO" ${contact.rol === "OTRO" ? "selected" : ""}>OTRO</option>
+          </select>
         </div>
 
-        <div class="form-group">
+        <div class="modal-field">
           <label>Correo</label>
           <input type="email" class="contacto-correo" value="${escapeHtml(contact.correo)}" />
         </div>
 
-        <div class="form-group">
+        <div class="modal-field">
           <label>Teléfono</label>
           <input type="text" class="contacto-telefono" value="${escapeHtml(contact.telefono)}" />
         </div>
 
-        <div class="form-group">
+        <div class="modal-field">
           <label>Nivel</label>
           <input type="text" class="contacto-nivel" placeholder="Ej: 3, 4, director" value="${escapeHtml(contact.nivel)}" />
         </div>
 
-        <div class="form-group">
+        <div class="modal-field">
           <label>Curso / letra</label>
           <input type="text" class="contacto-curso" placeholder="Ej: A, B, C" value="${escapeHtml(contact.curso)}" />
         </div>
 
-        <div class="form-group contacto-observaciones-wrap">
+        <div class="modal-field contacto-observaciones-wrap">
           <label>Observaciones del contacto</label>
           <textarea class="contacto-observaciones" rows="3">${escapeHtml(contact.observaciones)}</textarea>
         </div>
