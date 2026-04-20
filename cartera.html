@@ -730,6 +730,41 @@
       background:#fff;
     }
 
+    .contactos-container {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      margin-top: 8px;
+    }
+    
+    .contacto-item {
+      border: 1px solid rgba(255,255,255,.15);
+      border-radius: 14px;
+      padding: 14px;
+      background: rgba(255,255,255,.03);
+    }
+    
+    .contacto-item-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 12px;
+    }
+    
+    .contacto-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
+    
+    .contacto-observaciones-wrap {
+      grid-column: 1 / -1;
+    }
+    
+    .contactos-actions {
+      margin-top: 10px;
+    }
+
     @media (max-width: 900px){
       .cartera-page{
         padding:16px;
@@ -1042,6 +1077,18 @@
           <div class="modal-field">
             <label for="contacto2TelefonoInput">Teléfono</label>
             <input id="contacto2TelefonoInput" type="text" />
+          </div>
+
+          <div class="form-group contactos-group">
+            <label class="form-label">Contactos del colegio</label>
+          
+            <div id="contactosContainer" class="contactos-container"></div>
+          
+            <div class="contactos-actions">
+              <button type="button" id="btnAgregarContacto" class="btn-secundario">
+                + Agregar contacto
+              </button>
+            </div>
           </div>
         
           <div class="modal-field full">
