@@ -155,8 +155,12 @@ function stringifyContact(contact = {}) {
     normalizeText(contact.nombre || ""),
     normalizeText(contact.rol || ""),
     normalizeText(contact.correo || ""),
-    normalizeText(contact.telefono || "")
+    normalizeText(contact.telefono || ""),
+    normalizeText(contact.nivel || ""),
+    normalizeText(contact.curso || ""),
+    normalizeText(contact.observaciones || "")
   ].filter(Boolean);
+
   return parts.join(" · ");
 }
 
@@ -167,6 +171,132 @@ function buildContact(nombre = "", rol = "", correo = "", telefono = "") {
     correo: normalizeEmail(correo),
     telefono: normalizeText(telefono)
   };
+}
+
+function createEmptyContact() {
+  return {
+    nombre: "",
+    rol: "",
+    correo: "",
+    telefono: "",
+    nivel: "",
+    curso: "",
+    observaciones: ""
+  };
+}
+
+function normalizeContactItem(contact = {}) {
+  return {
+    nombre: normalizeText(contact.nombre || ""),
+    rol: normalizeText(contact.rol || ""),
+    correo: normalizeEmail(contact.correo || ""),
+    telefono: normalizeText(contact.telefono || ""),
+    nivel: normalizeText(contact.nivel || ""),
+    curso: normalizeText(contact.curso || "").toUpperCase(),
+    observaciones: normalizeText(contact.observaciones || "")
+  };
+}
+
+function renderContactos(contactos = []) {
+  const container = $("contactosContainer");
+  if (!container) return;
+
+  const safeContacts = Array.isArray(contactos) && contactos.length
+    ? contactos.map(normalizeContactItem)
+    : [createEmptyContact()];
+
+  container.innerHTML = safeContacts.map((contact, index) => `
+    <div class="contacto-item" data-index="${index}">
+      <div class="contacto-item-head">
+        <strong>Contacto ${index + 1}</strong>
+        <button type="button" class="btn-mini delete" data-action="remove-contact">
+          Eliminar
+        </button>
+      </div>
+
+      <div class="contacto-grid">
+        <div class="form-group">
+          <label>Nombre</label>
+          <input type="text" class="contacto-nombre" value="${escapeHtml(contact.nombre)}" />
+        </div>
+
+        <div class="form-group">
+          <label>Rol / cargo</label>
+          <input type="text" class="contacto-rol" value="${escapeHtml(contact.rol)}" />
+        </div>
+
+        <div class="form-group">
+          <label>Correo</label>
+          <input type="email" class="contacto-correo" value="${escapeHtml(contact.correo)}" />
+        </div>
+
+        <div class="form-group">
+          <label>Teléfono</label>
+          <input type="text" class="contacto-telefono" value="${escapeHtml(contact.telefono)}" />
+        </div>
+
+        <div class="form-group">
+          <label>Nivel</label>
+          <input type="text" class="contacto-nivel" placeholder="Ej: 3, 4, director" value="${escapeHtml(contact.nivel)}" />
+        </div>
+
+        <div class="form-group">
+          <label>Curso / letra</label>
+          <input type="text" class="contacto-curso" placeholder="Ej: A, B, C" value="${escapeHtml(contact.curso)}" />
+        </div>
+
+        <div class="form-group contacto-observaciones-wrap">
+          <label>Observaciones del contacto</label>
+          <textarea class="contacto-observaciones" rows="3">${escapeHtml(contact.observaciones)}</textarea>
+        </div>
+      </div>
+    </div>
+  `).join("");
+}
+
+function addContactoItem(data = {}) {
+  const container = $("contactosContainer");
+  if (!container) return;
+
+  const contactos = readContactosFromModal();
+  contactos.push(normalizeContactItem(data));
+  renderContactos(contactos);
+}
+
+function removeContactoItemByIndex(index) {
+  const contactos = readContactosFromModal().filter((_, i) => i !== index);
+  renderContactos(contactos.length ? contactos : [createEmptyContact()]);
+}
+
+function readContactosFromModal() {
+  const container = $("contactosContainer");
+  if (!container) return [];
+
+  const items = [...container.querySelectorAll(".contacto-item")];
+
+  return items
+    .map((item) => {
+      const contacto = {
+        nombre: item.querySelector(".contacto-nombre")?.value || "",
+        rol: item.querySelector(".contacto-rol")?.value || "",
+        correo: item.querySelector(".contacto-correo")?.value || "",
+        telefono: item.querySelector(".contacto-telefono")?.value || "",
+        nivel: item.querySelector(".contacto-nivel")?.value || "",
+        curso: item.querySelector(".contacto-curso")?.value || "",
+        observaciones: item.querySelector(".contacto-observaciones")?.value || ""
+      };
+
+      return normalizeContactItem(contacto);
+    })
+    .filter((contact) =>
+      contact.nombre ||
+      contact.rol ||
+      contact.correo ||
+      contact.telefono ||
+      contact.nivel ||
+      contact.curso ||
+      contact.observaciones
+    );
 }
 
 function normalizeCourseToken(value = "") {
@@ -1364,7 +1494,14 @@ function renderTable() {
    FIRESTORE
 ========================================================= */
 async function loadVendorItems(email) {
-  const sellerEmails = getVentasUserEmails(email);
+  const sellerEmails = (getVentasUserEmails(email) || [])
+    .map(e => normalizeEmail(e))
+    .filter(e => e && e.includes("@")); // evita undefined/null
+
+    if (!sellerEmails.length) {
+    console.warn("No hay emails válidos para cargar cartera:", email);
+    return [];
+  }
 
   setProgressStatus({
     text: "Cargando cartera...",
@@ -1425,6 +1562,7 @@ async function loadAllItems() {
 
   for (const sellerDoc of sellerDocs) {
     const sellerEmail = sellerDoc.id;
+    if (!sellerEmail || !sellerEmail.includes("@")) continue;
     const itemsSnap = await getDocs(collection(db, "ventas_cartera", sellerEmail, "items"));
     itemsSnap.docs.forEach(d => rows.push(mapDocToRow(d.id, d.data())));
 
@@ -1549,11 +1687,13 @@ async function openCreateModal() {
 
   fillVendorSelectModal("");
   resetLogoModalState();
+
+  renderContactos([createEmptyContact()]);
+
   $("modalForm").classList.add("show");
 
   await syncNumeroColegioInputForSelectedVendor();
 }
-
 async function openEditModal(row) {
   state.modalMode = "edit";
   state.editingOriginal = { ...row };
@@ -1570,6 +1710,9 @@ async function openEditModal(row) {
   fillVendorSelectModal(row.correoVendedor || "");
   resetLogoModalState();
   refreshLogoPreview();
+
+  renderContactos(row.contactosColegio || [createEmptyContact()]);
+
   $("modalForm").classList.add("show");
 
   await syncNumeroColegioInputForSelectedVendor();
@@ -1583,12 +1726,16 @@ function closeModal() {
   if ($("logoInput")) $("logoInput").value = "";
   if ($("quitarLogoCheck")) $("quitarLogoCheck").checked = false;
 
+  const container = $("contactosContainer");
+  if (container) container.innerHTML = "";
+
   $("modalForm")?.classList.remove("show");
 }
 
 function readModalInput() {
   const sellerEmail = normalizeEmail($("vendedorSelectModal")?.value || "");
   const vendor = state.vendors.find(v => normalizeEmail(v.email) === sellerEmail);
+  const contactosColegio = readContactosFromModal();
 
   return {
     numeroColegio: normalizeText($("numeroColegioInput")?.value || ""),
@@ -1599,7 +1746,8 @@ function readModalInput() {
     observaciones: normalizeText($("observacionesInput")?.value || ""),
     correoVendedor: sellerEmail,
     nombreVendedor: vendor?.nombre || "",
-    apellidoVendedor: vendor?.apellido || ""
+    apellidoVendedor: vendor?.apellido || "",
+    contactosColegio
   };
 }
 
@@ -1607,6 +1755,17 @@ function validateRowInput(input) {
   if (!input.colegio) return "Debes indicar el nombre del colegio.";
   if (!input.correoVendedor) return "Debes seleccionar un vendedor(a).";
   if (!input.nombreVendedor) return "No se pudo determinar el nombre del vendedor(a).";
+
+  const invalidContact = (input.contactosColegio || []).find((c) => {
+    const hasSomething = c.nombre || c.rol || c.correo || c.telefono || c.nivel || c.curso || c.observaciones;
+    const hasMinimum = c.nombre || c.rol;
+    return hasSomething && !hasMinimum;
+  });
+
+  if (invalidContact) {
+    return "Cada contacto que ingreses debe tener al menos nombre o rol/cargo.";
+  }
+
   return "";
 }
 
@@ -2442,6 +2601,8 @@ function bindPageEvents() {
   const thead = document.querySelector(".cartera-table thead");
   const tbody = $("tbodyCartera");
   const modalBackdrop = $("modalForm");
+  const btnAgregarContacto = $("btnAgregarContacto");
+  const contactosContainer = $("contactosContainer");
 
   if (searchInput && !searchInput.dataset.bound) {
     searchInput.dataset.bound = "1";
@@ -2715,7 +2876,33 @@ function bindPageEvents() {
       if (e.target === historyModal) closeHistoryModal();
     });
   }
+
+  if (btnAgregarContacto && !btnAgregarContacto.dataset.bound) {
+    btnAgregarContacto.dataset.bound = "1";
+    btnAgregarContacto.addEventListener("click", () => {
+      addContactoItem(createEmptyContact());
+    });
+  }
+
+  if (contactosContainer && !contactosContainer.dataset.bound) {
+    contactosContainer.dataset.bound = "1";
+  
+    contactosContainer.addEventListener("click", (e) => {
+      const btn = e.target.closest('button[data-action="remove-contact"]');
+      if (!btn) return;
+  
+      const item = btn.closest(".contacto-item");
+      if (!item) return;
+  
+      const index = Number(item.dataset.index || "-1");
+      if (index < 0) return;
+  
+      removeContactoItemByIndex(index);
+    });
+  }
 }
+
+
 
 /* =========================================================
    INIT
