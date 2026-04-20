@@ -33,6 +33,13 @@ import {
   getEffectiveUser
 } from "./roles.js";
 
+import {
+  buildContratoHtml,
+  mapFichaToContratoData,
+  getContratoMissingFields,
+  CONTRATO_TEMPLATE_VERSION
+} from "./contrato-template.js";
+
 const $ = (id) => document.getElementById(id);
 
 const GITHUB_HOME_URL = "https://sistemas-raitrai.github.io/Ventas-RT/";
@@ -43,12 +50,20 @@ const state = {
   effectiveUser: null,
   effectiveEmail: "",
   canSeeAll: false,
+
   requestedId: "",
   groupDocId: "",
   groupId: "",
   group: null,
   ficha: null,
-  isSavingPdf: false
+
+  contratoData: null,
+  contratoHtmlAuto: "",
+  contratoHtmlFinal: "",
+  contratoManualActivo: false,
+
+  isSavingManual: false,
+  isGeneratingPdf: false
 };
 
 initPage();
@@ -112,7 +127,20 @@ async function loadAll() {
   }
 
   state.ficha = hydrateFicha(state.group);
-  renderContrato();
+
+  buildContractState();
+  renderAll();
+}
+
+function buildContractState() {
+  state.contratoData = mapFichaToContratoData(state.ficha, state.group);
+  state.contratoHtmlAuto = buildContratoHtml(state.contratoData);
+
+  const manualActivo = !!getByPath(state.group, "contrato.manual.activo");
+  const manualHtml = cleanText(getByPath(state.group, "contrato.manual.htmlEditado") || "");
+
+  state.contratoManualActivo = manualActivo && !!manualHtml;
+  state.contratoHtmlFinal = state.contratoManualActivo ? manualHtml : state.contratoHtmlAuto;
 }
 
 async function resolveGroupByParam(id) {
@@ -170,51 +198,121 @@ function canOpenContratoPdf() {
   return normalizeState(state.group?.estado) === "ganada";
 }
 
+function canEditManualContract() {
+  const rol = String(state.effectiveUser?.rol || "").toLowerCase();
+  const email = normalizeEmail(state.effectiveEmail || "");
+
+  if (rol === "admin") return true;
+  if (rol === "supervision") return true;
+
+  return (
+    email === "yenny@raitrai.cl" ||
+    email === "administracion@raitrai.cl" ||
+    email === "raitrai@raitrai.cl"
+  );
+}
+
+function canGeneratePdfContract() {
+  return canEditManualContract();
+}
+
 /* =========================================================
    RENDER
 ========================================================= */
-function renderContrato() {
-  setText("ctNombreGrupo", upper(valueOrDash(state.ficha?.nombreGrupo)));
-  setText("ctPrograma", upper(valueOrDash(state.ficha?.nombrePrograma)));
-  setText("ctFechaViaje", valueOrDash(state.ficha?.fechaViajeTexto));
-  setText("ctNumeroNegocio", valueOrDash(state.ficha?.numeroNegocio));
+function renderAll() {
+  renderHeaderSummary();
+  renderMissingFields();
+  renderContractHtml();
+  syncEditorVisibility();
+  syncButtons();
+}
 
-  setText("ctApoderadoInline", upper(valueOrDash(state.ficha?.apoderadoEncargado)));
-  setText("ctGrupoInline", upper(valueOrDash(state.ficha?.nombreGrupo)));
-  setText("ctProgramaInline", upper(valueOrDash(state.ficha?.nombrePrograma)));
-  setText("ctGrupoInline2", upper(valueOrDash(state.ficha?.nombreGrupo)));
+function renderHeaderSummary() {
+  setText("ctTopNombreGrupo", valueOrDash(state.contratoData?.nombreGrupo));
+  setText("ctTopPrograma", valueOrDash(state.contratoData?.programaNombre));
+  setText("ctTopNumeroNegocio", valueOrDash(state.contratoData?.numeroNegocio));
+  setText("ctTopVersion", CONTRATO_TEMPLATE_VERSION);
+}
 
-  setText("ctApoderado", upper(valueOrDash(state.ficha?.apoderadoEncargado)));
-  setText("ctTelefono", valueOrDash(state.ficha?.telefono));
-  setText("ctCorreo", valueOrDash(state.ficha?.correo));
-  setText("ctPax", valueOrDash(state.ficha?.numeroPaxTotal));
-  setText("ctLiberados", valueOrDash(state.ficha?.liberados));
-  setText("ctTramo", upper(valueOrDash(state.ficha?.tramo)));
-  setText("ctHotel", upper(valueOrDash(state.ficha?.categoriaHoteleraContratada)));
-  setText("ctAsistencia", upper(valueOrDash(state.ficha?.asistenciaEnViajes)));
-  setText("ctValor", formatMoneyMaybe(state.ficha?.valorPrograma));
-  setText("ctValorInline", formatMoneyMaybe(state.ficha?.valorPrograma));
-  setText("ctNumeroNegocioInline", valueOrDash(state.ficha?.numeroNegocio));
-  setText("ctVendedor", upper(valueOrDash(state.ficha?.nombreVendedor)));
-  setText("ctApoderadoFirma", upper(valueOrDash(state.ficha?.apoderadoEncargado)));
+function renderMissingFields() {
+  const box = $("contratoMissingFields");
+  if (!box) return;
 
-  renderRichAsHtml(
-    "ctInfoOperaciones",
-    state.ficha?.infoOperacionesHtml,
-    "Sin observaciones de operaciones."
-  );
+  const missing = getContratoMissingFields(state.contratoData || {});
 
-  renderRichAsHtml(
-    "ctInfoAdministracion",
-    state.ficha?.infoAdministracionHtml,
-    "Sin observaciones de administración."
-  );
+  if (!missing.length) {
+    box.innerHTML = `<div class="ok">Contrato listo para generar.</div>`;
+    return;
+  }
 
-  renderRichAsHtml(
-    "ctObservaciones",
-    state.ficha?.observacionesHtml,
-    "Sin observaciones generales."
-  );
+  box.innerHTML = `
+    <div class="warn">
+      <strong>Faltan datos recomendados:</strong>
+      <ul>${missing.map((field) => `<li>${escapeHtml(field)}</li>`).join("")}</ul>
+    </div>
+  `;
+}
+
+function renderContractHtml() {
+  const preview = $("contratoPreview");
+  if (!preview) return;
+
+  preview.innerHTML = state.contratoHtmlFinal || `<p class="empty">No se pudo generar el contrato.</p>`;
+
+  const editor = $("contratoEditor");
+  if (editor) {
+    editor.value = state.contratoHtmlFinal || "";
+  }
+}
+
+function syncEditorVisibility() {
+  const editorWrap = $("contratoEditorWrap");
+  const previewWrap = $("contratoPreviewWrap");
+
+  if (!editorWrap || !previewWrap) return;
+
+  const isEditing = editorWrap.dataset.editing === "1";
+
+  editorWrap.style.display = isEditing ? "block" : "none";
+  previewWrap.style.display = isEditing ? "none" : "block";
+}
+
+function setEditingMode(isEditing) {
+  const editorWrap = $("contratoEditorWrap");
+  if (!editorWrap) return;
+
+  editorWrap.dataset.editing = isEditing ? "1" : "0";
+  syncEditorVisibility();
+  syncButtons();
+}
+
+function syncButtons() {
+  const btnEditar = $("btnEditarContratoManual");
+  const btnCancelar = $("btnCancelarEdicionContrato");
+  const btnGuardar = $("btnGuardarContratoManual");
+  const btnVolverAuto = $("btnVolverAutomatico");
+  const btnPdf = $("btnGenerarContratoPdf");
+  const editorWrap = $("contratoEditorWrap");
+
+  const isEditing = editorWrap?.dataset.editing === "1";
+
+  if (btnEditar) btnEditar.style.display = canEditManualContract() && !isEditing ? "inline-flex" : "none";
+  if (btnCancelar) btnCancelar.style.display = isEditing ? "inline-flex" : "none";
+  if (btnGuardar) {
+    btnGuardar.style.display = isEditing ? "inline-flex" : "none";
+    btnGuardar.disabled = state.isSavingManual;
+    btnGuardar.textContent = state.isSavingManual ? "Guardando..." : "Guardar edición manual";
+  }
+
+  if (btnVolverAuto) {
+    btnVolverAuto.style.display = canEditManualContract() ? "inline-flex" : "none";
+    btnVolverAuto.disabled = !state.contratoManualActivo || state.isSavingManual;
+  }
+
+  if (btnPdf) {
+    btnPdf.disabled = !canGeneratePdfContract() || state.isGeneratingPdf;
+    btnPdf.textContent = state.isGeneratingPdf ? "Generando PDF..." : "Generar contrato PDF";
+  }
 }
 
 /* =========================================================
@@ -229,16 +327,196 @@ function bindEvents() {
     location.href = `grupo.html?id=${encodeURIComponent(state.groupId || state.requestedId || "")}`;
   });
 
-  $("btnGuardarContratoPdf")?.addEventListener("click", async () => {
-    await handleGuardarContratoPdf();
+  $("btnEditarContratoManual")?.addEventListener("click", () => {
+    if (!canEditManualContract()) return;
+    setEditingMode(true);
+  });
+
+  $("btnCancelarEdicionContrato")?.addEventListener("click", () => {
+    renderContractHtml();
+    setEditingMode(false);
+  });
+
+  $("btnGuardarContratoManual")?.addEventListener("click", async () => {
+    await saveManualContract();
+  });
+
+  $("btnVolverAutomatico")?.addEventListener("click", async () => {
+    await revertToAutomaticContract();
+  });
+
+  $("btnGenerarContratoPdf")?.addEventListener("click", async () => {
+    await handleGeneratePdf();
+  });
+
+  $("btnLogoutContrato")?.addEventListener("click", async () => {
+    try {
+      sessionStorage.removeItem(ACTING_USER_KEY);
+      await signOut(auth);
+      location.href = "login.html";
+    } catch (error) {
+      alert("Error al cerrar sesión: " + (error?.message || error));
+    }
   });
 }
 
-async function handleGuardarContratoPdf() {
-  if (!state.group || !state.groupDocId || state.isSavingPdf) return;
+/* =========================================================
+   MANUAL OVERRIDE
+========================================================= */
+async function saveManualContract() {
+  if (!canEditManualContract()) return;
+  if (!state.groupDocId || state.isSavingManual) return;
 
-  state.isSavingPdf = true;
-  syncGuardarButton();
+  const editor = $("contratoEditor");
+  if (!editor) return;
+
+  const htmlEditado = String(editor.value || "").trim();
+  if (!htmlEditado) {
+    alert("El contrato manual no puede guardarse vacío.");
+    return;
+  }
+
+  state.isSavingManual = true;
+  syncButtons();
+
+  try {
+    const nombre = getDisplayName(state.effectiveUser);
+    const groupRef = doc(db, "ventas_cotizaciones", state.groupDocId);
+
+    await updateDoc(groupRef, {
+      "contrato.plantilla": CONTRATO_TEMPLATE_VERSION,
+      "contrato.htmlGenerado": state.contratoHtmlAuto || "",
+      "contrato.actualizadoPor": nombre,
+      "contrato.actualizadoPorCorreo": state.effectiveEmail,
+      "contrato.fechaActualizacion": serverTimestamp(),
+
+      "contrato.manual.activo": true,
+      "contrato.manual.htmlEditado": htmlEditado,
+      "contrato.manual.actualizadoPor": nombre,
+      "contrato.manual.actualizadoPorCorreo": state.effectiveEmail,
+      "contrato.manual.fechaActualizacion": serverTimestamp()
+    });
+
+    await addDoc(collection(db, HISTORIAL_COLLECTION), {
+      idGrupo: String(state.groupId || ""),
+      codigoRegistro: cleanText(state.group?.codigoRegistro || ""),
+      aliasGrupo: cleanText(state.group?.aliasGrupo || state.ficha?.nombreGrupo || ""),
+      modulo: "contrato",
+      tipoMovimiento: "edicion_manual_contrato",
+      titulo: "Edición manual de contrato",
+      asunto: "Edición manual de contrato",
+      mensaje: `${nombre} guardó una edición manual del contrato.`,
+      fecha: serverTimestamp(),
+      creadoPor: nombre,
+      creadoPorCorreo: state.effectiveEmail
+    });
+
+    state.group = {
+      ...state.group,
+      contrato: {
+        ...(state.group?.contrato || {}),
+        plantilla: CONTRATO_TEMPLATE_VERSION,
+        htmlGenerado: state.contratoHtmlAuto || "",
+        manual: {
+          ...((state.group?.contrato || {}).manual || {}),
+          activo: true,
+          htmlEditado
+        }
+      }
+    };
+
+    buildContractState();
+    renderAll();
+    setEditingMode(false);
+
+    alert("Edición manual del contrato guardada correctamente.");
+  } catch (error) {
+    console.error("[contrato-pdf] saveManualContract", error);
+    alert("No se pudo guardar la edición manual: " + (error?.message || error));
+  } finally {
+    state.isSavingManual = false;
+    syncButtons();
+  }
+}
+
+async function revertToAutomaticContract() {
+  if (!canEditManualContract()) return;
+  if (!state.groupDocId || state.isSavingManual) return;
+  if (!state.contratoManualActivo) return;
+
+  const ok = confirm("Esto desactivará la edición manual y volverá al contrato automático. ¿Continuar?");
+  if (!ok) return;
+
+  state.isSavingManual = true;
+  syncButtons();
+
+  try {
+    const nombre = getDisplayName(state.effectiveUser);
+    const groupRef = doc(db, "ventas_cotizaciones", state.groupDocId);
+
+    await updateDoc(groupRef, {
+      "contrato.plantilla": CONTRATO_TEMPLATE_VERSION,
+      "contrato.htmlGenerado": state.contratoHtmlAuto || "",
+      "contrato.actualizadoPor": nombre,
+      "contrato.actualizadoPorCorreo": state.effectiveEmail,
+      "contrato.fechaActualizacion": serverTimestamp(),
+
+      "contrato.manual.activo": false,
+      "contrato.manual.actualizadoPor": nombre,
+      "contrato.manual.actualizadoPorCorreo": state.effectiveEmail,
+      "contrato.manual.fechaActualizacion": serverTimestamp()
+    });
+
+    await addDoc(collection(db, HISTORIAL_COLLECTION), {
+      idGrupo: String(state.groupId || ""),
+      codigoRegistro: cleanText(state.group?.codigoRegistro || ""),
+      aliasGrupo: cleanText(state.group?.aliasGrupo || state.ficha?.nombreGrupo || ""),
+      modulo: "contrato",
+      tipoMovimiento: "volver_contrato_automatico",
+      titulo: "Volver a contrato automático",
+      asunto: "Volver a contrato automático",
+      mensaje: `${nombre} desactivó la edición manual y volvió al contrato automático.`,
+      fecha: serverTimestamp(),
+      creadoPor: nombre,
+      creadoPorCorreo: state.effectiveEmail
+    });
+
+    state.group = {
+      ...state.group,
+      contrato: {
+        ...(state.group?.contrato || {}),
+        plantilla: CONTRATO_TEMPLATE_VERSION,
+        htmlGenerado: state.contratoHtmlAuto || "",
+        manual: {
+          ...((state.group?.contrato || {}).manual || {}),
+          activo: false
+        }
+      }
+    };
+
+    buildContractState();
+    renderAll();
+    setEditingMode(false);
+
+    alert("El contrato volvió a la versión automática.");
+  } catch (error) {
+    console.error("[contrato-pdf] revertToAutomaticContract", error);
+    alert("No se pudo volver al contrato automático: " + (error?.message || error));
+  } finally {
+    state.isSavingManual = false;
+    syncButtons();
+  }
+}
+
+/* =========================================================
+   PDF
+========================================================= */
+async function handleGeneratePdf() {
+  if (!canGeneratePdfContract()) return;
+  if (!state.groupDocId || state.isGeneratingPdf) return;
+
+  state.isGeneratingPdf = true;
+  syncButtons();
 
   try {
     const fileName = buildContratoPdfName();
@@ -246,8 +524,13 @@ async function handleGuardarContratoPdf() {
     const { downloadUrl, storagePath } = await uploadContratoPdfToStorage(pdfBlob, fileName);
 
     const nombre = getDisplayName(state.effectiveUser);
+    const groupRef = doc(db, "ventas_cotizaciones", state.groupDocId);
 
-    await updateDoc(doc(db, "ventas_cotizaciones", state.groupDocId), {
+    await updateDoc(groupRef, {
+      "contrato.plantilla": CONTRATO_TEMPLATE_VERSION,
+      "contrato.htmlGenerado": state.contratoHtmlAuto || "",
+      "contrato.htmlFinal": state.contratoHtmlFinal || "",
+
       contratoPdfUrl: downloadUrl,
       contratoPdfNombre: fileName,
       fechaActualizacionContrato: serverTimestamp(),
@@ -289,33 +572,29 @@ async function handleGuardarContratoPdf() {
     });
 
     downloadBlobLocally(pdfBlob, fileName);
+
+    state.group = {
+      ...state.group,
+      contratoPdfUrl: downloadUrl,
+      contratoPdfNombre: fileName,
+      contrato: {
+        ...(state.group?.contrato || {}),
+        pdfUrl: downloadUrl,
+        pdfNombre: fileName,
+        storagePathPdf: storagePath
+      }
+    };
+
     alert("Contrato PDF generado y guardado correctamente.");
   } catch (error) {
-    console.error("[contrato-pdf] handleGuardarContratoPdf", error);
+    console.error("[contrato-pdf] handleGeneratePdf", error);
     alert("No se pudo generar el contrato PDF: " + (error?.message || error));
   } finally {
-    state.isSavingPdf = false;
-    syncGuardarButton();
+    state.isGeneratingPdf = false;
+    syncButtons();
   }
 }
 
-function syncGuardarButton() {
-  const btn = $("btnGuardarContratoPdf");
-  if (!btn) return;
-
-  if (state.isSavingPdf) {
-    btn.disabled = true;
-    btn.textContent = "Generando contrato...";
-    return;
-  }
-
-  btn.disabled = false;
-  btn.textContent = "Generar contrato PDF";
-}
-
-/* =========================================================
-   PDF / STORAGE
-========================================================= */
 function buildContratoPdfName() {
   const base =
     sanitizeFilePart(
@@ -336,9 +615,9 @@ function buildStorageContratoPath(fileName = "") {
 }
 
 function getContratoPageElement() {
-  const el = document.querySelector(".pdf-page");
+  const el = document.querySelector(".contrato-page");
   if (!el) {
-    throw new Error("No encontré el contenedor .pdf-page para generar el contrato.");
+    throw new Error("No encontré el contenedor .contrato-page para generar el contrato.");
   }
   return el;
 }
@@ -556,19 +835,6 @@ function renderFatal(message) {
   `;
 }
 
-function renderRichAsHtml(id, html = "", emptyText = "") {
-  const el = $(id);
-  if (!el) return;
-
-  const safe = sanitizeRichHtml(html || "");
-  if (!safe) {
-    el.innerHTML = `<div class="empty">${escapeHtml(emptyText || "Sin contenido.")}</div>`;
-    return;
-  }
-
-  el.innerHTML = `<div class="pdf-rich">${safe}</div>`;
-}
-
 function setText(id, value) {
   const el = $(id);
   if (!el) return;
@@ -642,10 +908,6 @@ function sanitizeFilePart(value = "") {
     .trim();
 }
 
-function upper(value = "") {
-  return String(value || "").toUpperCase();
-}
-
 function getDisplayName(user = {}) {
   const full = [user?.nombre, user?.apellido].filter(Boolean).join(" ").trim();
   if (full) return full;
@@ -662,66 +924,6 @@ function plainTextToRichHtml(value = "") {
     .split(/\n+/)
     .map((line) => `<p>${escapeHtml(line.trim())}</p>`)
     .join("");
-}
-
-function formatMoneyMaybe(value) {
-  const raw = String(value ?? "").trim();
-  if (!raw) return "—";
-
-  const normalized = raw.replace(/[^\d,-.]/g, "");
-  const onlyDigits = normalized.replace(/[^\d]/g, "");
-  if (!onlyDigits) return raw;
-
-  const n = Number(onlyDigits);
-  if (!Number.isFinite(n)) return raw;
-
-  return new Intl.NumberFormat("es-CL", {
-    style: "currency",
-    currency: "CLP",
-    maximumFractionDigits: 0
-  }).format(n);
-}
-
-function sanitizeRichHtml(html = "") {
-  const raw = String(html || "");
-  if (!raw.trim()) return "";
-
-  const template = document.createElement("template");
-  template.innerHTML = raw;
-
-  template.content
-    .querySelectorAll("script, iframe, object, embed, link, meta")
-    .forEach((el) => el.remove());
-
-  template.content.querySelectorAll("*").forEach((el) => {
-    [...el.attributes].forEach((attr) => {
-      const name = attr.name.toLowerCase();
-      const value = String(attr.value || "");
-
-      if (name.startsWith("on")) {
-        el.removeAttribute(attr.name);
-      }
-
-      if ((name === "href" || name === "src") && /^\s*javascript:/i.test(value)) {
-        el.removeAttribute(attr.name);
-      }
-
-      if (name === "style") {
-        el.removeAttribute(attr.name);
-      }
-    });
-  });
-
-  return normalizeRichHtml(template.innerHTML);
-}
-
-function normalizeRichHtml(html = "") {
-  return String(html || "")
-    .replace(/&nbsp;/gi, " ")
-    .replace(/<div><br><\/div>/gi, "")
-    .replace(/<p><br><\/p>/gi, "")
-    .replace(/>\s+</g, "><")
-    .trim();
 }
 
 function escapeHtml(value = "") {
