@@ -3,7 +3,7 @@
 // Este archivo NO genera el PDF.
 // Solo construye el HTML contractual completo con placeholders reemplazables.
 
-export const CONTRATO_TEMPLATE_VERSION = "base_2025_v1";
+export const CONTRATO_TEMPLATE_VERSION = "base_2025_v2";
 
 /* =========================================================
    API PRINCIPAL
@@ -11,70 +11,245 @@ export const CONTRATO_TEMPLATE_VERSION = "base_2025_v1";
 
 export function buildContratoHtml(data = {}) {
   const v = normalizeContratoData(data);
-
   const template = getContratoTemplate();
 
   return replacePlaceholders(template, {
     versionPlantilla: CONTRATO_TEMPLATE_VERSION,
 
-    fechaContratoLarga: v.fechaContratoLarga,
-    ciudadFirma: v.ciudadFirma,
+    fechaContratoLarga: escapeHtml(v.fechaContratoLarga),
+    ciudadFirma: escapeHtml(v.ciudadFirma),
 
-    razonSocialAgencia: v.razonSocialAgencia,
-    rutAgencia: v.rutAgencia,
-    representanteAgencia: v.representanteAgencia,
-    rutRepresentanteAgencia: v.rutRepresentanteAgencia,
-    domicilioAgencia: v.domicilioAgencia,
+    razonSocialAgencia: escapeHtml(v.razonSocialAgencia),
+    rutAgencia: escapeHtml(v.rutAgencia),
+    representanteAgencia: escapeHtml(v.representanteAgencia),
+    rutRepresentanteAgencia: escapeHtml(v.rutRepresentanteAgencia),
+    domicilioAgencia: escapeHtml(v.domicilioAgencia),
 
-    grupoDescripcionCompleta: v.grupoDescripcionCompleta,
-    cursoActualTexto: v.cursoActualTexto,
-    cursoProyectadoTexto: v.cursoProyectadoTexto,
-    colegio: v.colegio,
-    comuna: v.comuna,
+    grupoDescripcionCompleta: escapeHtml(v.grupoDescripcionCompleta),
+    cursoActualTexto: escapeHtml(v.cursoActualTexto),
+    cursoProyectadoTexto: escapeHtml(v.cursoProyectadoTexto),
+    colegio: escapeHtml(v.colegio),
+    comuna: escapeHtml(v.comuna),
 
-    nombreGrupo: v.nombreGrupo,
-    apoderadoEncargado: v.apoderadoEncargado,
-    telefono: v.telefono,
-    correo: v.correo,
+    nombreGrupo: escapeHtml(v.nombreGrupo),
+    apoderadoEncargado: escapeHtml(v.apoderadoEncargado),
+    telefono: escapeHtml(v.telefono),
+    correo: escapeHtml(v.correo),
 
-    programaNombre: v.programaNombre,
-    destinoPrograma: v.destinoPrograma,
-    fechaViajeTexto: v.fechaViajeTexto,
-    salidaTexto: v.salidaTexto,
-    regresoTexto: v.regresoTexto,
+    programaNombre: escapeHtml(v.programaNombre),
+    destinoPrograma: escapeHtml(v.destinoPrograma),
+    fechaViajeTexto: escapeHtml(v.fechaViajeTexto),
+    salidaTexto: escapeHtml(v.salidaTexto),
+    regresoTexto: escapeHtml(v.regresoTexto),
 
-    cantidadPaxTotal: v.cantidadPaxTotal,
-    cantidadPaxPagados: v.cantidadPaxPagados,
-    liberados: v.liberados,
-    tramo: v.tramo,
+    cantidadPaxTotal: escapeHtml(v.cantidadPaxTotal),
+    cantidadPaxPagados: escapeHtml(v.cantidadPaxPagados),
+    liberados: escapeHtml(v.liberados),
+    tramo: escapeHtml(v.tramo),
 
-    valorPrograma: v.valorPrograma,
-    valorProgramaTexto: v.valorProgramaTexto,
-    cuotaInscripcion: v.cuotaInscripcion,
-    cuotaInscripcionTexto: v.cuotaInscripcionTexto,
-    cuotasTexto: v.cuotasTexto,
-    diferenciaTramoTexto: v.diferenciaTramoTexto,
-    fechaPagoTotalTexto: v.fechaPagoTotalTexto,
+    valorPrograma: escapeHtml(String(v.valorPrograma ?? "")),
+    valorProgramaTexto: escapeHtml(v.valorProgramaTexto),
+    cuotaInscripcion: escapeHtml(String(v.cuotaInscripcion ?? "")),
+    cuotaInscripcionTexto: escapeHtml(v.cuotaInscripcionTexto),
+    cuotasTexto: escapeHtml(v.cuotasTexto),
+    diferenciaTramoTexto: escapeHtml(v.diferenciaTramoTexto),
+    fechaPagoTotalTexto: escapeHtml(v.fechaPagoTotalTexto),
 
-    asistenciaEnViajes: v.asistenciaEnViajes,
-    categoriaHoteleraContratada: v.categoriaHoteleraContratada,
+    asistenciaEnViajes: escapeHtml(v.asistenciaEnViajes),
+    categoriaHoteleraContratada: escapeHtml(v.categoriaHoteleraContratada),
 
-    numeroNegocio: v.numeroNegocio,
-    nombreVendedor: v.nombreVendedor,
+    numeroNegocio: escapeHtml(v.numeroNegocio),
+    nombreVendedor: escapeHtml(v.nombreVendedor),
 
-    delegado1Nombre: v.delegado1Nombre,
-    delegado1Rut: v.delegado1Rut,
-    delegado2Nombre: v.delegado2Nombre,
-    delegado2Rut: v.delegado2Rut,
-
-    observacionesOperaciones: v.observacionesOperaciones,
-    observacionesAdministracion: v.observacionesAdministracion,
-    observacionesGenerales: v.observacionesGenerales,
+    delegado1Nombre: escapeHtml(v.delegado1Nombre),
+    delegado1Rut: escapeHtml(v.delegado1Rut),
+    delegado2Nombre: escapeHtml(v.delegado2Nombre),
+    delegado2Rut: escapeHtml(v.delegado2Rut),
 
     htmlObservacionesOperaciones: v.htmlObservacionesOperaciones,
     htmlObservacionesAdministracion: v.htmlObservacionesAdministracion,
     htmlObservacionesGenerales: v.htmlObservacionesGenerales
   });
+}
+
+export function buildContratoHtmlFromFicha(ficha = {}, group = {}) {
+  return buildContratoHtml(mapFichaToContratoData(ficha, group));
+}
+
+export function mapFichaToContratoData(ficha = {}, group = {}) {
+  const anoViaje = cleanText(group?.anoViaje || ficha?.anoViaje || "");
+  const anoContrato = cleanText(group?.anoContrato || currentYearString());
+  const cursoBase = cleanText(group?.curso || ficha?.curso || "");
+
+  const cursoProyectado = cleanText(
+    group?.cursoProyectado || proyectarCursoSimple(cursoBase)
+  );
+
+  return {
+    fechaContrato: group?.fechaContrato || new Date(),
+    ciudadFirma: group?.ciudadFirma || "Santiago de Chile",
+
+    razonSocialAgencia: "TURISMO RAITRAI LIMITADA",
+    rutAgencia: "78.384.230-0",
+    representanteAgencia: "Carlos Flores Maragaño",
+    rutRepresentanteAgencia: "7.844.528-9",
+    domicilioAgencia: "La Concepción Nº 141 oficina 305, Santiago",
+
+    cursoActual: cursoBase,
+    anoActual: anoContrato,
+    cursoProyectado,
+    anoProyectado: anoViaje,
+
+    nombreGrupo:
+      cleanText(ficha?.nombreGrupo) ||
+      cleanText(group?.aliasGrupo) ||
+      cleanText(group?.nombreGrupo),
+
+    colegio: cleanText(group?.colegio),
+    comuna: cleanText(group?.comunaCiudad || group?.comuna),
+
+    apoderadoEncargado:
+      cleanText(ficha?.apoderadoEncargado) ||
+      cleanText(group?.nombreCliente),
+
+    telefono:
+      cleanText(ficha?.telefono) ||
+      cleanText(group?.celularCliente),
+
+    correo:
+      cleanText(ficha?.correo) ||
+      cleanText(group?.correoCliente),
+
+    programaNombre:
+      cleanText(ficha?.nombrePrograma) ||
+      cleanText(group?.programaOtro) ||
+      cleanText(group?.programa),
+
+    destinoPrograma:
+      cleanText(group?.destinoPrincipalOtro) ||
+      cleanText(group?.destinoPrincipal) ||
+      cleanText(group?.destino),
+
+    fechaViajeTexto:
+      cleanText(ficha?.fechaViajeTexto) ||
+      cleanText(group?.fechaDeViaje) ||
+      cleanText(group?.fechaViaje) ||
+      cleanText(group?.mesViaje) ||
+      cleanText(group?.semanaViaje),
+
+    salidaTexto:
+      cleanText(group?.salidaTexto) ||
+      cleanText(group?.fechaSalida) ||
+      cleanText(ficha?.fechaViajeTexto) ||
+      cleanText(group?.fechaDeViaje) ||
+      cleanText(group?.fechaViaje),
+
+    regresoTexto:
+      cleanText(group?.regresoTexto) ||
+      cleanText(group?.fechaRegreso) ||
+      cleanText(ficha?.fechaViajeTexto) ||
+      cleanText(group?.fechaDeViaje) ||
+      cleanText(group?.fechaViaje),
+
+    cantidadPaxTotal:
+      cleanText(ficha?.numeroPaxTotal) ||
+      cleanText(group?.cantidadGrupo),
+
+    cantidadPaxPagados:
+      cleanText(group?.cantidadPaxPagados) ||
+      cleanText(group?.paxPagados) ||
+      cleanText(ficha?.numeroPaxTotal) ||
+      cleanText(group?.cantidadGrupo),
+
+    liberados:
+      cleanText(ficha?.liberados) ||
+      cleanText(group?.liberados),
+
+    tramo:
+      cleanText(ficha?.tramo) ||
+      cleanText(group?.tramo),
+
+    valorPrograma:
+      ficha?.valorPrograma ?? group?.valorPrograma ?? "",
+
+    cuotaInscripcion:
+      group?.cuotaInscripcion ?? "",
+
+    cuotasTexto:
+      cleanText(group?.cuotasTexto),
+
+    diferenciaTramoTexto:
+      cleanText(group?.diferenciaTramoTexto),
+
+    fechaPagoTotalTexto:
+      cleanText(group?.fechaPagoTotalTexto),
+
+    asistenciaEnViajes:
+      cleanText(ficha?.asistenciaEnViajes) ||
+      cleanText(group?.asistenciaEnViajes) ||
+      cleanText(group?.asistenciaMed),
+
+    categoriaHoteleraContratada:
+      cleanText(ficha?.categoriaHoteleraContratada) ||
+      cleanText(group?.categoriaHoteleraContratada) ||
+      cleanText(group?.hotel) ||
+      cleanText(group?.Hotel),
+
+    numeroNegocio:
+      cleanText(ficha?.numeroNegocio) ||
+      cleanText(group?.numeroNegocio),
+
+    nombreVendedor:
+      cleanText(ficha?.nombreVendedor) ||
+      cleanText(group?.vendedora),
+
+    delegado1Nombre:
+      cleanText(group?.delegado1Nombre),
+
+    delegado1Rut:
+      cleanText(group?.delegado1Rut),
+
+    delegado2Nombre:
+      cleanText(group?.delegado2Nombre),
+
+    delegado2Rut:
+      cleanText(group?.delegado2Rut),
+
+    htmlObservacionesOperaciones:
+      ficha?.infoOperacionesHtml ||
+      group?.observacionesOperaciones ||
+      "",
+
+    htmlObservacionesAdministracion:
+      ficha?.infoAdministracionHtml ||
+      group?.observacionesAdministracion ||
+      "",
+
+    htmlObservacionesGenerales:
+      ficha?.observacionesHtml ||
+      group?.observacionesFicha ||
+      group?.observacionesGenerales ||
+      ""
+  };
+}
+
+export function getContratoMissingFields(data = {}) {
+  const v = normalizeContratoData(data);
+
+  const required = [
+    ["nombreGrupo", v.nombreGrupo],
+    ["colegio", v.colegio],
+    ["cursoActualTexto", v.cursoActualTexto],
+    ["cursoProyectadoTexto", v.cursoProyectadoTexto],
+    ["programaNombre", v.programaNombre],
+    ["cantidadPaxTotal", v.cantidadPaxTotal],
+    ["valorProgramaTexto", v.valorProgramaTexto],
+    ["numeroNegocio", v.numeroNegocio]
+  ];
+
+  return required
+    .filter(([, value]) => isMissingValue(value))
+    .map(([field]) => field);
 }
 
 /* =========================================================
@@ -107,13 +282,13 @@ export function normalizeContratoData(raw = {}) {
 
   return {
     fechaContratoLarga: humanDateLong(fechaContrato),
-    ciudadFirma: cleanText(raw.ciudadFirma || "Santiago de Chile"),
+    ciudadFirma: fallbackText(raw.ciudadFirma, "Santiago de Chile"),
 
-    razonSocialAgencia: cleanText(raw.razonSocialAgencia || "TURISMO RAITRAI LIMITADA"),
-    rutAgencia: cleanText(raw.rutAgencia || "78.384.230-0"),
-    representanteAgencia: cleanText(raw.representanteAgencia || "Carlos Flores Maragaño"),
-    rutRepresentanteAgencia: cleanText(raw.rutRepresentanteAgencia || "7.844.528-9"),
-    domicilioAgencia: cleanText(raw.domicilioAgencia || "La Concepción Nº 141 oficina 305, Santiago"),
+    razonSocialAgencia: fallbackText(raw.razonSocialAgencia, "TURISMO RAITRAI LIMITADA"),
+    rutAgencia: fallbackText(raw.rutAgencia, "78.384.230-0"),
+    representanteAgencia: fallbackText(raw.representanteAgencia, "Carlos Flores Maragaño"),
+    rutRepresentanteAgencia: fallbackText(raw.rutRepresentanteAgencia, "7.844.528-9"),
+    domicilioAgencia: fallbackText(raw.domicilioAgencia, "La Concepción Nº 141 oficina 305, Santiago"),
 
     grupoDescripcionCompleta,
     cursoActualTexto: cursoActualTexto || "CURSO NO INFORMADO",
@@ -121,48 +296,44 @@ export function normalizeContratoData(raw = {}) {
     colegio: colegio || "COLEGIO NO INFORMADO",
     comuna: comuna || "COMUNA NO INFORMADA",
 
-    nombreGrupo: cleanText(raw.nombreGrupo || raw.aliasGrupo || grupoDescripcionCompleta || ""),
-    apoderadoEncargado: cleanText(raw.apoderadoEncargado || raw.nombreCliente || "NO INFORMADO"),
-    telefono: cleanText(raw.telefono || raw.celularCliente || "NO INFORMADO"),
-    correo: cleanText(raw.correo || raw.correoCliente || "NO INFORMADO"),
+    nombreGrupo: fallbackText(raw.nombreGrupo || raw.aliasGrupo || grupoDescripcionCompleta, "GRUPO NO INFORMADO"),
+    apoderadoEncargado: fallbackText(raw.apoderadoEncargado || raw.nombreCliente, "NO INFORMADO"),
+    telefono: fallbackText(raw.telefono || raw.celularCliente, "NO INFORMADO"),
+    correo: fallbackText(raw.correo || raw.correoCliente, "NO INFORMADO"),
 
-    programaNombre: cleanText(raw.programaNombre || raw.nombrePrograma || raw.programa || "PROGRAMA NO INFORMADO"),
-    destinoPrograma: cleanText(raw.destinoPrograma || raw.destino || raw.destinoPrincipal || "DESTINO NO INFORMADO"),
-    fechaViajeTexto: cleanText(raw.fechaViajeTexto || raw.fechaDeViaje || raw.fechaViaje || "NO INFORMADA"),
-    salidaTexto: cleanText(raw.salidaTexto || raw.salidaViaje || raw.fechaSalida || raw.fechaViajeTexto || "NO INFORMADA"),
-    regresoTexto: cleanText(raw.regresoTexto || raw.regresoViaje || raw.fechaRegreso || raw.fechaViajeTexto || "NO INFORMADA"),
+    programaNombre: fallbackText(raw.programaNombre || raw.nombrePrograma || raw.programa, "PROGRAMA NO INFORMADO"),
+    destinoPrograma: fallbackText(raw.destinoPrograma || raw.destino || raw.destinoPrincipal, "DESTINO NO INFORMADO"),
+    fechaViajeTexto: fallbackText(raw.fechaViajeTexto || raw.fechaDeViaje || raw.fechaViaje, "NO INFORMADA"),
+    salidaTexto: fallbackText(raw.salidaTexto || raw.salidaViaje || raw.fechaSalida || raw.fechaViajeTexto, "NO INFORMADA"),
+    regresoTexto: fallbackText(raw.regresoTexto || raw.regresoViaje || raw.fechaRegreso || raw.fechaViajeTexto, "NO INFORMADA"),
 
-    cantidadPaxTotal: cleanText(raw.cantidadPaxTotal || raw.numeroPaxTotal || raw.cantidadGrupo || "NO INFORMADO"),
-    cantidadPaxPagados: cleanText(raw.cantidadPaxPagados || raw.paxPagados || raw.numeroPaxPagados || raw.cantidadGrupo || "NO INFORMADO"),
-    liberados: cleanText(raw.liberados || "NO INFORMADO"),
-    tramo: cleanText(raw.tramo || "NO INFORMADO"),
+    cantidadPaxTotal: fallbackText(raw.cantidadPaxTotal || raw.numeroPaxTotal || raw.cantidadGrupo, "NO INFORMADO"),
+    cantidadPaxPagados: fallbackText(raw.cantidadPaxPagados || raw.paxPagados || raw.numeroPaxPagados || raw.cantidadGrupo, "NO INFORMADO"),
+    liberados: fallbackText(raw.liberados, "NO INFORMADO"),
+    tramo: fallbackText(raw.tramo, "NO INFORMADO"),
 
     valorPrograma: valorProgramaRaw,
-    valorProgramaTexto: formatMoneyMaybe(valorProgramaRaw),
+    valorProgramaTexto: formatMoneyMaybe(valorProgramaRaw, "NO INFORMADO"),
     cuotaInscripcion: cuotaInscripcionRaw,
-    cuotaInscripcionTexto: cuotaInscripcionRaw ? formatMoneyMaybe(cuotaInscripcionRaw) : "NO INFORMADA",
-    cuotasTexto: cleanText(raw.cuotasTexto || "NO INFORMADAS"),
-    diferenciaTramoTexto: cleanText(raw.diferenciaTramoTexto || "NO INFORMADA"),
-    fechaPagoTotalTexto: cleanText(raw.fechaPagoTotalTexto || "NO INFORMADA"),
+    cuotaInscripcionTexto: cuotaInscripcionRaw !== "" ? formatMoneyMaybe(cuotaInscripcionRaw, "NO INFORMADA") : "NO INFORMADA",
+    cuotasTexto: fallbackText(raw.cuotasTexto, "NO INFORMADAS"),
+    diferenciaTramoTexto: fallbackText(raw.diferenciaTramoTexto, "NO INFORMADA"),
+    fechaPagoTotalTexto: fallbackText(raw.fechaPagoTotalTexto, "NO INFORMADA"),
 
-    asistenciaEnViajes: cleanText(raw.asistenciaEnViajes || "NO INFORMADA"),
-    categoriaHoteleraContratada: cleanText(raw.categoriaHoteleraContratada || raw.hotel || "NO INFORMADA"),
+    asistenciaEnViajes: fallbackText(raw.asistenciaEnViajes, "NO INFORMADA"),
+    categoriaHoteleraContratada: fallbackText(raw.categoriaHoteleraContratada || raw.hotel, "NO INFORMADA"),
 
-    numeroNegocio: cleanText(raw.numeroNegocio || "NO INFORMADO"),
-    nombreVendedor: cleanText(raw.nombreVendedor || raw.vendedora || "NO INFORMADO"),
+    numeroNegocio: fallbackText(raw.numeroNegocio, "NO INFORMADO"),
+    nombreVendedor: fallbackText(raw.nombreVendedor || raw.vendedora, "NO INFORMADO"),
 
     delegado1Nombre: cleanText(raw.delegado1Nombre || ""),
     delegado1Rut: cleanText(raw.delegado1Rut || ""),
     delegado2Nombre: cleanText(raw.delegado2Nombre || ""),
     delegado2Rut: cleanText(raw.delegado2Rut || ""),
 
-    observacionesOperaciones: cleanText(raw.observacionesOperaciones || ""),
-    observacionesAdministracion: cleanText(raw.observacionesAdministracion || ""),
-    observacionesGenerales: cleanText(raw.observacionesGenerales || raw.observacionesFicha || ""),
-
-    htmlObservacionesOperaciones: normalizeRichHtml(raw.htmlObservacionesOperaciones || ""),
-    htmlObservacionesAdministracion: normalizeRichHtml(raw.htmlObservacionesAdministracion || ""),
-    htmlObservacionesGenerales: normalizeRichHtml(raw.htmlObservacionesGenerales || "")
+    htmlObservacionesOperaciones: normalizeRichHtml(raw.htmlObservacionesOperaciones || raw.observacionesOperaciones || ""),
+    htmlObservacionesAdministracion: normalizeRichHtml(raw.htmlObservacionesAdministracion || raw.observacionesAdministracion || ""),
+    htmlObservacionesGenerales: normalizeRichHtml(raw.htmlObservacionesGenerales || raw.observacionesGenerales || raw.observacionesFicha || "")
   };
 }
 
@@ -707,6 +878,16 @@ function cleanText(value = "") {
   return String(value ?? "").trim();
 }
 
+function fallbackText(value = "", fallback = "") {
+  const v = cleanText(value);
+  return v || String(fallback || "").trim();
+}
+
+function isMissingValue(value = "") {
+  const v = cleanText(value);
+  return !v || v === "NO INFORMADO" || v === "NO INFORMADA";
+}
+
 function toDate(value) {
   if (!value) return null;
   if (value instanceof Date) return Number.isNaN(value.getTime()) ? null : value;
@@ -735,16 +916,19 @@ function humanDateLong(value) {
   });
 }
 
-function formatMoneyMaybe(value) {
+function formatMoneyMaybe(value, fallback = "NO INFORMADO") {
   const raw = String(value ?? "").trim();
-  if (!raw) return "NO INFORMADO";
+  if (!raw) return fallback;
 
-  const normalized = raw.replace(/[^\d,-.]/g, "");
-  const onlyDigits = normalized.replace(/[^\d]/g, "");
-  if (!onlyDigits) return raw;
+  const normalized = raw.replace(/[^\d,.-]/g, "");
+  const hasNumber = /\d/.test(normalized);
+  if (!hasNumber) return raw || fallback;
 
-  const n = Number(onlyDigits);
-  if (!Number.isFinite(n)) return raw;
+  const digits = normalized.replace(/[^\d]/g, "");
+  if (!digits) return raw || fallback;
+
+  const n = Number(digits);
+  if (!Number.isFinite(n)) return raw || fallback;
 
   return new Intl.NumberFormat("es-CL", {
     maximumFractionDigits: 0
@@ -757,5 +941,60 @@ function normalizeRichHtml(html = "") {
     return `<p class="empty">Sin observaciones.</p>`;
   }
 
-  return raw;
+  const looksLikeHtml = /<\/?[a-z][\s\S]*>/i.test(raw);
+  if (!looksLikeHtml) {
+    return raw
+      .split(/\n+/)
+      .map((line) => `<p>${escapeHtml(line.trim())}</p>`)
+      .join("");
+  }
+
+  return sanitizeBasicHtml(raw);
+}
+
+function sanitizeBasicHtml(html = "") {
+  const raw = String(html || "");
+
+  return raw
+    .replace(/<script[\s\S]*?>[\s\S]*?<\/script>/gi, "")
+    .replace(/<iframe[\s\S]*?>[\s\S]*?<\/iframe>/gi, "")
+    .replace(/\son\w+="[^"]*"/gi, "")
+    .replace(/\son\w+='[^']*'/gi, "")
+    .replace(/\sstyle="[^"]*"/gi, "")
+    .replace(/\sstyle='[^']*'/gi, "")
+    .trim();
+}
+
+function escapeHtml(value = "") {
+  return String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
+}
+
+function currentYearString() {
+  return String(new Date().getFullYear());
+}
+
+function proyectarCursoSimple(curso = "") {
+  const raw = cleanText(curso);
+  if (!raw) return "";
+
+  const match = raw.match(/^(\d+)([A-Za-zÁÉÍÓÚáéíóúÑñ]*)$/);
+  if (!match) return raw;
+
+  const numero = Number(match[1]);
+  const letras = match[2] || "";
+
+  if (!Number.isFinite(numero)) return raw;
+
+  let siguiente = numero + 1;
+
+  if (numero === 8) {
+    siguiente = 1;
+  }
+
+  return `${siguiente}${letras}`;
 }
