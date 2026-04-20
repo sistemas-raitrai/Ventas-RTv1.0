@@ -978,7 +978,14 @@ function applyEstadoAuditFields(patch = {}, cambios = []) {
 
 async function autoMarkVendorGroupAsContactedOnOpen() {
   if (!shouldAutoMarkVendorGroupAsContacted(state.group)) return false;
+  if (!state.groupDocId) return false;
 
+  const targetDocId = String(state.groupDocId);
+  const targetGroupId = String(state.groupId || "");
+  const estadoAnterior = normalizeState(state.group?.estado);
+
+  // Blindaje extra:
+  // solo cambia el grupo actualmente abierto en pantalla.
   await saveGroupPatch(
     {
       estado: "contactado"
@@ -987,14 +994,19 @@ async function autoMarkVendorGroupAsContactedOnOpen() {
       tipoMovimiento: "cambio_estado",
       modulo: "grupo",
       titulo: "Cambio automático de estado",
-      mensaje: `${getDisplayName(state.effectiveUser)} abrió el grupo y el sistema cambió el estado de A contactar a Contactado.`,
+      mensaje: `${getDisplayName(state.effectiveUser)} abrió el grupo ${targetGroupId} y el sistema cambió su estado de A contactar a Contactado.`,
       cambios: [
         {
           campo: "estado",
-          anterior: normalizeState(state.group.estado),
+          anterior: estadoAnterior,
           nuevo: "contactado"
         }
-      ]
+      ],
+      metadata: {
+        targetDocId,
+        targetGroupId,
+        origen: "apertura_grupo"
+      }
     }
   );
 
