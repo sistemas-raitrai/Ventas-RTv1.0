@@ -409,6 +409,7 @@ function mapClienteDoc(id, data) {
 
   return {
     id,
+    idGrupo: cleanText(data.idGrupo || id),
     aliasGrupo,
     nombreApoderado,
     nombreGrupo,
@@ -435,6 +436,7 @@ function mapClienteDoc(id, data) {
     avatarBaseText: colegio || nombreGrupo || nombreApoderado || displayTitle,
     searchIndex: normalizeText([
       id,
+      data.idGrupo || id,
       aliasGrupo,
       nombreApoderado,
       nombreGrupo,
@@ -601,7 +603,7 @@ function renderRow(row) {
     <td>
       <a
         class="seg-group-link"
-        href="grupo.html?id=${encodeURIComponent(row.id)}"
+        href="grupo.html?id=${encodeURIComponent(row.idGrupo || row.id)}"
         target="_blank"
         rel="noopener noreferrer"
       >
