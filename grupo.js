@@ -64,6 +64,7 @@ const state = {
   history: [],
   alertsManual: [],
   requests: [],
+  editingMeetingId: "",
 
   autoAlerts: [],
 
