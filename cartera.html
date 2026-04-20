@@ -730,39 +730,56 @@
       background:#fff;
     }
 
-    .contactos-container {
-      display: flex;
-      flex-direction: column;
-      gap: 14px;
-      margin-top: 8px;
+    .contactos-container{
+      display:flex;
+      flex-direction:column;
+      gap:14px;
     }
     
-    .contacto-item {
-      border: 1px solid rgba(255,255,255,.15);
-      border-radius: 14px;
-      padding: 14px;
-      background: rgba(255,255,255,.03);
+    .contacto-item{
+      border:2px solid #d7dde6;
+      border-radius:12px;
+      background:#faf8fd;
+      padding:14px;
     }
     
-    .contacto-item-head {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      margin-bottom: 12px;
+    .contacto-item-head{
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      gap:12px;
+      margin-bottom:12px;
+      flex-wrap:wrap;
     }
     
-    .contacto-grid {
-      display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 12px;
+    .contacto-item-head strong{
+      font-size:16px;
+      color:var(--header);
     }
     
-    .contacto-observaciones-wrap {
-      grid-column: 1 / -1;
+    .contacto-grid{
+      display:grid;
+      grid-template-columns:repeat(2, minmax(0, 1fr));
+      gap:14px 16px;
     }
     
-    .contactos-actions {
-      margin-top: 10px;
+    .contacto-grid .modal-field{
+      min-width:0;
+    }
+    
+    .contacto-observaciones-wrap{
+      grid-column:1 / -1;
+    }
+    
+    .contactos-actions{
+      display:flex;
+      justify-content:flex-start;
+    }
+    
+    @media (max-width: 900px){
+      .contacto-grid{
+        grid-template-columns:1fr;
+      }
     }
 
     @media (max-width: 900px){
@@ -1020,72 +1037,19 @@
           </div>
         
           <div class="modal-field full">
-            <label>Contacto 1</label>
+            <label>Contactos del colegio</label>
+            <div class="help-note">
+              Puedes agregar todos los contactos que necesites para este colegio.
+            </div>
           </div>
-        
-          <div class="modal-field">
-            <label for="contacto1NombreInput">Nombre</label>
-            <input id="contacto1NombreInput" type="text" />
-          </div>
-        
-          <div class="modal-field">
-            <label for="contacto1RolInput">Rol</label>
-            <select id="contacto1RolInput">
-              <option value="">Seleccionar</option>
-              <option value="APODERADO">APODERADO</option>
-              <option value="PROFESOR">PROFESOR</option>
-              <option value="DIRECTIVO">DIRECTIVO</option>
-              <option value="OTRO">OTRO</option>
-            </select>
-          </div>
-        
-          <div class="modal-field">
-            <label for="contacto1CorreoInput">Correo</label>
-            <input id="contacto1CorreoInput" type="email" />
-          </div>
-        
-          <div class="modal-field">
-            <label for="contacto1TelefonoInput">Teléfono</label>
-            <input id="contacto1TelefonoInput" type="text" />
-          </div>
-        
+          
           <div class="modal-field full">
-            <label>Contacto 2</label>
-          </div>
-        
-          <div class="modal-field">
-            <label for="contacto2NombreInput">Nombre</label>
-            <input id="contacto2NombreInput" type="text" />
-          </div>
-        
-          <div class="modal-field">
-            <label for="contacto2RolInput">Rol</label>
-            <select id="contacto2RolInput">
-              <option value="">Seleccionar</option>
-              <option value="APODERADO">APODERADO</option>
-              <option value="PROFESOR">PROFESOR</option>
-              <option value="DIRECTIVO">DIRECTIVO</option>
-              <option value="OTRO">OTRO</option>
-            </select>
-          </div>
-        
-          <div class="modal-field">
-            <label for="contacto2CorreoInput">Correo</label>
-            <input id="contacto2CorreoInput" type="email" />
-          </div>
-        
-          <div class="modal-field">
-            <label for="contacto2TelefonoInput">Teléfono</label>
-            <input id="contacto2TelefonoInput" type="text" />
-          </div>
-
-          <div class="form-group contactos-group">
-            <label class="form-label">Contactos del colegio</label>
-          
             <div id="contactosContainer" class="contactos-container"></div>
+          </div>
           
+          <div class="modal-field full">
             <div class="contactos-actions">
-              <button type="button" id="btnAgregarContacto" class="btn-secundario">
+              <button type="button" id="btnAgregarContacto" class="btn-page sec">
                 + Agregar contacto
               </button>
             </div>
