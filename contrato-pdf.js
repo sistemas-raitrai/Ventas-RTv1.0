@@ -630,7 +630,7 @@ async function generateRealPdfBlob(fileName = "contrato.pdf") {
   const element = getContratoPageElement();
 
   const options = {
-    margin: 0,
+    margin: [10, 8, 10, 8], // top, left, bottom, right en mm
     filename: fileName,
     image: { type: "jpeg", quality: 0.98 },
     html2canvas: {
