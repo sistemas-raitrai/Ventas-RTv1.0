@@ -2324,11 +2324,14 @@ function renderMeetings() {
     return;
   }
 
-  list.innerHTML = state.meetings.map((meeting) => `
+  list.innerHTML = state.meetings.map((meeting, index) => `
     <div class="list-card">
       <div class="list-card-top">
         <div>
-          <div class="list-card-title">${escapeHtml(meeting.titulo || "Reunión")}</div>
+          <div class="list-card-title">
+            ${escapeHtml(meeting.titulo || `Reunión ${state.meetings.length - index}`)}
+          </div>
+
           <div class="list-card-meta">
 ${escapeHtml(formatDateTime(meeting.fechaInicio))}
 ${escapeHtml(capitalize(meeting.tipo || "reunión"))} · ${escapeHtml(meeting.estadoReunion || "agendada")}
@@ -2336,8 +2339,40 @@ ${escapeHtml(meetingPlaceLabel(meeting))}
           </div>
         </div>
 
-        <div class="doc-chip ${docStateClass(meeting.estadoReunion === "cancelada" ? "no_aplica" : meeting.estadoReunion === "realizada" ? "ok" : "pendiente")}">
-          ${escapeHtml(capitalize(meeting.estadoReunion || "agendada"))}
+        <div class="registro-card-actions">
+          <div class="doc-chip ${docStateClass(
+            meeting.estadoReunion === "cancelada"
+              ? "no_aplica"
+              : meeting.estadoReunion === "realizada"
+                ? "ok"
+                : "pendiente"
+          )}">
+            ${escapeHtml(capitalize(meeting.estadoReunion || "agendada"))}
+          </div>
+
+          <button
+            class="btn-pill"
+            type="button"
+            data-action="edit-meeting"
+            data-id="${escapeHtml(meeting.id)}"
+          >
+            Editar
+          </button>
+
+          ${
+            normalizeSearchLocal(meeting.estadoReunion || "") !== "realizada"
+              ? `
+                <button
+                  class="btn-dark"
+                  type="button"
+                  data-action="complete-meeting"
+                  data-id="${escapeHtml(meeting.id)}"
+                >
+                  Marcar realizada
+                </button>
+              `
+              : ""
+          }
         </div>
       </div>
 
@@ -2855,6 +2890,23 @@ function bindEvents() {
 
   $("r_tipo")?.addEventListener("change", syncMeetingTypeVisibility);
 
+  $("meetingsList")?.addEventListener("click", async (e) => {
+    const btn = e.target.closest("[data-action]");
+    if (!btn) return;
+
+    const id = btn.dataset.id || "";
+    const action = btn.dataset.action || "";
+
+    if (action === "edit-meeting") {
+      await openEditMeetingModal(id);
+      return;
+    }
+
+    if (action === "complete-meeting") {
+      await completeMeeting(id);
+    }
+  });
+
   $("btnFirmarVendedor")?.addEventListener("click", () => signFlow("vendedor"));
   $("btnFirmarJefaVentas")?.addEventListener("click", () => signFlow("jefaVentas"));
   $("btnFirmarAdministracion")?.addEventListener("click", () => signFlow("administracion"));
@@ -3204,10 +3256,53 @@ function openMeetingModal() {
     return;
   }
 
+  state.editingMeetingId = "";
+
   $("formReunion")?.reset();
   setDefaultMeetingDates();
   setFormValue("r_tipo", "presencial");
   syncMeetingTypeVisibility();
+  setText("meetingModalTitle", "Nueva reunión");
+  setText("btnGuardarReunionLabel", "Guardar reunión");
+  openModal("modalReunion");
+}
+
+async function openEditMeetingModal(id) {
+  const meeting = state.meetings.find((m) => m.id === id);
+  if (!meeting) {
+    alert("No se encontró la reunión.");
+    return;
+  }
+
+  state.editingMeetingId = id;
+
+  $("formReunion")?.reset();
+
+  setFormValue("r_titulo", meeting.titulo || "");
+  setFormValue("r_tipo", meeting.tipo || "presencial");
+
+  const fecha = toDate(meeting.fechaInicio);
+  if (fecha) {
+    const yyyy = fecha.getFullYear();
+    const mm = String(fecha.getMonth() + 1).padStart(2, "0");
+    const dd = String(fecha.getDate()).padStart(2, "0");
+    const hh = String(fecha.getHours()).padStart(2, "0");
+    const mi = String(fecha.getMinutes()).padStart(2, "0");
+
+    setFormValue("r_fecha", `${yyyy}-${mm}-${dd}`);
+    setFormValue("r_horaInicio", `${hh}:${mi}`);
+  } else {
+    setFormValue("r_fecha", "");
+    setFormValue("r_horaInicio", "");
+  }
+
+  setFormValue("r_direccion", meeting.direccion || "");
+  setFormValue("r_link", meeting.link || "");
+  setFormValue("r_observaciones", meeting.observaciones || "");
+
+  syncMeetingTypeVisibility();
+  setText("meetingModalTitle", "Editar reunión");
+  setText("btnGuardarReunionLabel", "Guardar cambios");
   openModal("modalReunion");
 }
 
@@ -4184,13 +4279,12 @@ async function saveMeeting() {
   }
 
   const fechaInicio = new Date(`${fecha}T${horaInicio}`);
-
   if (Number.isNaN(fechaInicio.getTime())) {
     alert("La fecha u hora ingresada no es válida.");
     return;
   }
 
-  // Dejamos una duración referencial de 1 hora para agenda interna
+  // duración interna referencial de 1 hora
   const fechaFin = new Date(fechaInicio.getTime() + 60 * 60 * 1000);
 
   const data = {
@@ -4222,38 +4316,108 @@ async function saveMeeting() {
     fechaActualizacion: null
   };
 
-  await addDoc(collection(db, REUNIONES_COLLECTION), data);
+  if (state.editingMeetingId) {
+    const current = state.meetings.find((m) => m.id === state.editingMeetingId);
 
-  const patch = buildMeetingSummaryPatchAfterCreate(data);
-  await saveGroupPatch(patch, {
-    tipoMovimiento: "reunion_creada",
-    modulo: "agenda",
-    titulo: "Nueva reunión agendada",
-    mensaje: `${getDisplayName(state.effectiveUser)} agendó una reunión ${tipo}.`,
-    cambios: [
-      { campo: "proximaReunionFecha", anterior: state.group.proximaReunionFecha || "", nuevo: fechaInicio.toISOString() },
-      { campo: "proximaReunionTipo", anterior: state.group.proximaReunionTipo || "", nuevo: tipo }
-    ],
-    reloadAfterSave: false
+    await updateDoc(doc(db, REUNIONES_COLLECTION, state.editingMeetingId), {
+      titulo,
+      tipo,
+      modalidad: tipo,
+      fechaInicio: Timestamp.fromDate(fechaInicio),
+      fechaFin: Timestamp.fromDate(fechaFin),
+      direccion: tipo === "presencial" ? direccion : "",
+      link: tipo === "virtual" ? link : "",
+      observaciones,
+      actualizadoPor: getDisplayName(state.effectiveUser),
+      actualizadoPorCorreo: state.effectiveEmail,
+      fechaActualizacion: serverTimestamp()
+    });
+
+    await createHistoryEntry({
+      tipoMovimiento: "reunion_editada",
+      modulo: "agenda",
+      titulo: "Reunión editada",
+      mensaje: `${getDisplayName(state.effectiveUser)} editó la reunión "${titulo}".`,
+      metadata: {
+        cambios: [
+          { campo: "reunion.titulo", anterior: current?.titulo || "", nuevo: titulo },
+          { campo: "reunion.tipo", anterior: current?.tipo || "", nuevo: tipo },
+          { campo: "reunion.fechaInicio", anterior: current?.fechaInicio || "", nuevo: fechaInicio.toISOString() },
+          { campo: "reunion.lugar", anterior: meetingPlaceLabel(current || {}), nuevo: tipo === "presencial" ? direccion : link },
+          { campo: "reunion.observaciones", anterior: current?.observaciones || "", nuevo: observaciones }
+        ]
+      }
+    });
+
+  } else {
+    await addDoc(collection(db, REUNIONES_COLLECTION), data);
+
+    const patch = buildMeetingSummaryPatchAfterCreate(data);
+    await saveGroupPatch(patch, {
+      tipoMovimiento: "reunion_creada",
+      modulo: "agenda",
+      titulo: "Nueva reunión agendada",
+      mensaje: `${getDisplayName(state.effectiveUser)} agendó una reunión ${tipo}.`,
+      cambios: [
+        { campo: "proximaReunionFecha", anterior: state.group.proximaReunionFecha || "", nuevo: fechaInicio.toISOString() },
+        { campo: "proximaReunionTipo", anterior: state.group.proximaReunionTipo || "", nuevo: tipo }
+      ],
+      reloadAfterSave: false
+    });
+
+    await createHistoryEntry({
+      tipoMovimiento: "reunion_creada",
+      modulo: "agenda",
+      titulo: "Nueva reunión agendada",
+      mensaje: `${getDisplayName(state.effectiveUser)} agendó "${titulo}".`,
+      metadata: {
+        cambios: [
+          { campo: "reunion.tipo", anterior: "", nuevo: tipo },
+          { campo: "reunion.fechaInicio", anterior: "", nuevo: fechaInicio.toISOString() },
+          { campo: "reunion.lugar", anterior: "", nuevo: tipo === "presencial" ? direccion : link }
+        ]
+      }
+    });
+  }
+
+  state.editingMeetingId = "";
+  closeModal("modalReunion");
+  await loadAll();
+  showSaveNotice("Reunión guardada correctamente.");
+}
+
+async function completeMeeting(id) {
+  const meeting = state.meetings.find((m) => m.id === id);
+  if (!meeting) return;
+
+  const ok = confirm(`¿Marcar como realizada la reunión "${meeting.titulo || "Reunión"}"?`);
+  if (!ok) return;
+
+  await updateDoc(doc(db, REUNIONES_COLLECTION, id), {
+    estadoReunion: "realizada",
+    actualizadoPor: getDisplayName(state.effectiveUser),
+    actualizadoPorCorreo: state.effectiveEmail,
+    fechaActualizacion: serverTimestamp()
   });
 
   await createHistoryEntry({
-    tipoMovimiento: "reunion_creada",
+    tipoMovimiento: "reunion_realizada",
     modulo: "agenda",
-    titulo: "Nueva reunión agendada",
-    mensaje: `${getDisplayName(state.effectiveUser)} agendó "${titulo}".`,
+    titulo: "Reunión realizada",
+    mensaje: `${getDisplayName(state.effectiveUser)} marcó como realizada la reunión "${meeting.titulo || "Reunión"}".`,
     metadata: {
       cambios: [
-        { campo: "reunion.tipo", anterior: "", nuevo: tipo },
-        { campo: "reunion.fechaInicio", anterior: "", nuevo: fechaInicio.toISOString() },
-        { campo: "reunion.lugar", anterior: "", nuevo: tipo === "presencial" ? direccion : link }
+        {
+          campo: "reunion.estadoReunion",
+          anterior: meeting.estadoReunion || "agendada",
+          nuevo: "realizada"
+        }
       ]
     }
   });
 
-  closeModal("modalReunion");
   await loadAll();
-  showSaveNotice("Reunión guardada correctamente.");
+  showSaveNotice("Reunión marcada como realizada.");
 }
 
 async function saveManualAlert() {
