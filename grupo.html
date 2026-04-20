@@ -2243,7 +2243,7 @@
   <div class="modal" id="modalReunion">
     <div class="modal-card">
       <div class="modal-head">
-        <h3 class="modal-title">Nueva reunión</h3>
+        <h3 class="modal-title" id="meetingModalTitle">Nueva reunión</h3>
         <button class="modal-close" type="button" data-close="modalReunion">×</button>
       </div>
 
@@ -2291,7 +2291,9 @@
 
       <div class="modal-actions">
         <button class="btn-pill" type="button" data-close="modalReunion">Cancelar</button>
-        <button class="btn-dark" type="button" id="btnGuardarReunion">Guardar reunión</button>
+        <button class="btn-dark" type="button" id="btnGuardarReunion">
+          <span id="btnGuardarReunionLabel">Guardar reunión</span>
+        </button>
       </div>
     </div>
   </div>
