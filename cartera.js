@@ -740,8 +740,10 @@ function mapDocToRow(docId, data) {
     logoColegioUrl: String(data.logoColegioUrl || data.logoUrl || "").trim(),
     logoColegioPath: String(data.logoColegioPath || data.logoPath || "").trim(),
 
+    nivelesTexto: normalizeText(data.nivelesTexto || ""),
     nivelesColegio,
     resumenNiveles: normalizeText(data.resumenNiveles || summarizeNiveles(nivelesColegio)),
+
     contactosColegio: contactos,
     trabajado: !!data.trabajado,
     visitado: !!data.visitado,
@@ -804,8 +806,14 @@ function buildItemPayload(input, existing = null) {
         : existing?.observaciones || ""
     ),
 
+    nivelesTexto: normalizeText(
+      input.nivelesTexto !== undefined && input.nivelesTexto !== null
+        ? input.nivelesTexto
+        : existing?.nivelesTexto || ""
+    ),
     nivelesColegio,
     resumenNiveles: normalizeText(input.resumenNiveles || summarizeNiveles(nivelesColegio)),
+
     contactosColegio,
     trabajado,
     visitado,
@@ -1689,6 +1697,7 @@ async function openCreateModal() {
   $("comunaInput").value = "";
   $("ciudadInput").value = "";
   $("estatusInput").value = "";
+  $("nivelesInput").value = "";
   $("observacionesInput").value = "";
 
   fillVendorSelectModal("");
@@ -1700,6 +1709,7 @@ async function openCreateModal() {
 
   await syncNumeroColegioInputForSelectedVendor();
 }
+
 async function openEditModal(row) {
   state.modalMode = "edit";
   state.editingOriginal = { ...row };
@@ -1711,6 +1721,7 @@ async function openEditModal(row) {
   $("comunaInput").value = row.comuna || "";
   $("ciudadInput").value = row.ciudad || "";
   $("estatusInput").value = row.estatus || "";
+  $("nivelesInput").value = row.nivelesTexto || "";
   $("observacionesInput").value = row.observaciones || "";
 
   fillVendorSelectModal(row.correoVendedor || "");
@@ -1743,6 +1754,9 @@ function readModalInput() {
   const vendor = state.vendors.find(v => normalizeEmail(v.email) === sellerEmail);
   const contactosColegio = readContactosFromModal();
 
+  const nivelesTexto = normalizeText($("nivelesInput")?.value || "");
+  const nivelesColegio = parseNivelesText(nivelesTexto);
+
   return {
     numeroColegio: normalizeText($("numeroColegioInput")?.value || ""),
     colegio: normalizeText($("colegioInput")?.value || ""),
@@ -1753,6 +1767,9 @@ function readModalInput() {
     correoVendedor: sellerEmail,
     nombreVendedor: vendor?.nombre || "",
     apellidoVendedor: vendor?.apellido || "",
+    nivelesTexto,
+    nivelesColegio,
+    resumenNiveles: summarizeNiveles(nivelesColegio),
     contactosColegio
   };
 }
