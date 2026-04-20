@@ -920,6 +920,21 @@ function canEditGroup() {
   return canAccessGroup(state.group);
 }
 
+function canCreateAlertsAndComments() {
+  // Debe poder:
+  // - quien ya puede editar normalmente
+  // - y además el rol "registro", pero solo para alertas/comentarios
+  const rol = String(state.effectiveUser?.rol || "").toLowerCase();
+
+  if (canEditGroup()) return true;
+
+  if (rol === "registro" && canAccessGroup(state.group)) {
+    return true;
+  }
+
+  return false;
+}
+
 function canEditDocuments() {
   const rol = String(state.effectiveUser?.rol || "").toLowerCase();
   return rol === "admin" || rol === "supervision";
@@ -2581,6 +2596,8 @@ function syncButtons() {
   const autorizada = !!state.group.autorizada;
   const ficha = getFichaSummary();
 
+  const canAlertsComments = canCreateAlertsAndComments();
+
   [
     "btnEditarDatosHero",
     "btnEditarDatos",
@@ -2588,14 +2605,20 @@ function syncButtons() {
     "btnEditarSituacion",
     "btnNuevaReunionHero",
     "btnNuevaReunion",
-    "btnNuevaReunionListado",
-    "btnNuevaAlertaHero",
-    "btnNuevaAlerta"
+    "btnNuevaReunionListado"
   ].forEach((id) => {
     const el = $(id);
     if (el) el.disabled = !editable;
   });
 
+  [
+    "btnNuevaAlertaHero",
+    "btnNuevaAlerta",
+    "btnNuevoComentario"
+  ].forEach((id) => {
+    const el = $(id);
+    if (el) el.disabled = !canAlertsComments;
+  });
   const btnEditarDocumentos = $("btnEditarDocumentos");
   if (btnEditarDocumentos) {
     const canDocs = canEditDocuments();
@@ -3199,8 +3222,8 @@ function openAlertModal() {
 }
 
 function openCommentModal() {
-  if (!canEditGroup()) {
-    alert(getBlockedEditMessage());
+  if (!canCreateAlertsAndComments()) {
+    alert("No tienes permisos para crear comentarios en este grupo.");
     return;
   }
 
@@ -3209,8 +3232,8 @@ function openCommentModal() {
 }
 
 async function saveComment() {
-  if (!canEditGroup()) {
-    alert(getBlockedEditMessage());
+  if (!canCreateAlertsAndComments()) {
+    alert("No tienes permisos para crear comentarios en este grupo.");
     return;
   }
 
@@ -4233,8 +4256,8 @@ async function saveMeeting() {
 }
 
 async function saveManualAlert() {
-  if (!canEditGroup()) {
-    alert(getBlockedEditMessage());
+  if (!canCreateAlertsAndComments()) {
+    alert("No tienes permisos para crear alertas en este grupo.");
     return;
   }
 
