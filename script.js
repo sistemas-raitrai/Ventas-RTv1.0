@@ -1656,6 +1656,7 @@ async function renderPantalla() {
     poblarSelectorGrupos(effectiveUser, rowsScope);
     poblarSelectorApoderados(rowsScope);
     renderDashboard(rowsScope);
+    initBuscadorDashboard();
   } catch (error) {
     console.error("Error cargando dashboard:", error);
     inicializarDashboardEnCeros();
@@ -1875,6 +1876,100 @@ async function initPage() {
 
   updateClockDataset();
   setInterval(updateClockDataset, 1000);
+}
+
+/* =========================================================
+   BUSCADOR GLOBAL DE GRUPOS
+========================================================= */
+
+function buildSearchText(row = {}) {
+  let text = "";
+
+  function extract(obj) {
+    if (!obj) return;
+    if (typeof obj === "object") {
+      Object.values(obj).forEach(extract);
+    } else {
+      text += " " + String(obj);
+    }
+  }
+
+  extract(row);
+
+  return normalizeLoose(text);
+}
+
+function evaluarBusqueda(textoGrupo, query) {
+  const q = normalizeLoose(query);
+
+  if (!q) return true;
+
+  // OR
+  if (q.includes("(o)")) {
+    const parts = q.split("(o)").map(p => p.trim());
+    return parts.some(p => textoGrupo.includes(p));
+  }
+
+  // AND
+  if (q.includes("(y)")) {
+    const parts = q.split("(y)").map(p => p.trim());
+    return parts.every(p => textoGrupo.includes(p));
+  }
+
+  // default AND por palabras
+  return q.split(" ").every(p => textoGrupo.includes(p));
+}
+
+function filtrarGruposPorBusqueda(rows, query) {
+  if (!query) return rows;
+
+  return rows.filter(row => {
+    const text = buildSearchText(row);
+    return evaluarBusqueda(text, query);
+  });
+}
+
+function renderResultadosBusqueda(rows) {
+  const cont = $("buscador-resultados");
+  if (!cont) return;
+
+  if (!rows.length) {
+    cont.innerHTML = `<div class="buscador-item">Sin resultados</div>`;
+    return;
+  }
+
+  cont.innerHTML = rows.slice(0, 20).map(row => {
+    const id = getRowId(row);
+
+    return `
+      <div class="buscador-item" onclick="location.href='grupo.html?id=${id}'">
+        <strong>${getRowAlias(row)}</strong><br>
+        ${row.colegio || ""} — ${getRowApoderado(row)}<br>
+        <span style="opacity:.6">${row.estado || ""}</span>
+      </div>
+    `;
+  }).join("");
+}
+
+function initBuscadorDashboard() {
+  const input = $("input-buscador-grupos");
+  if (!input || input.dataset.bound) return;
+
+  input.dataset.bound = "1";
+
+  input.addEventListener("input", () => {
+    const query = input.value;
+
+    const baseRows = state.scopedRows || [];
+
+    const filtrados = filtrarGruposPorBusqueda(baseRows, query);
+
+    // 👉 render lista flotante
+    renderResultadosBusqueda(filtrados);
+
+    // 👉 actualizar TODO el dashboard con filtro
+    renderDashboard(filtrados);
+  });
 }
 
 initPage();
