@@ -63,6 +63,50 @@ const state = {
 
 initPage();
 
+function ensurePdfStatusBox() {
+  let box = document.getElementById("pdfStatusBox");
+  if (box) return box;
+
+  box = document.createElement("div");
+  box.id = "pdfStatusBox";
+  box.style.position = "fixed";
+  box.style.right = "18px";
+  box.style.bottom = "18px";
+  box.style.zIndex = "99999";
+  box.style.maxWidth = "360px";
+  box.style.padding = "12px 14px";
+  box.style.borderRadius = "14px";
+  box.style.background = "#2f2340";
+  box.style.color = "#fff";
+  box.style.boxShadow = "0 10px 26px rgba(0,0,0,.22)";
+  box.style.fontSize = "14px";
+  box.style.lineHeight = "1.4";
+  box.style.display = "none";
+
+  document.body.appendChild(box);
+  return box;
+}
+
+function showPdfStatus(message, isError = false) {
+  const box = ensurePdfStatusBox();
+  box.textContent = String(message || "");
+  box.style.display = "block";
+  box.style.background = isError ? "#7a1f1f" : "#2f2340";
+}
+
+function hidePdfStatus(delay = 0) {
+  const box = ensurePdfStatusBox();
+
+  if (delay > 0) {
+    setTimeout(() => {
+      box.style.display = "none";
+    }, delay);
+    return;
+  }
+
+  box.style.display = "none";
+}
+
 async function initPage() {
   state.requestedId = String(new URLSearchParams(location.search).get("id") || "").trim();
 
@@ -303,8 +347,31 @@ async function handlePrintButtonClick() {
   const existingPdfUrl = getExistingPdfUrl();
 
   if (alreadyConfirmed && existingPdfUrl) {
-    window.open(existingPdfUrl, "_blank", "noopener");
-    return;
+    const wantsOpenExisting = window.confirm(
+      "Esta ficha ya tiene un PDF real generado.\n\nAceptar = abrir el PDF actual.\nCancelar = continuar para generar una nueva versión."
+    );
+  
+    if (wantsOpenExisting) {
+      window.open(existingPdfUrl, "_blank", "noopener");
+      return;
+    }
+  
+    const claveNuevaVersion = window.prompt(
+      "Para generar una nueva versión, ingresa la clave de autorización:"
+    );
+  
+    if (claveNuevaVersion === null) {
+      showPdfStatus("Generación de nueva versión cancelada.");
+      hidePdfStatus(2500);
+      return;
+    }
+  
+    if (String(claveNuevaVersion).trim() !== "Raitrai2026") {
+      showPdfStatus("Clave incorrecta. No se generó una nueva versión.", true);
+      alert("Clave incorrecta. No autorizado para generar una nueva versión.");
+      hidePdfStatus(4000);
+      return;
+    }
   }
 
   if (!alreadyConfirmed && !canFinalizeFichaPdf()) {
@@ -332,27 +399,40 @@ async function handlePrintButtonClick() {
 
   state.isClosingPdf = true;
   syncPrintButton();
-
+  showPdfStatus(
+    alreadyConfirmed
+      ? "Generando nueva versión del PDF real..."
+      : "Generando PDF real..."
+  );
+  
   try {
     const result = await confirmOfficialPdfClosure({
-      preserveCurrentVersion: alreadyConfirmed
+      preserveCurrentVersion: false
     });
-
+  
+    showPdfStatus("Actualizando datos de la ficha...");
     await loadAll();
-
+  
     if (result?.blob && result?.pdfNombre) {
+      showPdfStatus("Descargando PDF generado...");
       downloadBlobLocally(result.blob, result.pdfNombre);
     }
-
+  
     if (result?.emailQueued === false) {
+      showPdfStatus("PDF generado correctamente, pero el correo quedó pendiente.", true);
       alert("El PDF real se generó y guardó correctamente, pero el correo quedó pendiente de envío.");
+      hidePdfStatus(5000);
       return;
     }
-
+  
+    showPdfStatus("PDF real generado correctamente.");
     alert("PDF real generado, subido a Storage y enlazado correctamente.");
+    hidePdfStatus(3500);
   } catch (error) {
     console.error("[ficha-pdf] confirmOfficialPdfClosure", error);
+    showPdfStatus("Error al generar el PDF real: " + (error?.message || error), true);
     alert("No se pudo generar el PDF real: " + (error?.message || error));
+    hidePdfStatus(7000);
   } finally {
     state.isClosingPdf = false;
     syncPrintButton();
@@ -373,7 +453,15 @@ function syncPrintButton() {
 
   if (isPdfOfficiallyConfirmed()) {
     btn.disabled = !canFinalizeFichaAsCurrentUser();
-    btn.textContent = existingPdfUrl ? "Abrir PDF real" : "Generar PDF real";
+  
+    if (state.isClosingPdf) {
+      btn.textContent = "Generando nueva versión...";
+    } else {
+      btn.textContent = existingPdfUrl
+        ? "Abrir PDF real / Generar nueva versión"
+        : "Generar PDF real";
+    }
+  
     return;
   }
 
