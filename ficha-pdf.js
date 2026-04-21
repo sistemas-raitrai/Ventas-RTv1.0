@@ -627,13 +627,14 @@ async function generateRealPdfBlob(fileName = "ficha.pdf") {
   const element = getPdfPageElement();
 
   const options = {
-    margin: 0,
+    margin: [0, 0, 0, 0],
     filename: fileName,
     image: { type: "jpeg", quality: 0.98 },
     html2canvas: {
       scale: 2,
       useCORS: true,
-      backgroundColor: "#ffffff"
+      backgroundColor: "#ffffff",
+      scrollY: 0
     },
     jsPDF: {
       unit: "mm",
@@ -641,7 +642,7 @@ async function generateRealPdfBlob(fileName = "ficha.pdf") {
       orientation: "portrait"
     },
     pagebreak: {
-      mode: ["css", "legacy"]
+      mode: ["css"]
     }
   };
 
