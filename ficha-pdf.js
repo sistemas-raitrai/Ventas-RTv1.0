@@ -734,10 +734,24 @@ async function generateRealPdfBlob(fileName = "ficha.pdf") {
     }
   };
 
-  return await window.html2pdf()
+  // 1) Genera el PDF visual desde el HTML
+  const rawBlob = await window.html2pdf()
     .set(options)
     .from(element)
     .outputPdf("blob");
+
+  // 2) Lo vuelve a cargar con pdf-lib para dejar SOLO la primera página
+  //    Esto evita que html2pdf deje una segunda hoja vacía.
+  const rawBytes = new Uint8Array(await rawBlob.arrayBuffer());
+  const rawPdf = await PDFDocument.load(rawBytes);
+
+  const cleanedPdf = await PDFDocument.create();
+  const [firstPage] = await cleanedPdf.copyPages(rawPdf, [0]);
+  cleanedPdf.addPage(firstPage);
+
+  const cleanedBytes = await cleanedPdf.save();
+
+  return new Blob([cleanedBytes], { type: "application/pdf" });
 }
 
 async function uploadRealPdfToStorage(blob, fileName = "ficha.pdf") {
