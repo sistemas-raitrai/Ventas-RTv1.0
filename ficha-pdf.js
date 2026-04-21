@@ -629,16 +629,27 @@ async function fetchPdfBytesFromUrl(url = "") {
 async function mergeFichaAndProgramaPdf(fichaBlob, programaPdfUrl) {
   const mergedPdf = await PDFDocument.create();
 
+  // ===== FICHA =====
   const fichaBytes = new Uint8Array(await fichaBlob.arrayBuffer());
   const fichaPdf = await PDFDocument.load(fichaBytes);
 
+  const fichaPages = await mergedPdf.copyPages(fichaPdf, [0]);
+  fichaPages.forEach((page) => mergedPdf.addPage(page));
+
+  // ===== PROGRAMA =====
   const programaBytes = await fetchPdfBytesFromUrl(programaPdfUrl);
   const programaPdf = await PDFDocument.load(programaBytes);
 
-  const fichaPages = await mergedPdf.copyPages(fichaPdf, fichaPdf.getPageIndices());
-  fichaPages.forEach((page) => mergedPdf.addPage(page));
+  let programaIndices = programaPdf.getPageIndices();
 
-  const programaPages = await mergedPdf.copyPages(programaPdf, programaPdf.getPageIndices());
+  // IMPORTANTE:
+  // Esto elimina SIEMPRE la última página del programa.
+  // Déjalo solo si tus programas siempre terminan con una hoja vacía.
+  if (programaIndices.length > 1) {
+    programaIndices = programaIndices.slice(0, -1);
+  }
+
+  const programaPages = await mergedPdf.copyPages(programaPdf, programaIndices);
   programaPages.forEach((page) => mergedPdf.addPage(page));
 
   const mergedBytes = await mergedPdf.save();
