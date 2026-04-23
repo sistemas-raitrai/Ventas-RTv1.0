@@ -839,24 +839,38 @@ function calcularEdad(fechaIso) {
 }
 
 function grupoEsInternacional() {
-  const destino = normalizarTexto(
-    grupoData?.destinoPrincipal ||
-    grupoData?.destino ||
-    grupoData?.programa ||
-    ""
+  const destinoPrincipal = normalizarTexto(
+    grupoData?.destinoPrincipal || ""
   );
 
-  // Ajusta esta lógica si usas un campo más específico en tu base
-  if (!destino) return false;
+  const destinoOtro = normalizarTexto(
+    grupoData?.destinoPrincipalOtro || ""
+  );
 
-  if (destino.includes("bariloche")) return true;
-  if (destino.includes("brasil")) return true;
-  if (destino.includes("argentina")) return true;
-  if (destino.includes("internacional")) return true;
+  const programa = normalizarTexto(
+    grupoData?.programa || ""
+  );
 
-  // Si explícitamente menciona "sur de chile", "norte de chile" o solo "chile", no internacional
-  if (destino.includes("sur de chile")) return false;
-  if (destino.includes("norte de chile")) return false;
+  const universo = `${destinoPrincipal} ${destinoOtro} ${programa}`.trim();
+
+  if (!universo) return false;
+
+  // INTERNACIONALES / mixtos con salida del país
+  if (universo.includes("bariloche")) return true;
+  if (universo.includes("brasil")) return true;
+  if (universo.includes("mexico")) return true;
+  if (universo.includes("republica dominicana")) return true;
+  if (universo.includes("argentina")) return true;
+  if (universo.includes("internacional")) return true;
+
+  // Casos mixtos que incluyen Chile + extranjero
+  if (universo.includes("sur de chile y bariloche")) return true;
+  if (universo.includes("bariloche y sur de chile")) return true;
+  if (universo.includes("pucon y bariloche")) return true;
+
+  // Nacionales
+  if (universo.includes("sur de chile")) return false;
+  if (universo.includes("norte de chile")) return false;
 
   return false;
 }
