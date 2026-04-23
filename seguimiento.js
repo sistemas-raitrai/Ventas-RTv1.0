@@ -386,9 +386,26 @@ function mapClienteDoc(id, data) {
   const vendedora = cleanText(data.vendedora || "");
   const vendedoraCorreo = normalizeEmail(data.vendedoraCorreo || "");
 
+  const fichaPdfUrl = cleanText(
+    data.fichaPdfUrl ||
+    data?.ficha?.pdfUrl ||
+    data?.ficha?.urlPdf ||
+    ""
+  );
+  
   const fichaMedicaEstado = normalizeDocState(data.fichaMedicaEstado);
   const nominaEstado = normalizeDocState(data.nominaEstado);
-  const fichaEstado = normalizeDocState(data.fichaEstado);
+  
+  // Si existe PDF real, la ficha del grupo debe figurar como cumplida.
+  const fichaEstado = fichaPdfUrl
+    ? "ok"
+    : normalizeDocState(
+        data.fichaEstado ||
+        data?.documentos?.fichaGrupo?.estado ||
+        data?.ficha?.estado ||
+        ""
+      );
+  
   const contratoEstado = normalizeDocState(data.contratoEstado);
   const cortesiaEstado = normalizeDocState(data.cortesiaEstado);
 
@@ -428,6 +445,7 @@ function mapClienteDoc(id, data) {
     fichaMedicaEstado,
     nominaEstado,
     fichaEstado,
+    fichaPdfUrl,
     contratoEstado,
     cortesiaEstado,
     displayTitle,
@@ -684,6 +702,20 @@ function renderDocs(row) {
     const value = row[item.key];
     const css = getDocCss(value);
     const label = getDocLabel(value);
+
+    // Solo la ficha del grupo lleva link directo al PDF cuando existe.
+    if (item.key === "fichaEstado" && row.fichaPdfUrl) {
+      return `
+        <a
+          class="seg-doc ${css}"
+          href="${escapeAttr(row.fichaPdfUrl)}"
+          target="_blank"
+          rel="noopener noreferrer"
+          title="${escapeAttr(item.label)} · ${escapeAttr(label)}"
+          aria-label="${escapeAttr(item.label)}"
+        >${item.icon}</a>
+      `;
+    }
 
     return `
       <span
@@ -1080,7 +1112,19 @@ function normalizeDocState(value) {
 
   if (!v) return "pendiente";
   if (v.includes("no aplica") || v === "na" || v === "n/a") return "no_aplica";
-  if (v.includes("ok") || v.includes("completo") || v.includes("cumpl") || v.includes("entreg")) return "ok";
+
+  if (
+    v.includes("ok") ||
+    v.includes("completo") ||
+    v.includes("cumpl") ||
+    v.includes("entreg") ||
+    v.includes("confirmada_pdf") ||
+    v.includes("pdf_confirmado") ||
+    v.includes("confirmada")
+  ) {
+    return "ok";
+  }
+
   if (v.includes("pend")) return "pendiente";
 
   return "pendiente";
