@@ -45,6 +45,8 @@ const ALERTAS_COLLECTION = "ventas_alertas";
 const SOLICITUDES_COLLECTION = "ventas_solicitudes_actualizacion";
 const EMAIL_TEMPLATES_COLLECTION = "ventas_email_templates";
 
+const DEFAULT_CORREO_CAMBIOS_INSCRIPCION = "operaciones@raitrai.cl";
+
 const richSelectionByEditor = new Map();
 let richEditorsBound = false;
 
@@ -1259,6 +1261,13 @@ function renderFichaPanel() {
         <div class="info-label">Regla de habilitación</div>
         <div class="info-value">${escapeHtml(regla)}</div>
       </div>
+
+      <div class="info-item">
+        <div class="info-label">Inscripción pasajeros</div>
+        <div class="info-value">
+          ${state.group?.inscripcionHabilitada ? "Habilitada" : "No habilitada"}
+        </div>
+      </div>
     </div>
 
     <div class="grupo-ficha-note">
@@ -1956,6 +1965,105 @@ function openFichaPdf() {
   }
 
   window.open(ficha.pdfUrl, "_blank", "noopener");
+}
+
+function generateInscripcionToken(length = 32) {
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789";
+  const array = new Uint8Array(length);
+  crypto.getRandomValues(array);
+
+  let out = "";
+  for (let i = 0; i < array.length; i += 1) {
+    out += chars[array[i] % chars.length];
+  }
+  return out;
+}
+
+function getInscripcionBaseUrl() {
+  return new URL("inscripcion.html", window.location.href).href.split("?")[0];
+}
+
+function getInscripcionPublicLink(groupId, token) {
+  const base = getInscripcionBaseUrl();
+  return `${base}?grupo=${encodeURIComponent(groupId)}&token=${encodeURIComponent(token)}`;
+}
+
+async function enableGroupInscripcion() {
+  if (!canEditGroup()) {
+    alert(getBlockedEditMessage());
+    return;
+  }
+
+  if (normalizeState(state.group?.estado) !== "ganada") {
+    alert("La inscripción solo se puede habilitar cuando el grupo está en estado GANADA.");
+    return;
+  }
+
+  const regenerando = !!state.group?.inscripcionHabilitada;
+  const ok = confirm(
+    regenerando
+      ? "Este grupo ya tiene inscripción habilitada. ¿Quieres regenerar el link público?"
+      : "¿Quieres habilitar la inscripción pública para este grupo?"
+  );
+
+  if (!ok) return;
+
+  const tokenInscripcion = generateInscripcionToken(32);
+
+  const patch = {
+    inscripcionHabilitada: true,
+    tokenInscripcion,
+    fechaAperturaInscripcion: serverTimestamp(),
+    correoCambiosInscripcion:
+      cleanText(state.group?.correoCambiosInscripcion || "") || DEFAULT_CORREO_CAMBIOS_INSCRIPCION
+  };
+
+  await saveGroupPatch(patch, {
+    tipoMovimiento: regenerando ? "inscripcion_regenerada" : "inscripcion_habilitada",
+    modulo: "inscripcion",
+    titulo: regenerando ? "Link de inscripción regenerado" : "Inscripción habilitada",
+    mensaje: regenerando
+      ? `${getDisplayName(state.effectiveUser)} regeneró el link público de inscripción del grupo.`
+      : `${getDisplayName(state.effectiveUser)} habilitó la inscripción pública del grupo.`,
+    cambios: [
+      {
+        campo: "inscripcionHabilitada",
+        anterior: !!state.group?.inscripcionHabilitada,
+        nuevo: true
+      },
+      {
+        campo: "tokenInscripcion",
+        anterior: state.group?.tokenInscripcion || "",
+        nuevo: tokenInscripcion
+      }
+    ]
+  });
+
+  const link = getInscripcionPublicLink(state.groupId, tokenInscripcion);
+
+  try {
+    await navigator.clipboard.writeText(link);
+    showSaveNotice("Inscripción habilitada y link copiado.");
+  } catch {
+    showSaveNotice("Inscripción habilitada correctamente.");
+    alert(`Link de inscripción:\n\n${link}`);
+  }
+}
+
+async function copyGroupInscripcionLink() {
+  if (!state.group?.inscripcionHabilitada || !state.group?.tokenInscripcion) {
+    alert("Este grupo todavía no tiene la inscripción habilitada.");
+    return;
+  }
+
+  const link = getInscripcionPublicLink(state.groupId, state.group.tokenInscripcion);
+
+  try {
+    await navigator.clipboard.writeText(link);
+    showSaveNotice("Link de inscripción copiado.");
+  } catch {
+    alert(`No se pudo copiar automáticamente.\n\nCopia este link:\n\n${link}`);
+  }
 }
 
 function prioritizeFichaPanelInLayout() {
@@ -2676,6 +2784,23 @@ function syncButtons() {
   const btnAbrirFichaPdf = $("btnAbrirFichaPdf");
   if (btnAbrirFichaPdf) btnAbrirFichaPdf.disabled = !ficha.pdfUrl;
 
+  const btnHabilitarInscripcion = $("btnHabilitarInscripcion");
+  const btnCopiarLinkInscripcion = $("btnCopiarLinkInscripcion");
+
+  const canManageInscripcion = editable && isGanada;
+  const inscripcionYaHabilitada = !!state.group?.inscripcionHabilitada;
+
+  if (btnHabilitarInscripcion) {
+    btnHabilitarInscripcion.disabled = !canManageInscripcion;
+    btnHabilitarInscripcion.textContent = inscripcionYaHabilitada
+      ? "Regenerar link inscripción"
+      : "Habilitar inscripción";
+  }
+
+  if (btnCopiarLinkInscripcion) {
+    btnCopiarLinkInscripcion.disabled = !inscripcionYaHabilitada;
+  }
+
   const btnContrato = $("btnCrearContrato");
   if (btnContrato) btnContrato.disabled = !autorizada;
 
@@ -2916,6 +3041,8 @@ function bindEvents() {
   
   $("btnCrearFicha")?.addEventListener("click", openFichaEditor);
   $("btnAbrirFichaPdf")?.addEventListener("click", openFichaPdf);
+  $("btnHabilitarInscripcion")?.addEventListener("click", enableGroupInscripcion);
+  $("btnCopiarLinkInscripcion")?.addEventListener("click", copyGroupInscripcionLink);
 
   $("btnCrearContrato")?.addEventListener("click", () => {
     if (!state.group?.autorizada) {
