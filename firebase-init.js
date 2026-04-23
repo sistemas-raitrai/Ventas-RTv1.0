@@ -212,7 +212,10 @@ export function puedeCrearCotizaciones(email = "") {
 /* =========================================================
    GUARDIA GLOBAL
 ========================================================= */
-const PUBLIC_PAGES = new Set(["login.html"]);
+const PUBLIC_PAGES = new Set([
+  "login.html",
+  "inscripcion.html"
+]);
 
 onAuthStateChanged(auth, async (user) => {
   const currentPage = (location.pathname.split("/").pop() || "index.html").toLowerCase();
