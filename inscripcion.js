@@ -1,23 +1,12 @@
 // inscripcion.js
 // -----------------------------------------------------------------------------
-// OBJETIVO
 // Página pública de inscripción de pasajero para un grupo de viaje.
 // Guarda en:
-// ventas_cotizaciones/{idGrupo}/inscripciones/{rutNormalizado}
+// ventas_cotizaciones/{idGrupo}/inscripciones/{documentoNormalizado}
 //
-// REGLA CLAVE
-// - El ID del documento será el RUT normalizado del viajante.
-// - Si ese RUT ya existe en el grupo, NO se vuelve a inscribir.
-// - Puede inscribirse:
-//   1) estudiante
-//   2) adulto acompañante
-// - Si es adulto acompañante, se diferencia entre:
-//   - responsable_grupo
-//   - acompanante
-//
-// IMPORTANTE
-// Este archivo asume que tu firebase-init.js exporta "db".
-// Si en tu proyecto usas otro nombre o estructura, ajusta SOLO esa importación.
+// Casos permitidos:
+// - RUT chileno (número + DV automático)
+// - Pasaporte
 // -----------------------------------------------------------------------------
 
 import { db } from "./firebase-init.js";
@@ -47,13 +36,24 @@ const chipCurso = $("chipCurso");
 const chipDestino = $("chipDestino");
 const chipAno = $("chipAno");
 
-// Bloques condicionales
 const adultoRolWrap = $("adultoRolWrap");
 const adultoCompromisoCard = $("adultoCompromisoCard");
 const adultoCargoWrap = $("adultoCargoWrap");
 const cursoWrap = $("cursoWrap");
 
+const rutWrap = $("rutWrap");
+const dvWrap = $("dvWrap");
+const pasaporteWrap = $("pasaporteWrap");
+
 const nacionalidadDetalleWrap = $("nacionalidadDetalleWrap");
+
+const contactoPrincipalRelacionOtroWrap = $("contactoPrincipalRelacionOtroWrap");
+const previsionIsapreWrap = $("previsionIsapreWrap");
+const previsionOtraWrap = $("previsionOtraWrap");
+
+const contactoPrincipalWhatsappAlternativoWrap = $("contactoPrincipalWhatsappAlternativoWrap");
+const emergenciaRelacionOtroWrap = $("emergenciaRelacionOtroWrap");
+const emergenciaWhatsappAlternativoWrap = $("emergenciaWhatsappAlternativoWrap");
 
 const bloqueInternacional = $("bloqueInternacional");
 const docsInternacionalesDetalleWrap = $("docsInternacionalesDetalleWrap");
@@ -68,10 +68,8 @@ const apoyosEspecialesDetalleWrap = $("apoyosEspecialesDetalleWrap");
 
 const medicamentosWrap = $("medicamentosWrap");
 const medicamentosProhibidosDetalleWrap = $("medicamentosProhibidosDetalleWrap");
-
 const alergiasWrap = $("alergiasWrap");
 const dietaWrap = $("dietaWrap");
-
 const otrosAntecedentesDetalleWrap = $("otrosAntecedentesDetalleWrap");
 const privadoExclusivoDetalleWrap = $("privadoExclusivoDetalleWrap");
 
@@ -107,9 +105,6 @@ async function init() {
   aplicarEstadoUI();
 }
 
-// -----------------------------------------------------------------------------
-// CARGA DE GRUPO
-// -----------------------------------------------------------------------------
 async function cargarGrupo() {
   const ref = doc(db, "ventas_cotizaciones", idGrupo);
   const snap = await getDoc(ref);
@@ -122,7 +117,6 @@ async function cargarGrupo() {
 
   grupoData = { id: snap.id, ...snap.data() };
 
-  // Validación de apertura de inscripción
   const inscripcionHabilitada = !!grupoData.inscripcionHabilitada;
   const tokenGrupo = limpiarTexto(grupoData.tokenInscripcion);
   correoCambios = limpiarTexto(grupoData.correoCambiosInscripcion) || "operaciones@raitrai.cl";
@@ -133,21 +127,18 @@ async function cargarGrupo() {
     return;
   }
 
-  // Si existe token configurado, se valida
   if (tokenGrupo && tokenUrl && tokenGrupo !== tokenUrl) {
     mostrarMensaje("error", "El enlace de inscripción no es válido para este grupo.");
     bloquearFormulario();
     return;
   }
 
-  // Si el grupo tiene token y no vino token, también bloqueamos
   if (tokenGrupo && !tokenUrl) {
     mostrarMensaje("error", "Falta el token de acceso para esta inscripción.");
     bloquearFormulario();
     return;
   }
 
-  // Rellenar chips visuales
   chipGrupo.textContent =
     limpiarTexto(grupoData.aliasGrupo) ||
     limpiarTexto(grupoData.nombreGrupo) ||
@@ -163,7 +154,6 @@ async function cargarGrupo() {
 
   chipAno.textContent = String(grupoData.anoViaje || "-");
 
-  // Precargar curso por defecto para estudiante
   const cursoViajante = $("cursoViajante");
   if (cursoViajante && grupoData.curso) {
     cursoViajante.value = String(grupoData.curso);
@@ -177,23 +167,25 @@ function conectarEventos() {
   form.addEventListener("submit", onSubmit);
   btnLimpiar.addEventListener("click", onLimpiar);
 
-  // Tipo viajante
   document.querySelectorAll('input[name="tipoViajante"]').forEach((el) => {
     el.addEventListener("change", aplicarEstadoUI);
   });
 
-  // Rol adulto
   document.querySelectorAll('input[name="rolAdulto"]').forEach((el) => {
     el.addEventListener("change", aplicarEstadoUI);
   });
 
-  // Nacionalidad
+  $("tipoIdentificacion").addEventListener("change", aplicarEstadoUI);
   $("nacionalidadBase").addEventListener("change", aplicarEstadoUI);
-
-  // Fecha nacimiento
   $("fechaNacimiento").addEventListener("change", aplicarEstadoUI);
 
-  // Radios de apertura/cierre
+  $("contactoPrincipalRelacion").addEventListener("change", aplicarEstadoUI);
+  $("previsionTipo").addEventListener("change", aplicarEstadoUI);
+  $("emergenciaRelacion").addEventListener("change", aplicarEstadoUI);
+
+  $("contactoPrincipalEsWhatsapp").addEventListener("change", aplicarEstadoUI);
+  $("emergenciaEsWhatsapp").addEventListener("change", aplicarEstadoUI);
+
   enlazarFlagDetalle("saludGeneralFlag", saludGeneralDetalleWrap, ["si", "privado"]);
   enlazarFlagDetalle("enfermedadBaseFlag", enfermedadBaseDetalleWrap, ["si"]);
   enlazarFlagDetalle("saludMentalFlag", saludMentalDetalleWrap, ["si", "privado"]);
@@ -201,20 +193,28 @@ function conectarEventos() {
 
   enlazarFlagDetalle("medicamentosFlag", medicamentosWrap, ["si"]);
   enlazarFlagDetalle("medicamentosProhibidosFlag", medicamentosProhibidosDetalleWrap, ["si"]);
-
   enlazarFlagDetalle("alergiasFlag", alergiasWrap, ["si"]);
   enlazarFlagDetalle("dietaFlag", dietaWrap, ["si"]);
-
   enlazarFlagDetalle("otrosAntecedentesFlag", otrosAntecedentesDetalleWrap, ["si", "privado"]);
   enlazarFlagDetalle("privadoExclusivoFlag", privadoExclusivoDetalleWrap, ["si"]);
-
   enlazarFlagDetalle("conoceDocsInternacionales", docsInternacionalesDetalleWrap, ["no", "parcial"]);
   enlazarFlagDetalle("situacionLegalAfecta", situacionLegalDetalleWrap, ["si", "privado"]);
 
-  // Formato RUT al salir del campo
-  $("rut").addEventListener("blur", () => {
-    $("rut").value = formatearRutVisual($("rut").value);
+  $("rutNumero").addEventListener("input", () => {
+    const soloDigitos = String($("rutNumero").value || "").replace(/\D/g, "").slice(0, 8);
+    $("rutNumero").value = soloDigitos;
+    $("rutDv").value = soloDigitos ? calcularDvRut(soloDigitos) : "";
   });
+
+  [
+    "contactoPrincipalTelefono",
+    "contactoPrincipalWhatsappAlternativo",
+    "emergenciaTelefono",
+    "emergenciaWhatsappAlternativo"
+  ].forEach(bindPhoneInput);
+
+  if (!$("contactoPrincipalTelefono").value) $("contactoPrincipalTelefono").value = "+569";
+  if (!$("emergenciaTelefono").value) $("emergenciaTelefono").value = "+569";
 }
 
 // -----------------------------------------------------------------------------
@@ -222,32 +222,58 @@ function conectarEventos() {
 // -----------------------------------------------------------------------------
 function aplicarEstadoUI() {
   const tipoViajante = obtenerRadio("tipoViajante");
+  const tipoIdentificacion = $("tipoIdentificacion").value;
   const nacionalidadBase = $("nacionalidadBase").value;
   const esInternacional = grupoEsInternacional();
   const esMenor = calcularEdad($("fechaNacimiento").value) < 18;
-
-  // Tipo viajante
   const esAdulto = tipoViajante === "adulto";
+
   mostrar(adultoRolWrap, esAdulto);
   mostrar(adultoCompromisoCard, esAdulto);
   mostrar(adultoCargoWrap, esAdulto);
   mostrar(cursoWrap, !esAdulto);
 
-  // Curso obligatorio solo para estudiante
-  $("cursoViajante").required = !esAdulto;
+  $("cursoViajante").required = false;
+  $("cursoViajante").readOnly = true;
 
-  // Nacionalidad
+  const mostrarRut = tipoIdentificacion === "rut";
+  const mostrarPasaporte = tipoIdentificacion === "pasaporte";
+
+  mostrar(rutWrap, mostrarRut);
+  mostrar(dvWrap, mostrarRut);
+  mostrar(pasaporteWrap, mostrarPasaporte);
+
   const mostrarNacionalidadDetalle =
     nacionalidadBase === "otra" || nacionalidadBase === "doble";
-
   mostrar(nacionalidadDetalleWrap, mostrarNacionalidadDetalle);
   $("nacionalidadDetalle").required = mostrarNacionalidadDetalle;
 
-  // Internacional
+  const relacionOtro = $("contactoPrincipalRelacion").value === "otro";
+  mostrar(contactoPrincipalRelacionOtroWrap, relacionOtro);
+  $("contactoPrincipalRelacionOtro").required = relacionOtro;
+
+  const prevision = $("previsionTipo").value;
+  const mostrarIsapre = prevision === "isapre";
+  const mostrarPrevisionOtra = prevision === "otra";
+  mostrar(previsionIsapreWrap, mostrarIsapre);
+  mostrar(previsionOtraWrap, mostrarPrevisionOtra);
+  $("previsionIsapre").required = mostrarIsapre;
+  $("previsionOtra").required = mostrarPrevisionOtra;
+
+  const emergenciaOtro = $("emergenciaRelacion").value === "otro";
+  mostrar(emergenciaRelacionOtroWrap, emergenciaOtro);
+  $("emergenciaRelacionOtro").required = emergenciaOtro;
+
+  const contactoEsWhatsapp = $("contactoPrincipalEsWhatsapp").checked;
+  mostrar(contactoPrincipalWhatsappAlternativoWrap, !contactoEsWhatsapp);
+  $("contactoPrincipalWhatsappAlternativo").required = !contactoEsWhatsapp;
+
+  const emergenciaEsWhatsapp = $("emergenciaEsWhatsapp").checked;
+  mostrar(emergenciaWhatsappAlternativoWrap, !emergenciaEsWhatsapp);
+  $("emergenciaWhatsappAlternativo").required = !emergenciaEsWhatsapp;
+
   mostrar(bloqueInternacional, esInternacional);
 
-  // Pregunta documentación internacional:
-  // solo si el viaje es internacional y la nacionalidad no es exclusivamente chilena
   const mostrarDocsNoChile = esInternacional && mostrarNacionalidadDetalle;
   const docsNoChileWrap = $("docsNoChileWrap");
   mostrar(docsNoChileWrap, mostrarDocsNoChile);
@@ -258,8 +284,6 @@ function aplicarEstadoUI() {
     mostrar(docsInternacionalesDetalleWrap, false);
   }
 
-  // Preguntas permiso menor:
-  // solo estudiante + internacional + menor de edad
   const mostrarPermisoMenor = !esAdulto && esInternacional && esMenor;
   mostrar(permisoMenorWrap, mostrarPermisoMenor);
   mostrar(situacionLegalWrap, mostrarPermisoMenor);
@@ -271,12 +295,10 @@ function aplicarEstadoUI() {
     mostrar(situacionLegalDetalleWrap, false);
   }
 
-  // Adulto: rol obligatorio
   document.querySelectorAll('input[name="rolAdulto"]').forEach((r) => {
     r.required = esAdulto;
   });
 
-  // Carta compromiso adulto obligatoria si es adulto
   $("adultoAceptaCompromiso").required = esAdulto;
 }
 
@@ -305,30 +327,25 @@ async function onSubmit(event) {
 
   try {
     const payload = construirPayload();
-    const rutNormalizado = payload.identificacion.rutNormalizado;
+    const documentoNormalizado = payload.identificacion.documentoNormalizado;
 
     const refInscripcion = doc(
       db,
       "ventas_cotizaciones",
       idGrupo,
       "inscripciones",
-      rutNormalizado
+      documentoNormalizado
     );
 
     await runTransaction(db, async (tx) => {
       const existente = await tx.get(refInscripcion);
-
       if (existente.exists()) {
-        throw new Error("duplicate_rut");
+        throw new Error("duplicate_document");
       }
-
       tx.set(refInscripcion, payload);
     });
 
-    // Cola correo de confirmación
     await crearCorreoConfirmacion(payload);
-
-    // Opcional: registrar un evento simple en historial del grupo
     await registrarEventoGrupo(payload);
 
     mostrarMensaje(
@@ -337,19 +354,26 @@ async function onSubmit(event) {
     );
 
     form.reset();
+
     if ($("cursoViajante") && grupoData?.curso) {
       $("cursoViajante").value = String(grupoData.curso);
     }
+
+    $("contactoPrincipalTelefono").value = "+569";
+    $("emergenciaTelefono").value = "+569";
+
+    ocultarMensaje();
+    mostrarMensaje("ok", "Inscripción enviada correctamente.");
     aplicarEstadoUI();
     window.scrollTo({ top: 0, behavior: "smooth" });
 
   } catch (error) {
     console.error(error);
 
-    if (error.message === "duplicate_rut") {
+    if (error.message === "duplicate_document") {
       mostrarMensaje(
         "error",
-        `Ya existe una inscripción para este RUT dentro del grupo. Si necesita corregir información, debe solicitarlo por correo a <strong>${escapeHtml(correoCambios)}</strong>.`
+        `Ya existe una inscripción para este documento dentro del grupo. Si necesita corregir información, debe solicitarlo por correo a <strong>${escapeHtml(correoCambios)}</strong>.`
       );
     } else {
       mostrarMensaje(
@@ -374,6 +398,7 @@ function validarFormulario() {
   const esInternacional = grupoEsInternacional();
   const edad = calcularEdad($("fechaNacimiento").value);
   const esMenor = edad < 18;
+  const tipoIdentificacion = $("tipoIdentificacion").value;
 
   if (!tipoViajante) {
     errores.push("Debe indicar si el viajante es estudiante o adulto acompañante.");
@@ -387,8 +412,34 @@ function validarFormulario() {
     errores.push("Debe ingresar el nombre completo del viajante.");
   }
 
-  if (!validarRutFlexible($("rut").value)) {
-    errores.push("Debe ingresar un RUT válido.");
+  if (!tipoIdentificacion) {
+    errores.push("Debe seleccionar el tipo de identificación.");
+  }
+
+  if (tipoIdentificacion === "rut") {
+    const rutNumero = limpiarRutNumero($("rutNumero").value);
+    const dv = limpiarTexto($("rutDv").value).toUpperCase();
+
+    if (!/^\d{7,8}$/.test(rutNumero)) {
+      errores.push("Debe ingresar un número de RUT válido, de 7 u 8 dígitos.");
+    } else {
+      const esperado = calcularDvRut(rutNumero);
+      if (!dv || dv !== esperado) {
+        errores.push("El RUT no es válido.");
+      }
+    }
+  }
+
+  if (tipoIdentificacion === "pasaporte") {
+    if (!limpiarTexto($("pasaporteNumero").value)) {
+      errores.push("Debe ingresar el número de pasaporte.");
+    }
+    if (!limpiarTexto($("pasaportePais").value)) {
+      errores.push("Debe indicar el país emisor del pasaporte.");
+    }
+    if (!$("pasaporteTipo").value) {
+      errores.push("Debe indicar el tipo de pasaporte.");
+    }
   }
 
   if (!$("fechaNacimiento").value) {
@@ -399,15 +450,8 @@ function validarFormulario() {
     errores.push("Debe indicar la nacionalidad.");
   }
 
-  if (
-    (["otra", "doble"].includes($("nacionalidadBase").value)) &&
-    !limpiarTexto($("nacionalidadDetalle").value)
-  ) {
+  if (["otra", "doble"].includes($("nacionalidadBase").value) && !limpiarTexto($("nacionalidadDetalle").value)) {
     errores.push("Debe especificar la nacionalidad indicada.");
-  }
-
-  if (!esAdulto && !limpiarTexto($("cursoViajante").value)) {
-    errores.push("Debe ingresar el curso del estudiante.");
   }
 
   if (!limpiarTexto($("direccion").value)) {
@@ -422,41 +466,69 @@ function validarFormulario() {
     errores.push("Debe ingresar el nombre del contacto principal.");
   }
 
-  if (!limpiarTexto($("contactoPrincipalRelacion").value)) {
+  if (!$("contactoPrincipalRelacion").value) {
     errores.push("Debe indicar la relación del contacto principal con el viajante.");
   }
 
-  if (!limpiarTexto($("contactoPrincipalTelefono").value)) {
-    errores.push("Debe ingresar el teléfono del contacto principal.");
+  if ($("contactoPrincipalRelacion").value === "otro" && !limpiarTexto($("contactoPrincipalRelacionOtro").value)) {
+    errores.push("Debe especificar la relación del contacto principal.");
+  }
+
+  if (!telefonoValido($("contactoPrincipalTelefono").value)) {
+    errores.push("Debe ingresar un teléfono principal válido.");
+  }
+
+  if (!$("contactoPrincipalEsWhatsapp").checked && !telefonoValido($("contactoPrincipalWhatsappAlternativo").value)) {
+    errores.push("Debe ingresar un número válido para WhatsApp del contacto principal.");
   }
 
   if (!validarCorreo($("contactoPrincipalCorreo").value)) {
     errores.push("Debe ingresar un correo válido para el contacto principal.");
   }
 
+  if (!$("previsionTipo").value) {
+    errores.push("Debe indicar la previsión.");
+  }
+
+  if ($("previsionTipo").value === "isapre" && !limpiarTexto($("previsionIsapre").value)) {
+    errores.push("Debe indicar qué Isapre tiene.");
+  }
+
+  if ($("previsionTipo").value === "otra" && !limpiarTexto($("previsionOtra").value)) {
+    errores.push("Debe especificar la otra previsión.");
+  }
+
   if (!limpiarTexto($("emergenciaNombre").value)) {
     errores.push("Debe ingresar el nombre del contacto de emergencia.");
   }
 
-  if (!limpiarTexto($("emergenciaTelefono").value)) {
-    errores.push("Debe ingresar el teléfono del contacto de emergencia.");
+  if (!$("emergenciaRelacion").value) {
+    errores.push("Debe indicar la relación del contacto de emergencia.");
+  }
+
+  if ($("emergenciaRelacion").value === "otro" && !limpiarTexto($("emergenciaRelacionOtro").value)) {
+    errores.push("Debe especificar la relación del contacto de emergencia.");
+  }
+
+  if (!telefonoValido($("emergenciaTelefono").value)) {
+    errores.push("Debe ingresar un teléfono válido para el contacto de emergencia.");
+  }
+
+  if (!$("emergenciaEsWhatsapp").checked && !telefonoValido($("emergenciaWhatsappAlternativo").value)) {
+    errores.push("Debe ingresar un número válido para WhatsApp del contacto de emergencia.");
   }
 
   if (esInternacional && ["otra", "doble"].includes($("nacionalidadBase").value)) {
-    const conoceDocs = obtenerRadio("conoceDocsInternacionales");
-    if (!conoceDocs) {
+    if (!obtenerRadio("conoceDocsInternacionales")) {
       errores.push("Debe indicar si conoce los documentos requeridos para ingreso internacional.");
     }
   }
 
   if (esInternacional && !esAdulto && esMenor) {
-    const permisoMenorViaje = obtenerRadio("permisoMenorViaje");
-    if (!permisoMenorViaje) {
+    if (!obtenerRadio("permisoMenorViaje")) {
       errores.push("Debe indicar la situación de autorizaciones del menor para salida del país.");
     }
-
-    const situacionLegalAfecta = obtenerRadio("situacionLegalAfecta");
-    if (!situacionLegalAfecta) {
+    if (!obtenerRadio("situacionLegalAfecta")) {
       errores.push("Debe indicar si existe alguna situación familiar o legal que pueda afectar el proceso.");
     }
   }
@@ -496,19 +568,76 @@ function construirPayload() {
   const tipoViajante = obtenerRadio("tipoViajante");
   const esAdulto = tipoViajante === "adulto";
   const nombreCompleto = limpiarTexto($("nombreCompleto").value);
-  const rutOriginal = limpiarTexto($("rut").value);
-  const rutNormalizado = normalizarRut(rutOriginal);
   const fechaNacimiento = $("fechaNacimiento").value || null;
   const edad = calcularEdad(fechaNacimiento);
   const esMenor = edad < 18;
   const esInternacional = grupoEsInternacional();
 
+  const tipoIdentificacion = $("tipoIdentificacion").value;
+  const rutNumero = limpiarRutNumero($("rutNumero").value);
+  const rutDv = limpiarTexto($("rutDv").value).toUpperCase();
+  const rutCompleto = rutNumero && rutDv ? `${rutNumero}${rutDv}` : "";
+
+  const pasaporteNumero = limpiarTexto($("pasaporteNumero").value);
+  const pasaportePais = limpiarTexto($("pasaportePais").value);
+  const pasaporteTipo = $("pasaporteTipo").value || "";
+
+  let documento = "";
+  let documentoNormalizado = "";
+  let identificacion = {};
+
+  if (tipoIdentificacion === "rut") {
+    documento = rutCompleto;
+    documentoNormalizado = rutCompleto;
+
+    identificacion = {
+      tipoIdentificacion,
+      documento,
+      documentoNormalizado,
+      rut: rutCompleto,
+      rutNumero,
+      rutDv,
+      pasaporteNumero: "",
+      pasaportePais: "",
+      pasaporteTipo: ""
+    };
+  } else {
+    documento = pasaporteNumero;
+    documentoNormalizado = normalizarDocumentoPasaporte(pasaportePais, pasaporteNumero);
+
+    identificacion = {
+      tipoIdentificacion,
+      documento,
+      documentoNormalizado,
+      rut: "",
+      rutNumero: "",
+      rutDv: "",
+      pasaporteNumero,
+      pasaportePais,
+      pasaporteTipo
+    };
+  }
+
   const nacionalidadBase = $("nacionalidadBase").value || "";
   const nacionalidadDetalle = limpiarTexto($("nacionalidadDetalle").value);
 
+  const contactoPrincipalRelacion = $("contactoPrincipalRelacion").value || "";
+  const contactoPrincipalRelacionOtro = limpiarTexto($("contactoPrincipalRelacionOtro").value);
+  const contactoPrincipalRelacionFinal =
+    contactoPrincipalRelacion === "otro" ? contactoPrincipalRelacionOtro : contactoPrincipalRelacion;
+
+  const previsionTipo = $("previsionTipo").value || "";
+  const previsionIsapre = limpiarTexto($("previsionIsapre").value);
+  const previsionOtra = limpiarTexto($("previsionOtra").value);
+
+  const emergenciaRelacion = $("emergenciaRelacion").value || "";
+  const emergenciaRelacionOtro = limpiarTexto($("emergenciaRelacionOtro").value);
+  const emergenciaRelacionFinal =
+    emergenciaRelacion === "otro" ? emergenciaRelacionOtro : emergenciaRelacion;
+
   const payload = {
     tipoRegistro: "inscripcion_pasajero",
-    tipoViajante, // estudiante | adulto
+    tipoViajante,
     rolAdulto: esAdulto ? (obtenerRadio("rolAdulto") || "") : "",
     esAdulto,
     esMenor,
@@ -525,9 +654,8 @@ function construirPayload() {
     },
 
     identificacion: {
+      ...identificacion,
       nombreCompleto,
-      rut: formatearRutVisual(rutOriginal),
-      rutNormalizado,
       fechaNacimiento,
       edad,
       nacionalidadBase,
@@ -540,16 +668,28 @@ function construirPayload() {
 
     contactoPrincipal: {
       nombre: limpiarTexto($("contactoPrincipalNombre").value),
-      relacion: limpiarTexto($("contactoPrincipalRelacion").value),
+      relacion: contactoPrincipalRelacionFinal,
+      relacionBase: contactoPrincipalRelacion,
       telefono: limpiarTexto($("contactoPrincipalTelefono").value),
+      esWhatsapp: !!$("contactoPrincipalEsWhatsapp").checked,
+      whatsappAlternativo: !$("contactoPrincipalEsWhatsapp").checked
+        ? limpiarTexto($("contactoPrincipalWhatsappAlternativo").value)
+        : "",
       correo: limpiarTexto($("contactoPrincipalCorreo").value),
-      prevision: limpiarTexto($("prevision").value)
+      previsionTipo,
+      previsionIsapre,
+      previsionOtra
     },
 
     emergencia: {
       nombre: limpiarTexto($("emergenciaNombre").value),
-      relacion: limpiarTexto($("emergenciaRelacion").value),
-      telefono: limpiarTexto($("emergenciaTelefono").value)
+      relacion: emergenciaRelacionFinal,
+      relacionBase: emergenciaRelacion,
+      telefono: limpiarTexto($("emergenciaTelefono").value),
+      esWhatsapp: !!$("emergenciaEsWhatsapp").checked,
+      whatsappAlternativo: !$("emergenciaEsWhatsapp").checked
+        ? limpiarTexto($("emergenciaWhatsappAlternativo").value)
+        : ""
     },
 
     documentacion: {
@@ -615,7 +755,7 @@ function construirPayload() {
     meta: {
       fechaInscripcion: serverTimestamp(),
       canal: "formulario_publico",
-      versionFormulario: 1,
+      versionFormulario: 2,
       creadoDesde: window.location.href,
       estado: "inscrito"
     }
@@ -627,9 +767,6 @@ function construirPayload() {
 // -----------------------------------------------------------------------------
 // CORREO DE CONFIRMACIÓN
 // -----------------------------------------------------------------------------
-// Esta función deja una solicitud en la colección "mail".
-// Si ya tienes Cloud Function / extensión que procesa esa colección, enviará el correo.
-// Si usas otro mecanismo, aquí solo cambias esta parte.
 async function crearCorreoConfirmacion(payload) {
   const destinatario = payload.contactoPrincipal?.correo;
   if (!destinatario) return;
@@ -639,6 +776,7 @@ async function crearCorreoConfirmacion(payload) {
   const destino = payload.grupo?.destinoPrincipal || "";
   const aliasGrupo = payload.grupo?.aliasGrupo || payload.grupo?.nombreGrupo || payload.grupo?.idGrupo || idGrupo;
   const tipoLabel = esAdulto ? "adulto acompañante" : "estudiante";
+  const documento = payload.identificacion?.documento || "";
 
   const html = `
     <div style="font-family: Arial, Helvetica, sans-serif; color:#222; line-height:1.6;">
@@ -647,7 +785,7 @@ async function crearCorreoConfirmacion(payload) {
 
       <p><strong>Grupo:</strong> ${escapeHtml(aliasGrupo)}<br>
       <strong>Destino:</strong> ${escapeHtml(destino)}<br>
-      <strong>RUT:</strong> ${escapeHtml(payload.identificacion?.rut || "")}</p>
+      <strong>Documento:</strong> ${escapeHtml(documento)}</p>
 
       <p>La información entregada será utilizada exclusivamente para la planificación y operación segura del viaje.</p>
 
@@ -666,7 +804,7 @@ async function crearCorreoConfirmacion(payload) {
     meta: {
       tipo: "confirmacion_inscripcion_pasajero",
       idGrupo,
-      rutNormalizado: payload.identificacion?.rutNormalizado || "",
+      documentoNormalizado: payload.identificacion?.documentoNormalizado || "",
       creadoEn: serverTimestamp()
     }
   });
@@ -680,8 +818,8 @@ async function registrarEventoGrupo(payload) {
     await addDoc(collection(db, "ventas_cotizaciones", idGrupo, "historial_inscripciones"), {
       fecha: serverTimestamp(),
       tipo: "inscripcion_publica",
-      rutNormalizado: payload.identificacion?.rutNormalizado || "",
-      rut: payload.identificacion?.rut || "",
+      documentoNormalizado: payload.identificacion?.documentoNormalizado || "",
+      documento: payload.identificacion?.documento || "",
       nombreCompleto: payload.identificacion?.nombreCompleto || "",
       tipoViajante: payload.tipoViajante || "",
       rolAdulto: payload.rolAdulto || "",
@@ -693,7 +831,7 @@ async function registrarEventoGrupo(payload) {
 }
 
 // -----------------------------------------------------------------------------
-// HELPERS DE UI
+// HELPERS UI
 // -----------------------------------------------------------------------------
 function enlazarFlagDetalle(nombreRadio, wrap, valoresActivos) {
   const radios = document.querySelectorAll(`input[name="${nombreRadio}"]`);
@@ -733,10 +871,13 @@ function bloquearFormulario() {
 function onLimpiar() {
   form.reset();
 
-  // Restituir curso del grupo para estudiante
   if ($("cursoViajante") && grupoData?.curso) {
     $("cursoViajante").value = String(grupoData.curso);
   }
+
+  $("contactoPrincipalTelefono").value = "+569";
+  $("emergenciaTelefono").value = "+569";
+  $("rutDv").value = "";
 
   ocultarMensaje();
   aplicarEstadoUI();
@@ -744,7 +885,7 @@ function onLimpiar() {
 }
 
 // -----------------------------------------------------------------------------
-// HELPERS DE DATOS
+// HELPERS DATOS
 // -----------------------------------------------------------------------------
 function obtenerRadio(name) {
   const checked = document.querySelector(`input[name="${name}"]:checked`);
@@ -773,53 +914,67 @@ function normalizarTexto(valor) {
     .toLowerCase();
 }
 
-function normalizarRut(rut) {
-  return limpiarTexto(rut)
-    .replace(/\./g, "")
-    .replace(/-/g, "")
-    .replace(/\s+/g, "")
-    .toUpperCase();
+function limpiarRutNumero(valor) {
+  return String(valor || "").replace(/\D/g, "");
 }
 
-function formatearRutVisual(rut) {
-  const limpio = normalizarRut(rut);
-  if (!limpio || limpio.length < 2) return limpiarTexto(rut);
-
-  const cuerpo = limpio.slice(0, -1);
-  const dv = limpio.slice(-1);
-
-  const cuerpoConPuntos = cuerpo.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
-  return `${cuerpoConPuntos}-${dv}`;
-}
-
-function validarRutFlexible(rut) {
-  const limpio = normalizarRut(rut);
-  if (!/^\d{7,8}[0-9K]$/.test(limpio)) return false;
-
-  const cuerpo = limpio.slice(0, -1);
-  const dv = limpio.slice(-1);
+function calcularDvRut(cuerpo) {
+  const rut = String(cuerpo || "").replace(/\D/g, "");
+  if (!rut) return "";
 
   let suma = 0;
   let multiplo = 2;
 
-  for (let i = cuerpo.length - 1; i >= 0; i--) {
-    suma += Number(cuerpo[i]) * multiplo;
+  for (let i = rut.length - 1; i >= 0; i--) {
+    suma += Number(rut[i]) * multiplo;
     multiplo = multiplo === 7 ? 2 : multiplo + 1;
   }
 
   const resto = 11 - (suma % 11);
-  let dvEsperado = "";
+  if (resto === 11) return "0";
+  if (resto === 10) return "K";
+  return String(resto);
+}
 
-  if (resto === 11) dvEsperado = "0";
-  else if (resto === 10) dvEsperado = "K";
-  else dvEsperado = String(resto);
-
-  return dv === dvEsperado;
+function normalizarDocumentoPasaporte(pais, numero) {
+  const paisNorm = limpiarTexto(pais).toUpperCase().replace(/[^A-Z0-9]/g, "");
+  const numNorm = limpiarTexto(numero).toUpperCase().replace(/[^A-Z0-9]/g, "");
+  return `PASAPORTE_${paisNorm}_${numNorm}`;
 }
 
 function validarCorreo(correo) {
   const v = limpiarTexto(correo);
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
+}
+
+function telefonoValido(valor) {
+  const limpio = limpiarTexto(valor).replace(/[^\d+]/g, "");
+  if (!limpio) return false;
+  const soloDigitos = limpio.replace(/\D/g, "");
+  return soloDigitos.length >= 8;
+}
+
+function bindPhoneInput(id) {
+  const el = $(id);
+  if (!el || el.dataset.phoneBound === "1") return;
+  el.dataset.phoneBound = "1";
+
+  el.addEventListener("focus", () => {
+    if (!limpiarTexto(el.value)) {
+      el.value = "+569";
+    }
+  });
+
+  el.addEventListener("input", () => {
+    const raw = String(el.value || "");
+    let clean = raw.replace(/[^\d+]/g, "");
+
+    if (clean.includes("+")) {
+      clean = clean[0] === "+" ? "+" + clean.slice(1).replace(/\+/g, "") : clean.replace(/\+/g, "");
+    }
+
+    el.value = clean;
+  });
 }
 
 function calcularEdad(fechaIso) {
@@ -839,23 +994,13 @@ function calcularEdad(fechaIso) {
 }
 
 function grupoEsInternacional() {
-  const destinoPrincipal = normalizarTexto(
-    grupoData?.destinoPrincipal || ""
-  );
-
-  const destinoOtro = normalizarTexto(
-    grupoData?.destinoPrincipalOtro || ""
-  );
-
-  const programa = normalizarTexto(
-    grupoData?.programa || ""
-  );
-
+  const destinoPrincipal = normalizarTexto(grupoData?.destinoPrincipal || "");
+  const destinoOtro = normalizarTexto(grupoData?.destinoPrincipalOtro || "");
+  const programa = normalizarTexto(grupoData?.programa || "");
   const universo = `${destinoPrincipal} ${destinoOtro} ${programa}`.trim();
 
   if (!universo) return false;
 
-  // INTERNACIONALES / mixtos con salida del país
   if (universo.includes("bariloche")) return true;
   if (universo.includes("brasil")) return true;
   if (universo.includes("mexico")) return true;
@@ -863,12 +1008,10 @@ function grupoEsInternacional() {
   if (universo.includes("argentina")) return true;
   if (universo.includes("internacional")) return true;
 
-  // Casos mixtos que incluyen Chile + extranjero
   if (universo.includes("sur de chile y bariloche")) return true;
   if (universo.includes("bariloche y sur de chile")) return true;
   if (universo.includes("pucon y bariloche")) return true;
 
-  // Nacionales
   if (universo.includes("sur de chile")) return false;
   if (universo.includes("norte de chile")) return false;
 
