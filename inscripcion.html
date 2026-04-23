@@ -8,7 +8,6 @@
   />
   <title>Inscripción de Pasajero | Rai Trai</title>
 
-  <!-- Ajusta esta ruta si tu CSS principal está en otra carpeta -->
   <link rel="stylesheet" href="./estilos.css" />
 
   <style>
@@ -134,11 +133,6 @@
       border: 1px solid #ffc3c3;
     }
 
-    .section-title {
-      margin: 0 0 14px;
-      font-size: 18px;
-    }
-
     .form-grid {
       display: grid;
       grid-template-columns: repeat(12, 1fr);
@@ -152,10 +146,11 @@
       gap: 6px;
     }
 
+    .field.col-8 { grid-column: span 8; }
     .field.col-6 { grid-column: span 6; }
     .field.col-4 { grid-column: span 4; }
     .field.col-3 { grid-column: span 3; }
-    .field.col-8 { grid-column: span 8; }
+    .field.col-2 { grid-column: span 2; }
 
     .field label {
       font-size: 14px;
@@ -183,6 +178,11 @@
       color: var(--rt-text);
       outline: none;
       transition: border-color .15s ease, box-shadow .15s ease;
+    }
+
+    input[readonly] {
+      background: #f7f7fb;
+      color: #575767;
     }
 
     textarea {
@@ -220,12 +220,6 @@
 
     .option-pill input {
       margin: 0;
-    }
-
-    .divider {
-      height: 1px;
-      background: var(--rt-border);
-      margin: 10px 0 18px;
     }
 
     .hidden {
@@ -284,10 +278,11 @@
     }
 
     @media (max-width: 880px) {
+      .field.col-8,
       .field.col-6,
       .field.col-4,
       .field.col-3,
-      .field.col-8 {
+      .field.col-2 {
         grid-column: span 12;
       }
 
@@ -323,12 +318,13 @@
     <section class="card">
       <div class="notice privacy">
         <strong>Información privada y de uso interno.</strong><br />
-        Los antecedentes de salud, alimentación y documentación que usted ingrese
-        serán recibidos directamente por Turismo Rai Trai. No serán compartidos con
-        intermediarios, encargados de curso ni terceros no autorizados. Si usted
-        indica información sensible o reservada, esta será tratada con resguardo y
-        utilizada exclusivamente para prevenir situaciones que puedan afectar al
-        viajante durante el viaje.
+        Toda la información ingresada en este formulario será tratada con resguardo,
+        por corresponder a antecedentes personales y de salud de carácter privado.
+        Será recibida directamente por Turismo Rai Trai y utilizada exclusivamente
+        para la planificación y operación segura del viaje. No será compartida con
+        intermediarios, encargados de curso ni terceros no autorizados.
+        Si usted marca algún antecedente como reservado, se entenderá que requiere
+        un tratamiento aún más delicado dentro del equipo interno.
       </div>
 
       <div class="notice time">
@@ -375,9 +371,6 @@
                 Solo acompañante
               </label>
             </div>
-            <div class="hint">
-              En ambos casos deberá aceptar carta compromiso y entregar sus antecedentes para el viaje.
-            </div>
           </div>
         </div>
       </section>
@@ -395,9 +388,49 @@
           </div>
 
           <div class="field col-4">
-            <label for="rut">RUT / documento <span class="req">*</span></label>
-            <input id="rut" name="rut" type="text" required placeholder="Ej: 123456789" />
-            <div class="hint">Rut sin puntos, sin guion y con dígito verificador</div>
+            <label for="tipoIdentificacion">Identificación <span class="req">*</span></label>
+            <select id="tipoIdentificacion" name="tipoIdentificacion" required>
+              <option value="">Seleccione...</option>
+              <option value="rut">RUT</option>
+              <option value="pasaporte">Pasaporte</option>
+            </select>
+            <div class="hint">
+              Si no tiene RUT chileno, utilice pasaporte.
+            </div>
+          </div>
+
+          <div id="rutWrap" class="field col-6">
+            <label for="rutNumero">Número de RUT <span class="req">*</span></label>
+            <input id="rutNumero" name="rutNumero" type="text" inputmode="numeric" placeholder="Ej: 16128922" />
+            <div class="hint">Ingrese solo números del RUT. El dígito verificador se calculará automáticamente.</div>
+          </div>
+
+          <div id="dvWrap" class="field col-2">
+            <label for="rutDv">DV</label>
+            <input id="rutDv" name="rutDv" type="text" readonly />
+          </div>
+
+          <div id="pasaporteWrap" class="hidden">
+            <div class="form-grid">
+              <div class="field col-4">
+                <label for="pasaporteNumero">Número de pasaporte <span class="req">*</span></label>
+                <input id="pasaporteNumero" name="pasaporteNumero" type="text" />
+              </div>
+
+              <div class="field col-4">
+                <label for="pasaportePais">País emisor del pasaporte <span class="req">*</span></label>
+                <input id="pasaportePais" name="pasaportePais" type="text" />
+              </div>
+
+              <div class="field col-4">
+                <label for="pasaporteTipo">Tipo de pasaporte <span class="req">*</span></label>
+                <select id="pasaporteTipo" name="pasaporteTipo">
+                  <option value="">Seleccione...</option>
+                  <option value="extranjero">Extranjero</option>
+                  <option value="chileno">Chileno</option>
+                </select>
+              </div>
+            </div>
           </div>
 
           <div class="field col-4">
@@ -421,8 +454,9 @@
           </div>
 
           <div id="cursoWrap" class="field col-4">
-            <label for="cursoViajante">Curso <span class="req">*</span></label>
-            <input id="cursoViajante" name="cursoViajante" type="text" />
+            <label for="cursoViajante">Curso</label>
+            <input id="cursoViajante" name="cursoViajante" type="text" readonly />
+            <div class="hint">Este dato corresponde al curso del grupo y no es editable.</div>
           </div>
 
           <div id="adultoCargoWrap" class="field col-4 hidden">
@@ -450,8 +484,8 @@
       <section class="card">
         <h2>3. Datos del apoderado o contacto principal</h2>
         <div class="sub">
-          Para estudiantes, estos datos corresponden al apoderado.
-          Para adultos acompañantes, corresponden al propio viajante o a su contacto principal.
+          Para estudiantes, estos datos corresponden al apoderado. Para adultos acompañantes,
+          corresponden al propio viajante o a su contacto principal.
         </div>
 
         <div class="form-grid">
@@ -462,18 +496,36 @@
 
           <div class="field col-3">
             <label for="contactoPrincipalRelacion">Relación con el viajante <span class="req">*</span></label>
-            <input
-              id="contactoPrincipalRelacion"
-              name="contactoPrincipalRelacion"
-              type="text"
-              required
-              placeholder="Ej: madre, padre, apoderado, propio viajante"
-            />
+            <select id="contactoPrincipalRelacion" name="contactoPrincipalRelacion" required>
+              <option value="">Seleccione...</option>
+              <option value="padre">Padre</option>
+              <option value="madre">Madre</option>
+              <option value="tutor">Tutor(a)</option>
+              <option value="otro">Otro</option>
+            </select>
           </div>
 
-          <div class="field col-3">
-            <label for="contactoPrincipalTelefono">Teléfono <span class="req">*</span></label>
+          <div id="contactoPrincipalRelacionOtroWrap" class="field col-3 hidden">
+            <label for="contactoPrincipalRelacionOtro">Especifique relación <span class="req">*</span></label>
+            <input id="contactoPrincipalRelacionOtro" name="contactoPrincipalRelacionOtro" type="text" />
+          </div>
+
+          <div class="field col-4">
+            <label for="contactoPrincipalTelefono">Teléfono principal <span class="req">*</span></label>
             <input id="contactoPrincipalTelefono" name="contactoPrincipalTelefono" type="tel" required />
+            <div class="hint">Por defecto se sugiere +569. Si necesita otro prefijo, puede reemplazarlo.</div>
+          </div>
+
+          <div class="field col-4">
+            <label class="option-pill" style="border-radius:14px;">
+              <input type="checkbox" id="contactoPrincipalEsWhatsapp" name="contactoPrincipalEsWhatsapp" checked />
+              Este número también es WhatsApp
+            </label>
+          </div>
+
+          <div id="contactoPrincipalWhatsappAlternativoWrap" class="field col-4 hidden">
+            <label for="contactoPrincipalWhatsappAlternativo">Número válido para WhatsApp <span class="req">*</span></label>
+            <input id="contactoPrincipalWhatsappAlternativo" name="contactoPrincipalWhatsappAlternativo" type="tel" />
           </div>
 
           <div class="field col-6">
@@ -482,8 +534,24 @@
           </div>
 
           <div class="field col-6">
-            <label for="prevision">Previsión / seguro de salud</label>
-            <input id="prevision" name="prevision" type="text" placeholder="Ej: Fonasa, Isapre, seguro particular" />
+            <label for="previsionTipo">Previsión <span class="req">*</span></label>
+            <select id="previsionTipo" name="previsionTipo" required>
+              <option value="">Seleccione...</option>
+              <option value="fonasa">Fonasa</option>
+              <option value="isapre">Isapre</option>
+              <option value="otra">Otra</option>
+              <option value="no_sabe">No sabe</option>
+            </select>
+          </div>
+
+          <div id="previsionIsapreWrap" class="field col-6 hidden">
+            <label for="previsionIsapre">¿Qué Isapre? <span class="req">*</span></label>
+            <input id="previsionIsapre" name="previsionIsapre" type="text" />
+          </div>
+
+          <div id="previsionOtraWrap" class="field col-6 hidden">
+            <label for="previsionOtra">Especifique otra previsión <span class="req">*</span></label>
+            <input id="previsionOtra" name="previsionOtra" type="text" />
           </div>
         </div>
       </section>
@@ -501,13 +569,42 @@
           </div>
 
           <div class="field col-3">
-            <label for="emergenciaRelacion">Relación</label>
-            <input id="emergenciaRelacion" name="emergenciaRelacion" type="text" placeholder="Ej: madre, tío, pareja" />
+            <label for="emergenciaRelacion">Relación <span class="req">*</span></label>
+            <select id="emergenciaRelacion" name="emergenciaRelacion" required>
+              <option value="">Seleccione...</option>
+              <option value="padre">Padre</option>
+              <option value="madre">Madre</option>
+              <option value="hermano">Hermano</option>
+              <option value="hermana">Hermana</option>
+              <option value="tio">Tío</option>
+              <option value="tia">Tía</option>
+              <option value="abuelo">Abuelo</option>
+              <option value="abuela">Abuela</option>
+              <option value="tutor">Tutor(a)</option>
+              <option value="otro">Otro</option>
+            </select>
           </div>
 
-          <div class="field col-3">
+          <div id="emergenciaRelacionOtroWrap" class="field col-3 hidden">
+            <label for="emergenciaRelacionOtro">Especifique relación <span class="req">*</span></label>
+            <input id="emergenciaRelacionOtro" name="emergenciaRelacionOtro" type="text" />
+          </div>
+
+          <div class="field col-4">
             <label for="emergenciaTelefono">Teléfono contacto de emergencia <span class="req">*</span></label>
             <input id="emergenciaTelefono" name="emergenciaTelefono" type="tel" required />
+          </div>
+
+          <div class="field col-4">
+            <label class="option-pill" style="border-radius:14px;">
+              <input type="checkbox" id="emergenciaEsWhatsapp" name="emergenciaEsWhatsapp" checked />
+              Este número también es WhatsApp
+            </label>
+          </div>
+
+          <div id="emergenciaWhatsappAlternativoWrap" class="field col-4 hidden">
+            <label for="emergenciaWhatsappAlternativo">Número válido para WhatsApp <span class="req">*</span></label>
+            <input id="emergenciaWhatsappAlternativo" name="emergenciaWhatsappAlternativo" type="tel" />
           </div>
         </div>
       </section>
@@ -526,25 +623,14 @@
               pueda ingresar al país de destino?
             </label>
             <div class="radio-group">
-              <label class="option-pill">
-                <input type="radio" name="conoceDocsInternacionales" value="si" />
-                Sí
-              </label>
-              <label class="option-pill">
-                <input type="radio" name="conoceDocsInternacionales" value="no" />
-                No
-              </label>
-              <label class="option-pill">
-                <input type="radio" name="conoceDocsInternacionales" value="parcial" />
-                Parcialmente / tengo dudas
-              </label>
+              <label class="option-pill"><input type="radio" name="conoceDocsInternacionales" value="si" /> Sí</label>
+              <label class="option-pill"><input type="radio" name="conoceDocsInternacionales" value="no" /> No</label>
+              <label class="option-pill"><input type="radio" name="conoceDocsInternacionales" value="parcial" /> Parcialmente / tengo dudas</label>
             </div>
           </div>
 
           <div id="docsInternacionalesDetalleWrap" class="field hidden">
-            <label for="docsInternacionalesDetalle">
-              Indique aquí cualquier duda o situación especial respecto de documentación internacional
-            </label>
+            <label for="docsInternacionalesDetalle">Indique aquí cualquier duda o situación especial respecto de documentación internacional</label>
             <textarea id="docsInternacionalesDetalle" name="docsInternacionalesDetalle"></textarea>
           </div>
 
@@ -554,49 +640,24 @@
               para viajar siendo menor de edad?
             </label>
             <div class="radio-group">
-              <label class="option-pill">
-                <input type="radio" name="permisoMenorViaje" value="si_listo" />
-                Sí, ya están listas
-              </label>
-              <label class="option-pill">
-                <input type="radio" name="permisoMenorViaje" value="en_tramite" />
-                Aún no, pero las gestionaremos
-              </label>
-              <label class="option-pill">
-                <input type="radio" name="permisoMenorViaje" value="no_seguro" />
-                No estoy seguro/a
-              </label>
-              <label class="option-pill">
-                <input type="radio" name="permisoMenorViaje" value="necesito_orientacion" />
-                Necesito orientación
-              </label>
+              <label class="option-pill"><input type="radio" name="permisoMenorViaje" value="si_listo" /> Sí, ya están listas</label>
+              <label class="option-pill"><input type="radio" name="permisoMenorViaje" value="en_tramite" /> Aún no, pero las gestionaremos</label>
+              <label class="option-pill"><input type="radio" name="permisoMenorViaje" value="no_seguro" /> No estoy seguro/a</label>
+              <label class="option-pill"><input type="radio" name="permisoMenorViaje" value="necesito_orientacion" /> Necesito orientación</label>
             </div>
           </div>
 
           <div id="situacionLegalWrap" class="field hidden">
-            <label>
-              ¿Existe alguna situación familiar, legal o de autorización que pueda afectar este proceso?
-            </label>
+            <label>¿Existe alguna situación familiar, legal o de autorización que pueda afectar este proceso?</label>
             <div class="radio-group">
-              <label class="option-pill">
-                <input type="radio" name="situacionLegalAfecta" value="no" />
-                No
-              </label>
-              <label class="option-pill">
-                <input type="radio" name="situacionLegalAfecta" value="si" />
-                Sí
-              </label>
-              <label class="option-pill">
-                <input type="radio" name="situacionLegalAfecta" value="privado" />
-                Prefiero informarlo de forma privada
-              </label>
+              <label class="option-pill"><input type="radio" name="situacionLegalAfecta" value="no" /> No</label>
+              <label class="option-pill"><input type="radio" name="situacionLegalAfecta" value="si" /> Sí</label>
+              <label class="option-pill"><input type="radio" name="situacionLegalAfecta" value="privado" /> Prefiero informarlo de forma privada</label>
             </div>
           </div>
 
           <div id="situacionLegalDetalleWrap" class="field hidden">
-            <label for="situacionLegalDetalle">
-              Describa brevemente la situación. Esta información será tratada de manera reservada.
-            </label>
+            <label for="situacionLegalDetalle">Describa brevemente la situación. Esta información será tratada de manera reservada.</label>
             <textarea id="situacionLegalDetalle" name="situacionLegalDetalle"></textarea>
           </div>
         </div>
@@ -610,9 +671,7 @@
 
         <div class="form-grid">
           <div class="field">
-            <label>
-              ¿Hay alguna condición de salud, diagnóstico o antecedente médico que considere importante informar?
-            </label>
+            <label>¿Hay alguna condición de salud, diagnóstico o antecedente médico que considere importante informar?</label>
             <div class="radio-group">
               <label class="option-pill"><input type="radio" name="saludGeneralFlag" value="no" /> No</label>
               <label class="option-pill"><input type="radio" name="saludGeneralFlag" value="si" /> Sí</label>
@@ -634,16 +693,12 @@
           </div>
 
           <div id="enfermedadBaseDetalleWrap" class="field hidden">
-            <label for="enfermedadBaseDetalle">
-              Indique cuál o cuáles, y explique si requiere algún cuidado especial durante el viaje
-            </label>
+            <label for="enfermedadBaseDetalle">Indique cuál o cuáles, y explique si requiere algún cuidado especial durante el viaje</label>
             <textarea id="enfermedadBaseDetalle" name="enfermedadBaseDetalle"></textarea>
           </div>
 
           <div class="field">
-            <label>
-              ¿Hay alguna situación emocional, de salud mental o de bienestar personal que considere importante informar?
-            </label>
+            <label>¿Hay alguna situación emocional, de salud mental o de bienestar personal que considere importante informar?</label>
             <div class="radio-group">
               <label class="option-pill"><input type="radio" name="saludMentalFlag" value="no" /> No</label>
               <label class="option-pill"><input type="radio" name="saludMentalFlag" value="si" /> Sí</label>
@@ -652,17 +707,12 @@
           </div>
 
           <div id="saludMentalDetalleWrap" class="field hidden">
-            <label for="saludMentalDetalle">
-              Si lo desea, puede explicarlo aquí. Esta información será tratada de forma privada.
-            </label>
+            <label for="saludMentalDetalle">Si lo desea, puede explicarlo aquí.</label>
             <textarea id="saludMentalDetalle" name="saludMentalDetalle"></textarea>
           </div>
 
           <div class="field">
-            <label>
-              ¿Hay alguna condición del desarrollo, forma de aprendizaje, sensibilidad o necesidad de apoyo particular
-              que sea importante considerar para este viaje?
-            </label>
+            <label>¿Hay alguna condición del desarrollo, forma de aprendizaje, sensibilidad o necesidad de apoyo particular que sea importante considerar para este viaje?</label>
             <div class="radio-group">
               <label class="option-pill"><input type="radio" name="apoyosEspecialesFlag" value="no" /> No</label>
               <label class="option-pill"><input type="radio" name="apoyosEspecialesFlag" value="si" /> Sí</label>
@@ -671,9 +721,7 @@
           </div>
 
           <div id="apoyosEspecialesDetalleWrap" class="field hidden">
-            <label for="apoyosEspecialesDetalle">
-              Indique qué apoyos, cuidados o consideraciones recomienda
-            </label>
+            <label for="apoyosEspecialesDetalle">Indique qué apoyos, cuidados o consideraciones recomienda</label>
             <textarea id="apoyosEspecialesDetalle" name="apoyosEspecialesDetalle"></textarea>
           </div>
 
@@ -701,9 +749,7 @@
 
           <div id="medicamentosWrap" class="hidden">
             <div class="field">
-              <label for="medicamentosDetalle">
-                Indique nombre, dosis, horario y motivo o indicación general
-              </label>
+              <label for="medicamentosDetalle">Indique nombre, dosis, horario y motivo o indicación general</label>
               <textarea id="medicamentosDetalle" name="medicamentosDetalle"></textarea>
             </div>
 
@@ -718,9 +764,7 @@
             </div>
 
             <div class="field">
-              <label for="medicamentosInstrucciones">
-                Instrucciones importantes sobre estos medicamentos para el viaje
-              </label>
+              <label for="medicamentosInstrucciones">Instrucciones importantes sobre estos medicamentos para el viaje</label>
               <textarea
                 id="medicamentosInstrucciones"
                 name="medicamentosInstrucciones"
@@ -738,9 +782,7 @@
           </div>
 
           <div id="medicamentosProhibidosDetalleWrap" class="field hidden">
-            <label for="medicamentosProhibidosDetalle">
-              Indique cuál o cuáles y explique el motivo, si corresponde
-            </label>
+            <label for="medicamentosProhibidosDetalle">Indique cuál o cuáles y explique el motivo, si corresponde</label>
             <textarea id="medicamentosProhibidosDetalle" name="medicamentosProhibidosDetalle"></textarea>
           </div>
         </div>
@@ -773,9 +815,7 @@
             </div>
 
             <div class="field">
-              <label for="alergiasDetalle">
-                Explique la alergia, sus síntomas habituales y qué debemos hacer en caso de reacción
-              </label>
+              <label for="alergiasDetalle">Explique la alergia, sus síntomas habituales y qué debemos hacer en caso de reacción</label>
               <textarea id="alergiasDetalle" name="alergiasDetalle"></textarea>
             </div>
           </div>
@@ -803,9 +843,7 @@
             </div>
 
             <div class="field">
-              <label for="dietaDetalle">
-                Explique claramente qué alimentos no puede consumir y qué cuidados debemos tener
-              </label>
+              <label for="dietaDetalle">Explique claramente qué alimentos no puede consumir y qué cuidados debemos tener</label>
               <textarea id="dietaDetalle" name="dietaDetalle"></textarea>
             </div>
 
@@ -826,10 +864,7 @@
 
         <div class="form-grid">
           <div class="field">
-            <label>
-              ¿Hay alguna situación de salud, conducta, adaptación, descanso, alimentación o cuidado personal
-              que debamos anticipar durante el viaje?
-            </label>
+            <label>¿Hay alguna situación de salud, conducta, adaptación, descanso, alimentación o cuidado personal que debamos anticipar durante el viaje?</label>
             <div class="radio-group">
               <label class="option-pill"><input type="radio" name="otrosAntecedentesFlag" value="no" /> No</label>
               <label class="option-pill"><input type="radio" name="otrosAntecedentesFlag" value="si" /> Sí</label>
@@ -843,10 +878,7 @@
           </div>
 
           <div class="field">
-            <label>
-              ¿Desea informar algún antecedente de manera estrictamente privada para conocimiento exclusivo
-              del equipo interno de Turismo Rai Trai?
-            </label>
+            <label>¿Desea informar algún antecedente de manera estrictamente reservada para conocimiento exclusivo del equipo interno de Turismo Rai Trai?</label>
             <div class="radio-group">
               <label class="option-pill"><input type="radio" name="privadoExclusivoFlag" value="no" /> No</label>
               <label class="option-pill"><input type="radio" name="privadoExclusivoFlag" value="si" /> Sí</label>
@@ -854,9 +886,7 @@
           </div>
 
           <div id="privadoExclusivoDetalleWrap" class="field hidden">
-            <label for="privadoExclusivoDetalle">
-              Indíquelo aquí. Esta información no será compartida con encargados de curso ni intermediarios.
-            </label>
+            <label for="privadoExclusivoDetalle">Indíquelo aquí. Esta información tendrá un tratamiento aún más reservado.</label>
             <textarea id="privadoExclusivoDetalle" name="privadoExclusivoDetalle"></textarea>
           </div>
         </div>
@@ -884,9 +914,7 @@
           </div>
 
           <div class="field">
-            <label for="adultoObservacionesCompromiso">
-              Observaciones adicionales del adulto acompañante
-            </label>
+            <label for="adultoObservacionesCompromiso">Observaciones adicionales del adulto acompañante</label>
             <textarea id="adultoObservacionesCompromiso" name="adultoObservacionesCompromiso"></textarea>
           </div>
         </div>
@@ -931,8 +959,7 @@
         </div>
 
         <div class="footer-note">
-          Una vez enviada la inscripción, el sistema bloqueará una nueva inscripción con el mismo RUT
-          dentro de este grupo.
+          Una vez enviada la inscripción, el sistema bloqueará una nueva inscripción con el mismo documento dentro de este grupo.
         </div>
       </section>
     </form>
