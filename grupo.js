@@ -2295,10 +2295,13 @@ function renderDocs() {
   const flowSteps = $("flowSteps");
 
   if (docsChips) {
+    const fichaPdfUrl = getFichaDocumentoPdfUrl(state.group);
+    const fichaDocumentoEstado = resolveFichaDocumentoEstado(state.group);
+
     docsChips.innerHTML = `
       ${renderDocChip("fichaMedicaEstado", state.group.fichaMedicaEstado)}
       ${renderDocChip("nominaEstado", state.group.nominaEstado)}
-      ${renderDocChip("fichaEstado", state.group.fichaEstado)}
+      ${renderDocChip("fichaEstado", fichaDocumentoEstado, { href: fichaPdfUrl })}
       ${renderDocChip("contratoEstado", state.group.contratoEstado)}
       ${renderDocChip("cortesiaEstado", state.group.cortesiaEstado)}
     `;
@@ -3243,7 +3246,7 @@ function openDocsModal() {
 
   setFormValue("doc_fichaMedicaEstado", normalizeDocState(state.group.fichaMedicaEstado));
   setFormValue("doc_nominaEstado", normalizeDocState(state.group.nominaEstado));
-  setFormValue("doc_fichaEstado", normalizeDocState(state.group.fichaEstado));
+  setFormValue("doc_fichaEstado", resolveFichaDocumentoEstado(state.group));
   setFormValue("doc_contratoEstado", normalizeDocState(state.group.contratoEstado));
   setFormValue("doc_cortesiaEstado", normalizeDocState(state.group.cortesiaEstado));
 
@@ -4192,10 +4195,17 @@ async function saveDocumentos() {
   const patch = {};
   const cambios = [];
 
+  const fichaPdfUrl = getFichaDocumentoPdfUrl(state.group);
+  
   const values = {
     fichaMedicaEstado: $("doc_fichaMedicaEstado")?.value || "pendiente",
     nominaEstado: $("doc_nominaEstado")?.value || "pendiente",
-    fichaEstado: $("doc_fichaEstado")?.value || "pendiente",
+  
+    // Si ya existe PDF real, este documento debe quedar cumplido.
+    fichaEstado: fichaPdfUrl
+      ? "ok"
+      : ($("doc_fichaEstado")?.value || "pendiente"),
+  
     contratoEstado: $("doc_contratoEstado")?.value || "pendiente",
     cortesiaEstado: $("doc_cortesiaEstado")?.value || "pendiente"
   };
@@ -5038,11 +5048,51 @@ function itemData(label, value, full = false) {
   };
 }
 
-function renderDocChip(key, value) {
+function getFichaDocumentoPdfUrl(groupData = {}) {
+  return cleanText(
+    groupData.fichaPdfUrl ||
+    getByPath(groupData, "ficha.pdfUrl") ||
+    getByPath(groupData, "ficha.urlPdf") ||
+    ""
+  );
+}
+
+function resolveFichaDocumentoEstado(groupData = {}) {
+  const pdfUrl = getFichaDocumentoPdfUrl(groupData);
+
+  // Si existe PDF real guardado, la ficha del grupo debe verse como cumplida.
+  if (pdfUrl) return "ok";
+
+  return normalizeDocState(
+    groupData.fichaEstado ||
+    getByPath(groupData, "documentos.fichaGrupo.estado") ||
+    getByPath(groupData, "ficha.estado") ||
+    ""
+  );
+}
+
+function renderDocChip(key, value, options = {}) {
   const normalized = normalizeDocState(value);
+  const href = cleanText(options.href || "");
+  const label = `${DOC_LABELS[key] || key} · ${getDocStateLabel(normalized)}`;
+
+  if (href) {
+    return `
+      <a
+        class="doc-chip ${docStateClass(normalized)}"
+        href="${escapeHtml(href)}"
+        target="_blank"
+        rel="noopener noreferrer"
+        title="${escapeHtml(label)}"
+      >
+        ${escapeHtml(label)}
+      </a>
+    `;
+  }
+
   return `
     <span class="doc-chip ${docStateClass(normalized)}">
-      ${escapeHtml(DOC_LABELS[key] || key)} · ${escapeHtml(getDocStateLabel(normalized))}
+      ${escapeHtml(label)}
     </span>
   `;
 }
