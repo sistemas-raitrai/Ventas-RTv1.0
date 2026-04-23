@@ -5232,18 +5232,30 @@ function normalizeState(value = "") {
   return "a_contactar";
 }
 
-function normalizeDocState(value = "") {
+function normalizeDocState(value) {
+  if (typeof value === "boolean") {
+    return value ? "ok" : "pendiente";
+  }
+
   const v = normalizeSearchLocal(value);
+
   if (!v) return "pendiente";
-  if (["ok", "cumplido", "firmado", "generado", "enviado", "realizada", "autorizada admin", "autorizada_admin"].includes(v)) return "ok";
-  if (v.includes("no aplica") || v === "n/a" || v === "na" || v === "cancelada") return "no_aplica";
-  if (v.includes("lista vendedor")) return "lista_vendedor";
-  if (v.includes("revisada jefa ventas")) return "revisada_jefa_ventas";
-  if (v.includes("autorizada admin")) return "autorizada_admin";
-  if (v.includes("en edicion")) return "en_edicion";
-  if (v.includes("generado")) return "generado";
-  if (v.includes("enviado")) return "enviado";
-  if (v.includes("firmado")) return "firmado";
+  if (v.includes("no aplica") || v === "na" || v === "n/a") return "no_aplica";
+
+  if (
+    v.includes("ok") ||
+    v.includes("completo") ||
+    v.includes("cumpl") ||
+    v.includes("entreg") ||
+    v.includes("confirmada_pdf") ||
+    v.includes("pdf_confirmado") ||
+    v.includes("confirmada")
+  ) {
+    return "ok";
+  }
+
+  if (v.includes("pend")) return "pendiente";
+
   return "pendiente";
 }
 
