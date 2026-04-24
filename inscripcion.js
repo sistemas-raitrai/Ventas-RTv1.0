@@ -45,8 +45,7 @@ const chipDestino = $("chipDestino");
 const chipAno = $("chipAno");
 
 const generoOtroWrap = $("generoOtroWrap");
-const rutWrap = $("rutWrap");
-const dvWrap = $("dvWrap");
+const rutCompletoWrap = $("rutCompletoWrap");
 const sinRutNotice = $("sinRutNotice");
 const rutHint = $("rutHint");
 const nacionalidadDetalleWrap = $("nacionalidadDetalleWrap");
@@ -333,8 +332,7 @@ function aplicarEstadoUI() {
   setRequired("telefonoViajante", esAdultoOperativo);
   setRequired("adultoAceptaCompromiso", esAdultoOperativo);
 
-  mostrar(rutWrap, tipoIdentificacion === "rut");
-  mostrar(dvWrap, tipoIdentificacion === "rut");
+  mostrar(rutCompletoWrap, tipoIdentificacion === "rut");
   mostrar(sinRutNotice, tipoIdentificacion === "sin_rut");
 
   setRequired("rutNumero", tipoIdentificacion === "rut");
