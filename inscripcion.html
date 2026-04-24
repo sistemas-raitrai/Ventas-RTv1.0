@@ -43,21 +43,22 @@
     .hero {
       background: linear-gradient(135deg, #ffffff 0%, #f3efff 100%);
       border: 1px solid var(--rt-border);
-      border-radius: 18px;
-      padding: 28px;
+      border-radius: 22px;
+      padding: 30px;
       box-shadow: 0 10px 28px rgba(0,0,0,.05);
       margin-bottom: 20px;
     }
 
     .hero h1 {
-      margin: 0 0 8px;
-      font-size: 28px;
+      margin: 0 0 10px;
+      font-size: 32px;
     }
 
     .hero p {
       margin: 0;
       color: var(--rt-muted);
-      line-height: 1.5;
+      line-height: 1.55;
+      font-size: 16px;
     }
 
     .chips {
@@ -283,18 +284,6 @@
       margin-top: 10px;
     }
 
-    .inline-badge {
-      display: inline-block;
-      font-size: 12px;
-      font-weight: 700;
-      padding: 4px 8px;
-      border-radius: 999px;
-      background: var(--rt-primary-soft);
-      color: var(--rt-primary);
-      margin-left: 8px;
-      vertical-align: middle;
-    }
-
     @media (max-width: 880px) {
       .field.col-8,
       .field.col-6,
@@ -313,7 +302,7 @@
       }
 
       .hero h1 {
-        font-size: 24px;
+        font-size: 25px;
       }
     }
   </style>
@@ -321,11 +310,14 @@
 
 <body>
   <main class="wrap">
-    <section class="hero">
-      <h1>Inscripción de pasajero y ficha de salud</h1>
+
+    <section id="pantallaBienvenida" class="hero">
+      <h1>✈️ ¡Bienvenido a Rai Trai!</h1>
+
       <p>
-        Complete este formulario para registrar al viajante del grupo.
-        Revise cuidadosamente la información del grupo antes de continuar.
+        Estamos felices de acompañarlos en esta experiencia 🙌
+        Este formulario nos ayudará a conocer mejor al viajante y preparar todo para un viaje seguro,
+        organizado y entretenido.
       </p>
 
       <div class="chips">
@@ -335,31 +327,36 @@
         <div class="chip"><span>Destino</span><strong id="chipDestino">Cargando...</strong></div>
         <div class="chip"><span>Año viaje</span><strong id="chipAno">Cargando...</strong></div>
       </div>
-    </section>
 
-    <section class="card">
-      <div class="notice privacy">
-        <strong>Información confidencial y uso de datos personales.</strong><br />
-        Toda la información ingresada en este formulario será tratada como confidencial,
-        incluyendo antecedentes personales, de salud, alimentación, documentación y contacto.
-        Esta información será utilizada exclusivamente por Turismo Rai Trai para la correcta
-        planificación, coordinación y operación segura del viaje, y no será compartida con terceros
-        no autorizados, salvo que sea necesario para la operación del viaje o por obligación legal.
-        El tratamiento de los datos se realiza conforme a la Ley N°19.628 sobre protección de la vida privada.
-        Una vez finalizado el viaje, el titular de los datos o su representante podrá solicitar
-        la modificación o eliminación de la información escribiendo a
-        <strong>administracion@raitrai.cl</strong>, en la medida que la legislación vigente lo permita.
+      <div class="notice privacy" style="margin-top:20px;">
+        🔒 <strong>Información confidencial y uso de datos personales.</strong><br />
+        Toda la información ingresada será tratada como confidencial, incluyendo antecedentes personales,
+        de salud, alimentación, documentación y contacto. Será utilizada exclusivamente por Turismo Rai Trai
+        para la correcta planificación, coordinación y operación segura del viaje.
       </div>
 
       <div class="notice time">
-        <strong>Tiempo estimado:</strong> completar este formulario toma normalmente entre
-        <strong>5 y 10 minutos</strong>.
+        ⏱️ Completar este formulario toma normalmente entre <strong>5 y 10 minutos</strong>.
+      </div>
+
+      <div class="notice privacy">
+        En caso de necesitar ayuda o modificar información posteriormente, deberá comunicarse con Turismo Rai Trai
+        y asegurarse de recibir confirmación del cambio.
+        <br />
+        Correo: <strong>administracion@raitrai.cl</strong><br />
+        Teléfono: <strong>+56 (2) 2236 3232</strong>
       </div>
 
       <div id="msgBox" class="notice hidden"></div>
+
+      <div class="actions" style="justify-content:center;">
+        <button type="button" id="btnComenzar" class="btn-primary">
+          Comenzar inscripción
+        </button>
+      </div>
     </section>
 
-    <form id="formInscripcion" class="grid" novalidate>
+    <form id="formInscripcion" class="grid hidden" novalidate>
       <section class="card">
         <h2>• Tipo de viajante</h2>
         <div class="sub">
@@ -407,9 +404,8 @@
           </div>
 
           <div class="field col-4">
-            <label for="segundoApellido">Segundo apellido <span class="inline-badge">Opcional</span></label>
+            <label for="segundoApellido">Segundo apellido <span class="req">*</span></label>
             <input id="segundoApellido" name="segundoApellido" type="text" />
-            <div class="hint">Si queda vacío, el sistema pedirá confirmación antes de enviar.</div>
           </div>
 
           <div class="field col-4">
@@ -438,8 +434,8 @@
 
           <div id="rutWrap" class="field col-4 hidden">
             <label for="rutNumero">Cuerpo del RUT <span class="req">*</span></label>
-            <input id="rutNumero" name="rutNumero" type="text" inputmode="numeric" placeholder="Ej: 16128922" />
-            <div id="rutHint" class="hint">Ingrese solo números. El DV se calculará automáticamente.</div>
+            <input id="rutNumero" name="rutNumero" type="text" inputmode="numeric" />
+            <div id="rutHint" class="hint">Ingrese solo números.</div>
           </div>
 
           <div id="dvWrap" class="field col-2 hidden">
@@ -449,9 +445,7 @@
 
           <div id="sinRutNotice" class="field hidden">
             <div class="notice time" style="margin:0;">
-              Si el viajante no tiene RUT, el sistema generará un documento interno para efectos operativos.
-              Si ya existe una inscripción con los mismos nombres y apellidos en este grupo, el envío será bloqueado
-              y deberá comunicarse con Turismo Rai Trai.
+              Si el viajante no tiene RUT, el sistema generará un registro interno para la operación del viaje.
             </div>
           </div>
 
@@ -483,11 +477,8 @@
           <div id="telefonoViajanteWrap" class="field col-4 hidden">
             <label for="telefonoViajante">Teléfono del viajante <span class="req">*</span></label>
             <input id="telefonoViajante" name="telefonoViajante" type="tel" />
-            <div class="hint">Aplica para profesor o adulto acompañante.</div>
-          </div>
 
-          <div id="whatsappViajanteWrap" class="field col-4 hidden">
-            <label class="option-pill" style="border-radius:14px;">
+            <label class="option-pill" style="border-radius:14px; margin-top:8px;">
               <input type="checkbox" id="telefonoViajanteEsWhatsapp" name="telefonoViajanteEsWhatsapp" checked />
               Este número también es WhatsApp
             </label>
@@ -542,19 +533,9 @@
             <input id="relacionCursoOtro" name="relacionCursoOtro" type="text" />
           </div>
 
-          <div class="field col-4">
-            <label for="estudianteRelacionadoNombres">Nombres del estudiante relacionado <span class="req">*</span></label>
-            <input id="estudianteRelacionadoNombres" name="estudianteRelacionadoNombres" type="text" />
-          </div>
-
-          <div class="field col-4">
-            <label for="estudianteRelacionadoPrimerApellido">Primer apellido del estudiante <span class="req">*</span></label>
-            <input id="estudianteRelacionadoPrimerApellido" name="estudianteRelacionadoPrimerApellido" type="text" />
-          </div>
-
-          <div class="field col-4">
-            <label for="estudianteRelacionadoSegundoApellido">Segundo apellido del estudiante <span class="inline-badge">Opcional</span></label>
-            <input id="estudianteRelacionadoSegundoApellido" name="estudianteRelacionadoSegundoApellido" type="text" />
+          <div class="field col-8">
+            <label for="estudianteRelacionado">Nombre del estudiante relacionado <span class="req">*</span></label>
+            <input id="estudianteRelacionado" name="estudianteRelacionado" type="text" />
           </div>
         </div>
       </section>
@@ -590,10 +571,8 @@
           <div class="field col-4">
             <label for="contactoPrincipalTelefono">Teléfono apoderado <span class="req">*</span></label>
             <input id="contactoPrincipalTelefono" name="contactoPrincipalTelefono" type="tel" />
-          </div>
 
-          <div class="field col-4">
-            <label class="option-pill" style="border-radius:14px;">
+            <label class="option-pill" style="border-radius:14px; margin-top:8px;">
               <input type="checkbox" id="contactoPrincipalEsWhatsapp" name="contactoPrincipalEsWhatsapp" checked />
               Este número también es WhatsApp
             </label>
@@ -648,10 +627,8 @@
           <div class="field col-4">
             <label for="emergenciaTelefono">Teléfono contacto de emergencia <span class="req">*</span></label>
             <input id="emergenciaTelefono" name="emergenciaTelefono" type="tel" required />
-          </div>
 
-          <div class="field col-4">
-            <label class="option-pill" style="border-radius:14px;">
+            <label class="option-pill" style="border-radius:14px; margin-top:8px;">
               <input type="checkbox" id="emergenciaEsWhatsapp" name="emergenciaEsWhatsapp" checked />
               Este número también es WhatsApp
             </label>
@@ -889,6 +866,11 @@
               y asegurarme de recibir confirmación de que el cambio fue efectivamente recibido y aplicado
             </label>
           </div>
+        </div>
+
+        <div class="notice ok" style="margin-top:20px;">
+          ✨ Gracias por confiar en nosotros.<br />
+          Puede conocer más en <strong>raitrai.cl</strong> y seguirnos en Instagram <strong>@turismo_raitrai</strong>.
         </div>
 
         <div class="actions">
