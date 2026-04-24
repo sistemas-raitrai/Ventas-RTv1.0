@@ -6,6 +6,8 @@
 // - Barra de progreso automática
 // - Tipo viajante: estudiante / profesor / adulto acompañante
 // - RUT / sin RUT con correlativo global
+// - Segundo apoderado opcional
+// - Segundo contacto de emergencia opcional
 // - Colección global inscripciones_sin_rut
 // - Colección global inscripciones_por_rut
 // - Historial del grupo
@@ -45,11 +47,14 @@ const chipDestino = $("chipDestino");
 const chipAno = $("chipAno");
 
 const generoOtroWrap = $("generoOtroWrap");
+
 const rutCompletoWrap = $("rutCompletoWrap");
+const rutWrap = $("rutWrap");
+const dvWrap = $("dvWrap");
 const sinRutNotice = $("sinRutNotice");
 const rutHint = $("rutHint");
-const nacionalidadDetalleWrap = $("nacionalidadDetalleWrap");
 
+const nacionalidadDetalleWrap = $("nacionalidadDetalleWrap");
 const telefonoViajanteWrap = $("telefonoViajanteWrap");
 
 const bloqueProfesor = $("bloqueProfesor");
@@ -62,8 +67,18 @@ const bloqueApoderado = $("bloqueApoderado");
 const contactoPrincipalRelacionOtroWrap = $("contactoPrincipalRelacionOtroWrap");
 const contactoPrincipalWhatsappAlternativoWrap = $("contactoPrincipalWhatsappAlternativoWrap");
 
+const btnAgregarApoderado2 = $("btnAgregarApoderado2");
+const bloqueApoderado2 = $("bloqueApoderado2");
+const contactoSecundarioRelacionOtroWrap = $("contactoSecundarioRelacionOtroWrap");
+const contactoSecundarioWhatsappAlternativoWrap = $("contactoSecundarioWhatsappAlternativoWrap");
+
 const emergenciaRelacionOtroWrap = $("emergenciaRelacionOtroWrap");
 const emergenciaWhatsappAlternativoWrap = $("emergenciaWhatsappAlternativoWrap");
+
+const btnAgregarEmergencia2 = $("btnAgregarEmergencia2");
+const bloqueEmergencia2 = $("bloqueEmergencia2");
+const emergencia2RelacionOtroWrap = $("emergencia2RelacionOtroWrap");
+const emergencia2WhatsappAlternativoWrap = $("emergencia2WhatsappAlternativoWrap");
 
 const bloqueInternacional = $("bloqueInternacional");
 const docsInternacionalesDetalleWrap = $("docsInternacionalesDetalleWrap");
@@ -168,15 +183,17 @@ async function cargarGrupo() {
       idGrupo;
   }
 
-  chipColegio.textContent = limpiarTexto(grupoData.colegio) || "-";
-  chipCurso.textContent = limpiarTexto(grupoData.curso) || "-";
+  if (chipColegio) chipColegio.textContent = limpiarTexto(grupoData.colegio) || "-";
+  if (chipCurso) chipCurso.textContent = limpiarTexto(grupoData.curso) || "-";
 
-  chipDestino.textContent =
-    limpiarTexto(grupoData.destinoPrincipal) ||
-    limpiarTexto(grupoData.destino) ||
-    "-";
+  if (chipDestino) {
+    chipDestino.textContent =
+      limpiarTexto(grupoData.destinoPrincipal) ||
+      limpiarTexto(grupoData.destino) ||
+      "-";
+  }
 
-  chipAno.textContent = String(grupoData.anoViaje || "-");
+  if (chipAno) chipAno.textContent = String(grupoData.anoViaje || "-");
 }
 
 // -----------------------------------------------------------------------------
@@ -190,11 +207,11 @@ function conectarEventos() {
     actualizarProgreso();
   });
 
-  form.addEventListener("submit", onSubmit);
-  btnLimpiar.addEventListener("click", onLimpiar);
+  form?.addEventListener("submit", onSubmit);
+  btnLimpiar?.addEventListener("click", onLimpiar);
 
-  form.addEventListener("input", actualizarProgreso);
-  form.addEventListener("change", () => {
+  form?.addEventListener("input", actualizarProgreso);
+  form?.addEventListener("change", () => {
     aplicarEstadoUI();
     actualizarProgreso();
   });
@@ -203,8 +220,30 @@ function conectarEventos() {
     el.addEventListener("change", aplicarEstadoUI);
   });
 
-  $("rutNumero").addEventListener("input", onRutInput);
-  $("rutDv").addEventListener("input", onRutInput);
+  $("rutNumero")?.addEventListener("input", onRutInput);
+  $("rutDv")?.addEventListener("input", onRutInput);
+
+  btnAgregarApoderado2?.addEventListener("click", () => {
+    mostrar(bloqueApoderado2, true);
+    btnAgregarApoderado2.classList.add("hidden");
+    setPhoneDefault("contactoSecundarioTelefono");
+    aplicarEstadoUI();
+    actualizarProgreso();
+  });
+
+  btnAgregarEmergencia2?.addEventListener("click", () => {
+    mostrar(bloqueEmergencia2, true);
+    btnAgregarEmergencia2.classList.add("hidden");
+    setPhoneDefault("emergencia2Telefono");
+    aplicarEstadoUI();
+    actualizarProgreso();
+  });
+
+  $("contactoSecundarioRelacion")?.addEventListener("change", aplicarEstadoUI);
+  $("contactoSecundarioEsWhatsapp")?.addEventListener("change", aplicarEstadoUI);
+
+  $("emergencia2Relacion")?.addEventListener("change", aplicarEstadoUI);
+  $("emergencia2EsWhatsapp")?.addEventListener("change", aplicarEstadoUI);
 
   enlazarFlagDetalle("conoceDocsInternacionales", docsInternacionalesDetalleWrap, ["no", "parcial"]);
   enlazarFlagDetalle("situacionLegalAfecta", situacionLegalDetalleWrap, ["si", "privado"]);
@@ -221,8 +260,12 @@ function conectarEventos() {
     "telefonoViajante",
     "contactoPrincipalTelefono",
     "contactoPrincipalWhatsappAlternativo",
+    "contactoSecundarioTelefono",
+    "contactoSecundarioWhatsappAlternativo",
     "emergenciaTelefono",
-    "emergenciaWhatsappAlternativo"
+    "emergenciaWhatsappAlternativo",
+    "emergencia2Telefono",
+    "emergencia2WhatsappAlternativo"
   ].forEach(bindPhoneInput);
 
   setPhoneDefault("telefonoViajante");
@@ -271,7 +314,6 @@ function actualizarProgreso() {
 
   const requeridos = obtenerCamposRequeridosVisibles();
   const total = requeridos.length || 1;
-
   const completos = requeridos.filter(campoEstaCompleto).length;
   const pct = Math.round((completos / total) * 100);
 
@@ -320,10 +362,10 @@ function aplicarEstadoUI() {
   const esAcompanante = tipoViajante === "adulto_acompanante";
   const esAdultoOperativo = esProfesor || esAcompanante;
 
-  const tipoIdentificacion = $("tipoIdentificacion").value;
-  const nacionalidadBase = $("nacionalidadBase").value;
+  const tipoIdentificacion = $("tipoIdentificacion")?.value || "";
+  const nacionalidadBase = $("nacionalidadBase")?.value || "";
   const esInternacional = grupoEsInternacional();
-  const esMenor = calcularEdad($("fechaNacimiento").value) < 18;
+  const esMenor = calcularEdad($("fechaNacimiento")?.value) < 18;
 
   mostrar(bloqueApoderado, esEstudiante);
   mostrar(bloqueProfesor, esProfesor);
@@ -334,18 +376,23 @@ function aplicarEstadoUI() {
   setRequired("telefonoViajante", esAdultoOperativo);
   setRequired("adultoAceptaCompromiso", esAdultoOperativo);
 
-  mostrar(rutCompletoWrap, tipoIdentificacion === "rut");
+  const muestraRut = tipoIdentificacion === "rut";
+  mostrar(rutCompletoWrap, muestraRut);
+  mostrar(rutWrap, muestraRut);
+  mostrar(dvWrap, muestraRut);
   mostrar(sinRutNotice, tipoIdentificacion === "sin_rut");
 
-  setRequired("rutNumero", tipoIdentificacion === "rut");
+  setRequired("rutNumero", muestraRut);
+  setRequired("rutDv", muestraRut);
 
-  if (tipoIdentificacion !== "rut") {
-    $("rutNumero").value = "";
-    $("rutDv").value = "";
-    $("rutNumero").classList.remove("input-error");
+  if (!muestraRut) {
+    if ($("rutNumero")) $("rutNumero").value = "";
+    if ($("rutDv")) $("rutDv").value = "";
+    $("rutNumero")?.classList.remove("input-error");
+    $("rutDv")?.classList.remove("input-error");
   }
 
-  const generoOtro = $("genero").value === "otro";
+  const generoOtro = $("genero")?.value === "otro";
   mostrar(generoOtroWrap, generoOtro);
   setRequired("generoOtro", generoOtro);
 
@@ -353,12 +400,12 @@ function aplicarEstadoUI() {
   mostrar(nacionalidadDetalleWrap, nacionalidadDetalle);
   setRequired("nacionalidadDetalle", nacionalidadDetalle);
 
-  const tipoProfesorOtro = $("tipoProfesor").value === "otro";
+  const tipoProfesorOtro = $("tipoProfesor")?.value === "otro";
   mostrar(tipoProfesorOtroWrap, tipoProfesorOtro);
   setRequired("tipoProfesor", esProfesor);
   setRequired("tipoProfesorOtro", esProfesor && tipoProfesorOtro);
 
-  const relacionCursoOtro = $("relacionCurso").value === "otro";
+  const relacionCursoOtro = $("relacionCurso")?.value === "otro";
   mostrar(relacionCursoOtroWrap, relacionCursoOtro);
   setRequired("relacionCurso", esAcompanante);
   setRequired("relacionCursoOtro", esAcompanante && relacionCursoOtro);
@@ -369,21 +416,37 @@ function aplicarEstadoUI() {
   setRequired("contactoPrincipalTelefono", esEstudiante);
   setRequired("contactoPrincipalCorreo", esEstudiante);
 
-  const relacionOtro = $("contactoPrincipalRelacion").value === "otro";
+  const relacionOtro = $("contactoPrincipalRelacion")?.value === "otro";
   mostrar(contactoPrincipalRelacionOtroWrap, esEstudiante && relacionOtro);
   setRequired("contactoPrincipalRelacionOtro", esEstudiante && relacionOtro);
 
-  const contactoEsWhatsapp = $("contactoPrincipalEsWhatsapp").checked;
+  const contactoEsWhatsapp = !!$("contactoPrincipalEsWhatsapp")?.checked;
   mostrar(contactoPrincipalWhatsappAlternativoWrap, esEstudiante && !contactoEsWhatsapp);
   setRequired("contactoPrincipalWhatsappAlternativo", esEstudiante && !contactoEsWhatsapp);
 
-  const emergenciaOtro = $("emergenciaRelacion").value === "otro";
+  const hayApoderado2 = bloqueApoderado2 && !bloqueApoderado2.classList.contains("hidden");
+
+  const contactoSecundarioOtro = $("contactoSecundarioRelacion")?.value === "otro";
+  mostrar(contactoSecundarioRelacionOtroWrap, hayApoderado2 && contactoSecundarioOtro);
+
+  const contactoSecundarioWhatsapp = !!$("contactoSecundarioEsWhatsapp")?.checked;
+  mostrar(contactoSecundarioWhatsappAlternativoWrap, hayApoderado2 && !contactoSecundarioWhatsapp);
+
+  const emergenciaOtro = $("emergenciaRelacion")?.value === "otro";
   mostrar(emergenciaRelacionOtroWrap, emergenciaOtro);
   setRequired("emergenciaRelacionOtro", emergenciaOtro);
 
-  const emergenciaEsWhatsapp = $("emergenciaEsWhatsapp").checked;
+  const emergenciaEsWhatsapp = !!$("emergenciaEsWhatsapp")?.checked;
   mostrar(emergenciaWhatsappAlternativoWrap, !emergenciaEsWhatsapp);
   setRequired("emergenciaWhatsappAlternativo", !emergenciaEsWhatsapp);
+
+  const hayEmergencia2 = bloqueEmergencia2 && !bloqueEmergencia2.classList.contains("hidden");
+
+  const emergencia2Otro = $("emergencia2Relacion")?.value === "otro";
+  mostrar(emergencia2RelacionOtroWrap, hayEmergencia2 && emergencia2Otro);
+
+  const emergencia2Whatsapp = !!$("emergencia2EsWhatsapp")?.checked;
+  mostrar(emergencia2WhatsappAlternativoWrap, hayEmergencia2 && !emergencia2Whatsapp);
 
   mostrar(bloqueInternacional, esInternacional);
 
@@ -392,7 +455,7 @@ function aplicarEstadoUI() {
 
   if (!docsNoChile) {
     limpiarRadios("conoceDocsInternacionales");
-    $("docsInternacionalesDetalle").value = "";
+    if ($("docsInternacionalesDetalle")) $("docsInternacionalesDetalle").value = "";
     mostrar(docsInternacionalesDetalleWrap, false);
   }
 
@@ -403,7 +466,7 @@ function aplicarEstadoUI() {
   if (!permisoMenor) {
     limpiarRadios("permisoMenorViaje");
     limpiarRadios("situacionLegalAfecta");
-    $("situacionLegalDetalle").value = "";
+    if ($("situacionLegalDetalle")) $("situacionLegalDetalle").value = "";
     mostrar(situacionLegalDetalleWrap, false);
   }
 
@@ -417,8 +480,10 @@ function onRutInput() {
   const numeroInput = $("rutNumero");
   const dvInput = $("rutDv");
 
-  const numero = limpiarRutNumero(numeroInput.value);
-  const dv = limpiarTexto(dvInput.value).toUpperCase();
+  if (!numeroInput || !dvInput) return;
+
+  const numero = limpiarRutNumero(numeroInput.value).slice(0, 8);
+  const dv = limpiarTexto(dvInput.value).toUpperCase().replace(/[^0-9K]/g, "").slice(0, 1);
 
   numeroInput.value = numero;
   dvInput.value = dv;
@@ -426,19 +491,19 @@ function onRutInput() {
   if (!numero || !dv) {
     numeroInput.classList.remove("input-error");
     dvInput.classList.remove("input-error");
-    rutHint.textContent = "Ingrese RUT completo.";
+    if (rutHint) rutHint.textContent = "Ingrese cuerpo del RUT y dígito verificador.";
     return;
   }
 
   const dvCorrecto = calcularDvRut(numero);
-  const valido = dv === dvCorrecto;
+  const valido = /^\d{7,8}$/.test(numero) && dv === dvCorrecto;
 
   numeroInput.classList.toggle("input-error", !valido);
   dvInput.classList.toggle("input-error", !valido);
 
-  rutHint.textContent = valido
-    ? "RUT válido ✔"
-    : "RUT inválido";
+  if (rutHint) {
+    rutHint.textContent = valido ? "RUT válido ✔" : "RUT inválido";
+  }
 }
 
 // -----------------------------------------------------------------------------
@@ -463,7 +528,7 @@ async function onSubmit(event) {
     return;
   }
 
-  const segundoApellido = limpiarTexto($("segundoApellido").value);
+  const segundoApellido = limpiarTexto($("segundoApellido")?.value);
 
   if (!segundoApellido) {
     const ok = window.confirm(
@@ -684,94 +749,119 @@ function validarFormulario() {
   const esAcompanante = tipoViajante === "adulto_acompanante";
   const esAdultoOperativo = esProfesor || esAcompanante;
 
-  const tipoIdentificacion = $("tipoIdentificacion").value;
+  const tipoIdentificacion = $("tipoIdentificacion")?.value || "";
   const esInternacional = grupoEsInternacional();
-  const edad = calcularEdad($("fechaNacimiento").value);
+  const edad = calcularEdad($("fechaNacimiento")?.value);
   const esMenor = edad < 18;
 
   if (!tipoViajante) errores.push("Debe indicar el tipo de viajante.");
-  if (!limpiarTexto($("nombres").value)) errores.push("Debe ingresar los nombres del viajante.");
-  if (!limpiarTexto($("primerApellido").value)) errores.push("Debe ingresar el primer apellido del viajante.");
+  if (!limpiarTexto($("nombres")?.value)) errores.push("Debe ingresar los nombres del viajante.");
+  if (!limpiarTexto($("primerApellido")?.value)) errores.push("Debe ingresar el primer apellido del viajante.");
 
-  if (!$("genero").value) errores.push("Debe indicar el género del viajante.");
-  if ($("genero").value === "otro" && !limpiarTexto($("generoOtro").value)) {
+  if (!$("genero")?.value) errores.push("Debe indicar el género del viajante.");
+  if ($("genero")?.value === "otro" && !limpiarTexto($("generoOtro")?.value)) {
     errores.push("Debe especificar el género del viajante.");
   }
 
   if (!tipoIdentificacion) errores.push("Debe seleccionar el documento de identidad.");
 
   if (tipoIdentificacion === "rut") {
-    const rutNumero = limpiarRutNumero($("rutNumero").value);
-    const dv = limpiarTexto($("rutDv").value).toUpperCase();
-  
+    const rutNumero = limpiarRutNumero($("rutNumero")?.value);
+    const dv = limpiarTexto($("rutDv")?.value).toUpperCase();
+
     if (!rutNumero || !dv) {
       errores.push("Debe ingresar el RUT completo.");
-    } else {
-      const dvCorrecto = calcularDvRut(rutNumero);
-  
-      if (dv !== dvCorrecto) {
-        errores.push("El RUT ingresado es inválido.");
-      }
+    } else if (!/^\d{7,8}$/.test(rutNumero)) {
+      errores.push("Debe ingresar un RUT válido.");
+    } else if (dv !== calcularDvRut(rutNumero)) {
+      errores.push("El RUT ingresado es inválido.");
     }
   }
 
-  if (!$("fechaNacimiento").value) errores.push("Debe ingresar la fecha de nacimiento.");
+  if (!$("fechaNacimiento")?.value) errores.push("Debe ingresar la fecha de nacimiento.");
 
-  if (!$("nacionalidadBase").value) errores.push("Debe indicar la nacionalidad.");
+  if (!$("nacionalidadBase")?.value) errores.push("Debe indicar la nacionalidad.");
 
-  if (["otra", "doble"].includes($("nacionalidadBase").value) && !limpiarTexto($("nacionalidadDetalle").value)) {
+  if (["otra", "doble"].includes($("nacionalidadBase")?.value) && !limpiarTexto($("nacionalidadDetalle")?.value)) {
     errores.push("Debe especificar la nacionalidad.");
   }
 
-  if (!validarCorreo($("correoViajante").value)) {
+  if (!validarCorreo($("correoViajante")?.value)) {
     errores.push("Debe ingresar un correo válido del viajante.");
   }
 
-  if (esAdultoOperativo && !telefonoValido($("telefonoViajante").value)) {
+  if (esAdultoOperativo && !telefonoValido($("telefonoViajante")?.value)) {
     errores.push("Debe ingresar un teléfono válido del viajante.");
   }
 
   if (esProfesor) {
-    if (!$("tipoProfesor").value) errores.push("Debe indicar el tipo de profesor.");
-    if ($("tipoProfesor").value === "otro" && !limpiarTexto($("tipoProfesorOtro").value)) {
+    if (!$("tipoProfesor")?.value) errores.push("Debe indicar el tipo de profesor.");
+    if ($("tipoProfesor")?.value === "otro" && !limpiarTexto($("tipoProfesorOtro")?.value)) {
       errores.push("Debe especificar el tipo de profesor.");
     }
   }
 
   if (esAcompanante) {
-    if (!$("relacionCurso").value) errores.push("Debe indicar la relación con el curso.");
-    if ($("relacionCurso").value === "otro" && !limpiarTexto($("relacionCursoOtro").value)) {
+    if (!$("relacionCurso")?.value) errores.push("Debe indicar la relación con el curso.");
+    if ($("relacionCurso")?.value === "otro" && !limpiarTexto($("relacionCursoOtro")?.value)) {
       errores.push("Debe especificar la relación con el curso.");
     }
-    if (!limpiarTexto($("estudianteRelacionado").value)) {
+    if (!limpiarTexto($("estudianteRelacionado")?.value)) {
       errores.push("Debe indicar el nombre del estudiante relacionado.");
     }
   }
 
   if (esEstudiante) {
-    if (!limpiarTexto($("contactoPrincipalNombre").value)) errores.push("Debe ingresar el nombre del apoderado.");
-    if (!$("contactoPrincipalRelacion").value) errores.push("Debe indicar la relación del apoderado.");
-    if ($("contactoPrincipalRelacion").value === "otro" && !limpiarTexto($("contactoPrincipalRelacionOtro").value)) {
+    if (!limpiarTexto($("contactoPrincipalNombre")?.value)) errores.push("Debe ingresar el nombre del apoderado.");
+    if (!$("contactoPrincipalRelacion")?.value) errores.push("Debe indicar la relación del apoderado.");
+    if ($("contactoPrincipalRelacion")?.value === "otro" && !limpiarTexto($("contactoPrincipalRelacionOtro")?.value)) {
       errores.push("Debe especificar la relación del apoderado.");
     }
-    if (!telefonoValido($("contactoPrincipalTelefono").value)) errores.push("Debe ingresar un teléfono válido del apoderado.");
-    if (!$("contactoPrincipalEsWhatsapp").checked && !telefonoValido($("contactoPrincipalWhatsappAlternativo").value)) {
+    if (!telefonoValido($("contactoPrincipalTelefono")?.value)) errores.push("Debe ingresar un teléfono válido del apoderado.");
+    if (!$("contactoPrincipalEsWhatsapp")?.checked && !telefonoValido($("contactoPrincipalWhatsappAlternativo")?.value)) {
       errores.push("Debe ingresar un WhatsApp válido del apoderado.");
     }
-    if (!validarCorreo($("contactoPrincipalCorreo").value)) errores.push("Debe ingresar un correo válido del apoderado.");
+    if (!validarCorreo($("contactoPrincipalCorreo")?.value)) errores.push("Debe ingresar un correo válido del apoderado.");
+
+    if (apoderado2Activo()) {
+      if (!limpiarTexto($("contactoSecundarioNombre")?.value)) errores.push("Debe ingresar el nombre del segundo apoderado.");
+      if (!$("contactoSecundarioRelacion")?.value) errores.push("Debe indicar la relación del segundo apoderado.");
+      if ($("contactoSecundarioRelacion")?.value === "otro" && !limpiarTexto($("contactoSecundarioRelacionOtro")?.value)) {
+        errores.push("Debe especificar la relación del segundo apoderado.");
+      }
+      if (!telefonoValido($("contactoSecundarioTelefono")?.value)) errores.push("Debe ingresar un teléfono válido del segundo apoderado.");
+      if (!$("contactoSecundarioEsWhatsapp")?.checked && !telefonoValido($("contactoSecundarioWhatsappAlternativo")?.value)) {
+        errores.push("Debe ingresar un WhatsApp válido del segundo apoderado.");
+      }
+      if ($("contactoSecundarioCorreo")?.value && !validarCorreo($("contactoSecundarioCorreo")?.value)) {
+        errores.push("Debe ingresar un correo válido del segundo apoderado.");
+      }
+    }
   }
 
-  if (!limpiarTexto($("emergenciaNombre").value)) errores.push("Debe ingresar el contacto de emergencia.");
-  if (!$("emergenciaRelacion").value) errores.push("Debe indicar la relación del contacto de emergencia.");
-  if ($("emergenciaRelacion").value === "otro" && !limpiarTexto($("emergenciaRelacionOtro").value)) {
+  if (!limpiarTexto($("emergenciaNombre")?.value)) errores.push("Debe ingresar el contacto de emergencia.");
+  if (!$("emergenciaRelacion")?.value) errores.push("Debe indicar la relación del contacto de emergencia.");
+  if ($("emergenciaRelacion")?.value === "otro" && !limpiarTexto($("emergenciaRelacionOtro")?.value)) {
     errores.push("Debe especificar la relación del contacto de emergencia.");
   }
-  if (!telefonoValido($("emergenciaTelefono").value)) errores.push("Debe ingresar un teléfono válido de emergencia.");
-  if (!$("emergenciaEsWhatsapp").checked && !telefonoValido($("emergenciaWhatsappAlternativo").value)) {
+  if (!telefonoValido($("emergenciaTelefono")?.value)) errores.push("Debe ingresar un teléfono válido de emergencia.");
+  if (!$("emergenciaEsWhatsapp")?.checked && !telefonoValido($("emergenciaWhatsappAlternativo")?.value)) {
     errores.push("Debe ingresar un WhatsApp válido de emergencia.");
   }
 
-  if (esInternacional && ["otra", "doble"].includes($("nacionalidadBase").value)) {
+  if (emergencia2Activa()) {
+    if (!limpiarTexto($("emergencia2Nombre")?.value)) errores.push("Debe ingresar el nombre del segundo contacto de emergencia.");
+    if (!$("emergencia2Relacion")?.value) errores.push("Debe indicar la relación del segundo contacto de emergencia.");
+    if ($("emergencia2Relacion")?.value === "otro" && !limpiarTexto($("emergencia2RelacionOtro")?.value)) {
+      errores.push("Debe especificar la relación del segundo contacto de emergencia.");
+    }
+    if (!telefonoValido($("emergencia2Telefono")?.value)) errores.push("Debe ingresar un teléfono válido del segundo contacto de emergencia.");
+    if (!$("emergencia2EsWhatsapp")?.checked && !telefonoValido($("emergencia2WhatsappAlternativo")?.value)) {
+      errores.push("Debe ingresar un WhatsApp válido del segundo contacto de emergencia.");
+    }
+  }
+
+  if (esInternacional && ["otra", "doble"].includes($("nacionalidadBase")?.value)) {
     if (!obtenerRadio("conoceDocsInternacionales")) errores.push("Debe indicar si conoce los documentos internacionales requeridos.");
   }
 
@@ -780,42 +870,42 @@ function validarFormulario() {
     if (!obtenerRadio("situacionLegalAfecta")) errores.push("Debe indicar si existe una situación legal o familiar relevante.");
   }
 
-  if (obtenerRadio("enfermedadBaseFlag") === "si" && !limpiarTexto($("enfermedadBaseDetalle").value)) {
+  if (obtenerRadio("enfermedadBaseFlag") === "si" && !limpiarTexto($("enfermedadBaseDetalle")?.value)) {
     errores.push("Debe detallar la enfermedad de base.");
   }
 
-  if (obtenerRadio("saludGeneralFlag") === "si" && !limpiarTexto($("saludGeneralDetalle").value)) {
+  if (obtenerRadio("saludGeneralFlag") === "si" && !limpiarTexto($("saludGeneralDetalle")?.value)) {
     errores.push("Debe detallar la condición de salud.");
   }
 
-  if (obtenerRadio("medicamentosFlag") === "si" && !limpiarTexto($("medicamentosDetalle").value)) {
+  if (obtenerRadio("medicamentosFlag") === "si" && !limpiarTexto($("medicamentosDetalle")?.value)) {
     errores.push("Debe detallar los medicamentos.");
   }
 
-  if (obtenerRadio("medicamentosProhibidosFlag") === "si" && !limpiarTexto($("medicamentosProhibidosDetalle").value)) {
+  if (obtenerRadio("medicamentosProhibidosFlag") === "si" && !limpiarTexto($("medicamentosProhibidosDetalle")?.value)) {
     errores.push("Debe detallar los medicamentos prohibidos.");
   }
 
-  if (obtenerRadio("alergiasFlag") === "si" && !limpiarTexto($("alergiasDetalle").value)) {
+  if (obtenerRadio("alergiasFlag") === "si" && !limpiarTexto($("alergiasDetalle")?.value)) {
     errores.push("Debe detallar la alergia.");
   }
 
   if (obtenerRadio("dietaFlag") === "si") {
     if (!obtenerChecks("dietaTipo").length) errores.push("Debe seleccionar al menos un tipo de dieta.");
-    if (!limpiarTexto($("dietaDetalle").value)) errores.push("Debe detallar la dieta.");
+    if (!limpiarTexto($("dietaDetalle")?.value)) errores.push("Debe detallar la dieta.");
   }
 
-  if (obtenerRadio("otrosAntecedentesFlag") === "si" && !limpiarTexto($("otrosAntecedentesDetalle").value)) {
+  if (obtenerRadio("otrosAntecedentesFlag") === "si" && !limpiarTexto($("otrosAntecedentesDetalle")?.value)) {
     errores.push("Debe detallar la información adicional.");
   }
 
-  if (esAdultoOperativo && !$("adultoAceptaCompromiso").checked) {
+  if (esAdultoOperativo && !$("adultoAceptaCompromiso")?.checked) {
     errores.push("Debe aceptar la declaración de responsabilidad.");
   }
 
-  if (!$("aceptaVeracidad").checked) errores.push("Debe aceptar la declaración de veracidad.");
-  if (!$("aceptaUsoInterno").checked) errores.push("Debe autorizar el uso interno de la información.");
-  if (!$("aceptaCambiosCorreo").checked) errores.push("Debe aceptar la condición de modificación posterior.");
+  if (!$("aceptaVeracidad")?.checked) errores.push("Debe aceptar la declaración de veracidad.");
+  if (!$("aceptaUsoInterno")?.checked) errores.push("Debe autorizar el uso interno de la información.");
+  if (!$("aceptaCambiosCorreo")?.checked) errores.push("Debe aceptar la condición de modificación posterior.");
 
   return errores;
 }
@@ -830,20 +920,20 @@ function construirPayloadBase() {
   const esAcompanante = tipoViajante === "adulto_acompanante";
   const esAdultoOperativo = esProfesor || esAcompanante;
 
-  const fechaNacimiento = $("fechaNacimiento").value || null;
+  const fechaNacimiento = $("fechaNacimiento")?.value || null;
   const edad = calcularEdad(fechaNacimiento);
   const esMenor = edad < 18;
   const esInternacional = grupoEsInternacional();
 
-  const nombres = limpiarTexto($("nombres").value);
-  const primerApellido = limpiarTexto($("primerApellido").value);
-  const segundoApellido = limpiarTexto($("segundoApellido").value);
+  const nombres = limpiarTexto($("nombres")?.value);
+  const primerApellido = limpiarTexto($("primerApellido")?.value);
+  const segundoApellido = limpiarTexto($("segundoApellido")?.value);
   const sinSegundoApellido = !segundoApellido;
   const nombreCompleto = [nombres, primerApellido, segundoApellido].filter(Boolean).join(" ");
 
-  const tipoIdentificacion = $("tipoIdentificacion").value;
-  const rutNumero = limpiarRutNumero($("rutNumero").value);
-  const rutDv = limpiarTexto($("rutDv").value).toUpperCase();
+  const tipoIdentificacion = $("tipoIdentificacion")?.value || "";
+  const rutNumero = limpiarRutNumero($("rutNumero")?.value);
+  const rutDv = limpiarTexto($("rutDv")?.value).toUpperCase();
 
   let documento = "";
   let documentoNormalizado = "";
@@ -855,25 +945,28 @@ function construirPayloadBase() {
     documentoNormalizado = normalizarRutDocumento(rutNumero, rutDv);
   }
 
-  const genero = $("genero").value || "";
-  const generoOtro = limpiarTexto($("generoOtro").value);
+  const genero = $("genero")?.value || "";
+  const generoOtro = limpiarTexto($("generoOtro")?.value);
   const generoFinal = genero === "otro" ? generoOtro : genero;
 
-  const contactoRelacion = $("contactoPrincipalRelacion").value || "";
-  const contactoRelacionOtro = limpiarTexto($("contactoPrincipalRelacionOtro").value);
+  const contactoRelacion = $("contactoPrincipalRelacion")?.value || "";
+  const contactoRelacionOtro = limpiarTexto($("contactoPrincipalRelacionOtro")?.value);
   const contactoRelacionFinal = contactoRelacion === "otro" ? contactoRelacionOtro : contactoRelacion;
 
-  const emergenciaRelacion = $("emergenciaRelacion").value || "";
-  const emergenciaRelacionOtro = limpiarTexto($("emergenciaRelacionOtro").value);
+  const emergenciaRelacion = $("emergenciaRelacion")?.value || "";
+  const emergenciaRelacionOtro = limpiarTexto($("emergenciaRelacionOtro")?.value);
   const emergenciaRelacionFinal = emergenciaRelacion === "otro" ? emergenciaRelacionOtro : emergenciaRelacion;
 
-  const tipoProfesor = $("tipoProfesor").value || "";
-  const tipoProfesorOtro = limpiarTexto($("tipoProfesorOtro").value);
+  const tipoProfesor = $("tipoProfesor")?.value || "";
+  const tipoProfesorOtro = limpiarTexto($("tipoProfesorOtro")?.value);
   const tipoProfesorFinal = tipoProfesor === "otro" ? tipoProfesorOtro : tipoProfesor;
 
-  const relacionCurso = $("relacionCurso").value || "";
-  const relacionCursoOtro = limpiarTexto($("relacionCursoOtro").value);
+  const relacionCurso = $("relacionCurso")?.value || "";
+  const relacionCursoOtro = limpiarTexto($("relacionCursoOtro")?.value);
   const relacionCursoFinal = relacionCurso === "otro" ? relacionCursoOtro : relacionCurso;
+
+  const contactoSecundarioActivo = apoderado2Activo();
+  const emergenciaSecundariaActiva = emergencia2Activa();
 
   return {
     tipoRegistro: "inscripcion_pasajero",
@@ -918,12 +1011,12 @@ function construirPayloadBase() {
 
       fechaNacimiento,
       edad,
-      nacionalidadBase: $("nacionalidadBase").value || "",
-      nacionalidadDetalle: limpiarTexto($("nacionalidadDetalle").value),
+      nacionalidadBase: $("nacionalidadBase")?.value || "",
+      nacionalidadDetalle: limpiarTexto($("nacionalidadDetalle")?.value),
 
-      correoViajante: limpiarTexto($("correoViajante").value),
-      telefonoViajante: esAdultoOperativo ? limpiarTexto($("telefonoViajante").value) : "",
-      telefonoViajanteEsWhatsapp: esAdultoOperativo ? !!$("telefonoViajanteEsWhatsapp").checked : false
+      correoViajante: limpiarTexto($("correoViajante")?.value),
+      telefonoViajante: esAdultoOperativo ? limpiarTexto($("telefonoViajante")?.value) : "",
+      telefonoViajanteEsWhatsapp: esAdultoOperativo ? !!$("telefonoViajanteEsWhatsapp")?.checked : false
     },
 
     profesor: {
@@ -931,7 +1024,7 @@ function construirPayloadBase() {
       tipoProfesor: esProfesor ? tipoProfesorFinal : "",
       tipoProfesorBase: esProfesor ? tipoProfesor : "",
       tipoProfesorOtro: esProfesor ? tipoProfesorOtro : "",
-      interesConoceRaitrai: esProfesor ? !!$("interesConoceRaitrai").checked : false
+      interesConoceRaitrai: esProfesor ? !!$("interesConoceRaitrai")?.checked : false
     },
 
     adultoAcompanante: {
@@ -939,30 +1032,63 @@ function construirPayloadBase() {
       relacionCurso: esAcompanante ? relacionCursoFinal : "",
       relacionCursoBase: esAcompanante ? relacionCurso : "",
       relacionCursoOtro: esAcompanante ? relacionCursoOtro : "",
-      estudianteRelacionado: esAcompanante ? limpiarTexto($("estudianteRelacionado").value) : ""
+      estudianteRelacionado: esAcompanante ? limpiarTexto($("estudianteRelacionado")?.value) : ""
     },
 
     contactoPrincipal: {
       aplica: esEstudiante,
-      nombre: esEstudiante ? limpiarTexto($("contactoPrincipalNombre").value) : nombreCompleto,
+      nombre: esEstudiante ? limpiarTexto($("contactoPrincipalNombre")?.value) : nombreCompleto,
       relacion: esEstudiante ? contactoRelacionFinal : "mismo_viajante",
       relacionBase: esEstudiante ? contactoRelacion : "mismo_viajante",
-      telefono: esEstudiante ? limpiarTexto($("contactoPrincipalTelefono").value) : limpiarTexto($("telefonoViajante").value),
-      esWhatsapp: esEstudiante ? !!$("contactoPrincipalEsWhatsapp").checked : !!$("telefonoViajanteEsWhatsapp").checked,
-      whatsappAlternativo: esEstudiante && !$("contactoPrincipalEsWhatsapp").checked
-        ? limpiarTexto($("contactoPrincipalWhatsappAlternativo").value)
+      telefono: esEstudiante ? limpiarTexto($("contactoPrincipalTelefono")?.value) : limpiarTexto($("telefonoViajante")?.value),
+      esWhatsapp: esEstudiante ? !!$("contactoPrincipalEsWhatsapp")?.checked : !!$("telefonoViajanteEsWhatsapp")?.checked,
+      whatsappAlternativo: esEstudiante && !$("contactoPrincipalEsWhatsapp")?.checked
+        ? limpiarTexto($("contactoPrincipalWhatsappAlternativo")?.value)
         : "",
-      correo: esEstudiante ? limpiarTexto($("contactoPrincipalCorreo").value) : limpiarTexto($("correoViajante").value)
+      correo: esEstudiante ? limpiarTexto($("contactoPrincipalCorreo")?.value) : limpiarTexto($("correoViajante")?.value)
+    },
+
+    contactoSecundario: {
+      aplica: esEstudiante && contactoSecundarioActivo,
+      nombre: contactoSecundarioActivo ? limpiarTexto($("contactoSecundarioNombre")?.value) : "",
+      relacion: contactoSecundarioActivo
+        ? ($("contactoSecundarioRelacion")?.value === "otro"
+          ? limpiarTexto($("contactoSecundarioRelacionOtro")?.value)
+          : $("contactoSecundarioRelacion")?.value)
+        : "",
+      relacionBase: contactoSecundarioActivo ? $("contactoSecundarioRelacion")?.value : "",
+      telefono: contactoSecundarioActivo ? limpiarTexto($("contactoSecundarioTelefono")?.value) : "",
+      esWhatsapp: contactoSecundarioActivo ? !!$("contactoSecundarioEsWhatsapp")?.checked : false,
+      whatsappAlternativo: contactoSecundarioActivo && !$("contactoSecundarioEsWhatsapp")?.checked
+        ? limpiarTexto($("contactoSecundarioWhatsappAlternativo")?.value)
+        : "",
+      correo: contactoSecundarioActivo ? limpiarTexto($("contactoSecundarioCorreo")?.value) : ""
     },
 
     emergencia: {
-      nombre: limpiarTexto($("emergenciaNombre").value),
+      nombre: limpiarTexto($("emergenciaNombre")?.value),
       relacion: emergenciaRelacionFinal,
       relacionBase: emergenciaRelacion,
-      telefono: limpiarTexto($("emergenciaTelefono").value),
-      esWhatsapp: !!$("emergenciaEsWhatsapp").checked,
-      whatsappAlternativo: !$("emergenciaEsWhatsapp").checked
-        ? limpiarTexto($("emergenciaWhatsappAlternativo").value)
+      telefono: limpiarTexto($("emergenciaTelefono")?.value),
+      esWhatsapp: !!$("emergenciaEsWhatsapp")?.checked,
+      whatsappAlternativo: !$("emergenciaEsWhatsapp")?.checked
+        ? limpiarTexto($("emergenciaWhatsappAlternativo")?.value)
+        : ""
+    },
+
+    emergenciaSecundaria: {
+      aplica: emergenciaSecundariaActiva,
+      nombre: emergenciaSecundariaActiva ? limpiarTexto($("emergencia2Nombre")?.value) : "",
+      relacion: emergenciaSecundariaActiva
+        ? ($("emergencia2Relacion")?.value === "otro"
+          ? limpiarTexto($("emergencia2RelacionOtro")?.value)
+          : $("emergencia2Relacion")?.value)
+        : "",
+      relacionBase: emergenciaSecundariaActiva ? $("emergencia2Relacion")?.value : "",
+      telefono: emergenciaSecundariaActiva ? limpiarTexto($("emergencia2Telefono")?.value) : "",
+      esWhatsapp: emergenciaSecundariaActiva ? !!$("emergencia2EsWhatsapp")?.checked : false,
+      whatsappAlternativo: emergenciaSecundariaActiva && !$("emergencia2EsWhatsapp")?.checked
+        ? limpiarTexto($("emergencia2WhatsappAlternativo")?.value)
         : ""
     },
 
@@ -977,38 +1103,38 @@ function construirPayloadBase() {
 
     salud: {
       enfermedadBaseFlag: obtenerRadio("enfermedadBaseFlag") || "",
-      enfermedadBaseDetalle: limpiarTexto($("enfermedadBaseDetalle").value),
+      enfermedadBaseDetalle: limpiarTexto($("enfermedadBaseDetalle")?.value),
 
       saludGeneralFlag: obtenerRadio("saludGeneralFlag") || "",
-      saludGeneralDetalle: limpiarTexto($("saludGeneralDetalle").value),
+      saludGeneralDetalle: limpiarTexto($("saludGeneralDetalle")?.value),
 
       medicamentosFlag: obtenerRadio("medicamentosFlag") || "",
-      medicamentosDetalle: limpiarTexto($("medicamentosDetalle").value),
+      medicamentosDetalle: limpiarTexto($("medicamentosDetalle")?.value),
 
       medicamentosProhibidosFlag: obtenerRadio("medicamentosProhibidosFlag") || "",
-      medicamentosProhibidosDetalle: limpiarTexto($("medicamentosProhibidosDetalle").value),
+      medicamentosProhibidosDetalle: limpiarTexto($("medicamentosProhibidosDetalle")?.value),
 
       alergiasFlag: obtenerRadio("alergiasFlag") || "",
-      alergiasDetalle: limpiarTexto($("alergiasDetalle").value),
+      alergiasDetalle: limpiarTexto($("alergiasDetalle")?.value),
 
       dietaFlag: obtenerRadio("dietaFlag") || "",
       dietaTipos: obtenerChecks("dietaTipo"),
-      dietaDetalle: limpiarTexto($("dietaDetalle").value),
+      dietaDetalle: limpiarTexto($("dietaDetalle")?.value),
 
       otrosAntecedentesFlag: obtenerRadio("otrosAntecedentesFlag") || "",
-      otrosAntecedentesDetalle: limpiarTexto($("otrosAntecedentesDetalle").value)
+      otrosAntecedentesDetalle: limpiarTexto($("otrosAntecedentesDetalle")?.value)
     },
 
     adultoCompromiso: {
       aplica: esAdultoOperativo,
-      aceptaCompromiso: esAdultoOperativo ? !!$("adultoAceptaCompromiso").checked : false,
-      observaciones: limpiarTexto($("adultoObservacionesCompromiso").value)
+      aceptaCompromiso: esAdultoOperativo ? !!$("adultoAceptaCompromiso")?.checked : false,
+      observaciones: limpiarTexto($("adultoObservacionesCompromiso")?.value)
     },
 
     consentimiento: {
-      aceptaVeracidad: !!$("aceptaVeracidad").checked,
-      aceptaUsoInterno: !!$("aceptaUsoInterno").checked,
-      aceptaCambiosCorreo: !!$("aceptaCambiosCorreo").checked,
+      aceptaVeracidad: !!$("aceptaVeracidad")?.checked,
+      aceptaUsoInterno: !!$("aceptaUsoInterno")?.checked,
+      aceptaCambiosCorreo: !!$("aceptaCambiosCorreo")?.checked,
       correoCambios: CORREO_ADMIN,
       telefonoCambios: TELEFONO_ADMIN
     },
@@ -1016,7 +1142,7 @@ function construirPayloadBase() {
     meta: {
       fechaInscripcion: null,
       canal: "formulario_publico",
-      versionFormulario: 3,
+      versionFormulario: 4,
       creadoDesde: window.location.href,
       estado: "inscrito"
     }
@@ -1116,7 +1242,6 @@ async function detectarRutEnOtrosGrupos(payload) {
   );
 
   const snap = await getDocs(q);
-
   const otros = snap.docs.map((d) => d.data()).filter((x) => x.idGrupo && x.idGrupo !== idGrupo);
 
   if (!otros.length) return;
@@ -1184,8 +1309,15 @@ function resetDefaults() {
   setPhoneDefault("contactoPrincipalTelefono");
   setPhoneDefault("emergenciaTelefono");
 
-  $("rutDv").value = "";
-  $("rutNumero").classList.remove("input-error");
+  if ($("rutDv")) $("rutDv").value = "";
+  $("rutNumero")?.classList.remove("input-error");
+  $("rutDv")?.classList.remove("input-error");
+
+  if (bloqueApoderado2) bloqueApoderado2.classList.add("hidden");
+  if (btnAgregarApoderado2) btnAgregarApoderado2.classList.remove("hidden");
+
+  if (bloqueEmergencia2) bloqueEmergencia2.classList.add("hidden");
+  if (btnAgregarEmergencia2) btnAgregarEmergencia2.classList.remove("hidden");
 }
 
 // -----------------------------------------------------------------------------
@@ -1234,6 +1366,33 @@ function bloquearFormulario() {
 // -----------------------------------------------------------------------------
 // HELPERS DATOS
 // -----------------------------------------------------------------------------
+function bloqueTieneDatos(ids) {
+  return ids.some((id) => limpiarTexto($(id)?.value));
+}
+
+function apoderado2Activo() {
+  return bloqueApoderado2 && !bloqueApoderado2.classList.contains("hidden") &&
+    bloqueTieneDatos([
+      "contactoSecundarioNombre",
+      "contactoSecundarioRelacion",
+      "contactoSecundarioRelacionOtro",
+      "contactoSecundarioTelefono",
+      "contactoSecundarioWhatsappAlternativo",
+      "contactoSecundarioCorreo"
+    ]);
+}
+
+function emergencia2Activa() {
+  return bloqueEmergencia2 && !bloqueEmergencia2.classList.contains("hidden") &&
+    bloqueTieneDatos([
+      "emergencia2Nombre",
+      "emergencia2Relacion",
+      "emergencia2RelacionOtro",
+      "emergencia2Telefono",
+      "emergencia2WhatsappAlternativo"
+    ]);
+}
+
 function obtenerRadio(name) {
   const checked = document.querySelector(`input[name="${name}"]:checked`);
   return checked ? checked.value : "";
