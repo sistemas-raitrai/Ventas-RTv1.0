@@ -203,6 +203,7 @@ function conectarEventos() {
   });
 
   $("rutNumero").addEventListener("input", onRutInput);
+  $("rutDv").addEventListener("input", onRutInput);
 
   enlazarFlagDetalle("conoceDocsInternacionales", docsInternacionalesDetalleWrap, ["no", "parcial"]);
   enlazarFlagDetalle("situacionLegalAfecta", situacionLegalDetalleWrap, ["si", "privado"]);
@@ -413,22 +414,31 @@ function aplicarEstadoUI() {
 // RUT
 // -----------------------------------------------------------------------------
 function onRutInput() {
-  const soloDigitos = String($("rutNumero").value || "").replace(/\D/g, "").slice(0, 8);
-  $("rutNumero").value = soloDigitos;
+  const numeroInput = $("rutNumero");
+  const dvInput = $("rutDv");
 
-  if (!soloDigitos) {
-    $("rutDv").value = "";
-    $("rutNumero").classList.remove("input-error");
-    rutHint.textContent = "Ingrese solo números.";
+  const numero = limpiarRutNumero(numeroInput.value);
+  const dv = limpiarTexto(dvInput.value).toUpperCase();
+
+  numeroInput.value = numero;
+  dvInput.value = dv;
+
+  if (!numero || !dv) {
+    numeroInput.classList.remove("input-error");
+    dvInput.classList.remove("input-error");
+    rutHint.textContent = "Ingrese RUT completo.";
     return;
   }
 
-  const dv = calcularDvRut(soloDigitos);
-  $("rutDv").value = dv;
+  const dvCorrecto = calcularDvRut(numero);
+  const valido = dv === dvCorrecto;
 
-  const valido = /^\d{7,8}$/.test(soloDigitos);
-  $("rutNumero").classList.toggle("input-error", !valido);
-  rutHint.textContent = valido ? `DV calculado: ${dv}` : "Ingrese un RUT válido.";
+  numeroInput.classList.toggle("input-error", !valido);
+  dvInput.classList.toggle("input-error", !valido);
+
+  rutHint.textContent = valido
+    ? "RUT válido ✔"
+    : "RUT inválido";
 }
 
 // -----------------------------------------------------------------------------
@@ -693,11 +703,15 @@ function validarFormulario() {
   if (tipoIdentificacion === "rut") {
     const rutNumero = limpiarRutNumero($("rutNumero").value);
     const dv = limpiarTexto($("rutDv").value).toUpperCase();
-
-    if (!/^\d{7,8}$/.test(rutNumero)) {
-      errores.push("Debe ingresar un RUT válido.");
-    } else if (dv !== calcularDvRut(rutNumero)) {
-      errores.push("El RUT ingresado no es válido.");
+  
+    if (!rutNumero || !dv) {
+      errores.push("Debe ingresar el RUT completo.");
+    } else {
+      const dvCorrecto = calcularDvRut(rutNumero);
+  
+      if (dv !== dvCorrecto) {
+        errores.push("El RUT ingresado es inválido.");
+      }
     }
   }
 
