@@ -1,13 +1,14 @@
 // inscripcion.js
 // -----------------------------------------------------------------------------
-// Página pública de inscripción de pasajero para un grupo de viaje.
-// Guarda en:
-// ventas_cotizaciones/{idGrupo}/inscripciones/{documentoNormalizado}
-//
-// Además:
-// - Personas sin RUT quedan registradas en colección global: inscripciones_sin_rut
-// - RUT reales quedan indexados en colección global: inscripciones_por_rut
-// - Correlativo global de RUT interno: config/contadorRutInterno
+// Formulario público de inscripción Rai Trai.
+// Incluye:
+// - Pantalla de bienvenida + botón comenzar
+// - Barra de progreso automática
+// - Tipo viajante: estudiante / profesor / adulto acompañante
+// - RUT / sin RUT con correlativo global
+// - Colección global inscripciones_sin_rut
+// - Colección global inscripciones_por_rut
+// - Historial del grupo
 // -----------------------------------------------------------------------------
 
 import { db } from "./firebase-init.js";
@@ -26,7 +27,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/11.7.3/firebase-firestore.js";
 
 // -----------------------------------------------------------------------------
-// REFERENCIAS DOM
+// DOM
 // -----------------------------------------------------------------------------
 const $ = (id) => document.getElementById(id);
 
@@ -34,6 +35,8 @@ const form = $("formInscripcion");
 const msgBox = $("msgBox");
 const btnEnviar = $("btnEnviar");
 const btnLimpiar = $("btnLimpiar");
+const btnComenzar = $("btnComenzar");
+const pantallaBienvenida = $("pantallaBienvenida");
 
 const chipGrupo = $("chipGrupo");
 const chipColegio = $("chipColegio");
@@ -42,16 +45,13 @@ const chipDestino = $("chipDestino");
 const chipAno = $("chipAno");
 
 const generoOtroWrap = $("generoOtroWrap");
-
 const rutWrap = $("rutWrap");
 const dvWrap = $("dvWrap");
 const sinRutNotice = $("sinRutNotice");
 const rutHint = $("rutHint");
-
 const nacionalidadDetalleWrap = $("nacionalidadDetalleWrap");
 
 const telefonoViajanteWrap = $("telefonoViajanteWrap");
-const whatsappViajanteWrap = $("whatsappViajanteWrap");
 
 const bloqueProfesor = $("bloqueProfesor");
 const tipoProfesorOtroWrap = $("tipoProfesorOtroWrap");
@@ -72,8 +72,8 @@ const permisoMenorWrap = $("permisoMenorWrap");
 const situacionLegalWrap = $("situacionLegalWrap");
 const situacionLegalDetalleWrap = $("situacionLegalDetalleWrap");
 
-const saludGeneralDetalleWrap = $("saludGeneralDetalleWrap");
 const enfermedadBaseDetalleWrap = $("enfermedadBaseDetalleWrap");
+const saludGeneralDetalleWrap = $("saludGeneralDetalleWrap");
 const medicamentosWrap = $("medicamentosWrap");
 const medicamentosProhibidosDetalleWrap = $("medicamentosProhibidosDetalleWrap");
 const alergiasWrap = $("alergiasWrap");
@@ -117,10 +117,15 @@ async function init() {
   }
 
   await cargarGrupo();
+  insertarBarraProgreso();
   conectarEventos();
   aplicarEstadoUI();
+  actualizarProgreso();
 }
 
+// -----------------------------------------------------------------------------
+// CARGA GRUPO
+// -----------------------------------------------------------------------------
 async function cargarGrupo() {
   const ref = doc(db, "ventas_cotizaciones", idGrupo);
   const snap = await getDoc(ref);
@@ -135,6 +140,7 @@ async function cargarGrupo() {
 
   const inscripcionHabilitada = !!grupoData.inscripcionHabilitada;
   const tokenGrupo = limpiarTexto(grupoData.tokenInscripcion);
+
   correoCambios = limpiarTexto(grupoData.correoCambiosInscripcion) || CORREO_ADMIN;
 
   if (!inscripcionHabilitada) {
@@ -176,26 +182,27 @@ async function cargarGrupo() {
 // EVENTOS
 // -----------------------------------------------------------------------------
 function conectarEventos() {
+  btnComenzar?.addEventListener("click", () => {
+    pantallaBienvenida?.classList.add("hidden");
+    form?.classList.remove("hidden");
+    window.scrollTo({ top: 0, behavior: "smooth" });
+    actualizarProgreso();
+  });
+
   form.addEventListener("submit", onSubmit);
   btnLimpiar.addEventListener("click", onLimpiar);
+
+  form.addEventListener("input", actualizarProgreso);
+  form.addEventListener("change", () => {
+    aplicarEstadoUI();
+    actualizarProgreso();
+  });
 
   document.querySelectorAll('input[name="tipoViajante"]').forEach((el) => {
     el.addEventListener("change", aplicarEstadoUI);
   });
 
-  $("tipoIdentificacion").addEventListener("change", aplicarEstadoUI);
-  $("genero").addEventListener("change", aplicarEstadoUI);
-  $("nacionalidadBase").addEventListener("change", aplicarEstadoUI);
-  $("fechaNacimiento").addEventListener("change", aplicarEstadoUI);
-
-  $("tipoProfesor").addEventListener("change", aplicarEstadoUI);
-  $("relacionCurso").addEventListener("change", aplicarEstadoUI);
-
-  $("contactoPrincipalRelacion").addEventListener("change", aplicarEstadoUI);
-  $("contactoPrincipalEsWhatsapp").addEventListener("change", aplicarEstadoUI);
-
-  $("emergenciaRelacion").addEventListener("change", aplicarEstadoUI);
-  $("emergenciaEsWhatsapp").addEventListener("change", aplicarEstadoUI);
+  $("rutNumero").addEventListener("input", onRutInput);
 
   enlazarFlagDetalle("conoceDocsInternacionales", docsInternacionalesDetalleWrap, ["no", "parcial"]);
   enlazarFlagDetalle("situacionLegalAfecta", situacionLegalDetalleWrap, ["si", "privado"]);
@@ -207,8 +214,6 @@ function conectarEventos() {
   enlazarFlagDetalle("alergiasFlag", alergiasWrap, ["si"]);
   enlazarFlagDetalle("dietaFlag", dietaWrap, ["si"]);
   enlazarFlagDetalle("otrosAntecedentesFlag", otrosAntecedentesDetalleWrap, ["si"]);
-
-  $("rutNumero").addEventListener("input", onRutInput);
 
   [
     "telefonoViajante",
@@ -223,25 +228,84 @@ function conectarEventos() {
   setPhoneDefault("emergenciaTelefono");
 }
 
-function onRutInput() {
-  const soloDigitos = String($("rutNumero").value || "").replace(/\D/g, "").slice(0, 8);
-  $("rutNumero").value = soloDigitos;
+// -----------------------------------------------------------------------------
+// BARRA DE PROGRESO
+// -----------------------------------------------------------------------------
+function insertarBarraProgreso() {
+  if ($("barraProgresoInscripcion") || !form) return;
 
-  if (!soloDigitos) {
-    $("rutDv").value = "";
-    $("rutNumero").classList.remove("input-error");
-    rutHint.textContent = "Ingrese solo números. El DV se calculará automáticamente.";
-    return;
+  const wrap = document.createElement("section");
+  wrap.id = "barraProgresoInscripcion";
+  wrap.className = "card";
+  wrap.style.position = "sticky";
+  wrap.style.top = "10px";
+  wrap.style.zIndex = "20";
+  wrap.style.padding = "14px 18px";
+
+  wrap.innerHTML = `
+    <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:8px;">
+      <strong id="progresoTexto">Avance del formulario</strong>
+      <span id="progresoPorcentaje" style="font-weight:700; color:#6f58c9;">0%</span>
+    </div>
+
+    <div style="height:10px; background:#efeafe; border-radius:999px; overflow:hidden; border:1px solid #d9d9e6;">
+      <div id="progresoBarra" style="height:100%; width:0%; background:#6f58c9; border-radius:999px; transition:width .25s ease;"></div>
+    </div>
+
+    <div id="progresoAyuda" style="margin-top:8px; color:#6d6d7a; font-size:12px;">
+      Complete los campos requeridos para avanzar.
+    </div>
+  `;
+
+  form.prepend(wrap);
+}
+
+function actualizarProgreso() {
+  const barra = $("progresoBarra");
+  const porcentaje = $("progresoPorcentaje");
+  const ayuda = $("progresoAyuda");
+
+  if (!barra || !porcentaje || !form || form.classList.contains("hidden")) return;
+
+  const requeridos = obtenerCamposRequeridosVisibles();
+  const total = requeridos.length || 1;
+
+  const completos = requeridos.filter(campoEstaCompleto).length;
+  const pct = Math.round((completos / total) * 100);
+
+  barra.style.width = `${pct}%`;
+  porcentaje.textContent = `${pct}%`;
+
+  if (pct < 35) {
+    ayuda.textContent = "Vamos comenzando. Complete los datos principales del viajante.";
+  } else if (pct < 70) {
+    ayuda.textContent = "Buen avance. Revise contactos, salud y datos importantes.";
+  } else if (pct < 100) {
+    ayuda.textContent = "Ya falta poco. Revise la confirmación final.";
+  } else {
+    ayuda.textContent = "Formulario completo. Ya puede enviar la inscripción.";
+  }
+}
+
+function obtenerCamposRequeridosVisibles() {
+  return Array.from(form.querySelectorAll("input, select, textarea"))
+    .filter((el) => {
+      if (!el.required) return false;
+      if (el.disabled) return false;
+      if (el.type === "hidden") return false;
+      if (el.closest(".hidden")) return false;
+      return true;
+    });
+}
+
+function campoEstaCompleto(el) {
+  if (el.type === "checkbox") return el.checked;
+
+  if (el.type === "radio") {
+    return !!document.querySelector(`input[name="${el.name}"]:checked`);
   }
 
-  const dv = calcularDvRut(soloDigitos);
-  $("rutDv").value = dv;
-
-  const valido = /^\d{7,8}$/.test(soloDigitos);
-  $("rutNumero").classList.toggle("input-error", !valido);
-  rutHint.textContent = valido
-    ? `DV calculado: ${dv}`
-    : "Debe ingresar un cuerpo de RUT válido de 7 u 8 dígitos.";
+  return !!limpiarTexto(el.value);
 }
 
 // -----------------------------------------------------------------------------
@@ -264,7 +328,6 @@ function aplicarEstadoUI() {
   mostrar(bloqueAcompanante, esAcompanante);
   mostrar(adultoCompromisoCard, esAdultoOperativo);
   mostrar(telefonoViajanteWrap, esAdultoOperativo);
-  mostrar(whatsappViajanteWrap, esAdultoOperativo);
 
   setRequired("telefonoViajante", esAdultoOperativo);
   setRequired("adultoAceptaCompromiso", esAdultoOperativo);
@@ -281,25 +344,24 @@ function aplicarEstadoUI() {
     $("rutNumero").classList.remove("input-error");
   }
 
-  const mostrarGeneroOtro = $("genero").value === "otro";
-  mostrar(generoOtroWrap, mostrarGeneroOtro);
-  setRequired("generoOtro", mostrarGeneroOtro);
+  const generoOtro = $("genero").value === "otro";
+  mostrar(generoOtroWrap, generoOtro);
+  setRequired("generoOtro", generoOtro);
 
-  const mostrarNacionalidadDetalle = nacionalidadBase === "otra" || nacionalidadBase === "doble";
-  mostrar(nacionalidadDetalleWrap, mostrarNacionalidadDetalle);
-  setRequired("nacionalidadDetalle", mostrarNacionalidadDetalle);
+  const nacionalidadDetalle = nacionalidadBase === "otra" || nacionalidadBase === "doble";
+  mostrar(nacionalidadDetalleWrap, nacionalidadDetalle);
+  setRequired("nacionalidadDetalle", nacionalidadDetalle);
 
-  const mostrarTipoProfesorOtro = $("tipoProfesor").value === "otro";
-  mostrar(tipoProfesorOtroWrap, mostrarTipoProfesorOtro);
-  setRequired("tipoProfesorOtro", esProfesor && mostrarTipoProfesorOtro);
+  const tipoProfesorOtro = $("tipoProfesor").value === "otro";
+  mostrar(tipoProfesorOtroWrap, tipoProfesorOtro);
   setRequired("tipoProfesor", esProfesor);
+  setRequired("tipoProfesorOtro", esProfesor && tipoProfesorOtro);
 
-  const mostrarRelacionCursoOtro = $("relacionCurso").value === "otro";
-  mostrar(relacionCursoOtroWrap, mostrarRelacionCursoOtro);
-  setRequired("relacionCursoOtro", esAcompanante && mostrarRelacionCursoOtro);
+  const relacionCursoOtro = $("relacionCurso").value === "otro";
+  mostrar(relacionCursoOtroWrap, relacionCursoOtro);
   setRequired("relacionCurso", esAcompanante);
-  setRequired("estudianteRelacionadoNombres", esAcompanante);
-  setRequired("estudianteRelacionadoPrimerApellido", esAcompanante);
+  setRequired("relacionCursoOtro", esAcompanante && relacionCursoOtro);
+  setRequired("estudianteRelacionado", esAcompanante);
 
   setRequired("contactoPrincipalNombre", esEstudiante);
   setRequired("contactoPrincipalRelacion", esEstudiante);
@@ -324,26 +386,49 @@ function aplicarEstadoUI() {
 
   mostrar(bloqueInternacional, esInternacional);
 
-  const mostrarDocsNoChile = esInternacional && mostrarNacionalidadDetalle;
-  const docsNoChileWrap = $("docsNoChileWrap");
-  mostrar(docsNoChileWrap, mostrarDocsNoChile);
+  const docsNoChile = esInternacional && nacionalidadDetalle;
+  mostrar($("docsNoChileWrap"), docsNoChile);
 
-  if (!mostrarDocsNoChile) {
+  if (!docsNoChile) {
     limpiarRadios("conoceDocsInternacionales");
     $("docsInternacionalesDetalle").value = "";
     mostrar(docsInternacionalesDetalleWrap, false);
   }
 
-  const mostrarPermisoMenor = esEstudiante && esInternacional && esMenor;
-  mostrar(permisoMenorWrap, mostrarPermisoMenor);
-  mostrar(situacionLegalWrap, mostrarPermisoMenor);
+  const permisoMenor = esEstudiante && esInternacional && esMenor;
+  mostrar(permisoMenorWrap, permisoMenor);
+  mostrar(situacionLegalWrap, permisoMenor);
 
-  if (!mostrarPermisoMenor) {
+  if (!permisoMenor) {
     limpiarRadios("permisoMenorViaje");
     limpiarRadios("situacionLegalAfecta");
     $("situacionLegalDetalle").value = "";
     mostrar(situacionLegalDetalleWrap, false);
   }
+
+  actualizarProgreso();
+}
+
+// -----------------------------------------------------------------------------
+// RUT
+// -----------------------------------------------------------------------------
+function onRutInput() {
+  const soloDigitos = String($("rutNumero").value || "").replace(/\D/g, "").slice(0, 8);
+  $("rutNumero").value = soloDigitos;
+
+  if (!soloDigitos) {
+    $("rutDv").value = "";
+    $("rutNumero").classList.remove("input-error");
+    rutHint.textContent = "Ingrese solo números.";
+    return;
+  }
+
+  const dv = calcularDvRut(soloDigitos);
+  $("rutDv").value = dv;
+
+  const valido = /^\d{7,8}$/.test(soloDigitos);
+  $("rutNumero").classList.toggle("input-error", !valido);
+  rutHint.textContent = valido ? `DV calculado: ${dv}` : "Ingrese un RUT válido.";
 }
 
 // -----------------------------------------------------------------------------
@@ -376,7 +461,7 @@ async function onSubmit(event) {
     );
 
     if (!ok) {
-      mostrarMensaje("error", "Complete el segundo apellido o confirme que el viajante no lo tiene.");
+      mostrarMensaje("error", "Complete el segundo apellido antes de enviar.");
       return;
     }
   }
@@ -393,14 +478,11 @@ async function onSubmit(event) {
     await detectarRutEnOtrosGrupos(payload);
     await verificarCupoCompleto();
 
-    mostrarMensaje(
-      "ok",
-      `Inscripción enviada correctamente. Si necesita modificar información posteriormente, debe comunicarse con Turismo Rai Trai y asegurarse de recibir confirmación del cambio.`
-    );
-
+    mostrarMensaje("ok", "Inscripción enviada correctamente. ¡Gracias por confiar en Rai Trai!");
     form.reset();
     resetDefaults();
     aplicarEstadoUI();
+    actualizarProgreso();
     window.scrollTo({ top: 0, behavior: "smooth" });
 
   } catch (error) {
@@ -409,17 +491,17 @@ async function onSubmit(event) {
     if (error.message === "duplicate_document") {
       mostrarMensaje(
         "error",
-        `Ya existe una inscripción para este documento dentro del grupo. Para resolver esta situación, comuníquese con Turismo Rai Trai al correo <strong>${escapeHtml(CORREO_ADMIN)}</strong> o al teléfono <strong>${escapeHtml(TELEFONO_ADMIN)}</strong>.`
+        `Ya existe una inscripción para este documento dentro del grupo. Comuníquese con <strong>${CORREO_ADMIN}</strong> o al <strong>${TELEFONO_ADMIN}</strong>.`
       );
     } else if (error.message === "duplicate_no_rut_name") {
       mostrarMensaje(
         "error",
-        `Ya existe una inscripción con esos nombres y apellidos en este grupo. Para resolver esta situación, comuníquese con Turismo Rai Trai al correo <strong>${escapeHtml(CORREO_ADMIN)}</strong> o al teléfono <strong>${escapeHtml(TELEFONO_ADMIN)}</strong>.`
+        `Ya existe una inscripción con esos nombres y apellidos en este grupo. Comuníquese con <strong>${CORREO_ADMIN}</strong> o al <strong>${TELEFONO_ADMIN}</strong>.`
       );
     } else {
       mostrarMensaje(
         "error",
-        `No fue posible enviar la inscripción. Intente nuevamente. Si el problema continúa, comuníquese con Turismo Rai Trai al correo <strong>${escapeHtml(CORREO_ADMIN)}</strong> o al teléfono <strong>${escapeHtml(TELEFONO_ADMIN)}</strong>.`
+        `No fue posible enviar la inscripción. Intente nuevamente o comuníquese con <strong>${CORREO_ADMIN}</strong>.`
       );
     }
 
@@ -483,15 +565,7 @@ async function guardarConRut(payloadBase) {
       rutNormalizado: documentoNormalizado,
       idGrupo,
       nombreCompleto: payload.identificacion.nombreCompleto,
-      nombres: payload.identificacion.nombres,
-      primerApellido: payload.identificacion.primerApellido,
-      segundoApellido: payload.identificacion.segundoApellido,
-      sinSegundoApellido: payload.identificacion.sinSegundoApellido,
-      aliasGrupo: payload.grupo.aliasGrupo,
-      colegio: payload.grupo.colegio,
-      cursoBase: payload.grupo.cursoBase,
-      anoViaje: payload.grupo.anoViaje,
-      destinoPrincipal: payload.grupo.destinoPrincipal,
+      grupo: payload.grupo,
       fechaRegistro: serverTimestamp()
     });
   });
@@ -540,12 +614,8 @@ async function guardarSinRut(payloadBase) {
       ...payloadBase,
       identificacion: {
         ...payloadBase.identificacion,
-        tipoIdentificacion: "sin_rut",
         documento,
         documentoNormalizado,
-        rut: "",
-        rutNumero: "",
-        rutDv: "",
         rutInterno: documento,
         esRutInterno: true
       },
@@ -563,11 +633,7 @@ async function guardarSinRut(payloadBase) {
       documentoNormalizado
     );
 
-    const refSinRutGlobal = doc(
-      db,
-      "inscripciones_sin_rut",
-      documentoNormalizado
-    );
+    const refSinRutGlobal = doc(db, "inscripciones_sin_rut", documentoNormalizado);
 
     tx.set(refCounter, { ultimoNumero: numero }, { merge: true });
 
@@ -587,18 +653,7 @@ async function guardarSinRut(payloadBase) {
       nombreKey,
       idGrupo,
       grupo: payload.grupo,
-      identificacion: {
-        nombres: payload.identificacion.nombres,
-        primerApellido: payload.identificacion.primerApellido,
-        segundoApellido: payload.identificacion.segundoApellido,
-        sinSegundoApellido: payload.identificacion.sinSegundoApellido,
-        nombreCompleto: payload.identificacion.nombreCompleto,
-        fechaNacimiento: payload.identificacion.fechaNacimiento,
-        genero: payload.identificacion.genero,
-        generoOtro: payload.identificacion.generoOtro,
-        nacionalidadBase: payload.identificacion.nacionalidadBase,
-        nacionalidadDetalle: payload.identificacion.nacionalidadDetalle
-      },
+      identificacion: payload.identificacion,
       fechaRegistro: serverTimestamp(),
       estado: "activo"
     });
@@ -624,59 +679,34 @@ function validarFormulario() {
   const edad = calcularEdad($("fechaNacimiento").value);
   const esMenor = edad < 18;
 
-  if (!tipoViajante) {
-    errores.push("Debe indicar si el viajante es estudiante, profesor o adulto acompañante.");
-  }
+  if (!tipoViajante) errores.push("Debe indicar el tipo de viajante.");
+  if (!limpiarTexto($("nombres").value)) errores.push("Debe ingresar los nombres del viajante.");
+  if (!limpiarTexto($("primerApellido").value)) errores.push("Debe ingresar el primer apellido del viajante.");
 
-  if (!limpiarTexto($("nombres").value)) {
-    errores.push("Debe ingresar los nombres del viajante.");
-  }
-
-  if (!limpiarTexto($("primerApellido").value)) {
-    errores.push("Debe ingresar el primer apellido del viajante.");
-  }
-
-  if (!$("genero").value) {
-    errores.push("Debe indicar el género del viajante.");
-  }
-
+  if (!$("genero").value) errores.push("Debe indicar el género del viajante.");
   if ($("genero").value === "otro" && !limpiarTexto($("generoOtro").value)) {
     errores.push("Debe especificar el género del viajante.");
   }
 
-  if (!tipoIdentificacion) {
-    errores.push("Debe seleccionar si el viajante tiene RUT o no tiene RUT.");
-  }
+  if (!tipoIdentificacion) errores.push("Debe seleccionar el documento de identidad.");
 
   if (tipoIdentificacion === "rut") {
     const rutNumero = limpiarRutNumero($("rutNumero").value);
     const dv = limpiarTexto($("rutDv").value).toUpperCase();
 
     if (!/^\d{7,8}$/.test(rutNumero)) {
-      errores.push("Debe ingresar un cuerpo de RUT válido, de 7 u 8 dígitos.");
-      $("rutNumero").classList.add("input-error");
-    } else {
-      const esperado = calcularDvRut(rutNumero);
-
-      if (!dv || dv !== esperado) {
-        errores.push("El RUT ingresado no es válido.");
-        $("rutNumero").classList.add("input-error");
-      } else {
-        $("rutNumero").classList.remove("input-error");
-      }
+      errores.push("Debe ingresar un RUT válido.");
+    } else if (dv !== calcularDvRut(rutNumero)) {
+      errores.push("El RUT ingresado no es válido.");
     }
   }
 
-  if (!$("fechaNacimiento").value) {
-    errores.push("Debe ingresar la fecha de nacimiento.");
-  }
+  if (!$("fechaNacimiento").value) errores.push("Debe ingresar la fecha de nacimiento.");
 
-  if (!$("nacionalidadBase").value) {
-    errores.push("Debe indicar la nacionalidad.");
-  }
+  if (!$("nacionalidadBase").value) errores.push("Debe indicar la nacionalidad.");
 
   if (["otra", "doble"].includes($("nacionalidadBase").value) && !limpiarTexto($("nacionalidadDetalle").value)) {
-    errores.push("Debe especificar la nacionalidad indicada.");
+    errores.push("Debe especificar la nacionalidad.");
   }
 
   if (!validarCorreo($("correoViajante").value)) {
@@ -688,152 +718,96 @@ function validarFormulario() {
   }
 
   if (esProfesor) {
-    if (!$("tipoProfesor").value) {
-      errores.push("Debe indicar si corresponde a profesor jefe, profesor u otro.");
-    }
-
+    if (!$("tipoProfesor").value) errores.push("Debe indicar el tipo de profesor.");
     if ($("tipoProfesor").value === "otro" && !limpiarTexto($("tipoProfesorOtro").value)) {
       errores.push("Debe especificar el tipo de profesor.");
     }
   }
 
   if (esAcompanante) {
-    if (!$("relacionCurso").value) {
-      errores.push("Debe indicar la relación del adulto acompañante con el curso.");
-    }
-
+    if (!$("relacionCurso").value) errores.push("Debe indicar la relación con el curso.");
     if ($("relacionCurso").value === "otro" && !limpiarTexto($("relacionCursoOtro").value)) {
-      errores.push("Debe especificar la relación del adulto acompañante con el curso.");
+      errores.push("Debe especificar la relación con el curso.");
     }
-
-    if (!limpiarTexto($("estudianteRelacionadoNombres").value)) {
-      errores.push("Debe ingresar los nombres del estudiante relacionado.");
-    }
-
-    if (!limpiarTexto($("estudianteRelacionadoPrimerApellido").value)) {
-      errores.push("Debe ingresar el primer apellido del estudiante relacionado.");
+    if (!limpiarTexto($("estudianteRelacionado").value)) {
+      errores.push("Debe indicar el nombre del estudiante relacionado.");
     }
   }
 
   if (esEstudiante) {
-    if (!limpiarTexto($("contactoPrincipalNombre").value)) {
-      errores.push("Debe ingresar el nombre del apoderado.");
-    }
-
-    if (!$("contactoPrincipalRelacion").value) {
-      errores.push("Debe indicar la relación del apoderado con el estudiante.");
-    }
-
+    if (!limpiarTexto($("contactoPrincipalNombre").value)) errores.push("Debe ingresar el nombre del apoderado.");
+    if (!$("contactoPrincipalRelacion").value) errores.push("Debe indicar la relación del apoderado.");
     if ($("contactoPrincipalRelacion").value === "otro" && !limpiarTexto($("contactoPrincipalRelacionOtro").value)) {
       errores.push("Debe especificar la relación del apoderado.");
     }
-
-    if (!telefonoValido($("contactoPrincipalTelefono").value)) {
-      errores.push("Debe ingresar un teléfono válido del apoderado.");
-    }
-
+    if (!telefonoValido($("contactoPrincipalTelefono").value)) errores.push("Debe ingresar un teléfono válido del apoderado.");
     if (!$("contactoPrincipalEsWhatsapp").checked && !telefonoValido($("contactoPrincipalWhatsappAlternativo").value)) {
-      errores.push("Debe ingresar un número válido para WhatsApp del apoderado.");
+      errores.push("Debe ingresar un WhatsApp válido del apoderado.");
     }
-
-    if (!validarCorreo($("contactoPrincipalCorreo").value)) {
-      errores.push("Debe ingresar un correo válido del apoderado.");
-    }
+    if (!validarCorreo($("contactoPrincipalCorreo").value)) errores.push("Debe ingresar un correo válido del apoderado.");
   }
 
-  if (!limpiarTexto($("emergenciaNombre").value)) {
-    errores.push("Debe ingresar el nombre del contacto de emergencia.");
-  }
-
-  if (!$("emergenciaRelacion").value) {
-    errores.push("Debe indicar la relación del contacto de emergencia.");
-  }
-
+  if (!limpiarTexto($("emergenciaNombre").value)) errores.push("Debe ingresar el contacto de emergencia.");
+  if (!$("emergenciaRelacion").value) errores.push("Debe indicar la relación del contacto de emergencia.");
   if ($("emergenciaRelacion").value === "otro" && !limpiarTexto($("emergenciaRelacionOtro").value)) {
     errores.push("Debe especificar la relación del contacto de emergencia.");
   }
-
-  if (!telefonoValido($("emergenciaTelefono").value)) {
-    errores.push("Debe ingresar un teléfono válido para el contacto de emergencia.");
-  }
-
+  if (!telefonoValido($("emergenciaTelefono").value)) errores.push("Debe ingresar un teléfono válido de emergencia.");
   if (!$("emergenciaEsWhatsapp").checked && !telefonoValido($("emergenciaWhatsappAlternativo").value)) {
-    errores.push("Debe ingresar un número válido para WhatsApp del contacto de emergencia.");
+    errores.push("Debe ingresar un WhatsApp válido de emergencia.");
   }
 
   if (esInternacional && ["otra", "doble"].includes($("nacionalidadBase").value)) {
-    if (!obtenerRadio("conoceDocsInternacionales")) {
-      errores.push("Debe indicar si conoce los documentos requeridos para ingreso internacional.");
-    }
+    if (!obtenerRadio("conoceDocsInternacionales")) errores.push("Debe indicar si conoce los documentos internacionales requeridos.");
   }
 
   if (esInternacional && esEstudiante && esMenor) {
-    if (!obtenerRadio("permisoMenorViaje")) {
-      errores.push("Debe indicar la situación de autorizaciones del menor para salida del país.");
-    }
-
-    if (!obtenerRadio("situacionLegalAfecta")) {
-      errores.push("Debe indicar si existe alguna situación familiar o legal que pueda afectar el proceso.");
-    }
+    if (!obtenerRadio("permisoMenorViaje")) errores.push("Debe indicar la situación de autorizaciones del menor.");
+    if (!obtenerRadio("situacionLegalAfecta")) errores.push("Debe indicar si existe una situación legal o familiar relevante.");
   }
 
   if (obtenerRadio("enfermedadBaseFlag") === "si" && !limpiarTexto($("enfermedadBaseDetalle").value)) {
-    errores.push("Debe detallar la enfermedad de base o condición médica permanente.");
+    errores.push("Debe detallar la enfermedad de base.");
   }
 
   if (obtenerRadio("saludGeneralFlag") === "si" && !limpiarTexto($("saludGeneralDetalle").value)) {
-    errores.push("Debe detallar la condición de salud, diagnóstico o antecedente médico informado.");
+    errores.push("Debe detallar la condición de salud.");
   }
 
   if (obtenerRadio("medicamentosFlag") === "si" && !limpiarTexto($("medicamentosDetalle").value)) {
-    errores.push("Debe detallar los medicamentos de uso regular.");
+    errores.push("Debe detallar los medicamentos.");
   }
 
   if (obtenerRadio("medicamentosProhibidosFlag") === "si" && !limpiarTexto($("medicamentosProhibidosDetalle").value)) {
-    errores.push("Debe detallar los medicamentos que no deben ser administrados.");
+    errores.push("Debe detallar los medicamentos prohibidos.");
   }
 
   if (obtenerRadio("alergiasFlag") === "si" && !limpiarTexto($("alergiasDetalle").value)) {
-    errores.push("Debe detallar la alergia informada.");
+    errores.push("Debe detallar la alergia.");
   }
 
   if (obtenerRadio("dietaFlag") === "si") {
-    const dietas = obtenerChecks("dietaTipo");
-
-    if (!dietas.length) {
-      errores.push("Debe seleccionar al menos un tipo de dieta o restricción alimentaria.");
-    }
-
-    if (!limpiarTexto($("dietaDetalle").value)) {
-      errores.push("Debe detallar la dieta o restricción alimentaria.");
-    }
+    if (!obtenerChecks("dietaTipo").length) errores.push("Debe seleccionar al menos un tipo de dieta.");
+    if (!limpiarTexto($("dietaDetalle").value)) errores.push("Debe detallar la dieta.");
   }
 
   if (obtenerRadio("otrosAntecedentesFlag") === "si" && !limpiarTexto($("otrosAntecedentesDetalle").value)) {
-    errores.push("Debe detallar la información adicional indicada.");
+    errores.push("Debe detallar la información adicional.");
   }
 
   if (esAdultoOperativo && !$("adultoAceptaCompromiso").checked) {
-    errores.push("El profesor o adulto acompañante debe aceptar la declaración de responsabilidad.");
+    errores.push("Debe aceptar la declaración de responsabilidad.");
   }
 
-  if (!$("aceptaVeracidad").checked) {
-    errores.push("Debe aceptar la declaración de veracidad.");
-  }
-
-  if (!$("aceptaUsoInterno").checked) {
-    errores.push("Debe autorizar el uso interno de la información.");
-  }
-
-  if (!$("aceptaCambiosCorreo").checked) {
-    errores.push("Debe aceptar la condición de corrección posterior comunicándose con la empresa.");
-  }
+  if (!$("aceptaVeracidad").checked) errores.push("Debe aceptar la declaración de veracidad.");
+  if (!$("aceptaUsoInterno").checked) errores.push("Debe autorizar el uso interno de la información.");
+  if (!$("aceptaCambiosCorreo").checked) errores.push("Debe aceptar la condición de modificación posterior.");
 
   return errores;
 }
 
 // -----------------------------------------------------------------------------
-// CONSTRUCCIÓN PAYLOAD
+// PAYLOAD
 // -----------------------------------------------------------------------------
 function construirPayloadBase() {
   const tipoViajante = obtenerRadio("tipoViajante");
@@ -867,22 +841,17 @@ function construirPayloadBase() {
     documentoNormalizado = normalizarRutDocumento(rutNumero, rutDv);
   }
 
-  const nacionalidadBase = $("nacionalidadBase").value || "";
-  const nacionalidadDetalle = limpiarTexto($("nacionalidadDetalle").value);
-
   const genero = $("genero").value || "";
   const generoOtro = limpiarTexto($("generoOtro").value);
   const generoFinal = genero === "otro" ? generoOtro : genero;
 
-  const contactoPrincipalRelacion = $("contactoPrincipalRelacion").value || "";
-  const contactoPrincipalRelacionOtro = limpiarTexto($("contactoPrincipalRelacionOtro").value);
-  const contactoPrincipalRelacionFinal =
-    contactoPrincipalRelacion === "otro" ? contactoPrincipalRelacionOtro : contactoPrincipalRelacion;
+  const contactoRelacion = $("contactoPrincipalRelacion").value || "";
+  const contactoRelacionOtro = limpiarTexto($("contactoPrincipalRelacionOtro").value);
+  const contactoRelacionFinal = contactoRelacion === "otro" ? contactoRelacionOtro : contactoRelacion;
 
   const emergenciaRelacion = $("emergenciaRelacion").value || "";
   const emergenciaRelacionOtro = limpiarTexto($("emergenciaRelacionOtro").value);
-  const emergenciaRelacionFinal =
-    emergenciaRelacion === "otro" ? emergenciaRelacionOtro : emergenciaRelacion;
+  const emergenciaRelacionFinal = emergenciaRelacion === "otro" ? emergenciaRelacionOtro : emergenciaRelacion;
 
   const tipoProfesor = $("tipoProfesor").value || "";
   const tipoProfesorOtro = limpiarTexto($("tipoProfesorOtro").value);
@@ -935,8 +904,8 @@ function construirPayloadBase() {
 
       fechaNacimiento,
       edad,
-      nacionalidadBase,
-      nacionalidadDetalle,
+      nacionalidadBase: $("nacionalidadBase").value || "",
+      nacionalidadDetalle: limpiarTexto($("nacionalidadDetalle").value),
 
       correoViajante: limpiarTexto($("correoViajante").value),
       telefonoViajante: esAdultoOperativo ? limpiarTexto($("telefonoViajante").value) : "",
@@ -956,18 +925,14 @@ function construirPayloadBase() {
       relacionCurso: esAcompanante ? relacionCursoFinal : "",
       relacionCursoBase: esAcompanante ? relacionCurso : "",
       relacionCursoOtro: esAcompanante ? relacionCursoOtro : "",
-      estudianteRelacionado: {
-        nombres: esAcompanante ? limpiarTexto($("estudianteRelacionadoNombres").value) : "",
-        primerApellido: esAcompanante ? limpiarTexto($("estudianteRelacionadoPrimerApellido").value) : "",
-        segundoApellido: esAcompanante ? limpiarTexto($("estudianteRelacionadoSegundoApellido").value) : ""
-      }
+      estudianteRelacionado: esAcompanante ? limpiarTexto($("estudianteRelacionado").value) : ""
     },
 
     contactoPrincipal: {
       aplica: esEstudiante,
       nombre: esEstudiante ? limpiarTexto($("contactoPrincipalNombre").value) : nombreCompleto,
-      relacion: esEstudiante ? contactoPrincipalRelacionFinal : "mismo_viajante",
-      relacionBase: esEstudiante ? contactoPrincipalRelacion : "mismo_viajante",
+      relacion: esEstudiante ? contactoRelacionFinal : "mismo_viajante",
+      relacionBase: esEstudiante ? contactoRelacion : "mismo_viajante",
       telefono: esEstudiante ? limpiarTexto($("contactoPrincipalTelefono").value) : limpiarTexto($("telefonoViajante").value),
       esWhatsapp: esEstudiante ? !!$("contactoPrincipalEsWhatsapp").checked : !!$("telefonoViajanteEsWhatsapp").checked,
       whatsappAlternativo: esEstudiante && !$("contactoPrincipalEsWhatsapp").checked
@@ -991,8 +956,8 @@ function construirPayloadBase() {
       aplicaInternacional: esInternacional,
       conoceDocsInternacionales: esInternacional ? (obtenerRadio("conoceDocsInternacionales") || "") : "",
       docsInternacionalesDetalle: limpiarTexto($("docsInternacionalesDetalle")?.value),
-      permisoMenorViaje: (esInternacional && esEstudiante && esMenor) ? (obtenerRadio("permisoMenorViaje") || "") : "",
-      situacionLegalAfecta: (esInternacional && esEstudiante && esMenor) ? (obtenerRadio("situacionLegalAfecta") || "") : "",
+      permisoMenorViaje: esInternacional && esEstudiante && esMenor ? (obtenerRadio("permisoMenorViaje") || "") : "",
+      situacionLegalAfecta: esInternacional && esEstudiante && esMenor ? (obtenerRadio("situacionLegalAfecta") || "") : "",
       situacionLegalDetalle: limpiarTexto($("situacionLegalDetalle")?.value)
     },
 
@@ -1059,28 +1024,16 @@ async function crearCorreoConfirmacion(payload) {
 
   const html = `
     <div style="font-family: Arial, Helvetica, sans-serif; color:#222; line-height:1.6;">
-      <h2 style="margin-bottom:8px;">Confirmación de inscripción recibida</h2>
-
+      <h2>Confirmación de inscripción recibida</h2>
       <p>Hemos recibido correctamente la inscripción de <strong>${escapeHtml(nombre)}</strong> como <strong>${escapeHtml(tipoLabel)}</strong>.</p>
-
       <p>
         <strong>Grupo:</strong> ${escapeHtml(aliasGrupo)}<br>
         <strong>Destino:</strong> ${escapeHtml(destino)}<br>
         <strong>Documento:</strong> ${escapeHtml(documento)}
       </p>
-
       <p>La información entregada será utilizada exclusivamente para la planificación, coordinación y operación segura del viaje.</p>
-
-      <p>
-        Si necesita corregir algún dato posteriormente, debe comunicarse con Turismo Rai Trai y asegurarse
-        de recibir confirmación de que el cambio fue efectivamente recibido y aplicado.
-      </p>
-
-      <p>
-        Correo: <strong>${escapeHtml(CORREO_ADMIN)}</strong><br>
-        Teléfono: <strong>${escapeHtml(TELEFONO_ADMIN)}</strong>
-      </p>
-
+      <p>Si necesita corregir algún dato posteriormente, debe comunicarse con Turismo Rai Trai y asegurarse de recibir confirmación del cambio.</p>
+      <p>Correo: <strong>${escapeHtml(CORREO_ADMIN)}</strong><br>Teléfono: <strong>${escapeHtml(TELEFONO_ADMIN)}</strong></p>
       <p>Atentamente,<br>Turismo Rai Trai</p>
     </div>
   `;
@@ -1101,7 +1054,7 @@ async function crearCorreoConfirmacion(payload) {
 }
 
 // -----------------------------------------------------------------------------
-// HISTORIAL Y ALERTAS
+// HISTORIAL
 // -----------------------------------------------------------------------------
 async function registrarEventosEspeciales(payload) {
   const eventos = [];
@@ -1150,9 +1103,7 @@ async function detectarRutEnOtrosGrupos(payload) {
 
   const snap = await getDocs(q);
 
-  const otros = snap.docs
-    .map((d) => d.data())
-    .filter((x) => x.idGrupo && x.idGrupo !== idGrupo);
+  const otros = snap.docs.map((d) => d.data()).filter((x) => x.idGrupo && x.idGrupo !== idGrupo);
 
   if (!otros.length) return;
 
@@ -1164,14 +1115,7 @@ async function detectarRutEnOtrosGrupos(payload) {
     rutNormalizado,
     nombreCompleto: payload.identificacion.nombreCompleto,
     grupoActual: payload.grupo,
-    coincidencias: otros.map((x) => ({
-      idGrupo: x.idGrupo,
-      aliasGrupo: x.aliasGrupo || "",
-      colegio: x.colegio || "",
-      cursoBase: x.cursoBase || "",
-      anoViaje: x.anoViaje || "",
-      destinoPrincipal: x.destinoPrincipal || ""
-    })),
+    coincidencias: otros,
     mensaje: `El RUT ${rutNormalizado} fue inscrito en este grupo y ya existe en otro grupo. Revisar administrativamente.`
   });
 }
@@ -1217,6 +1161,7 @@ function onLimpiar() {
   resetDefaults();
   ocultarMensaje();
   aplicarEstadoUI();
+  actualizarProgreso();
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
@@ -1224,6 +1169,7 @@ function resetDefaults() {
   setPhoneDefault("telefonoViajante");
   setPhoneDefault("contactoPrincipalTelefono");
   setPhoneDefault("emergenciaTelefono");
+
   $("rutDv").value = "";
   $("rutNumero").classList.remove("input-error");
 }
@@ -1238,6 +1184,7 @@ function enlazarFlagDetalle(nombreRadio, wrap, valoresActivos) {
     el.addEventListener("change", () => {
       const v = obtenerRadio(nombreRadio);
       mostrar(wrap, valoresActivos.includes(v));
+      actualizarProgreso();
     });
   });
 }
@@ -1279,8 +1226,7 @@ function obtenerRadio(name) {
 }
 
 function obtenerChecks(name) {
-  return Array.from(document.querySelectorAll(`input[name="${name}"]:checked`))
-    .map((el) => el.value);
+  return Array.from(document.querySelectorAll(`input[name="${name}"]:checked`)).map((el) => el.value);
 }
 
 function limpiarRadios(name) {
@@ -1306,7 +1252,6 @@ function limpiarRutNumero(valor) {
 
 function calcularDvRut(cuerpo) {
   const rut = String(cuerpo || "").replace(/\D/g, "");
-
   if (!rut) return "";
 
   let suma = 0;
