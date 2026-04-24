@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
   <title>Inscripción de Pasajero | Rai Trai</title>
 
   <link rel="stylesheet" href="./estilos.css" />
@@ -23,9 +24,6 @@
       --rt-danger-text:#9b1c1c;
       --rt-warning:#fff2d8;
       --rt-warning-text:#8a5a00;
-      --rt-info:#eef5ff;
-      --rt-info-border:#cfe0fb;
-      --rt-info-text:#234a78;
     }
 
     * { box-sizing: border-box; }
@@ -38,14 +36,14 @@
     }
 
     .wrap {
-      width: min(1120px, calc(100% - 32px));
+      width: min(1100px, calc(100% - 32px));
       margin: 24px auto 60px;
     }
 
     .hero {
       background: linear-gradient(135deg, #ffffff 0%, #f3efff 100%);
       border: 1px solid var(--rt-border);
-      border-radius: 22px;
+      border-radius: 18px;
       padding: 28px;
       box-shadow: 0 10px 28px rgba(0,0,0,.05);
       margin-bottom: 20px;
@@ -53,7 +51,7 @@
 
     .hero h1 {
       margin: 0 0 8px;
-      font-size: 30px;
+      font-size: 28px;
     }
 
     .hero p {
@@ -62,33 +60,32 @@
       line-height: 1.5;
     }
 
-    .group-box {
-      margin-top: 18px;
-      background: #fff;
-      border: 2px solid rgba(111, 88, 201, .28);
-      border-radius: 18px;
-      padding: 18px;
-    }
-
-    .group-box-title {
-      margin: 0 0 12px;
-      font-size: 17px;
-      color: var(--rt-primary);
-      font-weight: 800;
-    }
-
     .chips {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
+      display: grid;
+      grid-template-columns: repeat(5, minmax(130px, 1fr));
+      gap: 10px;
+      margin-top: 18px;
     }
 
     .chip {
-      background: var(--rt-primary-soft);
-      border: 1px solid rgba(111, 88, 201, .25);
-      border-radius: 999px;
-      padding: 9px 13px;
+      background: #fff;
+      border: 1px solid var(--rt-border);
+      border-radius: 16px;
+      padding: 12px 14px;
       font-size: 13px;
+      line-height: 1.4;
+    }
+
+    .chip span {
+      display:block;
+      color: var(--rt-muted);
+      font-size: 12px;
+      margin-bottom: 2px;
+    }
+
+    .chip strong {
+      font-size: 15px;
+      color: var(--rt-text);
     }
 
     .grid {
@@ -110,12 +107,6 @@
       font-size: 22px;
     }
 
-    .card h2::before {
-      content: "• ";
-      color: var(--rt-primary);
-      font-weight: 900;
-    }
-
     .card .sub {
       color: var(--rt-muted);
       margin-bottom: 18px;
@@ -131,9 +122,9 @@
     }
 
     .notice.privacy {
-      background: var(--rt-info);
-      color: var(--rt-info-text);
-      border: 1px solid var(--rt-info-border);
+      background: #eef5ff;
+      color: #234a78;
+      border: 1px solid #cfe0fb;
     }
 
     .notice.time {
@@ -198,11 +189,16 @@
       background: #fff;
       color: var(--rt-text);
       outline: none;
-      transition: border-color .15s ease, box-shadow .15s ease, background .15s ease;
+      transition: border-color .15s ease, box-shadow .15s ease;
+    }
+
+    input[readonly] {
+      background: #f7f7fb;
+      color: #575767;
     }
 
     textarea {
-      min-height: 105px;
+      min-height: 100px;
       resize: vertical;
     }
 
@@ -214,18 +210,9 @@
     }
 
     .input-error {
-      border-color: #c1121f !important;
-      background: #fff7f7 !important;
-    }
-
-    .field-error {
-      color: #b42318;
-      font-size: 12px;
-      display: none;
-    }
-
-    .field-error.show {
-      display: block;
+      border-color: #b42318 !important;
+      box-shadow: 0 0 0 4px rgba(180, 35, 24, .12) !important;
+      background: #fffafa !important;
     }
 
     .radio-group,
@@ -273,11 +260,6 @@
       cursor: pointer;
     }
 
-    button:disabled {
-      opacity: .7;
-      cursor: not-allowed;
-    }
-
     .btn-primary {
       background: var(--rt-primary);
       color: #fff;
@@ -322,6 +304,10 @@
         grid-column: span 12;
       }
 
+      .chips {
+        grid-template-columns: 1fr;
+      }
+
       .wrap {
         width: min(100% - 18px, 1000px);
       }
@@ -332,25 +318,22 @@
     }
   </style>
 </head>
+
 <body>
   <main class="wrap">
     <section class="hero">
       <h1>Inscripción de pasajero y ficha de salud</h1>
       <p>
         Complete este formulario para registrar al viajante del grupo.
-        La información será recibida directamente por Turismo Rai Trai y utilizada
-        exclusivamente para la planificación y operación segura del viaje.
+        Revise cuidadosamente la información del grupo antes de continuar.
       </p>
 
-      <div class="group-box">
-        <p class="group-box-title">Está registrando un viajante para este grupo de viaje</p>
-        <div class="chips">
-          <span class="chip">Grupo: <strong id="chipGrupo">Cargando...</strong></span>
-          <span class="chip">Colegio: <strong id="chipColegio">Cargando...</strong></span>
-          <span class="chip">Curso: <strong id="chipCurso">Cargando...</strong></span>
-          <span class="chip">Destino: <strong id="chipDestino">Cargando...</strong></span>
-          <span class="chip">Año viaje: <strong id="chipAno">Cargando...</strong></span>
-        </div>
+      <div class="chips">
+        <div class="chip"><span>Grupo</span><strong id="chipGrupo">Cargando...</strong></div>
+        <div class="chip"><span>Colegio</span><strong id="chipColegio">Cargando...</strong></div>
+        <div class="chip"><span>Curso</span><strong id="chipCurso">Cargando...</strong></div>
+        <div class="chip"><span>Destino</span><strong id="chipDestino">Cargando...</strong></div>
+        <div class="chip"><span>Año viaje</span><strong id="chipAno">Cargando...</strong></div>
       </div>
     </section>
 
@@ -358,21 +341,19 @@
       <div class="notice privacy">
         <strong>Información confidencial y uso de datos personales.</strong><br />
         Toda la información ingresada en este formulario será tratada como confidencial,
-        incluyendo antecedentes personales, de salud y de contacto. Esta información será
-        utilizada exclusivamente por Turismo Rai Trai para la correcta planificación,
-        coordinación y operación segura del viaje, y no será compartida con terceros no
-        autorizados, salvo que sea necesario para la correcta operación del viaje o por
-        obligación legal. El tratamiento de los datos se realiza conforme a la Ley N°19.628
-        sobre protección de la vida privada. Una vez finalizado el viaje, el titular de los
-        datos o su representante podrá solicitar la modificación o eliminación de la
-        información escribiendo a <strong>administracion@raitrai.cl</strong>, en la medida
-        que la legislación vigente lo permita.
+        incluyendo antecedentes personales, de salud, alimentación, documentación y contacto.
+        Esta información será utilizada exclusivamente por Turismo Rai Trai para la correcta
+        planificación, coordinación y operación segura del viaje, y no será compartida con terceros
+        no autorizados, salvo que sea necesario para la operación del viaje o por obligación legal.
+        El tratamiento de los datos se realiza conforme a la Ley N°19.628 sobre protección de la vida privada.
+        Una vez finalizado el viaje, el titular de los datos o su representante podrá solicitar
+        la modificación o eliminación de la información escribiendo a
+        <strong>administracion@raitrai.cl</strong>, en la medida que la legislación vigente lo permita.
       </div>
 
       <div class="notice time">
         <strong>Tiempo estimado:</strong> completar este formulario toma normalmente entre
-        <strong>5 y 10 minutos</strong>. Si necesita detallar información de salud,
-        alimentación, medicamentos o documentación especial, puede tardar algunos minutos adicionales.
+        <strong>5 y 10 minutos</strong>.
       </div>
 
       <div id="msgBox" class="notice hidden"></div>
@@ -380,8 +361,10 @@
 
     <form id="formInscripcion" class="grid" novalidate>
       <section class="card">
-        <h2>Tipo de viajante</h2>
-        <div class="sub">Indique si la persona que será inscrita corresponde a estudiante, profesor o adulto acompañante.</div>
+        <h2>• Tipo de viajante</h2>
+        <div class="sub">
+          Indique si la persona que será inscrita corresponde a estudiante, profesor o adulto acompañante.
+        </div>
 
         <div class="form-grid">
           <div class="field">
@@ -391,75 +374,26 @@
                 <input type="radio" name="tipoViajante" value="estudiante" required />
                 Estudiante
               </label>
+
               <label class="option-pill">
                 <input type="radio" name="tipoViajante" value="profesor" />
                 Profesor
               </label>
+
               <label class="option-pill">
                 <input type="radio" name="tipoViajante" value="adulto_acompanante" />
                 Adulto acompañante
               </label>
             </div>
           </div>
-
-          <div id="profesorDetalleWrap" class="field hidden">
-            <label>Tipo de profesor <span class="req">*</span></label>
-            <div class="radio-group">
-              <label class="option-pill"><input type="radio" name="tipoProfesor" value="profesor_jefe" /> Profesor jefe</label>
-              <label class="option-pill"><input type="radio" name="tipoProfesor" value="profesor" /> Profesor</label>
-              <label class="option-pill"><input type="radio" name="tipoProfesor" value="otro" /> Otro</label>
-            </div>
-          </div>
-
-          <div id="tipoProfesorOtroWrap" class="field col-6 hidden">
-            <label for="tipoProfesorOtro">Especifique <span class="req">*</span></label>
-            <input id="tipoProfesorOtro" name="tipoProfesorOtro" type="text" />
-          </div>
-
-          <div id="conoceRaitraiWrap" class="field hidden">
-            <label class="option-pill" style="border-radius:14px;">
-              <input type="checkbox" id="interesaConoceRaitrai" name="interesaConoceRaitrai" />
-              Me interesa recibir información del programa “Conoce Rai Trai”
-            </label>
-          </div>
-
-          <div id="adultoAcompananteDetalleWrap" class="field hidden">
-            <label>Relación del adulto acompañante con el curso <span class="req">*</span></label>
-            <div class="radio-group">
-              <label class="option-pill"><input type="radio" name="relacionAdultoCurso" value="padre_madre" /> Padre o madre de un estudiante</label>
-              <label class="option-pill"><input type="radio" name="relacionAdultoCurso" value="apoderado" /> Apoderado(a)</label>
-              <label class="option-pill"><input type="radio" name="relacionAdultoCurso" value="otro" /> Otro</label>
-            </div>
-          </div>
-
-          <div id="relacionAdultoCursoOtroWrap" class="field col-6 hidden">
-            <label for="relacionAdultoCursoOtro">Especifique relación <span class="req">*</span></label>
-            <input id="relacionAdultoCursoOtro" name="relacionAdultoCursoOtro" type="text" />
-          </div>
-
-          <div id="estudianteRelacionadoWrap" class="field hidden">
-            <label>Estudiante relacionado con el adulto acompañante <span class="req">*</span></label>
-            <div class="form-grid">
-              <div class="field col-4">
-                <label for="estudianteRelacionadoNombres">Nombres <span class="req">*</span></label>
-                <input id="estudianteRelacionadoNombres" name="estudianteRelacionadoNombres" type="text" />
-              </div>
-              <div class="field col-4">
-                <label for="estudianteRelacionadoPrimerApellido">Primer apellido <span class="req">*</span></label>
-                <input id="estudianteRelacionadoPrimerApellido" name="estudianteRelacionadoPrimerApellido" type="text" />
-              </div>
-              <div class="field col-4">
-                <label for="estudianteRelacionadoSegundoApellido">Segundo apellido <span class="inline-badge">Opcional</span></label>
-                <input id="estudianteRelacionadoSegundoApellido" name="estudianteRelacionadoSegundoApellido" type="text" />
-              </div>
-            </div>
-          </div>
         </div>
       </section>
 
       <section class="card">
-        <h2>Datos del viajante</h2>
-        <div class="sub">Ingrese los datos de la persona que viajará.</div>
+        <h2>• Datos del viajante</h2>
+        <div class="sub">
+          Ingrese los datos de la persona que viajará.
+        </div>
 
         <div class="form-grid">
           <div class="field col-4">
@@ -475,39 +409,7 @@
           <div class="field col-4">
             <label for="segundoApellido">Segundo apellido <span class="inline-badge">Opcional</span></label>
             <input id="segundoApellido" name="segundoApellido" type="text" />
-            <div class="hint">Si queda en blanco, el sistema pedirá confirmación antes de enviar.</div>
-          </div>
-
-          <div class="field col-4">
-            <label for="tipoIdentificacion">Documento de identidad <span class="req">*</span></label>
-            <select id="tipoIdentificacion" name="tipoIdentificacion" required>
-              <option value="">Seleccione...</option>
-              <option value="rut">RUT</option>
-              <option value="sin_rut">No tiene RUT</option>
-            </select>
-          </div>
-
-          <div id="rutWrap" class="field col-6 hidden">
-            <label for="rutNumero">Número de RUT <span class="req">*</span></label>
-            <input id="rutNumero" name="rutNumero" type="text" inputmode="numeric" placeholder="Ej: 16128922" />
-            <div class="hint">Ingrese solo números. El dígito verificador se calculará automáticamente.</div>
-            <div id="rutError" class="field-error">RUT inválido.</div>
-          </div>
-
-          <div id="dvWrap" class="field col-2 hidden">
-            <label for="rutDv">DV</label>
-            <input id="rutDv" name="rutDv" type="text" readonly />
-          </div>
-
-          <div id="sinRutNoticeWrap" class="field hidden">
-            <div class="notice time">
-              El sistema asignará un registro interno para esta persona. Si ya existe una inscripción sin RUT con los mismos nombres y apellidos en este grupo, el envío será bloqueado y deberá comunicarse con Turismo Rai Trai.
-            </div>
-          </div>
-
-          <div class="field col-4">
-            <label for="fechaNacimiento">Fecha de nacimiento <span class="req">*</span></label>
-            <input id="fechaNacimiento" name="fechaNacimiento" type="date" required />
+            <div class="hint">Si queda vacío, el sistema pedirá confirmación antes de enviar.</div>
           </div>
 
           <div class="field col-4">
@@ -523,6 +425,39 @@
           <div id="generoOtroWrap" class="field col-4 hidden">
             <label for="generoOtro">Especifique género <span class="req">*</span></label>
             <input id="generoOtro" name="generoOtro" type="text" />
+          </div>
+
+          <div class="field col-4">
+            <label for="tipoIdentificacion">Documento de identidad <span class="req">*</span></label>
+            <select id="tipoIdentificacion" name="tipoIdentificacion" required>
+              <option value="">Seleccione...</option>
+              <option value="rut">RUT</option>
+              <option value="sin_rut">No tiene RUT</option>
+            </select>
+          </div>
+
+          <div id="rutWrap" class="field col-4 hidden">
+            <label for="rutNumero">Cuerpo del RUT <span class="req">*</span></label>
+            <input id="rutNumero" name="rutNumero" type="text" inputmode="numeric" placeholder="Ej: 16128922" />
+            <div id="rutHint" class="hint">Ingrese solo números. El DV se calculará automáticamente.</div>
+          </div>
+
+          <div id="dvWrap" class="field col-2 hidden">
+            <label for="rutDv">DV</label>
+            <input id="rutDv" name="rutDv" type="text" readonly />
+          </div>
+
+          <div id="sinRutNotice" class="field hidden">
+            <div class="notice time" style="margin:0;">
+              Si el viajante no tiene RUT, el sistema generará un documento interno para efectos operativos.
+              Si ya existe una inscripción con los mismos nombres y apellidos en este grupo, el envío será bloqueado
+              y deberá comunicarse con Turismo Rai Trai.
+            </div>
+          </div>
+
+          <div class="field col-4">
+            <label for="fechaNacimiento">Fecha de nacimiento <span class="req">*</span></label>
+            <input id="fechaNacimiento" name="fechaNacimiento" type="date" required />
           </div>
 
           <div class="field col-4">
@@ -548,7 +483,7 @@
           <div id="telefonoViajanteWrap" class="field col-4 hidden">
             <label for="telefonoViajante">Teléfono del viajante <span class="req">*</span></label>
             <input id="telefonoViajante" name="telefonoViajante" type="tel" />
-            <div class="hint">Por defecto se sugiere +569. Si necesita otro prefijo, puede reemplazarlo.</div>
+            <div class="hint">Aplica para profesor o adulto acompañante.</div>
           </div>
 
           <div id="whatsappViajanteWrap" class="field col-4 hidden">
@@ -560,9 +495,75 @@
         </div>
       </section>
 
-      <section id="bloqueApoderado" class="card">
-        <h2>Datos del apoderado</h2>
-        <div class="sub">Este bloque aplica solo para estudiantes.</div>
+      <section id="bloqueProfesor" class="card hidden">
+        <h2>• Datos del profesor</h2>
+
+        <div class="form-grid">
+          <div class="field col-6">
+            <label for="tipoProfesor">Tipo de profesor <span class="req">*</span></label>
+            <select id="tipoProfesor" name="tipoProfesor">
+              <option value="">Seleccione...</option>
+              <option value="profesor_jefe">Profesor jefe</option>
+              <option value="profesor">Profesor</option>
+              <option value="otro">Otro</option>
+            </select>
+          </div>
+
+          <div id="tipoProfesorOtroWrap" class="field col-6 hidden">
+            <label for="tipoProfesorOtro">Especifique <span class="req">*</span></label>
+            <input id="tipoProfesorOtro" name="tipoProfesorOtro" type="text" />
+          </div>
+
+          <div class="field">
+            <label class="option-pill" style="border-radius:14px;">
+              <input type="checkbox" id="interesConoceRaitrai" name="interesConoceRaitrai" />
+              Me interesa recibir información del programa “Conoce Rai Trai”
+            </label>
+          </div>
+        </div>
+      </section>
+
+      <section id="bloqueAcompanante" class="card hidden">
+        <h2>• Datos del adulto acompañante</h2>
+
+        <div class="form-grid">
+          <div class="field col-6">
+            <label for="relacionCurso">Relación con el curso <span class="req">*</span></label>
+            <select id="relacionCurso" name="relacionCurso">
+              <option value="">Seleccione...</option>
+              <option value="padre_madre">Padre o madre de un estudiante</option>
+              <option value="apoderado">Apoderado</option>
+              <option value="otro">Otro</option>
+            </select>
+          </div>
+
+          <div id="relacionCursoOtroWrap" class="field col-6 hidden">
+            <label for="relacionCursoOtro">Especifique relación <span class="req">*</span></label>
+            <input id="relacionCursoOtro" name="relacionCursoOtro" type="text" />
+          </div>
+
+          <div class="field col-4">
+            <label for="estudianteRelacionadoNombres">Nombres del estudiante relacionado <span class="req">*</span></label>
+            <input id="estudianteRelacionadoNombres" name="estudianteRelacionadoNombres" type="text" />
+          </div>
+
+          <div class="field col-4">
+            <label for="estudianteRelacionadoPrimerApellido">Primer apellido del estudiante <span class="req">*</span></label>
+            <input id="estudianteRelacionadoPrimerApellido" name="estudianteRelacionadoPrimerApellido" type="text" />
+          </div>
+
+          <div class="field col-4">
+            <label for="estudianteRelacionadoSegundoApellido">Segundo apellido del estudiante <span class="inline-badge">Opcional</span></label>
+            <input id="estudianteRelacionadoSegundoApellido" name="estudianteRelacionadoSegundoApellido" type="text" />
+          </div>
+        </div>
+      </section>
+
+      <section id="bloqueApoderado" class="card hidden">
+        <h2>• Datos del apoderado</h2>
+        <div class="sub">
+          Este bloque solo aplica cuando el viajante es estudiante.
+        </div>
 
         <div class="form-grid">
           <div class="field col-6">
@@ -571,7 +572,7 @@
           </div>
 
           <div class="field col-3">
-            <label for="contactoPrincipalRelacion">Relación con el viajante <span class="req">*</span></label>
+            <label for="contactoPrincipalRelacion">Relación con el estudiante <span class="req">*</span></label>
             <select id="contactoPrincipalRelacion" name="contactoPrincipalRelacion">
               <option value="">Seleccione...</option>
               <option value="padre">Padre</option>
@@ -589,7 +590,6 @@
           <div class="field col-4">
             <label for="contactoPrincipalTelefono">Teléfono apoderado <span class="req">*</span></label>
             <input id="contactoPrincipalTelefono" name="contactoPrincipalTelefono" type="tel" />
-            <div class="hint">Por defecto se sugiere +569. Si necesita otro prefijo, puede reemplazarlo.</div>
           </div>
 
           <div class="field col-4">
@@ -605,15 +605,17 @@
           </div>
 
           <div class="field col-6">
-            <label for="contactoPrincipalCorreo">Correo electrónico apoderado <span class="req">*</span></label>
+            <label for="contactoPrincipalCorreo">Correo electrónico del apoderado <span class="req">*</span></label>
             <input id="contactoPrincipalCorreo" name="contactoPrincipalCorreo" type="email" />
           </div>
         </div>
       </section>
 
       <section class="card">
-        <h2>Contacto de emergencia</h2>
-        <div class="sub">Ingrese a una persona a quien podamos contactar si ocurriera una situación importante durante el viaje.</div>
+        <h2>• Contacto de emergencia</h2>
+        <div class="sub">
+          Ingrese a una persona a quien podamos contactar si ocurriera una situación importante durante el viaje.
+        </div>
 
         <div class="form-grid">
           <div class="field col-6">
@@ -634,7 +636,6 @@
               <option value="abuelo">Abuelo</option>
               <option value="abuela">Abuela</option>
               <option value="tutor">Tutor(a)</option>
-              <option value="colega">Colega</option>
               <option value="otro">Otro</option>
             </select>
           </div>
@@ -664,12 +665,17 @@
       </section>
 
       <section id="bloqueInternacional" class="card hidden">
-        <h2>Documentación y autorizaciones de viaje</h2>
-        <div class="sub">Este bloque aplica porque el destino del viaje incluye salida del país.</div>
+        <h2>• Documentación y autorizaciones de viaje</h2>
+        <div class="sub">
+          Este bloque aplica porque el destino del viaje incluye salida del país.
+        </div>
 
         <div class="form-grid">
           <div id="docsNoChileWrap" class="field">
-            <label>En caso de que el viajante no sea exclusivamente chileno/a: ¿tiene conocimiento de los documentos requeridos para ingresar al país de destino?</label>
+            <label>
+              En caso de que el viajante no sea exclusivamente chileno/a:
+              ¿tiene conocimiento de los documentos requeridos para ingresar al país de destino?
+            </label>
             <div class="radio-group">
               <label class="option-pill"><input type="radio" name="conoceDocsInternacionales" value="si" /> Sí</label>
               <label class="option-pill"><input type="radio" name="conoceDocsInternacionales" value="no" /> No</label>
@@ -678,12 +684,15 @@
           </div>
 
           <div id="docsInternacionalesDetalleWrap" class="field hidden">
-            <label for="docsInternacionalesDetalle">Indique dudas o situación especial respecto de documentación internacional</label>
+            <label for="docsInternacionalesDetalle">Indique cualquier duda o situación especial respecto de documentación internacional</label>
             <textarea id="docsInternacionalesDetalle" name="docsInternacionalesDetalle"></textarea>
           </div>
 
           <div id="permisoMenorWrap" class="field hidden">
-            <label>En caso de salida del país, ¿el estudiante cuenta o contará con las autorizaciones necesarias para viajar siendo menor de edad?</label>
+            <label>
+              En caso de salida del país, ¿el estudiante cuenta o contará con las autorizaciones necesarias
+              para viajar siendo menor de edad?
+            </label>
             <div class="radio-group">
               <label class="option-pill"><input type="radio" name="permisoMenorViaje" value="si_listo" /> Sí, ya están listas</label>
               <label class="option-pill"><input type="radio" name="permisoMenorViaje" value="en_tramite" /> Aún no, pero las gestionaremos</label>
@@ -691,12 +700,28 @@
               <label class="option-pill"><input type="radio" name="permisoMenorViaje" value="necesito_orientacion" /> Necesito orientación</label>
             </div>
           </div>
+
+          <div id="situacionLegalWrap" class="field hidden">
+            <label>¿Existe alguna situación familiar, legal o de autorización que pueda afectar este proceso?</label>
+            <div class="radio-group">
+              <label class="option-pill"><input type="radio" name="situacionLegalAfecta" value="no" /> No</label>
+              <label class="option-pill"><input type="radio" name="situacionLegalAfecta" value="si" /> Sí</label>
+              <label class="option-pill"><input type="radio" name="situacionLegalAfecta" value="privado" /> Prefiero informarlo de forma privada</label>
+            </div>
+          </div>
+
+          <div id="situacionLegalDetalleWrap" class="field hidden">
+            <label for="situacionLegalDetalle">Describa brevemente la situación.</label>
+            <textarea id="situacionLegalDetalle" name="situacionLegalDetalle"></textarea>
+          </div>
         </div>
       </section>
 
       <section class="card">
-        <h2>Salud general</h2>
-        <div class="sub">Estas preguntas permiten anticipar cuidados o apoyos importantes para el viaje.</div>
+        <h2>• Salud general</h2>
+        <div class="sub">
+          Estas preguntas permiten anticipar cuidados o apoyos importantes para el viaje.
+        </div>
 
         <div class="form-grid">
           <div class="field">
@@ -760,7 +785,7 @@
           </div>
 
           <div id="alergiasWrap" class="field hidden">
-            <label for="alergiasDetalle">Explique la alergia, síntomas habituales y qué debemos hacer en caso de reacción</label>
+            <label for="alergiasDetalle">Explique la alergia, sus síntomas habituales y qué debemos hacer en caso de reacción</label>
             <textarea id="alergiasDetalle" name="alergiasDetalle"></textarea>
           </div>
 
@@ -790,12 +815,14 @@
       </section>
 
       <section class="card">
-        <h2>Información reservada y otros antecedentes</h2>
-        <div class="sub">Puede dejar aquí información adicional que considere importante para el viaje.</div>
+        <h2>• Información reservada y otros antecedentes</h2>
+        <div class="sub">
+          Puede dejar aquí información adicional que considere importante para el viaje.
+        </div>
 
         <div class="form-grid">
           <div class="field">
-            <label>¿Hay alguna situación que usted crea importante sobre el pasajero que debamos anticipar durante el viaje?</label>
+            <label>¿Hay alguna situación que Ud. crea importante sobre el pasajero que debamos anticipar durante el viaje?</label>
             <div class="radio-group">
               <label class="option-pill"><input type="radio" name="otrosAntecedentesFlag" value="no" /> No</label>
               <label class="option-pill"><input type="radio" name="otrosAntecedentesFlag" value="si" /> Sí</label>
@@ -810,8 +837,7 @@
       </section>
 
       <section id="adultoCompromisoCard" class="card hidden">
-        <h2>Carta compromiso adulto/profesor acompañante</h2>
-        <div class="sub">Este bloque aplica para profesor o adulto acompañante.</div>
+        <h2>• Declaración para profesor o adulto acompañante</h2>
 
         <div class="notice privacy">
           Al continuar, usted declara que comprende que su participación en el viaje implica
@@ -824,7 +850,7 @@
           <div class="field">
             <label class="option-pill" style="border-radius:14px;">
               <input type="checkbox" id="adultoAceptaCompromiso" name="adultoAceptaCompromiso" />
-              Declaro que acepto la carta compromiso como adulto/profesor acompañante
+              Declaro que acepto esta responsabilidad como profesor o adulto acompañante
             </label>
           </div>
 
@@ -836,8 +862,10 @@
       </section>
 
       <section class="card">
-        <h2>Confirmación final</h2>
-        <div class="sub">Revise la información antes de enviarla.</div>
+        <h2>• Confirmación final</h2>
+        <div class="sub">
+          Revise la información antes de enviarla.
+        </div>
 
         <div class="form-grid">
           <div class="field">
@@ -850,14 +878,15 @@
           <div class="field">
             <label class="option-pill" style="border-radius:14px;">
               <input type="checkbox" id="aceptaUsoInterno" name="aceptaUsoInterno" required />
-              Autorizo el uso interno de esta información exclusivamente para la operación segura del viaje
+              Autorizo el uso interno de esta información exclusivamente para la correcta operación del viaje
             </label>
           </div>
 
           <div class="field">
             <label class="option-pill" style="border-radius:14px;">
               <input type="checkbox" id="aceptaCambiosCorreo" name="aceptaCambiosCorreo" required />
-              Entiendo que, si necesito modificar información posteriormente, debo comunicarme con Turismo Rai Trai y asegurarme de recibir confirmación de que el cambio fue efectivamente recibido y aplicado.
+              Entiendo que, si necesito modificar información posteriormente, debo comunicarme con Turismo Rai Trai
+              y asegurarme de recibir confirmación de que el cambio fue efectivamente recibido y aplicado
             </label>
           </div>
         </div>
@@ -868,7 +897,8 @@
         </div>
 
         <div class="footer-note">
-          Si necesita corregir información posteriormente, comuníquese con administracion@raitrai.cl o al +56 (2) 2236 3232.
+          En caso de necesitar ayuda, comuníquese con Turismo Rai Trai al correo
+          <strong>administracion@raitrai.cl</strong> o al teléfono <strong>+56 (2) 2236 3232</strong>.
         </div>
       </section>
     </form>
