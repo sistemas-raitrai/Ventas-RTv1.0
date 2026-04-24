@@ -160,11 +160,13 @@ async function cargarGrupo() {
     return;
   }
 
-  chipGrupo.textContent =
-    limpiarTexto(grupoData.aliasGrupo) ||
-    limpiarTexto(grupoData.nombreGrupo) ||
-    limpiarTexto(grupoData.idGrupo) ||
-    idGrupo;
+  if (chipGrupo) {
+    chipGrupo.textContent =
+      limpiarTexto(grupoData.aliasGrupo) ||
+      limpiarTexto(grupoData.nombreGrupo) ||
+      limpiarTexto(grupoData.idGrupo) ||
+      idGrupo;
+  }
 
   chipColegio.textContent = limpiarTexto(grupoData.colegio) || "-";
   chipCurso.textContent = limpiarTexto(grupoData.curso) || "-";
