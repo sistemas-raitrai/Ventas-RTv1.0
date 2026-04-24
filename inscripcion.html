@@ -575,15 +575,15 @@
         <div class="sub">
           Este bloque solo aplica cuando el viajante es estudiante.
         </div>
-
+      
         <div class="form-grid">
           <div class="field col-6">
-            <label for="contactoPrincipalNombre">Nombre del apoderado <span class="req">*</span></label>
+            <label for="contactoPrincipalNombre">Nombre apoderado 1 <span class="req">*</span></label>
             <input id="contactoPrincipalNombre" name="contactoPrincipalNombre" type="text" />
           </div>
-
+      
           <div class="field col-3">
-            <label for="contactoPrincipalRelacion">Relación con el estudiante <span class="req">*</span></label>
+            <label for="contactoPrincipalRelacion">Relación con estudiante <span class="req">*</span></label>
             <select id="contactoPrincipalRelacion" name="contactoPrincipalRelacion">
               <option value="">Seleccione...</option>
               <option value="padre">Padre</option>
@@ -592,30 +592,79 @@
               <option value="otro">Otro</option>
             </select>
           </div>
-
+      
           <div id="contactoPrincipalRelacionOtroWrap" class="field col-3 hidden">
             <label for="contactoPrincipalRelacionOtro">Especifique relación <span class="req">*</span></label>
             <input id="contactoPrincipalRelacionOtro" name="contactoPrincipalRelacionOtro" type="text" />
           </div>
-
+      
           <div class="field col-4">
-            <label for="contactoPrincipalTelefono">Teléfono apoderado <span class="req">*</span></label>
+            <label for="contactoPrincipalTelefono">Teléfono apoderado 1 <span class="req">*</span></label>
             <input id="contactoPrincipalTelefono" name="contactoPrincipalTelefono" type="tel" />
-
+      
             <label class="option-pill" style="border-radius:14px; margin-top:8px;">
               <input type="checkbox" id="contactoPrincipalEsWhatsapp" name="contactoPrincipalEsWhatsapp" checked />
               Este número también es WhatsApp
             </label>
           </div>
-
+      
           <div id="contactoPrincipalWhatsappAlternativoWrap" class="field col-4 hidden">
             <label for="contactoPrincipalWhatsappAlternativo">Número válido para WhatsApp <span class="req">*</span></label>
             <input id="contactoPrincipalWhatsappAlternativo" name="contactoPrincipalWhatsappAlternativo" type="tel" />
           </div>
-
+      
           <div class="field col-6">
-            <label for="contactoPrincipalCorreo">Correo electrónico del apoderado <span class="req">*</span></label>
+            <label for="contactoPrincipalCorreo">Correo apoderado 1 <span class="req">*</span></label>
             <input id="contactoPrincipalCorreo" name="contactoPrincipalCorreo" type="email" />
+          </div>
+      
+          <div class="field">
+            <button type="button" id="btnAgregarApoderado2" class="btn-secondary">
+              + Agregar segundo apoderado
+            </button>
+          </div>
+        </div>
+      
+        <div id="bloqueApoderado2" class="form-grid hidden" style="margin-top:18px;">
+          <div class="field col-6">
+            <label for="contactoSecundarioNombre">Nombre apoderado 2</label>
+            <input id="contactoSecundarioNombre" name="contactoSecundarioNombre" type="text" />
+          </div>
+      
+          <div class="field col-3">
+            <label for="contactoSecundarioRelacion">Relación con estudiante</label>
+            <select id="contactoSecundarioRelacion" name="contactoSecundarioRelacion">
+              <option value="">Seleccione...</option>
+              <option value="padre">Padre</option>
+              <option value="madre">Madre</option>
+              <option value="tutor">Tutor(a)</option>
+              <option value="otro">Otro</option>
+            </select>
+          </div>
+      
+          <div id="contactoSecundarioRelacionOtroWrap" class="field col-3 hidden">
+            <label for="contactoSecundarioRelacionOtro">Especifique relación</label>
+            <input id="contactoSecundarioRelacionOtro" name="contactoSecundarioRelacionOtro" type="text" />
+          </div>
+      
+          <div class="field col-4">
+            <label for="contactoSecundarioTelefono">Teléfono apoderado 2</label>
+            <input id="contactoSecundarioTelefono" name="contactoSecundarioTelefono" type="tel" />
+      
+            <label class="option-pill" style="border-radius:14px; margin-top:8px;">
+              <input type="checkbox" id="contactoSecundarioEsWhatsapp" name="contactoSecundarioEsWhatsapp" checked />
+              Este número también es WhatsApp
+            </label>
+          </div>
+      
+          <div id="contactoSecundarioWhatsappAlternativoWrap" class="field col-4 hidden">
+            <label for="contactoSecundarioWhatsappAlternativo">Número válido para WhatsApp</label>
+            <input id="contactoSecundarioWhatsappAlternativo" name="contactoSecundarioWhatsappAlternativo" type="tel" />
+          </div>
+      
+          <div class="field col-6">
+            <label for="contactoSecundarioCorreo">Correo apoderado 2</label>
+            <input id="contactoSecundarioCorreo" name="contactoSecundarioCorreo" type="email" />
           </div>
         </div>
       </section>
@@ -625,15 +674,15 @@
         <div class="sub">
           Ingrese a una persona a quien podamos contactar si ocurriera una situación importante durante el viaje.
         </div>
-
+      
         <div class="form-grid">
           <div class="field col-6">
-            <label for="emergenciaNombre">Nombre contacto de emergencia <span class="req">*</span></label>
+            <label for="emergenciaNombre">Nombre contacto de emergencia 1 <span class="req">*</span></label>
             <input id="emergenciaNombre" name="emergenciaNombre" type="text" required />
           </div>
-
+      
           <div class="field col-3">
-            <label for="emergenciaRelacion">Relación con Viajante <span class="req">*</span></label>
+            <label for="emergenciaRelacion">Relación con viajante <span class="req">*</span></label>
             <select id="emergenciaRelacion" name="emergenciaRelacion" required>
               <option value="">Seleccione...</option>
               <option value="padre">Padre</option>
@@ -648,25 +697,75 @@
               <option value="otro">Otro</option>
             </select>
           </div>
-
+      
           <div id="emergenciaRelacionOtroWrap" class="field col-3 hidden">
             <label for="emergenciaRelacionOtro">Especifique relación <span class="req">*</span></label>
             <input id="emergenciaRelacionOtro" name="emergenciaRelacionOtro" type="text" />
           </div>
-
+      
           <div class="field col-4">
-            <label for="emergenciaTelefono">Teléfono contacto de emergencia <span class="req">*</span></label>
+            <label for="emergenciaTelefono">Teléfono emergencia 1 <span class="req">*</span></label>
             <input id="emergenciaTelefono" name="emergenciaTelefono" type="tel" required />
-
+      
             <label class="option-pill" style="border-radius:14px; margin-top:8px;">
               <input type="checkbox" id="emergenciaEsWhatsapp" name="emergenciaEsWhatsapp" checked />
               Este número también es WhatsApp
             </label>
           </div>
-
+      
           <div id="emergenciaWhatsappAlternativoWrap" class="field col-4 hidden">
             <label for="emergenciaWhatsappAlternativo">Número válido para WhatsApp <span class="req">*</span></label>
             <input id="emergenciaWhatsappAlternativo" name="emergenciaWhatsappAlternativo" type="tel" />
+          </div>
+      
+          <div class="field">
+            <button type="button" id="btnAgregarEmergencia2" class="btn-secondary">
+              + Agregar segundo contacto de emergencia
+            </button>
+          </div>
+        </div>
+      
+        <div id="bloqueEmergencia2" class="form-grid hidden" style="margin-top:18px;">
+          <div class="field col-6">
+            <label for="emergencia2Nombre">Nombre contacto de emergencia 2</label>
+            <input id="emergencia2Nombre" name="emergencia2Nombre" type="text" />
+          </div>
+      
+          <div class="field col-3">
+            <label for="emergencia2Relacion">Relación con viajante</label>
+            <select id="emergencia2Relacion" name="emergencia2Relacion">
+              <option value="">Seleccione...</option>
+              <option value="padre">Padre</option>
+              <option value="madre">Madre</option>
+              <option value="hermano">Hermano</option>
+              <option value="hermana">Hermana</option>
+              <option value="tio">Tío</option>
+              <option value="tia">Tía</option>
+              <option value="abuelo">Abuelo</option>
+              <option value="abuela">Abuela</option>
+              <option value="tutor">Tutor(a)</option>
+              <option value="otro">Otro</option>
+            </select>
+          </div>
+      
+          <div id="emergencia2RelacionOtroWrap" class="field col-3 hidden">
+            <label for="emergencia2RelacionOtro">Especifique relación</label>
+            <input id="emergencia2RelacionOtro" name="emergencia2RelacionOtro" type="text" />
+          </div>
+      
+          <div class="field col-4">
+            <label for="emergencia2Telefono">Teléfono emergencia 2</label>
+            <input id="emergencia2Telefono" name="emergencia2Telefono" type="tel" />
+      
+            <label class="option-pill" style="border-radius:14px; margin-top:8px;">
+              <input type="checkbox" id="emergencia2EsWhatsapp" name="emergencia2EsWhatsapp" checked />
+              Este número también es WhatsApp
+            </label>
+          </div>
+      
+          <div id="emergencia2WhatsappAlternativoWrap" class="field col-4 hidden">
+            <label for="emergencia2WhatsappAlternativo">Número válido para WhatsApp</label>
+            <input id="emergencia2WhatsappAlternativo" name="emergencia2WhatsappAlternativo" type="tel" />
           </div>
         </div>
       </section>
