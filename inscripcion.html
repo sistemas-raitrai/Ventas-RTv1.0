@@ -432,15 +432,30 @@
             </select>
           </div>
 
-          <div id="rutWrap" class="field col-4 hidden">
-            <label for="rutNumero">RUT <span class="req">*</span></label>
-            <input id="rutNumero" name="rutNumero" type="text" inputmode="numeric" />
-            <div id="rutHint" class="hint">Ingrese solo números.</div>
-          </div>
-
-          <div id="dvWrap" class="field col-2 hidden">
-            <label for="rutDv">Dígito Verificador</label>
-            <input id="rutDv" name="rutDv" type="text" maxlength="1" />
+          <div id="rutCompletoWrap" class="field col-6 hidden">
+            <label>RUT completo <span class="req">*</span></label>
+          
+            <div class="rut-linea">
+              <input
+                id="rutNumero"
+                name="rutNumero"
+                type="text"
+                inputmode="numeric"
+                placeholder="12345678"
+              />
+          
+              <span class="rut-guion">-</span>
+          
+              <input
+                id="rutDv"
+                name="rutDv"
+                type="text"
+                maxlength="1"
+                placeholder="K"
+              />
+            </div>
+          
+            <div id="rutHint" class="hint">Ingrese cuerpo del RUT y dígito verificador.</div>
           </div>
 
           <div id="sinRutNotice" class="field hidden">
