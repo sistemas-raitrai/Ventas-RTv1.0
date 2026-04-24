@@ -28,10 +28,12 @@
 
     * { box-sizing: border-box; }
 
+    html,
     body {
+      min-height: 100%;
       margin: 0;
       font-family: Arial, Helvetica, sans-serif;
-      background: var(--rt-bg);
+      background: #f2f3f7 !important;
       color: var(--rt-text);
     }
 
@@ -41,12 +43,12 @@
     }
 
     .hero {
-      background: linear-gradient(135deg, #ffffff 0%, #f3efff 100%);
+      background: linear-gradient(135deg, #ffffff 0%, #f6f2ff 100%);
       border: 1px solid var(--rt-border);
-      border-radius: 22px;
-      padding: 30px;
-      box-shadow: 0 10px 28px rgba(0,0,0,.05);
-      margin-bottom: 20px;
+      border-radius: 24px;
+      padding: 34px;
+      box-shadow: 0 24px 55px rgba(34, 28, 70, .14);
+      margin-bottom: 22px;
     }
 
     .hero h1 {
@@ -63,9 +65,9 @@
 
     .chips {
       display: grid;
-      grid-template-columns: repeat(5, minmax(130px, 1fr));
-      gap: 10px;
-      margin-top: 18px;
+      grid-template-columns: repeat(4, minmax(130px, 1fr));
+      gap: 12px;
+      margin-top: 22px;
     }
 
     .chip {
@@ -96,11 +98,11 @@
     }
 
     .card {
-      background: var(--rt-card);
+      background: #ffffff;
       border: 1px solid var(--rt-border);
-      border-radius: 18px;
-      padding: 22px;
-      box-shadow: 0 10px 28px rgba(0,0,0,.04);
+      border-radius: 20px;
+      padding: 24px;
+      box-shadow: 0 18px 42px rgba(34, 28, 70, .10);
     }
 
     .card h2 {
@@ -335,11 +337,10 @@
       </p>
 
       <div class="chips">
-        <div class="chip"><span>Grupo</span><strong id="chipGrupo">Cargando...</strong></div>
         <div class="chip"><span>Colegio</span><strong id="chipColegio">Cargando...</strong></div>
-        <div class="chip"><span>Curso</span><strong id="chipCurso">Cargando...</strong></div>
+        <div class="chip"><span>Curso actual</span><strong id="chipCurso">Cargando...</strong></div>
         <div class="chip"><span>Destino</span><strong id="chipDestino">Cargando...</strong></div>
-        <div class="chip"><span>Año viaje</span><strong id="chipAno">Cargando...</strong></div>
+        <div class="chip"><span>Año de viaje</span><strong id="chipAno">Cargando...</strong></div>
       </div>
 
       <div class="notice privacy" style="margin-top:20px;">
