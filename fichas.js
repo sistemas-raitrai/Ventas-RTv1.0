@@ -1230,7 +1230,7 @@ function bindEvents() {
     window.open(`contrato-pdf.html?id=${encodeURIComponent(id)}`, "_blank", "noopener");
   });
 
-  $("f_programaPdfFile")?.addEventListener("change", handleProgramaPdfSelected);
+  $("btnGuardarProgramaPdf")?.addEventListener("click", handleProgramaPdfSelected);
 
   $("btnAbrirProgramaPdf")?.addEventListener("click", () => {
     const url = getProgramaPdfUrl();
