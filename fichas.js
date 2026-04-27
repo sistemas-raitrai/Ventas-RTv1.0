@@ -561,6 +561,22 @@ function canEditFicha() {
   return canAccessGroup(state.group);
 }
 
+function canEditProgramaGrupo() {
+  if (!state.group) return false;
+  if (!canAccessGroup(state.group)) return false;
+
+  const isVendor = isVendorRole();
+
+  if (isVendor) {
+    if (!canEditFicha()) return false;
+    if (isVendorLockedByFlow(state.group)) return false;
+    if (state.group?.autorizada) return false;
+    return true;
+  }
+
+  return isJefaVentas() || canActAsFichaAdministracion();
+}
+
 function canOpenFicha() {
   return normalizeState(state.group?.estado) === "ganada";
 }
@@ -571,6 +587,7 @@ function canGeneratePdfVersionAsCurrentUser() {
 
 function getProgramaPdfUrl() {
   return cleanText(
+    getByPath(state.group, "programaGrupo.pdfUrl") ||
     state.ficha?.programaPdfUrl ||
     getByPath(state.group, "ficha.programaPdfUrl") ||
     state.group?.programaPdfUrl ||
@@ -580,6 +597,7 @@ function getProgramaPdfUrl() {
 
 function getProgramaPdfNombre() {
   return cleanText(
+    getByPath(state.group, "programaGrupo.pdfNombre") ||
     state.ficha?.programaPdfNombre ||
     getByPath(state.group, "ficha.programaPdfNombre") ||
     state.group?.programaPdfNombre ||
@@ -611,15 +629,20 @@ function updateProgramaPdfUi() {
   const metaEl = $("programaPdfMeta");
   const openBtn = $("btnAbrirProgramaPdf");
   const input = $("f_programaPdfFile");
+  const versionInput = $("f_programaVersion");
+  const descInput = $("f_programaDescripcionCambio");
 
+  const programa = state.group?.programaGrupo || {};
   const hasPdf = hasProgramaPdf();
   const fileName = getProgramaPdfNombre();
+  const version = cleanText(programa.versionPrograma || "");
+  const descripcion = cleanText(programa.descripcionCambio || "");
 
   if (statusEl) {
     if (state.isUploadingProgramaPdf) {
       statusEl.textContent = "Subiendo Programa PDF...";
     } else if (hasPdf) {
-      statusEl.textContent = "Programa PDF cargado";
+      statusEl.textContent = `Programa PDF cargado${version ? ` · Versión ${version}` : ""}`;
     } else {
       statusEl.textContent = "Programa PDF pendiente";
     }
@@ -629,7 +652,10 @@ function updateProgramaPdfUi() {
     if (state.isUploadingProgramaPdf) {
       metaEl.textContent = "Espera a que termine la subida del archivo.";
     } else if (hasPdf) {
-      metaEl.textContent = fileName || "Archivo cargado correctamente.";
+      metaEl.textContent = [
+        fileName || "Archivo cargado correctamente.",
+        descripcion ? `Cambio: ${descripcion}` : ""
+      ].filter(Boolean).join(" · ");
     } else {
       metaEl.textContent = "Debe subirse obligatoriamente antes de firmar como vendedor(a).";
     }
@@ -640,7 +666,17 @@ function updateProgramaPdfUi() {
   }
 
   if (input) {
-    input.disabled = !canEditFicha() || state.isUploadingProgramaPdf;
+    input.disabled = !canEditProgramaGrupo() || state.isUploadingProgramaPdf;
+  }
+
+  if (versionInput) {
+    versionInput.disabled = !canEditProgramaGrupo() || state.isUploadingProgramaPdf;
+    versionInput.value = version;
+  }
+
+  if (descInput) {
+    descInput.disabled = !canEditProgramaGrupo() || state.isUploadingProgramaPdf;
+    descInput.value = descripcion;
   }
 }
 
@@ -650,8 +686,8 @@ async function handleProgramaPdfSelected(event) {
 
   if (!file) return;
 
-  if (!canEditFicha()) {
-    showToast(getBlockedEditMessage(), "warning");
+  if (!canEditProgramaGrupo()) {
+    showToast("No tienes permisos para subir o reemplazar el programa en este momento.", "warning");
     input.value = "";
     return;
   }
@@ -662,6 +698,29 @@ async function handleProgramaPdfSelected(event) {
 
   if (!isPdf) {
     showToast("Solo se permite subir archivos PDF para el programa.", "warning");
+    input.value = "";
+    return;
+  }
+
+  const programaAnterior = state.group?.programaGrupo || {};
+  const anteriorNombre = getProgramaPdfNombre();
+  const anteriorUrl = getProgramaPdfUrl();
+
+  let versionPrograma = cleanText($("f_programaVersion")?.value || "");
+  if (!versionPrograma) {
+    const prev = Number(programaAnterior.versionPrograma || 0);
+    versionPrograma = String(Number.isFinite(prev) && prev > 0 ? prev + 1 : 1);
+  }
+
+  let descripcionCambio = cleanText($("f_programaDescripcionCambio")?.value || "");
+
+  if (anteriorUrl && !descripcionCambio) {
+    descripcionCambio = window.prompt("¿Qué cambia en esta versión del programa?") || "";
+    descripcionCambio = cleanText(descripcionCambio);
+  }
+
+  if (anteriorUrl && !descripcionCambio) {
+    showToast("Debes indicar qué cambia al reemplazar el programa.", "warning");
     input.value = "";
     return;
   }
@@ -680,53 +739,135 @@ async function handleProgramaPdfSelected(event) {
 
     const downloadUrl = await getDownloadURL(storageRef);
     const displayName = getDisplayName(state.effectiveUser);
+    const flow = state.group?.flowFicha || {};
 
     const patch = {
-      ficha: {
-        ...(state.group?.ficha || {}),
-        programaPdfUrl: downloadUrl,
-        programaPdfNombre: file.name,
-        programaPdfStoragePath: storagePath,
-        programaPdfSubidoPor: displayName,
-        programaPdfSubidoPorCorreo: state.effectiveEmail,
-        programaPdfSubidoEl: serverTimestamp(),
-        pdfPendienteGeneracion: true
+      programaGrupo: {
+        ...(programaAnterior || {}),
+        pdfUrl: downloadUrl,
+        pdfNombre: file.name,
+        storagePath,
+        versionPrograma,
+        descripcionCambio,
+        subidoPor: displayName,
+        subidoPorCorreo: state.effectiveEmail,
+        subidoEl: serverTimestamp(),
+        reemplazaArchivoNombre: anteriorNombre || "",
+        reemplazaArchivoUrl: anteriorUrl || ""
       },
-      actualizadoPor: displayName,
-      actualizadoPorCorreo: state.effectiveEmail,
+
       fechaActualizacion: serverTimestamp(),
-      fechaActualizacionFicha: serverTimestamp()
+      fechaActualizacionFicha: serverTimestamp(),
+      actualizadoPor: displayName,
+      actualizadoPorCorreo: state.effectiveEmail
     };
 
-    // =========================================================
-    // SINCRONIZACIÓN FICHA -> GRUPO
-    // Lo escrito en la ficha para Operaciones y Administración
-    // debe reflejarse también en la situación del grupo.
-    // =========================================================
-    setNestedValue(patch, "situacion.observacionOperaciones", values.infoOperacionesHtml || "");
-    patch.observacionesOperaciones = values.infoOperacionesHtml || "";
-  
-    setNestedValue(patch, "situacion.observacionAdministracion", values.infoAdministracionHtml || "");
-    patch.observacionesAdministracion = values.infoAdministracionHtml || "";
+    const yaFirmoVendedor = !!flow?.vendedor?.firmado;
+    const yaFirmoJefa = !!flow?.jefaVentas?.firmado;
+    const yaFirmoAdmin = !!flow?.administracion?.firmado;
+    const estabaAutorizada = !!state.group?.autorizada;
+
+    const debeReabrirPorJefa =
+      isJefaVentas() &&
+      yaFirmoVendedor &&
+      (yaFirmoJefa || yaFirmoAdmin || estabaAutorizada);
+
+    const debeReabrirPorAdmin =
+      canActAsFichaAdministracion() &&
+      yaFirmoVendedor &&
+      (yaFirmoJefa || yaFirmoAdmin || estabaAutorizada);
+
+    if (debeReabrirPorJefa || debeReabrirPorAdmin) {
+      patch.autorizada = false;
+      patch.fichaEstado = debeReabrirPorAdmin
+        ? "lista_vendedor"
+        : "revisada_jefa_ventas";
+
+      patch.firmaAdministracion = "";
+      patch.fichaPdfUrl = "";
+      patch.fichaPdfNombre = "";
+
+      patch.ficha = {
+        ...(state.group?.ficha || {}),
+        estado: patch.fichaEstado,
+        flujoModo: "v2",
+        confirmada: false,
+        pdfPendienteGeneracion: true,
+        pdfUrl: "",
+        pdfNombre: ""
+      };
+
+      patch.flowFicha = {
+        ...(flow || {}),
+        modo: "v2",
+        legacy: false,
+        estado: patch.fichaEstado,
+        requiereActualizacion: false,
+        requiereRefirmaAdministracion: true,
+
+        vendedor: {
+          ...(flow?.vendedor || {}),
+          firmado: true
+        },
+
+        jefaVentas: {
+          ...(flow?.jefaVentas || {}),
+          firmado: debeReabrirPorJefa ? true : false,
+          firmadoAt: debeReabrirPorJefa ? flow?.jefaVentas?.firmadoAt || null : null,
+          firmadoPor: debeReabrirPorJefa ? flow?.jefaVentas?.firmadoPor || "" : "",
+          firmadoPorCorreo: debeReabrirPorJefa ? flow?.jefaVentas?.firmadoPorCorreo || "" : "",
+          observacion: ""
+        },
+
+        administracion: {
+          ...(flow?.administracion || {}),
+          firmado: false,
+          firmadoAt: null,
+          firmadoPor: "",
+          firmadoPorCorreo: "",
+          observacion: ""
+        }
+      };
+
+      patch.documentos = {
+        ...(state.group.documentos || {}),
+        fichaGrupo: {
+          ...(state.group.documentos?.fichaGrupo || {}),
+          estado: patch.fichaEstado
+        }
+      };
+    }
 
     await setDoc(doc(db, "ventas_cotizaciones", state.groupDocId), patch, { merge: true });
 
     await createHistoryEntry({
-      tipoMovimiento: "programa_pdf_subido",
-      modulo: "ficha",
-      titulo: "Programa PDF subido",
-      mensaje: `${displayName} subió o reemplazó el Programa PDF del grupo.`,
+      tipoMovimiento: anteriorUrl ? "programa_pdf_reemplazado" : "programa_pdf_subido",
+      modulo: "programa",
+      titulo: anteriorUrl ? "Programa PDF reemplazado" : "Programa PDF subido",
+      mensaje: anteriorUrl
+        ? `${displayName} reemplazó el Programa PDF del grupo. Archivo anterior: ${anteriorNombre || "sin nombre"}. Archivo nuevo: ${file.name}. Versión programa: ${versionPrograma}. Cambio: ${descripcionCambio || "sin detalle"}.`
+        : `${displayName} subió el Programa PDF del grupo. Archivo: ${file.name}. Versión programa: ${versionPrograma}.`,
       metadata: {
         cambios: [
           {
-            campo: "ficha.programaPdfNombre",
-            anterior: state.group?.ficha?.programaPdfNombre || "",
+            campo: "programaGrupo.pdfNombre",
+            anterior: anteriorNombre || "",
             nuevo: file.name
           },
           {
-            campo: "ficha.programaPdfUrl",
-            anterior: state.group?.ficha?.programaPdfUrl || "",
+            campo: "programaGrupo.pdfUrl",
+            anterior: anteriorUrl || "",
             nuevo: downloadUrl
+          },
+          {
+            campo: "programaGrupo.versionPrograma",
+            anterior: programaAnterior.versionPrograma || "",
+            nuevo: versionPrograma
+          },
+          {
+            campo: "programaGrupo.descripcionCambio",
+            anterior: programaAnterior.descripcionCambio || "",
+            nuevo: descripcionCambio || ""
           }
         ]
       }
@@ -735,13 +876,17 @@ async function handleProgramaPdfSelected(event) {
     await loadAll();
     syncButtons();
 
-    showToast("Programa PDF subido correctamente.", "success");
+    showToast(
+      anteriorUrl
+        ? "Programa PDF reemplazado correctamente."
+        : "Programa PDF subido correctamente.",
+      "success"
+    );
   } catch (error) {
     console.error("[fichas] handleProgramaPdfSelected", error);
     showToast("No se pudo subir el Programa PDF: " + (error?.message || error), "error", { duration: 5000 });
   } finally {
     state.isUploadingProgramaPdf = false;
-
     if (input) input.value = "";
     updateProgramaPdfUi();
     syncButtons();
