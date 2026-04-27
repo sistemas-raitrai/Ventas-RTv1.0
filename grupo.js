@@ -1065,7 +1065,12 @@ function isV2FichaFlow(groupData = {}) {
 
 function isVendorLockedByFlow(groupData = {}) {
   const flow = groupData.flowFicha || {};
-  return isV2FichaFlow(groupData) && !!flow?.vendedor?.firmado;
+
+  // Regla de negocio:
+  // si el vendedor ya firmó, queda bloqueado aunque el grupo sea legacy.
+  // La excepción legacy aplica al cierre / PDF real y al flujo posterior,
+  // no a que el vendedor siga editando.
+  return !!flow?.vendedor?.firmado;
 }
 
 function canCreateFichaFromEstado() {
