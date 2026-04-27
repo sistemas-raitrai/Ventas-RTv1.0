@@ -598,6 +598,7 @@ function getExistingPdfUrl() {
 
 function getProgramaPdfUrl() {
   return cleanText(
+    getByPath(state.group, "programaGrupo.pdfUrl") ||
     state.ficha?.programaPdfUrl ||
     getByPath(state.group, "ficha.programaPdfUrl") ||
     state.group?.programaPdfUrl ||
@@ -607,6 +608,7 @@ function getProgramaPdfUrl() {
 
 function getProgramaPdfNombre() {
   return cleanText(
+    getByPath(state.group, "programaGrupo.pdfNombre") ||
     state.ficha?.programaPdfNombre ||
     getByPath(state.group, "ficha.programaPdfNombre") ||
     state.group?.programaPdfNombre ||
