@@ -703,7 +703,46 @@
             </p>
           </div>
         </article>
-                <article class="ficha-panel">
+
+        <article class="ficha-panel">
+          <div class="ficha-panel-head">
+            <div>
+              <h2 class="ficha-panel-title">Programa del grupo</h2>
+              <p class="ficha-panel-sub">Archivo obligatorio para firmar la ficha</p>
+            </div>
+          </div>
+        
+          <div class="ficha-panel-body">
+            <div class="mini-card">
+              <div class="mini-label">Estado programa</div>
+              <div class="mini-value" id="programaPdfStatus">Programa PDF pendiente</div>
+              <div class="muted small" id="programaPdfMeta" style="margin-top:6px;">
+                Debe subirse obligatoriamente antes de firmar como vendedor(a).
+              </div>
+            </div>
+        
+            <div class="field" style="margin-top:14px;">
+              <label for="f_programaVersion">Versión programa</label>
+              <input id="f_programaVersion" type="text" placeholder="Ej: 1, 2, 3..." />
+            </div>
+        
+            <div class="field" style="margin-top:14px;">
+              <label for="f_programaDescripcionCambio">Qué cambia en este programa</label>
+              <textarea id="f_programaDescripcionCambio" placeholder="Ej: Se actualiza itinerario, valores, hotel, actividades, etc."></textarea>
+            </div>
+        
+            <div class="field" style="margin-top:14px;">
+              <label for="f_programaPdfFile">Subir / reemplazar Programa PDF</label>
+              <input id="f_programaPdfFile" type="file" accept="application/pdf,.pdf" />
+            </div>
+        
+            <div class="hero-actions no-print" style="justify-content:flex-start; margin-top:14px;">
+              <button type="button" id="btnAbrirProgramaPdf" class="btn-pill">Abrir programa PDF</button>
+            </div>
+          </div>
+        </article>
+        
+        <article class="ficha-panel">
           <div class="ficha-panel-head">
             <div>
               <h2 class="ficha-panel-title">Flujo de revisión y firmas</h2>
@@ -910,29 +949,6 @@
               <div class="field span-8 readonly">
                 <label for="f_fechaActualizacionTexto">Fecha actualización</label>
                 <input id="f_fechaActualizacionTexto" type="text" readonly />
-              </div>
-
-              <div class="field span-4">
-                <label for="f_programaPdfFile">Programa PDF</label>
-                <input
-                  id="f_programaPdfFile"
-                  type="file"
-                  accept="application/pdf,.pdf"
-                />
-              
-                <div style="display:flex; gap:8px; align-items:center; margin-top:8px; flex-wrap:wrap;">
-                  <button type="button" id="btnAbrirProgramaPdf" class="btn-pill">
-                    Abrir programa PDF
-                  </button>
-                </div>
-              
-                <div id="programaPdfStatus" class="muted small" style="margin-top:8px;">
-                  Programa PDF pendiente
-                </div>
-              
-                <div id="programaPdfMeta" class="muted small" style="margin-top:4px;">
-                  Debe subirse obligatoriamente antes de firmar como vendedor(a).
-                </div>
               </div>
 
               <div class="field span-12">
