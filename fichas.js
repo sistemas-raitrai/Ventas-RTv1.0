@@ -1591,12 +1591,29 @@ function isEmptyFichaFieldValue(path = "", value = "") {
 }
 
 function shouldIgnoreTrackedFichaChange(path = "", anterior = "", nuevo = "") {
+  /*
+    Campos propios de administración.
+    Si los modifica Yenny / administracion@raitrai.cl / raitrai@raitrai.cl,
+    NO deben reabrir flujo ni volver a firma de vendedor.
+  */
+  const adminOnlySafeFields = new Set([
+    "numeroNegocio",
+    "usuarioFicha",
+    "claveAdministrativa"
+  ]);
+
+  if (canActAsFichaAdministracion() && adminOnlySafeFields.has(path)) {
+    return true;
+  }
+
+  /*
+    Regla general:
+    Observaciones puede completarse por primera vez sin reabrir flujo
+    si la edita jefa de ventas o administración.
+  */
   if (!isAdministrativeReviewEditor()) return false;
 
   const firstFillSafeFields = new Set([
-    "numeroNegocio",
-    "usuarioFicha",
-    "claveAdministrativa",
     "observacionesHtml"
   ]);
 
