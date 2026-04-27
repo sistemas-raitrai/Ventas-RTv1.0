@@ -698,6 +698,17 @@ async function handleProgramaPdfSelected(event) {
       fechaActualizacionFicha: serverTimestamp()
     };
 
+    // =========================================================
+    // SINCRONIZACIÓN FICHA -> GRUPO
+    // Lo escrito en la ficha para Operaciones y Administración
+    // debe reflejarse también en la situación del grupo.
+    // =========================================================
+    setNestedValue(patch, "situacion.observacionOperaciones", values.infoOperacionesHtml || "");
+    patch.observacionesOperaciones = values.infoOperacionesHtml || "";
+  
+    setNestedValue(patch, "situacion.observacionAdministracion", values.infoAdministracionHtml || "");
+    patch.observacionesAdministracion = values.infoAdministracionHtml || "";
+
     await setDoc(doc(db, "ventas_cotizaciones", state.groupDocId), patch, { merge: true });
 
     await createHistoryEntry({
