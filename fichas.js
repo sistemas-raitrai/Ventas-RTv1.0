@@ -767,6 +767,43 @@ async function handleProgramaPdfSelected(event) {
       actualizadoPorCorreo: state.effectiveEmail
     };
 
+    // =========================================================
+    // ESPEJO FICHA -> GRUPO
+    // Mantener en el grupo los mismos datos que quedaron en ficha.
+    // NO cambia variables de Firebase: usa las mismas ya existentes.
+    // =========================================================
+    const nombreProgramaGrupo = cleanText(values.nombrePrograma || "");
+    const tramoGrupo = cleanText(values.tramo || "");
+    const fechaViajeGrupo = cleanText(values.fechaViajeTexto || "");
+  
+    patch.nombreGrupo = values.nombreGrupo || "";
+    patch.nombreCliente = values.apoderadoEncargado || "";
+    patch.celularCliente = sanitizeChileMobileForSave(values.telefono || "");
+    patch.correoCliente = normalizeEmail(values.correo || "");
+  
+    patch.programa = nombreProgramaGrupo || "";
+    patch.programaOtro = nombreProgramaGrupo || "";
+  
+    patch.cantidadGrupo = values.numeroPaxTotal || "";
+    patch.tramo = tramoGrupo || "";
+    patch.tramoOtro = tramoGrupo || "";
+  
+    patch.descuento = values.descuentoValorBase || "";
+    patch.vendedora = values.nombreVendedor || "";
+    patch.asistenciaEnViajes = values.asistenciaEnViajes || "";
+    patch.asistenciaMed = values.asistenciaEnViajes || "";
+  
+    patch.fechaDeViaje = fechaViajeGrupo || "";
+    patch.fechaViaje = fechaViajeGrupo || "";
+    patch.semanaViaje = fechaViajeGrupo || "";
+  
+    // Observaciones compartidas
+    setNestedValue(patch, "situacion.observacionOperaciones", values.infoOperacionesHtml || "");
+    patch.observacionesOperaciones = values.infoOperacionesHtml || "";
+  
+    setNestedValue(patch, "situacion.observacionAdministracion", values.infoAdministracionHtml || "");
+    patch.observacionesAdministracion = values.infoAdministracionHtml || "";
+
     const yaFirmoVendedor = !!flow?.vendedor?.firmado;
     const yaFirmoJefa = !!flow?.jefaVentas?.firmado;
     const yaFirmoAdmin = !!flow?.administracion?.firmado;
