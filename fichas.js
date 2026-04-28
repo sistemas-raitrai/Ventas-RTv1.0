@@ -1859,6 +1859,46 @@ function shouldReopenFlowAfterFichaSave(trackedChanges = []) {
   return !!flow?.vendedor?.firmado && downstreamStarted;
 }
 
+function isAccidentalFichaMassClear(previousFicha = {}, values = {}) {
+  const protectedFields = [
+    "solicitudReserva",
+    "nombreGrupo",
+    "apoderadoEncargado",
+    "telefono",
+    "correo",
+    "nombrePrograma",
+    "valorPrograma",
+    "numeroPaxTotal",
+    "tramo",
+    "liberados",
+    "categoriaHoteleraContratada",
+    "autorizacionGerencia",
+    "descuentoValorBase",
+    "fechaViajeTexto",
+    "asistenciaEnViajes",
+    "nombreVendedor",
+    "numeroNegocio",
+    "usuarioFicha",
+    "claveAdministrativa",
+    "infoOperacionesHtml",
+    "infoAdministracionHtml"
+  ];
+
+  const deleted = protectedFields.filter((field) => {
+    const before = isRichField(field)
+      ? normalizeRichHtml(previousFicha[field] || "")
+      : cleanText(previousFicha[field] || "");
+
+    const after = isRichField(field)
+      ? normalizeRichHtml(values[field] || "")
+      : cleanText(values[field] || "");
+
+    return before && !after;
+  });
+
+  return deleted.length >= 5;
+}
+
 /* =========================================================
    SAVE
 ========================================================= */
@@ -1911,6 +1951,27 @@ async function saveFicha({ silent = false, reloadAfterSave = true } = {}) {
   };
 
   const observacionesPlain = richHtmlToPlainText(values.observacionesHtml);
+  
+  // Blindaje: evita que una reapertura/actualización borre accidentalmente
+  // toda la ficha si el formulario viene vacío o mal hidratado.
+  if (isAccidentalFichaMassClear(previousFichaView, values)) {
+    showToast(
+      "Se detectó que la ficha quedaría casi vacía. No se guardó para evitar borrar datos existentes. Recarga la página e intenta nuevamente.",
+      "error",
+      { duration: 7000 }
+    );
+  
+    console.warn("[fichas] Guardado bloqueado por posible borrado masivo accidental", {
+      previousFichaView,
+      values
+    });
+  
+    return {
+      ok: false,
+      reason: "mass_clear_guard"
+    };
+  }
+  
   const actualChanges = [];
   const trackedChanges = [];
 
