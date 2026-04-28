@@ -2987,6 +2987,45 @@ function capitalize(value = "") {
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
+function setNestedValue(obj = {}, path = "", value = "") {
+  const parts = String(path || "").split(".").filter(Boolean);
+  if (!parts.length) return obj;
+
+  let ref = obj;
+
+  for (let i = 0; i < parts.length - 1; i += 1) {
+    const key = parts[i];
+
+    if (!ref[key] || typeof ref[key] !== "object" || Array.isArray(ref[key])) {
+      ref[key] = {};
+    }
+
+    ref = ref[key];
+  }
+
+  ref[parts[parts.length - 1]] = value;
+  return obj;
+}
+
+function sanitizeChileMobileForSave(value = "") {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+
+  let digits = raw.replace(/\D/g, "");
+
+  if (digits.startsWith("56")) {
+    digits = digits.slice(2);
+  }
+
+  if (digits.startsWith("9")) {
+    digits = digits.slice(1);
+  }
+
+  digits = digits.slice(0, 8);
+
+  return digits ? `+569${digits}` : "";
+}
+
 function escapeHtml(value = "") {
   return String(value ?? "")
     .replaceAll("&", "&amp;")
