@@ -2271,15 +2271,11 @@ function renderSituacion() {
   setText("situacionUltimoCambioEstado", fechaCambioEstadoTxt);
 
   const obsAdmin = sanitizeRichHtml(
-    getByPath(state.group, "situacion.observacionAdministracion") ||
-    state.group.observacionesAdministracion ||
-    ""
+    getSharedObsAdministracion(state.group)
   ) || "—";
-
+  
   const obsOps = sanitizeRichHtml(
-    getByPath(state.group, "situacion.observacionOperaciones") ||
-    state.group.observacionesOperaciones ||
-    ""
+    getSharedObsOperaciones(state.group)
   ) || "—";
 
   const adminWrap = $("situacionObsAdminWrap");
@@ -3333,6 +3329,24 @@ function openDatosModal() {
   openModal("modalDatos");
 }
 
+function getSharedObsAdministracion(groupData = state.group || {}) {
+  return (
+    getByPath(groupData, "ficha.infoAdministracionHtml") ||
+    getByPath(groupData, "situacion.observacionAdministracion") ||
+    groupData.observacionesAdministracion ||
+    ""
+  );
+}
+
+function getSharedObsOperaciones(groupData = state.group || {}) {
+  return (
+    getByPath(groupData, "ficha.infoOperacionesHtml") ||
+    getByPath(groupData, "situacion.observacionOperaciones") ||
+    groupData.observacionesOperaciones ||
+    ""
+  );
+}
+
 function openSituacionModal() {
   if (!canEditGroup()) {
     alert(getBlockedEditMessage());
@@ -3347,16 +3361,12 @@ function openSituacionModal() {
 
   setRichEditorHtml(
     "s_obsAdmin",
-    getByPath(state.group, "situacion.observacionAdministracion") ||
-    state.group.observacionesAdministracion ||
-    ""
+    getSharedObsAdministracion(state.group)
   );
-
+  
   setRichEditorHtml(
     "s_obsOperaciones",
-    getByPath(state.group, "situacion.observacionOperaciones") ||
-    state.group.observacionesOperaciones ||
-    ""
+    getSharedObsOperaciones(state.group)
   );
 
   openModal("modalSituacion");
@@ -4074,6 +4084,34 @@ async function saveDatos() {
     });
   }
 
+  // =========================================================
+  // ESPEJO GRUPO -> FICHA
+  // Mantener en ficha los mismos datos editados desde el modal Datos.
+  // NO cambia variables de Firebase: usa las mismas ya existentes.
+  // =========================================================
+  const nombreProgramaFicha =
+    values.programa === "OTRO"
+      ? (values.programaOtro || "")
+      : (values.programaOtro || values.programa || "");
+  
+  const tramoFicha =
+    values.tramo === "OTRO"
+      ? (values.tramoOtro || "")
+      : (values.tramoOtro || values.tramo || "");
+  
+  const fechaViajeFicha =
+    values.mesViaje === "OTRO"
+      ? (values.mesViajeOtro || "")
+      : (values.mesViajeOtro || values.mesViaje || values.semanaViaje || "");
+  
+  setNestedValue(patch, "ficha.apoderadoEncargado", values.nombreCliente || "");
+  setNestedValue(patch, "ficha.telefono", values.celularCliente || "");
+  setNestedValue(patch, "ficha.correo", values.correoCliente || "");
+  setNestedValue(patch, "ficha.nombrePrograma", nombreProgramaFicha || "");
+  setNestedValue(patch, "ficha.numeroPaxTotal", values.cantidadGrupo || "");
+  setNestedValue(patch, "ficha.tramo", tramoFicha || "");
+  setNestedValue(patch, "ficha.fechaViajeTexto", fechaViajeFicha || "");
+
   await applyCriticalChangeRules(patch, cambios);
 
   await saveGroupPatch(patch, {
@@ -4267,29 +4305,32 @@ async function saveSituacion() {
     const adminNuevo = getRichEditorHtml("s_obsAdmin");
     const opsNuevo = getRichEditorHtml("s_obsOperaciones");
 
-    const adminAnterior =
-      getByPath(state.group, "situacion.observacionAdministracion") ||
-      state.group.observacionesAdministracion ||
-      "";
-
-    const opsAnterior =
-      getByPath(state.group, "situacion.observacionOperaciones") ||
-      state.group.observacionesOperaciones ||
-      "";
-
+    const adminAnterior = getSharedObsAdministracion(state.group);
+    const opsAnterior = getSharedObsOperaciones(state.group);
+    
     if (normalizeRichHtml(adminAnterior) !== normalizeRichHtml(adminNuevo)) {
+      // espejo grupo
       setNestedValue(patch, "situacion.observacionAdministracion", adminNuevo);
       patch.observacionesAdministracion = adminNuevo;
+    
+      // espejo ficha
+      setNestedValue(patch, "ficha.infoAdministracionHtml", adminNuevo);
+    
       cambios.push({
         campo: "situacion.observacionAdministracion",
         anterior: adminAnterior,
         nuevo: adminNuevo
       });
     }
-
+    
     if (normalizeRichHtml(opsAnterior) !== normalizeRichHtml(opsNuevo)) {
+      // espejo grupo
       setNestedValue(patch, "situacion.observacionOperaciones", opsNuevo);
       patch.observacionesOperaciones = opsNuevo;
+    
+      // espejo ficha
+      setNestedValue(patch, "ficha.infoOperacionesHtml", opsNuevo);
+    
       cambios.push({
         campo: "situacion.observacionOperaciones",
         anterior: opsAnterior,
