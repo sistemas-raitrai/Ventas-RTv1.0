@@ -685,25 +685,12 @@ function updateProgramaPdfUi() {
   }
 }
 
-async function handleProgramaPdfSelected(event) {
-  const input = event?.target;
-  const file = input?.files?.[0];
-
-  if (!file) return;
+async function saveProgramaGrupo() {
+  const input = $("f_programaPdfFile");
+  const file = input?.files?.[0] || null;
 
   if (!canEditProgramaGrupo()) {
     showToast("No tienes permisos para subir o reemplazar el programa en este momento.", "warning");
-    input.value = "";
-    return;
-  }
-
-  const isPdf =
-    file.type === "application/pdf" ||
-    /\.pdf$/i.test(file.name || "");
-
-  if (!isPdf) {
-    showToast("Solo se permite subir archivos PDF para el programa.", "warning");
-    input.value = "";
     return;
   }
 
@@ -711,54 +698,87 @@ async function handleProgramaPdfSelected(event) {
   const anteriorNombre = getProgramaPdfNombre();
   const anteriorUrl = getProgramaPdfUrl();
 
+  if (!file && !anteriorUrl) {
+    showToast("Debes seleccionar un archivo PDF para guardar el programa.", "warning");
+    return;
+  }
+
   let versionPrograma = cleanText($("f_programaVersion")?.value || "");
   if (!versionPrograma) {
     const prev = Number(programaAnterior.versionPrograma || 0);
-    versionPrograma = String(Number.isFinite(prev) && prev > 0 ? prev + 1 : 1);
+    versionPrograma = String(Number.isFinite(prev) && prev > 0 ? prev : 1);
   }
 
-  let descripcionCambio = cleanText($("f_programaDescripcionCambio")?.value || "");
+  const descripcionCambio = cleanText($("f_programaDescripcionCambio")?.value || "");
+  const displayName = getDisplayName(state.effectiveUser);
+  const flow = state.group?.flowFicha || {};
+  const esReemplazo = !!file && !!anteriorUrl;
 
-  if (anteriorUrl && !descripcionCambio) {
-    descripcionCambio = window.prompt("¿Qué cambia en esta versión del programa?") || "";
-    descripcionCambio = cleanText(descripcionCambio);
-  }
+  let downloadUrl = anteriorUrl || "";
+  let storagePath = programaAnterior.storagePath || "";
+  let pdfNombre = anteriorNombre || "";
 
-  if (anteriorUrl && !descripcionCambio) {
-    showToast("Debes indicar qué cambia al reemplazar el programa.", "warning");
-    input.value = "";
-    return;
-  }
+  /*
+    ESPEJO FICHA -> GRUPO
+    Importante:
+    acá NO usamos "values" porque esa variable solo existe dentro de saveFicha().
+    Tomamos los valores directamente desde el formulario actual.
+  */
+  const fichaValues = {
+    nombreGrupo: getValue("f_nombreGrupo"),
+    apoderadoEncargado: getValue("f_apoderadoEncargado"),
+    telefono: getValue("f_telefono"),
+    correo: getValue("f_correo"),
+    nombrePrograma: getValue("f_nombrePrograma"),
+    numeroPaxTotal: getValue("f_numeroPaxTotal"),
+    tramo: getValue("f_tramo"),
+    descuentoValorBase: getValue("f_descuentoValorBase"),
+    nombreVendedor: getValue("f_nombreVendedor"),
+    asistenciaEnViajes: getValue("f_asistenciaEnViajes"),
+    fechaViajeTexto: getValue("f_fechaViajeTexto"),
+    infoOperacionesHtml: getRichEditorHtml("f_infoOperaciones"),
+    infoAdministracionHtml: getRichEditorHtml("f_infoAdministracion")
+  };
 
   state.isUploadingProgramaPdf = true;
   updateProgramaPdfUi();
 
   try {
-    const storage = getStorage();
-    const storagePath = buildProgramaPdfStoragePath(file.name);
-    const storageRef = ref(storage, storagePath);
+    if (file) {
+      const isPdf =
+        file.type === "application/pdf" ||
+        /\.pdf$/i.test(file.name || "");
 
-    await uploadBytes(storageRef, file, {
-      contentType: "application/pdf"
-    });
+      if (!isPdf) {
+        showToast("Solo se permite subir archivos PDF para el programa.", "warning");
+        return;
+      }
 
-    const downloadUrl = await getDownloadURL(storageRef);
-    const displayName = getDisplayName(state.effectiveUser);
-    const flow = state.group?.flowFicha || {};
+      const storage = getStorage();
+      storagePath = buildProgramaPdfStoragePath(file.name);
+      const storageRef = ref(storage, storagePath);
+
+      await uploadBytes(storageRef, file, {
+        contentType: "application/pdf"
+      });
+
+      downloadUrl = await getDownloadURL(storageRef);
+      pdfNombre = file.name;
+    }
 
     const patch = {
       programaGrupo: {
         ...(programaAnterior || {}),
         pdfUrl: downloadUrl,
-        pdfNombre: file.name,
+        pdfNombre,
         storagePath,
         versionPrograma,
         descripcionCambio,
         subidoPor: displayName,
         subidoPorCorreo: state.effectiveEmail,
         subidoEl: serverTimestamp(),
-        reemplazaArchivoNombre: anteriorNombre || "",
-        reemplazaArchivoUrl: anteriorUrl || ""
+        reemplazaArchivoNombre: esReemplazo ? anteriorNombre || "" : "",
+        reemplazaArchivoUrl: esReemplazo ? anteriorUrl || "" : ""
       },
 
       fechaActualizacion: serverTimestamp(),
@@ -769,40 +789,38 @@ async function handleProgramaPdfSelected(event) {
 
     // =========================================================
     // ESPEJO FICHA -> GRUPO
-    // Mantener en el grupo los mismos datos que quedaron en ficha.
-    // NO cambia variables de Firebase: usa las mismas ya existentes.
+    // Mantiene el grupo coherente con lo que está escrito en ficha.
     // =========================================================
-    const nombreProgramaGrupo = cleanText(values.nombrePrograma || "");
-    const tramoGrupo = cleanText(values.tramo || "");
-    const fechaViajeGrupo = cleanText(values.fechaViajeTexto || "");
-  
-    patch.nombreGrupo = values.nombreGrupo || "";
-    patch.nombreCliente = values.apoderadoEncargado || "";
-    patch.celularCliente = sanitizeChileMobileForSave(values.telefono || "");
-    patch.correoCliente = normalizeEmail(values.correo || "");
-  
+    const nombreProgramaGrupo = cleanText(fichaValues.nombrePrograma || "");
+    const tramoGrupo = cleanText(fichaValues.tramo || "");
+    const fechaViajeGrupo = cleanText(fichaValues.fechaViajeTexto || "");
+
+    patch.nombreGrupo = fichaValues.nombreGrupo || "";
+    patch.nombreCliente = fichaValues.apoderadoEncargado || "";
+    patch.celularCliente = sanitizeChileMobileForSave(fichaValues.telefono || "");
+    patch.correoCliente = normalizeEmail(fichaValues.correo || "");
+
     patch.programa = nombreProgramaGrupo || "";
     patch.programaOtro = nombreProgramaGrupo || "";
-  
-    patch.cantidadGrupo = values.numeroPaxTotal || "";
+
+    patch.cantidadGrupo = fichaValues.numeroPaxTotal || "";
     patch.tramo = tramoGrupo || "";
     patch.tramoOtro = tramoGrupo || "";
-  
-    patch.descuento = values.descuentoValorBase || "";
-    patch.vendedora = values.nombreVendedor || "";
-    patch.asistenciaEnViajes = values.asistenciaEnViajes || "";
-    patch.asistenciaMed = values.asistenciaEnViajes || "";
-  
+
+    patch.descuento = fichaValues.descuentoValorBase || "";
+    patch.vendedora = fichaValues.nombreVendedor || "";
+    patch.asistenciaEnViajes = fichaValues.asistenciaEnViajes || "";
+    patch.asistenciaMed = fichaValues.asistenciaEnViajes || "";
+
     patch.fechaDeViaje = fechaViajeGrupo || "";
     patch.fechaViaje = fechaViajeGrupo || "";
     patch.semanaViaje = fechaViajeGrupo || "";
-  
-    // Observaciones compartidas
-    setNestedValue(patch, "situacion.observacionOperaciones", values.infoOperacionesHtml || "");
-    patch.observacionesOperaciones = values.infoOperacionesHtml || "";
-  
-    setNestedValue(patch, "situacion.observacionAdministracion", values.infoAdministracionHtml || "");
-    patch.observacionesAdministracion = values.infoAdministracionHtml || "";
+
+    setNestedValue(patch, "situacion.observacionOperaciones", fichaValues.infoOperacionesHtml || "");
+    patch.observacionesOperaciones = fichaValues.infoOperacionesHtml || "";
+
+    setNestedValue(patch, "situacion.observacionAdministracion", fichaValues.infoAdministracionHtml || "");
+    patch.observacionesAdministracion = fichaValues.infoAdministracionHtml || "";
 
     const yaFirmoVendedor = !!flow?.vendedor?.firmado;
     const yaFirmoJefa = !!flow?.jefaVentas?.firmado;
@@ -810,11 +828,13 @@ async function handleProgramaPdfSelected(event) {
     const estabaAutorizada = !!state.group?.autorizada;
 
     const debeReabrirPorJefa =
+      esReemplazo &&
       isJefaVentas() &&
       yaFirmoVendedor &&
       (yaFirmoJefa || yaFirmoAdmin || estabaAutorizada);
 
     const debeReabrirPorAdmin =
+      esReemplazo &&
       canActAsFichaAdministracion() &&
       yaFirmoVendedor &&
       (yaFirmoJefa || yaFirmoAdmin || estabaAutorizada);
@@ -883,28 +903,34 @@ async function handleProgramaPdfSelected(event) {
     await setDoc(doc(db, "ventas_cotizaciones", state.groupDocId), patch, { merge: true });
 
     await createHistoryEntry({
-      tipoMovimiento: anteriorUrl ? "programa_pdf_reemplazado" : "programa_pdf_subido",
+      tipoMovimiento: esReemplazo ? "programa_pdf_reemplazado" : "programa_pdf_guardado",
       modulo: "programa",
-      titulo: anteriorUrl ? "Programa PDF reemplazado" : "Programa PDF subido",
-      mensaje: anteriorUrl
-        ? `${displayName} reemplazó el Programa PDF del grupo. Archivo anterior: ${anteriorNombre || "sin nombre"}. Archivo nuevo: ${file.name}. Versión programa: ${versionPrograma}. Cambio: ${descripcionCambio || "sin detalle"}.`
-        : `${displayName} subió el Programa PDF del grupo. Archivo: ${file.name}. Versión programa: ${versionPrograma}.`,
+      titulo: esReemplazo ? "Programa PDF reemplazado" : "Programa PDF guardado",
+      mensaje: [
+        esReemplazo
+          ? `${displayName} reemplazó el Programa PDF del grupo.`
+          : `${displayName} guardó el Programa PDF del grupo.`,
+        anteriorNombre ? `Archivo anterior: ${anteriorNombre}.` : "",
+        pdfNombre ? `Archivo actual: ${pdfNombre}.` : "",
+        versionPrograma ? `Versión programa: ${versionPrograma}.` : "",
+        descripcionCambio ? `Detalle: ${descripcionCambio}.` : ""
+      ].filter(Boolean).join(" "),
       metadata: {
         cambios: [
           {
             campo: "programaGrupo.pdfNombre",
             anterior: anteriorNombre || "",
-            nuevo: file.name
+            nuevo: pdfNombre || ""
           },
           {
             campo: "programaGrupo.pdfUrl",
             anterior: anteriorUrl || "",
-            nuevo: downloadUrl
+            nuevo: downloadUrl || ""
           },
           {
             campo: "programaGrupo.versionPrograma",
             anterior: programaAnterior.versionPrograma || "",
-            nuevo: versionPrograma
+            nuevo: versionPrograma || ""
           },
           {
             campo: "programaGrupo.descripcionCambio",
@@ -919,14 +945,14 @@ async function handleProgramaPdfSelected(event) {
     syncButtons();
 
     showToast(
-      anteriorUrl
+      esReemplazo
         ? "Programa PDF reemplazado correctamente."
-        : "Programa PDF subido correctamente.",
+        : "Programa PDF guardado correctamente.",
       "success"
     );
   } catch (error) {
-    console.error("[fichas] handleProgramaPdfSelected", error);
-    showToast("No se pudo subir el Programa PDF: " + (error?.message || error), "error", { duration: 5000 });
+    console.error("[fichas] saveProgramaGrupo", error);
+    showToast("No se pudo guardar el Programa PDF: " + (error?.message || error), "error", { duration: 5000 });
   } finally {
     state.isUploadingProgramaPdf = false;
     if (input) input.value = "";
@@ -1272,7 +1298,7 @@ function bindEvents() {
     window.open(`contrato-pdf.html?id=${encodeURIComponent(id)}`, "_blank", "noopener");
   });
 
-  $("btnGuardarProgramaPdf")?.addEventListener("click", handleProgramaPdfSelected);
+  $("btnGuardarProgramaPdf")?.addEventListener("click", saveProgramaGrupo);
 
   $("btnAbrirProgramaPdf")?.addEventListener("click", () => {
     const url = getProgramaPdfUrl();
