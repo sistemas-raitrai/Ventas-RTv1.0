@@ -1081,32 +1081,32 @@ function getFichaSummary() {
   const ficha = getByPath(state.group, "ficha") || {};
 
   const numeroNegocio =
-    state.group.numeroNegocio ??
     ficha.numeroNegocio ??
+    state.group.numeroNegocio ??
     "";
-
+  
   const version =
-    state.group.versionFicha ||
     ficha.version ||
+    state.group.versionFicha ||
     "";
-
+  
   const fechaActualizacion =
-    state.group.fechaActualizacionFicha ||
     ficha.fechaActualizacion ||
+    state.group.fechaActualizacionFicha ||
     "";
-
+  
   const pdfUrl =
     cleanText(
-      state.group.fichaPdfUrl ||
       ficha.pdfUrl ||
+      state.group.fichaPdfUrl ||
       ficha.urlPdf ||
       ""
     );
-
+  
   const pdfNombre =
     cleanText(
-      state.group.fichaPdfNombre ||
       ficha.pdfNombre ||
+      state.group.fichaPdfNombre ||
       ficha.nombrePdf ||
       ""
     );
