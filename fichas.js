@@ -1625,8 +1625,7 @@ async function signFlowFromFicha(step) {
         estado: "revisada_jefa",
         revisadaPor: nombre,
         revisadaPorCorreo: state.effectiveEmail,
-        respuestaAdministracion,
-        respuestaJefa: pendingRequest?.respuestaJefa || "",
+        respuestaJefa,
         fechaRevisionJefa: serverTimestamp()
       };
     }
@@ -1704,13 +1703,14 @@ async function signFlowFromFicha(step) {
       return;
     }
 
-    if (flow?.administracion?.firmado) {
+    const pendingRequest = getLatestOpenFichaUpdateRequest();
+    const hadPendingRequest = !!pendingRequest;
+    
+    if (flow?.administracion?.firmado && !hadPendingRequest) {
       alert("La firma de administración ya está registrada.");
       return;
     }
-
-    const pendingRequest = getLatestOpenFichaUpdateRequest();
-    const hadPendingRequest = !!pendingRequest;
+    
     let respuestaAdministracion = "";
     
     if (hadPendingRequest) {
