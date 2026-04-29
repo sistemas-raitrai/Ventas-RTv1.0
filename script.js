@@ -658,8 +658,23 @@ function isFichaPorFirmarSegunUsuario(row = {}, effectiveUser = null) {
 }
 
 function getFichasPorFirmarSegunUsuario(rows = [], effectiveUser = null) {
+  const solicitudesAbiertasIds = new Set(
+    (state.solicitudesRows || [])
+      .filter(isSolicitudActualizacionAbierta)
+      .map((sol) => String(sol.idGrupo || "").trim())
+      .filter(Boolean)
+  );
+
   return dedupeRowsByGroup(rows)
-    .filter((row) => isFichaPorFirmarSegunUsuario(row, effectiveUser))
+    .filter((row) => {
+      const idGrupo = getRowId(row);
+
+      // Si tiene solicitud de actualización abierta,
+      // sale de "fichas por firmar" y queda solo en "solicitudes de actualización".
+      if (solicitudesAbiertasIds.has(idGrupo)) return false;
+
+      return isFichaPorFirmarSegunUsuario(row, effectiveUser);
+    })
     .sort((a, b) => {
       const aliasA = getAliasColegioSortKey(getRowAlias(a));
       const aliasB = getAliasColegioSortKey(getRowAlias(b));
