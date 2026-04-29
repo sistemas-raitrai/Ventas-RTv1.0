@@ -45,6 +45,7 @@ const $ = (id) => document.getElementById(id);
 const GITHUB_HOME_URL = "https://sistemas-raitrai.github.io/Ventas-RT/";
 const HISTORIAL_COLLECTION = "ventas_historial";
 const SOLICITUDES_COLLECTION = "ventas_solicitudes_actualizacion";
+const ALERTAS_COLLECTION = "ventas_alertas";
 
 const richSelectionByEditor = new Map();
 let richEditorsBound = false;
@@ -517,6 +518,62 @@ function getPendingFichaUpdateRequests() {
 
 function hasPendingUpdateRequest() {
   return getPendingFichaUpdateRequests().length > 0;
+}
+
+function getLatestPendingFichaUpdateRequest() {
+  return getPendingFichaUpdateRequests()[0] || null;
+}
+
+async function createFichaAlert({
+  titulo = "",
+  mensaje = "",
+  nivel = "info",
+  destinatarioRol = "",
+  destinatarioCorreo = ""
+} = {}) {
+  await addDoc(collection(db, ALERTAS_COLLECTION), {
+    idGrupo: String(state.groupId),
+    codigoRegistro: cleanText(state.group?.codigoRegistro),
+    aliasGrupo: cleanText(state.group?.aliasGrupo),
+    colegio: cleanText(state.group?.colegio),
+
+    tipo: "solicitud_actualizacion_ficha",
+    origen: "ficha",
+    modulo: "ficha",
+    nivel,
+    titulo,
+    mensaje,
+
+    destinatarioRol,
+    destinatarioCorreo: normalizeEmail(destinatarioCorreo || ""),
+
+    activa: true,
+    visibleEnIndex: true,
+    visibleEnGrupo: true,
+    resuelta: false,
+
+    creadoPor: getDisplayName(state.effectiveUser),
+    creadoPorCorreo: state.effectiveEmail,
+    fechaCreacion: serverTimestamp()
+  });
+}
+
+async function markPendingFichaUpdateRequestsAsReviewedByJefa({
+  reviewedBy = getDisplayName(state.effectiveUser),
+  reviewedByCorreo = state.effectiveEmail
+} = {}) {
+  const pending = getPendingFichaUpdateRequests();
+
+  for (const item of pending) {
+    await setDoc(doc(db, SOLICITUDES_COLLECTION, item.id), {
+      estadoSolicitud: "revisada_jefa",
+      revisadaPor: reviewedBy,
+      revisadaPorCorreo: reviewedByCorreo,
+      fechaRevisionJefa: serverTimestamp()
+    }, { merge: true });
+  }
+
+  return pending.length;
 }
 
 function canRequestFichaUpdate() {
@@ -1464,22 +1521,51 @@ async function signFlowFromFicha(step) {
       alert("Esta firma solo puede realizarla la jefa de ventas.");
       return;
     }
-
+  
     if (!flow?.vendedor?.firmado) {
       alert("Primero debe firmar el vendedor(a).");
       return;
     }
-
-    if (flow?.jefaVentas?.firmado) {
+  
+    const pendingRequest = getLatestPendingFichaUpdateRequest();
+    const hadPendingRequest = !!pendingRequest;
+  
+    if (flow?.jefaVentas?.firmado && !hadPendingRequest) {
       alert("La firma de jefa de ventas ya está registrada.");
       return;
     }
-
+  
+    const flowPatch = {
+      ...(state.group.flowFicha || {}),
+      modo: "v2",
+      legacy: false,
+      estado: "revisada_jefa_ventas",
+      requiereActualizacion: hadPendingRequest ? true : false,
+      jefaVentas: {
+        ...(state.group.flowFicha?.jefaVentas || {}),
+        firmado: true,
+        firmadoAt: serverTimestamp(),
+        firmadoPor: nombre,
+        firmadoPorCorreo: state.effectiveEmail,
+        observacion: ""
+      }
+    };
+  
+    if (hadPendingRequest) {
+      flowPatch.ultimaSolicitudActualizacion = {
+        ...(state.group.flowFicha?.ultimaSolicitudActualizacion || {}),
+        estado: "revisada_jefa_ventas",
+        revisadaPor: nombre,
+        revisadaPorCorreo: state.effectiveEmail,
+        fechaRevisionJefa: serverTimestamp()
+      };
+    }
+  
     const patch = {
       fichaFlujoModo: "v2",
       fichaEstado: "revisada_jefa_ventas",
       firmaSupervision: nombre,
-
+  
       documentos: {
         ...(state.group.documentos || {}),
         fichaGrupo: {
@@ -1487,43 +1573,51 @@ async function signFlowFromFicha(step) {
           estado: "revisada_jefa_ventas"
         }
       },
-
+  
       ficha: {
         ...(state.group.ficha || {}),
         flujoModo: "v2",
         estado: "revisada_jefa_ventas"
       },
-
-      flowFicha: {
-        ...(state.group.flowFicha || {}),
-        modo: "v2",
-        legacy: false,
-        estado: "revisada_jefa_ventas",
-        jefaVentas: {
-          ...(state.group.flowFicha?.jefaVentas || {}),
-          firmado: true,
-          firmadoAt: serverTimestamp(),
-          firmadoPor: nombre,
-          firmadoPorCorreo: state.effectiveEmail,
-          observacion: ""
-        }
-      }
+  
+      flowFicha: flowPatch
     };
-
+  
     await saveGroupPatch(patch, {
       tipoMovimiento: "firma_jefa_ventas",
       modulo: "ficha",
-      titulo: "Firma jefa de ventas",
-      mensaje: `${nombre} revisó la ficha como jefa de ventas.`,
+      titulo: hadPendingRequest ? "Solicitud revisada por jefa de ventas" : "Firma jefa de ventas",
+      mensaje: hadPendingRequest
+        ? `${nombre} revisó la solicitud de actualización. Motivo original: ${pendingRequest?.detalle || "Sin detalle"}`
+        : `${nombre} revisó la ficha como jefa de ventas.`,
       cambios: [
         { campo: "fichaEstado", anterior: state.group.fichaEstado || "", nuevo: "revisada_jefa_ventas" },
         { campo: "firmaSupervision", anterior: state.group.firmaSupervision || "", nuevo: nombre }
       ],
-      successMessage: "Firma de jefa de ventas registrada correctamente."
+      successMessage: hadPendingRequest
+        ? "Solicitud revisada por jefa de ventas."
+        : "Firma de jefa de ventas registrada correctamente."
     });
+  
+    if (hadPendingRequest) {
+      await markPendingFichaUpdateRequestsAsReviewedByJefa({
+        reviewedBy: nombre,
+        reviewedByCorreo: state.effectiveEmail
+      });
+  
+      await createFichaAlert({
+        titulo: "Solicitud revisada por jefa de ventas",
+        mensaje: `${nombre} revisó una solicitud de actualización.\n\nMotivo original: ${pendingRequest?.detalle || "Sin detalle"}`,
+        nivel: "warning",
+        destinatarioRol: "administracion",
+        destinatarioCorreo: "administracion@raitrai.cl"
+      });
+    }
+  
+    await loadAll();
     return;
   }
-
+  
   if (step === "administracion") {
     if (!canActAsFichaAdministracion()) {
       alert("Esta firma solo puede realizarla administración.");
@@ -1540,7 +1634,8 @@ async function signFlowFromFicha(step) {
       return;
     }
 
-    const hadPendingRequest = hasPendingUpdateRequest();
+    const pendingRequest = getLatestPendingFichaUpdateRequest();
+    const hadPendingRequest = !!pendingRequest;
 
     const flowPatch = {
       ...(state.group.flowFicha || {}),
@@ -1619,6 +1714,26 @@ async function signFlowFromFicha(step) {
         resolvedBy: nombre,
         resolvedByCorreo: state.effectiveEmail
       });
+    
+      await createFichaAlert({
+        titulo: "Solicitud de actualización cerrada",
+        mensaje: `${nombre} cerró la solicitud de actualización.\n\nMotivo original: ${pendingRequest?.detalle || "Sin detalle"}`,
+        nivel: "info",
+        destinatarioRol: "vendedor",
+        destinatarioCorreo: state.group?.vendedoraCorreo || pendingRequest?.solicitadoPorCorreo || ""
+      });
+    
+      await createHistoryEntry({
+        tipoMovimiento: "solicitud_actualizacion_cerrada",
+        modulo: "ficha",
+        titulo: "Solicitud de actualización cerrada",
+        asunto: pendingRequest?.asunto || "Solicitud de actualización",
+        mensaje: `${nombre} cerró la solicitud de actualización. Motivo original: ${pendingRequest?.detalle || "Sin detalle"}`,
+        metadata: {
+          solicitudId: pendingRequest?.id || "",
+          detalleSolicitud: pendingRequest?.detalle || ""
+        }
+      });
     }
 
     await loadAll();
@@ -1654,142 +1769,63 @@ async function saveUpdateRequest() {
     codigoRegistro: cleanText(state.group.codigoRegistro),
     aliasGrupo: cleanText(state.group.aliasGrupo),
     colegio: cleanText(state.group.colegio),
+
     tipoSolicitud: "actualizacion_ficha",
     asunto: asuntoFinal,
     detalle,
     estadoSolicitud: "pendiente",
+
     destinatarioRol: "jefa_ventas",
     destinatarioCorreo: "chernandez@raitrai.cl",
+
     solicitadoPor: getDisplayName(state.effectiveUser),
     solicitadoPorCorreo: state.effectiveEmail,
     fechaSolicitud: serverTimestamp()
   });
 
-  const nombreVendedorFirmado =
-    cleanText(state.group?.flowFicha?.vendedor?.firmadoPor) ||
-    cleanText(state.group?.firmaVendedor) ||
-    getDisplayName(state.effectiveUser);
-
-  const correoVendedorFirmado =
-    normalizeEmail(
-      state.group?.flowFicha?.vendedor?.firmadoPorCorreo ||
-      state.group?.vendedoraCorreo ||
-      state.effectiveEmail
-    );
-
-  closeModal("modalSolicitudFicha");
-
-  await saveGroupPatch(
-    {
-      autorizada: false,
-      cerrada: false,
-      cierre: "",
-
-      fichaFlujoModo: "v2",
-      fichaEstado: "lista_vendedor",
-      firmaSupervision: "",
-      firmaAdministracion: "",
-
-      ficha: {
-        ...(state.group.ficha || {}),
-        flujoModo: "v2",
-        estado: "lista_vendedor",
-        pdfPendienteGeneracion: true
-      },
-
-      flowFicha: {
-        ...(state.group.flowFicha || {}),
-        modo: "v2",
-        legacy: false,
-        habilitada: true,
-        estado: "lista_vendedor",
-        bloqueadaParaVendedor: true,
-        requiereActualizacion: true,
-        requiereRefirmaAdministracion: true,
-
-        ultimaSolicitudActualizacion: {
-          asunto: asuntoFinal,
-          detalle,
-          solicitadaPor: getDisplayName(state.effectiveUser),
-          solicitadaPorCorreo: state.effectiveEmail,
-          fechaSolicitud: serverTimestamp(),
-          estado: "pendiente"
-        },
-
-        vendedor: {
-          ...(state.group.flowFicha?.vendedor || {}),
-          firmado: true,
-          firmadoPor: nombreVendedorFirmado,
-          firmadoPorCorreo: correoVendedorFirmado
-        },
-
-        jefaVentas: {
-          ...(state.group.flowFicha?.jefaVentas || {}),
-          firmado: false,
-          firmadoAt: null,
-          firmadoPor: "",
-          firmadoPorCorreo: "",
-          observacion: ""
-        },
-
-        administracion: {
-          ...(state.group.flowFicha?.administracion || {}),
-          firmado: false,
-          firmadoAt: null,
-          firmadoPor: "",
-          firmadoPorCorreo: "",
-          observacion: ""
-        }
-      },
-
-      documentos: {
-        ...(state.group.documentos || {}),
-        fichaGrupo: {
-          ...(state.group.documentos?.fichaGrupo || {}),
-          estado: "lista_vendedor"
-        }
+  await setDoc(doc(db, "ventas_cotizaciones", state.groupDocId), {
+    flowFicha: {
+      ...(state.group.flowFicha || {}),
+      requiereActualizacion: true,
+      ultimaSolicitudActualizacion: {
+        asunto: asuntoFinal,
+        detalle,
+        solicitadaPor: getDisplayName(state.effectiveUser),
+        solicitadaPorCorreo: state.effectiveEmail,
+        fechaSolicitud: serverTimestamp(),
+        estado: "pendiente"
       }
     },
-    {
-      tipoMovimiento: "solicitud_actualizacion_ficha",
-      modulo: "ficha",
-      titulo: "Solicitud de actualización de ficha",
-      mensaje: `${getDisplayName(state.effectiveUser)} solicitó actualización de la ficha y reinició el flujo de firmas.`,
-      cambios: [
-        {
-          campo: "autorizada",
-          anterior: !!state.group.autorizada,
-          nuevo: false
-        },
-        {
-          campo: "cerrada",
-          anterior: !!state.group.cerrada,
-          nuevo: false
-        },
-        {
-          campo: "cierre",
-          anterior: state.group.cierre || "",
-          nuevo: ""
-        },
-        {
-          campo: "fichaEstado",
-          anterior: state.group.fichaEstado || "",
-          nuevo: "lista_vendedor"
-        },
-        {
-          campo: "flowFicha.jefaVentas.firmado",
-          anterior: !!state.group.flowFicha?.jefaVentas?.firmado,
-          nuevo: false
-        },
-        {
-          campo: "flowFicha.administracion.firmado",
-          anterior: !!state.group.flowFicha?.administracion?.firmado,
-          nuevo: false
-        }
-      ],
-      successMessage: "Solicitud de actualización enviada correctamente."
+    actualizadoPor: getDisplayName(state.effectiveUser),
+    actualizadoPorCorreo: state.effectiveEmail,
+    fechaActualizacion: serverTimestamp()
+  }, { merge: true });
+
+  await createHistoryEntry({
+    tipoMovimiento: "solicitud_actualizacion_ficha",
+    modulo: "ficha",
+    titulo: "Solicitud de actualización de ficha",
+    asunto: asuntoFinal,
+    mensaje: `${getDisplayName(state.effectiveUser)} solicitó actualización de la ficha. Motivo: ${detalle}`,
+    metadata: {
+      asunto: asuntoFinal,
+      detalleSolicitud: detalle,
+      destinatarioCorreo: "chernandez@raitrai.cl"
     }
-  );
+  });
+
+  await createFichaAlert({
+    titulo: "Solicitud de actualización de ficha",
+    mensaje: `${getDisplayName(state.effectiveUser)} solicitó revisar la ficha.\n\nMotivo: ${detalle}`,
+    nivel: "warning",
+    destinatarioRol: "jefa_ventas",
+    destinatarioCorreo: "chernandez@raitrai.cl"
+  });
+
+  closeModal("modalSolicitudFicha");
+  await loadAll();
+
+  showToast("Solicitud enviada a jefa de ventas correctamente.", "success");
 }
 
 function isAdministrativeReviewEditor() {
