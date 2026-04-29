@@ -2336,11 +2336,18 @@ function renderDatos() {
 
   const nombre1 = normalizeTextUpper(state.group.nombreCliente || "");
   const nombre2 = normalizeTextUpper(state.group.nombreCliente2 || "");
+  const rol1 = normalizeTextUpper(state.group.rolCliente || "");
+  const rol2 = normalizeTextUpper(state.group.rolCliente2 || "");
 
   const items = [
     {
       label: "1° Contacto",
-      valueHtml: escapeHtml(nombre1 || "—")
+      valueHtml: `
+        <div class="contact-value-stack">
+          <div class="contact-main-value">${escapeHtml(nombre1 || "—")}</div>
+          ${rol1 ? `<div class="contact-role-chip">${escapeHtml(rol1)}</div>` : ""}
+        </div>
+      `
     },
     {
       label: "Correo 1° Contacto",
@@ -2353,7 +2360,12 @@ function renderDatos() {
 
     {
       label: "2° Contacto",
-      valueHtml: escapeHtml(nombre2 || "—")
+      valueHtml: `
+        <div class="contact-value-stack">
+          <div class="contact-main-value">${escapeHtml(nombre2 || "—")}</div>
+          ${rol2 ? `<div class="contact-role-chip">${escapeHtml(rol2)}</div>` : ""}
+        </div>
+      `
     },
     {
       label: "Correo 2° Contacto",
