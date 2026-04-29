@@ -111,7 +111,8 @@ const state = {
   alertasCriticasRows: [],
   alertasWarningRows: [],
   solicitudesRows: [],
-  solicitudesActualizacionRows: []
+  solicitudesActualizacionRows: [],
+  aContactarRows: []
 };
 
 /* =========================================================
@@ -822,6 +823,94 @@ function isReunionEnProximosTresDias(row = {}) {
   return fecha >= todayStart && fecha <= limit;
 }
 
+function renderAContactarModal(rows = [], effectiveUser = null) {
+  const titleEl = $("a-contactar-titulo");
+  const subtitleEl = $("a-contactar-subtitulo");
+  const summaryEl = $("a-contactar-resumen");
+  const listEl = $("a-contactar-lista");
+
+  if (!titleEl || !subtitleEl || !summaryEl || !listEl) return;
+
+  titleEl.textContent = "Contactos a contactar";
+  subtitleEl.textContent = isVendedorRole(effectiveUser)
+    ? "Aquí ves tus grupos pendientes de primer contacto."
+    : "Aquí ves los grupos pendientes de primer contacto según la vista actual.";
+
+  summaryEl.textContent = rows.length
+    ? `Hay ${rows.length} contacto(s) pendientes de contactar.`
+    : "No hay contactos pendientes de contactar en esta vista.";
+
+  if (!rows.length) {
+    listEl.innerHTML = `
+      <div style="padding:16px 18px; border:1px solid rgba(60,40,90,.10); border-radius:16px; background:#faf8fd; color:#5d546d;">
+        No hay contactos a contactar.
+      </div>
+    `;
+    return;
+  }
+
+  listEl.innerHTML = rows.map((row) => {
+    const id = getRowId(row);
+    const alias = getRowAlias(row);
+    const apoderado = getRowApoderado(row);
+    const vendedor = getRowVendorName(row) || row.vendedoraCorreo || "Sin vendedor";
+
+    return `
+      <div style="padding:14px 16px; border:1px solid rgba(60,40,90,.12); border-radius:16px; background:#fff; display:flex; justify-content:space-between; gap:14px; align-items:flex-start;">
+        <div style="min-width:0;">
+          <div style="font-weight:800; color:#31194b; font-size:16px; line-height:1.2;">
+            ${escapeHtml(alias)}
+          </div>
+
+          <div style="margin-top:6px; color:#6a6078; font-size:13px; line-height:1.45;">
+            Apoderado: ${escapeHtml(apoderado)}<br>
+            Vendedor(a): ${escapeHtml(vendedor)}<br>
+            Estado: ${escapeHtml(row.estado || "A contactar")}
+          </div>
+        </div>
+
+        <a
+          href="grupo.html?id=${encodeURIComponent(id)}"
+          target="_blank"
+          rel="noopener"
+          style="flex:0 0 auto; text-decoration:none; background:#3b2357; color:#fff; border-radius:999px; padding:10px 14px; font-weight:700; white-space:nowrap;"
+        >
+          Abrir grupo
+        </a>
+      </div>
+    `;
+  }).join("");
+}
+
+function openAContactarModal() {
+  const dialog = $("modal-a-contactar");
+  if (!dialog) return;
+
+  renderAContactarModal(
+    Array.isArray(state.aContactarRows) ? state.aContactarRows : [],
+    getEffectiveUser()
+  );
+
+  if (typeof dialog.showModal === "function") {
+    if (!dialog.open) dialog.showModal();
+    return;
+  }
+
+  dialog.setAttribute("open", "open");
+}
+
+function closeAContactarModal() {
+  const dialog = $("modal-a-contactar");
+  if (!dialog) return;
+
+  if (typeof dialog.close === "function") {
+    dialog.close();
+    return;
+  }
+
+  dialog.removeAttribute("open");
+}
+
 function getFichasPorFirmarSubtitulo(user = null) {
   const effectiveUser = user || getEffectiveUser();
   if (!effectiveUser) return "Listado de fichas pendientes según tu rol.";
@@ -1501,8 +1590,7 @@ function inicializarDashboardEnCeros() {
   
   setText("count-sin-asignar", "0");
   setSinAsignarManagementHref();
-  setAlertCountLink("count-a-contactar", 0, "a_contactar");
-  setAlertHref("link-a-contactar", "a_contactar");
+  setText("count-a-contactar", "0");
   setText("count-fichas-firmar", "0");
   setText("count-solicitudes-actualizacion", "0");
   setText("count-alertas-criticas", "0");
@@ -1565,14 +1653,14 @@ function renderDashboard(rows = []) {
     : scopedRows.filter(isSinAsignar);
 
   const aContactarRows = scopedRows.filter(isAContactar);
+  state.aContactarRows = aContactarRows;
   const reuniones3DiasRows = scopedRows.filter(isReunionEnProximosTresDias);
 
   // ALERTAS
   setText("count-sin-asignar", sinAsignarRows.length);
   setSinAsignarManagementHref();
 
-  setAlertCountLink("count-a-contactar", aContactarRows.length, "a_contactar");
-  setAlertHref("link-a-contactar", "a_contactar");
+  setText("count-a-contactar", aContactarRows.length);
 
   setText("count-fichas-firmar", fichasPorFirmar.length);
   setText("count-solicitudes-actualizacion", solicitudesActualizacion.length);
@@ -1975,6 +2063,12 @@ async function initPage() {
   const btnIrGrupo = $("btn-ir-grupo");
   const btnIrApoderado = $("btn-ir-apoderado");
 
+  const linkSinAsignar = $("link-sin-asignar");
+
+  const linkAContactar = $("link-a-contactar");
+  const btnCerrarAContactar = $("btn-cerrar-a-contactar");
+  const modalAContactar = $("modal-a-contactar");
+
   const linkFichasFirmar = $("link-fichas-firmar");
   const btnCerrarFichasFirmar = $("btn-cerrar-fichas-firmar");
   const modalFichasFirmar = $("modal-fichas-firmar");
@@ -2033,6 +2127,47 @@ async function initPage() {
       }
       
       location.href = `grupo.html?id=${encodeURIComponent(grupoSeleccionado)}`;
+    });
+  }
+
+  if (linkSinAsignar && !linkSinAsignar.dataset.boundPopup) {
+    linkSinAsignar.dataset.boundPopup = "1";
+  
+    linkSinAsignar.addEventListener("click", (e) => {
+      e.preventDefault();
+  
+      window.open(
+        "asignados.html?tab=sin_asignar",
+        "sinAsignarPopup",
+        "width=1200,height=800,scrollbars=yes,resizable=yes"
+      );
+    });
+  }
+  
+  if (linkAContactar && !linkAContactar.dataset.bound) {
+    linkAContactar.dataset.bound = "1";
+  
+    linkAContactar.addEventListener("click", (e) => {
+      e.preventDefault();
+      openAContactarModal();
+    });
+  }
+  
+  if (btnCerrarAContactar && !btnCerrarAContactar.dataset.bound) {
+    btnCerrarAContactar.dataset.bound = "1";
+  
+    btnCerrarAContactar.addEventListener("click", () => {
+      closeAContactarModal();
+    });
+  }
+  
+  if (modalAContactar && !modalAContactar.dataset.bound) {
+    modalAContactar.dataset.bound = "1";
+  
+    modalAContactar.addEventListener("click", (e) => {
+      if (e.target === modalAContactar) {
+        closeAContactarModal();
+      }
     });
   }
 
