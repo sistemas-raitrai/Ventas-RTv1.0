@@ -7,6 +7,7 @@ import {
   orderBy,
   limit,
   setDoc,
+  deleteDoc,
   serverTimestamp
 } from "https://www.gstatic.com/firebasejs/11.7.3/firebase-firestore.js";
 
@@ -43,6 +44,8 @@ import {
 ========================================================= */
 const GITHUB_HOME_URL = "https://sistemas-raitrai.github.io/Ventas-RT/";
 const DETALLE_GRUPO_URL = "grupo.html";
+const ARCHIVE_PASSWORD = "Raitrai2026";
+const ARCHIVED_COLLECTION = "ventas_cotizaciones_archivadas";
 
 /* =========================================================
    ESTADO
@@ -1563,6 +1566,10 @@ function renderTable() {
               ` : ""}
             ` : ""}
 
+            <button class="btn-mini warn" data-action="archive-group" data-id="${escapeHtml(idGrupo)}">
+              Archivar
+            </button>
+
             <button class="btn-mini open" data-action="history" data-id="${escapeHtml(idGrupo)}">
               Historial
             </button>
@@ -2076,6 +2083,106 @@ function closeHistory() {
 /* =========================================================
    GUARDAR / QUITAR ASIGNACIÓN
 ========================================================= */
+async function archiveGroup(idGrupo) {
+  if (!canEditAsignados(state.effectiveUser)) {
+    alert("No tienes permisos para archivar grupos.");
+    return;
+  }
+
+  const row = state.rows.find((item) => getRowId(item) === String(idGrupo));
+  if (!row) {
+    alert("No se encontró el grupo en la vista actual.");
+    return;
+  }
+
+  const alias = getRowAlias(row);
+
+  const ok = confirm(
+    `Vas a archivar el grupo ${idGrupo} - ${alias}.\n\n` +
+    `Esto lo sacará de la colección activa ventas_cotizaciones y lo moverá a ventas_cotizaciones_archivadas.\n\n` +
+    `No se eliminará la información principal, pero saldrá del sistema activo, dashboard, asignaciones y contabilidad.\n\n` +
+    `¿Quieres continuar?`
+  );
+
+  if (!ok) return;
+
+  const password = prompt("Ingresa la clave para archivar este grupo:");
+  if (password !== ARCHIVE_PASSWORD) {
+    alert("Clave incorrecta. No se archivó el grupo.");
+    return;
+  }
+
+  const motivo = prompt("Motivo del archivo del grupo:") || "";
+
+  try {
+    setProgressStatus({
+      text: "Archivando grupo...",
+      meta: `Moviendo grupo ${idGrupo} a archivados`,
+      progress: 35
+    });
+
+    const id = String(idGrupo);
+
+    const archivedData = {
+      ...row,
+
+      // Metadata de archivo
+      archivado: true,
+      archivadoEn: serverTimestamp(),
+      archivadoPor: getNombreUsuario(state.effectiveUser),
+      archivadoPorCorreo: normalizeEmail(state.realUser?.email || ""),
+      motivoArchivado: normalizeText(motivo),
+
+      // Conservamos referencia de origen
+      coleccionOrigen: "ventas_cotizaciones",
+      idOriginal: id
+    };
+
+    // Evita guardar el campo interno "id" duplicado si venía desde el map local
+    delete archivedData.id;
+
+    // 1) Copia el documento principal a la colección de archivados
+    await setDoc(doc(db, ARCHIVED_COLLECTION, id), archivedData, { merge: true });
+
+    // 2) Deja una marca mínima de historial dentro del archivado
+    await setDoc(doc(collection(db, ARCHIVED_COLLECTION, id, "historialArchivo")), {
+      idGrupo: id,
+      tipo: "Archivado",
+      mensaje: `Grupo archivado desde asignaciones. Motivo: ${normalizeText(motivo || "Sin motivo indicado")}`,
+      hechoPor: getNombreUsuario(state.effectiveUser),
+      hechoPorCorreo: normalizeEmail(state.realUser?.email || ""),
+      fecha: serverTimestamp()
+    });
+
+    // 3) Elimina el documento principal de la colección activa
+    await deleteDoc(doc(db, "ventas_cotizaciones", id));
+
+    setProgressStatus({
+      text: "Grupo archivado.",
+      meta: `Grupo ${idGrupo} movido a archivados.`,
+      progress: 100,
+      type: "success"
+    });
+
+    clearProgressStatus();
+
+    await loadData();
+
+    alert(`El grupo ${idGrupo} fue archivado correctamente.`);
+  } catch (error) {
+    console.error(error);
+
+    setProgressStatus({
+      text: "Error archivando grupo.",
+      meta: error.message || "No se pudo archivar el grupo.",
+      progress: 100,
+      type: "error"
+    });
+
+    alert("No se pudo archivar el grupo. Revisa consola o permisos de Firestore.");
+  }
+}
+
 async function saveAssignment(idGrupo) {
   if (!canEditAsignados(state.effectiveUser)) {
     alert("No tienes permisos para asignar vendedores.");
@@ -2340,6 +2447,15 @@ function bindPageEvents() {
           return;
         }
         await removeAssignment(id);
+        return;
+      }
+
+      if (action === "archive-group") {
+        if (!canEdit) {
+          alert("Estás en modo solo lectura.");
+          return;
+        }
+        await archiveGroup(id);
         return;
       }
 
