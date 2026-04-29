@@ -2026,6 +2026,23 @@ async function initPage() {
     });
   }
 
+  if (linkFichasFirmar && !linkFichasFirmar.dataset.bound) {
+    linkFichasFirmar.dataset.bound = "1";
+  
+    linkFichasFirmar.addEventListener("click", (e) => {
+      e.preventDefault();
+      openFichasPorFirmarModal();
+    });
+  }
+  
+  if (btnCerrarFichasFirmar && !btnCerrarFichasFirmar.dataset.bound) {
+    btnCerrarFichasFirmar.dataset.bound = "1";
+  
+    btnCerrarFichasFirmar.addEventListener("click", () => {
+      closeFichasPorFirmarModal();
+    });
+  }
+
   if (linkSolicitudesActualizacion && !linkSolicitudesActualizacion.dataset.bound) {
     linkSolicitudesActualizacion.dataset.bound = "1";
   
