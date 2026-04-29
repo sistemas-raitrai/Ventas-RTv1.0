@@ -470,7 +470,8 @@ function isAdministracion() {
 
   return (
     email === "yenny@raitrai.cl" ||
-    email === "administracion@raitrai.cl"
+    email === "administracion@raitrai.cl" ||
+    email === "raitrai@raitrai.cl"
   );
 }
 
@@ -631,26 +632,6 @@ async function markOpenFichaUpdateRequestsAsCompleted({
   }
 
   return open.length;
-}
-
-async function markPendingFichaUpdateRequestsAsCompleted({
-  resolvedBy = getDisplayName(state.effectiveUser),
-  resolvedByCorreo = state.effectiveEmail,
-  newStatus = "completada"
-} = {}) {
-  const pending = getPendingFichaUpdateRequests();
-
-  for (const item of pending) {
-    await setDoc(doc(db, SOLICITUDES_COLLECTION, item.id), {
-      estadoSolicitud: newStatus,
-      resuelta: true,
-      resueltaPor: resolvedBy,
-      resueltaPorCorreo: resolvedByCorreo,
-      fechaResolucion: serverTimestamp()
-    }, { merge: true });
-  }
-
-  return pending.length;
 }
 
 function canEditFicha() {
@@ -1263,6 +1244,7 @@ function syncButtons() {
   const flow = state.group?.flowFicha || {};
   const isGanada = normalizeState(state.group?.estado) === "ganada";
   const pendingUpdate = hasPendingUpdateRequest();
+  const pendingRequest = getLatestPendingFichaUpdateRequest();
 
   const btnGuardar = $("btnGuardarFicha");
   if (btnGuardar) btnGuardar.disabled = !editable || state.isUploadingProgramaPdf;
@@ -1321,7 +1303,11 @@ function syncButtons() {
   const btnJefa = $("btnFirmarFichaJefa");
   if (btnJefa) {
     btnJefa.classList.toggle("hidden", !isJefaVentas());
-    btnJefa.disabled = !isJefaVentas() || !flow?.vendedor?.firmado || !!flow?.jefaVentas?.firmado;
+  
+    btnJefa.disabled =
+      !isJefaVentas() ||
+      !flow?.vendedor?.firmado ||
+      (!!flow?.jefaVentas?.firmado && !pendingRequest);
   }
   
   const btnAdmin = $("btnFirmarFichaAdmin");
