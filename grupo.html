@@ -1629,6 +1629,32 @@
     .grupo-quick-sub{
       color: #6b5d79;
     }
+
+    .email-variable-buttons{
+      display:flex;
+      flex-wrap:wrap;
+      gap:8px;
+      padding:10px;
+      border-radius:14px;
+      background:#faf8fd;
+      border:1px solid rgba(58,42,82,.14);
+    }
+    
+    .email-variable-buttons button{
+      min-height:30px;
+      padding:0 10px;
+      border:none;
+      border-radius:999px;
+      background:#efe7f8;
+      color:#4a2570;
+      font-size:12px;
+      font-weight:900;
+      cursor:pointer;
+    }
+    
+    .email-variable-buttons button:hover{
+      background:#e7dcf5;
+    }
     
     @media (max-width: 1100px){
       .hero-v2-cards{
@@ -2436,8 +2462,15 @@
 
           <div class="form-field span-3">
             <label>Variables disponibles</label>
-            <div class="email-preview-box" id="mail_variablesInfo">
-              {{nombreContacto}}, {{nombreGrupo}}, {{colegio}}, {{curso}}, {{anoViaje}}, {{destinoPrincipal}}, {{programa}}, {{vendedora}}
+            <div class="email-variable-buttons" data-variable-targets="email_subject,email_body">
+              <button type="button" data-var="{{nombreContacto}}">{{nombreContacto}}</button>
+              <button type="button" data-var="{{nombreGrupo}}">{{nombreGrupo}}</button>
+              <button type="button" data-var="{{colegio}}">{{colegio}}</button>
+              <button type="button" data-var="{{curso}}">{{curso}}</button>
+              <button type="button" data-var="{{anoViaje}}">{{anoViaje}}</button>
+              <button type="button" data-var="{{destinoPrincipal}}">{{destinoPrincipal}}</button>
+              <button type="button" data-var="{{programa}}">{{programa}}</button>
+              <button type="button" data-var="{{vendedora}}">{{vendedora}}</button>
             </div>
           </div>
         </form>
@@ -2484,8 +2517,15 @@
 
           <div class="form-field span-3">
             <label>Tip</label>
-            <div class="email-preview-box">
-              Puedes usar: {{nombreContacto}}, {{nombreGrupo}}, {{colegio}}, {{curso}}, {{anoViaje}}, {{destinoPrincipal}}, {{programa}}, {{vendedora}}
+            <div class="email-variable-buttons" data-variable-targets="tpl_asunto,tpl_cuerpo">
+              <button type="button" data-var="{{nombreContacto}}">{{nombreContacto}}</button>
+              <button type="button" data-var="{{nombreGrupo}}">{{nombreGrupo}}</button>
+              <button type="button" data-var="{{colegio}}">{{colegio}}</button>
+              <button type="button" data-var="{{curso}}">{{curso}}</button>
+              <button type="button" data-var="{{anoViaje}}">{{anoViaje}}</button>
+              <button type="button" data-var="{{destinoPrincipal}}">{{destinoPrincipal}}</button>
+              <button type="button" data-var="{{programa}}">{{programa}}</button>
+              <button type="button" data-var="{{vendedora}}">{{vendedora}}</button>
             </div>
           </div>
         </form>
