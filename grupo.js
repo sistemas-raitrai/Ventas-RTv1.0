@@ -2945,6 +2945,22 @@ function bindEvents() {
     btn.addEventListener("click", () => closeModal(btn.dataset.close));
   });
 
+  document.addEventListener("click", (e) => {
+    const btn = e.target.closest("[data-var]");
+    if (!btn) return;
+  
+    const variable = btn.dataset.var || "";
+    const wrap = btn.closest("[data-variable-targets]");
+    if (!wrap || !variable) return;
+  
+    const targets = String(wrap.dataset.variableTargets || "")
+      .split(",")
+      .map((x) => x.trim())
+      .filter(Boolean);
+  
+    insertVariableAtActiveField(variable, targets);
+  });
+
   $("btnAbrirPdfFicha")?.addEventListener("click", () => {
     const url = cleanText(state.ficha?.pdfUrl || state.group?.fichaPdfUrl || "");
     if (!url) {
@@ -5631,6 +5647,33 @@ function normalizeSearchLocal(value = "") {
     .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase()
     .trim();
+}
+
+function insertVariableAtActiveField(variable, allowedIds = []) {
+  const active = document.activeElement;
+
+  const isValidTarget =
+    active &&
+    allowedIds.includes(active.id) &&
+    (active.tagName === "TEXTAREA" || active.tagName === "INPUT");
+
+  const target = isValidTarget
+    ? active
+    : $(allowedIds[allowedIds.length - 1]);
+
+  if (!target) return;
+
+  const start = target.selectionStart ?? target.value.length;
+  const end = target.selectionEnd ?? target.value.length;
+
+  const before = target.value.slice(0, start);
+  const after = target.value.slice(end);
+
+  target.value = `${before}${variable}${after}`;
+
+  const nextPos = start + variable.length;
+  target.focus();
+  target.setSelectionRange(nextPos, nextPos);
 }
 
 function escapeHtml(value = "") {
