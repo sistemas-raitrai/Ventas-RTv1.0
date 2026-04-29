@@ -548,6 +548,26 @@ function getLatestOpenFichaUpdateRequest() {
   return getOpenFichaUpdateRequests()[0] || null;
 }
 
+function canRequestFichaUpdate() {
+  if (!state.group) return false;
+  if (!canAccessGroup(state.group)) return false;
+  if (!canOpenFicha()) return false;
+
+  const flow = state.group?.flowFicha || {};
+  const rol = String(state.effectiveUser?.rol || "").toLowerCase();
+
+  const isAdmin = rol === "admin";
+  const isVendor = rol === "vendedor";
+
+  // Puede solicitar:
+  // 1) vendedor del grupo
+  // 2) admin como soporte
+  if (!isVendor && !isAdmin) return false;
+
+  // Debe existir firma del vendedor.
+  return !!flow?.vendedor?.firmado;
+}
+
 function promptRequired(message = "") {
   const value = window.prompt(message, "");
   if (value === null) return null;
