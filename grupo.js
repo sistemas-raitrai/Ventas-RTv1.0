@@ -2934,6 +2934,69 @@ function buildAutomaticAlerts() {
   return list;
 }
 
+window.repararHistorialSolicitudesFicha = async function () {
+  if (!state.canSeeAll) {
+    alert("Solo administración/supervisión puede reparar historial.");
+    return;
+  }
+
+  const solicitudes = state.requests.filter((item) =>
+    normalizeSearchLocal(item.tipoSolicitud || "") === "actualizacion_ficha"
+  );
+
+  if (!solicitudes.length) {
+    console.log("No hay solicitudes de actualización para reconstruir.");
+    return;
+  }
+
+  let creadas = 0;
+
+  for (const sol of solicitudes) {
+    const yaExiste = state.history.some((h) =>
+      normalizeSearchLocal(h.tipoMovimiento || "") === "solicitud_actualizacion_ficha" &&
+      normalizeSearchLocal(h?.metadata?.solicitudId || "") === normalizeSearchLocal(sol.id || "")
+    );
+
+    if (yaExiste) continue;
+
+    await addDoc(collection(db, HISTORIAL_COLLECTION), {
+      idGrupo: String(state.groupId),
+      codigoRegistro: cleanText(state.group?.codigoRegistro),
+      aliasGrupo: cleanText(state.group?.aliasGrupo),
+      colegio: cleanText(state.group?.colegio),
+
+      tipoMovimiento: "solicitud_actualizacion_ficha",
+      modulo: "ficha",
+      titulo: "Solicitud de actualización de ficha",
+      asunto: cleanText(sol.asunto || "Solicitud de actualización"),
+      mensaje: `${sol.solicitadoPor || "Vendedor(a)"} solicitó actualización de la ficha. Motivo: ${sol.detalle || "Sin detalle registrado"}`,
+
+      metadata: {
+        solicitudId: sol.id,
+        detalleSolicitud: sol.detalle || "",
+        reconstruido: true
+      },
+
+      destacado: false,
+      oculto: false,
+
+      creadoPor: "Sistema",
+      creadoPorCorreo: state.effectiveEmail,
+      fecha: sol.fechaSolicitud || serverTimestamp()
+    });
+
+    await setDoc(doc(db, SOLICITUDES_COLLECTION, sol.id), {
+      historialReconstruido: true,
+      fechaReconstruccionHistorial: serverTimestamp()
+    }, { merge: true });
+
+    creadas++;
+  }
+
+  await loadAll();
+  console.log(`Historial reconstruido. Entradas creadas: ${creadas}`);
+};
+
 /* =========================================================
    MODALS / EVENTS
 ========================================================= */
