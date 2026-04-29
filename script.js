@@ -2101,6 +2101,23 @@ async function initPage() {
       }
     });
   }
+
+  if (linkAlertasCriticas && !linkAlertasCriticas.dataset.bound) {
+    linkAlertasCriticas.dataset.bound = "1";
+  
+    linkAlertasCriticas.addEventListener("click", (e) => {
+      e.preventDefault();
+      openAlertasCriticasModal();
+    });
+  }
+  
+  if (btnCerrarAlertasCriticas && !btnCerrarAlertasCriticas.dataset.bound) {
+    btnCerrarAlertasCriticas.dataset.bound = "1";
+  
+    btnCerrarAlertasCriticas.addEventListener("click", () => {
+      closeAlertasCriticasModal();
+    });
+  }
   
   if (linkAlertasWarning && !linkAlertasWarning.dataset.bound) {
     linkAlertasWarning.dataset.bound = "1";
