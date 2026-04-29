@@ -51,6 +51,7 @@ import {
 const GITHUB_HOME_URL = "https://sistemas-raitrai.github.io/Ventas-RT/";
 const APODERADO_FILTER_KEY = "ventas_dashboard_apoderado";
 const ALERTAS_COLLECTION = "ventas_alertas";
+const SOLICITUDES_COLLECTION = "ventas_solicitudes_actualizacion";
 const PRIVATE_NOTES_COLLECTION = "ventas_notas_privadas";
 const PRIVATE_NOTE_PAGE = "index";
 
@@ -108,7 +109,9 @@ const state = {
   scopedRows: [],
   fichasPorFirmarRows: [],
   alertasCriticasRows: [],
-  alertasWarningRows: []
+  alertasWarningRows: [],
+  solicitudesRows: [],
+  solicitudesActualizacionRows: []
 };
 
 /* =========================================================
@@ -664,6 +667,85 @@ function getFichasPorFirmarSegunUsuario(rows = [], effectiveUser = null) {
     });
 }
 
+function getSolicitudEstadoLabel(sol = {}) {
+  const estado = normalizeLoose(sol.estadoSolicitud || "");
+
+  if (estado === "pendiente") return "Pendiente revisión jefa de ventas";
+  if (estado === "revisada_jefa") return "Revisada por jefa / pendiente Administración";
+  if (estado === "completada") return "Cerrada por Administración";
+
+  return sol.estadoSolicitud || "Sin estado";
+}
+
+function isSolicitudActualizacionAbierta(sol = {}) {
+  const tipo = normalizeLoose(sol.tipoSolicitud || "");
+  const estado = normalizeLoose(sol.estadoSolicitud || "");
+
+  return tipo === "actualizacion_ficha" &&
+    sol.resuelta !== true &&
+    estado !== "completada" &&
+    estado !== "cerrada";
+}
+
+function isSolicitudVisibleParaUsuario(sol = {}, user = null, groupRow = {}) {
+  if (!user) return false;
+
+  const estado = normalizeLoose(sol.estadoSolicitud || "");
+  const userEmail = normalizeEmail(user.email || "");
+  const rol = normalizeLoose(user.rol || "");
+
+  if (!isSolicitudActualizacionAbierta(sol)) return false;
+
+  if (rol === "admin") return true;
+
+  if (isCaroDashboardUser(user)) {
+    return estado === "pendiente";
+  }
+
+  if (isAdministracionDashboardUser(user)) {
+    return estado === "revisada_jefa";
+  }
+
+  if (isVendedorRole(user)) {
+    const solicitadoPor = normalizeEmail(sol.solicitadoPorCorreo || "");
+    const vendedorGrupo = normalizeEmail(groupRow?.vendedoraCorreo || "");
+
+    return (
+      solicitadoPor === userEmail ||
+      vendedorGrupo === userEmail
+    );
+  }
+
+  return false;
+}
+
+function getSolicitudesActualizacionSegunUsuario(rows = [], effectiveUser = null) {
+  const user = effectiveUser || getEffectiveUser();
+
+  const scopedIds = new Set(
+    dedupeRowsByGroup(rows)
+      .map((row) => getRowId(row))
+      .filter(Boolean)
+  );
+
+  return (state.solicitudesRows || [])
+    .map((sol) => {
+      const idGrupo = String(sol.idGrupo || "").trim();
+      const groupRow = state.rowsById.get(idGrupo) || {};
+      return { ...sol, _groupRow: groupRow };
+    })
+    .filter((sol) => {
+      const idGrupo = String(sol.idGrupo || "").trim();
+      if (!scopedIds.has(idGrupo)) return false;
+      return isSolicitudVisibleParaUsuario(sol, user, sol._groupRow || {});
+    })
+    .sort((a, b) => {
+      const da = timestampLikeToDate(a.fechaSolicitud)?.getTime() || 0;
+      const db = timestampLikeToDate(b.fechaSolicitud)?.getTime() || 0;
+      return db - da;
+    });
+}
+
 function setAlertRowVisibleByChild(childId, visible = true) {
   const child = $(childId);
   const row = child?.closest(".alert-row") || child?.closest(".alert-row-wrap");
@@ -681,11 +763,13 @@ function syncAlertRowsByRole(effectiveUser = null) {
     isRegistroRole(user);
 
   const canSeeFichas = !!user;
+  const canSeeSolicitudes = !!user;
   const canSeeAlertasCriticas = !!user;
   const canSeeAlertasWarning = !!user;
 
   setAlertRowVisibleByChild("link-sin-asignar", canSeeSinAsignar);
   setAlertRowVisibleByChild("link-fichas-firmar", canSeeFichas);
+  setAlertRowVisibleByChild("link-solicitudes-actualizacion", canSeeSolicitudes);
   setAlertRowVisibleByChild("link-alertas-criticas", canSeeAlertasCriticas);
   setAlertRowVisibleByChild("link-alertas-warning", canSeeAlertasWarning);
   setAlertRowVisibleByChild("count-pendientes", false);
@@ -801,6 +885,144 @@ function openFichasPorFirmarModal() {
 
 function closeFichasPorFirmarModal() {
   const dialog = $("modal-fichas-firmar");
+  if (!dialog) return;
+
+  if (typeof dialog.close === "function") {
+    dialog.close();
+    return;
+  }
+
+  dialog.removeAttribute("open");
+}
+
+function getSolicitudesActualizacionSubtitulo(user = null) {
+  const effectiveUser = user || getEffectiveUser();
+
+  if (!effectiveUser) return "Solicitudes abiertas según tu rol.";
+
+  if (isVendedorRole(effectiveUser)) {
+    return "Aquí ves el seguimiento de tus solicitudes de actualización abiertas.";
+  }
+
+  if (isCaroDashboardUser(effectiveUser)) {
+    return "Aquí ves las solicitudes pendientes de revisión por jefa de ventas.";
+  }
+
+  if (isAdministracionDashboardUser(effectiveUser)) {
+    return "Aquí ves las solicitudes ya revisadas por jefa de ventas y pendientes de cierre administrativo.";
+  }
+
+  return "Aquí ves las solicitudes de actualización abiertas.";
+}
+
+function renderSolicitudesActualizacionModal(rows = [], effectiveUser = null) {
+  const titleEl = $("solicitudes-actualizacion-titulo");
+  const subtitleEl = $("solicitudes-actualizacion-subtitulo");
+  const summaryEl = $("solicitudes-actualizacion-resumen");
+  const listEl = $("solicitudes-actualizacion-lista");
+
+  if (!titleEl || !subtitleEl || !summaryEl || !listEl) return;
+
+  titleEl.textContent = "Solicitudes de actualización";
+  subtitleEl.textContent = getSolicitudesActualizacionSubtitulo(effectiveUser);
+
+  summaryEl.textContent = rows.length
+    ? `Hay ${rows.length} solicitud(es) de actualización en tu vista actual.`
+    : "No hay solicitudes de actualización pendientes para tu rol.";
+
+  if (!rows.length) {
+    listEl.innerHTML = `
+      <div style="padding:16px 18px; border:1px solid rgba(60,40,90,.10); border-radius:16px; background:#faf8fd; color:#5d546d;">
+        No hay solicitudes de actualización abiertas.
+      </div>
+    `;
+    return;
+  }
+
+  listEl.innerHTML = rows.map((sol) => {
+    const groupRow = sol._groupRow || {};
+    const idGrupo = String(sol.idGrupo || "").trim();
+    const alias = getRowAlias(groupRow) || sol.aliasGrupo || `Grupo ${idGrupo}`;
+    const vendedor = getRowVendorName(groupRow) || groupRow.vendedoraCorreo || sol.solicitadoPor || "Sin vendedor";
+    const fecha = timestampLikeToDate(sol.fechaSolicitud);
+    const fechaTxt = fecha
+      ? fecha.toLocaleString("es-CL", {
+          day: "2-digit",
+          month: "2-digit",
+          year: "numeric",
+          hour: "2-digit",
+          minute: "2-digit",
+          hour12: false
+        })
+      : "Sin fecha";
+
+    return `
+      <div style="padding:14px 16px; border:1px solid rgba(60,40,90,.12); border-radius:16px; background:#fff; display:flex; justify-content:space-between; gap:14px; align-items:flex-start;">
+        <div style="min-width:0;">
+          <div style="font-weight:800; color:#31194b; font-size:16px; line-height:1.2;">
+            ${escapeHtml(alias)}
+          </div>
+
+          <div style="margin-top:6px; color:#6a6078; font-size:13px; line-height:1.45;">
+            Vendedor(a): ${escapeHtml(vendedor)}<br>
+            Estado: ${escapeHtml(getSolicitudEstadoLabel(sol))}<br>
+            Fecha solicitud: ${escapeHtml(fechaTxt)}
+          </div>
+
+          <div style="margin-top:10px; color:#3e3550; font-size:14px; line-height:1.5;">
+            <strong>Motivo vendedor:</strong><br>
+            ${escapeHtml(sol.detalle || "Sin detalle")}
+          </div>
+
+          ${sol.respuestaJefa ? `
+            <div style="margin-top:10px; color:#3e3550; font-size:14px; line-height:1.5;">
+              <strong>Respuesta jefa de ventas:</strong><br>
+              ${escapeHtml(sol.respuestaJefa)}
+            </div>
+          ` : ""}
+
+          ${sol.respuestaAdministracion ? `
+            <div style="margin-top:10px; color:#3e3550; font-size:14px; line-height:1.5;">
+              <strong>Cierre administración:</strong><br>
+              ${escapeHtml(sol.respuestaAdministracion)}
+            </div>
+          ` : ""}
+        </div>
+
+        <a
+          href="fichas.html?id=${encodeURIComponent(idGrupo)}"
+          target="_blank"
+          rel="noopener"
+          style="flex:0 0 auto; text-decoration:none; background:#3b2357; color:#fff; border-radius:999px; padding:10px 14px; font-weight:700; white-space:nowrap;"
+        >
+          Abrir ficha
+        </a>
+      </div>
+    `;
+  }).join("");
+}
+
+function openSolicitudesActualizacionModal() {
+  const dialog = $("modal-solicitudes-actualizacion");
+  if (!dialog) return;
+
+  const effectiveUser = getEffectiveUser();
+  const rows = Array.isArray(state.solicitudesActualizacionRows)
+    ? state.solicitudesActualizacionRows
+    : [];
+
+  renderSolicitudesActualizacionModal(rows, effectiveUser);
+
+  if (typeof dialog.showModal === "function") {
+    if (!dialog.open) dialog.showModal();
+    return;
+  }
+
+  dialog.setAttribute("open", "open");
+}
+
+function closeSolicitudesActualizacionModal() {
+  const dialog = $("modal-solicitudes-actualizacion");
   if (!dialog) return;
 
   if (typeof dialog.close === "function") {
@@ -1072,9 +1294,10 @@ function closeAlertasWarningModal() {
    CARGA DE DATOS
 ========================================================= */
 async function loadDashboardData() {
-  const [groupsSnap, alertsSnap] = await Promise.all([
+  const [groupsSnap, alertsSnap, solicitudesSnap] = await Promise.all([
     getDocs(collection(db, "ventas_cotizaciones")),
-    getDocs(collection(db, ALERTAS_COLLECTION))
+    getDocs(collection(db, ALERTAS_COLLECTION)),
+    getDocs(collection(db, SOLICITUDES_COLLECTION))
   ]);
 
   state.rows = groupsSnap.docs.map((docSnap) => {
@@ -1091,6 +1314,11 @@ async function loadDashboardData() {
   );
 
   state.alertRows = alertsSnap.docs.map((docSnap) => ({
+    id: docSnap.id,
+    ...docSnap.data()
+  }));
+
+  state.solicitudesRows = solicitudesSnap.docs.map((docSnap) => ({
     id: docSnap.id,
     ...docSnap.data()
   }));
@@ -1230,6 +1458,7 @@ function inicializarDashboardEnCeros() {
   state.fichasPorFirmarRows = [];
   state.alertasCriticasRows = [];
   state.alertasWarningRows = [];
+  state.solicitudesActualizacionRows = [];
   
   const setText = (id, value) => {
     const el = $(id);
@@ -1243,6 +1472,7 @@ function inicializarDashboardEnCeros() {
   setAlertCountLink("count-a-contactar", 0, "a_contactar");
   setAlertHref("link-a-contactar", "a_contactar");
   setText("count-fichas-firmar", "0");
+  setText("count-solicitudes-actualizacion", "0");
   setText("count-alertas-criticas", "0");
   setText("count-alertas-warning", "0");
   setText("count-reunion-3dias", "0");
@@ -1283,6 +1513,9 @@ function renderDashboard(rows = []) {
 
   const fichasPorFirmar = getFichasPorFirmarSegunUsuario(scopedRows, effectiveUser);
   state.fichasPorFirmarRows = fichasPorFirmar;
+
+  const solicitudesActualizacion = getSolicitudesActualizacionSegunUsuario(scopedRows, effectiveUser);
+  state.solicitudesActualizacionRows = solicitudesActualizacion;
   
   const alertasCriticas = getCriticalAlertsForScope(scopedRows);
   state.alertasCriticasRows = alertasCriticas;
@@ -1310,6 +1543,7 @@ function renderDashboard(rows = []) {
   setAlertHref("link-a-contactar", "a_contactar");
 
   setText("count-fichas-firmar", fichasPorFirmar.length);
+  setText("count-solicitudes-actualizacion", solicitudesActualizacion.length);
   setText("count-alertas-criticas", alertasCriticas.length);
   setText("count-alertas-warning", alertasWarning.length);
   setText("count-reunion-3dias", reuniones3DiasRows.length);
@@ -1712,6 +1946,10 @@ async function initPage() {
   const linkFichasFirmar = $("link-fichas-firmar");
   const btnCerrarFichasFirmar = $("btn-cerrar-fichas-firmar");
   const modalFichasFirmar = $("modal-fichas-firmar");
+
+  const linkSolicitudesActualizacion = $("link-solicitudes-actualizacion");
+  const btnCerrarSolicitudesActualizacion = $("btn-cerrar-solicitudes-actualizacion");
+  const modalSolicitudesActualizacion = $("modal-solicitudes-actualizacion");
   
   const linkAlertasCriticas = $("link-alertas-criticas");
   const btnCerrarAlertasCriticas = $("btn-cerrar-alertas-criticas");
@@ -1788,37 +2026,30 @@ async function initPage() {
     });
   }
 
-    if (linkFichasFirmar && !linkFichasFirmar.dataset.bound) {
-    linkFichasFirmar.dataset.bound = "1";
-
-    linkFichasFirmar.addEventListener("click", (e) => {
+  if (linkSolicitudesActualizacion && !linkSolicitudesActualizacion.dataset.bound) {
+    linkSolicitudesActualizacion.dataset.bound = "1";
+  
+    linkSolicitudesActualizacion.addEventListener("click", (e) => {
       e.preventDefault();
-      openFichasPorFirmarModal();
-    });
-  }
-
-  if (btnCerrarFichasFirmar && !btnCerrarFichasFirmar.dataset.bound) {
-    btnCerrarFichasFirmar.dataset.bound = "1";
-
-    btnCerrarFichasFirmar.addEventListener("click", () => {
-      closeFichasPorFirmarModal();
-    });
-  }
-
-  if (linkAlertasCriticas && !linkAlertasCriticas.dataset.bound) {
-    linkAlertasCriticas.dataset.bound = "1";
-  
-    linkAlertasCriticas.addEventListener("click", (e) => {
-      e.preventDefault();
-      openAlertasCriticasModal();
+      openSolicitudesActualizacionModal();
     });
   }
   
-  if (btnCerrarAlertasCriticas && !btnCerrarAlertasCriticas.dataset.bound) {
-    btnCerrarAlertasCriticas.dataset.bound = "1";
+  if (btnCerrarSolicitudesActualizacion && !btnCerrarSolicitudesActualizacion.dataset.bound) {
+    btnCerrarSolicitudesActualizacion.dataset.bound = "1";
   
-    btnCerrarAlertasCriticas.addEventListener("click", () => {
-      closeAlertasCriticasModal();
+    btnCerrarSolicitudesActualizacion.addEventListener("click", () => {
+      closeSolicitudesActualizacionModal();
+    });
+  }
+  
+  if (modalSolicitudesActualizacion && !modalSolicitudesActualizacion.dataset.bound) {
+    modalSolicitudesActualizacion.dataset.bound = "1";
+  
+    modalSolicitudesActualizacion.addEventListener("click", (e) => {
+      if (e.target === modalSolicitudesActualizacion) {
+        closeSolicitudesActualizacionModal();
+      }
     });
   }
   
