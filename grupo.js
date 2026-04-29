@@ -1043,7 +1043,8 @@ function isAdministracion() {
 
   return (
     email === "yenny@raitrai.cl" ||
-    email === "administracion@raitrai.cl"
+    email === "administracion@raitrai.cl" ||
+    email === "raitrai@raitrai.cl"
   );
 }
 
@@ -2851,6 +2852,38 @@ function renderFatal(message) {
 /* =========================================================
    AUTO ALERTS
 ========================================================= */
+function getOpenFichaUpdateRequestsForGroup() {
+  return state.requests.filter((item) => {
+    const tipo = normalizeSearchLocal(item.tipoSolicitud || "");
+    const estado = normalizeSearchLocal(item.estadoSolicitud || "");
+
+    return tipo === "actualizacion_ficha" &&
+      item.resuelta !== true &&
+      estado !== "completada" &&
+      estado !== "cerrada";
+  });
+}
+
+function getSolicitudFichaEstadoLabel(item = {}) {
+  const estado = normalizeSearchLocal(item.estadoSolicitud || "");
+
+  if (estado === "pendiente") return "Pendiente revisión jefa de ventas";
+  if (estado === "revisada_jefa") return "Revisada por jefa / pendiente Administración";
+  if (estado === "completada") return "Cerrada por Administración";
+
+  return item.estadoSolicitud || "Sin estado";
+}
+
+function buildSolicitudFichaMensaje(item = {}) {
+  return [
+    `Estado: ${getSolicitudFichaEstadoLabel(item)}.`,
+    item.solicitadoPor ? `Solicitado por: ${item.solicitadoPor}.` : "",
+    item.detalle ? `Motivo vendedor: ${item.detalle}` : "Motivo vendedor: sin detalle registrado.",
+    item.respuestaJefa ? `Respuesta jefa: ${item.respuestaJefa}` : "",
+    item.respuestaAdministracion ? `Cierre administración: ${item.respuestaAdministracion}` : ""
+  ].filter(Boolean).join("\n");
+}
+
 function buildAutomaticAlerts() {
   const list = [];
   const nextMeeting = getNextMeeting();
@@ -2904,18 +2937,18 @@ function buildAutomaticAlerts() {
     });
   }
 
-  const pendingRequests = state.requests.filter(
-    (item) => normalizeSearchLocal(item.estadoSolicitud) === "pendiente"
-  ).length;
-
-  if (pendingRequests > 0) {
+  const openFichaRequests = getOpenFichaUpdateRequestsForGroup();
+  
+  openFichaRequests.forEach((item, index) => {
+    const estado = normalizeSearchLocal(item.estadoSolicitud || "");
+  
     list.push({
-      id: `auto-request-${state.groupId}`,
-      nivel: "info",
-      titulo: "Solicitudes de actualización pendientes",
-      mensaje: `Este grupo tiene ${pendingRequests} solicitud(es) de actualización pendientes.`
+      id: `auto-request-${state.groupId}-${item.id || index}`,
+      nivel: estado === "pendiente" || estado === "revisada_jefa" ? "warning" : "info",
+      titulo: "Solicitud de actualización de ficha",
+      mensaje: buildSolicitudFichaMensaje(item)
     });
-  }
+  });
 
   const lastClosedUpdate = toDate(state.group?.flowFicha?.ultimaActualizacionCerradaAt || null);
   if (lastClosedUpdate) {
