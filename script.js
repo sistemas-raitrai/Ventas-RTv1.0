@@ -660,18 +660,35 @@ function isFichaPorFirmarSegunUsuario(row = {}, effectiveUser = null) {
 function getFichasPorFirmarSegunUsuario(rows = [], effectiveUser = null) {
   const solicitudesAbiertasIds = new Set(
     (state.solicitudesRows || [])
-      .filter(isSolicitudActualizacionAbierta)
-      .map((sol) => String(sol.idGrupo || "").trim())
+      .filter((sol) => {
+        const tipo = normalizeLoose(sol.tipoSolicitud || "");
+        const estado = normalizeLoose(sol.estadoSolicitud || "");
+
+        return tipo === "actualizacion_ficha" &&
+          sol.resuelta !== true &&
+          estado !== "completada" &&
+          estado !== "cerrada";
+      })
+      .flatMap((sol) => [
+        String(sol.idGrupo || "").trim(),
+        String(sol.codigoRegistro || "").trim()
+      ])
       .filter(Boolean)
   );
 
   return dedupeRowsByGroup(rows)
     .filter((row) => {
-      const idGrupo = getRowId(row);
+      const posiblesIdsGrupo = [
+        String(row.idGrupo || "").trim(),
+        String(row.id || "").trim(),
+        String(row.codigoRegistro || "").trim()
+      ].filter(Boolean);
 
-      // Si tiene solicitud de actualización abierta,
-      // sale de "fichas por firmar" y queda solo en "solicitudes de actualización".
-      if (solicitudesAbiertasIds.has(idGrupo)) return false;
+      const tieneSolicitudAbierta = posiblesIdsGrupo.some((id) =>
+        solicitudesAbiertasIds.has(id)
+      );
+
+      if (tieneSolicitudAbierta) return false;
 
       return isFichaPorFirmarSegunUsuario(row, effectiveUser);
     })
