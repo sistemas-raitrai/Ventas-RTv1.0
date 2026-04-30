@@ -811,6 +811,57 @@ function updateProgramaPdfUi() {
   }
 }
 
+function getProgramaFileKind(file = null) {
+  const name = String(file?.name || "").toLowerCase();
+  const type = String(file?.type || "").toLowerCase();
+
+  if (type === "application/pdf" || name.endsWith(".pdf")) return "pdf";
+
+  if (
+    type === "application/msword" ||
+    type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
+    name.endsWith(".doc") ||
+    name.endsWith(".docx")
+  ) {
+    return name.endsWith(".doc") ? "doc" : "docx";
+  }
+
+  return "";
+}
+
+function getContentTypeByProgramaKind(kind = "") {
+  if (kind === "pdf") return "application/pdf";
+  if (kind === "doc") return "application/msword";
+  if (kind === "docx") {
+    return "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+  }
+  return "application/octet-stream";
+}
+
+function buildProgramaOriginalStoragePath(fileName = "") {
+  const ano = sanitizeFileNamePart(String(state.group?.anoViaje || "sin-ano"));
+  const id = sanitizeFileNamePart(String(state.groupId || "sin-id"));
+  const safeFile = sanitizeFileNamePart(fileName || "programa") || "programa";
+
+  return `ventas/programas-originales/${ano}/${id}/${Date.now()}-${safeFile}`;
+}
+
+/*
+  IMPORTANTE:
+  Esta función requiere backend/Cloud Function/API externa.
+  Acá debe devolver:
+  {
+    pdfUrl: "...",
+    pdfStoragePath: "...",
+    pdfNombre: "programa.pdf"
+  }
+*/
+async function convertirProgramaOfficeAPdf({ archivoUrl, archivoNombre, archivoStoragePath, archivoTipo }) {
+  throw new Error(
+    "El programa Word se subió correctamente, pero todavía falta conectar la conversión DOC/DOCX → PDF."
+  );
+}
+
 async function saveProgramaGrupo() {
   const input = $("f_programaPdfFile");
   const file = input?.files?.[0] || null;
@@ -840,6 +891,11 @@ async function saveProgramaGrupo() {
   const flow = state.group?.flowFicha || {};
   const esReemplazo = !!file && !!anteriorUrl;
 
+  let archivoUrl = programaAnterior.archivoUrl || anteriorUrl || "";
+  let archivoStoragePath = programaAnterior.archivoStoragePath || programaAnterior.storagePath || "";
+  let archivoNombre = programaAnterior.archivoNombre || anteriorNombre || "";
+  let archivoTipo = programaAnterior.archivoTipo || "pdf";
+  
   let downloadUrl = anteriorUrl || "";
   let storagePath = programaAnterior.storagePath || "";
   let pdfNombre = anteriorNombre || "";
@@ -871,33 +927,65 @@ async function saveProgramaGrupo() {
 
   try {
     if (file) {
-      const isPdf =
-        file.type === "application/pdf" ||
-        /\.pdf$/i.test(file.name || "");
-
-      if (!isPdf) {
-        showToast("Solo se permite subir archivos PDF para el programa.", "warning");
+      const kind = getProgramaFileKind(file);
+    
+      if (!kind) {
+        showToast("Solo se permite subir programas en PDF, DOC o DOCX.", "warning");
         return;
       }
-
+    
       const storage = getStorage();
-      storagePath = buildProgramaPdfStoragePath(file.name);
-      const storageRef = ref(storage, storagePath);
-
-      await uploadBytes(storageRef, file, {
-        contentType: "application/pdf"
+    
+      // 1) Siempre guardamos el archivo original editable.
+      archivoTipo = kind;
+      archivoNombre = file.name;
+      archivoStoragePath = buildProgramaOriginalStoragePath(file.name);
+    
+      const originalRef = ref(storage, archivoStoragePath);
+    
+      await uploadBytes(originalRef, file, {
+        contentType: getContentTypeByProgramaKind(kind)
       });
-
-      downloadUrl = await getDownloadURL(storageRef);
-      pdfNombre = file.name;
+    
+      archivoUrl = await getDownloadURL(originalRef);
+    
+      // 2) Si es PDF, ese mismo archivo sirve para unir.
+      if (kind === "pdf") {
+        downloadUrl = archivoUrl;
+        storagePath = archivoStoragePath;
+        pdfNombre = file.name;
+      }
+    
+      // 3) Si es DOC/DOCX, se guarda original y se debe convertir a PDF.
+      if (kind === "doc" || kind === "docx") {
+        const convertido = await convertirProgramaOfficeAPdf({
+          archivoUrl,
+          archivoNombre,
+          archivoStoragePath,
+          archivoTipo
+        });
+    
+        downloadUrl = convertido.pdfUrl;
+        storagePath = convertido.pdfStoragePath;
+        pdfNombre = convertido.pdfNombre || archivoNombre.replace(/\.(docx|doc)$/i, ".pdf");
+      }
     }
 
     const patch = {
       programaGrupo: {
         ...(programaAnterior || {}),
+        
+        // Archivo original editable
+        archivoUrl,
+        archivoNombre,
+        archivoStoragePath,
+        archivoTipo,
+      
+        // PDF usado para juntar con la ficha
         pdfUrl: downloadUrl,
         pdfNombre,
         storagePath,
+        
         versionPrograma,
         descripcionCambio,
         subidoPor: displayName,
@@ -1029,13 +1117,13 @@ async function saveProgramaGrupo() {
     await setDoc(doc(db, "ventas_cotizaciones", state.groupDocId), patch, { merge: true });
 
     await createHistoryEntry({
-      tipoMovimiento: esReemplazo ? "programa_pdf_reemplazado" : "programa_pdf_guardado",
+      tipoMovimiento: esReemplazo ? "programa_reemplazado" : "programa_guardado",
       modulo: "programa",
-      titulo: esReemplazo ? "Programa PDF reemplazado" : "Programa PDF guardado",
+      titulo: esReemplazo ? "Programa reemplazado" : "Programa guardado",
       mensaje: [
         esReemplazo
-          ? `${displayName} reemplazó el Programa PDF del grupo.`
-          : `${displayName} guardó el Programa PDF del grupo.`,
+          ? `${displayName} reemplazó el programa del grupo.`
+          : `${displayName} guardó el programa del grupo.`,
         anteriorNombre ? `Archivo anterior: ${anteriorNombre}.` : "",
         pdfNombre ? `Archivo actual: ${pdfNombre}.` : "",
         versionPrograma ? `Versión programa: ${versionPrograma}.` : "",
