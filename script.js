@@ -2050,8 +2050,8 @@ function renderDashboard(rows = []) {
   renderBucketLinks("perdidas-top", "perdidas", perdidas);
   renderBucketLinks("recotizando-top", "recotizando", recotizando);
   renderBucketLinks("ganadas-top", "ganadas", ganadas);
-  setText("abiertas-top", pad2(state.fichasAbiertasRows.length));
-  setText("cerradas-top", pad2(state.fichasCerradasRows.length));
+  setText("abiertas-top", formatYearBuckets(state.fichasAbiertasRows));
+  setText("cerradas-top", formatYearBuckets(state.fichasCerradasRows));
   setText("autorizadas-top", formatYearBuckets(state.fichasAutorizadasRows));
 }
 /* =========================================================
