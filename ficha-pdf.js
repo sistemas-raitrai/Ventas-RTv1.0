@@ -474,7 +474,7 @@ function canFinalizeFichaPdf() {
   if (!canFinalizeFichaAsCurrentUser()) return false;
   if (!state.group || !state.groupDocId) return false;
   if (!canAccessGroup(state.group)) return false;
-  if (!hasProgramaPdf()) return false;
+  if (!hasProgramaPdf() && !hasProgramaOriginalEditable()) return false;
 
   const flow = state.group.flowFicha || {};
   const fichaEstado = normalizeSearchLocal(state.group?.fichaEstado || "");
@@ -488,11 +488,7 @@ function getFinalizeBlockedMessage() {
     return "Solo admin, yenny@raitrai.cl o administracion@raitrai.cl pueden confirmar oficialmente esta ficha para impresión.";
   }
 
-  if (!hasProgramaPdf()) {
-    if (hasProgramaOriginalEditable()) {
-      return "El programa editable está subido, pero falta generar su versión PDF para poder unirlo a la ficha.";
-    }
-  
+  if (!hasProgramaPdf() && !hasProgramaOriginalEditable()) {
     return "Falta subir el programa obligatorio para cerrar la ficha.";
   }
 
@@ -627,6 +623,129 @@ function hasProgramaPdf() {
 
 function hasProgramaOriginalEditable() {
   return !!cleanText(getByPath(state.group, "programaGrupo.archivoUrl") || "");
+}
+
+function getProgramaOriginalStoragePath() {
+  return cleanText(getByPath(state.group, "programaGrupo.archivoStoragePath") || "");
+}
+
+function getProgramaOriginalNombre() {
+  return cleanText(
+    getByPath(state.group, "programaGrupo.archivoNombre") ||
+    getProgramaPdfNombre() ||
+    "programa"
+  );
+}
+
+function getProgramaOriginalTipo() {
+  return cleanText(getByPath(state.group, "programaGrupo.archivoTipo") || "");
+}
+
+function isProgramaOriginalOffice() {
+  const tipo = normalizeSearchLocal(getProgramaOriginalTipo());
+  const nombre = normalizeSearchLocal(getProgramaOriginalNombre());
+
+  return (
+    tipo === "doc" ||
+    tipo === "docx" ||
+    nombre.endsWith(".doc") ||
+    nombre.endsWith(".docx")
+  );
+}
+
+async function waitForProgramaPdfConversion({
+  maxIntentos = 40,
+  esperaMs = 3000
+} = {}) {
+  const originalPath = getProgramaOriginalStoragePath();
+  const originalNombre = getProgramaOriginalNombre();
+
+  if (!originalPath) {
+    throw new Error("El programa está subido, pero no encontré su ruta interna para convertirlo a PDF.");
+  }
+
+  showPdfStatus("Convirtiendo programa Word a PDF. Esto puede tardar unos segundos...");
+
+  for (let intento = 1; intento <= maxIntentos; intento += 1) {
+    const snap = await getDocs(
+      query(
+        collection(db, "conversiones_programa"),
+        where("originalPath", "==", originalPath)
+      )
+    );
+
+    if (!snap.empty) {
+      const data = snap.docs[0].data() || {};
+
+      if (data.pdfUrl && data.pdfPath) {
+        return {
+          pdfUrl: data.pdfUrl,
+          pdfStoragePath: data.pdfPath,
+          pdfNombre: String(originalNombre || "programa.docx").replace(/\.(docx|doc)$/i, ".pdf")
+        };
+      }
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, esperaMs));
+  }
+
+  throw new Error("El programa Word está subido, pero todavía no aparece el PDF convertido. Revisa los logs de convertirProgramaAPdf.");
+}
+
+async function ensureProgramaPdfReady(groupRef) {
+  const existingPdfUrl = getProgramaPdfUrl();
+
+  if (existingPdfUrl) {
+    return {
+      pdfUrl: existingPdfUrl,
+      pdfNombre: getProgramaPdfNombre()
+    };
+  }
+
+  if (!hasProgramaOriginalEditable()) {
+    throw new Error("Falta subir el programa obligatorio para generar la ficha final.");
+  }
+
+  if (!isProgramaOriginalOffice()) {
+    throw new Error("El programa subido no tiene PDF asociado y tampoco parece ser DOC/DOCX.");
+  }
+
+  const convertido = await waitForProgramaPdfConversion();
+
+  await updateDoc(groupRef, {
+    "programaGrupo.pdfUrl": convertido.pdfUrl,
+    "programaGrupo.pdfNombre": convertido.pdfNombre,
+    "programaGrupo.storagePath": convertido.pdfStoragePath,
+
+    "ficha.programaPdfUrl": convertido.pdfUrl,
+    "ficha.programaPdfNombre": convertido.pdfNombre,
+    "ficha.programaPdfStoragePath": convertido.pdfStoragePath,
+
+    programaPdfUrl: convertido.pdfUrl,
+    programaPdfNombre: convertido.pdfNombre,
+    programaPdfStoragePath: convertido.pdfStoragePath,
+
+    fechaActualizacionFicha: serverTimestamp()
+  });
+
+  state.group.programaGrupo = {
+    ...(state.group.programaGrupo || {}),
+    pdfUrl: convertido.pdfUrl,
+    pdfNombre: convertido.pdfNombre,
+    storagePath: convertido.pdfStoragePath
+  };
+
+  state.ficha = {
+    ...(state.ficha || {}),
+    programaPdfUrl: convertido.pdfUrl,
+    programaPdfNombre: convertido.pdfNombre,
+    programaPdfStoragePath: convertido.pdfStoragePath
+  };
+
+  return {
+    pdfUrl: convertido.pdfUrl,
+    pdfNombre: convertido.pdfNombre
+  };
 }
 
 async function fetchPdfBytesFromUrl(url = "") {
@@ -893,11 +1012,12 @@ async function confirmOfficialPdfClosure({ preserveCurrentVersion = false } = {}
   const versionLabel = getFichaVersionLabel(versionData);
   const pdfNombre = buildConfirmedPdfName(versionLabel);
 
-  const programaPdfUrl = getProgramaPdfUrl();
-  const programaPdfNombre = getProgramaPdfNombre();
+  const programaReady = await ensureProgramaPdfReady(groupRef);
+  const programaPdfUrl = programaReady.pdfUrl;
+  const programaPdfNombre = programaReady.pdfNombre;
   
   if (!programaPdfUrl) {
-    throw new Error("No existe Programa PDF cargado para esta ficha.");
+    throw new Error("No se pudo obtener el PDF del programa para unirlo con la ficha.");
   }
   
   // 1) generar PDF base de la ficha
