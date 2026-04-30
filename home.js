@@ -54,6 +54,7 @@ const state = {
   sinAsignarRows: [],
   aContactarRows: [],
   fichasPorFirmarRows: [],
+  fichasCorregidasRows: [],
   solicitudesActualizacionRows: [],
   alertasCriticasRows: [],
   alertasWarningRows: [],
@@ -266,6 +267,67 @@ function isAdministracionDashboardUser(user = {}) {
   );
 }
 
+function isCorreccionFichaPendiente(row = {}) {
+  const flow = row.flowFicha || {};
+  const modo = normalizeLoose(flow.modo || row.fichaFlujoModo || "");
+
+  return (
+    modo === "correccion" ||
+    flow.correccionPendiente === true ||
+    normalizeLoose(flow.correccionEstado || "").startsWith("pendiente")
+  );
+}
+
+function getCorreccionFichaEstado(row = {}) {
+  const flow = row.flowFicha || {};
+  return normalizeLoose(flow.correccionEstado || "");
+}
+
+function isFichaCorregidaVisibleParaUsuario(row = {}, user = null) {
+  const effectiveUser = user || getEffectiveUser();
+  if (!effectiveUser) return false;
+  if (!isCorreccionFichaPendiente(row)) return false;
+
+  const estado = getCorreccionFichaEstado(row);
+  const rol = normalizeLoose(effectiveUser.rol || "");
+
+  if (rol === "admin" || rol === "supervision") return true;
+
+  if (isCaroDashboardUser(effectiveUser)) {
+    return estado === "pendiente_jefa";
+  }
+
+  if (isAdministracionDashboardUser(effectiveUser)) {
+    return estado === "pendiente_administracion";
+  }
+
+  return false;
+}
+
+function getFichaCorregidaLabel(row = {}) {
+  const flow = row.flowFicha || {};
+  const origen = normalizeLoose(flow.correccionOrigen || "");
+  const estado = getCorreccionFichaEstado(row);
+
+  if (estado === "pendiente_jefa") {
+    return "Corrección pendiente de revisión por jefa de ventas";
+  }
+
+  if (estado === "pendiente_administracion") {
+    return "Corrección pendiente de cierre administrativo";
+  }
+
+  if (origen === "administracion") {
+    return "Corrección iniciada por administración";
+  }
+
+  if (origen === "jefaventas") {
+    return "Corrección iniciada por jefa de ventas";
+  }
+
+  return "Corrección interna pendiente";
+}
+
 function getRowsForCurrentScope(effectiveUser) {
   if (!effectiveUser) return [];
 
@@ -289,6 +351,7 @@ function syncAlertRowsByRole(effectiveUser = null) {
 
   setAlertRowVisibleByChild("link-sin-asignar", canSeeSinAsignar);
   setAlertRowVisibleByChild("link-fichas-firmar", !!user);
+  setAlertRowVisibleByChild("link-fichas-corregidas", !!user);
   setAlertRowVisibleByChild("link-solicitudes-actualizacion", !!user);
   setAlertRowVisibleByChild("link-alertas-criticas", !!user);
   setAlertRowVisibleByChild("link-alertas-warning", !!user);
@@ -600,6 +663,10 @@ function renderHome() {
       .filter(Boolean)
   );
   
+  state.fichasCorregidasRows = sortRowsByAlias(
+    scopedRows.filter((row) => isFichaCorregidaVisibleParaUsuario(row, effectiveUser))
+  );
+  
   state.fichasPorFirmarRows = sortRowsByAlias(
     scopedRows.filter((row) => {
       const posiblesIds = [
@@ -613,6 +680,9 @@ function renderHome() {
       );
   
       if (tieneSolicitudAbierta) return false;
+  
+      // Si está en corrección interna, NO es ficha nueva por firmar.
+      if (isCorreccionFichaPendiente(row)) return false;
   
       return isFichaPorFirmarSegunUsuario(row, effectiveUser);
     })
@@ -646,6 +716,7 @@ function renderHome() {
   setText("count-sin-asignar", state.sinAsignarRows.length);
   setText("count-a-contactar", state.aContactarRows.length);
   setText("count-fichas-firmar", state.fichasPorFirmarRows.length);
+  setText("count-fichas-corregidas", state.fichasCorregidasRows.length);
   setText("count-solicitudes-actualizacion", state.solicitudesActualizacionRows.length);
   setText("count-alertas-criticas", state.alertasCriticasRows.length);
   setText("count-alertas-warning", state.alertasWarningRows.length);
@@ -1218,6 +1289,7 @@ function bindAlertButtons() {
   const linkSinAsignar = $("link-sin-asignar");
   const linkAContactar = $("link-a-contactar");
   const linkFichas = $("link-fichas-firmar");
+  const linkFichasCorregidas = $("link-fichas-corregidas");
   const linkSolicitudes = $("link-solicitudes-actualizacion");
   const linkCriticas = $("link-alertas-criticas");
   const linkWarning = $("link-alertas-warning");
