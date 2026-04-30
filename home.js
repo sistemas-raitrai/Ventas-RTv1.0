@@ -49,6 +49,7 @@ const state = {
   rowsById: new Map(),
   alertRows: [],
   solicitudesRows: [],
+  anoFichaFiltro: String(new Date().getFullYear()),
 
   scopedRows: [],
   sinAsignarRows: [],
@@ -690,11 +691,42 @@ function setText(id, value) {
   if (el) el.textContent = String(value);
 }
 
+function poblarSelectorAnoFichas(scopedRows = []) {
+  const select = $("select-home-ano-fichas");
+  if (!select) return;
+
+  const currentYear = String(new Date().getFullYear());
+
+  const years = [...new Set(
+    scopedRows
+      .map((row) => getAnoViajeNumber(row))
+      .filter(Boolean)
+      .map(String)
+  )].sort();
+
+  if (!years.includes(currentYear)) {
+    years.unshift(currentYear);
+  }
+
+  const currentValue = state.anoFichaFiltro || currentYear;
+
+  select.innerHTML = `
+    <option value="">Todos los años</option>
+    ${years.map((year) => `
+      <option value="${escapeHtml(year)}">${escapeHtml(year)}</option>
+    `).join("")}
+  `;
+
+  select.value = years.includes(currentValue) ? currentValue : currentYear;
+  state.anoFichaFiltro = select.value;
+}
+
 function renderHome() {
   const effectiveUser = getEffectiveUser();
   const scopedRows = getRowsForCurrentScope(effectiveUser);
 
   state.scopedRows = scopedRows;
+  poblarSelectorAnoFichas(scopedRows);
 
   const canSeeGlobalSinAsignar =
     isAdminDashboardRole(effectiveUser) ||
@@ -723,7 +755,11 @@ function renderHome() {
     scopedRows.filter((row) => isFichaCorregidaVisibleParaUsuario(row, effectiveUser))
   );
 
-  const ganadasScope = scopedRows.filter(isGanadaComercial);
+  const ganadasScopeBase = scopedRows.filter(isGanadaComercial);
+
+  const ganadasScope = state.anoFichaFiltro
+    ? ganadasScopeBase.filter((row) => String(getAnoViajeNumber(row)) === String(state.anoFichaFiltro))
+    : ganadasScopeBase;
 
   state.fichasAbiertasRows = sortRowsByAlias(
     ganadasScope.filter(isFichaAbiertaAdministrativa)
@@ -1370,6 +1406,7 @@ function bindAlertButtons() {
   const linkCriticas = $("link-alertas-criticas");
   const linkWarning = $("link-alertas-warning");
   const linkReuniones = $("link-reunion-3dias");
+  const selectAnoFichas = $("select-home-ano-fichas");
 
   if (linkSinAsignar && !linkSinAsignar.dataset.bound) {
     linkSinAsignar.dataset.bound = "1";
@@ -1586,6 +1623,15 @@ function bindAlertButtons() {
     linkHomeFichasAutorizadas.addEventListener("click", (e) => {
       e.preventDefault();
       abrirModalFichasHome("autorizadas", state.fichasAutorizadasRows);
+    });
+  }
+
+  if (selectAnoFichas && !selectAnoFichas.dataset.bound) {
+    selectAnoFichas.dataset.bound = "1";
+  
+    selectAnoFichas.addEventListener("change", () => {
+      state.anoFichaFiltro = selectAnoFichas.value;
+      renderHome();
     });
   }
 }
