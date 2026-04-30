@@ -2279,3 +2279,8 @@ html, body{
 .groups-board > .flow-card.buscador .buscador-resultados{
   grid-column: 1 / -1 !important;
 }
+
+/* Quitar línea superior del buscador del index */
+.groups-board > .flow-card.buscador::before{
+  display:none !important;
+}
