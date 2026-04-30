@@ -307,6 +307,27 @@
       cursor:pointer;
     }
 
+    body[data-page="home"] .home-search-actions{
+      margin-top:12px;
+      display:flex;
+      justify-content:flex-end;
+    }
+    
+    body[data-page="home"] .home-search-btn{
+      border:none;
+      background:#32184f;
+      color:#fff;
+      border-radius:999px;
+      padding:10px 18px;
+      font-weight:900;
+      cursor:pointer;
+      box-shadow:0 8px 18px rgba(35,18,56,.14);
+    }
+    
+    body[data-page="home"] .home-search-btn:hover{
+      transform:translateY(-1px);
+    }
+
     @media (max-width:900px){
       body[data-page="home"] .home-content{
         grid-template-columns:1fr;
@@ -421,6 +442,12 @@
                 type="text"
                 placeholder="Buscar grupo..."
               />
+
+              <div class="home-search-actions">
+                <button id="btn-buscar-grupos-home" type="button" class="home-search-btn">
+                  Buscar
+                </button>
+              </div>
             </div>
 
             <div class="home-search-card">
@@ -433,6 +460,11 @@
                 type="text"
                 placeholder="Buscar ficha..."
               />
+              <div class="home-search-actions">
+                <button id="btn-buscar-fichas-home" type="button" class="home-search-btn">
+                  Buscar
+                </button>
+              </div>
             </div>
 
           </div>
