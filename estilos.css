@@ -2248,3 +2248,34 @@ html, body{
     max-width:none;
   }
 }
+
+/* FIX BUSCADOR INDEX: ancho desde Reunión Confirmada hasta Perdidas */
+.groups-board > .flow-card.buscador{
+  grid-column: 3 / 6 !important;
+  grid-row: 1 !important;
+  justify-self: stretch !important;
+  align-self: stretch !important;
+  width: 100% !important;
+  max-width: none !important;
+  min-height: 104px !important;
+
+  display: grid !important;
+  grid-template-columns: auto 1fr !important;
+  align-items: center !important;
+  gap: 18px !important;
+}
+
+.groups-board > .flow-card.buscador h3{
+  margin: 0 !important;
+  white-space: nowrap !important;
+  text-align: left !important;
+}
+
+.groups-board > .flow-card.buscador .buscador-input{
+  width: 100% !important;
+  margin: 0 !important;
+}
+
+.groups-board > .flow-card.buscador .buscador-resultados{
+  grid-column: 1 / -1 !important;
+}
