@@ -108,6 +108,7 @@ const state = {
   alertRows: [],
   scopedRows: [],
   fichasPorFirmarRows: [],
+  fichasCorregidasRows: [],
   alertasCriticasRows: [],
   alertasWarningRows: [],
   solicitudesRows: [],
@@ -617,6 +618,77 @@ function isAdministracionDashboardUser(user = {}) {
   );
 }
 
+function isCorreccionFichaPendiente(row = {}) {
+  const flow = row.flowFicha || {};
+  const modo = normalizeLoose(flow.modo || row.fichaFlujoModo || "");
+
+  return (
+    modo === "correccion" ||
+    flow.correccionPendiente === true ||
+    normalizeLoose(flow.correccionEstado || "").startsWith("pendiente")
+  );
+}
+
+function getCorreccionFichaEstado(row = {}) {
+  const flow = row.flowFicha || {};
+  return normalizeLoose(flow.correccionEstado || "");
+}
+
+function isFichaCorregidaVisibleParaUsuario(row = {}, user = null) {
+  const effectiveUser = user || getEffectiveUser();
+  if (!effectiveUser) return false;
+  if (!isCorreccionFichaPendiente(row)) return false;
+
+  const estado = getCorreccionFichaEstado(row);
+  const rol = normalizeLoose(effectiveUser.rol || "");
+
+  if (rol === "admin" || rol === "supervision") return true;
+
+  if (isCaroDashboardUser(effectiveUser)) {
+    return estado === "pendiente_jefa";
+  }
+
+  if (isAdministracionDashboardUser(effectiveUser)) {
+    return estado === "pendiente_administracion";
+  }
+
+  return false;
+}
+
+function getFichaCorregidaLabel(row = {}) {
+  const flow = row.flowFicha || {};
+  const origen = normalizeLoose(flow.correccionOrigen || "");
+  const estado = getCorreccionFichaEstado(row);
+
+  if (estado === "pendiente_jefa") {
+    return "Corrección pendiente de revisión por jefa de ventas";
+  }
+
+  if (estado === "pendiente_administracion") {
+    return "Corrección pendiente de cierre administrativo";
+  }
+
+  if (origen === "administracion") {
+    return "Corrección iniciada por administración";
+  }
+
+  if (origen === "jefaventas") {
+    return "Corrección iniciada por jefa de ventas";
+  }
+
+  return "Corrección interna pendiente";
+}
+
+function getFichasCorregidasSegunUsuario(rows = [], effectiveUser = null) {
+  return dedupeRowsByGroup(rows)
+    .filter((row) => isFichaCorregidaVisibleParaUsuario(row, effectiveUser))
+    .sort((a, b) => {
+      const aliasA = getAliasColegioSortKey(getRowAlias(a));
+      const aliasB = getAliasColegioSortKey(getRowAlias(b));
+      return aliasA.localeCompare(aliasB, "es", { sensitivity: "base", numeric: true });
+    });
+}
+
 function getFichaPendienteLabel(row = {}) {
   const firmas = getFichaFirmas(row);
 
@@ -690,7 +762,10 @@ function getFichasPorFirmarSegunUsuario(rows = [], effectiveUser = null) {
       );
 
       if (tieneSolicitudAbierta) return false;
-
+      
+      // Si está en corrección interna, NO es ficha nueva por firmar.
+      if (isCorreccionFichaPendiente(row)) return false;
+      
       return isFichaPorFirmarSegunUsuario(row, effectiveUser);
     })
     .sort((a, b) => {
@@ -802,6 +877,7 @@ function syncAlertRowsByRole(effectiveUser = null) {
 
   setAlertRowVisibleByChild("link-sin-asignar", canSeeSinAsignar);
   setAlertRowVisibleByChild("link-fichas-firmar", canSeeFichas);
+  setAlertRowVisibleByChild("link-fichas-corregidas", canSeeFichas);
   setAlertRowVisibleByChild("link-solicitudes-actualizacion", canSeeSolicitudes);
   setAlertRowVisibleByChild("link-alertas-criticas", canSeeAlertasCriticas);
   setAlertRowVisibleByChild("link-alertas-warning", canSeeAlertasWarning);
@@ -1006,6 +1082,92 @@ function openFichasPorFirmarModal() {
 
 function closeFichasPorFirmarModal() {
   const dialog = $("modal-fichas-firmar");
+  if (!dialog) return;
+
+  if (typeof dialog.close === "function") {
+    dialog.close();
+    return;
+  }
+
+  dialog.removeAttribute("open");
+}
+
+function renderFichasCorregidasModal(rows = [], effectiveUser = null) {
+  const titleEl = $("fichas-corregidas-titulo");
+  const subtitleEl = $("fichas-corregidas-subtitulo");
+  const summaryEl = $("fichas-corregidas-resumen");
+  const listEl = $("fichas-corregidas-lista");
+
+  if (!titleEl || !subtitleEl || !summaryEl || !listEl) return;
+
+  titleEl.textContent = "Fichas corregidas";
+  subtitleEl.textContent = "Correcciones internas pendientes según tu rol.";
+  summaryEl.textContent = rows.length
+    ? `Hay ${rows.length} ficha(s) corregida(s) pendiente(s).`
+    : "No hay fichas corregidas pendientes para tu rol.";
+
+  if (!rows.length) {
+    listEl.innerHTML = `
+      <div style="padding:16px 18px; border:1px solid rgba(60,40,90,.10); border-radius:16px; background:#faf8fd; color:#5d546d;">
+        No hay fichas corregidas pendientes.
+      </div>
+    `;
+    return;
+  }
+
+  listEl.innerHTML = rows.map((row) => {
+    const id = getRowId(row);
+    const alias = getRowAlias(row);
+    const apoderado = getRowApoderado(row);
+    const vendedor = getRowVendorName(row) || row.vendedoraCorreo || "Sin vendedor";
+    const pendiente = getFichaCorregidaLabel(row);
+
+    return `
+      <div style="padding:14px 16px; border:1px solid rgba(60,40,90,.12); border-radius:16px; background:#fff; display:flex; justify-content:space-between; gap:14px; align-items:flex-start;">
+        <div style="min-width:0;">
+          <div style="font-weight:800; color:#31194b; font-size:16px; line-height:1.2;">
+            ${escapeHtml(alias)}
+          </div>
+
+          <div style="margin-top:6px; color:#6a6078; font-size:13px; line-height:1.45;">
+            Apoderado: ${escapeHtml(apoderado)}<br>
+            Vendedor(a): ${escapeHtml(vendedor)}<br>
+            Estado corrección: ${escapeHtml(pendiente)}
+          </div>
+        </div>
+
+        <a
+          href="fichas.html?id=${encodeURIComponent(id)}"
+          target="_blank"
+          rel="noopener"
+          style="flex:0 0 auto; text-decoration:none; background:#3b2357; color:#fff; border-radius:999px; padding:10px 14px; font-weight:700; white-space:nowrap;"
+        >
+          Abrir ficha
+        </a>
+      </div>
+    `;
+  }).join("");
+}
+
+function openFichasCorregidasModal() {
+  const dialog = $("modal-fichas-corregidas");
+  if (!dialog) return;
+
+  const effectiveUser = getEffectiveUser();
+  const rows = Array.isArray(state.fichasCorregidasRows) ? state.fichasCorregidasRows : [];
+
+  renderFichasCorregidasModal(rows, effectiveUser);
+
+  if (typeof dialog.showModal === "function") {
+    if (!dialog.open) dialog.showModal();
+    return;
+  }
+
+  dialog.setAttribute("open", "open");
+}
+
+function closeFichasCorregidasModal() {
+  const dialog = $("modal-fichas-corregidas");
   if (!dialog) return;
 
   if (typeof dialog.close === "function") {
@@ -1411,6 +1573,8 @@ function closeAlertasWarningModal() {
   dialog.removeAttribute("open");
 }
 
+
+
 /* =========================================================
    CARGA DE DATOS
 ========================================================= */
@@ -1577,6 +1741,7 @@ function renderSingleTotalLink(targetId, bucket, count = 0) {
 function inicializarDashboardEnCeros() {
   state.scopedRows = [];
   state.fichasPorFirmarRows = [];
+  state.fichasCorregidasRows = [];
   state.alertasCriticasRows = [];
   state.alertasWarningRows = [];
   state.solicitudesActualizacionRows = [];
@@ -1592,6 +1757,7 @@ function inicializarDashboardEnCeros() {
   setSinAsignarManagementHref();
   setText("count-a-contactar", "0");
   setText("count-fichas-firmar", "0");
+  setText("count-fichas-corregidas", "0");
   setText("count-solicitudes-actualizacion", "0");
   setText("count-alertas-criticas", "0");
   setText("count-alertas-warning", "0");
@@ -1634,6 +1800,9 @@ function renderDashboard(rows = []) {
   const fichasPorFirmar = getFichasPorFirmarSegunUsuario(scopedRows, effectiveUser);
   state.fichasPorFirmarRows = fichasPorFirmar;
 
+  const fichasCorregidas = getFichasCorregidasSegunUsuario(scopedRows, effectiveUser);
+  state.fichasCorregidasRows = fichasCorregidas;
+
   const solicitudesActualizacion = getSolicitudesActualizacionSegunUsuario(scopedRows, effectiveUser);
   state.solicitudesActualizacionRows = solicitudesActualizacion;
   
@@ -1663,6 +1832,7 @@ function renderDashboard(rows = []) {
   setText("count-a-contactar", aContactarRows.length);
 
   setText("count-fichas-firmar", fichasPorFirmar.length);
+  setText("count-fichas-corregidas", fichasCorregidas.length);
   setText("count-solicitudes-actualizacion", solicitudesActualizacion.length);
   setText("count-alertas-criticas", alertasCriticas.length);
   setText("count-alertas-warning", alertasWarning.length);
@@ -2072,6 +2242,10 @@ async function initPage() {
   const linkFichasFirmar = $("link-fichas-firmar");
   const btnCerrarFichasFirmar = $("btn-cerrar-fichas-firmar");
   const modalFichasFirmar = $("modal-fichas-firmar");
+
+  const linkFichasCorregidas = $("link-fichas-corregidas");
+  const btnCerrarFichasCorregidas = $("btn-cerrar-fichas-corregidas");
+  const modalFichasCorregidas = $("modal-fichas-corregidas");
 
   const linkSolicitudesActualizacion = $("link-solicitudes-actualizacion");
   const btnCerrarSolicitudesActualizacion = $("btn-cerrar-solicitudes-actualizacion");
