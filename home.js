@@ -1020,6 +1020,50 @@ function renderResultadosFichas(rows = []) {
 function initSearchers() {
   const inputGrupos = $("input-buscador-grupos-home");
   const inputFichas = $("input-buscador-fichas-home");
+  const btnBuscarGrupos = $("btn-buscar-grupos-home");
+  const btnBuscarFichas = $("btn-buscar-fichas-home");
+
+  const ejecutarBusquedaGrupos = () => {
+    const query = inputGrupos?.value?.trim() || "";
+    if (!query) return;
+
+    const rows = sortRowsByAlias(filtrarRows(state.scopedRows, query));
+
+    openListadoModal({
+      titulo: `Resultados grupos: "${query}"`,
+      subtitulo: "Grupos encontrados según la búsqueda ingresada.",
+      resumen: `Hay ${rows.length} grupo(s) encontrado(s).`,
+      rows,
+      renderFn: (lista) => renderGroupCards(lista, {
+        buttonLabel: "Abrir grupo",
+        hrefBase: "grupo.html"
+      })
+    });
+  };
+
+  const ejecutarBusquedaFichas = () => {
+    const query = inputFichas?.value?.trim() || "";
+    if (!query) return;
+
+    const fichaRows = state.scopedRows.filter(hasFichaSignal);
+    const rows = sortRowsByAlias(filtrarRows(fichaRows, query));
+
+    openListadoModal({
+      titulo: `Resultados fichas: "${query}"`,
+      subtitulo: "Fichas encontradas según la búsqueda ingresada.",
+      resumen: `Hay ${rows.length} ficha(s) encontrada(s).`,
+      rows,
+      renderFn: (lista) => renderGroupCards(lista, {
+        buttonLabel: "Abrir ficha",
+        hrefBase: "fichas.html",
+        extraRenderer: (row) => `
+          <div style="margin-top:10px; color:#3e3550; font-size:14px;">
+            <strong>Pendiente:</strong> ${escapeHtml(getFichaPendienteLabel(row))}
+          </div>
+        `
+      })
+    });
+  };
 
   if (inputGrupos && !inputGrupos.dataset.bound) {
     inputGrupos.dataset.bound = "1";
@@ -1027,22 +1071,7 @@ function initSearchers() {
     inputGrupos.addEventListener("keydown", (e) => {
       if (e.key !== "Enter") return;
       e.preventDefault();
-
-      const query = inputGrupos.value.trim();
-      if (!query) return;
-
-      const rows = sortRowsByAlias(filtrarRows(state.scopedRows, query));
-
-      openListadoModal({
-        titulo: `Resultados grupos: "${query}"`,
-        subtitulo: "Grupos encontrados según la búsqueda ingresada.",
-        resumen: `Hay ${rows.length} grupo(s) encontrado(s).`,
-        rows,
-        renderFn: (lista) => renderGroupCards(lista, {
-          buttonLabel: "Abrir grupo",
-          hrefBase: "grupo.html"
-        })
-      });
+      ejecutarBusquedaGrupos();
     });
   }
 
@@ -1052,29 +1081,18 @@ function initSearchers() {
     inputFichas.addEventListener("keydown", (e) => {
       if (e.key !== "Enter") return;
       e.preventDefault();
-
-      const query = inputFichas.value.trim();
-      if (!query) return;
-
-      const fichaRows = state.scopedRows.filter(hasFichaSignal);
-      const rows = sortRowsByAlias(filtrarRows(fichaRows, query));
-
-      openListadoModal({
-        titulo: `Resultados fichas: "${query}"`,
-        subtitulo: "Fichas encontradas según la búsqueda ingresada.",
-        resumen: `Hay ${rows.length} ficha(s) encontrada(s).`,
-        rows,
-        renderFn: (lista) => renderGroupCards(lista, {
-          buttonLabel: "Abrir ficha",
-          hrefBase: "fichas.html",
-          extraRenderer: (row) => `
-            <div style="margin-top:10px; color:#3e3550; font-size:14px;">
-              <strong>Pendiente:</strong> ${escapeHtml(getFichaPendienteLabel(row))}
-            </div>
-          `
-        })
-      });
+      ejecutarBusquedaFichas();
     });
+  }
+
+  if (btnBuscarGrupos && !btnBuscarGrupos.dataset.bound) {
+    btnBuscarGrupos.dataset.bound = "1";
+    btnBuscarGrupos.addEventListener("click", ejecutarBusquedaGrupos);
+  }
+
+  if (btnBuscarFichas && !btnBuscarFichas.dataset.bound) {
+    btnBuscarFichas.dataset.bound = "1";
+    btnBuscarFichas.addEventListener("click", ejecutarBusquedaFichas);
   }
 }
 
