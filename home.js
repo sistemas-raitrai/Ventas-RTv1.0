@@ -1344,6 +1344,30 @@ function bindAlertButtons() {
     });
   }
 
+  if (linkFichasCorregidas && !linkFichasCorregidas.dataset.bound) {
+    linkFichasCorregidas.dataset.bound = "1";
+  
+    linkFichasCorregidas.addEventListener("click", (e) => {
+      e.preventDefault();
+  
+      openListadoModal({
+        titulo: "Fichas corregidas",
+        subtitulo: "Correcciones internas pendientes según tu rol.",
+        resumen: `Hay ${state.fichasCorregidasRows.length} ficha(s) corregida(s) pendiente(s).`,
+        rows: state.fichasCorregidasRows,
+        renderFn: (rows) => renderGroupCards(rows, {
+          buttonLabel: "Abrir ficha",
+          hrefBase: "fichas.html",
+          extraRenderer: (row) => `
+            <div style="margin-top:10px; color:#3e3550; font-size:14px;">
+              <strong>Corrección:</strong> ${escapeHtml(getFichaCorregidaLabel(row))}
+            </div>
+          `
+        })
+      });
+    });
+  }
+
   if (linkSolicitudes && !linkSolicitudes.dataset.bound) {
     linkSolicitudes.dataset.bound = "1";
     linkSolicitudes.addEventListener("click", (e) => {
