@@ -740,6 +740,26 @@ function hasProgramaPdf() {
   return !!getProgramaPdfUrl();
 }
 
+function getProgramaOriginalUrl() {
+  return cleanText(
+    getByPath(state.group, "programaGrupo.archivoUrl") ||
+    getProgramaPdfUrl() ||
+    ""
+  );
+}
+
+function getProgramaOriginalNombre() {
+  return cleanText(
+    getByPath(state.group, "programaGrupo.archivoNombre") ||
+    getProgramaPdfNombre() ||
+    ""
+  );
+}
+
+function hasProgramaOriginal() {
+  return !!getProgramaOriginalUrl();
+}
+
 function sanitizeFileNamePart(value = "") {
   return String(value || "")
     .replace(/[<>:"/\\|?*]+/g, " ")
@@ -764,15 +784,16 @@ function updateProgramaPdfUi() {
   const descInput = $("f_programaDescripcionCambio");
 
   const programa = state.group?.programaGrupo || {};
-  const hasPdf = hasProgramaPdf();
-  const fileName = getProgramaPdfNombre();
+  const hasPrograma = hasProgramaOriginal();
+  const fileName = getProgramaOriginalNombre();
   const version = cleanText(programa.versionPrograma || "");
   const descripcion = cleanText(programa.descripcionCambio || "");
+  const tipo = cleanText(programa.archivoTipo || "");
 
   if (statusEl) {
     if (state.isUploadingProgramaPdf) {
-      statusEl.textContent = "Subiendo Programa...";
-    } else if (hasPdf) {
+      statusEl.textContent = "Subiendo programa...";
+    } else if (hasPrograma) {
       statusEl.textContent = `Programa cargado${version ? ` · Versión ${version}` : ""}`;
     } else {
       statusEl.textContent = "Programa pendiente";
@@ -782,9 +803,10 @@ function updateProgramaPdfUi() {
   if (metaEl) {
     if (state.isUploadingProgramaPdf) {
       metaEl.textContent = "Espera a que termine la subida del archivo.";
-    } else if (hasPdf) {
+    } else if (hasPrograma) {
       metaEl.textContent = [
         fileName || "Archivo cargado correctamente.",
+        tipo ? `Formato: ${tipo.toUpperCase()}` : "",
         descripcion ? `Cambio: ${descripcion}` : ""
       ].filter(Boolean).join(" · ");
     } else {
@@ -793,7 +815,7 @@ function updateProgramaPdfUi() {
   }
 
   if (openBtn) {
-    openBtn.disabled = !hasPdf || state.isUploadingProgramaPdf;
+    openBtn.disabled = !hasPrograma || state.isUploadingProgramaPdf;
   }
 
   if (input) {
@@ -905,7 +927,9 @@ async function saveProgramaGrupo() {
   const anteriorNombre = getProgramaPdfNombre();
   const anteriorUrl = getProgramaPdfUrl();
 
-  if (!file && !anteriorUrl) {
+  const anteriorOriginalUrl = getProgramaOriginalUrl();
+  
+  if (!file && !anteriorOriginalUrl) {
     showToast("Debes seleccionar un archivo PDF, DOC o DOCX para guardar el programa.", "warning");
     return;
   }
@@ -986,18 +1010,12 @@ async function saveProgramaGrupo() {
         pdfNombre = file.name;
       }
     
-      // 3) Si es DOC/DOCX, se guarda original y se debe convertir a PDF.
+      // 3) Si es DOC/DOCX, solo guardamos el original editable.
+      // La conversión/unión PDF queda para el cierre final en ficha-pdf.js.
       if (kind === "doc" || kind === "docx") {
-        const convertido = await convertirProgramaOfficeAPdf({
-          archivoUrl,
-          archivoNombre,
-          archivoStoragePath,
-          archivoTipo
-        });
-    
-        downloadUrl = convertido.pdfUrl;
-        storagePath = convertido.pdfStoragePath;
-        pdfNombre = convertido.pdfNombre || archivoNombre.replace(/\.(docx|doc)$/i, ".pdf");
+        downloadUrl = "";
+        storagePath = "";
+        pdfNombre = "";
       }
     }
 
@@ -1399,7 +1417,7 @@ function fillForm() {
 function syncButtons() {
   const editable = canEditFicha();
   const tienePdf = !!cleanText(state.ficha?.pdfUrl || state.group?.fichaPdfUrl || "");
-  const tienePrograma = hasProgramaPdf();
+  const tienePrograma = hasProgramaOriginal();
   const flow = state.group?.flowFicha || {};
   const isGanada = normalizeState(state.group?.estado) === "ganada";
   const pendingUpdate = hasPendingUpdateRequest();
@@ -1550,9 +1568,9 @@ function bindEvents() {
   $("btnGuardarProgramaPdf")?.addEventListener("click", saveProgramaGrupo);
 
   $("btnAbrirProgramaPdf")?.addEventListener("click", () => {
-    const url = getProgramaPdfUrl();
+    const url = getProgramaOriginalUrl();
     if (!url) {
-      alert("Todavía no hay un Programa PDF cargado.");
+      alert("Todavía no hay un programa cargado.");
       return;
     }
     window.open(url, "_blank", "noopener");
@@ -1652,8 +1670,8 @@ async function signFlowFromFicha(step) {
       return;
     }
     
-    if (!hasProgramaPdf()) {
-      alert("Debes subir el Programa PDF antes de firmar la ficha.");
+    if (!hasProgramaOriginal()) {
+      alert("Debes subir el programa antes de firmar la ficha.");
       return;
     }
 
