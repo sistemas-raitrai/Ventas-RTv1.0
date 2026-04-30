@@ -856,9 +856,39 @@ function buildProgramaOriginalStoragePath(fileName = "") {
     pdfNombre: "programa.pdf"
   }
 */
-async function convertirProgramaOfficeAPdf({ archivoUrl, archivoNombre, archivoStoragePath, archivoTipo }) {
+async function convertirProgramaOfficeAPdf({ archivoStoragePath, archivoNombre }) {
+  const maxIntentos = 40; // aprox. 2 minutos
+  const esperaMs = 3000;
+
+  showToast("Programa Word subido. Generando PDF automáticamente...", "info", {
+    duration: 5000
+  });
+
+  for (let intento = 1; intento <= maxIntentos; intento += 1) {
+    const snap = await getDocs(
+      query(
+        collection(db, "conversiones_programa"),
+        where("originalPath", "==", archivoStoragePath)
+      )
+    );
+
+    if (!snap.empty) {
+      const data = snap.docs[0].data() || {};
+
+      if (data.pdfUrl && data.pdfPath) {
+        return {
+          pdfUrl: data.pdfUrl,
+          pdfStoragePath: data.pdfPath,
+          pdfNombre: String(archivoNombre || "programa.docx").replace(/\.(docx|doc)$/i, ".pdf")
+        };
+      }
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, esperaMs));
+  }
+
   throw new Error(
-    "El programa Word se subió correctamente, pero todavía falta conectar la conversión DOC/DOCX → PDF."
+    "El Word se subió, pero la conversión a PDF aún no aparece. Espera unos segundos y vuelve a guardar."
   );
 }
 
@@ -876,7 +906,7 @@ async function saveProgramaGrupo() {
   const anteriorUrl = getProgramaPdfUrl();
 
   if (!file && !anteriorUrl) {
-    showToast("Debes seleccionar un archivo PDF para guardar el programa.", "warning");
+    showToast("Debes seleccionar un archivo PDF, DOC o DOCX para guardar el programa.", "warning");
     return;
   }
 
@@ -1160,13 +1190,13 @@ async function saveProgramaGrupo() {
 
     showToast(
       esReemplazo
-        ? "Programa PDF reemplazado correctamente."
-        : "Programa PDF guardado correctamente.",
+        ? "Programa reemplazado correctamente."
+        : "Programa guardado correctamente.",
       "success"
     );
   } catch (error) {
     console.error("[fichas] saveProgramaGrupo", error);
-    showToast("No se pudo guardar el Programa PDF: " + (error?.message || error), "error", { duration: 5000 });
+    showToast("No se pudo guardar el programa: " + (error?.message || error), "error", { duration: 7000 });
   } finally {
     state.isUploadingProgramaPdf = false;
     if (input) input.value = "";
