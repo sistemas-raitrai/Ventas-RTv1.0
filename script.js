@@ -109,6 +109,9 @@ const state = {
   scopedRows: [],
   fichasPorFirmarRows: [],
   fichasCorregidasRows: [],
+  fichasAbiertasRows: [],
+  fichasCerradasRows: [],
+  fichasAutorizadasRows: [],
   alertasCriticasRows: [],
   alertasWarningRows: [],
   solicitudesRows: [],
@@ -603,6 +606,84 @@ function isGanadaComercial(row = {}) {
 function hasAllThreeFichaFirmas(row = {}) {
   const firmas = getFichaFirmas(row);
   return !!(firmas.vendedor && firmas.jefa && firmas.admin);
+}
+
+function getAdminValue(row = {}, fichaKey = "", rootKey = "") {
+  return String(
+    row?.ficha?.[fichaKey] ||
+    row?.[rootKey] ||
+    row?.[fichaKey] ||
+    ""
+  ).trim();
+}
+
+function tuvoFirmaAdministracionAlgunaVez(row = {}) {
+  const flow = row.flowFicha || {};
+
+  return (
+    !!flow?.administracion?.firmado ||
+    !!flow?.administracion?.firmadoAt ||
+    !!flow?.administracion?.firmadoPor ||
+    !!row.firmaAdministracion ||
+    !!row.fechaFirmaAdministracion ||
+    row.autorizada === true
+  );
+}
+
+function isFichaAbiertaAdministrativa(row = {}) {
+  const flow = row.flowFicha || {};
+  const modo = normalizeLoose(flow.modo || row.fichaFlujoModo || row?.ficha?.flujoModo || "");
+
+  const haySolicitudAbierta = (state.solicitudesRows || []).some((sol) => {
+    return (
+      String(sol.idGrupo || "").trim() === getRowId(row) &&
+      normalizeLoose(sol.tipoSolicitud || "") === "actualizacion_ficha" &&
+      sol.resuelta !== true &&
+      !["completada", "cerrada"].includes(normalizeLoose(sol.estadoSolicitud || ""))
+    );
+  });
+
+  return (
+    haySolicitudAbierta ||
+    modo === "correccion" ||
+    flow.correccionPendiente === true ||
+    normalizeLoose(flow.correccionEstado || "").startsWith("pendiente")
+  );
+}
+
+function isFichaCerradaAdministrativa(row = {}) {
+  const firmas = getFichaFirmas(row);
+  return firmas.vendedor && firmas.jefa && firmas.admin && !isFichaAbiertaAdministrativa(row);
+}
+
+function isFichaAutorizadaAdministrativa(row = {}) {
+  const numeroNegocio = getAdminValue(row, "numeroNegocio", "numeroNegocio");
+  const usuario = getAdminValue(row, "usuarioFicha", "usuarioProgramaAdm");
+  const clave = getAdminValue(row, "claveAdministrativa", "claveAdministrativa");
+
+  return tuvoFirmaAdministracionAlgunaVez(row) && !!numeroNegocio && !!usuario && !!clave;
+}
+
+function getFichaAdminMotivo(row = {}) {
+  if (isFichaAbiertaAdministrativa(row)) {
+    const estado = normalizeLoose(row?.flowFicha?.correccionEstado || "");
+
+    if (estado === "pendiente_jefa") return "Corrección pendiente de jefa de ventas";
+    if (estado === "pendiente_administracion") return "Corrección pendiente de administración";
+
+    return "Solicitud de actualización o corrección abierta";
+  }
+
+  if (isFichaAutorizadaAdministrativa(row)) return "Autorizada para gestión de pago";
+  if (isFichaCerradaAdministrativa(row)) return "Flujo de firmas completo";
+
+  return "Sin clasificación";
+}
+
+function sortRowsByAliasComparator(a, b) {
+  const aliasA = getAliasColegioSortKey(getRowAlias(a));
+  const aliasB = getAliasColegioSortKey(getRowAlias(b));
+  return aliasA.localeCompare(aliasB, "es", { sensitivity: "base", numeric: true });
 }
 
 function isCaroDashboardUser(user = {}) {
@@ -1180,6 +1261,109 @@ function closeFichasCorregidasModal() {
   }
 
   dialog.removeAttribute("open");
+}
+
+function buildSearchTextLocal(obj = {}) {
+  let text = "";
+
+  function walk(value) {
+    if (value === null || value === undefined) return;
+    if (Array.isArray(value)) return value.forEach(walk);
+    if (typeof value === "object") return Object.values(value).forEach(walk);
+    text += " " + String(value);
+  }
+
+  walk(obj);
+  return normalizeLoose(text);
+}
+
+function renderFichasAdminModal(rows = [], tipo = "") {
+  const titleEl = $("fichas-admin-titulo");
+  const subtitleEl = $("fichas-admin-subtitulo");
+  const summaryEl = $("fichas-admin-resumen");
+  const listEl = $("fichas-admin-lista");
+  const buscador = $("fichas-admin-buscador");
+
+  if (!titleEl || !subtitleEl || !summaryEl || !listEl) return;
+
+  const titles = {
+    abiertas: "Fichas abiertas",
+    cerradas: "Fichas cerradas",
+    autorizadas: "Fichas autorizadas"
+  };
+
+  titleEl.textContent = titles[tipo] || "Fichas";
+  subtitleEl.textContent =
+    tipo === "abiertas" ? "Fichas reabiertas por actualización, corrección o refirma." :
+    tipo === "cerradas" ? "Fichas con flujo completo y sin reapertura activa." :
+    "Fichas autorizadas para gestión administrativa de pago.";
+
+  summaryEl.textContent = `Hay ${rows.length} ficha(s) en este listado.`;
+  if (buscador) buscador.value = "";
+
+  const pintar = (lista = rows) => {
+    if (!lista.length) {
+      listEl.innerHTML = `<div style="padding:16px 18px; border-radius:16px; background:#faf8fd; color:#5d546d;">No hay fichas para mostrar.</div>`;
+      return;
+    }
+
+    listEl.innerHTML = lista.map((row) => {
+      const id = getRowId(row);
+      return `
+        <div style="padding:14px 16px; border:1px solid rgba(60,40,90,.12); border-radius:16px; background:#fff; display:flex; justify-content:space-between; gap:14px;">
+          <div>
+            <div style="font-weight:800; color:#31194b; font-size:16px;">${escapeHtml(getRowAlias(row))}</div>
+            <div style="margin-top:6px; color:#6a6078; font-size:13px; line-height:1.45;">
+              Apoderado: ${escapeHtml(getRowApoderado(row))}<br>
+              Vendedor(a): ${escapeHtml(getRowVendorName(row) || row.vendedoraCorreo || "Sin vendedor")}<br>
+              Año viaje: ${escapeHtml(row.anoViaje || "—")}<br>
+              Motivo: ${escapeHtml(getFichaAdminMotivo(row))}
+            </div>
+          </div>
+
+          <a href="fichas.html?id=${encodeURIComponent(id)}" target="_blank" rel="noopener" style="text-decoration:none; background:#3b2357; color:#fff; border-radius:999px; padding:10px 14px; font-weight:700; height:max-content;">
+            Abrir ficha
+          </a>
+        </div>
+      `;
+    }).join("");
+  };
+
+  pintar(rows);
+
+  if (buscador && !buscador.dataset.boundFichasAdmin) {
+    buscador.dataset.boundFichasAdmin = "1";
+    buscador.addEventListener("input", () => {
+      const q = normalizeLoose(buscador.value || "");
+      pintar(q ? rows.filter((row) => buildSearchTextLocal(row).includes(q)) : rows);
+    });
+  }
+}
+
+function openFichasAdminModal(tipo = "") {
+  const dialog = $("modal-fichas-admin");
+  if (!dialog) return;
+
+  const rows =
+    tipo === "abiertas" ? state.fichasAbiertasRows :
+    tipo === "cerradas" ? state.fichasCerradasRows :
+    tipo === "autorizadas" ? state.fichasAutorizadasRows :
+    [];
+
+  renderFichasAdminModal(rows || [], tipo);
+
+  if (typeof dialog.showModal === "function") {
+    if (!dialog.open) dialog.showModal();
+  } else {
+    dialog.setAttribute("open", "open");
+  }
+}
+
+function closeFichasAdminModal() {
+  const dialog = $("modal-fichas-admin");
+  if (!dialog) return;
+  if (typeof dialog.close === "function") dialog.close();
+  else dialog.removeAttribute("open");
 }
 
 function getSolicitudesActualizacionSubtitulo(user = null) {
@@ -1807,6 +1991,20 @@ function renderDashboard(rows = []) {
   const fichasCorregidas = getFichasCorregidasSegunUsuario(scopedRows, effectiveUser);
   state.fichasCorregidasRows = fichasCorregidas;
 
+  const ganadasScope = scopedRows.filter(isGanadaComercial);
+
+  state.fichasAbiertasRows = ganadasScope
+    .filter(isFichaAbiertaAdministrativa)
+    .sort(sortRowsByAliasComparator);
+  
+  state.fichasCerradasRows = ganadasScope
+    .filter(isFichaCerradaAdministrativa)
+    .sort(sortRowsByAliasComparator);
+  
+  state.fichasAutorizadasRows = ganadasScope
+    .filter(isFichaAutorizadaAdministrativa)
+    .sort(sortRowsByAliasComparator);
+
   const solicitudesActualizacion = getSolicitudesActualizacionSegunUsuario(scopedRows, effectiveUser);
   state.solicitudesActualizacionRows = solicitudesActualizacion;
   
@@ -2244,6 +2442,11 @@ async function initPage() {
   const modalAContactar = $("modal-a-contactar");
 
   const linkFichasFirmar = $("link-fichas-firmar");
+  const linkFichasAbiertas = $("abiertas-top");
+  const linkFichasCerradas = $("cerradas-top");
+  const linkFichasAutorizadas = $("autorizadas-top");
+  const btnCerrarFichasAdmin = $("btn-cerrar-fichas-admin");
+  const modalFichasAdmin = $("modal-fichas-admin");
   const btnCerrarFichasFirmar = $("btn-cerrar-fichas-firmar");
   const modalFichasFirmar = $("modal-fichas-firmar");
 
