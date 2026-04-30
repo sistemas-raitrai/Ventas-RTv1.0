@@ -1024,50 +1024,56 @@ function initSearchers() {
   if (inputGrupos && !inputGrupos.dataset.bound) {
     inputGrupos.dataset.bound = "1";
 
-    inputGrupos.addEventListener("input", () => {
-      const query = inputGrupos.value;
-      const rows = filtrarRows(state.scopedRows, query);
-      renderResultadosGrupos(sortRowsByAlias(rows));
+    inputGrupos.addEventListener("keydown", (e) => {
+      if (e.key !== "Enter") return;
+      e.preventDefault();
+
+      const query = inputGrupos.value.trim();
+      if (!query) return;
+
+      const rows = sortRowsByAlias(filtrarRows(state.scopedRows, query));
+
+      openListadoModal({
+        titulo: `Resultados grupos: "${query}"`,
+        subtitulo: "Grupos encontrados según la búsqueda ingresada.",
+        resumen: `Hay ${rows.length} grupo(s) encontrado(s).`,
+        rows,
+        renderFn: (lista) => renderGroupCards(lista, {
+          buttonLabel: "Abrir grupo",
+          hrefBase: "grupo.html"
+        })
+      });
     });
   }
 
   if (inputFichas && !inputFichas.dataset.bound) {
     inputFichas.dataset.bound = "1";
 
-    inputFichas.addEventListener("input", () => {
-      const query = inputFichas.value;
+    inputFichas.addEventListener("keydown", (e) => {
+      if (e.key !== "Enter") return;
+      e.preventDefault();
+
+      const query = inputFichas.value.trim();
+      if (!query) return;
+
       const fichaRows = state.scopedRows.filter(hasFichaSignal);
-      const rows = filtrarRows(fichaRows, query);
-      renderResultadosFichas(sortRowsByAlias(rows));
-    });
-  }
+      const rows = sortRowsByAlias(filtrarRows(fichaRows, query));
 
-  const contGrupos = $("resultados-grupos-home");
-  const contFichas = $("resultados-fichas-home");
-
-  if (contGrupos && !contGrupos.dataset.bound) {
-    contGrupos.dataset.bound = "1";
-
-    contGrupos.addEventListener("click", (e) => {
-      const item = e.target.closest("[data-open-group]");
-      if (!item) return;
-
-      const id = item.dataset.openGroup;
-      const row = state.rowsById.get(id);
-      if (row) openDetalleGrupo(row);
-    });
-  }
-
-  if (contFichas && !contFichas.dataset.bound) {
-    contFichas.dataset.bound = "1";
-
-    contFichas.addEventListener("click", (e) => {
-      const item = e.target.closest("[data-open-ficha]");
-      if (!item) return;
-
-      const id = item.dataset.openFicha;
-      const row = state.rowsById.get(id);
-      if (row) openDetalleFicha(row);
+      openListadoModal({
+        titulo: `Resultados fichas: "${query}"`,
+        subtitulo: "Fichas encontradas según la búsqueda ingresada.",
+        resumen: `Hay ${rows.length} ficha(s) encontrada(s).`,
+        rows,
+        renderFn: (lista) => renderGroupCards(lista, {
+          buttonLabel: "Abrir ficha",
+          hrefBase: "fichas.html",
+          extraRenderer: (row) => `
+            <div style="margin-top:10px; color:#3e3550; font-size:14px;">
+              <strong>Pendiente:</strong> ${escapeHtml(getFichaPendienteLabel(row))}
+            </div>
+          `
+        })
+      });
     });
   }
 }
