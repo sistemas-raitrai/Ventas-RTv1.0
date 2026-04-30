@@ -2284,3 +2284,12 @@ html, body{
 .groups-board > .flow-card.buscador::before{
   display:none !important;
 }
+
+/* Ajuste líneas superiores: Abiertas claro / Cerradas oscuro */
+.flow-card.abiertas::before{
+  background:#b9abd0 !important;
+}
+
+.flow-card.cerradas::before{
+  background:#32184f !important;
+}
