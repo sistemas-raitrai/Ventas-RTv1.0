@@ -8,6 +8,7 @@ import {
   addDoc,
   doc,
   setDoc,
+  updateDoc,
   serverTimestamp
 } from "https://www.gstatic.com/firebasejs/11.7.3/firebase-firestore.js";
 
@@ -3222,3 +3223,84 @@ function escapeHtml(value = "") {
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#39;");
 }
+
+// =========================================================
+// BACKFILL TEMPORAL — FICHAS CORREGIDAS
+// Ejecutar una sola vez desde consola: backfillFichasCorregidas()
+// Luego eliminar esta función del archivo.
+// =========================================================
+window.backfillFichasCorregidas = async function backfillFichasCorregidas() {
+  const snap = await getDocs(collection(db, "ventas_cotizaciones"));
+
+  let revisadas = 0;
+  let marcadas = 0;
+
+  for (const docSnap of snap.docs) {
+    const row = { id: docSnap.id, ...docSnap.data() };
+    const flow = row.flowFicha || {};
+
+    const firmas = {
+      vendedor: !!flow?.vendedor?.firmado || row.firmaVendedor === true,
+      jefa: !!flow?.jefaVentas?.firmado || row.firmaSupervision === true || !!row.firmaSupervision,
+      admin: !!flow?.administracion?.firmado || row.firmaAdministracion === true || !!row.firmaAdministracion
+    };
+
+    const tuvoFirmaJefa =
+      !!flow?.jefaVentas?.firmadoAt ||
+      !!flow?.jefaVentas?.firmadoEn ||
+      !!flow?.jefaVentas?.fechaFirma ||
+      !!flow?.jefaVentas?.firmadoPor ||
+      !!row.fechaFirmaSupervision ||
+      !!row.firmaSupervision;
+
+    const tuvoFirmaAdmin =
+      !!flow?.administracion?.firmadoAt ||
+      !!flow?.administracion?.firmadoEn ||
+      !!flow?.administracion?.fechaFirma ||
+      !!flow?.administracion?.firmadoPor ||
+      !!row.fechaFirmaAdministracion ||
+      !!row.firmaAdministracion;
+
+    const yaEstaEnCorreccion =
+      flow.modo === "correccion" ||
+      flow.correccionPendiente === true;
+
+    const tieneSolicitudAbierta =
+      flow.modo === "solicitud_actualizacion" ||
+      flow.solicitudActualizacionPendiente === true ||
+      flow.requiereActualizacion === true;
+
+    revisadas++;
+
+    if (yaEstaEnCorreccion || tieneSolicitudAbierta) continue;
+
+    let correccionEstado = "";
+
+    if (tuvoFirmaAdmin && !firmas.jefa) {
+      correccionEstado = "pendiente_jefa";
+    }
+
+    if (tuvoFirmaJefa && !firmas.admin) {
+      correccionEstado = "pendiente_administracion";
+    }
+
+    if (!correccionEstado) continue;
+
+    await updateDoc(doc(db, "ventas_cotizaciones", docSnap.id), {
+      "flowFicha.modo": "correccion",
+      "flowFicha.correccionPendiente": true,
+      "flowFicha.correccionEstado": correccionEstado,
+      "flowFicha.correccionOrigen":
+        correccionEstado === "pendiente_jefa"
+          ? "administracion"
+          : "jefaVentas",
+      "flowFicha.correccionBackfill": true,
+      "flowFicha.correccionBackfillEn": serverTimestamp()
+    });
+
+    marcadas++;
+    console.log("Marcada como corrección:", row.idGrupo || docSnap.id, correccionEstado);
+  }
+
+  console.log(`Backfill terminado. Revisadas: ${revisadas}. Marcadas: ${marcadas}.`);
+};
