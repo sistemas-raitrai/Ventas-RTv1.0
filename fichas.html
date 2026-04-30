@@ -19,12 +19,13 @@
       overflow: hidden;
       padding: 26px 28px;
       border-radius: 26px;
-      background: linear-gradient(135deg, #241238 0%, #31194b 58%, #3c1d5a 100%);
-      color: #fff;
-      box-shadow: 0 18px 42px rgba(36,18,56,.20);
+      background: linear-gradient(180deg, #f5effb 0%, #eee6f7 100%);
+      color: #20172f;
+      border: 1px solid rgba(117, 89, 150, .14);
+      box-shadow: 0 14px 30px rgba(74, 42, 112, .08);
       margin-bottom: 24px;
     }
-
+    
     .ficha-hero::before{
       content: "";
       position: absolute;
@@ -32,7 +33,7 @@
       width: 220px;
       height: 220px;
       border-radius: 50%;
-      background: radial-gradient(circle, rgba(255,255,255,.18) 0%, rgba(255,255,255,0) 70%);
+      background: radial-gradient(circle, rgba(129,95,170,.14) 0%, rgba(129,95,170,0) 72%);
       pointer-events: none;
     }
 
@@ -54,33 +55,47 @@
       align-items: center;
       gap: 8px;
       font-size: 12px;
-      font-weight: 800;
+      font-weight: 900;
       letter-spacing: .5px;
       text-transform: uppercase;
-      color: rgba(255,255,255,.74);
-      margin-bottom: 8px;
+      color: #766686;
+      margin-bottom: 6px;
     }
-
+    
     .ficha-title{
       margin: 0;
       font-size: clamp(28px, 4vw, 42px);
-      line-height: 1.04;
+      line-height: 1.03;
       font-weight: 900;
       letter-spacing: .2px;
       word-break: break-word;
+      color: #20172f;
     }
-
+    
     .ficha-subtitle{
-      margin-top: 8px;
+      margin-top: 10px;
       display: flex;
       flex-wrap: wrap;
-      gap: 10px 14px;
-      font-size: 15px;
-      color: rgba(255,255,255,.82);
+      gap: 10px 12px;
+      font-size: 14px;
+      color: #344054;
     }
-
+    
+    .ficha-subtitle span{
+      display: inline-flex;
+      align-items: center;
+      min-height: 34px;
+      padding: 0 12px;
+      border-radius: 999px;
+      background: rgba(255,255,255,.72);
+      border: 1px solid rgba(107, 77, 146, .14);
+      color: #35264a;
+      box-shadow: 0 4px 10px rgba(74, 42, 112, .05);
+    }
+    
     .ficha-subtitle strong{
-      color: #fff;
+      color: #241733;
+      margin-right: 4px;
     }
 
     .ficha-badges{
@@ -98,17 +113,31 @@
       padding: 0 14px;
       border-radius: 999px;
       font-size: 13px;
-      font-weight: 800;
+      font-weight: 900;
       letter-spacing: .2px;
-      border: 1px solid rgba(255,255,255,.12);
-      background: rgba(255,255,255,.12);
-      color: #fff;
-      backdrop-filter: blur(5px);
+      border: 1px solid rgba(107, 77, 146, .14);
+      background: rgba(255,255,255,.78);
+      color: #35264a;
+      box-shadow: 0 4px 10px rgba(74, 42, 112, .05);
     }
-
-    .f-badge.ok{ background: rgba(30,125,54,.22); }
-    .f-badge.warn{ background: rgba(241,169,41,.18); }
-    .f-badge.muted{ background: rgba(255,255,255,.08); }
+    
+    .f-badge.ok{
+      background: #edf9f1;
+      border-color: #c9e6d2;
+      color: #2d6a45;
+    }
+    
+    .f-badge.warn{
+      background: #fff4e8;
+      border-color: #efd8bd;
+      color: #8a4f21;
+    }
+    
+    .f-badge.muted{
+      background: #f8fafc;
+      border-color: #dde3ea;
+      color: #445164;
+    }
 
     .ficha-hero-right{
       display: flex;
@@ -197,9 +226,9 @@
     }
 
     .btn-ghost{
-      background: rgba(255,255,255,.10);
-      color: #fff;
-      border: 1px solid rgba(255,255,255,.16);
+      background: rgba(255,255,255,.72);
+      color: #40235f;
+      border: 1px solid rgba(107, 77, 146, .14);
     }
 
     .btn-pill{
