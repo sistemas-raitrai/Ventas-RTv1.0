@@ -1216,7 +1216,8 @@ function bindAlertButtons() {
         titulo: "Contactos a contactar",
         subtitulo: "Grupos pendientes de primer contacto según tu rol.",
         resumen: `Hay ${state.aContactarRows.length} contacto(s) por contactar.`,
-        html: renderGroupCards(state.aContactarRows, {
+        rows: state.aContactarRows,
+        renderFn: (rows) => renderGroupCards(rows, {
           buttonLabel: "Abrir grupo",
           hrefBase: "grupo.html"
         })
@@ -1233,7 +1234,8 @@ function bindAlertButtons() {
         titulo: "Fichas por firmar",
         subtitulo: "Fichas pendientes según rol y correo del usuario.",
         resumen: `Hay ${state.fichasPorFirmarRows.length} ficha(s) pendiente(s).`,
-        html: renderGroupCards(state.fichasPorFirmarRows, {
+        rows: state.fichasPorFirmarRows,
+        renderFn: (rows) => renderGroupCards(rows, {
           buttonLabel: "Abrir ficha",
           hrefBase: "fichas.html",
           extraRenderer: (row) => `
@@ -1255,7 +1257,8 @@ function bindAlertButtons() {
         titulo: "Solicitudes de actualización",
         subtitulo: "Solicitudes abiertas visibles para este usuario.",
         resumen: `Hay ${state.solicitudesActualizacionRows.length} solicitud(es) abierta(s).`,
-        html: renderSolicitudesCards(state.solicitudesActualizacionRows)
+        rows: state.solicitudesActualizacionRows, 
+        renderFn: renderSolicitudesCards
       });
     });
   }
@@ -1269,7 +1272,8 @@ function bindAlertButtons() {
         titulo: "Alertas críticas",
         subtitulo: "Alertas críticas activas según la vista del usuario.",
         resumen: `Hay ${state.alertasCriticasRows.length} alerta(s) crítica(s).`,
-        html: renderAlertCards(state.alertasCriticasRows)
+        rows: state.alertasCriticasRows,
+        renderFn: renderAlertCards
       });
     });
   }
@@ -1283,7 +1287,8 @@ function bindAlertButtons() {
         titulo: "Alertas pendientes",
         subtitulo: "Alertas pendientes activas según la vista del usuario.",
         resumen: `Hay ${state.alertasWarningRows.length} alerta(s) pendiente(s).`,
-        html: renderAlertCards(state.alertasWarningRows)
+        rows: state.alertasWarningRows,
+        renderFn: renderAlertCards
       });
     });
   }
@@ -1297,7 +1302,8 @@ function bindAlertButtons() {
         titulo: "Reuniones próximas",
         subtitulo: "Reuniones confirmadas dentro de los próximos tres días.",
         resumen: `Hay ${state.reuniones3DiasRows.length} reunión(es) próxima(s).`,
-        html: renderGroupCards(state.reuniones3DiasRows, {
+        rows: state.reuniones3DiasRows,
+        renderFn: (rows) => renderGroupCards(rows, {
           buttonLabel: "Abrir grupo",
           hrefBase: "grupo.html",
           extraRenderer: (row) => `
