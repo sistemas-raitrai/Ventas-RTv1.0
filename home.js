@@ -55,6 +55,9 @@ const state = {
   aContactarRows: [],
   fichasPorFirmarRows: [],
   fichasCorregidasRows: [],
+  fichasAbiertasRows: [],
+  fichasCerradasRows: [],
+  fichasAutorizadasRows: [],
   solicitudesActualizacionRows: [],
   alertasCriticasRows: [],
   alertasWarningRows: [],
@@ -423,6 +426,55 @@ function hasAllThreeFichaFirmas(row = {}) {
   return !!(firmas.vendedor && firmas.jefa && firmas.admin);
 }
 
+function getAdminValue(row = {}, fichaKey = "", rootKey = "") {
+  return String(row?.ficha?.[fichaKey] || row?.[rootKey] || row?.[fichaKey] || "").trim();
+}
+
+function tuvoFirmaAdministracionAlgunaVez(row = {}) {
+  const flow = row.flowFicha || {};
+  return !!flow?.administracion?.firmado || !!flow?.administracion?.firmadoAt || !!flow?.administracion?.firmadoPor || !!row.firmaAdministracion || !!row.fechaFirmaAdministracion || row.autorizada === true;
+}
+
+function isFichaAbiertaAdministrativa(row = {}) {
+  const flow = row.flowFicha || {};
+  const modo = normalizeLoose(flow.modo || row.fichaFlujoModo || row?.ficha?.flujoModo || "");
+
+  const haySolicitudAbierta = (state.solicitudesRows || []).some((sol) => {
+    return String(sol.idGrupo || "").trim() === getRowId(row) &&
+      normalizeLoose(sol.tipoSolicitud || "") === "actualizacion_ficha" &&
+      sol.resuelta !== true &&
+      !["completada", "cerrada"].includes(normalizeLoose(sol.estadoSolicitud || ""));
+  });
+
+  return haySolicitudAbierta || modo === "correccion" || flow.correccionPendiente === true || normalizeLoose(flow.correccionEstado || "").startsWith("pendiente");
+}
+
+function isFichaCerradaAdministrativa(row = {}) {
+  const firmas = getFichaFirmas(row);
+  return firmas.vendedor && firmas.jefa && firmas.admin && !isFichaAbiertaAdministrativa(row);
+}
+
+function isFichaAutorizadaAdministrativa(row = {}) {
+  const numeroNegocio = getAdminValue(row, "numeroNegocio", "numeroNegocio");
+  const usuario = getAdminValue(row, "usuarioFicha", "usuarioProgramaAdm");
+  const clave = getAdminValue(row, "claveAdministrativa", "claveAdministrativa");
+
+  return tuvoFirmaAdministracionAlgunaVez(row) && !!numeroNegocio && !!usuario && !!clave;
+}
+
+function getFichaAdminMotivo(row = {}) {
+  if (isFichaAbiertaAdministrativa(row)) {
+    const estado = normalizeLoose(row?.flowFicha?.correccionEstado || "");
+    if (estado === "pendiente_jefa") return "Corrección pendiente de jefa de ventas";
+    if (estado === "pendiente_administracion") return "Corrección pendiente de administración";
+    return "Solicitud de actualización o corrección abierta";
+  }
+
+  if (isFichaAutorizadaAdministrativa(row)) return "Autorizada para gestión de pago";
+  if (isFichaCerradaAdministrativa(row)) return "Flujo de firmas completo";
+  return "Sin clasificación";
+}
+
 function getFichaPendienteLabel(row = {}) {
   const firmas = getFichaFirmas(row);
 
@@ -670,6 +722,20 @@ function renderHome() {
   state.fichasCorregidasRows = sortRowsByAlias(
     scopedRows.filter((row) => isFichaCorregidaVisibleParaUsuario(row, effectiveUser))
   );
+
+  const ganadasScope = scopedRows.filter(isGanadaComercial);
+
+  state.fichasAbiertasRows = sortRowsByAlias(
+    ganadasScope.filter(isFichaAbiertaAdministrativa)
+  );
+  
+  state.fichasCerradasRows = sortRowsByAlias(
+    ganadasScope.filter(isFichaCerradaAdministrativa)
+  );
+  
+  state.fichasAutorizadasRows = sortRowsByAlias(
+    ganadasScope.filter(isFichaAutorizadaAdministrativa)
+  );
   
   state.fichasPorFirmarRows = sortRowsByAlias(
     scopedRows.filter((row) => {
@@ -721,6 +787,9 @@ function renderHome() {
   setText("count-a-contactar", state.aContactarRows.length);
   setText("count-fichas-firmar", state.fichasPorFirmarRows.length);
   setText("count-fichas-corregidas", state.fichasCorregidasRows.length);
+  setText("count-home-fichas-abiertas", state.fichasAbiertasRows.length);
+  setText("count-home-fichas-cerradas", state.fichasCerradasRows.length);
+  setText("count-home-fichas-autorizadas", state.fichasAutorizadasRows.length);
   setText("count-solicitudes-actualizacion", state.solicitudesActualizacionRows.length);
   setText("count-alertas-criticas", state.alertasCriticasRows.length);
   setText("count-alertas-warning", state.alertasWarningRows.length);
@@ -1295,6 +1364,9 @@ function bindAlertButtons() {
   const linkFichas = $("link-fichas-firmar");
   const linkFichasCorregidas = $("link-fichas-corregidas");
   const linkSolicitudes = $("link-solicitudes-actualizacion");
+  const linkHomeFichasAbiertas = $("link-home-fichas-abiertas");
+  const linkHomeFichasCerradas = $("link-home-fichas-cerradas");
+  const linkHomeFichasAutorizadas = $("link-home-fichas-autorizadas");
   const linkCriticas = $("link-alertas-criticas");
   const linkWarning = $("link-alertas-warning");
   const linkReuniones = $("link-reunion-3dias");
@@ -1467,6 +1539,53 @@ function bindAlertButtons() {
     modalDetalle.dataset.bound = "1";
     modalDetalle.addEventListener("click", (e) => {
       if (e.target === modalDetalle) closeDialog(modalDetalle);
+    });
+  }
+  function abrirModalFichasHome(tipo = "", rows = []) {
+    const titulos = {
+      abiertas: "Fichas abiertas",
+      cerradas: "Fichas cerradas",
+      autorizadas: "Fichas autorizadas"
+    };
+  
+    openListadoModal({
+      titulo: titulos[tipo] || "Fichas",
+      subtitulo: "Detalle administrativo de fichas.",
+      resumen: `Hay ${rows.length} ficha(s).`,
+      rows,
+      renderFn: (lista) => renderGroupCards(lista, {
+        buttonLabel: "Abrir ficha",
+        hrefBase: "fichas.html",
+        extraRenderer: (row) => `
+          <div style="margin-top:10px; color:#3e3550; font-size:14px;">
+            <strong>Estado administrativo:</strong> ${escapeHtml(getFichaAdminMotivo(row))}
+          </div>
+        `
+      })
+    });
+  }
+  
+  if (linkHomeFichasAbiertas && !linkHomeFichasAbiertas.dataset.bound) {
+    linkHomeFichasAbiertas.dataset.bound = "1";
+    linkHomeFichasAbiertas.addEventListener("click", (e) => {
+      e.preventDefault();
+      abrirModalFichasHome("abiertas", state.fichasAbiertasRows);
+    });
+  }
+  
+  if (linkHomeFichasCerradas && !linkHomeFichasCerradas.dataset.bound) {
+    linkHomeFichasCerradas.dataset.bound = "1";
+    linkHomeFichasCerradas.addEventListener("click", (e) => {
+      e.preventDefault();
+      abrirModalFichasHome("cerradas", state.fichasCerradasRows);
+    });
+  }
+  
+  if (linkHomeFichasAutorizadas && !linkHomeFichasAutorizadas.dataset.bound) {
+    linkHomeFichasAutorizadas.dataset.bound = "1";
+    linkHomeFichasAutorizadas.addEventListener("click", (e) => {
+      e.preventDefault();
+      abrirModalFichasHome("autorizadas", state.fichasAutorizadasRows);
     });
   }
 }
