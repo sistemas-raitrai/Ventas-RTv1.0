@@ -328,6 +328,51 @@
       transform:translateY(-1px);
     }
 
+    body[data-page="home"] .home-admin-flow{
+      display:grid;
+      grid-template-columns:repeat(3, minmax(0,1fr));
+      gap:14px;
+    }
+    
+    body[data-page="home"] .home-admin-card{
+      text-decoration:none;
+      display:flex;
+      flex-direction:column;
+      gap:6px;
+      padding:18px;
+      border-radius:20px;
+      background:#faf8fd;
+      border:1px solid rgba(49,25,75,.10);
+      color:#26133d;
+      box-shadow:0 8px 18px rgba(35,18,56,.05);
+    }
+    
+    body[data-page="home"] .home-admin-card span{
+      font-size:13px;
+      font-weight:900;
+      text-transform:uppercase;
+      letter-spacing:.35px;
+    }
+    
+    body[data-page="home"] .home-admin-card strong{
+      font-size:28px;
+      font-weight:900;
+    }
+    
+    body[data-page="home"] .home-admin-card small{
+      color:#766b84;
+      font-weight:700;
+    }
+    
+    body[data-page="home"] .home-admin-card.is-dark{
+      background:#163d52;
+      color:#fff;
+    }
+    
+    body[data-page="home"] .home-admin-card.is-dark small{
+      color:rgba(255,255,255,.78);
+    }
+
     @media (max-width:900px){
       body[data-page="home"] .home-content{
         grid-template-columns:1fr;
@@ -344,6 +389,9 @@
       body[data-page="home"] .alert-row a{
         grid-column:3;
         width:max-content;
+      }
+      body[data-page="home"] .home-admin-flow{
+        grid-template-columns:1fr;
       }
     }
   </style>
@@ -478,6 +526,35 @@
         </section>
 
       </div>
+
+      <section class="home-card" style="margin-top:22px;">
+        <div class="home-card-head">
+          <div>
+            <h2 class="home-card-title">Estado administrativo de fichas</h2>
+            <p class="home-card-desc">Control de fichas abiertas, cerradas y autorizadas.</p>
+          </div>
+        </div>
+
+        <div class="home-admin-flow">
+          <a href="#" id="link-home-fichas-abiertas" class="home-admin-card">
+            <span>Abiertas</span>
+            <strong id="count-home-fichas-abiertas">0</strong>
+            <small>Requieren gestión interna</small>
+          </a>
+
+          <a href="#" id="link-home-fichas-cerradas" class="home-admin-card">
+            <span>Cerradas</span>
+            <strong id="count-home-fichas-cerradas">0</strong>
+            <small>Flujo completo</small>
+          </a>
+
+          <a href="#" id="link-home-fichas-autorizadas" class="home-admin-card is-dark">
+            <span>Autorizadas</span>
+            <strong id="count-home-fichas-autorizadas">0</strong>
+            <small>En gestión de pago</small>
+          </a>
+        </div>
+      </section>
     </div>
 
     <dialog id="modal-listado-home" class="home-modal">
