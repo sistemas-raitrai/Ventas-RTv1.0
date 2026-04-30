@@ -771,11 +771,11 @@ function updateProgramaPdfUi() {
 
   if (statusEl) {
     if (state.isUploadingProgramaPdf) {
-      statusEl.textContent = "Subiendo Programa PDF...";
+      statusEl.textContent = "Subiendo Programa...";
     } else if (hasPdf) {
-      statusEl.textContent = `Programa PDF cargado${version ? ` · Versión ${version}` : ""}`;
+      statusEl.textContent = `Programa cargado${version ? ` · Versión ${version}` : ""}`;
     } else {
-      statusEl.textContent = "Programa PDF pendiente";
+      statusEl.textContent = "Programa pendiente";
     }
   }
 
