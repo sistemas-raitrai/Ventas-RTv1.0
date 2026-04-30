@@ -366,7 +366,27 @@ async function loadAll() {
     return;
   }
 
-  const resolved = await resolveGroupByParam(state.requestedId);
+  let resolved = null;
+
+  try {
+    resolved = await resolveGroupByParam(state.requestedId);
+  } catch (error) {
+    console.error("[fichas] Error conectando con Firestore", error);
+
+    renderFatal(`
+      No se pudo conectar con Firebase/Firestore.
+
+      Esto suele pasar por conexión lenta, bloqueo de red, VPN, firewall, navegador o Firebase temporalmente sin respuesta.
+
+      Prueba:
+      1. Recargar la página.
+      2. Abrir en incógnito.
+      3. Probar otra red.
+      4. Revisar que firebase-init.js tenga useFetchStreams: false.
+    `);
+
+    return;
+  }
 
   if (!resolved) {
     renderFatal(`No encontré el grupo ${state.requestedId}.`);
