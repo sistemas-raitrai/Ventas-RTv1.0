@@ -588,8 +588,34 @@ function renderHome() {
 
   state.aContactarRows = sortRowsByAlias(scopedRows.filter(isAContactar));
 
+  // Excluir de "Fichas por firmar" las fichas que están en solicitud de actualización abierta.
+  // Esas deben aparecer solo en "Solicitudes de actualización", no duplicadas en firma general.
+  const solicitudesAbiertasIds = new Set(
+    (state.solicitudesRows || [])
+      .filter(isSolicitudActualizacionAbierta)
+      .flatMap((sol) => [
+        String(sol.idGrupo || "").trim(),
+        String(sol.codigoRegistro || "").trim()
+      ])
+      .filter(Boolean)
+  );
+  
   state.fichasPorFirmarRows = sortRowsByAlias(
-    scopedRows.filter((row) => isFichaPorFirmarSegunUsuario(row, effectiveUser))
+    scopedRows.filter((row) => {
+      const posiblesIds = [
+        String(row.idGrupo || "").trim(),
+        String(row.id || "").trim(),
+        String(row.codigoRegistro || "").trim()
+      ].filter(Boolean);
+  
+      const tieneSolicitudAbierta = posiblesIds.some((id) =>
+        solicitudesAbiertasIds.has(id)
+      );
+  
+      if (tieneSolicitudAbierta) return false;
+  
+      return isFichaPorFirmarSegunUsuario(row, effectiveUser);
+    })
   );
 
   const scopedIds = new Set(
