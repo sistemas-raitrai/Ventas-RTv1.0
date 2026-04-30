@@ -491,6 +491,40 @@ function formatYearBuckets(rows = []) {
   return `${pad2(c1)} | ${pad2(c2)} | ${pad2(c3)} | (${pad2(rows.length)})`;
 }
 
+function renderFichaAdminBucketLinks(targetId, tipo = "", rows = []) {
+  const el = $(targetId);
+  if (!el) return;
+
+  const baseYear = getDashboardBaseYear();
+  const years = [baseYear, baseYear + 1, baseYear + 2];
+
+  const counts = years.map((year) =>
+    rows.filter((row) => getAnoViajeNumber(row) === year).length
+  );
+
+  const yearLinks = years.map((year, index) => `
+    <a
+      href="#"
+      class="flow-number-link"
+      data-fichas-admin-tipo="${tipo}"
+      data-fichas-admin-year="${year}"
+      style="color:inherit;text-decoration:none;"
+    >${pad2(counts[index])}</a>
+  `);
+
+  const totalLink = `
+    <a
+      href="#"
+      class="flow-number-link"
+      data-fichas-admin-tipo="${tipo}"
+      data-fichas-admin-year="total"
+      style="color:inherit;text-decoration:none;"
+    >${pad2(rows.length)}</a>
+  `;
+
+  el.innerHTML = `${yearLinks[0]} | ${yearLinks[1]} | ${yearLinks[2]} | (${totalLink})`;
+}
+
 function resolveEstadoBucket(row = {}) {
   const estado = normalizeLoose(row.estado);
 
@@ -1340,15 +1374,19 @@ function renderFichasAdminModal(rows = [], tipo = "") {
   }
 }
 
-function openFichasAdminModal(tipo = "") {
+function openFichasAdminModal(tipo = "", year = "total") {
   const dialog = $("modal-fichas-admin");
   if (!dialog) return;
 
-  const rows =
+  const allRows =
     tipo === "abiertas" ? state.fichasAbiertasRows :
     tipo === "cerradas" ? state.fichasCerradasRows :
     tipo === "autorizadas" ? state.fichasAutorizadasRows :
     [];
+
+  const rows = year && year !== "total"
+    ? allRows.filter((row) => getAnoViajeNumber(row) === Number(year))
+    : allRows;
 
   renderFichasAdminModal(rows || [], tipo);
 
@@ -1959,9 +1997,9 @@ function inicializarDashboardEnCeros() {
   renderBucketLinks("perdidas-top", "perdidas", []);
   renderBucketLinks("recotizando-top", "recotizando", []);
   renderBucketLinks("ganadas-top", "ganadas", []);
-  setText("abiertas-top", "00");
-  setText("cerradas-top", "00");
-  setText("autorizadas-top", "00 | 00 | 00 | (00)");
+  renderFichaAdminBucketLinks("abiertas-top", "abiertas", []);
+  renderFichaAdminBucketLinks("cerradas-top", "cerradas", []);
+  renderFichaAdminBucketLinks("autorizadas-top", "autorizadas", []);
 }
 
 function renderDashboard(rows = []) {
@@ -2050,9 +2088,9 @@ function renderDashboard(rows = []) {
   renderBucketLinks("perdidas-top", "perdidas", perdidas);
   renderBucketLinks("recotizando-top", "recotizando", recotizando);
   renderBucketLinks("ganadas-top", "ganadas", ganadas);
-  setText("abiertas-top", formatYearBuckets(state.fichasAbiertasRows));
-  setText("cerradas-top", formatYearBuckets(state.fichasCerradasRows));
-  setText("autorizadas-top", formatYearBuckets(state.fichasAutorizadasRows));
+  renderFichaAdminBucketLinks("abiertas-top", "abiertas", state.fichasAbiertasRows);
+  renderFichaAdminBucketLinks("cerradas-top", "cerradas", state.fichasCerradasRows);
+  renderFichaAdminBucketLinks("autorizadas-top", "autorizadas", state.fichasAutorizadasRows);
 }
 /* =========================================================
    SELECTOR DE VENDEDORES
@@ -2620,29 +2658,23 @@ async function initPage() {
     });
   }
 
-  if (linkFichasAbiertas && !linkFichasAbiertas.dataset.bound) {
-    linkFichasAbiertas.dataset.bound = "1";
-    linkFichasAbiertas.addEventListener("click", (e) => {
-      e.preventDefault();
-      openFichasAdminModal("abiertas");
-    });
-  }
+  [linkFichasAbiertas, linkFichasCerradas, linkFichasAutorizadas].forEach((link) => {
+    if (!link || link.dataset.boundAdminBuckets) return;
   
-  if (linkFichasCerradas && !linkFichasCerradas.dataset.bound) {
-    linkFichasCerradas.dataset.bound = "1";
-    linkFichasCerradas.addEventListener("click", (e) => {
-      e.preventDefault();
-      openFichasAdminModal("cerradas");
-    });
-  }
+    link.dataset.boundAdminBuckets = "1";
   
-  if (linkFichasAutorizadas && !linkFichasAutorizadas.dataset.bound) {
-    linkFichasAutorizadas.dataset.bound = "1";
-    linkFichasAutorizadas.addEventListener("click", (e) => {
+    link.addEventListener("click", (e) => {
+      const clicked = e.target.closest("[data-fichas-admin-tipo]");
+      if (!clicked) return;
+  
       e.preventDefault();
-      openFichasAdminModal("autorizadas");
+  
+      const tipo = clicked.dataset.fichasAdminTipo || "";
+      const year = clicked.dataset.fichasAdminYear || "total";
+  
+      openFichasAdminModal(tipo, year);
     });
-  }
+  });
   
   if (btnCerrarFichasAdmin && !btnCerrarFichasAdmin.dataset.bound) {
     btnCerrarFichasAdmin.dataset.bound = "1";
