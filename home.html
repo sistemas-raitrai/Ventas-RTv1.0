@@ -364,13 +364,24 @@
       font-weight:700;
     }
     
+    body[data-page="home"] .home-admin-card.is-soft{
+      background:#ebe5f4;
+      border-color:rgba(49,25,75,.08);
+      color:#351a55;
+    }
+    
+    body[data-page="home"] .home-admin-card.is-soft small{
+      color:#6f5f82;
+    }
+    
     body[data-page="home"] .home-admin-card.is-dark{
-      background:#163d52;
+      background:#32184f;
+      border-color:#32184f;
       color:#fff;
     }
     
     body[data-page="home"] .home-admin-card.is-dark small{
-      color:rgba(255,255,255,.78);
+      color:rgba(255,255,255,.82);
     }
 
     @media (max-width:900px){
@@ -542,7 +553,7 @@
             <small>Requieren gestión interna</small>
           </a>
 
-          <a href="#" id="link-home-fichas-cerradas" class="home-admin-card">
+          <a href="#" id="link-home-fichas-cerradas" class="home-admin-card is-soft">
             <span>Cerradas</span>
             <strong id="count-home-fichas-cerradas">0</strong>
             <small>Flujo completo</small>
