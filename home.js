@@ -680,17 +680,58 @@ function closeDialog(dialog) {
   dialog.removeAttribute("open");
 }
 
-function openListadoModal({ titulo = "Listado", subtitulo = "", resumen = "", html = "" } = {}) {
+function openListadoModal({
+  titulo = "Listado",
+  subtitulo = "",
+  resumen = "",
+  html = "",
+  rows = [],
+  renderFn = null
+} = {}) {
   const dialog = $("modal-listado-home");
+  const buscador = $("modal-listado-buscador");
+  const contenido = $("modal-listado-contenido");
 
   setText("modal-listado-titulo", titulo);
   setText("modal-listado-subtitulo", subtitulo);
   setText("modal-listado-resumen", resumen);
 
-  const contenido = $("modal-listado-contenido");
-  if (contenido) contenido.innerHTML = html || emptyHtml("No hay registros para mostrar.");
+  if (buscador) {
+    buscador.value = "";
+  }
+
+  const pintar = (lista = rows) => {
+    if (!contenido) return;
+
+    if (typeof renderFn === "function") {
+      contenido.innerHTML = renderFn(lista);
+      return;
+    }
+
+    contenido.innerHTML = html || emptyHtml("No hay registros para mostrar.");
+  };
+
+  pintar(rows);
+
+  if (buscador && !buscador.dataset.boundModalListado) {
+    buscador.dataset.boundModalListado = "1";
+
+    buscador.addEventListener("input", () => {
+      const q = buscador.value;
+
+      const filtradas = rows.filter((item) =>
+        evaluarBusqueda(buildSearchText(item), q)
+      );
+
+      pintar(q.trim() ? filtradas : rows);
+    });
+  }
 
   openDialog(dialog);
+
+  setTimeout(() => {
+    if (buscador) buscador.focus();
+  }, 120);
 }
 
 function emptyHtml(text = "Sin resultados.") {
