@@ -291,16 +291,20 @@ function isFichaCorregidaVisibleParaUsuario(row = {}, user = null) {
   const estado = getCorreccionFichaEstado(row);
   const rol = normalizeLoose(effectiveUser.rol || "");
 
-  if (rol === "admin" || rol === "supervision") return true;
+  // Admin real / general ve todas las correcciones.
+  if (rol === "admin") return true;
 
+  // Jefa de ventas ve solo las correcciones que vuelven a ella.
   if (isCaroDashboardUser(effectiveUser)) {
     return estado === "pendiente_jefa";
   }
 
+  // Administración ve solo las correcciones que esperan cierre administrativo.
   if (isAdministracionDashboardUser(effectiveUser)) {
     return estado === "pendiente_administracion";
   }
 
+  // Supervisión genérica NO ve todas las correcciones.
   return false;
 }
 
