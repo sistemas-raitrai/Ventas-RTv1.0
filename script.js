@@ -2452,12 +2452,6 @@ async function initPage() {
   const btnCerrarFichasFirmar = $("btn-cerrar-fichas-firmar");
   const modalFichasFirmar = $("modal-fichas-firmar");
 
-  const linkFichasAbiertas = $("abiertas-top");
-  const linkFichasCerradas = $("cerradas-top");
-  const linkFichasAutorizadas = $("autorizadas-top");
-  const btnCerrarFichasAdmin = $("btn-cerrar-fichas-admin");
-  const modalFichasAdmin = $("modal-fichas-admin");
-
   const linkFichasCorregidas = $("link-fichas-corregidas");
   const btnCerrarFichasCorregidas = $("btn-cerrar-fichas-corregidas");
   const modalFichasCorregidas = $("modal-fichas-corregidas");
