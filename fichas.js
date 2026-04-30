@@ -3304,3 +3304,234 @@ window.backfillFichasCorregidas = async function backfillFichasCorregidas() {
 
   console.log(`Backfill terminado. Revisadas: ${revisadas}. Marcadas: ${marcadas}.`);
 };
+
+// =========================================================
+// BACKFILL TEMPORAL — OBSERVACIONES DE FICHA
+// Ejecutar una sola vez desde consola: backfillObservacionesFicha()
+// Luego eliminar esta función del archivo.
+// =========================================================
+window.backfillObservacionesFicha = async function backfillObservacionesFicha() {
+  const groupsSnap = await getDocs(collection(db, "ventas_cotizaciones"));
+
+  let revisadas = 0;
+  let actualizadas = 0;
+  let omitidas = 0;
+
+  function localToDate(value) {
+    if (!value) return null;
+    if (value instanceof Date) return value;
+    if (typeof value?.toDate === "function") return value.toDate();
+    if (typeof value?.seconds === "number") return new Date(value.seconds * 1000);
+
+    const d = new Date(value);
+    return Number.isNaN(d.getTime()) ? null : d;
+  }
+
+  function localFormatDate(value) {
+    const d = localToDate(value);
+    if (!d) return "Sin fecha";
+
+    return d.toLocaleString("es-CL", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false
+    });
+  }
+
+  function localClean(value = "") {
+    return String(value ?? "").trim();
+  }
+
+  function htmlEscape(value = "") {
+    return String(value ?? "")
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#039;");
+  }
+
+  function stripHtml(value = "") {
+    return String(value ?? "")
+      .replace(/<br\s*\/?>/gi, "\n")
+      .replace(/<\/p>/gi, "\n")
+      .replace(/<[^>]*>/g, "")
+      .replace(/\n{3,}/g, "\n\n")
+      .trim();
+  }
+
+  function pushEvent(events, {
+    fecha = null,
+    usuario = "",
+    tipo = "",
+    detalle = ""
+  } = {}) {
+    const cleanTipo = localClean(tipo);
+    const cleanDetalle = localClean(detalle);
+
+    if (!cleanTipo && !cleanDetalle) return;
+
+    events.push({
+      fecha,
+      usuario: localClean(usuario) || "Sistema",
+      tipo: cleanTipo || "Evento",
+      detalle: cleanDetalle
+    });
+  }
+
+  for (const docSnap of groupsSnap.docs) {
+    revisadas++;
+
+    const row = { id: docSnap.id, ...docSnap.data() };
+    const idGrupo = String(row.idGrupo || docSnap.id || "").trim();
+    const flow = row.flowFicha || {};
+    const ficha = row.ficha || {};
+
+    if (flow.observacionesBackfill === true) {
+      omitidas++;
+      continue;
+    }
+
+    const observacionesActualesHtml = localClean(ficha.observacionesHtml || "");
+    const observacionesActualesPlain = stripHtml(observacionesActualesHtml);
+
+    if (observacionesActualesHtml.includes("BITÁCORA AUTOMÁTICA RETROACTIVA")) {
+      omitidas++;
+      continue;
+    }
+
+    const events = [];
+
+    // Firma vendedor
+    if (flow?.vendedor?.firmado) {
+      pushEvent(events, {
+        fecha: flow.vendedor.firmadoAt || flow.vendedor.firmadoEn || flow.vendedor.fechaFirma,
+        usuario: flow.vendedor.firmadoPor || row.firmaVendedor || row.vendedora || "",
+        tipo: "Firma vendedor(a)",
+        detalle: "El vendedor dejó la ficha lista para revisión."
+      });
+    }
+
+    // Firma jefa
+    if (flow?.jefaVentas?.firmado || row.firmaSupervision) {
+      pushEvent(events, {
+        fecha: flow.jefaVentas?.firmadoAt || flow.jefaVentas?.firmadoEn || flow.jefaVentas?.fechaFirma,
+        usuario: flow.jefaVentas?.firmadoPor || row.firmaSupervision || "Jefa de ventas",
+        tipo: "Firma jefa de ventas",
+        detalle: flow.jefaVentas?.observacion || "La jefa de ventas revisó la ficha."
+      });
+    }
+
+    // Firma administración
+    if (flow?.administracion?.firmado || row.firmaAdministracion) {
+      pushEvent(events, {
+        fecha: flow.administracion?.firmadoAt || flow.administracion?.firmadoEn || flow.administracion?.fechaFirma,
+        usuario: flow.administracion?.firmadoPor || row.firmaAdministracion || "Administración",
+        tipo: "Firma administración",
+        detalle: flow.administracion?.observacion || "Administración autorizó o cerró la ficha."
+      });
+    }
+
+    // Corrección detectada por backfill
+    if (flow.correccionBackfill === true || flow.correccionPendiente === true) {
+      const estadoCorreccion = localClean(flow.correccionEstado || "");
+      const origenCorreccion = localClean(flow.correccionOrigen || "");
+
+      pushEvent(events, {
+        fecha: flow.correccionBackfillEn || row.fechaActualizacionFicha || row.fechaActualizacion,
+        usuario: "Sistema",
+        tipo: "Corrección interna detectada",
+        detalle: `Se marcó la ficha como corrección pendiente. Estado: ${estadoCorreccion || "sin estado"}. Origen: ${origenCorreccion || "sin origen"}.`
+      });
+    }
+
+    // Solicitudes de actualización
+    const solicitudesSnap = await getDocs(
+      query(collection(db, SOLICITUDES_COLLECTION), where("idGrupo", "==", idGrupo))
+    );
+
+    solicitudesSnap.docs.forEach((solDoc) => {
+      const sol = solDoc.data() || {};
+      const tipoSolicitud = localClean(sol.tipoSolicitud || "");
+
+      if (tipoSolicitud !== "actualizacion_ficha") return;
+
+      pushEvent(events, {
+        fecha: sol.fechaSolicitud,
+        usuario: sol.solicitadoPor || sol.solicitadoPorCorreo || "Vendedor(a)",
+        tipo: "Solicitud de actualización",
+        detalle: sol.detalle || sol.asunto || "Se solicitó actualización de ficha."
+      });
+
+      if (sol.respuestaJefa) {
+        pushEvent(events, {
+          fecha: sol.fechaRevisionJefa,
+          usuario: sol.revisadaPor || sol.revisadaPorCorreo || "Jefa de ventas",
+          tipo: "Revisión solicitud por jefa de ventas",
+          detalle: sol.respuestaJefa
+        });
+      }
+
+      if (sol.respuestaAdministracion || sol.resuelta === true) {
+        pushEvent(events, {
+          fecha: sol.fechaResolucion,
+          usuario: sol.resueltaPor || sol.resueltaPorCorreo || "Administración",
+          tipo: "Cierre solicitud por administración",
+          detalle: sol.respuestaAdministracion || "Administración cerró la solicitud de actualización."
+        });
+      }
+    });
+
+    if (!events.length) {
+      omitidas++;
+      continue;
+    }
+
+    events.sort((a, b) => {
+      const da = localToDate(a.fecha)?.getTime() || 0;
+      const db = localToDate(b.fecha)?.getTime() || 0;
+      return da - db;
+    });
+
+    const bitacoraHtml = `
+      <hr>
+      <p><strong>BITÁCORA AUTOMÁTICA RETROACTIVA</strong></p>
+      ${events.map((ev) => `
+        <p>
+          <strong>[${htmlEscape(localFormatDate(ev.fecha))} - ${htmlEscape(ev.usuario)} - ${htmlEscape(ev.tipo)}]</strong><br>
+          ${htmlEscape(ev.detalle)}
+        </p>
+      `).join("")}
+    `;
+
+    const bitacoraPlain = events.map((ev) => {
+      return `[${localFormatDate(ev.fecha)} - ${ev.usuario} - ${ev.tipo}]\n${ev.detalle}`;
+    }).join("\n\n");
+
+    const nuevoHtml = [
+      observacionesActualesHtml,
+      bitacoraHtml
+    ].filter(Boolean).join("\n");
+
+    const nuevoPlain = [
+      observacionesActualesPlain,
+      "BITÁCORA AUTOMÁTICA RETROACTIVA",
+      bitacoraPlain
+    ].filter(Boolean).join("\n\n");
+
+    await updateDoc(doc(db, "ventas_cotizaciones", docSnap.id), {
+      "ficha.observacionesHtml": nuevoHtml,
+      observacionesFicha: nuevoPlain,
+      "flowFicha.observacionesBackfill": true,
+      "flowFicha.observacionesBackfillEn": serverTimestamp()
+    });
+
+    actualizadas++;
+    console.log("Observaciones actualizadas:", idGrupo);
+  }
+
+  console.log(`Backfill observaciones terminado. Revisadas: ${revisadas}. Actualizadas: ${actualizadas}. Omitidas: ${omitidas}.`);
+};
