@@ -2384,6 +2384,33 @@ async function initPage() {
     });
   }
 
+  if (linkFichasCorregidas && !linkFichasCorregidas.dataset.bound) {
+    linkFichasCorregidas.dataset.bound = "1";
+  
+    linkFichasCorregidas.addEventListener("click", (e) => {
+      e.preventDefault();
+      openFichasCorregidasModal();
+    });
+  }
+  
+  if (btnCerrarFichasCorregidas && !btnCerrarFichasCorregidas.dataset.bound) {
+    btnCerrarFichasCorregidas.dataset.bound = "1";
+  
+    btnCerrarFichasCorregidas.addEventListener("click", () => {
+      closeFichasCorregidasModal();
+    });
+  }
+  
+  if (modalFichasCorregidas && !modalFichasCorregidas.dataset.bound) {
+    modalFichasCorregidas.dataset.bound = "1";
+  
+    modalFichasCorregidas.addEventListener("click", (e) => {
+      if (e.target === modalFichasCorregidas) {
+        closeFichasCorregidasModal();
+      }
+    });
+  }
+
   if (linkSolicitudesActualizacion && !linkSolicitudesActualizacion.dataset.bound) {
     linkSolicitudesActualizacion.dataset.bound = "1";
   
