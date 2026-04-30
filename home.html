@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Home | Sistema Ventas RT</title>
+  <link rel="stylesheet" href="estilos.css" />
+  <link rel="icon" type="image/png" href="IMG/logo-raitrai.png" />
+
+  <style>
+    .home-grid {
+      display: grid;
+      grid-template-columns: minmax(320px, 420px) 1fr;
+      gap: 22px;
+      align-items: start;
+      width: 100%;
+    }
+
+    .home-panel-title {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+
+    .home-panel-title h2 {
+      margin: 0;
+    }
+
+    .home-search-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 18px;
+    }
+
+    .home-search-card {
+      background: #fff;
+      border: 1px solid rgba(72, 48, 110, .12);
+      border-radius: 22px;
+      padding: 18px;
+      box-shadow: 0 10px 30px rgba(32, 18, 54, .06);
+    }
+
+    .home-search-card h3 {
+      margin: 0 0 6px;
+      color: #31194b;
+      font-size: 18px;
+    }
+
+    .home-search-card p {
+      margin: 0 0 14px;
+      color: #6a6078;
+      font-size: 13px;
+      line-height: 1.45;
+    }
+
+    .home-search-input {
+      width: 100%;
+      border: 1px solid rgba(72, 48, 110, .16);
+      border-radius: 999px;
+      padding: 12px 16px;
+      font: inherit;
+      outline: none;
+      color: #2f2340;
+      background: #fffdfd;
+    }
+
+    .home-search-results {
+      margin-top: 14px;
+      display: grid;
+      gap: 10px;
+      max-height: 520px;
+      overflow: auto;
+      padding-right: 4px;
+    }
+
+    .home-result-item {
+      border: 1px solid rgba(72, 48, 110, .12);
+      border-radius: 16px;
+      padding: 13px 14px;
+      background: #faf8fd;
+      cursor: pointer;
+      transition: .15s ease;
+    }
+
+    .home-result-item:hover {
+      transform: translateY(-1px);
+      background: #f2edf8;
+    }
+
+    .home-result-item strong {
+      color: #31194b;
+      display: block;
+      font-size: 15px;
+      margin-bottom: 4px;
+    }
+
+    .home-result-item span {
+      display: block;
+      color: #6a6078;
+      font-size: 12px;
+      line-height: 1.4;
+    }
+
+    .home-empty {
+      padding: 14px 16px;
+      border-radius: 16px;
+      background: #faf8fd;
+      color: #6a6078;
+      border: 1px solid rgba(72,48,110,.10);
+    }
+
+    .home-modal {
+      width: min(920px, calc(100vw - 32px));
+      border: none;
+      border-radius: 22px;
+      padding: 0;
+      box-shadow: 0 24px 64px rgba(24,16,36,.28);
+    }
+
+    .home-modal-header {
+      padding: 20px 22px 16px;
+      border-bottom: 1px solid rgba(60,40,90,.12);
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 16px;
+    }
+
+    .home-modal-header h3 {
+      margin: 0;
+      font-size: 24px;
+      color: #31194b;
+    }
+
+    .home-modal-header p {
+      margin: 6px 0 0;
+      color: #6a6078;
+      font-size: 14px;
+    }
+
+    .home-modal-close {
+      border: none;
+      background: #ece8f4;
+      color: #31194b;
+      border-radius: 999px;
+      padding: 10px 14px;
+      cursor: pointer;
+      font-weight: 700;
+    }
+
+    .home-modal-body {
+      padding: 18px 22px 22px;
+    }
+
+    .home-modal-list {
+      display: grid;
+      gap: 12px;
+    }
+
+    .home-card-row {
+      padding: 14px 16px;
+      border: 1px solid rgba(60,40,90,.12);
+      border-radius: 16px;
+      background: #fff;
+      display: flex;
+      justify-content: space-between;
+      gap: 14px;
+      align-items: flex-start;
+    }
+
+    .home-card-row-title {
+      font-weight: 800;
+      color: #31194b;
+      font-size: 16px;
+      line-height: 1.2;
+    }
+
+    .home-card-row-text {
+      margin-top: 6px;
+      color: #6a6078;
+      font-size: 13px;
+      line-height: 1.45;
+    }
+
+    .home-btn {
+      flex: 0 0 auto;
+      text-decoration: none;
+      background: #3b2357;
+      color: #fff;
+      border-radius: 999px;
+      padding: 10px 14px;
+      font-weight: 700;
+      white-space: nowrap;
+      border: none;
+      cursor: pointer;
+    }
+
+    @media (max-width: 980px) {
+      .home-grid,
+      .home-search-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+
+<body class="ventas-body" data-page="home">
+
+  <div id="layout-top"></div>
+
+  <main class="ventas-main">
+    <div class="home-grid">
+
+      <section>
+        <div class="panel panel-alertas">
+          <div class="home-panel-title">
+            <h2>ALERTAS</h2>
+          </div>
+
+          <div class="alert-row">
+            <span>Hay</span>
+            <strong id="count-sin-asignar">0</strong>
+            <span>contactos</span>
+            <a href="#" id="link-sin-asignar">Sin Asignar</a>
+          </div>
+
+          <div class="alert-row">
+            <span>Hay</span>
+            <strong id="count-a-contactar">0</strong>
+            <span>contactos</span>
+            <a href="#" id="link-a-contactar">A contactar</a>
+          </div>
+
+          <div class="alert-row">
+            <span>Hay</span>
+            <strong id="count-fichas-firmar">0</strong>
+            <span>fichas por firmar</span>
+            <a href="#" id="link-fichas-firmar">Ver</a>
+          </div>
+
+          <div class="alert-row">
+            <span>Hay</span>
+            <strong id="count-solicitudes-actualizacion">0</strong>
+            <span>solicitudes de actualización</span>
+            <a href="#" id="link-solicitudes-actualizacion">Ver</a>
+          </div>
+
+          <div class="alert-row">
+            <span>Hay</span>
+            <strong id="count-alertas-criticas">0</strong>
+            <span>alertas críticas</span>
+            <a href="#" id="link-alertas-criticas">Ver</a>
+          </div>
+
+          <div class="alert-row">
+            <span>Hay</span>
+            <strong id="count-alertas-warning">0</strong>
+            <span>alertas pendientes</span>
+            <a href="#" id="link-alertas-warning">Ver</a>
+          </div>
+
+          <div class="alert-row">
+            <span>Hay</span>
+            <strong id="count-reunion-3dias">0</strong>
+            <span>reunión confirmada en los próximos tres días</span>
+            <a href="#" id="link-reunion-3dias">Ver</a>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <div class="panel">
+          <div class="home-panel-title">
+            <div>
+              <h2>HOME DE TRABAJO</h2>
+              <p style="margin:4px 0 0; color:#6a6078; font-size:13px;">
+                Busca grupos, fichas y revisa alertas según el rol del usuario.
+              </p>
+            </div>
+          </div>
+
+          <div class="home-search-grid">
+
+            <div class="home-search-card">
+              <h3>Buscador de grupos</h3>
+              <p>Busca libremente por datos del grupo, apoderado, vendedor, estado, destino, colegio u observaciones.</p>
+
+              <input
+                id="input-buscador-grupos-home"
+                class="home-search-input"
+                type="text"
+                placeholder="Buscar grupo..."
+              />
+
+              <div id="resultados-grupos-home" class="home-search-results">
+                <div class="home-empty">Escribe para buscar grupos.</div>
+              </div>
+            </div>
+
+            <div class="home-search-card">
+              <h3>Buscador de fichas</h3>
+              <p>Busca libremente por datos de ficha, firmas, número de negocio, programa, cierre u observaciones.</p>
+
+              <input
+                id="input-buscador-fichas-home"
+                class="home-search-input"
+                type="text"
+                placeholder="Buscar ficha..."
+              />
+
+              <div id="resultados-fichas-home" class="home-search-results">
+                <div class="home-empty">Escribe para buscar fichas.</div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </section>
+
+    </div>
+
+    <!-- MODAL GENÉRICO DE ALERTAS -->
+    <dialog id="modal-listado-home" class="home-modal">
+      <div class="home-modal-header">
+        <div>
+          <h3 id="modal-listado-titulo">Listado</h3>
+          <p id="modal-listado-subtitulo">Detalle de registros.</p>
+        </div>
+
+        <button id="btn-cerrar-modal-listado" type="button" class="home-modal-close">
+          Cerrar
+        </button>
+      </div>
+
+      <div class="home-modal-body">
+        <div id="modal-listado-resumen" style="margin-bottom:14px; color:#4b405a; font-size:14px;"></div>
+        <div id="modal-listado-contenido" class="home-modal-list"></div>
+      </div>
+    </dialog>
+
+    <!-- MODAL DETALLE GRUPO / FICHA -->
+    <dialog id="modal-detalle-home" class="home-modal">
+      <div class="home-modal-header">
+        <div>
+          <h3 id="modal-detalle-titulo">Detalle</h3>
+          <p id="modal-detalle-subtitulo">Información encontrada.</p>
+        </div>
+
+        <button id="btn-cerrar-modal-detalle" type="button" class="home-modal-close">
+          Cerrar
+        </button>
+      </div>
+
+      <div class="home-modal-body">
+        <div id="modal-detalle-contenido"></div>
+      </div>
+    </dialog>
+
+  </main>
+
+  <script type="module" src="layout.js"></script>
+  <script type="module" src="home.js"></script>
+</body>
+</html>
