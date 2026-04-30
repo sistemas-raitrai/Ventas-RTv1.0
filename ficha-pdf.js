@@ -489,7 +489,11 @@ function getFinalizeBlockedMessage() {
   }
 
   if (!hasProgramaPdf()) {
-    return "Falta subir el Programa PDF obligatorio para cerrar la ficha.";
+    if (hasProgramaOriginalEditable()) {
+      return "El programa editable está subido, pero falta generar su versión PDF para poder unirlo a la ficha.";
+    }
+  
+    return "Falta subir el programa obligatorio para cerrar la ficha.";
   }
 
   const flow = state.group?.flowFicha || {};
@@ -619,6 +623,10 @@ function getProgramaPdfNombre() {
 
 function hasProgramaPdf() {
   return !!getProgramaPdfUrl();
+}
+
+function hasProgramaOriginalEditable() {
+  return !!cleanText(getByPath(state.group, "programaGrupo.archivoUrl") || "");
 }
 
 async function fetchPdfBytesFromUrl(url = "") {
