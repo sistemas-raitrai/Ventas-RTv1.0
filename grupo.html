@@ -1673,6 +1673,18 @@
         grid-template-columns: 1fr;
       }
     }
+    /* Alias manual cambiado desde ficha */
+    .readonly-box.alias-manual {
+      background: #fff7cc !important;
+      border: 1px solid #e5bd32 !important;
+      color: #3b2b00 !important;
+      box-shadow: 0 0 0 3px rgba(229, 189, 50, 0.18);
+    }
+    
+    .helper.alias-manual-helper {
+      color: #8a6700 !important;
+      font-weight: 800;
+    }
   </style>
 </head>
 
@@ -1928,11 +1940,12 @@
 
       <div class="modal-body">
         <form id="formDatos" class="form-grid">
-          <div class="form-field">
-            <label>Alias grupo</label>
-            <div id="d_aliasPreview" class="readonly-box">—</div>
-            <div class="helper">
-              Se reconstruye automáticamente si cambias curso o año de viaje.
+            <div class="form-field">
+              <label>Alias grupo</label>
+              <div id="d_aliasPreview" class="readonly-box">—</div>
+              <div class="helper" id="d_aliasHelper">
+                Se reconstruye automáticamente si cambias curso o año de viaje.
+              </div>
             </div>
           </div>
         
