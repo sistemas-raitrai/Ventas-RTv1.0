@@ -2295,19 +2295,48 @@ function renderHeroBadges() {
   const estado = normalizeState(state.group.estado);
   const estadoMeta = ESTADO_META[estado] || ESTADO_META.a_contactar;
 
+  const anoViajeNum = Number(state.group?.anoViaje || 0);
+  const esLegacy2025 = anoViajeNum <= 2025;
+
   const flujoAbierto = !!state.group?.fichaFlujoAbierto;
+
+  const tienePdf = !!cleanText(
+    getByPath(state.group, "ficha.pdfUrl") ||
+    state.group?.fichaPdfUrl ||
+    ""
+  );
+
+  // Regla real:
+  // 2025 = autorizada por firma admin
+  // 2026+ = autorizada solo si PDF vigente real
+  const autorizadaVisual = esLegacy2025
+    ? !!state.group?.autorizada
+    : (tienePdf && !flujoAbierto);
+
+  const pdfVigente = tienePdf && !flujoAbierto;
+  const pdfAnterior = tienePdf && flujoAbierto;
 
   box.innerHTML = `
     <span class="g-badge ${estadoMeta.css}">
       Estado: ${escapeHtml(estadoMeta.label)}
     </span>
 
-    <span class="g-badge ${state.group.autorizada ? "is-ok" : "is-muted"}">
-      ${state.group.autorizada ? "Autorizada" : "No autorizada"}
+    <span class="g-badge ${flujoAbierto ? "is-warning" : "is-ok"}">
+      ${flujoAbierto ? "Ficha abierta" : "Ficha cerrada"}
     </span>
 
-    <span class="g-badge ${flujoAbierto ? "is-warning" : "is-ok"}">
-      ${flujoAbierto ? "Abierta" : "Cerrada"}
+    <span class="g-badge ${autorizadaVisual ? "is-ok" : "is-warning"}">
+      ${autorizadaVisual ? "Autorizada" : "No autorizada"}
+    </span>
+
+    <span class="g-badge ${pdfVigente ? "is-ok" : "is-warning"}">
+      ${
+        pdfVigente
+          ? "PDF vigente"
+          : pdfAnterior
+            ? "PDF anterior"
+            : "PDF pendiente"
+      }
     </span>
   `;
 }
@@ -2328,7 +2357,22 @@ function renderSituacion() {
   setText("situacionEstado", getEstadoLabel(state.group.estado));
   const flujoAbierto = !!state.group?.fichaFlujoAbierto;
   
-  setText("situacionAutorizacion", state.group.autorizada ? "Autorizada" : "No autorizada");
+  const anoViajeNum = Number(state.group?.anoViaje || 0);
+  const esLegacy2025 = anoViajeNum <= 2025;
+  
+  const flujoAbierto = !!state.group?.fichaFlujoAbierto;
+  
+  const tienePdf = !!cleanText(
+    getByPath(state.group, "ficha.pdfUrl") ||
+    state.group?.fichaPdfUrl ||
+    ""
+  );
+  
+  const autorizadaVisual = esLegacy2025
+    ? !!state.group?.autorizada
+    : (tienePdf && !flujoAbierto);
+  
+  setText("situacionAutorizacion", autorizadaVisual ? "Autorizada" : "No autorizada");
   setText("situacionCierre", flujoAbierto ? "Abierta" : "Cerrada");
   setText("situacionProximoPaso", getByPath(state.group, "situacion.proximoPaso") || "—");
   setText("situacionUltimoCambioEstado", fechaCambioEstadoTxt);
