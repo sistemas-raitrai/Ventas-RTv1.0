@@ -1837,10 +1837,44 @@ function buildDatosAliasPayload() {
 }
 
 function syncDatosAliasPreview() {
-  const { aliasGrupo } = buildDatosAliasPayload();
-  setText("d_aliasPreview", aliasGrupo || "—");
-}
+  const aliasBox = $("d_aliasPreview");
+  const aliasHelper = $("d_aliasHelper");
 
+  if (!aliasBox) return;
+
+  const esAliasManual = state.group?.nombreGrupoManual === true;
+
+  if (esAliasManual) {
+    const aliasManual = cleanText(
+      state.group?.aliasGrupo ||
+      state.group?.nombreGrupo ||
+      getByPath(state.group, "ficha.nombreGrupo") ||
+      ""
+    );
+
+    aliasBox.textContent = aliasManual || "—";
+    aliasBox.classList.add("alias-manual");
+
+    if (aliasHelper) {
+      aliasHelper.textContent =
+        "Nombre personalizado desde Ficha editable. El alias automático fue reemplazado manualmente y no se reconstruirá al cambiar curso o año.";
+      aliasHelper.classList.add("alias-manual-helper");
+    }
+
+    return;
+  }
+
+  const { aliasGrupo } = buildDatosAliasPayload();
+
+  aliasBox.textContent = aliasGrupo || "—";
+  aliasBox.classList.remove("alias-manual");
+
+  if (aliasHelper) {
+    aliasHelper.textContent =
+      "Se reconstruye automáticamente si cambias curso o año de viaje.";
+    aliasHelper.classList.remove("alias-manual-helper");
+  }
+}
 function bindUppercaseModalInput(id, afterChange = null) {
   const el = $(id);
   if (!el || el.dataset.upperBound === "1") return;
