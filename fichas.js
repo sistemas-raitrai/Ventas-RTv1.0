@@ -2134,8 +2134,10 @@ async function signFlowFromFicha(step) {
       // Regla:
       // 2025 o anterior queda autorizada al firmar administración.
       // 2026 en adelante solo queda autorizada cuando se genera PDF real en ficha-pdf.js.
+      // Cerrada = ya están las 3 firmas.
+      // Autorizada = 2025 se autoriza aquí; 2026+ recién cuando se genera PDF.
       autorizada: esFichaLegacy2025,
-      fichaFlujoAbierto: !esFichaLegacy2025,
+      fichaFlujoAbierto: false,
 
       documentos: {
         ...(state.group.documentos || {}),
@@ -2164,7 +2166,7 @@ async function signFlowFromFicha(step) {
         : `${nombre} autorizó el grupo desde administración.`,
       cambios: [
         { campo: "autorizada", anterior: !!state.group.autorizada, nuevo: esFichaLegacy2025 },
-        { campo: "fichaFlujoAbierto", anterior: !!state.group.fichaFlujoAbierto, nuevo: !esFichaLegacy2025 },
+        { campo: "fichaFlujoAbierto", anterior: !!state.group.fichaFlujoAbierto, nuevo: false },
         { campo: "fichaEstado", anterior: state.group.fichaEstado || "", nuevo: "autorizada_admin" }
       ],
       reloadAfterSave: false,
