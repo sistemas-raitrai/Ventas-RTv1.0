@@ -1059,7 +1059,9 @@
   <div class="modal" id="modalSolicitudFicha">
     <div class="modal-card">
       <div class="modal-head">
-        <h3 class="modal-title">Solicitar actualización de ficha</h3>
+        <h3 class="modal-title" id="modalSolicitudFichaTitle">
+          Solicitar actualización de ficha
+        </h3>
         <button class="modal-close" type="button" data-close="modalSolicitudFicha">×</button>
       </div>
 
@@ -1071,7 +1073,7 @@
           </div>
 
           <div class="field span-12">
-            <label for="sr_detalle">Qué hay que cambiar</label>
+            <label for="sr_detalle" id="sr_detalle_label">Qué hay que cambiar</label>
             <textarea id="sr_detalle"></textarea>
           </div>
         </form>
