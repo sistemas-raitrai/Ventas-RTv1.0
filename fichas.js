@@ -1365,6 +1365,11 @@ function renderHero() {
 
   const estadoFicha = getFichaEstadoLabel(state.group?.fichaEstado || state.ficha?.estado || "pendiente");
   const tienePdf = !!cleanText(state.ficha?.pdfUrl || state.group?.fichaPdfUrl || "");
+  const flujoAbierto = !!state.group?.fichaFlujoAbierto;
+  
+  // Si hay flujo abierto, el PDF existente es anterior/no vigente.
+  const pdfVigente = tienePdf && !flujoAbierto;
+  const pdfAnterior = tienePdf && flujoAbierto;
 
   setText("heroFichaEstado", estadoFicha);
   setText(
@@ -1420,15 +1425,28 @@ function renderHero() {
       ${state.group?.autorizada ? "Autorizada" : "No autorizada"}
     </span>
   
-    <span class="f-badge ${tienePdf ? "ok" : "muted"}">
-      ${tienePdf ? "PDF enlazado" : "PDF pendiente"}
+    <span class="f-badge ${pdfVigente ? "ok" : "warn"}">
+      ${
+        pdfVigente
+          ? "PDF vigente"
+          : pdfAnterior
+            ? "PDF anterior"
+            : "PDF pendiente"
+      }
     </span>
   `;
 
   setText("sideEstadoFicha", estadoFicha);
   setText("sideVersionFicha", state.ficha?.version || "—");
   setText("sideNumeroNegocio", state.ficha?.numeroNegocio || "—");
-  setText("sidePdfGuardado", tienePdf ? "Sí" : "No");
+  setText(
+    "sidePdfGuardado",
+    pdfVigente
+      ? "Sí, vigente"
+      : pdfAnterior
+        ? "Sí, pero anterior"
+        : "No"
+  );
 }
 
 function renderResumenGrupo() {
