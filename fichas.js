@@ -2317,6 +2317,9 @@ async function saveUpdateRequest() {
       };
 
   await setDoc(doc(db, "ventas_cotizaciones", state.groupDocId), {
+    // Una solicitud de actualización/corrección abre la ficha nuevamente.
+    fichaFlujoAbierto: true,
+  
     fichaFlujoModo: esCorreccion ? "correccion" : "v2",
     fichaEstado: esCorreccion
       ? "correccion_pendiente_jefa"
