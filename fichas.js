@@ -663,7 +663,8 @@ async function createFichaAlert({
   mensaje = "",
   nivel = "info",
   destinatarioRol = "",
-  destinatarioCorreo = ""
+  destinatarioCorreo = "",
+  tipo = "solicitud_actualizacion_ficha"
 } = {}) {
   await addDoc(collection(db, ALERTAS_COLLECTION), {
     idGrupo: String(state.groupId),
@@ -671,7 +672,7 @@ async function createFichaAlert({
     aliasGrupo: cleanText(state.group?.aliasGrupo),
     colegio: cleanText(state.group?.colegio),
 
-    tipo: "solicitud_actualizacion_ficha",
+    tipo,
     origen: "ficha",
     modulo: "ficha",
     nivel,
@@ -1827,10 +1828,11 @@ async function signFlowFromFicha(step) {
 
   const flow = state.group.flowFicha || {};
   const nombre = getDisplayName(state.effectiveUser);
+  const firmanteComoAdmin = isRealAdminRole();
 
   if (step === "vendedor") {
-    if (!isVendorRole()) {
-      alert("Esta firma solo la realiza el vendedor(a) del grupo.");
+    if (!isVendorRole() && !isRealAdminRole()) {
+      alert("Esta firma solo la realiza el vendedor(a) o admin.");
       return;
     }
 
@@ -1896,7 +1898,9 @@ async function signFlowFromFicha(step) {
       tipoMovimiento: "firma_vendedor",
       modulo: "ficha",
       titulo: "Firma de vendedor(a)",
-      mensaje: `${nombre} dejó la ficha lista como vendedor(a).`,
+      mensaje: firmanteComoAdmin
+        ? `${nombre} (admin) registró firma como vendedor(a).`
+        : `${nombre} dejó la ficha lista como vendedor(a).`,
       cambios: [
         { campo: "fichaEstado", anterior: state.group.fichaEstado || "", nuevo: "lista_vendedor" }
       ],
@@ -2168,8 +2172,16 @@ async function signFlowFromFicha(step) {
 }
 
 async function saveUpdateRequest() {
-  if (!canRequestFichaUpdate()) {
-    showToast("No tienes permisos para solicitar actualización/corrección.", "warning");
+  const mode = state.requestMode === "correccion" ? "correccion" : "actualizacion";
+  const esCorreccion = mode === "correccion";
+
+  if (esCorreccion && !canRequestFichaCorrection()) {
+    showToast("No tienes permisos para solicitar corrección.", "warning");
+    return;
+  }
+
+  if (!esCorreccion && !canRequestFichaUpdate()) {
+    showToast("No tienes permisos para solicitar actualización.", "warning");
     return;
   }
 
@@ -2183,16 +2195,19 @@ async function saveUpdateRequest() {
   const detalle = getValue("sr_detalle");
 
   if (!detalle) {
-    showToast("Debes explicar qué hay que corregir.", "warning");
+    showToast(
+      esCorreccion
+        ? "Debes explicar qué hay que corregir."
+        : "Debes explicar qué hay que actualizar.",
+      "warning"
+    );
     return;
   }
-
-  const esCorreccionAdministracion = isAdministracionLimitedAfterVendorSign();
 
   const asuntoFinal =
     asunto ||
     (
-      esCorreccionAdministracion
+      esCorreccion
         ? `Corrección ficha · ${state.group.aliasGrupo || state.group.colegio || state.groupId}`
         : `Actualizar ficha · ${state.group.aliasGrupo || state.group.colegio || state.groupId}`
     );
@@ -2203,14 +2218,14 @@ async function saveUpdateRequest() {
     aliasGrupo: cleanText(state.group.aliasGrupo),
     colegio: cleanText(state.group.colegio),
 
-    tipoSolicitud: esCorreccionAdministracion
+    tipoSolicitud: esCorreccion
       ? "correccion_ficha"
       : "actualizacion_ficha",
 
     asunto: asuntoFinal,
     detalle,
 
-    estadoSolicitud: esCorreccionAdministracion
+    estadoSolicitud: esCorreccion
       ? "pendiente_jefa"
       : "pendiente",
 
@@ -2226,16 +2241,21 @@ async function saveUpdateRequest() {
 
   const flowActual = state.group.flowFicha || {};
 
-  const flowPatch = esCorreccionAdministracion
+  const flowPatch = esCorreccion
     ? {
         ...flowActual,
         modo: "correccion",
         correccionPendiente: true,
-        correccionOrigen: "administracion",
+        correccionOrigen: isStrictAdministracionUser()
+          ? "administracion"
+          : isRealAdminRole()
+            ? "admin"
+            : "jefa_ventas",
         correccionEstado: "pendiente_jefa",
         correccionSolicitadaPor: getDisplayName(state.effectiveUser),
         correccionSolicitadaPorCorreo: state.effectiveEmail,
         correccionSolicitadaAt: serverTimestamp(),
+        requiereActualizacion: false,
         ultimaCorreccion: {
           asunto: asuntoFinal,
           detalle,
@@ -2247,6 +2267,7 @@ async function saveUpdateRequest() {
       }
     : {
         ...flowActual,
+        modo: "v2",
         requiereActualizacion: true,
         ultimaSolicitudActualizacion: {
           asunto: asuntoFinal,
@@ -2259,15 +2280,15 @@ async function saveUpdateRequest() {
       };
 
   await setDoc(doc(db, "ventas_cotizaciones", state.groupDocId), {
-    fichaFlujoModo: esCorreccionAdministracion ? "correccion" : "v2",
-    fichaEstado: esCorreccionAdministracion
+    fichaFlujoModo: esCorreccion ? "correccion" : "v2",
+    fichaEstado: esCorreccion
       ? "correccion_pendiente_jefa"
       : state.group?.fichaEstado || "en_edicion",
 
     ficha: {
       ...(state.group.ficha || {}),
-      flujoModo: esCorreccionAdministracion ? "correccion" : "v2",
-      estado: esCorreccionAdministracion
+      flujoModo: esCorreccion ? "correccion" : "v2",
+      estado: esCorreccion
         ? "correccion_pendiente_jefa"
         : state.group?.ficha?.estado || state.group?.fichaEstado || "en_edicion"
     },
@@ -2280,44 +2301,46 @@ async function saveUpdateRequest() {
   }, { merge: true });
 
   await createHistoryEntry({
-    tipoMovimiento: esCorreccionAdministracion
+    tipoMovimiento: esCorreccion
       ? "solicitud_correccion_ficha"
       : "solicitud_actualizacion_ficha",
     modulo: "ficha",
-    titulo: esCorreccionAdministracion
+    titulo: esCorreccion
       ? "Solicitud de corrección de ficha"
       : "Solicitud de actualización de ficha",
     asunto: asuntoFinal,
-    mensaje: esCorreccionAdministracion
+    mensaje: esCorreccion
       ? `${getDisplayName(state.effectiveUser)} solicitó corrección de la ficha. Motivo: ${detalle}`
       : `${getDisplayName(state.effectiveUser)} solicitó actualización de la ficha. Motivo: ${detalle}`,
     metadata: {
       asunto: asuntoFinal,
       detalleSolicitud: detalle,
       destinatarioCorreo: "chernandez@raitrai.cl",
-      origen: esCorreccionAdministracion ? "administracion" : "vendedor"
+      tipoSolicitud: esCorreccion ? "correccion_ficha" : "actualizacion_ficha"
     }
   });
 
   await createFichaAlert({
-    titulo: esCorreccionAdministracion
+    titulo: esCorreccion
       ? "Corrección de ficha solicitada"
       : "Solicitud de actualización de ficha",
-    mensaje: esCorreccionAdministracion
+    mensaje: esCorreccion
       ? `${getDisplayName(state.effectiveUser)} solicitó corregir la ficha.\n\nMotivo: ${detalle}`
-      : `${getDisplayName(state.effectiveUser)} solicitó revisar la ficha.\n\nMotivo: ${detalle}`,
+      : `${getDisplayName(state.effectiveUser)} solicitó actualizar la ficha.\n\nMotivo: ${detalle}`,
     nivel: "warning",
     destinatarioRol: "jefa_ventas",
-    destinatarioCorreo: "chernandez@raitrai.cl"
+    destinatarioCorreo: "chernandez@raitrai.cl",
+    tipo: esCorreccion ? "solicitud_correccion_ficha" : "solicitud_actualizacion_ficha"
   });
 
+  state.requestMode = "";
   closeModal("modalSolicitudFicha");
   await loadAll();
 
   showToast(
-    esCorreccionAdministracion
+    esCorreccion
       ? "Corrección enviada a jefa de ventas correctamente."
-      : "Solicitud enviada a jefa de ventas correctamente.",
+      : "Solicitud de actualización enviada a jefa de ventas correctamente.",
     "success"
   );
 }
