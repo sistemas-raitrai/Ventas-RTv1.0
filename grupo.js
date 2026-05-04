@@ -2306,7 +2306,7 @@ function renderHeroBadges() {
       ${state.group.autorizada ? "Autorizada" : "No autorizada"}
     </span>
 
-    <span class="g-badge ${flujoAbierto ? "is-muted" : "is-ok"}">
+    <span class="g-badge ${flujoAbierto ? "is-warning" : "is-ok"}">
       ${flujoAbierto ? "Abierta" : "Cerrada"}
     </span>
   `;
