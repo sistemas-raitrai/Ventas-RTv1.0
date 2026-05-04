@@ -2355,12 +2355,10 @@ function renderSituacion() {
   const isGanada = estadoNormalizado === "ganada";
 
   setText("situacionEstado", getEstadoLabel(state.group.estado));
-  const flujoAbierto = !!state.group?.fichaFlujoAbierto;
   
   const anoViajeNum = Number(state.group?.anoViaje || 0);
   const esLegacy2025 = anoViajeNum <= 2025;
   
-  const flujoAbierto = !!state.group?.fichaFlujoAbierto;
   
   const tienePdf = !!cleanText(
     getByPath(state.group, "ficha.pdfUrl") ||
