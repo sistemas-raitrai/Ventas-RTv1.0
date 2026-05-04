@@ -2295,6 +2295,8 @@ function renderHeroBadges() {
   const estado = normalizeState(state.group.estado);
   const estadoMeta = ESTADO_META[estado] || ESTADO_META.a_contactar;
 
+  const flujoAbierto = !!state.group?.fichaFlujoAbierto;
+
   box.innerHTML = `
     <span class="g-badge ${estadoMeta.css}">
       Estado: ${escapeHtml(estadoMeta.label)}
@@ -2304,8 +2306,8 @@ function renderHeroBadges() {
       ${state.group.autorizada ? "Autorizada" : "No autorizada"}
     </span>
 
-    <span class="g-badge ${state.group.cerrada ? "is-ok" : "is-muted"}">
-      ${state.group.cerrada ? "Cerrada" : "Abierta"}
+    <span class="g-badge ${flujoAbierto ? "is-muted" : "is-ok"}">
+      ${flujoAbierto ? "Abierta" : "Cerrada"}
     </span>
   `;
 }
@@ -2324,8 +2326,10 @@ function renderSituacion() {
   const isGanada = estadoNormalizado === "ganada";
 
   setText("situacionEstado", getEstadoLabel(state.group.estado));
+  const flujoAbierto = !!state.group?.fichaFlujoAbierto;
+  
   setText("situacionAutorizacion", state.group.autorizada ? "Autorizada" : "No autorizada");
-  setText("situacionCierre", state.group.cerrada ? "Cerrada" : "Abierta");
+  setText("situacionCierre", flujoAbierto ? "Abierta" : "Cerrada");
   setText("situacionProximoPaso", getByPath(state.group, "situacion.proximoPaso") || "—");
   setText("situacionUltimoCambioEstado", fechaCambioEstadoTxt);
 
