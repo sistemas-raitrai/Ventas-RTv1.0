@@ -4238,9 +4238,14 @@ async function saveDatos() {
     const derivedValues = {
       anoBaseCurso: String(anoBase),
       cursoViaje,
-      aliasGrupo,
       aliasTripKey
     };
+    
+    // Si el nombre fue editado manualmente desde la ficha,
+    // NO volver a recalcular ni pisar aliasGrupo.
+    if (state.group?.nombreGrupoManual !== true) {
+      derivedValues.aliasGrupo = aliasGrupo;
+    }
 
     Object.entries(derivedValues).forEach(([path, nuevo]) => {
       const anterior = getByPath(state.group, path);
