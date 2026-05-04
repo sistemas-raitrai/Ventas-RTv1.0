@@ -1339,7 +1339,7 @@ function syncAdminLimitedFichaFields() {
     notice.id = noticeId;
     notice.className = "admin-limited-notice";
     notice.textContent =
-      "Administración solo puede editar N° negocio, usuario ficha y clave administrativa. Para corregir otros datos debe solicitar corrección.";
+      "Para corregir datos debe solicitar corrección.";
     
     const form = document.querySelector("#formFicha") || document.querySelector("main");
     form?.prepend(notice);
