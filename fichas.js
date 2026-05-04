@@ -1411,8 +1411,6 @@ function renderHero() {
 
   const badges = $("heroBadges");
   if (!badges) return;
-
-  const flujoAbierto = !!state.group?.fichaFlujoAbierto;
   
   badges.innerHTML = `
     <span class="f-badge ok">Estado grupo: ${escapeHtml(getEstadoLabel(state.group?.estado))}</span>
