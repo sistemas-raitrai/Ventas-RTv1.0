@@ -1032,7 +1032,10 @@ async function confirmOfficialPdfClosure({ preserveCurrentVersion = false } = {}
   // 3) guardar URL real en Firestore
   await updateDoc(groupRef, {
     fichaEstado: "confirmada_pdf",
+  
+    // Desde 2026 en adelante, autorizada significa PDF real creado en Storage.
     autorizada: true,
+    fichaFlujoAbierto: false,
     ultimaGestionAt: serverTimestamp(),
     ultimaGestionTipo: "confirmacion_ficha_pdf",
 
