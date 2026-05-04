@@ -599,25 +599,49 @@ function getLatestOpenFichaUpdateRequest() {
   return getOpenFichaUpdateRequests()[0] || null;
 }
 
+function isRealAdminRole() {
+  return String(state.effectiveUser?.rol || "").toLowerCase() === "admin";
+}
+
 function canRequestFichaUpdate() {
   if (!state.group) return false;
   if (!canAccessGroup(state.group)) return false;
   if (!canOpenFicha()) return false;
 
   const flow = state.group?.flowFicha || {};
-  const rol = String(state.effectiveUser?.rol || "").toLowerCase();
 
-  const isAdmin = rol === "admin";
-  const isVendor = rol === "vendedor";
-  const isAdminLimited = isStrictAdministracionUser();
-
-  // Vendedor puede solicitar actualización después de haber firmado.
-  if (isVendor || isAdmin) {
+  // Admin real puede solicitar actualización si ya firmó vendedor.
+  if (isRealAdminRole()) {
     return !!flow?.vendedor?.firmado;
   }
 
-  // Administración puede solicitar corrección desde que firmó vendedor.
-  if (isAdminLimited) {
+  // Vendedor solo puede solicitar actualización después de firmar.
+  if (isVendorRole()) {
+    return !!flow?.vendedor?.firmado;
+  }
+
+  return false;
+}
+
+function canRequestFichaCorrection() {
+  if (!state.group) return false;
+  if (!canAccessGroup(state.group)) return false;
+  if (!canOpenFicha()) return false;
+
+  const flow = state.group?.flowFicha || {};
+
+  // Admin real puede pedir corrección si ya firmó vendedor.
+  if (isRealAdminRole()) {
+    return !!flow?.vendedor?.firmado;
+  }
+
+  // Administración operativa puede pedir corrección si ya firmó vendedor.
+  if (isStrictAdministracionUser()) {
+    return !!flow?.vendedor?.firmado;
+  }
+
+  // Jefa de ventas también puede iniciar corrección después de firma vendedor.
+  if (normalizeEmail(state.effectiveEmail) === "chernandez@raitrai.cl") {
     return !!flow?.vendedor?.firmado;
   }
 
@@ -1584,12 +1608,35 @@ function syncButtons() {
     btnAdmin.disabled = !canActAsFichaAdministracion() || !flow?.jefaVentas?.firmado || !!flow?.administracion?.firmado;
   }
 
+  const canUpdate = canRequestFichaUpdate();
+  const canCorrection = canRequestFichaCorrection();
+
   const btnSolicitar = $("btnSolicitarActualizacionFicha");
   if (btnSolicitar) {
-    const show = canRequestFichaUpdate();
-    btnSolicitar.classList.toggle("hidden", !show);
-    btnSolicitar.disabled = !show || pendingUpdate;
+    btnSolicitar.classList.toggle("hidden", !canUpdate);
+    btnSolicitar.disabled = !canUpdate || pendingUpdate;
     btnSolicitar.textContent = pendingUpdate ? "Actualización solicitada" : "Solicitar actualización";
+  }
+
+  const btnSolicitarBottom = $("btnSolicitarActualizacionFichaBottom");
+  if (btnSolicitarBottom) {
+    btnSolicitarBottom.classList.toggle("hidden", !canUpdate);
+    btnSolicitarBottom.disabled = !canUpdate || pendingUpdate;
+    btnSolicitarBottom.textContent = pendingUpdate ? "Actualización solicitada" : "Solicitar actualización";
+  }
+
+  const btnCorreccion = $("btnSolicitarCorreccionFicha");
+  if (btnCorreccion) {
+    btnCorreccion.classList.toggle("hidden", !canCorrection);
+    btnCorreccion.disabled = !canCorrection || pendingUpdate;
+    btnCorreccion.textContent = pendingUpdate ? "Solicitud abierta" : "Solicitar corrección";
+  }
+
+  const btnCorreccionBottom = $("btnSolicitarCorreccionFichaBottom");
+  if (btnCorreccionBottom) {
+    btnCorreccionBottom.classList.toggle("hidden", !canCorrection);
+    btnCorreccionBottom.disabled = !canCorrection || pendingUpdate;
+    btnCorreccionBottom.textContent = pendingUpdate ? "Solicitud abierta" : "Solicitar corrección";
   }
 
   updateProgramaPdfUi();
@@ -1694,7 +1741,22 @@ function bindEvents() {
     }
   });
 
-  $("btnSolicitarActualizacionFicha")?.addEventListener("click", openUpdateRequestModal);
+  $("btnSolicitarActualizacionFicha")?.addEventListener("click", () => {
+    openRequestModal("actualizacion");
+  });
+  
+  $("btnSolicitarActualizacionFichaBottom")?.addEventListener("click", () => {
+    openRequestModal("actualizacion");
+  });
+  
+  $("btnSolicitarCorreccionFicha")?.addEventListener("click", () => {
+    openRequestModal("correccion");
+  });
+  
+  $("btnSolicitarCorreccionFichaBottom")?.addEventListener("click", () => {
+    openRequestModal("correccion");
+  });
+  
   $("btnEnviarSolicitudFicha")?.addEventListener("click", saveUpdateRequest);
 
   document.querySelectorAll("[data-close]").forEach((btn) => {
@@ -1714,9 +1776,16 @@ function closeModal(id) {
   $(id)?.classList.remove("show");
 }
 
-function openUpdateRequestModal() {
-  if (!canRequestFichaUpdate()) {
-    alert("Solo vendedor(a), administración o admin pueden solicitar actualización/corrección cuando la ficha ya fue firmada por vendedor.");
+function openRequestModal(mode = "actualizacion") {
+  const isCorrection = mode === "correccion";
+
+  if (isCorrection && !canRequestFichaCorrection()) {
+    alert("No tienes permisos para solicitar corrección.");
+    return;
+  }
+
+  if (!isCorrection && !canRequestFichaUpdate()) {
+    alert("No tienes permisos para solicitar actualización.");
     return;
   }
 
@@ -1725,10 +1794,27 @@ function openUpdateRequestModal() {
     return;
   }
 
+  state.requestMode = isCorrection ? "correccion" : "actualizacion";
+
   $("formSolicitudFicha")?.reset();
+
+  setText(
+    "modalSolicitudFichaTitle",
+    isCorrection
+      ? "Solicitar corrección de ficha"
+      : "Solicitar actualización de ficha"
+  );
+
+  setText(
+    "sr_detalle_label",
+    isCorrection
+      ? "Qué hay que corregir"
+      : "Qué hay que actualizar"
+  );
+
   setValue(
     "sr_asunto",
-    isAdministracionLimitedAfterVendorSign()
+    isCorrection
       ? `Corrección ficha · ${state.group?.aliasGrupo || state.group?.colegio || state.groupId}`
       : `Actualizar ficha · ${state.group?.aliasGrupo || state.group?.colegio || state.groupId}`
   );
