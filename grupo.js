@@ -912,6 +912,10 @@ function canEditGroup() {
 
   const isVendor = String(state.effectiveUser?.rol || "").toLowerCase() === "vendedor";
 
+  if (isAdministracionBlockedFromGroupEdit()) {
+    return false;
+  }
+
   if (isVendor && isVendorLockedByFlow(state.group)) {
     return false;
   }
@@ -1045,6 +1049,26 @@ function isAdministracion() {
     email === "yenny@raitrai.cl" ||
     email === "administracion@raitrai.cl" ||
     email === "raitrai@raitrai.cl"
+  );
+}
+
+function isStrictAdministracionUser() {
+  const email = normalizeEmail(state.effectiveEmail || "");
+
+  return (
+    email === "yenny@raitrai.cl" ||
+    email === "administracion@raitrai.cl" ||
+    email === "raitrai@raitrai.cl"
+  );
+}
+
+function isAdministracionBlockedFromGroupEdit() {
+  const flow = state.group?.flowFicha || {};
+
+  return (
+    isStrictAdministracionUser() &&
+    normalizeState(state.group?.estado) === "ganada" &&
+    !!flow?.vendedor?.firmado
   );
 }
 
@@ -5506,6 +5530,9 @@ function getBlockedEditMessage() {
   }
 
   const isVendor = String(state.effectiveUser?.rol || "").toLowerCase() === "vendedor";
+  if (isAdministracionBlockedFromGroupEdit()) {
+    return "Administración no puede editar datos del grupo después de la firma del vendedor. Solo puede editar N° negocio, usuario ficha y clave administrativa desde la ficha, o solicitar corrección.";
+  }
 
   if (isVendor && isVendorLockedByFlow(state.group)) {
     return "Ya firmaste la ficha. Desde este momento no puedes modificar el grupo ni la ficha; debes solicitar actualización a jefa de ventas.";
