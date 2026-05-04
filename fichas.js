@@ -1407,10 +1407,22 @@ function renderHero() {
   const badges = $("heroBadges");
   if (!badges) return;
 
+  const flujoAbierto = !!state.group?.fichaFlujoAbierto;
+  
   badges.innerHTML = `
     <span class="f-badge ok">Estado grupo: ${escapeHtml(getEstadoLabel(state.group?.estado))}</span>
-    <span class="f-badge ${state.group?.autorizada ? "ok" : "warn"}">${state.group?.autorizada ? "Autorizada" : "No autorizada"}</span>
-    <span class="f-badge ${tienePdf ? "ok" : "muted"}">${tienePdf ? "PDF enlazado" : "PDF pendiente"}</span>
+  
+    <span class="f-badge ${flujoAbierto ? "warn" : "ok"}">
+      ${flujoAbierto ? "Ficha abierta" : "Ficha cerrada"}
+    </span>
+  
+    <span class="f-badge ${state.group?.autorizada ? "ok" : "warn"}">
+      ${state.group?.autorizada ? "Autorizada" : "No autorizada"}
+    </span>
+  
+    <span class="f-badge ${tienePdf ? "ok" : "muted"}">
+      ${tienePdf ? "PDF enlazado" : "PDF pendiente"}
+    </span>
   `;
 
   setText("sideEstadoFicha", estadoFicha);
