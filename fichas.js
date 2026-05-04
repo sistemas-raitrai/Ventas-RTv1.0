@@ -1338,8 +1338,6 @@ function syncAdminLimitedFichaFields() {
     notice = document.createElement("div");
     notice.id = noticeId;
     notice.className = "admin-limited-notice";
-    notice.textContent =
-      "Para corregir datos debe solicitar corrección.";
     
     const form = document.querySelector("#formFicha") || document.querySelector("main");
     form?.prepend(notice);
