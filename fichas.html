@@ -571,6 +571,30 @@
       flex-wrap: wrap;
     }
 
+    /* Aviso y bloqueo visual para Administración */
+    .admin-limited-notice {
+      margin: 0 0 18px;
+      padding: 14px 16px;
+      border-radius: 16px;
+      background: #fff7cc;
+      border: 1px solid #e5bd32;
+      color: #4a3600;
+      font-size: 13px;
+      font-weight: 800;
+      line-height: 1.45;
+    }
+    
+    .admin-limited-disabled {
+      opacity: .55 !important;
+      background: #f4f1f7 !important;
+      cursor: not-allowed !important;
+    }
+    
+    .admin-limited-editable {
+      background: #fffaf0 !important;
+      border-color: #d8a923 !important;
+    }
+
     .hidden{
       display: none !important;
     }
@@ -821,6 +845,7 @@
               <button class="btn-pill" id="btnFirmarFichaJefa" type="button">Firmar jefa ventas</button>
               <button class="btn-pill" id="btnFirmarFichaAdmin" type="button">Firmar administración</button>
               <button class="btn-pill hidden" id="btnSolicitarActualizacionFicha" type="button">Solicitar actualización</button>
+              <button class="btn-pill hidden" id="btnSolicitarCorreccionFicha" type="button">Solicitar corrección</button>
             </div>
           </div>
         </article>
@@ -1016,7 +1041,13 @@
             <div class="hero-actions no-print" style="justify-content:flex-end; margin-top:18px;">
               <button class="btn-pill" id="btnVerFichaPdfHtmlBottom" type="button">Ver PDF</button>
               <button class="btn-pill" id="btnGenerarPdfVersionBottom" type="button">Generar PDF versión</button>
-              <button class="btn-pill hidden" id="btnSolicitarActualizacionFicha" type="button">Solicitar actualización</button>
+              <button class="btn-pill hidden" id="btnSolicitarActualizacionFichaBottom" type="button">
+                Solicitar actualización
+              </button>
+              
+              <button class="btn-pill hidden" id="btnSolicitarCorreccionFichaBottom" type="button">
+                Solicitar corrección
+              </button>
               <button class="btn-dark" id="btnGuardarFichaBottom" type="button">Guardar ficha</button>
             </div>
           </div>
