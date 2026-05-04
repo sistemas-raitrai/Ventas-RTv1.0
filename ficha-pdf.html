@@ -257,15 +257,21 @@
     }
     
     .pdf-box.rich{
-      min-height:128px;
-      max-height:128px;
+      min-height:118px;
+      max-height:118px;
       padding:6px 8px;
     }
     
     .pdf-box.obs{
-      min-height:52px;
-      max-height:52px;
+      min-height:112px;   /* aprovecha el espacio hasta el borde inferior */
+      max-height:112px;   /* mantiene una sola página */
       padding:6px 8px;
+      overflow:hidden;
+    }
+    
+    .pdf-box.obs .pdf-rich{
+      max-height:100px;
+      overflow:hidden;
     }
 
     .pdf-header-cell{
