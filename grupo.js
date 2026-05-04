@@ -2312,21 +2312,21 @@ function renderHeroBadges() {
 
   const pdfVigente = tienePdf && !flujoAbierto;
   const pdfAnterior = tienePdf && flujoAbierto;
-
+  
   box.innerHTML = `
     <span class="g-badge ${estadoMeta.css}">
       Estado: ${escapeHtml(estadoMeta.label)}
     </span>
-
-    <span class="g-badge ${flujoAbierto ? "is-warning" : "is-ok"}">
+  
+    <span class="f-badge ${flujoAbierto ? "warn" : "ok"}">
       ${flujoAbierto ? "Ficha abierta" : "Ficha cerrada"}
     </span>
-
-    <span class="g-badge ${autorizadaVisual ? "is-ok" : "is-warning"}">
+  
+    <span class="f-badge ${autorizadaVisual ? "ok" : "warn"}">
       ${autorizadaVisual ? "Autorizada" : "No autorizada"}
     </span>
-
-    <span class="g-badge ${pdfVigente ? "is-ok" : "is-warning"}">
+  
+    <span class="f-badge ${pdfVigente ? "ok" : "warn"}">
       ${
         pdfVigente
           ? "PDF vigente"
