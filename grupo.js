@@ -2292,7 +2292,7 @@ function renderHeroBadges() {
   const box = $("heroBadges");
   if (!box) return;
 
-  const estado = normalizeState(state.group.estado);
+  const estado = normalizeState(state.group?.estado);
   const estadoMeta = ESTADO_META[estado] || ESTADO_META.a_contactar;
 
   const anoViajeNum = Number(state.group?.anoViaje || 0);
@@ -2306,9 +2306,6 @@ function renderHeroBadges() {
     ""
   );
 
-  // Regla real:
-  // 2025 = autorizada por firma admin
-  // 2026+ = autorizada solo si PDF vigente real
   const autorizadaVisual = esLegacy2025
     ? !!state.group?.autorizada
     : (tienePdf && !flujoAbierto);
@@ -2343,7 +2340,7 @@ function renderHeroBadges() {
 
 function renderSituacion() {
   const fechaCambioEstado =
-    state.group.fechaUltimoCambioEstado ||
+    state.group?.fechaUltimoCambioEstado ||
     getByPath(state.group, "situacion.fechaUltimoCambioEstado") ||
     null;
 
@@ -2351,37 +2348,31 @@ function renderSituacion() {
     ? formatDateTime(fechaCambioEstado)
     : (stringValue(fechaCambioEstado) || "—");
 
-  const estadoNormalizado = normalizeState(state.group.estado);
+  const estadoNormalizado = normalizeState(state.group?.estado);
   const isGanada = estadoNormalizado === "ganada";
 
-  setText("situacionEstado", getEstadoLabel(state.group.estado));
-  
   const anoViajeNum = Number(state.group?.anoViaje || 0);
   const esLegacy2025 = anoViajeNum <= 2025;
-  
-  
+  const flujoAbierto = !!state.group?.fichaFlujoAbierto;
+
   const tienePdf = !!cleanText(
     getByPath(state.group, "ficha.pdfUrl") ||
     state.group?.fichaPdfUrl ||
     ""
   );
-  
+
   const autorizadaVisual = esLegacy2025
     ? !!state.group?.autorizada
     : (tienePdf && !flujoAbierto);
-  
+
+  setText("situacionEstado", getEstadoLabel(state.group?.estado));
   setText("situacionAutorizacion", autorizadaVisual ? "Autorizada" : "No autorizada");
   setText("situacionCierre", flujoAbierto ? "Abierta" : "Cerrada");
   setText("situacionProximoPaso", getByPath(state.group, "situacion.proximoPaso") || "—");
   setText("situacionUltimoCambioEstado", fechaCambioEstadoTxt);
 
-  const obsAdmin = sanitizeRichHtml(
-    getSharedObsAdministracion(state.group)
-  ) || "—";
-  
-  const obsOps = sanitizeRichHtml(
-    getSharedObsOperaciones(state.group)
-  ) || "—";
+  const obsAdmin = sanitizeRichHtml(getSharedObsAdministracion(state.group)) || "—";
+  const obsOps = sanitizeRichHtml(getSharedObsOperaciones(state.group)) || "—";
 
   const adminWrap = $("situacionObsAdminWrap");
   const opsWrap = $("situacionObsOperacionesWrap");
@@ -2417,6 +2408,7 @@ function renderSituacion() {
   if (!box) return;
 
   const nextMeeting = getNextMeeting();
+
   if (!nextMeeting) {
     box.innerHTML = `<div class="empty-box">No hay reuniones agendadas para este grupo.</div>`;
     return;
