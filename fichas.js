@@ -2095,11 +2095,19 @@ async function signFlowFromFicha(step) {
       flowPatch.ultimaActualizacionCerradaPorCorreo = state.effectiveEmail;
     }
 
+    const anoViajeNum = Number(state.group?.anoViaje || 0);
+    const esFichaLegacy2025 = anoViajeNum <= 2025;
+    
     const patch = {
       fichaFlujoModo: "v2",
       fichaEstado: "autorizada_admin",
       firmaAdministracion: nombre,
-      autorizada: true,
+    
+      // Regla:
+      // 2025 o anterior queda autorizada al firmar administración.
+      // 2026 en adelante solo queda autorizada cuando se genera PDF real en ficha-pdf.js.
+      autorizada: esFichaLegacy2025,
+      fichaFlujoAbierto: !esFichaLegacy2025,
 
       documentos: {
         ...(state.group.documentos || {}),
@@ -2127,7 +2135,8 @@ async function signFlowFromFicha(step) {
         ? `${nombre} aprobó nuevamente la ficha desde administración y cerró la solicitud de actualización.`
         : `${nombre} autorizó el grupo desde administración.`,
       cambios: [
-        { campo: "autorizada", anterior: !!state.group.autorizada, nuevo: true },
+        { campo: "autorizada", anterior: !!state.group.autorizada, nuevo: esFichaLegacy2025 },
+        { campo: "fichaFlujoAbierto", anterior: !!state.group.fichaFlujoAbierto, nuevo: !esFichaLegacy2025 },
         { campo: "fichaEstado", anterior: state.group.fichaEstado || "", nuevo: "autorizada_admin" }
       ],
       reloadAfterSave: false,
