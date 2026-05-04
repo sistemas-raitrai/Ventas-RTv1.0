@@ -496,6 +496,36 @@ function isAdministracion() {
   );
 }
 
+function isStrictAdministracionUser() {
+  const email = normalizeEmail(state.effectiveEmail || "");
+
+  return (
+    email === "yenny@raitrai.cl" ||
+    email === "administracion@raitrai.cl" ||
+    email === "raitrai@raitrai.cl"
+  );
+}
+
+function isAdministracionLimitedAfterVendorSign() {
+  const flow = state.group?.flowFicha || {};
+
+  return (
+    isStrictAdministracionUser() &&
+    !!flow?.vendedor?.firmado
+  );
+}
+
+const ADMIN_LIMITED_FICHA_FIELDS = new Set([
+  "numeroNegocio",
+  "usuarioFicha",
+  "claveAdministrativa"
+]);
+
+function canEditFichaFieldByAdminLimit(fieldName = "") {
+  if (!isAdministracionLimitedAfterVendorSign()) return true;
+  return ADMIN_LIMITED_FICHA_FIELDS.has(fieldName);
+}
+
 function canActAsFichaAdministracion() {
   const email = normalizeEmail(state.effectiveEmail || "");
   return isAdministracion() || email === "raitrai@raitrai.cl";
@@ -579,14 +609,19 @@ function canRequestFichaUpdate() {
 
   const isAdmin = rol === "admin";
   const isVendor = rol === "vendedor";
+  const isAdminLimited = isStrictAdministracionUser();
 
-  // Puede solicitar:
-  // 1) vendedor del grupo
-  // 2) admin como soporte
-  if (!isVendor && !isAdmin) return false;
+  // Vendedor puede solicitar actualización después de haber firmado.
+  if (isVendor || isAdmin) {
+    return !!flow?.vendedor?.firmado;
+  }
 
-  // Debe existir firma del vendedor.
-  return !!flow?.vendedor?.firmado;
+  // Administración puede solicitar corrección desde que firmó vendedor.
+  if (isAdminLimited) {
+    return !!flow?.vendedor?.firmado;
+  }
+
+  return false;
 }
 
 function promptRequired(message = "") {
@@ -1232,6 +1267,62 @@ function renderPage() {
   renderWorkflowPanel();
   fillForm();
   syncButtons();
+  syncAdminLimitedFichaFields(); 
+}
+
+function syncAdminLimitedFichaFields() {
+  const limited = isAdministracionLimitedAfterVendorSign();
+
+  FICHA_FIELDS.forEach((fieldName) => {
+    const canEditField = !limited || ADMIN_LIMITED_FICHA_FIELDS.has(fieldName);
+    const fieldId = `f_${fieldName}`;
+    const el = $(fieldId);
+
+    if (!el) return;
+
+    if ("disabled" in el) {
+      el.disabled = !canEditField;
+    }
+
+    if (el.classList) {
+      el.classList.toggle("admin-limited-disabled", limited && !canEditField);
+      el.classList.toggle("admin-limited-editable", limited && canEditField);
+    }
+
+    if (el.getAttribute("contenteditable") !== null) {
+      el.setAttribute("contenteditable", canEditField ? "true" : "false");
+    }
+  });
+
+  document.querySelectorAll("[data-editor-target]").forEach((btn) => {
+    const target = btn.dataset.editorTarget || "";
+    const fieldName = target.replace(/^f_/, "");
+    const canEditField = !limited || ADMIN_LIMITED_FICHA_FIELDS.has(fieldName);
+
+    if ("disabled" in btn) {
+      btn.disabled = !canEditField;
+    }
+
+    btn.classList?.toggle("admin-limited-disabled", limited && !canEditField);
+  });
+
+  const noticeId = "adminLimitedNotice";
+  let notice = document.getElementById(noticeId);
+
+  if (limited && !notice) {
+    notice = document.createElement("div");
+    notice.id = noticeId;
+    notice.className = "admin-limited-notice";
+    notice.textContent =
+      "Administración solo puede editar N° negocio, usuario ficha y clave administrativa. Para corregir otros datos debe solicitar corrección.";
+    
+    const form = document.querySelector("#formFicha") || document.querySelector("main");
+    form?.prepend(notice);
+  }
+
+  if (notice) {
+    notice.classList.toggle("hidden", !limited);
+  }
 }
 
 function renderHero() {
@@ -1625,7 +1716,7 @@ function closeModal(id) {
 
 function openUpdateRequestModal() {
   if (!canRequestFichaUpdate()) {
-    alert("Solo el vendedor(a) del grupo, después de firmar, puede solicitar actualización.");
+    alert("Solo vendedor(a), administración o admin pueden solicitar actualización/corrección cuando la ficha ya fue firmada por vendedor.");
     return;
   }
 
@@ -1637,7 +1728,9 @@ function openUpdateRequestModal() {
   $("formSolicitudFicha")?.reset();
   setValue(
     "sr_asunto",
-    `Actualizar ficha · ${state.group?.aliasGrupo || state.group?.colegio || state.groupId}`
+    isAdministracionLimitedAfterVendorSign()
+      ? `Corrección ficha · ${state.group?.aliasGrupo || state.group?.colegio || state.groupId}`
+      : `Actualizar ficha · ${state.group?.aliasGrupo || state.group?.colegio || state.groupId}`
   );
 
   openModal("modalSolicitudFicha");
@@ -1990,7 +2083,7 @@ async function signFlowFromFicha(step) {
 
 async function saveUpdateRequest() {
   if (!canRequestFichaUpdate()) {
-    showToast("No tienes permisos para solicitar actualización.", "warning");
+    showToast("No tienes permisos para solicitar actualización/corrección.", "warning");
     return;
   }
 
@@ -2004,12 +2097,19 @@ async function saveUpdateRequest() {
   const detalle = getValue("sr_detalle");
 
   if (!detalle) {
-    showToast("Debes explicar qué hay que cambiar.", "warning");
+    showToast("Debes explicar qué hay que corregir.", "warning");
     return;
   }
 
+  const esCorreccionAdministracion = isAdministracionLimitedAfterVendorSign();
+
   const asuntoFinal =
-    asunto || `Actualizar ficha · ${state.group.aliasGrupo || state.group.colegio || state.groupId}`;
+    asunto ||
+    (
+      esCorreccionAdministracion
+        ? `Corrección ficha · ${state.group.aliasGrupo || state.group.colegio || state.groupId}`
+        : `Actualizar ficha · ${state.group.aliasGrupo || state.group.colegio || state.groupId}`
+    );
 
   await addDoc(collection(db, SOLICITUDES_COLLECTION), {
     idGrupo: String(state.groupId),
@@ -2017,10 +2117,17 @@ async function saveUpdateRequest() {
     aliasGrupo: cleanText(state.group.aliasGrupo),
     colegio: cleanText(state.group.colegio),
 
-    tipoSolicitud: "actualizacion_ficha",
+    tipoSolicitud: esCorreccionAdministracion
+      ? "correccion_ficha"
+      : "actualizacion_ficha",
+
     asunto: asuntoFinal,
     detalle,
-    estadoSolicitud: "pendiente",
+
+    estadoSolicitud: esCorreccionAdministracion
+      ? "pendiente_jefa"
+      : "pendiente",
+
     resuelta: false,
 
     destinatarioRol: "jefa_ventas",
@@ -2031,40 +2138,88 @@ async function saveUpdateRequest() {
     fechaSolicitud: serverTimestamp()
   });
 
-  await setDoc(doc(db, "ventas_cotizaciones", state.groupDocId), {
-    flowFicha: {
-      ...(state.group.flowFicha || {}),
-      requiereActualizacion: true,
-      ultimaSolicitudActualizacion: {
-        asunto: asuntoFinal,
-        detalle,
-        solicitadaPor: getDisplayName(state.effectiveUser),
-        solicitadaPorCorreo: state.effectiveEmail,
-        fechaSolicitud: serverTimestamp(),
-        estado: "pendiente"
+  const flowActual = state.group.flowFicha || {};
+
+  const flowPatch = esCorreccionAdministracion
+    ? {
+        ...flowActual,
+        modo: "correccion",
+        correccionPendiente: true,
+        correccionOrigen: "administracion",
+        correccionEstado: "pendiente_jefa",
+        correccionSolicitadaPor: getDisplayName(state.effectiveUser),
+        correccionSolicitadaPorCorreo: state.effectiveEmail,
+        correccionSolicitadaAt: serverTimestamp(),
+        ultimaCorreccion: {
+          asunto: asuntoFinal,
+          detalle,
+          solicitadaPor: getDisplayName(state.effectiveUser),
+          solicitadaPorCorreo: state.effectiveEmail,
+          fechaSolicitud: serverTimestamp(),
+          estado: "pendiente_jefa"
+        }
       }
+    : {
+        ...flowActual,
+        requiereActualizacion: true,
+        ultimaSolicitudActualizacion: {
+          asunto: asuntoFinal,
+          detalle,
+          solicitadaPor: getDisplayName(state.effectiveUser),
+          solicitadaPorCorreo: state.effectiveEmail,
+          fechaSolicitud: serverTimestamp(),
+          estado: "pendiente"
+        }
+      };
+
+  await setDoc(doc(db, "ventas_cotizaciones", state.groupDocId), {
+    fichaFlujoModo: esCorreccionAdministracion ? "correccion" : "v2",
+    fichaEstado: esCorreccionAdministracion
+      ? "correccion_pendiente_jefa"
+      : state.group?.fichaEstado || "en_edicion",
+
+    ficha: {
+      ...(state.group.ficha || {}),
+      flujoModo: esCorreccionAdministracion ? "correccion" : "v2",
+      estado: esCorreccionAdministracion
+        ? "correccion_pendiente_jefa"
+        : state.group?.ficha?.estado || state.group?.fichaEstado || "en_edicion"
     },
+
+    flowFicha: flowPatch,
+
     actualizadoPor: getDisplayName(state.effectiveUser),
     actualizadoPorCorreo: state.effectiveEmail,
     fechaActualizacion: serverTimestamp()
   }, { merge: true });
 
   await createHistoryEntry({
-    tipoMovimiento: "solicitud_actualizacion_ficha",
+    tipoMovimiento: esCorreccionAdministracion
+      ? "solicitud_correccion_ficha"
+      : "solicitud_actualizacion_ficha",
     modulo: "ficha",
-    titulo: "Solicitud de actualización de ficha",
+    titulo: esCorreccionAdministracion
+      ? "Solicitud de corrección de ficha"
+      : "Solicitud de actualización de ficha",
     asunto: asuntoFinal,
-    mensaje: `${getDisplayName(state.effectiveUser)} solicitó actualización de la ficha. Motivo: ${detalle}`,
+    mensaje: esCorreccionAdministracion
+      ? `${getDisplayName(state.effectiveUser)} solicitó corrección de la ficha. Motivo: ${detalle}`
+      : `${getDisplayName(state.effectiveUser)} solicitó actualización de la ficha. Motivo: ${detalle}`,
     metadata: {
       asunto: asuntoFinal,
       detalleSolicitud: detalle,
-      destinatarioCorreo: "chernandez@raitrai.cl"
+      destinatarioCorreo: "chernandez@raitrai.cl",
+      origen: esCorreccionAdministracion ? "administracion" : "vendedor"
     }
   });
 
   await createFichaAlert({
-    titulo: "Solicitud de actualización de ficha",
-    mensaje: `${getDisplayName(state.effectiveUser)} solicitó revisar la ficha.\n\nMotivo: ${detalle}`,
+    titulo: esCorreccionAdministracion
+      ? "Corrección de ficha solicitada"
+      : "Solicitud de actualización de ficha",
+    mensaje: esCorreccionAdministracion
+      ? `${getDisplayName(state.effectiveUser)} solicitó corregir la ficha.\n\nMotivo: ${detalle}`
+      : `${getDisplayName(state.effectiveUser)} solicitó revisar la ficha.\n\nMotivo: ${detalle}`,
     nivel: "warning",
     destinatarioRol: "jefa_ventas",
     destinatarioCorreo: "chernandez@raitrai.cl"
@@ -2073,7 +2228,12 @@ async function saveUpdateRequest() {
   closeModal("modalSolicitudFicha");
   await loadAll();
 
-  showToast("Solicitud enviada a jefa de ventas correctamente.", "success");
+  showToast(
+    esCorreccionAdministracion
+      ? "Corrección enviada a jefa de ventas correctamente."
+      : "Solicitud enviada a jefa de ventas correctamente.",
+    "success"
+  );
 }
 
 function isAdministrativeReviewEditor() {
@@ -2233,6 +2393,21 @@ async function saveFicha({ silent = false, reloadAfterSave = true } = {}) {
     pdfUrl: cleanText(oldFicha.pdfUrl || ""),
     pdfNombre: cleanText(oldFicha.pdfNombre || "")
   };
+
+  if (isAdministracionLimitedAfterVendorSign()) {
+    FICHA_FIELDS.forEach((fieldName) => {
+      if (ADMIN_LIMITED_FICHA_FIELDS.has(fieldName)) return;
+
+      if (Object.prototype.hasOwnProperty.call(values, fieldName)) {
+        values[fieldName] =
+          previousFichaView?.[fieldName] ??
+          oldFicha?.[fieldName] ??
+          "";
+      }
+    });
+
+    values.fechaActualizacionTexto = nowText;
+  }
 
   const observacionesPlain = richHtmlToPlainText(values.observacionesHtml);
   
