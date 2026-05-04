@@ -2576,8 +2576,8 @@ function hydrateFicha(group = {}) {
 
   const observacionesFallbackTexto =
     pick(
-      group.observacionesFicha,
       ficha.observacionesGenerales,
+      group.observacionesFicha,
       group.observacionesGenerales,
       ""
     ) || "";
@@ -2590,9 +2590,9 @@ function hydrateFicha(group = {}) {
     ),
 
     nombreGrupo: pick(
+      ficha.nombreGrupo,
       group.aliasGrupo,
       group.nombreGrupo,
-      ficha.nombreGrupo,
       buildDefaultGroupName(group)
     ),
 
@@ -2638,13 +2638,13 @@ function hydrateFicha(group = {}) {
       group.programaPdfStoragePath,
       ""
     ),
-    
+
     programaPdfSubidoPor: pick(
       ficha.programaPdfSubidoPor,
       group.programaPdfSubidoPor,
       ""
     ),
-    
+
     programaPdfSubidoPorCorreo: pick(
       ficha.programaPdfSubidoPorCorreo,
       group.programaPdfSubidoPorCorreo,
