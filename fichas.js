@@ -2306,15 +2306,27 @@ async function saveFicha({ silent = false, reloadAfterSave = true } = {}) {
           : "en_edicion"
       );
 
+  const nombreGrupoManualNuevo = cleanText(values.nombreGrupo || "");
+  
   const patch = {
     ficha: {
       ...(oldFicha || {}),
       ...values,
+      nombreGrupo: nombreGrupoManualNuevo,
       estado: nextFichaEstado,
       actualizadoPor: getDisplayName(state.effectiveUser),
       actualizadoPorCorreo: state.effectiveEmail,
       fechaActualizacion: serverTimestamp()
     },
+  
+    // =====================================================
+    // ESPEJO FICHA -> GRUPO
+    // Si se edita el nombre en la ficha, pasa a ser el nombre oficial
+    // del grupo en todo el sistema.
+    // =====================================================
+    nombreGrupo: nombreGrupoManualNuevo,
+    aliasGrupo: nombreGrupoManualNuevo,
+    nombreGrupoManual: true,
   
     solicitudReserva: values.solicitudReserva,
     categoriaHoteleraContratada: values.categoriaHoteleraContratada,
@@ -2336,7 +2348,7 @@ async function saveFicha({ silent = false, reloadAfterSave = true } = {}) {
     actualizadoPorCorreo: state.effectiveEmail,
     fechaActualizacion: serverTimestamp()
   };
-
+  
   if (reopenFlow) {
     patch.autorizada = false;
     patch.firmaSupervision = "";
@@ -2591,8 +2603,8 @@ function hydrateFicha(group = {}) {
 
     nombreGrupo: pick(
       ficha.nombreGrupo,
-      group.aliasGrupo,
       group.nombreGrupo,
+      group.aliasGrupo,
       buildDefaultGroupName(group)
     ),
 
