@@ -2581,6 +2581,47 @@ function renderAlerts() {
   }).join("");
 }
 
+function buildDuplicateReviewHtml(item = {}) {
+  const alertas = Array.isArray(item?.metadata?.alertas)
+    ? item.metadata.alertas
+    : [];
+
+  if (!alertas.length) return "";
+
+  const rows = alertas.map((a, index) => {
+    const reasons = Array.isArray(a.reasons) ? a.reasons : [];
+
+    return `
+      <li>
+        <strong>${index + 1}. ID ${escapeHtml(a.relatedIdGrupo || "—")}</strong>
+        · ${escapeHtml(a.aliasGrupo || "Grupo sin alias")}
+        <br>
+        Colegio: ${escapeHtml(a.colegio || "—")}
+        · Curso: ${escapeHtml(a.curso || "—")}
+        · Año: ${escapeHtml(a.anoViaje || "—")}
+        · Comuna: ${escapeHtml(a.comunaCiudad || "—")}
+        <br>
+        Vendedora: ${escapeHtml(a.vendedora || "Sin asignar")}
+        · Estado: ${escapeHtml(a.estado || "—")}
+        · Nivel: ${escapeHtml(a.level || "—")}
+        · Puntaje: ${escapeHtml(a.score ?? "—")}
+        ${
+          reasons.length
+            ? `<br><em>Razones:</em> ${reasons.map(r => escapeHtml(r)).join(" · ")}`
+            : ""
+        }
+      </li>
+    `;
+  }).join("");
+
+  return `
+    <div class="registro-detail-block">
+      <div class="registro-detail-label">Coincidencias revisadas</div>
+      <ul class="registro-detail-list">${rows}</ul>
+    </div>
+  `;
+}
+
 function renderHistory() {
   const list = $("historyList");
   const note = $("historyToolbarNote");
@@ -2663,8 +2704,10 @@ function renderHistory() {
       return `<li><strong>Modificado</strong> · ${escapeHtml(prettyLabel(c.campo))}: ${escapeHtml(c.anteriorPreview || "vacío")} → ${escapeHtml(c.nuevoPreview || "vacío")}</li>`;
     }).join("");
 
+    const duplicateReviewHtml = buildDuplicateReviewHtml(item);
+    
     const hasLongMessage = fullMessage.length > 220;
-    const hasDetails = hasLongMessage || cambiosDetallados.length > 0;
+    const hasDetails = hasLongMessage || cambiosDetallados.length > 0 || !!duplicateReviewHtml;
 
     return `
       <article class="registro-card ${cssType} ${item.destacado ? "is-featured" : ""} ${item.oculto ? "is-hidden-item" : ""}">
@@ -2731,6 +2774,7 @@ function renderHistory() {
                     `
                     : ""
                 }
+                ${duplicateReviewHtml}
               </div>
             `
             : ""
