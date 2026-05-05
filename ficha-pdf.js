@@ -660,36 +660,91 @@ async function waitForProgramaPdfConversion({
   const originalPath = getProgramaOriginalStoragePath();
   const originalNombre = getProgramaOriginalNombre();
 
+  console.group("[ficha-pdf] Conversión programa DOC/DOCX → PDF");
+  console.log("Original path:", originalPath);
+  console.log("Original nombre:", originalNombre);
+
   if (!originalPath) {
+    console.error("No existe programaGrupo.archivoStoragePath");
+    console.groupEnd();
     throw new Error("El programa está subido, pero no encontré su ruta interna para convertirlo a PDF.");
   }
 
+  const expectedPdfPath = originalPath
+    .replace("programas-originales", "programas-pdf")
+    .replace(/\.(docx|doc)$/i, ".pdf");
+
+  const expectedPdfNombre = String(originalNombre || "programa.docx")
+    .replace(/\.(docx|doc)$/i, ".pdf");
+
+  console.log("PDF esperado path:", expectedPdfPath);
+  console.log("PDF esperado nombre:", expectedPdfNombre);
+
   showPdfStatus("Convirtiendo programa Word a PDF. Esto puede tardar unos segundos...");
 
+  const storage = getStorage();
+
   for (let intento = 1; intento <= maxIntentos; intento += 1) {
-    const snap = await getDocs(
-      query(
-        collection(db, "conversiones_programa"),
-        where("originalPath", "==", originalPath)
-      )
-    );
+    console.log(`Intento ${intento}/${maxIntentos}: buscando PDF en Storage...`);
 
-    if (!snap.empty) {
-      const data = snap.docs[0].data() || {};
+    try {
+      const pdfRef = ref(storage, expectedPdfPath);
+      const pdfUrl = await getDownloadURL(pdfRef);
 
-      if (data.pdfUrl && data.pdfPath) {
-        return {
-          pdfUrl: data.pdfUrl,
-          pdfStoragePath: data.pdfPath,
-          pdfNombre: String(originalNombre || "programa.docx").replace(/\.(docx|doc)$/i, ".pdf")
-        };
+      console.log("PDF convertido encontrado en Storage:", pdfUrl);
+      console.groupEnd();
+
+      return {
+        pdfUrl,
+        pdfStoragePath: expectedPdfPath,
+        pdfNombre: expectedPdfNombre
+      };
+    } catch (storageError) {
+      console.log(
+        `PDF aún no disponible en Storage. Esperando ${esperaMs}ms...`,
+        storageError?.code || storageError?.message || storageError
+      );
+    }
+
+    try {
+      const snap = await getDocs(
+        query(
+          collection(db, "conversiones_programa"),
+          where("originalPath", "==", originalPath)
+        )
+      );
+
+      if (!snap.empty) {
+        const data = snap.docs[0].data() || {};
+        console.log("Documento encontrado en conversiones_programa:", data);
+
+        if (data.pdfUrl && data.pdfPath) {
+          console.log("PDF convertido encontrado por Firestore:", data.pdfUrl);
+          console.groupEnd();
+
+          return {
+            pdfUrl: data.pdfUrl,
+            pdfStoragePath: data.pdfPath,
+            pdfNombre: expectedPdfNombre
+          };
+        }
+      } else {
+        console.log("Aún no hay documento en conversiones_programa.");
       }
+    } catch (firestoreError) {
+      console.warn(
+        "No se pudo consultar conversiones_programa:",
+        firestoreError?.message || firestoreError
+      );
     }
 
     await new Promise((resolve) => setTimeout(resolve, esperaMs));
   }
 
-  throw new Error("El programa Word está subido, pero todavía no aparece el PDF convertido. Revisa los logs de convertirProgramaAPdf.");
+  console.error("No apareció el PDF convertido después de todos los intentos.");
+  console.groupEnd();
+
+  throw new Error("El programa Word está subido, pero todavía no aparece el PDF convertido. Revisa Storage y los logs de convertirProgramaAPdf.");
 }
 
 async function ensureProgramaPdfReady(groupRef) {
