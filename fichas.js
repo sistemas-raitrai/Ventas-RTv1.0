@@ -1740,14 +1740,6 @@ function bindEvents() {
   $("btnGuardarFicha")?.addEventListener("click", () => saveFicha());
   $("btnGuardarFichaBottom")?.addEventListener("click", () => saveFicha());
   
-  $("btnVerFichaPdfHtml")?.addEventListener("click", () => {
-    openFichaPdfHtml();
-  });
-  
-  $("btnVerFichaPdfHtmlBottom")?.addEventListener("click", () => {
-    openFichaPdfHtml();
-  });
-  
   $("btnGenerarPdfVersion")?.addEventListener("click", async () => {
     await handleGenerarPdfVersion();
   });
@@ -3391,49 +3383,32 @@ function buildFichaPdfHtmlUrl({ mode = "view" } = {}) {
 
 function openFichaPdfHtml() {
   if (!canOpenFicha()) {
-    alert("La vista PDF solo se habilita cuando el grupo está en estado GANADA.");
+    alert("La ficha solo se habilita cuando el grupo está en estado GANADA.");
     return;
   }
 
-  window.open(buildFichaPdfHtmlUrl({ mode: "view" }), "_blank", "noopener");
+  window.open(buildFichaPdfHtmlUrl({ mode: "generator" }), "_blank", "noopener");
 }
 
 async function handleGenerarPdfVersion() {
   if (!canOpenFicha()) {
-    alert("La generación de la versión PDF solo se habilita cuando el grupo está en estado GANADA.");
+    alert("El generador de fichas solo se habilita cuando el grupo está en estado GANADA.");
     return;
   }
 
-  const result = await saveFicha({ silent: true, reloadAfterSave: false });
-  if (!result?.ok) return;
+  if (!canGeneratePdfVersionAsCurrentUser()) {
+    alert("Solo admin, yenny@raitrai.cl, administracion@raitrai.cl o raitrai@raitrai.cl pueden usar el generador de fichas.");
+    return;
+  }
 
-  const win = window.open(buildFichaPdfHtmlUrl({ mode: "save" }), "_blank", "noopener");
+  // IMPORTANTE:
+  // No guardamos la ficha aquí.
+  // Este botón solo abre el generador; guardar antes podía reiniciar flujo.
+  const win = window.open(buildFichaPdfHtmlUrl({ mode: "generator" }), "_blank", "noopener");
+
   if (!win) {
-    alert("El navegador bloqueó la ventana del PDF. Debes permitir pop-ups para continuar.");
-    return;
+    alert("El navegador bloqueó la ventana del generador. Debes permitir pop-ups para continuar.");
   }
-
-  const status = await waitForPdfPersistResult(win);
-
-  if (status?.ok) {
-    await loadAll();
-    alert("PDF generado y guardado correctamente en Firebase.");
-    return;
-  }
-
-  await loadAll();
-
-  if (status?.reason === "timeout") {
-    alert("La vista PDF se abrió, pero no llegó confirmación de guardado. Revisa si la página del PDF realmente subió el archivo.");
-    return;
-  }
-
-  if (status?.reason === "error") {
-    alert(`La vista PDF se abrió, pero falló el guardado automático: ${status.message || "sin detalle"}`);
-    return;
-  }
-
-  alert("Se abrió la vista PDF, pero no se confirmó el guardado en Firebase.");
 }
 
 function waitForPdfPersistResult(win, timeoutMs = 90000) {
