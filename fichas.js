@@ -775,21 +775,16 @@ function canGeneratePdfVersionAsCurrentUser() {
 }
 
 function getProgramaPdfUrl() {
-  return cleanText(
-    getByPath(state.group, "programaGrupo.pdfUrl") ||
-    state.ficha?.programaPdfUrl ||
-    getByPath(state.group, "ficha.programaPdfUrl") ||
-    state.group?.programaPdfUrl ||
-    ""
-  );
+  const programa = state.group?.programaGrupo || {};
+  return cleanText(programa.pdfUrl || "");
 }
 
 function getProgramaPdfNombre() {
+  const programa = state.group?.programaGrupo || {};
+
   return cleanText(
-    getByPath(state.group, "programaGrupo.pdfNombre") ||
-    state.ficha?.programaPdfNombre ||
-    getByPath(state.group, "ficha.programaPdfNombre") ||
-    state.group?.programaPdfNombre ||
+    programa.pdfNombre ||
+    programa.archivoNombre ||
     ""
   );
 }
@@ -1100,6 +1095,14 @@ async function saveProgramaGrupo() {
         reemplazaArchivoNombre: esReemplazo ? anteriorNombre || "" : "",
         reemplazaArchivoUrl: esReemplazo ? anteriorUrl || "" : ""
       },
+
+      "ficha.programaPdfUrl": downloadUrl || "",
+      "ficha.programaPdfNombre": pdfNombre || "",
+      "ficha.programaPdfStoragePath": storagePath || "",
+      
+      programaPdfUrl: downloadUrl || "",
+      programaPdfNombre: pdfNombre || "",
+      programaPdfStoragePath: storagePath || "",
 
       fechaActualizacion: serverTimestamp(),
       fechaActualizacionFicha: serverTimestamp(),
