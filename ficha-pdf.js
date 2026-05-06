@@ -481,16 +481,37 @@ function syncPrintButton() {
 }
 
 function canFinalizeFichaPdf() {
-  if (!canFinalizeFichaAsCurrentUser()) return false;
-  if (!state.group || !state.groupDocId) return false;
-  if (!canAccessGroup(state.group)) return false;
-  if (!hasProgramaPdf() && !hasProgramaOriginalEditable()) return false;
+  const puedeUsuario = canFinalizeFichaAsCurrentUser();
+  const tieneGrupo = !!state.group && !!state.groupDocId;
+  const puedeAcceder = state.group ? canAccessGroup(state.group) : false;
+  const tienePrograma = hasProgramaPdf() || hasProgramaOriginalEditable();
 
-  const flow = state.group.flowFicha || {};
+  const flow = state.group?.flowFicha || {};
   const fichaEstado = normalizeSearchLocal(state.group?.fichaEstado || "");
   const adminFirmado = !!flow?.administracion?.firmado;
 
-  return fichaEstado === "autorizada_admin" && adminFirmado;
+  const ok =
+    puedeUsuario &&
+    tieneGrupo &&
+    puedeAcceder &&
+    tienePrograma &&
+    fichaEstado === "autorizada_admin" &&
+    adminFirmado;
+
+  console.log("[ficha-pdf] canFinalizeFichaPdf", {
+    ok,
+    puedeUsuario,
+    tieneGrupo,
+    puedeAcceder,
+    tienePrograma,
+    fichaEstadoOriginal: state.group?.fichaEstado,
+    fichaEstadoNormalizado: fichaEstado,
+    adminFirmado,
+    programaGrupo: state.group?.programaGrupo || null,
+    flowFicha: state.group?.flowFicha || null
+  });
+
+  return ok;
 }
 
 function getFinalizeBlockedMessage() {
