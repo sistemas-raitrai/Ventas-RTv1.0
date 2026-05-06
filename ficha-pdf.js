@@ -476,7 +476,9 @@ function syncPrintButton() {
     return;
   }
 
-  btn.disabled = !canFinalizeFichaPdf();
+  // No lo dejamos deshabilitado por flujo,
+  // porque si falta algo queremos mostrar una explicación clara al hacer clic.
+  btn.disabled = !canFinalizeFichaAsCurrentUser();
   btn.textContent = "Confirmar y generar PDF real";
 }
 
@@ -515,24 +517,52 @@ function canFinalizeFichaPdf() {
 }
 
 function getFinalizeBlockedMessage() {
+  const motivos = [];
+
   if (!canFinalizeFichaAsCurrentUser()) {
-    return "Solo admin, yenny@raitrai.cl o administracion@raitrai.cl pueden confirmar oficialmente esta ficha para impresión.";
+    motivos.push("• Tu usuario no tiene permiso para generar el PDF real.");
+  }
+
+  if (!state.group || !state.groupDocId) {
+    motivos.push("• No se cargó correctamente la información del grupo.");
+  }
+
+  if (state.group && !canAccessGroup(state.group)) {
+    motivos.push("• No tienes acceso a este grupo.");
   }
 
   if (!hasProgramaPdf() && !hasProgramaOriginalEditable()) {
-    return "Falta subir el programa obligatorio para cerrar la ficha.";
+    motivos.push("• Falta subir el programa obligatorio.");
   }
 
   const flow = state.group?.flowFicha || {};
+
+  if (!flow?.vendedor?.firmado) {
+    motivos.push("• Falta firma de vendedor(a).");
+  }
+
+  if (!flow?.jefaVentas?.firmado) {
+    motivos.push("• Falta firma de jefa de ventas.");
+  }
+
   if (!flow?.administracion?.firmado) {
-    return "Primero debe existir la firma de administración.";
+    motivos.push("• Falta firma de administración.");
   }
 
-  if (normalizeSearchLocal(state.group?.fichaEstado || "") !== "autorizada_admin") {
-    return "La ficha todavía no está en estado autorizada por administración.";
+  const fichaEstado = normalizeSearchLocal(state.group?.fichaEstado || "");
+
+  if (fichaEstado !== "autorizada_admin") {
+    motivos.push(`• La ficha no está en estado autorizada_admin. Estado actual: ${state.group?.fichaEstado || "sin estado"}.`);
   }
 
-  return "La ficha todavía no está lista para cierre oficial.";
+  return [
+    "No se puede generar el PDF real todavía.",
+    "",
+    "Motivos detectados:",
+    motivos.length ? motivos.join("\n") : "• No se detectó el motivo exacto. Revisa consola.",
+    "",
+    "Cuando se corrijan estos puntos, vuelve a intentar."
+  ].join("\n");
 }
 
 function isPdfOfficiallyConfirmed() {
