@@ -1162,65 +1162,83 @@ async function saveProgramaGrupo() {
       (yaFirmoJefa || yaFirmoAdmin || estabaAutorizada);
 
     if (debeReabrirPorJefa || debeReabrirPorAdmin) {
-      patch.autorizada = false;
-      patch.fichaEstado = debeReabrirPorAdmin
-        ? "lista_vendedor"
-        : "revisada_jefa_ventas";
-
-      patch.firmaAdministracion = "";
-      patch.fichaPdfUrl = "";
-      patch.fichaPdfNombre = "";
-
-      patch.ficha = {
-        ...(state.group?.ficha || {}),
-        estado: patch.fichaEstado,
-        flujoModo: "v2",
-        confirmada: false,
-        pdfPendienteGeneracion: true,
-        pdfUrl: "",
-        pdfNombre: ""
-      };
-
-      patch.flowFicha = {
-        ...(flow || {}),
-        modo: "v2",
-        legacy: false,
-        estado: patch.fichaEstado,
-        requiereActualizacion: false,
-        requiereRefirmaAdministracion: true,
-
-        vendedor: {
-          ...(flow?.vendedor || {}),
-          firmado: true
-        },
-
-        jefaVentas: {
-          ...(flow?.jefaVentas || {}),
-          firmado: debeReabrirPorJefa ? true : false,
-          firmadoAt: debeReabrirPorJefa ? flow?.jefaVentas?.firmadoAt || null : null,
-          firmadoPor: debeReabrirPorJefa ? flow?.jefaVentas?.firmadoPor || "" : "",
-          firmadoPorCorreo: debeReabrirPorJefa ? flow?.jefaVentas?.firmadoPorCorreo || "" : "",
-          observacion: ""
-        },
-
-        administracion: {
-          ...(flow?.administracion || {}),
-          firmado: false,
-          firmadoAt: null,
-          firmadoPor: "",
-          firmadoPorCorreo: "",
-          observacion: ""
-        }
-      };
-
-      patch.documentos = {
-        ...(state.group.documentos || {}),
-        fichaGrupo: {
-          ...(state.group.documentos?.fichaGrupo || {}),
-          estado: patch.fichaEstado
-        }
-      };
+    patch.autorizada = false;
+  
+    // Flujo vuelve a abrirse
+    patch.fichaFlujoAbierto = true;
+  
+    patch.fichaEstado = debeReabrirPorAdmin
+      ? "lista_vendedor"
+      : "revisada_jefa_ventas";
+  
+    // Limpieza firma final
+    patch.firmaAdministracion = "";
+  
+    // Limpieza PDF raíz (compatibilidad)
+    patch.fichaPdfUrl = "";
+    patch.fichaPdfNombre = "";
+  
+    // =========================================================
+    // HISTORIAL PDF ANTERIOR (opcional pero recomendado)
+    // =========================================================
+    const fichaAnterior = state.group?.ficha || {};
+  
+    const pdfHistorialPrevio = Array.isArray(fichaAnterior.pdfHistorial)
+      ? fichaAnterior.pdfHistorial
+      : [];
+  
+    if (fichaAnterior.pdfUrl || fichaAnterior.pdfNombre) {
+      pdfHistorialPrevio.push({
+        pdfUrl: fichaAnterior.pdfUrl || "",
+        pdfNombre: fichaAnterior.pdfNombre || "",
+        version: fichaAnterior.version || "",
+        fechaArchivado: new Date().toISOString(),
+        motivo: "Reapertura por actualización/corrección"
+      });
     }
+  
+    // =========================================================
+    // Limpieza ficha activa
+    // =========================================================
+    patch.ficha = {
+      ...(fichaAnterior || {}),
+      estado: patch.fichaEstado,
+      flujoModo: "v2",
+      confirmada: false,
+      pdfPendienteGeneracion: true,
+  
+      // PDF ACTIVO
+      pdfUrl: "",
+      pdfNombre: "",
+  
+      // HISTORIAL
+      pdfHistorial: pdfHistorialPrevio
+    };
+  
+    // =========================================================
+    // Flujo firmas
+    // =========================================================
+    patch.flowFicha = {
+      ...(flow || {}),
+      modo: "v2",
+      legacy: false,
+      estado: patch.fichaEstado,
+  
+      requiereActualizacion: false,
+      requiereRefirmaAdministracion: false,
+  
+      // Muy importante:
+      cierrePdfRealizado: false,
+  
+      // Si hubo solicitud previa, ya no debe bloquear nuevo PDF
+      ultimaSolicitudActualizacion: {
+        ...(flow?.ultimaSolicitudActualizacion || {}),
+        estado: "reabierta"
+      }
+    };
+  
+    console.warn("[fichas] Reapertura completa: PDF anterior invalidado, listo para nueva versión.");
+  }
 
     await setDoc(doc(db, "ventas_cotizaciones", state.groupDocId), patch, { merge: true });
 
