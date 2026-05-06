@@ -1886,6 +1886,15 @@ function openRequestModal(mode = "actualizacion") {
   openModal("modalSolicitudFicha");
 }
 
+async function refreshFichaUiAfterFlowChange() {
+  await loadAll();
+
+  renderHero();
+  renderWorkflowPanel();
+  syncButtons();
+  syncAdminLimitedFichaFields();
+}
+
 async function signFlowFromFicha(step) {
   if (!state.group) return;
 
@@ -1967,8 +1976,11 @@ async function signFlowFromFicha(step) {
       cambios: [
         { campo: "fichaEstado", anterior: state.group.fichaEstado || "", nuevo: "lista_vendedor" }
       ],
+      reloadAfterSave: false,
       successMessage: "Firma de vendedor(a) registrada correctamente."
     });
+
+    await refreshFichaUiAfterFlowChange();
     return;
   }
 
@@ -2070,6 +2082,7 @@ async function signFlowFromFicha(step) {
         { campo: "fichaEstado", anterior: state.group.fichaEstado || "", nuevo: "revisada_jefa_ventas" },
         { campo: "firmaSupervision", anterior: state.group.firmaSupervision || "", nuevo: nombre }
       ],
+      reloadAfterSave: false,
       successMessage: hadPendingRequest
         ? "Solicitud revisada por jefa de ventas y enviada a Administración."
         : "Firma de jefa de ventas registrada correctamente."
@@ -2091,8 +2104,9 @@ async function signFlowFromFicha(step) {
       });
     }
   
-    await loadAll();
-    return;
+      await refreshFichaUiAfterFlowChange();
+      return;
+    }
   }
   
   if (step === "administracion") {
@@ -2240,7 +2254,7 @@ async function signFlowFromFicha(step) {
       });
     }
 
-    await loadAll();
+    await refreshFichaUiAfterFlowChange();
     return;
   }
 }
