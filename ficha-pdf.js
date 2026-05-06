@@ -629,14 +629,20 @@ function getExistingPdfUrl() {
 
 function getProgramaPdfUrl() {
   const programa = state.group?.programaGrupo || {};
+  const tipo = cleanText(programa.archivoTipo || "").toLowerCase();
 
-  // 1) Siempre priorizar el programa nuevo guardado en programaGrupo.
-  // Este es el dato oficial actual.
-  return cleanText(
-    programa.pdfUrl ||
-    programa.archivoUrl ||
-    ""
-  );
+  // Si el último archivo subido fue PDF, usar el archivo original actual.
+  if (tipo === "pdf" && programa.archivoUrl) {
+    return cleanText(programa.archivoUrl);
+  }
+
+  // Si el último archivo subido fue DOC/DOCX, usar SOLO el PDF convertido
+  // correspondiente a ese último archivo.
+  if ((tipo === "doc" || tipo === "docx") && programa.pdfUrl) {
+    return cleanText(programa.pdfUrl);
+  }
+
+  return "";
 }
 
 function getProgramaPdfNombre() {
