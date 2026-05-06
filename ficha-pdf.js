@@ -628,22 +628,24 @@ function getExistingPdfUrl() {
 }
 
 function getProgramaPdfUrl() {
+  const programa = state.group?.programaGrupo || {};
+
+  // 1) Siempre priorizar el programa nuevo guardado en programaGrupo.
+  // Este es el dato oficial actual.
   return cleanText(
-    getByPath(state.group, "programaGrupo.pdfUrl") ||
-    state.ficha?.programaPdfUrl ||
-    getByPath(state.group, "ficha.programaPdfUrl") ||
-    state.group?.programaPdfUrl ||
+    programa.pdfUrl ||
+    programa.archivoUrl ||
     ""
   );
 }
 
 function getProgramaPdfNombre() {
+  const programa = state.group?.programaGrupo || {};
+
   return cleanText(
-    getByPath(state.group, "programaGrupo.pdfNombre") ||
-    state.ficha?.programaPdfNombre ||
-    getByPath(state.group, "ficha.programaPdfNombre") ||
-    state.group?.programaPdfNombre ||
-    ""
+    programa.pdfNombre ||
+    programa.archivoNombre ||
+    "programa.pdf"
   );
 }
 
