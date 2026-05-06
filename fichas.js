@@ -1620,16 +1620,13 @@ function syncButtons() {
   if (btnGuardarBottom) btnGuardarBottom.disabled = !editable || state.isUploadingProgramaPdf;
   
   const btnAbrirPdf = $("btnAbrirPdfFicha");
-  if (btnAbrirPdf) btnAbrirPdf.disabled = !tienePdf;
-  
-  const btnVerPdf = $("btnVerFichaPdfHtml");
-  if (btnVerPdf) btnVerPdf.disabled = !canOpenFicha();
-  
-  const btnVerPdfBottom = $("btnVerFichaPdfHtmlBottom");
-  if (btnVerPdfBottom) btnVerPdfBottom.disabled = !canOpenFicha();
+  if (btnAbrirPdf) {
+    btnAbrirPdf.classList.toggle("hidden", !tienePdf);
+    btnAbrirPdf.disabled = !tienePdf;
+  }
   
   const canGeneratePdf = canGeneratePdfVersionAsCurrentUser();
-
+  
   const btnGenerarPdf = $("btnGenerarPdfVersion");
   if (btnGenerarPdf) {
     btnGenerarPdf.classList.toggle("hidden", !canGeneratePdf);
