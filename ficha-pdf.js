@@ -837,6 +837,15 @@ async function ensureProgramaPdfReady(groupRef) {
   const originalPath = getProgramaOriginalStoragePath();
   const originalNombre = getProgramaOriginalNombre();
 
+  const pdfDetectado = getProgramaPdfUrl();
+  
+  if (pdfDetectado) {
+    return {
+      pdfUrl: pdfDetectado,
+      pdfNombre: getProgramaPdfNombre()
+    };
+  }
+  
   if (!hasProgramaOriginalEditable()) {
     throw new Error("Falta subir el programa obligatorio para generar la ficha final.");
   }
