@@ -464,20 +464,14 @@ function syncPrintButton() {
 
   if (isPdfOfficiallyConfirmed()) {
     btn.disabled = !canFinalizeFichaAsCurrentUser();
-  
-    if (state.isClosingPdf) {
-      btn.textContent = "Generando nueva versión...";
-    } else {
-      btn.textContent = existingPdfUrl
-        ? "Abrir PDF real / Generar nueva versión"
-        : "Generar PDF real";
-    }
-  
+    btn.textContent = existingPdfUrl
+      ? "Abrir PDF real / Generar nueva versión"
+      : "Generar PDF real";
     return;
   }
 
-  // No lo dejamos deshabilitado por flujo,
-  // porque si falta algo queremos mostrar una explicación clara al hacer clic.
+  // No se deshabilita por falta de firma/programa/estado.
+  // Si falta algo, al hacer clic mostramos explicación con getFinalizeBlockedMessage().
   btn.disabled = !canFinalizeFichaAsCurrentUser();
   btn.textContent = "Confirmar y generar PDF real";
 }
