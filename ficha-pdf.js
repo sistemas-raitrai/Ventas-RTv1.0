@@ -651,19 +651,44 @@ function getExistingPdfUrl() {
 function getProgramaPdfUrl() {
   const programa = state.group?.programaGrupo || {};
   const tipo = cleanText(programa.archivoTipo || "").toLowerCase();
+  const archivoNombre = cleanText(programa.archivoNombre || "").toLowerCase();
+  const pdfNombre = cleanText(programa.pdfNombre || "").toLowerCase();
 
-  // Si el último archivo subido fue PDF, usar el archivo original actual.
-  if (tipo === "pdf" && programa.archivoUrl) {
+  // 1) Si el último archivo original es PDF, usarlo directo.
+  if (
+    (tipo === "pdf" || archivoNombre.endsWith(".pdf")) &&
+    programa.archivoUrl
+  ) {
     return cleanText(programa.archivoUrl);
   }
 
-  // Si el último archivo subido fue DOC/DOCX, usar SOLO el PDF convertido
-  // correspondiente a ese último archivo.
+  // 2) Si ya existe PDF guardado en programaGrupo, usarlo.
+  // Esto cubre programas antiguos o cargados directamente como PDF.
+  if (
+    programa.pdfUrl &&
+    (
+      tipo === "pdf" ||
+      tipo === "" ||
+      pdfNombre.endsWith(".pdf") ||
+      archivoNombre.endsWith(".pdf")
+    )
+  ) {
+    return cleanText(programa.pdfUrl);
+  }
+
+  // 3) Si el último archivo es DOC/DOCX, solo sirve el PDF convertido
+  // si corresponde al último original.
   if ((tipo === "doc" || tipo === "docx") && programa.pdfUrl) {
     return cleanText(programa.pdfUrl);
   }
 
-  return "";
+  // 4) Compatibilidad con espejos antiguos.
+  return cleanText(
+    state.ficha?.programaPdfUrl ||
+    getByPath(state.group, "ficha.programaPdfUrl") ||
+    state.group?.programaPdfUrl ||
+    ""
+  );
 }
 
 function getProgramaPdfNombre() {
