@@ -786,29 +786,55 @@ async function waitForProgramaPdfConversion({
 }
 
 async function ensureProgramaPdfReady(groupRef) {
-  const existingPdfUrl = getProgramaPdfUrl();
-
-  if (existingPdfUrl) {
-    return {
-      pdfUrl: existingPdfUrl,
-      pdfNombre: getProgramaPdfNombre()
-    };
-  }
+  const programa = state.group?.programaGrupo || {};
+  const tipo = cleanText(programa.archivoTipo || "").toLowerCase();
+  const originalPath = getProgramaOriginalStoragePath();
+  const originalNombre = getProgramaOriginalNombre();
 
   if (!hasProgramaOriginalEditable()) {
     throw new Error("Falta subir el programa obligatorio para generar la ficha final.");
   }
 
+  // Si el último archivo cargado es PDF, usar ese PDF directamente.
+  if (tipo === "pdf" && programa.archivoUrl) {
+    return {
+      pdfUrl: cleanText(programa.archivoUrl),
+      pdfNombre: cleanText(programa.archivoNombre || "programa.pdf")
+    };
+  }
+
+  // Si es DOC/DOCX, el PDF válido debe venir del archivo original ACTUAL.
   if (!isProgramaOriginalOffice()) {
     throw new Error("El programa subido no tiene PDF asociado y tampoco parece ser DOC/DOCX.");
   }
 
+  const expectedPdfPath = originalPath
+    .replace("programas-originales", "programas-pdf")
+    .replace(/\.(docx|doc)$/i, ".pdf");
+
+  const expectedPdfNombre = String(originalNombre || "programa.docx")
+    .replace(/\.(docx|doc)$/i, ".pdf");
+
+  // Solo aceptar pdfUrl existente si corresponde al último DOC/DOCX.
+  if (
+    programa.pdfUrl &&
+    programa.storagePath &&
+    programa.storagePath === expectedPdfPath
+  ) {
+    return {
+      pdfUrl: cleanText(programa.pdfUrl),
+      pdfNombre: cleanText(programa.pdfNombre || expectedPdfNombre)
+    };
+  }
+
+  // Si no coincide, convertir/buscar el PDF del DOCX actual.
   const convertido = await waitForProgramaPdfConversion();
 
   await updateDoc(groupRef, {
     "programaGrupo.pdfUrl": convertido.pdfUrl,
     "programaGrupo.pdfNombre": convertido.pdfNombre,
     "programaGrupo.storagePath": convertido.pdfStoragePath,
+    "programaGrupo.pdfOriginalPath": originalPath,
 
     "ficha.programaPdfUrl": convertido.pdfUrl,
     "ficha.programaPdfNombre": convertido.pdfNombre,
@@ -825,7 +851,8 @@ async function ensureProgramaPdfReady(groupRef) {
     ...(state.group.programaGrupo || {}),
     pdfUrl: convertido.pdfUrl,
     pdfNombre: convertido.pdfNombre,
-    storagePath: convertido.pdfStoragePath
+    storagePath: convertido.pdfStoragePath,
+    pdfOriginalPath: originalPath
   };
 
   state.ficha = {
