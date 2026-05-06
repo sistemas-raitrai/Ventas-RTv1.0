@@ -837,32 +837,55 @@ async function ensureProgramaPdfReady(groupRef) {
   const originalPath = getProgramaOriginalStoragePath();
   const originalNombre = getProgramaOriginalNombre();
 
-  const pdfDetectado = getProgramaPdfUrl();
-  
+  const pdfDetectado = cleanText(
+    getProgramaPdfUrl() ||
+    state.ficha?.programaPdfUrl ||
+    getByPath(state.group, "ficha.programaPdfUrl") ||
+    state.group?.programaPdfUrl ||
+    ""
+  );
+
+  console.log("[ficha-pdf] ensureProgramaPdfReady", {
+    tipo,
+    archivoUrl: programa.archivoUrl || "",
+    archivoNombre: programa.archivoNombre || "",
+    pdfUrl: programa.pdfUrl || "",
+    pdfNombre: programa.pdfNombre || "",
+    originalPath,
+    originalNombre,
+    pdfDetectado
+  });
+
+  // Caso 1: ya hay PDF disponible. Se usa directo.
   if (pdfDetectado) {
     return {
       pdfUrl: pdfDetectado,
       pdfNombre: getProgramaPdfNombre()
     };
   }
-  
-  if (!hasProgramaOriginalEditable()) {
-    throw new Error("Falta subir el programa obligatorio para generar la ficha final.");
-  }
 
-  // Si el último archivo cargado es PDF, usar ese PDF directamente.
-  if (tipo === "pdf" && programa.archivoUrl) {
+  // Caso 2: el archivo original actual es PDF. Se usa directo.
+  if (
+    (tipo === "pdf" || cleanText(programa.archivoNombre || "").toLowerCase().endsWith(".pdf")) &&
+    programa.archivoUrl
+  ) {
     return {
       pdfUrl: cleanText(programa.archivoUrl),
       pdfNombre: cleanText(programa.archivoNombre || "programa.pdf")
     };
   }
 
-  // Si es DOC/DOCX, el PDF válido debe venir del archivo original ACTUAL.
+  // Caso 3: no hay PDF ni archivo original.
+  if (!programa.archivoUrl && !originalPath) {
+    throw new Error("Falta subir el programa obligatorio para generar la ficha final.");
+  }
+
+  // Caso 4: si no es DOC/DOCX, no podemos convertir.
   if (!isProgramaOriginalOffice()) {
     throw new Error("El programa subido no tiene PDF asociado y tampoco parece ser DOC/DOCX.");
   }
 
+  // Caso 5: DOC/DOCX actual: buscar/esperar conversión.
   const expectedPdfPath = originalPath
     .replace("programas-originales", "programas-pdf")
     .replace(/\.(docx|doc)$/i, ".pdf");
@@ -870,7 +893,6 @@ async function ensureProgramaPdfReady(groupRef) {
   const expectedPdfNombre = String(originalNombre || "programa.docx")
     .replace(/\.(docx|doc)$/i, ".pdf");
 
-  // Solo aceptar pdfUrl existente si corresponde al último DOC/DOCX.
   if (
     programa.pdfUrl &&
     programa.storagePath &&
@@ -882,7 +904,6 @@ async function ensureProgramaPdfReady(groupRef) {
     };
   }
 
-  // Si no coincide, convertir/buscar el PDF del DOCX actual.
   const convertido = await waitForProgramaPdfConversion();
 
   await updateDoc(groupRef, {
@@ -901,21 +922,6 @@ async function ensureProgramaPdfReady(groupRef) {
 
     fechaActualizacionFicha: serverTimestamp()
   });
-
-  state.group.programaGrupo = {
-    ...(state.group.programaGrupo || {}),
-    pdfUrl: convertido.pdfUrl,
-    pdfNombre: convertido.pdfNombre,
-    storagePath: convertido.pdfStoragePath,
-    pdfOriginalPath: originalPath
-  };
-
-  state.ficha = {
-    ...(state.ficha || {}),
-    programaPdfUrl: convertido.pdfUrl,
-    programaPdfNombre: convertido.pdfNombre,
-    programaPdfStoragePath: convertido.pdfStoragePath
-  };
 
   return {
     pdfUrl: convertido.pdfUrl,
