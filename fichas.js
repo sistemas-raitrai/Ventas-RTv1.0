@@ -977,10 +977,17 @@ async function saveProgramaGrupo() {
   }
 
   const programaAnterior = state.group?.programaGrupo || {};
-  const anteriorNombre = getProgramaPdfNombre();
-  const anteriorUrl = getProgramaPdfUrl();
-
+  
+  // PDF anterior, si existía
+  const anteriorPdfNombre = getProgramaPdfNombre();
+  const anteriorPdfUrl = getProgramaPdfUrl();
+  
+  // Archivo original anterior, sea PDF, DOC o DOCX
+  const anteriorOriginalNombre = getProgramaOriginalNombre();
   const anteriorOriginalUrl = getProgramaOriginalUrl();
+  
+  const anteriorNombre = anteriorOriginalNombre || anteriorPdfNombre || "";
+  const anteriorUrl = anteriorOriginalUrl || anteriorPdfUrl || "";
   
   if (!file && !anteriorOriginalUrl) {
     showToast("Debes seleccionar un archivo PDF, DOC o DOCX para guardar el programa.", "warning");
@@ -997,15 +1004,15 @@ async function saveProgramaGrupo() {
   const displayName = getDisplayName(state.effectiveUser);
   const flow = state.group?.flowFicha || {};
   const esReemplazo = !!file && !!anteriorUrl;
-
-  let archivoUrl = programaAnterior.archivoUrl || anteriorUrl || "";
-  let archivoStoragePath = programaAnterior.archivoStoragePath || programaAnterior.storagePath || "";
-  let archivoNombre = programaAnterior.archivoNombre || anteriorNombre || "";
-  let archivoTipo = programaAnterior.archivoTipo || "pdf";
   
-  let downloadUrl = anteriorUrl || "";
+  let archivoUrl = programaAnterior.archivoUrl || anteriorOriginalUrl || "";
+  let archivoStoragePath = programaAnterior.archivoStoragePath || "";
+  let archivoNombre = programaAnterior.archivoNombre || anteriorOriginalNombre || "";
+  let archivoTipo = programaAnterior.archivoTipo || "";
+  
+  let downloadUrl = anteriorPdfUrl || "";
   let storagePath = programaAnterior.storagePath || "";
-  let pdfNombre = anteriorNombre || "";
+  let pdfNombre = anteriorPdfNombre || "";
 
   /*
     ESPEJO FICHA -> GRUPO
