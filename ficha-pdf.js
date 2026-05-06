@@ -342,11 +342,21 @@ async function handlePrintButtonClick() {
   if (isVendorPdfReadOnlyView()) {
     return;
   }
-
+  
   const alreadyConfirmed = isPdfOfficiallyConfirmed();
   const existingPdfUrl = getExistingPdfUrl();
-
-  if (alreadyConfirmed && existingPdfUrl) {
+  const needsNewGeneration = hasPreviousPdfButNeedsNewGeneration();
+  
+  console.log("[ficha-pdf] Estado generación PDF", {
+    alreadyConfirmed,
+    existingPdfUrl,
+    needsNewGeneration,
+    fichaEstado: state.group?.fichaEstado,
+    fichaFlujoAbierto: state.group?.fichaFlujoAbierto,
+    pdfPendienteGeneracion: getByPath(state.group, "ficha.pdfPendienteGeneracion")
+  });
+  
+  if (alreadyConfirmed && existingPdfUrl && !needsNewGeneration) {
     const wantsOpenExisting = window.confirm(
       "Esta ficha ya tiene un PDF real generado.\n\nAceptar = abrir el PDF actual.\nCancelar = continuar para generar una nueva versión."
     );
@@ -508,10 +518,30 @@ function isPdfOfficiallyConfirmed() {
   const fichaEstado = normalizeSearchLocal(state.group?.fichaEstado || "");
   const ficha = getByPath(state.group, "ficha") || {};
 
+  const pdfPendienteGeneracion = ficha.pdfPendienteGeneracion === true;
+  const flujoAbierto = state.group?.fichaFlujoAbierto === true;
+
+  // Si la ficha fue reabierta o quedó pendiente de nueva generación,
+  // NO debe tratarse como PDF confirmado, aunque exista un PDF anterior.
+  if (pdfPendienteGeneracion || flujoAbierto) {
+    console.log("[ficha-pdf] PDF anterior detectado, pero ficha reabierta o pendiente de nueva generación.");
+    return false;
+  }
+
   return (
     fichaEstado === "confirmada_pdf" ||
     fichaEstado === "pdf_confirmado" ||
     ficha.confirmada === true
+  );
+}
+
+function hasPreviousPdfButNeedsNewGeneration() {
+  const ficha = getByPath(state.group, "ficha") || {};
+  const existingPdfUrl = getExistingPdfUrl();
+
+  return !!existingPdfUrl && (
+    ficha.pdfPendienteGeneracion === true ||
+    state.group?.fichaFlujoAbierto === true
   );
 }
 
