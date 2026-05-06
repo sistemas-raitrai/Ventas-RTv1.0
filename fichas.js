@@ -2104,9 +2104,8 @@ async function signFlowFromFicha(step) {
       });
     }
   
-      await refreshFichaUiAfterFlowChange();
-      return;
-    }
+    await refreshFichaUiAfterFlowChange();
+    return;
   }
   
   if (step === "administracion") {
