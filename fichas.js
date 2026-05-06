@@ -507,12 +507,10 @@ function isStrictAdministracionUser() {
 }
 
 function isAdministracionLimitedAfterVendorSign() {
-  const flow = state.group?.flowFicha || {};
-
-  return (
-    isStrictAdministracionUser() &&
-    !!flow?.vendedor?.firmado
-  );
+  // Administración operativa SIEMPRE queda limitada
+  // a N° negocio, usuario y clave administrativa.
+  // No depende de si ya firmó vendedor.
+  return isStrictAdministracionUser();
 }
 
 const ADMIN_LIMITED_FICHA_FIELDS = new Set([
