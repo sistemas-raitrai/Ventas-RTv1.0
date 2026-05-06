@@ -1157,17 +1157,39 @@ async function saveProgramaGrupo() {
     const yaFirmoAdmin = !!flow?.administracion?.firmado;
     const estabaAutorizada = !!state.group?.autorizada;
 
+    const adminReal = isRealAdminRole();
+    
     const debeReabrirPorJefa =
       esReemplazo &&
+      !adminReal &&
       isJefaVentas() &&
       yaFirmoVendedor &&
       (yaFirmoJefa || yaFirmoAdmin || estabaAutorizada);
-
+    
     const debeReabrirPorAdmin =
       esReemplazo &&
+      !adminReal &&
       canActAsFichaAdministracion() &&
       yaFirmoVendedor &&
       (yaFirmoJefa || yaFirmoAdmin || estabaAutorizada);
+
+    if (esReemplazo && adminReal) {
+      patch.autorizada = false;
+      patch.fichaFlujoAbierto = false;
+      patch.fichaEstado = "autorizada_admin";
+    
+      patch.fichaPdfUrl = "";
+      patch.fichaPdfNombre = "";
+    
+      setNestedValue(patch, "ficha.pdfUrl", "");
+      setNestedValue(patch, "ficha.pdfNombre", "");
+      setNestedValue(patch, "ficha.confirmada", false);
+      setNestedValue(patch, "ficha.pdfPendienteGeneracion", true);
+      setNestedValue(patch, "ficha.estado", "autorizada_admin");
+    
+      setNestedValue(patch, "flowFicha.estado", "autorizada_admin");
+      setNestedValue(patch, "flowFicha.cierrePdfRealizado", false);
+    }
 
     if (debeReabrirPorJefa || debeReabrirPorAdmin) {
     patch.autorizada = false;
