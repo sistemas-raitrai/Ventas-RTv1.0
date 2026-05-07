@@ -1627,16 +1627,28 @@ function syncButtons() {
   
   const canGeneratePdf = canGeneratePdfVersionAsCurrentUser();
   
+  const listoParaGenerarPdf =
+    canGeneratePdf &&
+    canOpenFicha() &&
+    normalizeSearchLocal(state.group?.fichaEstado || "") === "autorizada_admin" &&
+    state.group?.flowFicha?.administracion?.firmado === true;
+  
   const btnGenerarPdf = $("btnGenerarPdfVersion");
   if (btnGenerarPdf) {
     btnGenerarPdf.classList.toggle("hidden", !canGeneratePdf);
     btnGenerarPdf.disabled = !canGeneratePdf || !canOpenFicha();
+  
+    btnGenerarPdf.classList.toggle("btn-light", listoParaGenerarPdf);
+    btnGenerarPdf.classList.toggle("btn-pill", !listoParaGenerarPdf);
   }
   
   const btnGenerarPdfBottom = $("btnGenerarPdfVersionBottom");
   if (btnGenerarPdfBottom) {
     btnGenerarPdfBottom.classList.toggle("hidden", !canGeneratePdf);
     btnGenerarPdfBottom.disabled = !canGeneratePdf || !canOpenFicha();
+  
+    btnGenerarPdfBottom.classList.toggle("btn-light", listoParaGenerarPdf);
+    btnGenerarPdfBottom.classList.toggle("btn-pill", !listoParaGenerarPdf);
   }
   
   document.querySelectorAll("#formFicha input, #formFicha select, #formFicha textarea").forEach((el) => {
