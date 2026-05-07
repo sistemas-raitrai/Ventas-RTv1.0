@@ -953,11 +953,30 @@ async function ensureProgramaPdfReady(groupRef) {
   };
 }
 
-async function fetchPdfBytesFromUrl(url = "") {
-  const response = await fetch(url);
+async function fetchPdfBytesFromUrl(url = "", storagePath = "") {
+  let finalUrl = cleanText(url || "");
+
+  if (storagePath) {
+    const storage = getStorage();
+    finalUrl = await getDownloadURL(ref(storage, storagePath));
+  }
+
+  console.log("[ficha-pdf] fetchPdfBytesFromUrl", {
+    urlOriginal: url,
+    storagePath,
+    finalUrl
+  });
+
+  if (!finalUrl) {
+    throw new Error("No hay URL válida para descargar el Programa PDF.");
+  }
+
+  const response = await fetch(finalUrl);
+
   if (!response.ok) {
     throw new Error(`No se pudo descargar el Programa PDF (${response.status}).`);
   }
+
   return new Uint8Array(await response.arrayBuffer());
 }
 
@@ -972,7 +991,14 @@ async function mergeFichaAndProgramaPdf(fichaBlob, programaPdfUrl) {
   fichaPages.forEach((page) => mergedPdf.addPage(page));
 
   // ===== PROGRAMA =====
-  const programaBytes = await fetchPdfBytesFromUrl(programaPdfUrl);
+  const programaBytes = await fetchPdfBytesFromUrl(
+    programaPdfUrl,
+    getByPath(state.group, "programaGrupo.storagePath") ||
+    getByPath(state.group, "programaGrupo.pdfStoragePath") ||
+    getByPath(state.group, "ficha.programaPdfStoragePath") ||
+    state.group?.programaPdfStoragePath ||
+    ""
+  );
   const programaPdf = await PDFDocument.load(programaBytes);
 
   let programaIndices = programaPdf.getPageIndices();
