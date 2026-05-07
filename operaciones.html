@@ -1,0 +1,456 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Operaciones | Sistema Ventas RT</title>
+
+  <link rel="stylesheet" href="estilos.css" />
+  <link rel="icon" type="image/png" href="IMG/logo-raitrai.png" />
+
+  <style>
+    body[data-page="operaciones"]{ background:#f5f3f8; }
+
+    .ops-main{
+      width:min(1280px, calc(100% - 32px));
+      margin:28px auto 42px;
+    }
+
+    .ops-shell{
+      background:rgba(255,255,255,.9);
+      border:1px solid rgba(49,25,75,.10);
+      border-radius:28px;
+      box-shadow:0 18px 50px rgba(35,18,56,.10);
+      padding:24px;
+    }
+
+    .ops-top{
+      display:flex;
+      justify-content:space-between;
+      align-items:flex-start;
+      gap:18px;
+      flex-wrap:wrap;
+      margin-bottom:22px;
+    }
+
+    .ops-title{
+      margin:0;
+      color:#26133d;
+      font-size:28px;
+      font-weight:900;
+    }
+
+    .ops-subtitle{
+      margin:6px 0 0;
+      color:#766b84;
+      font-size:14px;
+    }
+
+    .ops-toolbar{
+      display:grid;
+      grid-template-columns:160px 180px 1fr auto auto;
+      gap:10px;
+      align-items:end;
+      margin-bottom:18px;
+    }
+
+    .ops-field{
+      display:flex;
+      flex-direction:column;
+      gap:6px;
+    }
+
+    .ops-field label{
+      font-size:13px;
+      font-weight:900;
+      color:#32184f;
+    }
+
+    .ops-field input,
+    .ops-field select{
+      height:42px;
+      border:1px solid rgba(49,25,75,.16);
+      border-radius:999px;
+      padding:0 14px;
+      font:inherit;
+      color:#26133d;
+      background:#fff;
+      outline:none;
+    }
+
+    .ops-btn{
+      height:42px;
+      border:none;
+      border-radius:999px;
+      background:#32184f;
+      color:#fff;
+      padding:0 18px;
+      font-weight:900;
+      cursor:pointer;
+      white-space:nowrap;
+    }
+
+    .ops-btn.sec{ background:#6f5f82; }
+
+    .ops-summary{
+      display:grid;
+      grid-template-columns:repeat(6, minmax(0, 1fr));
+      gap:12px;
+      margin-bottom:18px;
+    }
+
+    .ops-card{
+      border:none;
+      border-radius:20px;
+      padding:16px;
+      background:#faf8fd;
+      color:#26133d;
+      text-align:left;
+      cursor:pointer;
+      box-shadow:0 8px 18px rgba(35,18,56,.05);
+    }
+
+    .ops-card span{
+      display:block;
+      font-size:12px;
+      font-weight:900;
+      text-transform:uppercase;
+      letter-spacing:.3px;
+      color:#6f5f82;
+    }
+
+    .ops-card strong{
+      display:block;
+      margin-top:6px;
+      font-size:30px;
+      font-weight:900;
+      line-height:1;
+    }
+
+    .ops-card.dark{
+      background:#32184f;
+      color:#fff;
+    }
+
+    .ops-card.dark span{ color:rgba(255,255,255,.78); }
+
+    .ops-table-card{
+      background:#fff;
+      border:1px solid rgba(49,25,75,.10);
+      border-radius:22px;
+      overflow:hidden;
+    }
+
+    .ops-table-wrap{
+      width:100%;
+      overflow:auto;
+    }
+
+    .ops-table{
+      width:max-content;
+      min-width:100%;
+      border-collapse:collapse;
+    }
+
+    .ops-table th{
+      position:sticky;
+      top:0;
+      background:#32184f;
+      color:#fff;
+      padding:12px 10px;
+      text-align:left;
+      font-size:12px;
+      text-transform:uppercase;
+      white-space:nowrap;
+      z-index:1;
+    }
+
+    .ops-table td{
+      padding:12px 10px;
+      border-bottom:1px solid #ece8f1;
+      color:#34283f;
+      font-size:14px;
+      vertical-align:middle;
+      white-space:nowrap;
+      background:#fff;
+    }
+
+    .ops-table tr:hover td{ background:#faf8fd; }
+
+    .ops-group-title{
+      font-weight:900;
+      color:#26133d;
+      max-width:340px;
+      overflow:hidden;
+      text-overflow:ellipsis;
+    }
+
+    .ops-group-sub{
+      margin-top:4px;
+      color:#766b84;
+      font-size:12px;
+    }
+
+    .ops-pill{
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      min-height:28px;
+      padding:0 10px;
+      border-radius:999px;
+      font-size:12px;
+      font-weight:900;
+      text-decoration:none;
+      border:1px solid transparent;
+    }
+
+    .ops-ok{
+      background:#dcfce7;
+      color:#166534;
+    }
+
+    .ops-warn{
+      background:#fef3c7;
+      color:#a16207;
+    }
+
+    .ops-muted{
+      background:#e5e7eb;
+      color:#475569;
+    }
+
+    .ops-docs{
+      display:flex;
+      gap:8px;
+      align-items:center;
+      flex-wrap:wrap;
+      min-width:260px;
+    }
+
+    .ops-doc{
+      width:36px;
+      height:36px;
+      border-radius:12px;
+      display:grid;
+      place-items:center;
+      font-size:16px;
+      text-decoration:none;
+      font-weight:900;
+    }
+
+    .ops-empty{
+      padding:26px !important;
+      text-align:center;
+      color:#766b84;
+      font-weight:900;
+    }
+
+    .ops-modal{
+      width:min(920px, calc(100vw - 32px));
+      border:none;
+      border-radius:24px;
+      padding:0;
+      box-shadow:0 24px 64px rgba(24,16,36,.28);
+    }
+
+    .ops-modal::backdrop{
+      background:rgba(22,10,34,.42);
+      backdrop-filter:blur(4px);
+    }
+
+    .ops-modal-head{
+      padding:20px 22px 16px;
+      border-bottom:1px solid rgba(60,40,90,.10);
+      display:flex;
+      justify-content:space-between;
+      gap:16px;
+    }
+
+    .ops-modal-head h3{
+      margin:0;
+      color:#26133d;
+      font-size:22px;
+    }
+
+    .ops-modal-head p{
+      margin:6px 0 0;
+      color:#766b84;
+      font-size:14px;
+    }
+
+    .ops-modal-body{
+      padding:18px 22px 22px;
+    }
+
+    .ops-modal-close{
+      border:none;
+      background:#ebe5f4;
+      color:#351a55;
+      border-radius:999px;
+      padding:10px 14px;
+      cursor:pointer;
+      font-weight:900;
+    }
+
+    .ops-list{
+      display:grid;
+      gap:12px;
+    }
+
+    .ops-list-row{
+      padding:14px 16px;
+      border:1px solid rgba(60,40,90,.10);
+      border-radius:18px;
+      background:#fff;
+      display:flex;
+      justify-content:space-between;
+      gap:14px;
+      align-items:flex-start;
+    }
+
+    .ops-list-title{
+      font-weight:900;
+      color:#26133d;
+      font-size:16px;
+    }
+
+    .ops-list-text{
+      margin-top:6px;
+      color:#766b84;
+      font-size:13px;
+      line-height:1.45;
+    }
+
+    @media(max-width:1000px){
+      .ops-toolbar{ grid-template-columns:1fr 1fr; }
+      .ops-summary{ grid-template-columns:repeat(2, minmax(0,1fr)); }
+    }
+
+    @media(max-width:640px){
+      .ops-toolbar,
+      .ops-summary{ grid-template-columns:1fr; }
+    }
+  </style>
+</head>
+
+<body class="ventas-body" data-page="operaciones">
+  <div id="layout-top"></div>
+
+  <main class="ops-main">
+    <section class="ops-shell">
+      <div class="ops-top">
+        <div>
+          <h1 class="ops-title">Operaciones</h1>
+          <p class="ops-subtitle">Grupos ganados, fichas, programas y pendientes operativos.</p>
+        </div>
+      </div>
+
+      <div class="ops-toolbar">
+        <div class="ops-field">
+          <label for="filtroAnoOps">Año viaje</label>
+          <select id="filtroAnoOps"></select>
+        </div>
+
+        <div class="ops-field">
+          <label for="filtroDocOps">Documentos</label>
+          <select id="filtroDocOps">
+            <option value="todos">Todos</option>
+            <option value="programa_pendiente">Programa pendiente</option>
+            <option value="ficha_pendiente">Ficha PDF pendiente</option>
+            <option value="todo_ok">Programa + ficha OK</option>
+          </select>
+        </div>
+
+        <div class="ops-field">
+          <label for="buscadorOps">Buscar</label>
+          <input id="buscadorOps" type="text" placeholder="Buscar grupo, colegio, vendedor, negocio, programa..." />
+        </div>
+
+        <button id="btnExportarOps" class="ops-btn sec" type="button">Exportar XLSX</button>
+        <button id="btnRecargarOps" class="ops-btn" type="button">Recargar</button>
+      </div>
+
+      <section class="ops-summary">
+        <button class="ops-card" type="button" data-modal="ganadas">
+          <span>Ganadas año</span>
+          <strong id="opsCountGanadas">0</strong>
+        </button>
+
+        <button class="ops-card" type="button" data-modal="firmar">
+          <span>Fichas por firmar</span>
+          <strong id="opsCountFirmar">0</strong>
+        </button>
+
+        <button class="ops-card" type="button" data-modal="actualizacion">
+          <span>Actualización</span>
+          <strong id="opsCountActualizacion">0</strong>
+        </button>
+
+        <button class="ops-card" type="button" data-modal="correccion">
+          <span>Corrección</span>
+          <strong id="opsCountCorreccion">0</strong>
+        </button>
+
+        <button class="ops-card" type="button" data-modal="programa">
+          <span>Programa pendiente</span>
+          <strong id="opsCountProgramaPendiente">0</strong>
+        </button>
+
+        <button class="ops-card dark" type="button" data-modal="autorizadas">
+          <span>Autorizadas</span>
+          <strong id="opsCountAutorizadas">0</strong>
+        </button>
+      </section>
+
+      <section class="ops-table-card">
+        <div class="ops-table-wrap">
+          <table class="ops-table">
+            <thead>
+              <tr>
+                <th>Grupo</th>
+                <th>Vendedor(a)</th>
+                <th>Destino</th>
+                <th>Año</th>
+                <th>Ficha</th>
+                <th>Estado operativo</th>
+                <th>Documentos / accesos</th>
+                <th>Acciones</th>
+              </tr>
+            </thead>
+            <tbody id="tbodyOperaciones">
+              <tr>
+                <td colspan="8" class="ops-empty">Cargando grupos...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </section>
+
+    <dialog id="modalOps" class="ops-modal">
+      <div class="ops-modal-head">
+        <div>
+          <h3 id="modalOpsTitulo">Listado</h3>
+          <p id="modalOpsSubtitulo">Detalle de grupos.</p>
+        </div>
+        <button id="btnCerrarModalOps" class="ops-modal-close" type="button">Cerrar</button>
+      </div>
+
+      <div class="ops-modal-body">
+        <input
+          id="modalOpsBuscador"
+          class="ops-field-input"
+          type="text"
+          placeholder="Buscar dentro del listado..."
+          style="width:100%;height:42px;border:1px solid rgba(49,25,75,.14);border-radius:999px;padding:0 14px;margin-bottom:14px;"
+        />
+        <div id="modalOpsContenido" class="ops-list"></div>
+      </div>
+    </dialog>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+  <script type="module" src="layout.js"></script>
+  <script type="module" src="operaciones.js"></script>
+</body>
+</html>
