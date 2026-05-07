@@ -147,11 +147,11 @@
     }
 
     .ops-table{
-      width:max-content;
-      min-width:100%;
+      width:100%;
+      min-width:1180px;
       border-collapse:collapse;
     }
-
+    
     .ops-table th{
       position:sticky;
       top:0;
@@ -319,6 +319,62 @@
       color:#766b84;
       font-size:13px;
       line-height:1.45;
+    }
+
+    /* AJUSTE RESPONSIVE TABLA OPERACIONES */
+    .ops-table-card{
+      max-width:100%;
+    }
+    
+    .ops-table-wrap{
+      max-width:100%;
+      overflow-x:auto;
+      overflow-y:auto;
+      scrollbar-gutter:stable;
+      border-radius:22px;
+    }
+    
+    .ops-table-wrap::-webkit-scrollbar{
+      height:14px;
+    }
+    
+    .ops-table-wrap::-webkit-scrollbar-track{
+      background:#eee8f4;
+      border-radius:999px;
+    }
+    
+    .ops-table-wrap::-webkit-scrollbar-thumb{
+      background:#6f5f82;
+      border-radius:999px;
+    }
+    
+    .ops-table{
+      min-width:1180px;
+      width:100%;
+    }
+    
+    .ops-table th,
+    .ops-table td{
+      white-space:nowrap;
+    }
+    
+    .ops-table td:first-child,
+    .ops-table th:first-child{
+      position:sticky;
+      left:0;
+      z-index:2;
+    }
+    
+    .ops-table th:first-child{
+      z-index:3;
+    }
+    
+    .ops-table td:first-child{
+      background:#fff;
+    }
+    
+    .ops-table tr:hover td:first-child{
+      background:#faf8fd;
     }
 
     @media(max-width:1000px){
