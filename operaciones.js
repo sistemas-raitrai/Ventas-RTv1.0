@@ -149,6 +149,8 @@ function bindEvents() {
   $("modalOps")?.addEventListener("click", (e) => {
     if (e.target === $("modalOps")) closeDialog($("modalOps"));
   });
+
+  bindTableScrollSync();
 }
 
 async function loadOperaciones() {
@@ -331,10 +333,13 @@ function renderTable(rows = []) {
 
   if (!rows.length) {
     renderEmpty("No hay grupos para los filtros seleccionados.");
+    syncTableScrollWidth();
     return;
   }
 
   tbody.innerHTML = rows.map(renderRow).join("");
+
+  syncTableScrollWidth();
 }
 
 function renderRow(row) {
@@ -795,4 +800,38 @@ function escapeHtml(value = "") {
 
 function escapeAttr(value = "") {
   return escapeHtml(value);
+}
+
+function bindTableScrollSync() {
+  const top = $("opsScrollTop");
+  const wrap = $("opsTableWrap");
+  const inner = $("opsScrollTopInner");
+
+  if (!top || !wrap || !inner) return;
+  if (top.dataset.bound === "1") return;
+
+  top.dataset.bound = "1";
+
+  top.addEventListener("scroll", () => {
+    wrap.scrollLeft = top.scrollLeft;
+  });
+
+  wrap.addEventListener("scroll", () => {
+    top.scrollLeft = wrap.scrollLeft;
+  });
+
+  window.addEventListener("resize", syncTableScrollWidth);
+
+  setTimeout(syncTableScrollWidth, 300);
+}
+
+function syncTableScrollWidth() {
+  const wrap = $("opsTableWrap");
+  const inner = $("opsScrollTopInner");
+
+  if (!wrap || !inner) return;
+
+  requestAnimationFrame(() => {
+    inner.style.width = `${wrap.scrollWidth}px`;
+  });
 }
