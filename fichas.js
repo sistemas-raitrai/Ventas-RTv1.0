@@ -1666,7 +1666,7 @@ function syncButtons() {
 
   const btnVend = $("btnFirmarFichaVendedor");
   if (btnVend) {
-    btnVend.classList.toggle("hidden", !isVendorRole());
+    btnVend.classList.toggle("hidden", !isVendorRole() && !isRealAdminRole());
     btnVend.disabled =
       !isVendorRole() ||
       !editable ||
