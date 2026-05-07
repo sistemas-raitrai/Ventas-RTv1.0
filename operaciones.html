@@ -377,6 +377,41 @@
       background:#faf8fd;
     }
 
+    /* Scroll horizontal arriba + abajo */
+    .ops-table-card{
+      position:relative;
+    }
+    
+    .ops-scroll-top{
+      overflow-x:auto;
+      overflow-y:hidden;
+      height:18px;
+      margin:0 0 8px;
+      border-radius:999px;
+    }
+    
+    .ops-scroll-top-inner{
+      height:1px;
+      min-width:1180px;
+    }
+    
+    .ops-scroll-top::-webkit-scrollbar,
+    .ops-table-wrap::-webkit-scrollbar{
+      height:14px;
+    }
+    
+    .ops-scroll-top::-webkit-scrollbar-track,
+    .ops-table-wrap::-webkit-scrollbar-track{
+      background:#eee8f4;
+      border-radius:999px;
+    }
+    
+    .ops-scroll-top::-webkit-scrollbar-thumb,
+    .ops-table-wrap::-webkit-scrollbar-thumb{
+      background:#6f5f82;
+      border-radius:999px;
+    }
+
     @media(max-width:1000px){
       .ops-toolbar{ grid-template-columns:1fr 1fr; }
       .ops-summary{ grid-template-columns:repeat(2, minmax(0,1fr)); }
@@ -459,7 +494,11 @@
       </section>
 
       <section class="ops-table-card">
-        <div class="ops-table-wrap">
+        <div class="ops-scroll-top" id="opsScrollTop">
+          <div class="ops-scroll-top-inner" id="opsScrollTopInner"></div>
+        </div>
+      
+        <div class="ops-table-wrap" id="opsTableWrap">
           <table class="ops-table">
             <thead>
               <tr>
