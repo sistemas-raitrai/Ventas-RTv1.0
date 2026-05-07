@@ -1663,17 +1663,23 @@ function syncButtons() {
   document.querySelectorAll(".rich-btn, .rich-color").forEach((el) => {
     el.disabled = !editable || state.isUploadingProgramaPdf;
   });
-
+  
   const btnVend = $("btnFirmarFichaVendedor");
   if (btnVend) {
-    btnVend.classList.toggle("hidden", !isVendorRole() && !isRealAdminRole());
+    const puedeFirmarComoVendedor = isVendorRole() || isRealAdminRole();
+  
+    btnVend.classList.toggle("hidden", !puedeFirmarComoVendedor);
     btnVend.disabled =
-      !isVendorRole() ||
+      !puedeFirmarComoVendedor ||
       !editable ||
       !isGanada ||
       !tienePrograma ||
       !!flow?.vendedor?.firmado ||
       state.isUploadingProgramaPdf;
+  
+    btnVend.textContent = isRealAdminRole()
+      ? "Firmar vendedor(a) como admin"
+      : "Firmar vendedor(a)";
   }
 
   const btnJefa = $("btnFirmarFichaJefa");
