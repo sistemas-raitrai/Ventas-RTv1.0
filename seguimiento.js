@@ -56,8 +56,8 @@ const state = {
   // Perdidas oculto por defecto
   hiddenSummaryStates: new Set(["perdida"]),
 
-  // Orden default pedido: por vendedor
-  sortKey: "vendedora",
+  // Orden default: por grupo/colegio A → Z
+  sortKey: "grupo",
   sortDir: "asc"
 };
 
