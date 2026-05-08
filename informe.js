@@ -1756,27 +1756,132 @@ function formatPct(value = 0) {
   return `${sign}${Math.round(value)}%`;
 }
 
-function buildStageVsRows(currentKpis, previousKpis) {
+function getMonthStartDate(year, monthNumber) {
+  return new Date(Number(year), Number(monthNumber) - 1, 1, 0, 0, 0, 0);
+}
+
+function dateInRange(date, startDate, endDate) {
+  if (!date || !startDate || !endDate) return false;
+  return date >= startDate && date <= endDate;
+}
+
+function buildVsMonthlyMovement({ rows = [], anoViaje, startDate, endDate, vendorName = "" } = {}) {
+  const targetRows = rows.filter((row) => {
+    const rowYear = getAnoViajeNumber(row);
+    if (rowYear !== Number(anoViaje)) return false;
+
+    if (vendorName && normalizeText(row.vendedora) !== normalizeText(vendorName)) return false;
+
+    return true;
+  });
+
+  const targetIds = new Set(targetRows.map((row) => getRowId(row)).filter(Boolean));
+
+  const ingresos = targetRows.filter((row) => {
+    const rowDate = extractRowDate(row);
+    return dateInRange(rowDate, startDate, endDate);
+  });
+
+  const counters = {
+    ingresos: ingresos.length,
+    aContactar: 0,
+    contactado: 0,
+    cotizando: 0,
+    reunion: 0,
+    ganada: 0,
+    perdida: 0
+  };
+
+  const movementRows = {
+    ingresos,
+    aContactar: [],
+    contactado: [],
+    cotizando: [],
+    reunion: [],
+    ganada: [],
+    perdida: []
+  };
+
+  state.historyRows.forEach((item) => {
+    const idGrupo = String(item.idGrupo || "").trim();
+    if (!idGrupo || !targetIds.has(idGrupo)) return;
+
+    const fecha = extractHistoryDate(item);
+    if (!dateInRange(fecha, startDate, endDate)) return;
+
+    const estado = extractEstadoFromHistoryItem(item);
+    if (!estado) return;
+
+    const row = targetRows.find((r) => getRowId(r) === idGrupo);
+    if (!row) return;
+
+    const itemResumen = {
+      ...row,
+      estadoMovimientoMes: estado,
+      fechaMovimientoMes: formatDateCL(fecha),
+      asuntoMovimientoMes: item.asunto || item.titulo || "",
+      mensajeMovimientoMes: item.mensajeLimpio || item.mensaje || ""
+    };
+
+    if (estado === "a_contactar") {
+      counters.aContactar += 1;
+      movementRows.aContactar.push(itemResumen);
+    }
+
+    if (estado === "contactado") {
+      counters.contactado += 1;
+      movementRows.contactado.push(itemResumen);
+    }
+
+    if (estado === "cotizando" || estado === "recotizando") {
+      counters.cotizando += 1;
+      movementRows.cotizando.push(itemResumen);
+    }
+
+    if (estado === "reunion_confirmada") {
+      counters.reunion += 1;
+      movementRows.reunion.push(itemResumen);
+    }
+
+    if (estado === "ganada") {
+      counters.ganada += 1;
+      movementRows.ganada.push(itemResumen);
+    }
+
+    if (estado === "perdida") {
+      counters.perdida += 1;
+      movementRows.perdida.push(itemResumen);
+    }
+  });
+
+  return {
+    counters,
+    movementRows,
+    startDate,
+    endDate
+  };
+}
+
+function buildMonthlyVsRows(currentMonthly, previousMonthly) {
   const rows = [
-    ["Total", "total"],
-    ["Activos", "activos"],
-    ["A contactar", "aContactar"],
-    ["Contactado", "contactado"],
-    ["Cotizando", "cotizando"],
-    ["Reunión confirmada", "reunion"],
-    ["Ganada", "ganada"],
-    ["Perdida", "perdida"],
-    ["Sin asignar", "sinAsignar"]
+    ["Ingresaron en el mes", "ingresos"],
+    ["Pasaron a A contactar", "aContactar"],
+    ["Pasaron a Contactado", "contactado"],
+    ["Pasaron a Cotizando / Recotizando", "cotizando"],
+    ["Pasaron a Reunión confirmada", "reunion"],
+    ["Pasaron a Ganada", "ganada"],
+    ["Pasaron a Perdida", "perdida"]
   ];
 
   return rows.map(([label, key]) => {
-    const current = Number(currentKpis[key] || 0);
-    const previous = Number(previousKpis[key] || 0);
+    const current = Number(currentMonthly?.counters?.[key] || 0);
+    const previous = Number(previousMonthly?.counters?.[key] || 0);
     const diff = current - previous;
     const pct = pctChange(current, previous);
 
     return {
       label,
+      key,
       current,
       previous,
       diff,
@@ -1860,6 +1965,9 @@ function buildVsReport() {
   const currentCutDate = getCommercialCutDate(baseYear, month);
   const previousCutDate = getCommercialCutDate(previousBaseYear, month);
 
+  const currentMonthStartDate = getMonthStartDate(baseYear, month);
+  const previousMonthStartDate = getMonthStartDate(previousBaseYear, month);
+
   const currentRows = buildRowsForVsSnapshot({
     rows: state.quoteRows,
     anoViaje: currentTravelYear,
@@ -1876,9 +1984,28 @@ function buildVsReport() {
 
   const currentKpis = computeGlobalKpis(currentRows);
   const previousKpis = computeGlobalKpis(previousRows);
-
+  
+  const currentMonthly = buildVsMonthlyMovement({
+    rows: state.quoteRows,
+    anoViaje: currentTravelYear,
+    startDate: currentMonthStartDate,
+    endDate: currentCutDate,
+    vendorName
+  });
+  
+  const previousMonthly = buildVsMonthlyMovement({
+    rows: state.quoteRows,
+    anoViaje: previousTravelYear,
+    startDate: previousMonthStartDate,
+    endDate: previousCutDate,
+    vendorName
+  });
+  
   const stageRows = buildStageVsRows(currentKpis, previousKpis);
+  const monthlyRows = buildMonthlyVsRows(currentMonthly, previousMonthly);
   const vendorRows = buildVendorVsRows(currentRows, previousRows);
+
+  
 
   return {
     month,
@@ -1889,12 +2016,17 @@ function buildVsReport() {
     previousTravelYear,
     currentCutDate,
     previousCutDate,
+    currentMonthStartDate,
+    previousMonthStartDate,
     vendorName,
     currentRows,
     previousRows,
     currentKpis,
     previousKpis,
     stageRows,
+    monthlyRows,
+    currentMonthly,
+    previousMonthly,
     vendorRows
   };
 }
@@ -1976,6 +2108,70 @@ function renderVsReport(report) {
         </thead>
         <tbody>
           ${report.stageRows.map((row) => `
+            <tr>
+              <td><strong>${row.label}</strong></td>
+              <td>${row.current}</td>
+              <td>${row.previous}</td>
+              <td class="${diffClass(row.diff)}">${formatDiff(row.diff)}</td>
+              <td class="${diffClass(row.pct)}">${formatPct(row.pct)}</td>
+            </tr>
+          `).join("")}
+        </tbody>
+      </table>
+    </div>
+
+    <h3 class="section-title" style="margin:16px 0 10px;">Movimiento del mes</h3>
+    <div class="vs-summary">
+      <div class="vs-card">
+        <div class="label">Ingresaron mes</div>
+        <div class="value">${report.currentMonthly.counters.ingresos} / ${report.previousMonthly.counters.ingresos}</div>
+        <div class="meta">${report.monthName} ${report.baseYear} vs ${report.previousBaseYear}</div>
+      </div>
+
+      <div class="vs-card">
+        <div class="label">Ganadas mes</div>
+        <div class="value">${report.currentMonthly.counters.ganada} / ${report.previousMonthly.counters.ganada}</div>
+        <div class="meta">Movimientos del mes</div>
+      </div>
+
+      <div class="vs-card">
+        <div class="label">Reuniones mes</div>
+        <div class="value">${report.currentMonthly.counters.reunion} / ${report.previousMonthly.counters.reunion}</div>
+        <div class="meta">Movimientos del mes</div>
+      </div>
+
+      <div class="vs-card">
+        <div class="label">Cotizando mes</div>
+        <div class="value">${report.currentMonthly.counters.cotizando} / ${report.previousMonthly.counters.cotizando}</div>
+        <div class="meta">Incluye recotizando</div>
+      </div>
+
+      <div class="vs-card">
+        <div class="label">Perdidas mes</div>
+        <div class="value">${report.currentMonthly.counters.perdida} / ${report.previousMonthly.counters.perdida}</div>
+        <div class="meta">Movimientos del mes</div>
+      </div>
+
+      <div class="vs-card">
+        <div class="label">Contactados mes</div>
+        <div class="value">${report.currentMonthly.counters.contactado} / ${report.previousMonthly.counters.contactado}</div>
+        <div class="meta">Movimientos del mes</div>
+      </div>
+    </div>
+
+    <div class="vs-table-wrap">
+      <table class="vs-table">
+        <thead>
+          <tr>
+            <th>Movimiento</th>
+            <th>${report.monthName} ${report.baseYear} / viaje ${report.currentTravelYear}</th>
+            <th>${report.monthName} ${report.previousBaseYear} / viaje ${report.previousTravelYear}</th>
+            <th>Diferencia</th>
+            <th>% Var.</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${report.monthlyRows.map((row) => `
             <tr>
               <td><strong>${row.label}</strong></td>
               <td>${row.current}</td>
@@ -2120,6 +2316,14 @@ function exportVsXlsx() {
     variacionPct: Math.round(row.pct)
   }));
 
+  const movimientosMes = report.monthlyRows.map((row) => ({
+    movimiento: row.label,
+    actual: row.current,
+    anterior: row.previous,
+    diferencia: row.diff,
+    variacionPct: Math.round(row.pct)
+  }));
+
   const vendedores = report.vendorRows.map((row) => ({
     vendedor: row.vendedor,
     totalActual: row.totalActual,
@@ -2161,7 +2365,8 @@ function exportVsXlsx() {
   }));
 
   XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(resumen), "Resumen VS");
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(estados), "Estados");
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(estados), "Estados acumulado");
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(movimientosMes), "Movimientos mes");
   XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(vendedores), "Vendedores");
   XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(gruposActual), "Grupos actual");
   XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(gruposAnterior), "Grupos anterior");
