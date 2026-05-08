@@ -446,9 +446,9 @@
     .vs-dialog{
       position:relative;
       z-index:2;
-      width:min(1180px, calc(100vw - 32px));
-      max-height:calc(100vh - 110px);
-      margin:70px auto 40px;
+      width:min(1240px, calc(100vw - 32px));
+      max-height:calc(100vh - 60px);
+      margin:30px auto;
       background:#fff;
       border:2px solid #d7dde6;
       border-radius:16px;
@@ -461,10 +461,12 @@
     .vs-head{
       display:flex;
       justify-content:space-between;
+      align-items:flex-start;
       gap:16px;
-      padding:16px 18px;
+      padding:14px 18px;
       border-bottom:1px solid #e5e7eb;
       background:#faf8fd;
+      flex-shrink:0;
     }
     
     .vs-head h3{
@@ -478,6 +480,7 @@
       color:#6d6480;
       font-size:13px;
       font-weight:700;
+      line-height:1.35;
     }
     
     .vs-close{
@@ -490,11 +493,13 @@
       font-size:24px;
       cursor:pointer;
       font-weight:800;
+      flex-shrink:0;
     }
     
     .vs-body{
       padding:16px 18px 18px;
       overflow:auto;
+      max-height:calc(100vh - 155px);
     }
     
     .vs-filters{
@@ -518,7 +523,7 @@
     
     .vs-summary{
       display:grid;
-      grid-template-columns:repeat(6, minmax(120px, 1fr));
+      grid-template-columns:repeat(6, minmax(130px, 1fr));
       gap:10px;
       margin-bottom:16px;
     }
@@ -528,6 +533,7 @@
       border:2px solid #d7dde6;
       border-radius:12px;
       padding:12px 14px;
+      min-height:86px;
     }
     
     .vs-card .label{
@@ -542,6 +548,7 @@
       font-size:24px;
       font-weight:900;
       color:var(--header);
+      line-height:1.1;
     }
     
     .vs-card .meta{
@@ -549,13 +556,16 @@
       font-size:12px;
       color:#7b748a;
       font-weight:700;
+      line-height:1.25;
     }
     
     .vs-table-wrap{
+      width:100%;
       overflow:auto;
       border:2px solid #d7dde6;
       border-radius:12px;
-      margin-bottom:14px;
+      margin-bottom:16px;
+      background:#fff;
     }
     
     .vs-table{
@@ -567,7 +577,7 @@
     .vs-table th{
       background:var(--header);
       color:#fff;
-      padding:10px;
+      padding:10px 12px;
       text-align:left;
       font-size:12px;
       white-space:nowrap;
@@ -575,7 +585,7 @@
     
     .vs-table td{
       border-bottom:1px solid #e5e7eb;
-      padding:10px;
+      padding:10px 12px;
       font-size:13px;
       white-space:nowrap;
     }
@@ -618,6 +628,11 @@
         border:none !important;
       }
     
+      .vs-body{
+        max-height:none !important;
+        overflow:visible !important;
+      }
+    
       body.print-vs-only .page-shell > section > *:not(#vsModal){
         display:none !important;
       }
@@ -638,6 +653,16 @@
     }
     
     @media (max-width:560px){
+      .vs-dialog{
+        width:calc(100vw - 20px);
+        max-height:calc(100vh - 24px);
+        margin:12px auto;
+      }
+    
+      .vs-body{
+        max-height:calc(100vh - 140px);
+      }
+    
       .vs-filters,
       .vs-summary{
         grid-template-columns:1fr;
