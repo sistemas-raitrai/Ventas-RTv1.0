@@ -624,24 +624,79 @@ function fillDestinoFilter() {
 
   const previous = select.value || "todos";
 
-  const destinos = [...new Set(
-    state.allRows
-      .filter((row) => row.estado === "ganada")
-      .map((row) => cleanText(row.destino || ""))
-      .filter(Boolean)
-  )].sort((a, b) => a.localeCompare(b, "es", {
-    sensitivity: "base",
-    numeric: true
-  }));
+  // =========================================
+  // NORMALIZADOR ÚNICO DE DESTINOS
+  // =========================================
+  function normalizarDestino(valor = "") {
+    const v = normalizeSearch(valor);
+
+    if (!v) return "Sin destino";
+
+    // SIN DESTINO
+    if (v.includes("sin destino")) return "Sin destino";
+
+    // SUR DE CHILE Y BARILOCHE
+    if (
+      (v.includes("sur de chile") && v.includes("bariloche")) ||
+      v.includes("sur y bariloche")
+    ) {
+      return "Sur de Chile y Bariloche";
+    }
+
+    // BARILOCHE
+    if (v.includes("bariloche")) return "Bariloche";
+
+    // SUR DE CHILE
+    if (v.includes("sur de chile")) return "Sur de Chile";
+
+    // NORTE DE CHILE
+    if (v.includes("norte de chile")) return "Norte de Chile";
+
+    // BRASIL
+    if (v.includes("brasil")) return "Brasil";
+
+    // REPÚBLICA DOMINICANA
+    if (
+      v.includes("republica dominicana") ||
+      v.includes("rep dominicana") ||
+      v.includes("dominicana")
+    ) {
+      return "República Dominicana";
+    }
+
+    // OTRO
+    return "Otro";
+  }
+
+  // =========================================
+  // ACTUALIZAR TODAS LAS FILAS EN MEMORIA
+  // =========================================
+  state.allRows.forEach((row) => {
+    row.destino = normalizarDestino(row.destino);
+  });
+
+  // =========================================
+  // OPCIONES FIJAS Y LIMPIAS
+  // =========================================
+  const destinosOrdenados = [
+    "Bariloche",
+    "Sur de Chile y Bariloche",
+    "Sur de Chile",
+    "Norte de Chile",
+    "Brasil",
+    "República Dominicana",
+    "Otro",
+    "Sin destino"
+  ];
 
   select.innerHTML = `
     <option value="todos">Todos</option>
-    ${destinos.map((destino) => `
+    ${destinosOrdenados.map((destino) => `
       <option value="${escapeAttr(destino)}">${escapeHtml(destino)}</option>
     `).join("")}
   `;
 
-  select.value = destinos.includes(previous) ? previous : "todos";
+  select.value = destinosOrdenados.includes(previous) ? previous : "todos";
 }
 
 function exportarXlsx() {
