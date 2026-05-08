@@ -269,6 +269,7 @@ function mapRow(docId, data = {}) {
     searchIndex: normalizeSearch([
       idGrupo,
       alias,
+      buildDisplayGrupo(data, alias, anoViaje),
       data.colegio,
       data.curso,
       anoViaje,
@@ -624,7 +625,7 @@ function exportarXlsx() {
 
   const data = state.filteredRows.map((row) => ({
     "ID GRUPO": row.idGrupo,
-    "GRUPO": row.alias,
+    "GRUPO": row.displayGrupo || row.alias,
     "COLEGIO": row.colegio,
     "CURSO": row.curso,
     "AÑO VIAJE": row.anoViaje,
