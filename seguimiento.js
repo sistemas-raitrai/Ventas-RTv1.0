@@ -311,6 +311,11 @@ async function loadSeguimiento() {
     });
 
     state.allRows = rows;
+
+    // Blindaje: cada vez que carga la página, el orden default vuelve a GRUPO A → Z
+    state.sortKey = "grupo";
+    state.sortDir = "asc";
+    updateSortHeaderUI();
     
     fillVendorFilter(rows);
     applyDashboardPreset();
@@ -586,7 +591,11 @@ function applyFiltersAndRender() {
   });
 
   // Orden final
-  rows.sort((a, b) => compareRows(a, b, state.sortKey, state.sortDir));
+  // Si por cualquier motivo no hay sortKey válido, forzamos grupo A → Z
+  const sortKey = state.sortKey || "grupo";
+  const sortDir = state.sortDir || "asc";
+  
+  rows.sort((a, b) => compareRows(a, b, sortKey, sortDir));
 
   state.visibleRows = rows;
   renderRows(rows);
@@ -1208,14 +1217,15 @@ function buildGrupoSortTitle(displayTitle = "", colegioFallback = "") {
   const title = cleanText(displayTitle);
   const colegio = cleanText(colegioFallback);
 
-  if (colegio) {
-    return normalizeText(colegio);
-  }
+  const base = colegio || title;
 
-  // Si no hay colegio limpio, ordena ignorando cursos/años al final.
-  return normalizeText(
-    title.replace(/\s+\d{1,2}[A-ZÁÉÍÓÚÑ]*\s*\(\d{4}\).*$/i, "")
-  );
+  return normalizeText(base)
+    // elimina cursos/años al inicio
+    .replace(/^(\d{1,2}[a-zñ]*\s*\(\d{4}\)\s*(?:-|–|—)?\s*)+/i, "")
+    // elimina cursos/años al final
+    .replace(/\s+(\d{1,2}[a-zñ]*\s*\(\d{4}\)\s*(?:-|–|—)?\s*)+$/i, "")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 function normalizeText(value) {
