@@ -1561,31 +1561,57 @@ function renderCharts(globalKpis, vendorKpis) {
    COMPARATIVO VS AÑO A AÑO
 ========================================================= */
 function extractEstadoFromHistoryItem(item = {}) {
-  const text = normalizeHistoryText([
+  const rawText = [
     item.asunto || "",
     item.mensajeLimpio || "",
     item.mensaje || "",
     item.titulo || ""
-  ].join(" "));
+  ].join(" ");
 
-  // Casos típicos:
-  // "Modificación de Estado a Reunión confirmada"
-  // "ha modificado el ESTADO ... a "Ganada""
-  const candidates = [
-    "reunion confirmada",
-    "reunión confirmada",
-    "recotizando",
-    "re cotizando",
-    "cotizando",
-    "contactado",
-    "a contactar",
-    "ganada",
-    "perdida"
+  const text = normalizeHistoryText(rawText);
+
+  // Solo nos interesan movimientos que parezcan cambio de ESTADO.
+  if (
+    !text.includes("estado") &&
+    !text.includes("situacion") &&
+    !text.includes("situación")
+  ) {
+    return "";
+  }
+
+  const estados = [
+    { key: "reunion_confirmada", labels: ["reunion confirmada", "reunión confirmada"] },
+    { key: "recotizando", labels: ["recotizando", "re cotizando"] },
+    { key: "cotizando", labels: ["cotizando"] },
+    { key: "contactado", labels: ["contactado"] },
+    { key: "a_contactar", labels: ["a contactar"] },
+    { key: "ganada", labels: ["ganada"] },
+    { key: "perdida", labels: ["perdida"] }
   ];
 
-  for (const candidate of candidates) {
-    if (text.includes(candidate)) {
-      return candidate;
+  // Preferimos detectar el estado destino:
+  // "a Reunión confirmada", 'a "Ganada"', "nuevo estado: Perdida", etc.
+  for (const estado of estados) {
+    for (const label of estado.labels) {
+      const escaped = label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+      const patterns = [
+        new RegExp(`\\ba\\s+["']?${escaped}["']?\\b`, "i"),
+        new RegExp(`\\bnuevo\\s+estado\\s*:?\\s*["']?${escaped}["']?\\b`, "i"),
+        new RegExp(`\\bestado\\s*:?\\s*["']?${escaped}["']?\\b`, "i")
+      ];
+
+      if (patterns.some((rx) => rx.test(text))) {
+        return estado.key;
+      }
+    }
+  }
+
+  // Fallback: si el historial dice "Modificación de Estado a X"
+  // pero no calzó por formato raro, usamos presencia simple.
+  for (const estado of estados) {
+    if (estado.labels.some((label) => text.includes(label))) {
+      return estado.key;
     }
   }
 
@@ -1639,6 +1665,9 @@ function buildRowsForVsSnapshot({ rows = [], anoViaje, cutDate, vendorName = "" 
         // Guardamos referencia para exportación / revisión
         estadoActualSistema: row.estado || "",
         estadoAlCorte,
+
+        estadoFuenteVs: estadoAlCorte ? "historial" : "estado_actual_fallback",
+        fechaBaseVs: formatDateCL(extractRowDate(row)),
 
         // Sobrescribimos estado para que computeGlobalKpis()
         // calcule el embudo histórico real.
