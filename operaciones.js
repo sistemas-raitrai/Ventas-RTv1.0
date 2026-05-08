@@ -494,7 +494,7 @@ function renderEmpty(message) {
 
   tbody.innerHTML = `
     <tr>
-      <td colspan="8" class="ops-empty">${escapeHtml(message)}</td>
+      <td colspan="10" class="ops-empty">${escapeHtml(message)}</td>
     </tr>
   `;
 }
