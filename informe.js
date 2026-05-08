@@ -1587,7 +1587,13 @@ function initVsDefaults() {
 
   if ($("vsMesCorte")) $("vsMesCorte").value = String(d.month);
   if ($("vsAnoBase")) $("vsAnoBase").value = String(d.baseYear);
-  if ($("vsAnoViajeActual")) $("vsAnoViajeActual").value = String(d.currentTravelYear);
+
+  // Regla fija:
+  // Mayo 2026 compara viaje 2027
+  // contra Mayo 2025 viaje 2026.
+  if ($("vsAnoViajeActual")) {
+    $("vsAnoViajeActual").value = String(d.baseYear + 1);
+  }
 
   populateVsVendorFilter();
 }
@@ -1712,9 +1718,18 @@ function buildVendorVsRows(currentRows = [], previousRows = []) {
 function buildVsReport() {
   const month = Number($("vsMesCorte")?.value || 1);
   const baseYear = Number($("vsAnoBase")?.value || getCurrentCommercialYear());
-  const currentTravelYear = Number($("vsAnoViajeActual")?.value || baseYear + 1);
+
+  // Regla correcta:
+  // Si comparo Mayo 2026, miro grupos viaje 2027.
+  // Contra Mayo 2025, miro grupos viaje 2026.
+  const currentTravelYear = baseYear + 1;
   const previousBaseYear = baseYear - 1;
-  const previousTravelYear = currentTravelYear - 1;
+  const previousTravelYear = baseYear;
+
+  if ($("vsAnoViajeActual")) {
+    $("vsAnoViajeActual").value = String(currentTravelYear);
+  }
+
   const vendorName = normalizeText($("vsVendedora")?.value || "");
 
   const currentCutDate = getCommercialCutDate(baseYear, month);
@@ -2355,6 +2370,14 @@ function bindPageEvents() {
 
   $("btnRunVs")?.addEventListener("click", () => {
     runVsReport();
+  });
+
+  $("vsAnoBase")?.addEventListener("input", () => {
+    const baseYear = Number($("vsAnoBase")?.value || getCurrentCommercialYear());
+  
+    if ($("vsAnoViajeActual")) {
+      $("vsAnoViajeActual").value = String(baseYear + 1);
+    }
   });
 
   $("btnExportVsXlsx")?.addEventListener("click", () => {
