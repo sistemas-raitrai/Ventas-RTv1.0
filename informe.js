@@ -1560,6 +1560,93 @@ function renderCharts(globalKpis, vendorKpis) {
 /* =========================================================
    COMPARATIVO VS AÑO A AÑO
 ========================================================= */
+function extractEstadoFromHistoryItem(item = {}) {
+  const text = normalizeHistoryText([
+    item.asunto || "",
+    item.mensajeLimpio || "",
+    item.mensaje || "",
+    item.titulo || ""
+  ].join(" "));
+
+  // Casos típicos:
+  // "Modificación de Estado a Reunión confirmada"
+  // "ha modificado el ESTADO ... a "Ganada""
+  const candidates = [
+    "reunion confirmada",
+    "reunión confirmada",
+    "recotizando",
+    "re cotizando",
+    "cotizando",
+    "contactado",
+    "a contactar",
+    "ganada",
+    "perdida"
+  ];
+
+  for (const candidate of candidates) {
+    if (text.includes(candidate)) {
+      return candidate;
+    }
+  }
+
+  return "";
+}
+
+function getEstadoHistoricoAlCorte(row = {}, cutDate) {
+  const idGrupo = String(row.idGrupo || row.id || "").trim();
+  if (!idGrupo || !cutDate) return row.estado || "";
+
+  const historyItems = state.historyRows
+    .filter((item) => String(item.idGrupo || "").trim() === idGrupo)
+    .map((item) => ({
+      ...item,
+      _fecha: extractHistoryDate(item)
+    }))
+    .filter((item) => item._fecha && item._fecha <= cutDate)
+    .sort((a, b) => a._fecha - b._fecha);
+
+  let estadoHistorico = "";
+
+  historyItems.forEach((item) => {
+    const estadoDetectado = extractEstadoFromHistoryItem(item);
+    if (estadoDetectado) {
+      estadoHistorico = estadoDetectado;
+    }
+  });
+
+  // Si no hay historial de estado antes del corte,
+  // usamos el estado actual como fallback.
+  return estadoHistorico || row.estado || "";
+}
+
+function buildRowsForVsSnapshot({ rows = [], anoViaje, cutDate, vendorName = "" } = {}) {
+  return rows
+    .filter((row) => {
+      const rowYear = getAnoViajeNumber(row);
+      if (rowYear !== Number(anoViaje)) return false;
+
+      if (vendorName && normalizeText(row.vendedora) !== normalizeText(vendorName)) return false;
+
+      // Primero: el grupo debe existir al corte.
+      return rowExistsAtCutDate(row, cutDate);
+    })
+    .map((row) => {
+      const estadoAlCorte = getEstadoHistoricoAlCorte(row, cutDate);
+
+      return {
+        ...row,
+
+        // Guardamos referencia para exportación / revisión
+        estadoActualSistema: row.estado || "",
+        estadoAlCorte,
+
+        // Sobrescribimos estado para que computeGlobalKpis()
+        // calcule el embudo histórico real.
+        estado: estadoAlCorte || row.estado || ""
+      };
+    });
+}
+                        
 function getVsDefaults() {
   const today = new Date();
   const baseYear = getCurrentCommercialYear();
@@ -1744,14 +1831,14 @@ function buildVsReport() {
   const currentCutDate = getCommercialCutDate(baseYear, month);
   const previousCutDate = getCommercialCutDate(previousBaseYear, month);
 
-  const currentRows = filterRowsForVs({
+  const currentRows = buildRowsForVsSnapshot({
     rows: state.quoteRows,
     anoViaje: currentTravelYear,
     cutDate: currentCutDate,
     vendorName
   });
-
-  const previousRows = filterRowsForVs({
+  
+  const previousRows = buildRowsForVsSnapshot({
     rows: state.quoteRows,
     anoViaje: previousTravelYear,
     cutDate: previousCutDate,
@@ -2026,7 +2113,8 @@ function exportVsXlsx() {
     aliasGrupo: r.aliasGrupo || "",
     colegio: r.colegio || "",
     anoViaje: r.anoViaje || "",
-    estado: r.estado || "",
+    estadoAlCorte: r.estadoAlCorte || r.estado || "",
+    estadoActualSistema: r.estadoActualSistema || "",
     vendedora: r.vendedora || "",
     fechaCreacion: formatDateCL(extractRowDate(r))
   }));
@@ -2037,7 +2125,8 @@ function exportVsXlsx() {
     aliasGrupo: r.aliasGrupo || "",
     colegio: r.colegio || "",
     anoViaje: r.anoViaje || "",
-    estado: r.estado || "",
+    estadoAlCorte: r.estadoAlCorte || r.estado || "",
+    estadoActualSistema: r.estadoActualSistema || "",
     vendedora: r.vendedora || "",
     fechaCreacion: formatDateCL(extractRowDate(r))
   }));
@@ -2116,7 +2205,8 @@ function exportXlsx(globalKpis, vendorKpis, rows, alerts, opportunities) {
     comuna: r.comunaCiudad || r.comuna || "",
     anoViaje: r.anoViaje || "",
     cliente: r.nombreCliente || "",
-    estado: r.estado || "",
+    estadoAlCorte: r.estadoAlCorte || r.estado || "",
+    estadoActualSistema: r.estadoActualSistema || "",
     vendedora: r.vendedora || "",
     vendedoraCorreo: r.vendedoraCorreo || ""
   }));
