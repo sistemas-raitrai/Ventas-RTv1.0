@@ -208,16 +208,16 @@ function getCommercialCutDate(year, monthNumber) {
 
 function extractRowDate(row = {}) {
   const raw =
-    // Prioridad 1:
-    // Fecha histórica importada desde el sistema anterior.
-    // Sirve para comparativos año a año.
+    // Campo que quedó realmente guardado en Firebase
+    row.ingresoSistema ||
+
+    // Campo recomendado si después lo normalizamos
     row.fechaIngresoSistema ||
 
-    // Prioridad 2:
-    // Fecha real de creación en el sistema actual.
+    // Fecha del sistema actual
     row.fechaCreacion ||
 
-    // Fallbacks por si existen otros nombres antiguos.
+    // Fallbacks
     row.creado ||
     row.createdAt ||
     row.fechaRegistro ||
