@@ -504,8 +504,7 @@
     
     .vs-filters{
       display:grid;
-      grid-template-columns:repeat(5, minmax(0, 1fr));
-      gap:10px;
+      grid-template-columns:repeat(7, minmax(0, 1fr));      gap:10px;
       align-items:end;
       margin-bottom:16px;
     }
@@ -1213,9 +1212,19 @@
       
               <div class="field-wrap">
                 <label for="vsAnoViajeActual">Año viaje actual</label>
-                <input id="vsAnoViajeActual" type="number" min="2024" max="2099" step="1" readonly />
+                <input id="vsAnoViajeActual" type="number" min="2024" max="2099" step="1" />
               </div>
-      
+              
+              <div class="field-wrap">
+                <label for="vsAnoBaseAnterior">Año comparación anterior</label>
+                <input id="vsAnoBaseAnterior" type="number" min="2024" max="2099" step="1" />
+              </div>
+              
+              <div class="field-wrap">
+                <label for="vsAnoViajeAnterior">Año viaje anterior</label>
+                <input id="vsAnoViajeAnterior" type="number" min="2024" max="2099" step="1" />
+              </div>
+              
               <div class="field-wrap">
                 <label for="vsVendedora">Vendedor(a)</label>
                 <select id="vsVendedora">
