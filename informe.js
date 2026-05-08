@@ -1561,6 +1561,73 @@ function renderCharts(globalKpis, vendorKpis) {
    COMPARATIVO VS AÑO A AÑO
 ========================================================= */
 function extractEstadoFromHistoryItem(item = {}) {
+  // =========================================================
+  // PRIORIDAD 1:
+  // Leer estructura real guardada por grupo.js
+  // metadata.cambios / metadata.cambiosDetallados
+  // =========================================================
+  const cambios = Array.isArray(item?.metadata?.cambios)
+    ? item.metadata.cambios
+    : [];
+
+  const cambiosDetallados = Array.isArray(item?.metadata?.cambiosDetallados)
+    ? item.metadata.cambiosDetallados
+    : [];
+
+  const allChanges = [...cambios, ...cambiosDetallados];
+
+  for (const change of allChanges) {
+    const campo = normalizeText(
+      change?.campo ||
+      change?.field ||
+      ""
+    );
+
+    if (campo !== "estado") continue;
+
+    const nuevoEstado = normalizeText(
+      change?.nuevo ||
+      change?.nuevoValor ||
+      change?.despues ||
+      change?.after ||
+      ""
+    );
+
+    if (!nuevoEstado) continue;
+
+    if (nuevoEstado.includes("reunion confirmada") || nuevoEstado.includes("reunión confirmada")) {
+      return "reunion_confirmada";
+    }
+
+    if (nuevoEstado.includes("recotizando") || nuevoEstado.includes("re cotizando")) {
+      return "recotizando";
+    }
+
+    if (nuevoEstado.includes("cotizando")) {
+      return "cotizando";
+    }
+
+    if (nuevoEstado.includes("contactado")) {
+      return "contactado";
+    }
+
+    if (nuevoEstado.includes("a contactar")) {
+      return "a_contactar";
+    }
+
+    if (nuevoEstado.includes("ganada")) {
+      return "ganada";
+    }
+
+    if (nuevoEstado.includes("perdida")) {
+      return "perdida";
+    }
+  }
+
+  // =========================================================
+  // PRIORIDAD 2:
+  // Fallback por texto libre / historial legacy
+  // =========================================================
   const rawText = [
     item.asunto || "",
     item.mensajeLimpio || "",
@@ -1570,7 +1637,6 @@ function extractEstadoFromHistoryItem(item = {}) {
 
   const text = normalizeHistoryText(rawText);
 
-  // Solo nos interesan movimientos que parezcan cambio de ESTADO.
   if (
     !text.includes("estado") &&
     !text.includes("situacion") &&
@@ -1589,8 +1655,6 @@ function extractEstadoFromHistoryItem(item = {}) {
     { key: "perdida", labels: ["perdida"] }
   ];
 
-  // Preferimos detectar el estado destino:
-  // "a Reunión confirmada", 'a "Ganada"', "nuevo estado: Perdida", etc.
   for (const estado of estados) {
     for (const label of estado.labels) {
       const escaped = label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -1607,8 +1671,6 @@ function extractEstadoFromHistoryItem(item = {}) {
     }
   }
 
-  // Fallback: si el historial dice "Modificación de Estado a X"
-  // pero no calzó por formato raro, usamos presencia simple.
   for (const estado of estados) {
     if (estado.labels.some((label) => text.includes(label))) {
       return estado.key;
