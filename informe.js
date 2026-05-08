@@ -72,7 +72,8 @@ const state = {
     vendors: {},
     charts: {}
   },
-  lastRender: null
+  lastRender: null,
+  lastVsReport: null
 };
 
 /* =========================================================
@@ -190,8 +191,73 @@ function getAnoViajeNumber(row = {}) {
 }
 
 function getCurrentCommercialYear() {
-  // Año comercial fijo o configurable
-  return 2026;
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = now.getMonth(); // 0 enero, 1 febrero, 2 marzo
+
+  // Año comercial RT: desde 1 de marzo hasta fin de febrero siguiente.
+  return month < 2 ? year - 1 : year;
+}
+
+function getCommercialCutDate(year, monthNumber) {
+  const month = Number(monthNumber || 1);
+
+  // Último día del mes seleccionado.
+  return new Date(Number(year), month, 0, 23, 59, 59, 999);
+}
+
+function extractRowDate(row = {}) {
+  const raw =
+    row.fechaCreacion ||
+    row.creado ||
+    row.createdAt ||
+    row.fechaRegistro ||
+    row.fechaActualizacion ||
+    null;
+
+  if (!raw) return null;
+  if (typeof raw?.toDate === "function") return raw.toDate();
+
+  const d = new Date(raw);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+function rowExistsAtCutDate(row = {}, cutDate) {
+  const rowDate = extractRowDate(row);
+
+  // Si no tiene fecha, lo dejamos fuera para que el comparativo sea serio.
+  if (!rowDate) return false;
+
+  return rowDate <= cutDate;
+}
+
+function formatDateCL(date) {
+  if (!date) return "—";
+  return date.toLocaleDateString("es-CL", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric"
+  });
+}
+
+function getMonthName(monthNumber) {
+  const names = [
+    "",
+    "Enero",
+    "Febrero",
+    "Marzo",
+    "Abril",
+    "Mayo",
+    "Junio",
+    "Julio",
+    "Agosto",
+    "Septiembre",
+    "Octubre",
+    "Noviembre",
+    "Diciembre"
+  ];
+
+  return names[Number(monthNumber)] || "Mes";
 }
 
 function isCurrentOrFutureTravelYear(row = {}) {
@@ -1483,6 +1549,497 @@ function renderCharts(globalKpis, vendorKpis) {
 }
 
 /* =========================================================
+   COMPARATIVO VS AÑO A AÑO
+========================================================= */
+function getVsDefaults() {
+  const today = new Date();
+  const baseYear = getCurrentCommercialYear();
+  const month = today.getMonth() + 1;
+
+  return {
+    month,
+    baseYear,
+    currentTravelYear: baseYear + 1,
+    previousBaseYear: baseYear - 1,
+    previousTravelYear: baseYear
+  };
+}
+
+function populateVsVendorFilter() {
+  const select = $("vsVendedora");
+  if (!select) return;
+
+  const current = select.value || "";
+  select.innerHTML = `<option value="">Todas</option>`;
+
+  getVendorOptions().forEach((v) => {
+    const opt = document.createElement("option");
+    opt.value = v.nombre;
+    opt.textContent = v.nombre;
+    select.appendChild(opt);
+  });
+
+  select.value = current;
+}
+
+function initVsDefaults() {
+  const d = getVsDefaults();
+
+  if ($("vsMesCorte")) $("vsMesCorte").value = String(d.month);
+  if ($("vsAnoBase")) $("vsAnoBase").value = String(d.baseYear);
+  if ($("vsAnoViajeActual")) $("vsAnoViajeActual").value = String(d.currentTravelYear);
+
+  populateVsVendorFilter();
+}
+
+function filterRowsForVs({ rows = [], anoViaje, cutDate, vendorName = "" } = {}) {
+  return rows.filter((row) => {
+    const rowYear = getAnoViajeNumber(row);
+    if (rowYear !== Number(anoViaje)) return false;
+
+    if (vendorName && normalizeText(row.vendedora) !== normalizeText(vendorName)) return false;
+
+    return rowExistsAtCutDate(row, cutDate);
+  });
+}
+
+function pctChange(currentValue = 0, previousValue = 0) {
+  if (!previousValue && !currentValue) return 0;
+  if (!previousValue && currentValue) return 100;
+  return ((currentValue - previousValue) / previousValue) * 100;
+}
+
+function diffClass(value = 0) {
+  if (value > 0) return "vs-positive";
+  if (value < 0) return "vs-negative";
+  return "vs-neutral";
+}
+
+function formatDiff(value = 0) {
+  const sign = value > 0 ? "+" : "";
+  return `${sign}${value}`;
+}
+
+function formatPct(value = 0) {
+  const sign = value > 0 ? "+" : "";
+  return `${sign}${Math.round(value)}%`;
+}
+
+function buildStageVsRows(currentKpis, previousKpis) {
+  const rows = [
+    ["Total", "total"],
+    ["Activos", "activos"],
+    ["A contactar", "aContactar"],
+    ["Contactado", "contactado"],
+    ["Cotizando", "cotizando"],
+    ["Reunión confirmada", "reunion"],
+    ["Ganada", "ganada"],
+    ["Perdida", "perdida"],
+    ["Sin asignar", "sinAsignar"]
+  ];
+
+  return rows.map(([label, key]) => {
+    const current = Number(currentKpis[key] || 0);
+    const previous = Number(previousKpis[key] || 0);
+    const diff = current - previous;
+    const pct = pctChange(current, previous);
+
+    return {
+      label,
+      current,
+      previous,
+      diff,
+      pct
+    };
+  });
+}
+
+function buildVendorVsRows(currentRows = [], previousRows = []) {
+  const vendors = new Map();
+
+  function ensureVendor(name = "") {
+    const key = normalizeText(name || "Sin asignar") || "Sin asignar";
+
+    if (!vendors.has(key)) {
+      vendors.set(key, {
+        vendedor: key,
+        currentRows: [],
+        previousRows: []
+      });
+    }
+
+    return vendors.get(key);
+  }
+
+  currentRows.forEach((row) => {
+    ensureVendor(row.vendedora || "Sin asignar").currentRows.push(row);
+  });
+
+  previousRows.forEach((row) => {
+    ensureVendor(row.vendedora || "Sin asignar").previousRows.push(row);
+  });
+
+  return Array.from(vendors.values())
+    .map((item) => {
+      const currentKpis = computeGlobalKpis(item.currentRows);
+      const previousKpis = computeGlobalKpis(item.previousRows);
+
+      return {
+        vendedor: item.vendedor,
+        totalActual: currentKpis.total,
+        totalAnterior: previousKpis.total,
+        diffTotal: currentKpis.total - previousKpis.total,
+        ganadasActual: currentKpis.ganada,
+        ganadasAnterior: previousKpis.ganada,
+        diffGanadas: currentKpis.ganada - previousKpis.ganada,
+        reunionesActual: currentKpis.reunion,
+        reunionesAnterior: previousKpis.reunion,
+        diffReuniones: currentKpis.reunion - previousKpis.reunion,
+        cotizandoActual: currentKpis.cotizando,
+        cotizandoAnterior: previousKpis.cotizando,
+        diffCotizando: currentKpis.cotizando - previousKpis.cotizando
+      };
+    })
+    .sort((a, b) => {
+      return (
+        b.totalActual - a.totalActual ||
+        b.ganadasActual - a.ganadasActual ||
+        a.vendedor.localeCompare(b.vendedor, "es", { sensitivity: "base" })
+      );
+    });
+}
+
+function buildVsReport() {
+  const month = Number($("vsMesCorte")?.value || 1);
+  const baseYear = Number($("vsAnoBase")?.value || getCurrentCommercialYear());
+  const currentTravelYear = Number($("vsAnoViajeActual")?.value || baseYear + 1);
+  const previousBaseYear = baseYear - 1;
+  const previousTravelYear = currentTravelYear - 1;
+  const vendorName = normalizeText($("vsVendedora")?.value || "");
+
+  const currentCutDate = getCommercialCutDate(baseYear, month);
+  const previousCutDate = getCommercialCutDate(previousBaseYear, month);
+
+  const currentRows = filterRowsForVs({
+    rows: state.quoteRows,
+    anoViaje: currentTravelYear,
+    cutDate: currentCutDate,
+    vendorName
+  });
+
+  const previousRows = filterRowsForVs({
+    rows: state.quoteRows,
+    anoViaje: previousTravelYear,
+    cutDate: previousCutDate,
+    vendorName
+  });
+
+  const currentKpis = computeGlobalKpis(currentRows);
+  const previousKpis = computeGlobalKpis(previousRows);
+
+  const stageRows = buildStageVsRows(currentKpis, previousKpis);
+  const vendorRows = buildVendorVsRows(currentRows, previousRows);
+
+  return {
+    month,
+    monthName: getMonthName(month),
+    baseYear,
+    previousBaseYear,
+    currentTravelYear,
+    previousTravelYear,
+    currentCutDate,
+    previousCutDate,
+    vendorName,
+    currentRows,
+    previousRows,
+    currentKpis,
+    previousKpis,
+    stageRows,
+    vendorRows
+  };
+}
+
+function renderVsReport(report) {
+  const el = $("vsResult");
+  if (!el || !report) return;
+
+  const totalDiff = report.currentKpis.total - report.previousKpis.total;
+  const ganadasDiff = report.currentKpis.ganada - report.previousKpis.ganada;
+  const reunionDiff = report.currentKpis.reunion - report.previousKpis.reunion;
+
+  const conversionActual = safeRate(report.currentKpis.ganada, report.currentKpis.total);
+  const conversionAnterior = safeRate(report.previousKpis.ganada, report.previousKpis.total);
+  const conversionDiff = Math.round((conversionActual - conversionAnterior) * 100);
+
+  const title = `
+    ${report.monthName} ${report.baseYear} / viaje ${report.currentTravelYear}
+    VS
+    ${report.monthName} ${report.previousBaseYear} / viaje ${report.previousTravelYear}
+  `;
+
+  if ($("vsSubtitle")) {
+    $("vsSubtitle").textContent =
+      `${title} · Corte actual: ${formatDateCL(report.currentCutDate)} · Corte anterior: ${formatDateCL(report.previousCutDate)}` +
+      `${report.vendorName ? ` · Vendedor(a): ${report.vendorName}` : ""}`;
+  }
+
+  el.innerHTML = `
+    <div class="vs-summary">
+      <div class="vs-card">
+        <div class="label">Total actual</div>
+        <div class="value">${report.currentKpis.total}</div>
+        <div class="meta">Año viaje ${report.currentTravelYear}</div>
+      </div>
+
+      <div class="vs-card">
+        <div class="label">Total anterior</div>
+        <div class="value">${report.previousKpis.total}</div>
+        <div class="meta">Año viaje ${report.previousTravelYear}</div>
+      </div>
+
+      <div class="vs-card">
+        <div class="label">Diferencia total</div>
+        <div class="value ${diffClass(totalDiff)}">${formatDiff(totalDiff)}</div>
+        <div class="meta">${formatPct(pctChange(report.currentKpis.total, report.previousKpis.total))}</div>
+      </div>
+
+      <div class="vs-card">
+        <div class="label">Ganadas</div>
+        <div class="value ${diffClass(ganadasDiff)}">${report.currentKpis.ganada} / ${report.previousKpis.ganada}</div>
+        <div class="meta">Dif: ${formatDiff(ganadasDiff)}</div>
+      </div>
+
+      <div class="vs-card">
+        <div class="label">Reuniones</div>
+        <div class="value ${diffClass(reunionDiff)}">${report.currentKpis.reunion} / ${report.previousKpis.reunion}</div>
+        <div class="meta">Dif: ${formatDiff(reunionDiff)}</div>
+      </div>
+
+      <div class="vs-card">
+        <div class="label">Conversión ganada</div>
+        <div class="value ${diffClass(conversionDiff)}">${Math.round(conversionActual * 100)}%</div>
+        <div class="meta">Anterior: ${Math.round(conversionAnterior * 100)}% · Dif: ${formatDiff(conversionDiff)} pts</div>
+      </div>
+    </div>
+
+    <h3 class="section-title" style="margin:10px 0;">Comparativo por estado</h3>
+    <div class="vs-table-wrap">
+      <table class="vs-table">
+        <thead>
+          <tr>
+            <th>Indicador</th>
+            <th>${report.currentTravelYear} al ${formatDateCL(report.currentCutDate)}</th>
+            <th>${report.previousTravelYear} al ${formatDateCL(report.previousCutDate)}</th>
+            <th>Diferencia</th>
+            <th>% Var.</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${report.stageRows.map((row) => `
+            <tr>
+              <td><strong>${row.label}</strong></td>
+              <td>${row.current}</td>
+              <td>${row.previous}</td>
+              <td class="${diffClass(row.diff)}">${formatDiff(row.diff)}</td>
+              <td class="${diffClass(row.pct)}">${formatPct(row.pct)}</td>
+            </tr>
+          `).join("")}
+        </tbody>
+      </table>
+    </div>
+
+    <h3 class="section-title" style="margin:10px 0;">Comparativo por vendedor(a)</h3>
+    <div class="vs-table-wrap">
+      <table class="vs-table">
+        <thead>
+          <tr>
+            <th>Vendedor(a)</th>
+            <th>Total actual</th>
+            <th>Total anterior</th>
+            <th>Dif. total</th>
+            <th>Ganadas actual</th>
+            <th>Ganadas anterior</th>
+            <th>Dif. ganadas</th>
+            <th>Reuniones actual</th>
+            <th>Reuniones anterior</th>
+            <th>Dif. reuniones</th>
+            <th>Cotizando actual</th>
+            <th>Cotizando anterior</th>
+            <th>Dif. cotizando</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${report.vendorRows.length ? report.vendorRows.map((row) => `
+            <tr>
+              <td><strong>${row.vendedor}</strong></td>
+              <td>${row.totalActual}</td>
+              <td>${row.totalAnterior}</td>
+              <td class="${diffClass(row.diffTotal)}">${formatDiff(row.diffTotal)}</td>
+              <td>${row.ganadasActual}</td>
+              <td>${row.ganadasAnterior}</td>
+              <td class="${diffClass(row.diffGanadas)}">${formatDiff(row.diffGanadas)}</td>
+              <td>${row.reunionesActual}</td>
+              <td>${row.reunionesAnterior}</td>
+              <td class="${diffClass(row.diffReuniones)}">${formatDiff(row.diffReuniones)}</td>
+              <td>${row.cotizandoActual}</td>
+              <td>${row.cotizandoAnterior}</td>
+              <td class="${diffClass(row.diffCotizando)}">${formatDiff(row.diffCotizando)}</td>
+            </tr>
+          `).join("") : `
+            <tr>
+              <td colspan="13" class="empty">No hay vendedores para mostrar.</td>
+            </tr>
+          `}
+        </tbody>
+      </table>
+    </div>
+
+    <h3 class="section-title" style="margin:10px 0;">Lectura rápida</h3>
+    <div class="alert-list" style="border:2px solid #d7dde6;border-radius:12px;">
+      <li class="alert-item">
+        <strong>Total:</strong>
+        ${report.currentKpis.total} grupos actuales versus ${report.previousKpis.total} al mismo corte anterior.
+        Diferencia: <span class="${diffClass(totalDiff)}">${formatDiff(totalDiff)}</span>.
+      </li>
+      <li class="alert-item">
+        <strong>Ganadas:</strong>
+        ${report.currentKpis.ganada} versus ${report.previousKpis.ganada}.
+        Diferencia: <span class="${diffClass(ganadasDiff)}">${formatDiff(ganadasDiff)}</span>.
+      </li>
+      <li class="alert-item">
+        <strong>Reuniones confirmadas:</strong>
+        ${report.currentKpis.reunion} versus ${report.previousKpis.reunion}.
+        Diferencia: <span class="${diffClass(reunionDiff)}">${formatDiff(reunionDiff)}</span>.
+      </li>
+    </div>
+  `;
+}
+
+function openVsModal() {
+  const modal = $("vsModal");
+  if (!modal) return;
+
+  initVsDefaults();
+
+  const report = buildVsReport();
+  state.lastVsReport = report;
+  renderVsReport(report);
+
+  modal.classList.remove("hidden");
+  document.body.style.overflow = "hidden";
+}
+
+function closeVsModal() {
+  const modal = $("vsModal");
+  if (!modal) return;
+
+  modal.classList.add("hidden");
+  document.body.style.overflow = "";
+  document.body.classList.remove("print-vs-only");
+}
+
+function runVsReport() {
+  const report = buildVsReport();
+  state.lastVsReport = report;
+  renderVsReport(report);
+}
+
+function exportVsXlsx() {
+  if (typeof XLSX === "undefined") {
+    alert("No se encontró la librería XLSX.");
+    return;
+  }
+
+  const report = state.lastVsReport || buildVsReport();
+
+  const wb = XLSX.utils.book_new();
+
+  const resumen = [
+    { Indicador: "Mes de corte", Valor: report.monthName },
+    { Indicador: "Año base actual", Valor: report.baseYear },
+    { Indicador: "Año viaje actual", Valor: report.currentTravelYear },
+    { Indicador: "Corte actual", Valor: formatDateCL(report.currentCutDate) },
+    { Indicador: "Año base anterior", Valor: report.previousBaseYear },
+    { Indicador: "Año viaje anterior", Valor: report.previousTravelYear },
+    { Indicador: "Corte anterior", Valor: formatDateCL(report.previousCutDate) },
+    { Indicador: "Vendedor(a)", Valor: report.vendorName || "Todas" },
+    { Indicador: "Total actual", Valor: report.currentKpis.total },
+    { Indicador: "Total anterior", Valor: report.previousKpis.total },
+    { Indicador: "Diferencia total", Valor: report.currentKpis.total - report.previousKpis.total },
+    { Indicador: "Ganadas actual", Valor: report.currentKpis.ganada },
+    { Indicador: "Ganadas anterior", Valor: report.previousKpis.ganada },
+    { Indicador: "Reuniones actual", Valor: report.currentKpis.reunion },
+    { Indicador: "Reuniones anterior", Valor: report.previousKpis.reunion }
+  ];
+
+  const estados = report.stageRows.map((row) => ({
+    indicador: row.label,
+    actual: row.current,
+    anterior: row.previous,
+    diferencia: row.diff,
+    variacionPct: Math.round(row.pct)
+  }));
+
+  const vendedores = report.vendorRows.map((row) => ({
+    vendedor: row.vendedor,
+    totalActual: row.totalActual,
+    totalAnterior: row.totalAnterior,
+    diferenciaTotal: row.diffTotal,
+    ganadasActual: row.ganadasActual,
+    ganadasAnterior: row.ganadasAnterior,
+    diferenciaGanadas: row.diffGanadas,
+    reunionesActual: row.reunionesActual,
+    reunionesAnterior: row.reunionesAnterior,
+    diferenciaReuniones: row.diffReuniones,
+    cotizandoActual: row.cotizandoActual,
+    cotizandoAnterior: row.cotizandoAnterior,
+    diferenciaCotizando: row.diffCotizando
+  }));
+
+  const gruposActual = report.currentRows.map((r) => ({
+    periodo: "Actual",
+    idGrupo: r.idGrupo || r.id || "",
+    aliasGrupo: r.aliasGrupo || "",
+    colegio: r.colegio || "",
+    anoViaje: r.anoViaje || "",
+    estado: r.estado || "",
+    vendedora: r.vendedora || "",
+    fechaCreacion: formatDateCL(extractRowDate(r))
+  }));
+
+  const gruposAnterior = report.previousRows.map((r) => ({
+    periodo: "Anterior",
+    idGrupo: r.idGrupo || r.id || "",
+    aliasGrupo: r.aliasGrupo || "",
+    colegio: r.colegio || "",
+    anoViaje: r.anoViaje || "",
+    estado: r.estado || "",
+    vendedora: r.vendedora || "",
+    fechaCreacion: formatDateCL(extractRowDate(r))
+  }));
+
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(resumen), "Resumen VS");
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(estados), "Estados");
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(vendedores), "Vendedores");
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(gruposActual), "Grupos actual");
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(gruposAnterior), "Grupos anterior");
+
+  XLSX.writeFile(
+    wb,
+    `comparativo_vs_${report.currentTravelYear}_vs_${report.previousTravelYear}_${new Date().toISOString().slice(0, 10)}.xlsx`
+  );
+}
+
+function exportVsPdf() {
+  document.body.classList.add("print-vs-only");
+  window.print();
+
+  setTimeout(() => {
+    document.body.classList.remove("print-vs-only");
+  }, 600);
+}
+
+/* =========================================================
    EXPORT
 ========================================================= */
 function exportXlsx(globalKpis, vendorKpis, rows, alerts, opportunities) {
@@ -1663,6 +2220,8 @@ function populateFilters() {
       .sort((a, b) => a.localeCompare(b, "es", { sensitivity: "base" })),
     "Todos"
   );
+
+  populateVsVendorFilter();
 }
 
 function applyFilters() {
@@ -1780,7 +2339,33 @@ function bindPageEvents() {
     exportPdf();
   });
 
-    $("analysisMode")?.addEventListener("change", () => {
+    $("btnOpenVs")?.addEventListener("click", () => {
+    openVsModal();
+  });
+
+  $("btnCloseVs")?.addEventListener("click", () => {
+    closeVsModal();
+  });
+
+  document.querySelectorAll("[data-close-vs='1']").forEach((el) => {
+    el.addEventListener("click", () => {
+      closeVsModal();
+    });
+  });
+
+  $("btnRunVs")?.addEventListener("click", () => {
+    runVsReport();
+  });
+
+  $("btnExportVsXlsx")?.addEventListener("click", () => {
+    exportVsXlsx();
+  });
+
+  $("btnExportVsPdf")?.addEventListener("click", () => {
+    exportVsPdf();
+  });
+
+  $("analysisMode")?.addEventListener("change", () => {
     readScoringInputs();
     renderAll();
   });
@@ -1825,7 +2410,10 @@ function bindPageEvents() {
   });
 
   document.addEventListener("keydown", (e) => {
-    if (e.key === "Escape") closeEvidenceModal();
+    if (e.key === "Escape") {
+      closeEvidenceModal();
+      closeVsModal();
+    }
   });
 }
 
