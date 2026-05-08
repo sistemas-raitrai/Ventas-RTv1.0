@@ -127,7 +127,6 @@ const BASE_COLUMNS = [
   "creadoPor",
   "creadoPorCorreo",
   "fechaCreacion",
-  "fechaIngresoSistema",
   "actualizadoPor",
   "actualizadoPorCorreo",
   "fechaActualizacion"
@@ -247,7 +246,6 @@ const LABELS = {
   creadoPor: "CREADO POR",
   creadoPorCorreo: "CORREO CREADOR",
   fechaCreacion: "FECHA CREACIÓN",
-  fechaIngresoSistema: "INGRESO SISTEMA",
   actualizadoPor: "ACTUALIZADO POR",
   actualizadoPorCorreo: "CORREO ACTUALIZACIÓN",
   fechaActualizacion: "FECHA ACTUALIZACIÓN"
@@ -532,7 +530,6 @@ const DATE_IMPORT_KEYS = new Set([
   "fechaActualizacionFicha",
   "fechaViaje",
   "fechaCreacion",
-  "fechaIngresoSistema",
   "fechaActualizacion"
 ]);
 
@@ -820,11 +817,7 @@ if (looksLikeInternalKey && !/\s/.test(original)) {
     "correo creado por": "creadoPorCorreo",
     "fecha creacion": "fechaCreacion",
     "fecha creación": "fechaCreacion",
-    
-    "ingreso sistema": "fechaIngresoSistema",
-    "fecha ingreso sistema": "fechaIngresoSistema",
-    "ingreso al sistema": "fechaIngresoSistema",
-    
+
     "actualizado por": "actualizadoPor",
     "correo actualizacion": "actualizadoPorCorreo",
     "correo actualización": "actualizadoPorCorreo",
