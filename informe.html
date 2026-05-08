@@ -423,6 +423,227 @@
       font-weight:700;
     }
 
+    /* =========================================================
+       MODAL COMPARATIVO VS
+    ========================================================= */
+    .vs-modal.hidden{
+      display:none !important;
+    }
+    
+    .vs-modal{
+      position:fixed;
+      inset:0;
+      z-index:10000;
+    }
+    
+    .vs-backdrop{
+      position:absolute;
+      inset:0;
+      background:rgba(24, 13, 38, 0.45);
+      backdrop-filter:blur(2px);
+    }
+    
+    .vs-dialog{
+      position:relative;
+      z-index:2;
+      width:min(1180px, calc(100vw - 32px));
+      max-height:calc(100vh - 40px);
+      margin:20px auto;
+      background:#fff;
+      border:2px solid #d7dde6;
+      border-radius:16px;
+      overflow:hidden;
+      box-shadow:0 24px 70px rgba(33, 18, 52, 0.28);
+      display:flex;
+      flex-direction:column;
+    }
+    
+    .vs-head{
+      display:flex;
+      justify-content:space-between;
+      gap:16px;
+      padding:16px 18px;
+      border-bottom:1px solid #e5e7eb;
+      background:#faf8fd;
+    }
+    
+    .vs-head h3{
+      margin:0 0 4px;
+      color:var(--header);
+      font-size:22px;
+    }
+    
+    .vs-head p{
+      margin:0;
+      color:#6d6480;
+      font-size:13px;
+      font-weight:700;
+    }
+    
+    .vs-close{
+      width:38px;
+      height:38px;
+      border:none;
+      border-radius:10px;
+      background:#ece8f4;
+      color:var(--header);
+      font-size:24px;
+      cursor:pointer;
+      font-weight:800;
+    }
+    
+    .vs-body{
+      padding:16px 18px 18px;
+      overflow:auto;
+    }
+    
+    .vs-filters{
+      display:grid;
+      grid-template-columns:repeat(5, minmax(0, 1fr));
+      gap:10px;
+      align-items:end;
+      margin-bottom:16px;
+    }
+    
+    .vs-filters input,
+    .vs-filters select{
+      width:100%;
+      height:42px;
+      border:2px solid var(--line);
+      border-radius:8px;
+      padding:0 12px;
+      background:#fff;
+      color:var(--header);
+    }
+    
+    .vs-summary{
+      display:grid;
+      grid-template-columns:repeat(6, minmax(120px, 1fr));
+      gap:10px;
+      margin-bottom:16px;
+    }
+    
+    .vs-card{
+      background:#fff;
+      border:2px solid #d7dde6;
+      border-radius:12px;
+      padding:12px 14px;
+    }
+    
+    .vs-card .label{
+      font-size:11px;
+      font-weight:800;
+      color:#6d6480;
+      text-transform:uppercase;
+    }
+    
+    .vs-card .value{
+      margin-top:5px;
+      font-size:24px;
+      font-weight:900;
+      color:var(--header);
+    }
+    
+    .vs-card .meta{
+      margin-top:4px;
+      font-size:12px;
+      color:#7b748a;
+      font-weight:700;
+    }
+    
+    .vs-table-wrap{
+      overflow:auto;
+      border:2px solid #d7dde6;
+      border-radius:12px;
+      margin-bottom:14px;
+    }
+    
+    .vs-table{
+      width:max-content;
+      min-width:100%;
+      border-collapse:collapse;
+    }
+    
+    .vs-table th{
+      background:var(--header);
+      color:#fff;
+      padding:10px;
+      text-align:left;
+      font-size:12px;
+      white-space:nowrap;
+    }
+    
+    .vs-table td{
+      border-bottom:1px solid #e5e7eb;
+      padding:10px;
+      font-size:13px;
+      white-space:nowrap;
+    }
+    
+    .vs-positive{
+      color:#127a3a;
+      font-weight:900;
+    }
+    
+    .vs-negative{
+      color:#b42318;
+      font-weight:900;
+    }
+    
+    .vs-neutral{
+      color:#6d6480;
+      font-weight:900;
+    }
+    
+    @media print{
+      .vs-modal{
+        position:static !important;
+        inset:auto !important;
+      }
+    
+      .vs-backdrop,
+      .vs-close,
+      .vs-filters,
+      #btnRunVs,
+      #btnExportVsXlsx,
+      #btnExportVsPdf{
+        display:none !important;
+      }
+    
+      .vs-dialog{
+        width:100% !important;
+        max-height:none !important;
+        margin:0 !important;
+        box-shadow:none !important;
+        border:none !important;
+      }
+    
+      body.print-vs-only .page-shell > section > *:not(#vsModal){
+        display:none !important;
+      }
+    
+      body.print-vs-only #vsModal{
+        display:block !important;
+      }
+    }
+    
+    @media (max-width:980px){
+      .vs-filters{
+        grid-template-columns:repeat(2, minmax(0, 1fr));
+      }
+    
+      .vs-summary{
+        grid-template-columns:repeat(2, minmax(120px, 1fr));
+      }
+    }
+    
+    @media (max-width:560px){
+      .vs-filters,
+      .vs-summary{
+        grid-template-columns:1fr;
+      }
+    }
+
     .evidence-modal.hidden{
       display:none !important;
     }
@@ -745,6 +966,7 @@
           </div>
 
           <div class="informe-actions">
+            <button id="btnOpenVs" class="btn-page light" type="button">Comparativo VS</button>
             <button id="btnExportXlsx" class="btn-page sec" type="button">Exportar XLSX</button>
             <button id="btnActualizar" class="btn-page" type="button">Actualizar</button>
           </div>
@@ -923,6 +1145,74 @@
 
       <div class="footer-note">
         Informe generado desde ventas_cotizaciones y ventas_historial. Exportación PDF mediante impresión del navegador.
+      </div>
+
+      <div id="vsModal" class="vs-modal hidden">
+        <div class="vs-backdrop" data-close-vs="1"></div>
+      
+        <div class="vs-dialog" role="dialog" aria-modal="true" aria-labelledby="vsTitle">
+          <div class="vs-head">
+            <div>
+              <h3 id="vsTitle">Comparativo comercial año a año</h3>
+              <p id="vsSubtitle">
+                Compara cómo vamos hoy versus cómo íbamos el año pasado a la misma fecha.
+              </p>
+            </div>
+            <button id="btnCloseVs" class="vs-close" type="button" aria-label="Cerrar">×</button>
+          </div>
+      
+          <div class="vs-body">
+            <div class="vs-filters">
+              <div class="field-wrap">
+                <label for="vsMesCorte">Mes de corte</label>
+                <select id="vsMesCorte">
+                  <option value="1">Enero</option>
+                  <option value="2">Febrero</option>
+                  <option value="3">Marzo</option>
+                  <option value="4">Abril</option>
+                  <option value="5">Mayo</option>
+                  <option value="6">Junio</option>
+                  <option value="7">Julio</option>
+                  <option value="8">Agosto</option>
+                  <option value="9">Septiembre</option>
+                  <option value="10">Octubre</option>
+                  <option value="11">Noviembre</option>
+                  <option value="12">Diciembre</option>
+                </select>
+              </div>
+      
+              <div class="field-wrap">
+                <label for="vsAnoBase">Año base comercial</label>
+                <input id="vsAnoBase" type="number" min="2024" max="2099" step="1" />
+              </div>
+      
+              <div class="field-wrap">
+                <label for="vsAnoViajeActual">Año viaje actual</label>
+                <input id="vsAnoViajeActual" type="number" min="2024" max="2099" step="1" />
+              </div>
+      
+              <div class="field-wrap">
+                <label for="vsVendedora">Vendedor(a)</label>
+                <select id="vsVendedora">
+                  <option value="">Todas</option>
+                </select>
+              </div>
+      
+              <div class="informe-actions">
+                <button id="btnRunVs" class="btn-page" type="button">Generar VS</button>
+              </div>
+            </div>
+      
+            <div id="vsResult">
+              <div class="empty">Selecciona los parámetros y genera el comparativo.</div>
+            </div>
+      
+            <div class="informe-actions" style="justify-content:flex-end;margin-top:14px;">
+              <button id="btnExportVsXlsx" class="btn-page sec" type="button">Exportar VS XLSX</button>
+              <button id="btnExportVsPdf" class="btn-page light" type="button">Exportar VS PDF</button>
+            </div>
+          </div>
+        </div>
       </div>
 
       <div id="evidenceModal" class="evidence-modal hidden">
