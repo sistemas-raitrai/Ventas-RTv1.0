@@ -1619,10 +1619,28 @@ function syncButtons() {
   const btnGuardarBottom = $("btnGuardarFichaBottom");
   if (btnGuardarBottom) btnGuardarBottom.disabled = !editable || state.isUploadingProgramaPdf;
   
+  const flujoAbierto = !!state.group?.fichaFlujoAbierto;
+  const pdfVigente = tienePdf && !flujoAbierto;
+  const autorizada = !!state.group?.autorizada;
+
   const btnAbrirPdf = $("btnAbrirPdfFicha");
   if (btnAbrirPdf) {
     btnAbrirPdf.classList.toggle("hidden", !tienePdf);
     btnAbrirPdf.disabled = !tienePdf;
+
+    btnAbrirPdf.classList.toggle("btn-light", pdfVigente);
+    btnAbrirPdf.classList.toggle("btn-pill", !pdfVigente);
+  }
+
+  const btnContrato = $("btnAbrirContratoPdf");
+  if (btnContrato) {
+    const vendedor = isVendorRole();
+
+    btnContrato.classList.toggle("hidden", vendedor && !autorizada);
+    btnContrato.disabled = vendedor && !autorizada;
+
+    btnContrato.classList.toggle("btn-light", autorizada);
+    btnContrato.classList.toggle("btn-pill", !autorizada);
   }
   
   const canGeneratePdf = canGeneratePdfVersionAsCurrentUser();
@@ -1638,8 +1656,8 @@ function syncButtons() {
     btnGenerarPdf.classList.toggle("hidden", !canGeneratePdf);
     btnGenerarPdf.disabled = !canGeneratePdf || !canOpenFicha();
   
-    btnGenerarPdf.classList.toggle("btn-light", listoParaGenerarPdf);
-    btnGenerarPdf.classList.toggle("btn-pill", !listoParaGenerarPdf);
+    btnGenerarPdf.classList.toggle("btn-light", listoParaGenerarPdf && !pdfVigente);
+    btnGenerarPdf.classList.toggle("btn-pill", !(listoParaGenerarPdf && !pdfVigente));
   }
   
   const btnGenerarPdfBottom = $("btnGenerarPdfVersionBottom");
@@ -1647,8 +1665,8 @@ function syncButtons() {
     btnGenerarPdfBottom.classList.toggle("hidden", !canGeneratePdf);
     btnGenerarPdfBottom.disabled = !canGeneratePdf || !canOpenFicha();
   
-    btnGenerarPdfBottom.classList.toggle("btn-light", listoParaGenerarPdf);
-    btnGenerarPdfBottom.classList.toggle("btn-pill", !listoParaGenerarPdf);
+    btnGenerarPdfBottom.classList.toggle("btn-light", listoParaGenerarPdf && !pdfVigente);
+    btnGenerarPdfBottom.classList.toggle("btn-pill", !(listoParaGenerarPdf && !pdfVigente));
   }
   
   document.querySelectorAll("#formFicha input, #formFicha select, #formFicha textarea").forEach((el) => {
