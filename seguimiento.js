@@ -625,13 +625,14 @@ function renderRow(row) {
   const ultimaReunion = formatDateTime(row.fechaUltimaReunion, "Sin reunión");
 
   return `
-    <td>
-      <a
-        class="seg-group-link"
-        href="grupo.html?id=${encodeURIComponent(row.idGrupo || row.id)}"
-        target="_blank"
-        rel="noopener noreferrer"
-      >
+      <tr>
+        <td>
+        <a
+          class="seg-group-link"
+          href="grupo.html?id=${encodeURIComponent(row.idGrupo || row.id)}"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
         <div class="seg-avatar">${avatarHtml}</div>
       
           <div class="seg-group-info">
@@ -1217,7 +1218,9 @@ function buildGrupoSortTitle(displayTitle = "", colegioFallback = "") {
   const title = cleanText(displayTitle);
   const colegio = cleanText(colegioFallback);
 
-  const base = colegio || title;
+  // Prioridad: usar el título ya reordenado visualmente.
+  // Ej: "INSTITUTO LA SALLE 1B (2026) - 3B (2028)"
+  const base = title || colegio;
 
   return normalizeText(base)
     // elimina cursos/años al inicio
