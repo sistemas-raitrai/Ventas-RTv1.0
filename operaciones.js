@@ -137,6 +137,7 @@ function bindEvents() {
     applyFiltersAndRender();
   });
 
+  $("filtroDestinoOps")?.addEventListener("change", applyFiltersAndRender);
   $("filtroDocOps")?.addEventListener("change", applyFiltersAndRender);
   $("buscadorOps")?.addEventListener("input", debounce(applyFiltersAndRender, 180));
 
@@ -188,6 +189,7 @@ async function loadOperaciones() {
     }));
 
     fillYearFilter();
+    fillDestinoFilter();
     applyFiltersAndRender();
   } catch (error) {
     console.error("[operaciones] loadOperaciones", error);
@@ -290,6 +292,7 @@ function mapRow(docId, data = {}) {
 
 function applyFiltersAndRender() {
   const ano = String($("filtroAnoOps")?.value || state.anoFiltro || "");
+  const filtroDestino = $("filtroDestinoOps")?.value || "todos";
   const filtroDoc = $("filtroDocOps")?.value || "todos";
   const q = normalizeSearch($("buscadorOps")?.value || "");
 
@@ -299,6 +302,9 @@ function applyFiltersAndRender() {
 
   if (ano && ano !== "todos") {
     rows = rows.filter((row) => String(row.anoViaje || "") === String(ano));
+  }
+  if (filtroDestino !== "todos") {
+    rows = rows.filter((row) => normalizeSearch(row.destino || "") === normalizeSearch(filtroDestino));
   }
 
   rows = rows.filter((row) => {
@@ -610,6 +616,32 @@ function fillYearFilter() {
 
   select.value = years.includes(state.anoFiltro) ? state.anoFiltro : defaultYear;
   state.anoFiltro = select.value;
+}
+
+function fillDestinoFilter() {
+  const select = $("filtroDestinoOps");
+  if (!select) return;
+
+  const previous = select.value || "todos";
+
+  const destinos = [...new Set(
+    state.allRows
+      .filter((row) => row.estado === "ganada")
+      .map((row) => cleanText(row.destino || ""))
+      .filter(Boolean)
+  )].sort((a, b) => a.localeCompare(b, "es", {
+    sensitivity: "base",
+    numeric: true
+  }));
+
+  select.innerHTML = `
+    <option value="todos">Todos</option>
+    ${destinos.map((destino) => `
+      <option value="${escapeAttr(destino)}">${escapeHtml(destino)}</option>
+    `).join("")}
+  `;
+
+  select.value = destinos.includes(previous) ? previous : "todos";
 }
 
 function exportarXlsx() {
