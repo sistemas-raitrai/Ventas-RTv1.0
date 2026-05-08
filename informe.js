@@ -208,7 +208,16 @@ function getCommercialCutDate(year, monthNumber) {
 
 function extractRowDate(row = {}) {
   const raw =
+    // Prioridad 1:
+    // Fecha histórica importada desde el sistema anterior.
+    // Sirve para comparativos año a año.
+    row.fechaIngresoSistema ||
+
+    // Prioridad 2:
+    // Fecha real de creación en el sistema actual.
     row.fechaCreacion ||
+
+    // Fallbacks por si existen otros nombres antiguos.
     row.creado ||
     row.createdAt ||
     row.fechaRegistro ||
