@@ -172,12 +172,17 @@ function normalizeStage(value = "") {
   const raw = normalizeLoose(value);
 
   if (!raw) return "";
-  if (raw.includes("reunion")) return "reunion_confirmada";
-  if (raw.includes("cotiz")) return "cotizando";
+
+  if (raw.includes("a contactar")) return "a_contactar";
   if (raw.includes("contactad")) return "contactado";
+
+  if (raw.includes("reunion") && raw.includes("confirm")) return "reunion_confirmada";
+
+  if (raw.includes("recot") || raw.includes("re cot")) return "cotizando";
+  if (raw.includes("cotiz")) return "cotizando";
+
   if (raw.includes("ganad")) return "ganada";
   if (raw.includes("perdid")) return "perdida";
-  if (raw.includes("a contactar")) return "a_contactar";
 
   return raw;
 }
@@ -2645,8 +2650,14 @@ function populateFilters() {
 
   fillSelect(
     "filterEstado",
-    [...new Set(state.quoteRows.map((r) => normalizeText(r.estado)).filter(Boolean))]
-      .sort((a, b) => a.localeCompare(b, "es", { sensitivity: "base" })),
+    [
+      "A contactar",
+      "Contactado",
+      "Cotizando / Re Cotizando",
+      "Reunión Confirmada",
+      "Ganada",
+      "Perdida"
+    ],
     "Todos"
   );
 
@@ -2673,7 +2684,8 @@ function applyFilters() {
   }
 
   if (state.filters.estado) {
-    rows = rows.filter((row) => normalizeText(row.estado) === state.filters.estado);
+    const estadoFiltro = normalizeStage(state.filters.estado);
+    rows = rows.filter((row) => normalizeStage(row.estado) === estadoFiltro);
   }
 
   const q = normalizeSearch(state.filters.search || "");
