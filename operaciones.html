@@ -412,6 +412,32 @@
       border-radius:999px;
     }
 
+    .ops-col-grupo{
+      max-width:270px;
+      width:270px;
+    }
+    
+    .ops-group-title{
+      max-width:250px;
+    }
+    
+    .ops-table td{
+      max-width:220px;
+      overflow:hidden;
+      text-overflow:ellipsis;
+    }
+    
+    .ops-status-btn{
+      border:none;
+      cursor:pointer;
+      font:inherit;
+    }
+    
+    .ops-status-btn:disabled{
+      cursor:not-allowed;
+      opacity:.65;
+    }
+
     @media(max-width:1000px){
       .ops-toolbar{ grid-template-columns:1fr 1fr; }
       .ops-summary{ grid-template-columns:repeat(2, minmax(0,1fr)); }
@@ -506,15 +532,17 @@
                 <th>Vendedor(a)</th>
                 <th>Destino</th>
                 <th>Año</th>
-                <th>Ficha</th>
+                <th>PAX</th>
+                <th>Tramo</th>
                 <th>Estado operativo</th>
+                <th>Usuario estado</th>
                 <th>Documentos / accesos</th>
                 <th>Acciones</th>
               </tr>
             </thead>
             <tbody id="tbodyOperaciones">
               <tr>
-                <td colspan="8" class="ops-empty">Cargando grupos...</td>
+                <td colspan="10" class="ops-empty">Cargando grupos...</td>
               </tr>
             </tbody>
           </table>
