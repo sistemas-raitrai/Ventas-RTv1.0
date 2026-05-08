@@ -1711,14 +1711,12 @@ function initVsDefaults() {
   const d = getVsDefaults();
 
   if ($("vsMesCorte")) $("vsMesCorte").value = String(d.month);
-  if ($("vsAnoBase")) $("vsAnoBase").value = String(d.baseYear);
 
-  // Regla fija:
-  // Mayo 2026 compara viaje 2027
-  // contra Mayo 2025 viaje 2026.
-  if ($("vsAnoViajeActual")) {
-    $("vsAnoViajeActual").value = String(d.baseYear + 1);
-  }
+  if ($("vsAnoBase")) $("vsAnoBase").value = String(d.baseYear);
+  if ($("vsAnoViajeActual")) $("vsAnoViajeActual").value = String(d.baseYear + 1);
+
+  if ($("vsAnoBaseAnterior")) $("vsAnoBaseAnterior").value = String(d.baseYear - 1);
+  if ($("vsAnoViajeAnterior")) $("vsAnoViajeAnterior").value = String(d.baseYear);
 
   populateVsVendorFilter();
 }
@@ -1976,18 +1974,12 @@ function buildVendorVsRows(currentRows = [], previousRows = []) {
 
 function buildVsReport() {
   const month = Number($("vsMesCorte")?.value || 1);
+
   const baseYear = Number($("vsAnoBase")?.value || getCurrentCommercialYear());
+  const currentTravelYear = Number($("vsAnoViajeActual")?.value || (baseYear + 1));
 
-  // Regla correcta:
-  // Si comparo Mayo 2026, miro grupos viaje 2027.
-  // Contra Mayo 2025, miro grupos viaje 2026.
-  const currentTravelYear = baseYear + 1;
-  const previousBaseYear = baseYear - 1;
-  const previousTravelYear = baseYear;
-
-  if ($("vsAnoViajeActual")) {
-    $("vsAnoViajeActual").value = String(currentTravelYear);
-  }
+  const previousBaseYear = Number($("vsAnoBaseAnterior")?.value || (baseYear - 1));
+  const previousTravelYear = Number($("vsAnoViajeAnterior")?.value || baseYear);
 
   const vendorName = normalizeText($("vsVendedora")?.value || "");
 
@@ -2003,7 +1995,7 @@ function buildVsReport() {
     cutDate: currentCutDate,
     vendorName
   });
-  
+
   const previousRows = buildRowsForVsSnapshot({
     rows: state.quoteRows,
     anoViaje: previousTravelYear,
@@ -2013,7 +2005,7 @@ function buildVsReport() {
 
   const currentKpis = computeGlobalKpis(currentRows);
   const previousKpis = computeGlobalKpis(previousRows);
-  
+
   const currentMonthly = buildVsMonthlyMovement({
     rows: state.quoteRows,
     anoViaje: currentTravelYear,
@@ -2021,7 +2013,7 @@ function buildVsReport() {
     endDate: currentCutDate,
     vendorName
   });
-  
+
   const previousMonthly = buildVsMonthlyMovement({
     rows: state.quoteRows,
     anoViaje: previousTravelYear,
@@ -2029,12 +2021,10 @@ function buildVsReport() {
     endDate: previousCutDate,
     vendorName
   });
-  
+
   const stageRows = buildStageVsRows(currentKpis, previousKpis);
   const monthlyRows = buildMonthlyVsRows(currentMonthly, previousMonthly);
   const vendorRows = buildVendorVsRows(currentRows, previousRows);
-
-  
 
   return {
     month,
@@ -2737,9 +2727,9 @@ function bindPageEvents() {
   $("vsAnoBase")?.addEventListener("input", () => {
     const baseYear = Number($("vsAnoBase")?.value || getCurrentCommercialYear());
   
-    if ($("vsAnoViajeActual")) {
-      $("vsAnoViajeActual").value = String(baseYear + 1);
-    }
+    if ($("vsAnoViajeActual")) $("vsAnoViajeActual").value = String(baseYear + 1);
+    if ($("vsAnoBaseAnterior")) $("vsAnoBaseAnterior").value = String(baseYear - 1);
+    if ($("vsAnoViajeAnterior")) $("vsAnoViajeAnterior").value = String(baseYear);
   });
 
   $("btnExportVsXlsx")?.addEventListener("click", () => {
