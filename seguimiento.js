@@ -358,8 +358,10 @@ function mapClienteDoc(id, data) {
     data.etapaComercial
   );
 
-  const autorizada = resolveAutorizada(data);
-  const cerrada = resolveCerrada(data);
+  const visualFicha = resolveFichaVisualState(data);
+  
+  const autorizada = visualFicha.autorizadaVisual;
+  const cerrada = visualFicha.fichaCerrada;
 
   const imagen = cleanText(
     data.imagen ||
@@ -409,20 +411,14 @@ function mapClienteDoc(id, data) {
   const contratoEstado = normalizeDocState(data.contratoEstado);
   const cortesiaEstado = normalizeDocState(data.cortesiaEstado);
 
-  const displayTitle = aliasGrupo || nombreApoderado || nombreGrupo || `Grupo ${id}`;
-
-  let subtitleParts = [];
-
-  if (aliasGrupo) {
-    subtitleParts = [
-      anoViaje ? `Año ${anoViaje}` : ""
-    ].filter(Boolean);
-  } else {
-    subtitleParts = [
-      colegio || nombreGrupo || "",
-      anoViaje ? `Año ${anoViaje}` : ""
-    ].filter(Boolean);
-  }
+  const displayTitleRaw = aliasGrupo || nombreApoderado || nombreGrupo || `Grupo ${id}`;
+  const displayTitle = buildGrupoDisplayTitle(displayTitleRaw, colegio || nombreGrupo);
+  
+  const grupoSortTitle = buildGrupoSortTitle(displayTitle, colegio || nombreGrupo);
+  
+  let subtitleParts = [
+    anoViaje ? `Año ${anoViaje}` : ""
+  ].filter(Boolean);
 
   return {
     id,
@@ -449,6 +445,8 @@ function mapClienteDoc(id, data) {
     contratoEstado,
     cortesiaEstado,
     displayTitle,
+    displayTitleRaw,
+    grupoSortTitle,
     subtitleParts,
     hasAlias: !!aliasGrupo,
     avatarBaseText: colegio || nombreGrupo || nombreApoderado || displayTitle,
@@ -628,7 +626,9 @@ function renderRow(row) {
         <div class="seg-avatar">${avatarHtml}</div>
       
           <div class="seg-group-info">
-            <div class="seg-group-title">${escapeHtml(row.displayTitle)}</div>
+            <div class="seg-group-title" title="${escapeAttr(row.displayTitleRaw || row.displayTitle)}">
+              ${escapeHtml(row.displayTitle)}
+            </div>
       
             <div class="seg-group-sub">
               ${row.subtitleParts.map((part) => `<span>${escapeHtml(part)}</span>`).join("")}
@@ -919,7 +919,7 @@ function compareRows(a, b, sortKey, sortDir) {
 
   switch (sortKey) {
     case "grupo":
-      result = compareText(a.displayTitle, b.displayTitle);
+      result = compareText(a.grupoSortTitle || a.displayTitle, b.grupoSortTitle || b.displayTitle);
       break;
 
     case "vendedora":
@@ -961,7 +961,7 @@ function compareRows(a, b, sortKey, sortDir) {
       break;
 
     default:
-      result = compareText(a.displayTitle, b.displayTitle);
+      result = compareText(a.grupoSortTitle || a.displayTitle, b.grupoSortTitle || b.displayTitle);
       break;
   }
 
@@ -1077,6 +1077,41 @@ function normalizeEstado(value) {
   return "a_contactar";
 }
 
+function resolveFichaVisualState(data = {}) {
+  const anoViajeNum = Number(data?.anoViaje || 0);
+  const esLegacy2025 = anoViajeNum <= 2025;
+
+  const flujoAbierto = !!data?.fichaFlujoAbierto;
+
+  const tienePdf = !!cleanText(
+    data?.ficha?.pdfUrl ||
+    data?.fichaPdfUrl ||
+    data?.ficha?.urlPdf ||
+    ""
+  );
+
+  const autorizadaVisual = esLegacy2025
+    ? resolveAutorizada(data)
+    : (tienePdf && !flujoAbierto);
+
+  const fichaCerrada = !flujoAbierto && (
+    esLegacy2025
+      ? resolveCerrada(data)
+      : !!(
+          data?.flowFicha?.vendedor?.firmado &&
+          data?.flowFicha?.jefaVentas?.firmado &&
+          data?.flowFicha?.administracion?.firmado
+        )
+  );
+
+  return {
+    autorizadaVisual,
+    fichaCerrada,
+    flujoAbierto,
+    tienePdf
+  };
+}
+
 function resolveAutorizada(data) {
   const raw = data.autorizada ?? data.autorizacion ?? data.estadoAutorizacion ?? null;
 
@@ -1147,6 +1182,42 @@ function getDocLabel(value) {
 /* =========================================================
    HELPERS
 ========================================================= */
+function buildGrupoDisplayTitle(title = "", colegioFallback = "") {
+  const raw = cleanText(title);
+  if (!raw) return "";
+
+  // Detecta cursos/años al inicio:
+  // 1B (2026) 3B (2028) INSTITUTO...
+  // 1B (2026) - 3B (2028) INSTITUTO...
+  const match = raw.match(/^((?:\d{1,2}[A-ZÁÉÍÓÚÑ]*\s*\(\d{4}\)\s*(?:-|–|—)?\s*)+)(.+)$/i);
+
+  if (!match) return raw;
+
+  const cursos = cleanText(match[1])
+    .replace(/\s+/g, " ")
+    .replace(/\s*-\s*/g, " - ");
+
+  const colegio = cleanText(match[2]) || cleanText(colegioFallback);
+
+  if (!colegio || !cursos) return raw;
+
+  return `${colegio} ${cursos}`.replace(/\s+/g, " ").trim();
+}
+
+function buildGrupoSortTitle(displayTitle = "", colegioFallback = "") {
+  const title = cleanText(displayTitle);
+  const colegio = cleanText(colegioFallback);
+
+  if (colegio) {
+    return normalizeText(colegio);
+  }
+
+  // Si no hay colegio limpio, ordena ignorando cursos/años al final.
+  return normalizeText(
+    title.replace(/\s+\d{1,2}[A-ZÁÉÍÓÚÑ]*\s*\(\d{4}\).*$/i, "")
+  );
+}
+
 function normalizeText(value) {
   return String(value ?? "")
     .normalize("NFD")
