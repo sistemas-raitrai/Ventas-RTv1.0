@@ -1862,6 +1862,35 @@ function buildVsMonthlyMovement({ rows = [], anoViaje, startDate, endDate, vendo
   };
 }
 
+function buildStageVsRows(currentKpis, previousKpis) {
+  const rows = [
+    ["Total", "total"],
+    ["Activos", "activos"],
+    ["A contactar", "aContactar"],
+    ["Contactado", "contactado"],
+    ["Cotizando", "cotizando"],
+    ["Reunión confirmada", "reunion"],
+    ["Ganada", "ganada"],
+    ["Perdida", "perdida"],
+    ["Sin asignar", "sinAsignar"]
+  ];
+
+  return rows.map(([label, key]) => {
+    const current = Number(currentKpis[key] || 0);
+    const previous = Number(previousKpis[key] || 0);
+    const diff = current - previous;
+    const pct = pctChange(current, previous);
+
+    return {
+      label,
+      current,
+      previous,
+      diff,
+      pct
+    };
+  });
+}
+
 function buildMonthlyVsRows(currentMonthly, previousMonthly) {
   const rows = [
     ["Ingresaron en el mes", "ingresos"],
