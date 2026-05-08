@@ -48,7 +48,7 @@
 
     .ops-toolbar{
       display:grid;
-      grid-template-columns:160px 180px 1fr auto auto;
+      grid-template-columns:150px 180px 190px 1fr auto auto;
       gap:10px;
       align-items:end;
       margin-bottom:18px;
@@ -467,7 +467,14 @@
           <label for="filtroAnoOps">Año viaje</label>
           <select id="filtroAnoOps"></select>
         </div>
-
+        
+        <div class="ops-field">
+          <label for="filtroDestinoOps">Destino</label>
+          <select id="filtroDestinoOps">
+            <option value="todos">Todos</option>
+          </select>
+        </div>
+        
         <div class="ops-field">
           <label for="filtroDocOps">Documentos</label>
           <select id="filtroDocOps">
