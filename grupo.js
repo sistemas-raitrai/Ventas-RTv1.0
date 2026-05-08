@@ -927,6 +927,14 @@ function canEditGroup() {
   return canAccessGroup(state.group);
 }
 
+function canManageMeetings() {
+  if (!state.canModify) return false;
+
+  // Reuniones se pueden seguir creando/editando aunque el vendedor ya haya firmado.
+  // La firma bloquea datos y situación, pero no agenda.
+  return canAccessGroup(state.group);
+}
+
 function canCreateAlertsAndComments() {
   // Debe poder:
   // - quien ya puede editar normalmente
@@ -964,6 +972,45 @@ function canManageHistoryItems() {
 
 function isEffectiveVendorRole() {
   return String(state.effectiveUser?.rol || "").toLowerCase() === "vendedor";
+}
+
+function isRealAdminRoleGrupo() {
+  return String(state.effectiveUser?.rol || "").toLowerCase() === "admin";
+}
+
+function isJefaVentasStrict() {
+  return normalizeEmail(state.effectiveEmail || "") === "chernandez@raitrai.cl";
+}
+
+function canBypassEstadoAutorizadoLock() {
+  return isRealAdminRoleGrupo() || isJefaVentasStrict();
+}
+
+function hasFichaPdfVigente(groupData = state.group || {}) {
+  const tienePdf = !!cleanText(
+    getByPath(groupData, "ficha.pdfUrl") ||
+    groupData?.fichaPdfUrl ||
+    ""
+  );
+
+  return tienePdf && !groupData?.fichaFlujoAbierto;
+}
+
+function isGrupoAutorizadoVisual(groupData = state.group || {}) {
+  const anoViajeNum = Number(groupData?.anoViaje || 0);
+  const esLegacy2025 = anoViajeNum <= 2025;
+
+  if (esLegacy2025) return !!groupData?.autorizada;
+
+  return !!groupData?.autorizada || hasFichaPdfVigente(groupData);
+}
+
+function canEditSituacionGrupo() {
+  // Misma regla que editar datos:
+  // si el vendedor ya firmó, queda bloqueado para cambiar situación.
+  // Ganada NO bloquea por sí sola.
+  // No metemos aquí regla de autorizada.
+  return canEditGroup();
 }
 
 function shouldAutoMarkVendorGroupAsContacted(groupData = {}) {
@@ -2901,15 +2948,27 @@ function syncButtons() {
 
   [
     "btnEditarDatosHero",
-    "btnEditarDatos",
-    "btnEditarSituacionHero",
-    "btnEditarSituacion",
+    "btnEditarDatos"
+  ].forEach((id) => {
+    const el = $(id);
+    if (el) el.disabled = !editable;
+  });
+  
+  [
     "btnNuevaReunionHero",
     "btnNuevaReunion",
     "btnNuevaReunionListado"
   ].forEach((id) => {
     const el = $(id);
-    if (el) el.disabled = !editable;
+    if (el) el.disabled = !canManageMeetings();
+  });
+  
+  [
+    "btnEditarSituacionHero",
+    "btnEditarSituacion"
+  ].forEach((id) => {
+    const el = $(id);
+    if (el) el.disabled = !canEditSituacionGrupo();
   });
 
   [
@@ -3612,36 +3671,42 @@ function getSharedObsOperaciones(groupData = state.group || {}) {
 }
 
 function openSituacionModal() {
-  if (!canEditGroup()) {
+  if (!canEditSituacionGrupo()) {
     alert(getBlockedEditMessage());
     return;
   }
 
-  setFormValue("s_estado", normalizeState(state.group.estado));
+  const estadoActual = normalizeState(state.group.estado);
+
   setFormValue("s_mensajeHistorial", "");
+
+  const selectEstado = $("s_estado");
+  if (selectEstado) {
+    selectEstado.innerHTML = `
+      <option value="contactado">Contactado</option>
+      <option value="cotizando">Cotizando</option>
+      <option value="recotizando">Recotizando</option>
+      <option value="reunion_confirmada">Reunión confirmada</option>
+      <option value="ganada">Ganada</option>
+      <option value="perdida">Perdida</option>
+    `;
+
+    setFormValue(
+      "s_estado",
+      estadoActual === "a_contactar" ? "contactado" : estadoActual
+    );
+  }
 
   const meetingBaseDate = getSituacionMeetingBaseDate();
   setFormValue("s_fechaReunion", meetingBaseDate ? toDatetimeLocal(meetingBaseDate) : "");
 
-  setRichEditorHtml(
-    "s_obsAdmin",
-    getSharedObsAdministracion(state.group)
-  );
-  
-  setRichEditorHtml(
-    "s_obsOperaciones",
-    getSharedObsOperaciones(state.group)
-  );
+  setRichEditorHtml("s_obsAdmin", getSharedObsAdministracion(state.group));
+  setRichEditorHtml("s_obsOperaciones", getSharedObsOperaciones(state.group));
 
   openModal("modalSituacion");
 
-  requestAnimationFrame(() => {
-    syncSituacionStateUI();
-  });
-
-  setTimeout(() => {
-    syncSituacionStateUI();
-  }, 0);
+  requestAnimationFrame(syncSituacionStateUI);
+  setTimeout(syncSituacionStateUI, 0);
 }
 
 function openDocsModal() {
@@ -3660,8 +3725,8 @@ function openDocsModal() {
 }
 
 function openMeetingModal() {
-  if (!canEditGroup()) {
-    alert(getBlockedEditMessage());
+  if (!canManageMeetings()) {
+    alert("No tienes permisos para crear reuniones en este grupo.");
     return;
   }
 
@@ -3677,6 +3742,11 @@ function openMeetingModal() {
 }
 
 async function openEditMeetingModal(id) {
+  if (!canManageMeetings()) {
+    alert("No tienes permisos para editar reuniones en este grupo.");
+    return;
+  }
+
   const meeting = state.meetings.find((m) => m.id === id);
   if (!meeting) {
     alert("No se encontró la reunión.");
@@ -3714,6 +3784,8 @@ async function openEditMeetingModal(id) {
   setText("btnGuardarReunionLabel", "Guardar cambios");
   openModal("modalReunion");
 }
+
+
 
 function openAlertModal() {
   if (!canCreateAlertsAndComments()) {
@@ -4396,7 +4468,7 @@ async function saveDatos() {
 }
 
 async function saveSituacion() {
-  if (!canEditGroup()) {
+if (!canEditSituacionGrupo()) {
     alert(getBlockedEditMessage());
     return;
   }
@@ -4421,6 +4493,62 @@ async function saveSituacion() {
   if (isReunionConfirmada && !fechaReunionRaw) {
     alert("Debes indicar la fecha de la reunión cuando el estado es Reunión confirmada.");
     return;
+  }
+
+  const flujoNormal = {
+    a_contactar: ["contactado"],
+    contactado: ["cotizando"],
+    cotizando: ["reunion_confirmada"],
+    reunion_confirmada: ["ganada", "perdida", "recotizando"],
+    perdida: ["recotizando"],
+    recotizando: ["cotizando", "reunion_confirmada", "ganada", "perdida"],
+    ganada: ["contactado", "cotizando", "reunion_confirmada", "recotizando", "perdida"]
+  };
+  
+  const cambioEstado = estadoNuevo !== estadoAnterior;
+  const esSaltoFlujo =
+    cambioEstado &&
+    estadoNuevo !== "ganada" &&
+    !(flujoNormal[estadoAnterior] || []).includes(estadoNuevo);
+  
+  const esGanadaSaltando =
+    cambioEstado &&
+    estadoNuevo === "ganada" &&
+    estadoAnterior !== "reunion_confirmada";
+  
+  let justificacionSalto = "";
+  
+  if (esSaltoFlujo || esGanadaSaltando) {
+    const omitidos =
+      esGanadaSaltando
+        ? getPasosOmitidosHastaGanada(estadoAnterior)
+        : [];
+  
+    const ok = confirm(
+      [
+        "Estás realizando un cambio fuera del flujo comercial normal.",
+        "",
+        `Cambio: ${getEstadoLabel(estadoAnterior)} → ${getEstadoLabel(estadoNuevo)}`,
+        omitidos.length ? `Pasos omitidos: ${omitidos.map(getEstadoLabel).join(", ")}` : "",
+        "",
+        "Este salto quedará registrado en el historial.",
+        "¿Deseas continuar?"
+      ].filter(Boolean).join("\n")
+    );
+  
+    if (!ok) return;
+  
+    justificacionSalto = cleanText(
+      window.prompt(
+        "Justifica el salto de flujo. Esto quedará en el historial:",
+        mensajeHistorial
+      ) || ""
+    );
+  
+    if (!justificacionSalto) {
+      alert("Debes justificar el salto de flujo.");
+      return;
+    }
   }
 
   // 1) Cambio de estado
@@ -4615,17 +4743,53 @@ async function saveSituacion() {
 
   await applyCriticalChangeRules(patch, cambios);
 
+  const omitidosFinal = getPasosOmitidosHastaGanada(estadoAnterior);
+  
+  const mensajeFinal = [
+    mensajeHistorial,
+    (esSaltoFlujo || esGanadaSaltando)
+      ? `⚠️ Cambio con salto de flujo comercial: ${getEstadoLabel(estadoAnterior)} → ${getEstadoLabel(estadoNuevo)}.`
+      : "",
+    esGanadaSaltando && omitidosFinal.length
+      ? `Pasos omitidos: ${omitidosFinal.map(getEstadoLabel).join(", ")}.`
+      : "",
+    justificacionSalto
+      ? `Justificación del salto: ${justificacionSalto}.`
+      : ""
+  ].filter(Boolean).join("\n\n");
+  
   await saveGroupPatch(patch, {
-    tipoMovimiento: "cambio_estado",
+    tipoMovimiento: (esSaltoFlujo || esGanadaSaltando)
+      ? "cambio_estado_salto_flujo"
+      : "cambio_estado",
     modulo: "grupo",
-    titulo: "Actualización de situación",
+    titulo: (esSaltoFlujo || esGanadaSaltando)
+      ? "Cambio de situación con salto de flujo"
+      : "Actualización de situación",
     asunto: `Cambio de situación · ${getEstadoLabel(estadoAnterior)} → ${getEstadoLabel(estadoNuevo)}`,
-    mensaje: mensajeHistorial,
-    cambios
+    mensaje: mensajeFinal,
+    cambios,
+    metadata: {
+      saltoFlujo: esSaltoFlujo || esGanadaSaltando,
+      estadoAnterior,
+      estadoNuevo,
+      pasosOmitidos: esGanadaSaltando ? omitidosFinal : [],
+      justificacionSalto
+    }
   });
 
   closeModal("modalSituacion");
   showSaveNotice("Situación guardada correctamente.");
+}
+
+function getPasosOmitidosHastaGanada(estadoAnterior = "") {
+  const orden = ["contactado", "cotizando", "reunion_confirmada", "ganada"];
+  const fromIndex = orden.indexOf(normalizeState(estadoAnterior));
+  const toIndex = orden.indexOf("ganada");
+
+  if (fromIndex < 0 || fromIndex >= toIndex) return [];
+
+  return orden.slice(fromIndex + 1, toIndex);
 }
 
 async function saveDocumentos() {
@@ -4697,8 +4861,8 @@ async function saveDocumentos() {
 }
 
 async function saveMeeting() {
-  if (!canEditGroup()) {
-    alert(getBlockedEditMessage());
+  if (!canManageMeetings()) {
+    alert("No tienes permisos para guardar reuniones en este grupo.");
     return;
   }
 
@@ -4839,6 +5003,11 @@ async function saveMeeting() {
 }
 
 async function completeMeeting(id) {
+  if (!canManageMeetings()) {
+    alert("No tienes permisos para modificar reuniones en este grupo.");
+    return;
+  }
+
   const meeting = state.meetings.find((m) => m.id === id);
   if (!meeting) return;
 
