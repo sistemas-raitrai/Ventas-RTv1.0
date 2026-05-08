@@ -1,7 +1,11 @@
 import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.7.3/firebase-auth.js";
 import {
   collection,
-  getDocs
+  getDocs,
+  doc,
+  setDoc,
+  addDoc,
+  serverTimestamp
 } from "https://www.gstatic.com/firebasejs/11.7.3/firebase-firestore.js";
 
 import {
@@ -29,6 +33,7 @@ const $ = (id) => document.getElementById(id);
 
 const GITHUB_HOME_URL = "https://sistemas-raitrai.github.io/Ventas-RT/";
 const SOLICITUDES_COLLECTION = "ventas_solicitudes_actualizacion";
+const HISTORIAL_COLLECTION = "ventas_historial";
 
 const state = {
   realUser: null,
@@ -151,6 +156,16 @@ function bindEvents() {
   });
 
   bindTableScrollSync();
+
+  document.addEventListener("click", async (e) => {
+    const btn = e.target.closest("[data-ops-toggle]");
+    if (!btn) return;
+
+    const idGrupo = btn.dataset.opsToggle || "";
+    if (!idGrupo) return;
+
+    await toggleOperacionesEstado(idGrupo);
+  });
 }
 
 async function loadOperaciones() {
@@ -222,9 +237,12 @@ function mapRow(docId, data = {}) {
     docId,
     idGrupo,
     alias,
+    displayGrupo: buildDisplayGrupo(data, alias, anoViaje),
     colegio: cleanText(data.colegio),
     curso: cleanText(data.curso),
     anoViaje,
+    pax: cleanText(data.cantidadGrupo || ""),
+    tramo: cleanText(data.tramo || data.tramoOtro || ""),
     estado: normalizeEstado(data.estado),
     estadoOriginal: cleanText(data.estado),
     destino: cleanText(data.destinoPrincipal || data.destino || "Sin destino"),
@@ -236,6 +254,10 @@ function mapRow(docId, data = {}) {
     fichaFlujoAbierto: data.fichaFlujoAbierto === true,
     autorizada: data.autorizada === true,
     flow,
+    opsEstado: cleanText(data.operacionesEstado || "pendiente"),
+    opsEstadoPor: cleanText(data.operacionesEstadoPor || ""),
+    opsEstadoPorCorreo: normalizeEmail(data.operacionesEstadoPorCorreo || ""),
+    opsEstadoAt: data.operacionesEstadoAt || null,
 
     programaOriginalUrl,
     programaOriginalNombre,
@@ -291,7 +313,7 @@ function applyFiltersAndRender() {
   }
 
   rows.sort((a, b) => {
-    return getAliasSortKey(a.alias).localeCompare(getAliasSortKey(b.alias), "es", {
+    return getAliasSortKey(a.displayGrupo).localeCompare(getAliasSortKey(b.displayGrupo), "es", {
       sensitivity: "base",
       numeric: true
     });
@@ -343,29 +365,27 @@ function renderTable(rows = []) {
 }
 
 function renderRow(row) {
-  const fichaStatus = getFichaStatus(row);
-
   return `
     <tr>
-      <td>
-        <div class="ops-group-title">${escapeHtml(row.alias)}</div>
-        <div class="ops-group-sub">
+      <td class="ops-col-grupo" title="${escapeAttr(row.displayGrupo)}">
+        <div class="ops-group-title">${escapeHtml(row.displayGrupo)}</div>
+        <div class="ops-group-sub" title="ID ${escapeAttr(row.idGrupo)} · ${escapeAttr(row.colegio || "")} · ${escapeAttr(row.curso || "")}">
           ID ${escapeHtml(row.idGrupo)} · ${escapeHtml(row.colegio || "Sin colegio")} · ${escapeHtml(row.curso || "Sin curso")}
         </div>
       </td>
 
-      <td>${escapeHtml(row.vendedora || row.vendedoraCorreo || "—")}</td>
-      <td>${escapeHtml(row.destino || "—")}</td>
-      <td>${escapeHtml(row.anoViaje || "—")}</td>
+      <td title="${escapeAttr(row.vendedora || row.vendedoraCorreo || "—")}">${escapeHtml(row.vendedora || row.vendedoraCorreo || "—")}</td>
+      <td title="${escapeAttr(row.destino || "—")}">${escapeHtml(row.destino || "—")}</td>
+      <td title="${escapeAttr(row.anoViaje || "—")}">${escapeHtml(row.anoViaje || "—")}</td>
+      <td title="${escapeAttr(row.pax || "—")}">${escapeHtml(row.pax || "—")}</td>
+      <td title="${escapeAttr(row.tramo || "—")}">${escapeHtml(row.tramo || "—")}</td>
 
       <td>
-        <span class="ops-pill ${fichaStatus.css}">
-          ${escapeHtml(fichaStatus.label)}
-        </span>
+        ${renderEstadoOperativoButton(row)}
       </td>
 
-      <td>
-        ${renderEstadoOperativo(row)}
+      <td title="${escapeAttr(row.opsEstadoPor || row.opsEstadoPorCorreo || "Sin usuario")}">
+        ${escapeHtml(row.opsEstadoPor || row.opsEstadoPorCorreo || "—")}
       </td>
 
       <td>
@@ -400,7 +420,6 @@ function renderRow(row) {
         <div class="ops-docs">
           <a class="ops-pill ops-muted" href="grupo.html?id=${encodeURIComponent(row.idGrupo)}" target="_blank" rel="noopener">Grupo</a>
           <a class="ops-pill ops-muted" href="fichas.html?id=${encodeURIComponent(row.idGrupo)}" target="_blank" rel="noopener">Ficha</a>
-          <a class="ops-pill ops-muted" href="ficha-pdf.html?id=${encodeURIComponent(row.idGrupo)}" target="_blank" rel="noopener">PDF</a>
         </div>
       </td>
     </tr>
@@ -448,6 +467,25 @@ function renderEstadoOperativo(row) {
   }
 
   return `<span class="ops-pill ops-ok">OK operaciones</span>`;
+}
+
+function renderEstadoOperativoButton(row) {
+  const ok = normalizeSearch(row.opsEstado) === "ok";
+  const css = ok ? "ops-ok" : "ops-warn";
+  const label = ok ? "OK" : "Pendiente";
+  const disabled = canEditOperacionesEstado() ? "" : "disabled";
+
+  return `
+    <button
+      type="button"
+      class="ops-pill ops-status-btn ${css}"
+      data-ops-toggle="${escapeAttr(row.idGrupo)}"
+      ${disabled}
+      title="${canEditOperacionesEstado() ? "Cambiar estado operativo" : "Solo operaciones/admin puede cambiar este estado"}"
+    >
+      ${label}
+    </button>
+  `;
 }
 
 function renderEmpty(message) {
@@ -834,4 +872,95 @@ function syncTableScrollWidth() {
   requestAnimationFrame(() => {
     inner.style.width = `${wrap.scrollWidth}px`;
   });
+}
+
+function canEditOperacionesEstado() {
+  const email = normalizeEmail(state.effectiveEmail || "");
+  const rol = String(state.effectiveUser?.rol || "").toLowerCase();
+
+  return (
+    rol === "admin" ||
+    email === "aleoperaciones@raitrai.cl" ||
+    email === "operaciones@raitrai.cl"
+  );
+}
+
+async function toggleOperacionesEstado(idGrupo = "") {
+  if (!canEditOperacionesEstado()) {
+    alert("Solo Operaciones o Admin puede cambiar este estado.");
+    return;
+  }
+
+  const row = state.allRows.find((item) => String(item.idGrupo) === String(idGrupo));
+  if (!row) {
+    alert("No encontré el grupo.");
+    return;
+  }
+
+  const actual = normalizeSearch(row.opsEstado) === "ok" ? "ok" : "pendiente";
+  const nuevo = actual === "ok" ? "pendiente" : "ok";
+
+  const ok = confirm(`Vas a cambiar el estado operativo de "${row.displayGrupo}" de ${actual.toUpperCase()} a ${nuevo.toUpperCase()}.`);
+  if (!ok) return;
+
+  const userName = getDisplayName(state.effectiveUser);
+
+  try {
+    await setDoc(doc(db, "ventas_cotizaciones", row.docId), {
+      operacionesEstado: nuevo,
+      operacionesEstadoPor: userName,
+      operacionesEstadoPorCorreo: state.effectiveEmail,
+      operacionesEstadoAt: serverTimestamp()
+    }, { merge: true });
+
+    await addDoc(collection(db, HISTORIAL_COLLECTION), {
+      idGrupo: String(row.idGrupo),
+      aliasGrupo: row.displayGrupo || row.alias || "",
+      colegio: row.colegio || "",
+      modulo: "operaciones",
+      tipoMovimiento: "estado_operativo",
+      titulo: "Cambio de estado operativo",
+      mensaje: `${userName} cambió estado operativo de ${actual.toUpperCase()} a ${nuevo.toUpperCase()}.`,
+      metadata: {
+        cambios: [
+          {
+            campo: "operacionesEstado",
+            anterior: actual,
+            nuevo
+          }
+        ]
+      },
+      creadoPor: userName,
+      creadoPorCorreo: state.effectiveEmail,
+      fecha: serverTimestamp()
+    });
+
+    await loadOperaciones();
+  } catch (error) {
+    console.error("[operaciones] toggleOperacionesEstado", error);
+    alert("No se pudo guardar el estado operativo: " + error.message);
+  }
+}
+
+function getDisplayName(user = {}) {
+  const full = [user?.nombre, user?.apellido].filter(Boolean).join(" ").trim();
+  return full || user?.email || state.effectiveEmail || "Usuario";
+}
+
+function buildDisplayGrupo(data = {}, alias = "", anoViaje = "") {
+  const colegio = cleanText(data.colegio || "");
+  const curso = cleanText(data.curso || "");
+  const year = cleanText(anoViaje || data.anoViaje || "");
+
+  const aliasClean = cleanText(alias || "");
+
+  if (!colegio) return aliasClean;
+
+  const cursoYear = [curso, year ? `(${year})` : ""].filter(Boolean).join(" ");
+
+  if (cursoYear) {
+    return `${colegio} ${cursoYear}`;
+  }
+
+  return colegio;
 }
