@@ -690,7 +690,7 @@ function isFichaCerradaAdministrativa(row = {}) {
 function isFichaAutorizadaAdministrativa(row = {}) {
   const estado = normalizeLoose(row.estado || "");
 
-  // Si el grupo se perdió, deja de contar como autorizada.
+  // Si pasa a perdida, deja de contar como autorizada
   if (estado.includes("perdid")) return false;
 
   return row.autorizada === true || tienePdfRealFicha(row);
@@ -748,20 +748,38 @@ function isPdfPendienteGeneracion(row = {}) {
   );
 }
 
+
+function tienePdfRealFicha(row = {}) {
+  return !!String(
+    row?.ficha?.pdfUrl ||
+    row?.fichaPdfUrl ||
+    row?.pdfUrl ||
+    ""
+  ).trim();
+}
+
+function isPdfPendienteGeneracion(row = {}) {
+  return (
+    row?.ficha?.pdfPendienteGeneracion === true ||
+    row?.pdfPendienteGeneracion === true ||
+    row?.fichaPdfPendienteGeneracion === true
+  );
+}
 function isCorreccionFichaPendiente(row = {}) {
   const flow = row.flowFicha || {};
   const estado = normalizeLoose(flow.correccionEstado || "");
+  const modo = normalizeLoose(flow.modo || row.fichaFlujoModo || "");
 
   return (
     flow.correccionPendiente === true ||
     estado === "pendiente_jefa" ||
     estado === "pendiente_administracion" ||
     (
-      normalizeLoose(flow.modo || row.fichaFlujoModo || "") === "correccion" &&
+      modo === "correccion" &&
       row.fichaFlujoAbierto === true
     ) ||
     (
-      normalizeLoose(flow.modo || row.fichaFlujoModo || "") === "correccion" &&
+      modo === "correccion" &&
       isPdfPendienteGeneracion(row)
     )
   );
@@ -775,25 +793,26 @@ function getCorreccionFichaEstado(row = {}) {
 function isFichaCorregidaVisibleParaUsuario(row = {}, user = null) {
   const effectiveUser = user || getEffectiveUser();
   if (!effectiveUser) return false;
+
+  // Solo si hay corrección realmente pendiente
   if (!isCorreccionFichaPendiente(row)) return false;
 
   const estado = getCorreccionFichaEstado(row);
   const rol = normalizeLoose(effectiveUser.rol || "");
 
-  // Admin real / general ve todas las correcciones.
+  // Admin real ve todas las correcciones activas
   if (rol === "admin") return true;
 
-  // Jefa de ventas ve solo las correcciones que vuelven a ella.
+  // Jefa de ventas solo ve las que están pendientes para ella
   if (isCaroDashboardUser(effectiveUser)) {
     return estado === "pendiente_jefa";
   }
 
-  // Administración ve solo las correcciones que esperan cierre administrativo.
+  // Administración solo ve las que ya pasaron por jefa
   if (isAdministracionDashboardUser(effectiveUser)) {
     return estado === "pendiente_administracion";
   }
 
-  // Supervisión genérica NO ve todas las correcciones.
   return false;
 }
 
@@ -844,31 +863,35 @@ function isFichaPorFirmarSegunUsuario(row = {}, effectiveUser = null) {
   const user = effectiveUser || getEffectiveUser();
   if (!user) return false;
 
-  const ganada = isGanadaComercial(row);
-  if (!ganada) return false;
+  const ano = getAnoViajeNumber(row);
+
+  // Solo fichas 2026 en adelante
+  if (!ano || ano < 2026) return false;
+
+  // Solo grupos ganados
+  if (!isGanadaComercial(row)) return false;
+
+  // Si está en corrección, no pertenece a fichas nuevas por firmar
+  if (isCorreccionFichaPendiente(row)) return false;
 
   const firmas = getFichaFirmas(row);
 
-  // VENDEDOR:
-  // ve las ganadas donde todavía falta su firma.
+  // Vendedor: solo ve sus fichas donde falta su firma
   if (isVendedorRole(user)) {
     return !firmas.vendedor;
   }
 
-  // CARO:
-  // ve solo las que le toca firmar a ella.
+  // Jefa de ventas: solo ve las que ya firmó vendedor y falta ella
   if (isCaroDashboardUser(user)) {
     return firmas.vendedor && !firmas.jefa;
   }
 
-  // ADMINISTRACIÓN (YENNY / ADMINISTRACION@):
-  // ve solo las que le toca firmar a administración.
+  // Administración: solo ve las que ya firmaron vendedor + jefa y falta admin
   if (isAdministracionDashboardUser(user)) {
     return firmas.vendedor && firmas.jefa && !firmas.admin;
   }
 
-  // RESTO:
-  // ve todas las ganadas que aún no tienen las 3 firmas completas.
+  // Admin / otros roles internos: ven todas las incompletas
   return !hasAllThreeFichaFirmas(row);
 }
 
