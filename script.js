@@ -665,9 +665,6 @@ function tuvoFirmaAdministracionAlgunaVez(row = {}) {
 }
 
 function isFichaAbiertaAdministrativa(row = {}) {
-  const flow = row.flowFicha || {};
-  const modo = normalizeLoose(flow.modo || row.fichaFlujoModo || row?.ficha?.flujoModo || "");
-
   const haySolicitudAbierta = (state.solicitudesRows || []).some((sol) => {
     return (
       String(sol.idGrupo || "").trim() === getRowId(row) &&
@@ -679,9 +676,9 @@ function isFichaAbiertaAdministrativa(row = {}) {
 
   return (
     haySolicitudAbierta ||
-    modo === "correccion" ||
-    flow.correccionPendiente === true ||
-    normalizeLoose(flow.correccionEstado || "").startsWith("pendiente")
+    isCorreccionFichaPendiente(row) ||
+    row.fichaFlujoAbierto === true ||
+    isPdfPendienteGeneracion(row)
   );
 }
 
@@ -691,11 +688,12 @@ function isFichaCerradaAdministrativa(row = {}) {
 }
 
 function isFichaAutorizadaAdministrativa(row = {}) {
-  const numeroNegocio = getAdminValue(row, "numeroNegocio", "numeroNegocio");
-  const usuario = getAdminValue(row, "usuarioFicha", "usuarioProgramaAdm");
-  const clave = getAdminValue(row, "claveAdministrativa", "claveAdministrativa");
+  const estado = normalizeLoose(row.estado || "");
 
-  return tuvoFirmaAdministracionAlgunaVez(row) && !!numeroNegocio && !!usuario && !!clave;
+  // Si el grupo se perdió, deja de contar como autorizada.
+  if (estado.includes("perdid")) return false;
+
+  return row.autorizada === true || tienePdfRealFicha(row);
 }
 
 function getFichaAdminMotivo(row = {}) {
@@ -733,14 +731,39 @@ function isAdministracionDashboardUser(user = {}) {
   );
 }
 
+function tienePdfRealFicha(row = {}) {
+  return !!String(
+    row?.ficha?.pdfUrl ||
+    row?.fichaPdfUrl ||
+    row?.pdfUrl ||
+    ""
+  ).trim();
+}
+
+function isPdfPendienteGeneracion(row = {}) {
+  return (
+    row?.ficha?.pdfPendienteGeneracion === true ||
+    row?.pdfPendienteGeneracion === true ||
+    row?.fichaPdfPendienteGeneracion === true
+  );
+}
+
 function isCorreccionFichaPendiente(row = {}) {
   const flow = row.flowFicha || {};
-  const modo = normalizeLoose(flow.modo || row.fichaFlujoModo || "");
+  const estado = normalizeLoose(flow.correccionEstado || "");
 
   return (
-    modo === "correccion" ||
     flow.correccionPendiente === true ||
-    normalizeLoose(flow.correccionEstado || "").startsWith("pendiente")
+    estado === "pendiente_jefa" ||
+    estado === "pendiente_administracion" ||
+    (
+      normalizeLoose(flow.modo || row.fichaFlujoModo || "") === "correccion" &&
+      row.fichaFlujoAbierto === true
+    ) ||
+    (
+      normalizeLoose(flow.modo || row.fichaFlujoModo || "") === "correccion" &&
+      isPdfPendienteGeneracion(row)
+    )
   );
 }
 
