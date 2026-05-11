@@ -151,6 +151,13 @@ function getRowId(row = {}) {
   return String(row.idGrupo || row.id || "").trim();
 }
 
+function formatGrupoId(row = {}) {
+  const id = row.idGrupo || row.id || "—";
+  const numeroNegocio = String(row.numeroNegocio || "").trim();
+
+  return numeroNegocio ? `ID ${id} (N° ${numeroNegocio})` : `ID ${id}`;
+}
+
 function getRowVendorEmail(row = {}) {
   return normalizeEmail(row.vendedoraCorreo || "");
 }
@@ -402,16 +409,24 @@ function openEvidenceModal({ title = "", subtitle = "", meta = [], rows = [] } =
     .map((item) => `<span class="evidence-chip">${item}</span>`)
     .join("");
 
+  const exportButtonHtml = rows.length
+  ? `<div style="margin: 0 0 12px;">
+      <button type="button" class="alert-open-btn" id="btnExportEvidenceExcel">
+        Exportar Excel
+      </button>
+    </div>`
+  : "";
+
   if (!rows.length) {
     contentEl.innerHTML = `<div class="empty">No hay grupos para mostrar.</div>`;
   } else {
-    contentEl.innerHTML = rows.map((row) => `
+    contentEl.innerHTML = exportButtonHtml + rows.map((row) => `
       <div class="evidence-row">
         <div class="evidence-row-top">
           <div>
             <div class="evidence-row-title">${row.aliasGrupo || row.colegio || row.idGrupo || "Grupo sin nombre"}</div>
             <div class="evidence-row-sub">
-              ID ${row.idGrupo || "—"} · ${row.colegio || "—"} · ${row.comunaCiudad || row.comuna || "—"} · Año ${row.anoViaje || "—"}
+              ${formatGrupoId(row)} · ${row.colegio || "—"} · ${row.comunaCiudad || row.comuna || "—"} · Año ${row.anoViaje || "—"}
             </div>
             <div class="evidence-row-sub">
               Estado: ${row.estado || "—"} · Vendedora: ${row.vendedora || "Sin asignar"}
@@ -422,6 +437,10 @@ function openEvidenceModal({ title = "", subtitle = "", meta = [], rows = [] } =
       </div>
     `).join("");
   }
+
+  $("btnExportEvidenceExcel")?.addEventListener("click", () => {
+    exportRowsToExcel(rows, title || "vista_filtrada");
+  });
 
   modal.classList.remove("hidden");
   document.body.style.overflow = "hidden";
@@ -2475,6 +2494,41 @@ function exportVsPdf() {
 /* =========================================================
    EXPORT
 ========================================================= */
+function exportRowsToExcel(rows = [], filenameBase = "vista_filtrada") {
+  if (typeof XLSX === "undefined") {
+    alert("No se encontró la librería XLSX.");
+    return;
+  }
+
+  const data = rows.map((r) => ({
+    idGrupo: r.idGrupo || r.id || "",
+    numeroNegocio: r.numeroNegocio || "",
+    grupo: r.aliasGrupo || "",
+    colegio: r.colegio || "",
+    comuna: r.comunaCiudad || r.comuna || "",
+    anoViaje: r.anoViaje || "",
+    estado: r.estadoAlCorte || r.estado || "",
+    estadoActualSistema: r.estadoActualSistema || "",
+    vendedora: r.vendedora || "",
+    vendedoraCorreo: r.vendedoraCorreo || "",
+    cliente: r.nombreCliente || "",
+    correoCliente: r.correoCliente || "",
+    celularCliente: r.celularCliente || "",
+    fechaCreacion: formatDateCL(extractRowDate(r))
+  }));
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(data), "Vista filtrada");
+
+  const cleanName = String(filenameBase)
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^\w]+/g, "_")
+    .toLowerCase();
+
+  XLSX.writeFile(wb, `${cleanName}_${new Date().toISOString().slice(0, 10)}.xlsx`);
+}
+
 function exportXlsx(globalKpis, vendorKpis, rows, alerts, opportunities) {
   if (typeof XLSX === "undefined") {
     alert("No se encontró la librería XLSX.");
@@ -2520,6 +2574,7 @@ function exportXlsx(globalKpis, vendorKpis, rows, alerts, opportunities) {
 
   const gruposData = rows.map((r) => ({
     idGrupo: r.idGrupo || r.id || "",
+    numeroNegocio: r.numeroNegocio || "",
     aliasGrupo: r.aliasGrupo || "",
     colegio: r.colegio || "",
     comuna: r.comunaCiudad || r.comuna || "",
