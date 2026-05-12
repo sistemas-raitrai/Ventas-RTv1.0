@@ -60,15 +60,24 @@ const ICON_LOGOUT = `
   </svg>
 `;
 
-function getInicioHref(user) {
+ffunction getInicioHref(user) {
   const rol = String(user?.rol || "").toLowerCase();
   const email = String(user?.email || "").toLowerCase();
+
+  const correosOperaciones = [
+    "aleoperaciones@raitrai.cl",
+    "operaciones@raitrai.cl"
+  ];
 
   const correosHome = [
     "administracion@raitrai.cl",
     "yenny@raitrai.cl",
     "raitrai@raitrai.cl"
   ];
+
+  if (correosOperaciones.includes(email)) {
+    return "operaciones.html";
+  }
 
   if (rol === "registro" || correosHome.includes(email)) {
     return "home.html";
