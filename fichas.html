@@ -1000,8 +1000,16 @@
                     <button class="rich-btn" type="button" data-rich-cmd="insertUnorderedList" data-editor-target="f_infoAdministracion">• Lista</button>
                     <button class="rich-btn" type="button" data-rich-cmd="insertOrderedList" data-editor-target="f_infoAdministracion">1. Lista</button>
                     <button class="rich-btn" type="button" data-rich-cmd="removeFormat" data-editor-target="f_infoAdministracion">Limpiar</button>
-                    <input class="rich-color" type="color" value="#000000" data-rich-color="foreColor" data-editor-target="f_infoAdministracion" title="Color texto" />
-                    <input class="rich-color" type="color" value="#fff2a8" data-rich-color="hiliteColor" data-editor-target="f_infoAdministracion" title="Resaltar" />
+                    
+                    <label class="rich-btn rich-color-btn" title="Color texto">
+                      <input class="rich-color" type="color" value="#000000" data-rich-color="foreColor" data-editor-target="f_infoAdministracion" />
+                      <span class="rich-color-swatch" style="background:#000000;"></span>
+                    </label>
+                    
+                    <label class="rich-btn rich-color-btn" title="Resaltar">
+                      <input class="rich-color" type="color" value="#fff2a8" data-rich-color="hiliteColor" data-editor-target="f_infoAdministracion" />
+                      <span class="rich-color-swatch" style="background:#fff2a8;"></span>
+                    </label>
                   </div>
 
                   <div
@@ -1052,8 +1060,16 @@
                     <button class="rich-btn" type="button" data-rich-cmd="insertUnorderedList" data-editor-target="f_observacionesHtml">• Lista</button>
                     <button class="rich-btn" type="button" data-rich-cmd="insertOrderedList" data-editor-target="f_observacionesHtml">1. Lista</button>
                     <button class="rich-btn" type="button" data-rich-cmd="removeFormat" data-editor-target="f_observacionesHtml">Limpiar</button>
-                    <input class="rich-color" type="color" value="#000000" data-rich-color="foreColor" data-editor-target="f_observacionesHtml" title="Color texto" />
-                    <input class="rich-color" type="color" value="#fff2a8" data-rich-color="hiliteColor" data-editor-target="f_observacionesHtml" title="Resaltar" />
+                    
+                    <label class="rich-btn rich-color-btn" title="Color texto">
+                      <input class="rich-color" type="color" value="#000000" data-rich-color="foreColor" data-editor-target="f_observacionesHtml" />
+                      <span class="rich-color-swatch" style="background:#000000;"></span>
+                    </label>
+                    
+                    <label class="rich-btn rich-color-btn" title="Resaltar">
+                      <input class="rich-color" type="color" value="#fff2a8" data-rich-color="hiliteColor" data-editor-target="f_observacionesHtml" />
+                      <span class="rich-color-swatch" style="background:#fff2a8;"></span>
+                    </label>
                   </div>
 
                   <div
@@ -1066,15 +1082,6 @@
               </div>
             </form>
             <div class="hero-actions no-print" style="justify-content:flex-end; margin-top:18px;">
-              <button class="btn-pill" id="btnVerFichaPdfHtmlBottom" type="button">Ver PDF</button>
-              <button class="btn-pill" id="btnGenerarPdfVersionBottom" type="button">Generar PDF versión</button>
-              <button class="btn-pill hidden" id="btnSolicitarActualizacionFichaBottom" type="button">
-                Solicitar actualización
-              </button>
-              
-              <button class="btn-pill hidden" id="btnSolicitarCorreccionFichaBottom" type="button">
-                Solicitar corrección
-              </button>
               <button class="btn-dark" id="btnGuardarFichaBottom" type="button">Guardar ficha</button>
             </div>
           </div>
