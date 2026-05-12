@@ -305,25 +305,30 @@ function isCorreccionFichaPendiente(row = {}) {
   const estado = normalizeLoose(flow.correccionEstado || "");
   const modo = normalizeLoose(flow.modo || row.fichaFlujoModo || "");
 
-  const correccionDeclarada =
+  const firmasCompletas = hasAllThreeFichaFirmas(row);
+  const pdfGenerado = tienePdfRealFicha(row);
+  const pdfPendiente = isPdfPendienteGeneracion(row);
+  const flujoAbierto = row.fichaFlujoAbierto === true;
+
+  // Si ya están las 3 firmas, ya existe PDF real, no hay PDF pendiente
+  // y el flujo está cerrado, NO puede seguir como corrección pendiente.
+  if (firmasCompletas && pdfGenerado && !pdfPendiente && !flujoAbierto) {
+    return false;
+  }
+
+  return (
     flow.correccionPendiente === true ||
     estado === "pendiente_jefa" ||
     estado === "pendiente_administracion" ||
     (
       modo === "correccion" &&
-      row.fichaFlujoAbierto === true
+      flujoAbierto
     ) ||
     (
       modo === "correccion" &&
-      isPdfPendienteGeneracion(row)
-    );
-
-  const refirmaPorCorreccionPostPdf =
-    flow.requiereRefirmaAdministracion === true &&
-    tuvoPdfOficialAlgunaVez(row) &&
-    isPdfPendienteGeneracion(row);
-
-  return correccionDeclarada || refirmaPorCorreccionPostPdf;
+      pdfPendiente
+    )
+  );
 }
 
 function getCorreccionFichaEstado(row = {}) {
