@@ -160,6 +160,57 @@ function getRowId(row = {}) {
   return String(row.idGrupo || row.id || "").trim();
 }
 
+function getNumeroNegocio(row = {}) {
+  return String(
+    row.numeroNegocio ||
+    row?.ficha?.numeroNegocio ||
+    ""
+  ).trim();
+}
+
+function getIdNegocioLabel(row = {}) {
+  const id = getRowId(row);
+  const numero = getNumeroNegocio(row);
+
+  return numero ? `ID: ${id} / N°: ${numero}` : `ID: ${id}`;
+}
+
+function getAdminImportantChanges(row = {}) {
+  const directos = Array.isArray(row.camposAdministracionModificados)
+    ? row.camposAdministracionModificados
+    : [];
+
+  const ficha = Array.isArray(row?.ficha?.camposAdministracionModificados)
+    ? row.ficha.camposAdministracionModificados
+    : [];
+
+  const flow = Array.isArray(row?.flowFicha?.camposAdministracionModificados)
+    ? row.flowFicha.camposAdministracionModificados
+    : [];
+
+  return [...directos, ...ficha, ...flow].filter(Boolean);
+}
+
+function renderAdminImportantChanges(row = {}, user = null) {
+  const effectiveUser = user || getEffectiveUser();
+  if (!isAdministracionDashboardUser(effectiveUser)) return "";
+
+  const changes = getAdminImportantChanges(row);
+  if (!changes.length) return "";
+
+  return `
+    <div style="margin-top:10px; padding:10px 12px; border-radius:14px; background:#fff1f1; border:1px solid #f0b4b4; color:#9f1d1d; font-size:13px; line-height:1.45;">
+      <strong>⚠ Campos administrativos modificados:</strong><br>
+      ${changes.map((c) => `
+        ${escapeHtml(c.label || c.campo || "Campo")} fue modificado de
+        <strong>${escapeHtml(String(c.anterior ?? ""))}</strong>
+        a
+        <strong>${escapeHtml(String(c.nuevo ?? ""))}</strong>
+      `).join("<br>")}
+    </div>
+  `;
+}
+
 function getRowAlias(row = {}) {
   return String(
     row.aliasGrupo ||
@@ -559,33 +610,51 @@ function isFichaPorFirmarSegunUsuario(row = {}, effectiveUser = null) {
 
   const ano = getAnoViajeNumber(row);
 
-  // Solo fichas 2026 en adelante
   if (!ano || ano < 2026) return false;
-
-  // Solo grupos ganados
   if (!isGanadaComercial(row)) return false;
 
-  // Si está en corrección, no pertenece a fichas nuevas por firmar
-  if (isCorreccionFichaPendiente(row)) return false;
+  const flow = row.flowFicha || {};
+  const flowMode = normalizeLoose(
+    row.fichaFlujoModo ||
+    row?.flowFicha?.modo ||
+    row?.ficha?.flujoModo ||
+    ""
+  );
+
+  if (
+    flowMode === "actualizacion" ||
+    flowMode === "correccion" ||
+    flow.correccionPendiente === true ||
+    flow.requiereActualizacion === true ||
+    row.fichaFlujoAbierto === true ||
+    isCorreccionFichaPendiente(row)
+  ) {
+    return false;
+  }
+
+  if (
+    tienePdfRealFicha(row) ||
+    tuvoPdfOficialAlgunaVez(row) ||
+    row.autorizada === true ||
+    Number(row.versionFichaNumero || row?.ficha?.versionNumero || 0) > 1
+  ) {
+    return false;
+  }
 
   const firmas = getFichaFirmas(row);
 
-  // Vendedor: solo ve sus fichas donde falta su firma
   if (isVendedorRole(user)) {
     return !firmas.vendedor;
   }
 
-  // Jefa de ventas: solo ve las que ya firmó vendedor y falta ella
   if (isCaroDashboardUser(user)) {
     return firmas.vendedor && !firmas.jefa;
   }
 
-  // Administración: solo ve las que ya firmaron vendedor + jefa y falta admin
   if (isAdministracionDashboardUser(user)) {
     return firmas.vendedor && firmas.jefa && !firmas.admin;
   }
 
-  // Admin / otros roles internos: ven todas las incompletas
   return !hasAllThreeFichaFirmas(row);
 }
 
