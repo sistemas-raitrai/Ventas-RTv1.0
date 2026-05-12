@@ -212,7 +212,14 @@ function updateLayoutUser(user) {
   if (brandLink) brandLink.href = inicioHref;
 
   const btnHome = document.getElementById("btn-home");
-  if (btnHome) btnHome.href = inicioHref;
+  if (btnHome) {
+    btnHome.setAttribute("href", inicioHref);
+  
+    btnHome.onclick = (e) => {
+      e.preventDefault();
+      window.location.href = inicioHref;
+    };
+  }
 
   window.dispatchEvent(new CustomEvent("ventas-layout-ready", {
     detail: { user }
