@@ -2054,7 +2054,7 @@ function inicializarDashboardEnCeros() {
   setText("count-alertas-warning", "0");
   setText("count-reunion-3dias", "0");
   
-  syncAlertRowsByRole(effectiveUser);
+  syncAlertRowsByRole(viewUser);
 
   renderBucketLinks("contactados-top", "contactados", []);
   renderBucketLinks("cotizando-top", "cotizando", []);
@@ -2067,6 +2067,25 @@ function inicializarDashboardEnCeros() {
   renderFichaAdminBucketLinks("autorizadas-top", "autorizadas", []);
 }
 
+function getDashboardViewUser(effectiveUser = null) {
+  const user = effectiveUser || getEffectiveUser();
+  const vendorFilter = normalizeEmail(getVendorFilter(user) || "");
+
+  if (!user || !vendorFilter || isVendedorRole(user)) return user;
+
+  const vendedor = getVendorUsers().find(
+    (v) => normalizeEmail(v.email) === vendorFilter
+  );
+
+  if (!vendedor) return user;
+
+  return {
+    ...vendedor,
+    rol: "vendedor",
+    email: normalizeEmail(vendedor.email)
+  };
+}
+
 function renderDashboard(rows = []) {
   const setText = (id, value) => {
     const el = $(id);
@@ -2074,6 +2093,7 @@ function renderDashboard(rows = []) {
   };
 
   const effectiveUser = getEffectiveUser();
+  const viewUser = getDashboardViewUser(effectiveUser);
 
   const scopedRows = dedupeRowsByGroup(rows);
   const allRows = dedupeRowsByGroup(state.rows);
@@ -2089,10 +2109,10 @@ function renderDashboard(rows = []) {
   const autorizadas = getBucketRows(scopedRows, "autorizadas");
   const cerradas = getBucketRows(scopedRows, "cerradas");
 
-  const fichasPorFirmar = getFichasPorFirmarSegunUsuario(scopedRows, effectiveUser);
+  const fichasPorFirmar = getFichasPorFirmarSegunUsuario(scopedRows, viewUser);
   state.fichasPorFirmarRows = fichasPorFirmar;
 
-  const fichasCorregidas = getFichasCorregidasSegunUsuario(scopedRows, effectiveUser);
+  const fichasCorregidas = getFichasCorregidasSegunUsuario(scopedRows, viewUser);
   state.fichasCorregidasRows = fichasCorregidas;
 
   const ganadasScope = scopedRows.filter(isGanadaComercial);
@@ -2109,7 +2129,7 @@ function renderDashboard(rows = []) {
     .filter(isFichaAutorizadaAdministrativa)
     .sort(sortRowsByAliasComparator);
 
-  const solicitudesActualizacion = getSolicitudesActualizacionSegunUsuario(scopedRows, effectiveUser);
+  const solicitudesActualizacion = getSolicitudesActualizacionSegunUsuario(scopedRows, viewUser);
   state.solicitudesActualizacionRows = solicitudesActualizacion;
   
   const alertasCriticas = getCriticalAlertsForScope(scopedRows);
@@ -2144,7 +2164,7 @@ function renderDashboard(rows = []) {
   setText("count-alertas-warning", alertasWarning.length);
   setText("count-reunion-3dias", reuniones3DiasRows.length);
 
-  syncAlertRowsByRole(effectiveUser);
+  syncAlertRowsByRole(viewUser);
 
   // FLUJO CON LINKS
   renderBucketLinks("contactados-top", "contactados", contactados);
