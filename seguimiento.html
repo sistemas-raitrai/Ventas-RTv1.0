@@ -641,19 +641,44 @@
   }
 }
 
-.seg-group-title {
-  max-width: 260px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+/* ===============================
+   GRUPO EN 2 LÍNEAS, MÁS LEGIBLE
+================================= */
+
+.seguimiento-table thead th:first-child{
+  width:460px;
+  min-width:460px;
 }
 
-.seg-group-info {
-  min-width: 0;
+.seguimiento-table tbody td:first-child{
+  width:460px;
+  min-width:460px;
+  max-width:460px;
 }
 
-.seg-group-link {
-  min-width: 0;
+.seg-group-link{
+  width:100%;
+  min-width:0;
+  max-width:460px;
+  align-items:center;
+}
+
+.seg-group-info{
+  min-width:0;
+  flex:1;
+}
+
+.seg-group-title{
+  max-width:390px;
+  white-space:normal;
+  overflow:hidden;
+  text-overflow:clip;
+  display:-webkit-box;
+  -webkit-line-clamp:2;
+  -webkit-box-orient:vertical;
+  line-height:1.25;
+  font-size:15px;
+  font-weight:800;
 }
 </style>
 </head>
