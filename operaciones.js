@@ -376,8 +376,8 @@ function renderRow(row) {
     <tr>
       <td class="ops-col-grupo" title="${escapeAttr(row.displayGrupo)}">
         <div class="ops-group-title">${escapeHtml(row.displayGrupo)}</div>
-        <div class="ops-group-sub" title="ID ${escapeAttr(row.idGrupo)} · ${escapeAttr(row.colegio || "")} · ${escapeAttr(row.curso || "")}">
-          ID ${escapeHtml(row.idGrupo)} · ${escapeHtml(row.colegio || "Sin colegio")} · ${escapeHtml(row.curso || "Sin curso")}
+        <div class="ops-group-sub" title="${escapeAttr(formatGrupoId(row))} · ${escapeAttr(row.colegio || "")} · ${escapeAttr(row.curso || "")}">
+          ${escapeHtml(formatGrupoId(row))} · ${escapeHtml(row.colegio || "Sin colegio")} · ${escapeHtml(row.curso || "Sin curso")}
         </div>
       </td>
 
@@ -580,7 +580,7 @@ function renderModalRows(rows = []) {
       <div style="min-width:0;">
         <div class="ops-list-title">${escapeHtml(row.alias)}</div>
         <div class="ops-list-text">
-          ID: ${escapeHtml(row.idGrupo)}<br>
+          ${escapeHtml(formatGrupoId(row))}<br>
           Colegio: ${escapeHtml(row.colegio || "Sin colegio")} · Curso: ${escapeHtml(row.curso || "Sin curso")} · Año: ${escapeHtml(row.anoViaje || "—")}<br>
           Vendedor(a): ${escapeHtml(row.vendedora || row.vendedoraCorreo || "—")}<br>
           Programa: ${hasPrograma(row) ? "OK" : "Pendiente"} · Ficha PDF: ${hasFichaPdfVigente(row) ? "OK" : "Pendiente"}
@@ -712,13 +712,14 @@ function exportarXlsx() {
 
   const data = state.filteredRows.map((row) => ({
     "ID GRUPO": row.idGrupo,
+    "N° NEGOCIO": row.numeroNegocio,
+    "ID + N°": formatGrupoId(row),
     "GRUPO": row.displayGrupo || row.alias,
     "COLEGIO": row.colegio,
     "CURSO": row.curso,
     "AÑO VIAJE": row.anoViaje,
     "VENDEDOR(A)": row.vendedora || row.vendedoraCorreo,
     "DESTINO": row.destino,
-    "N° NEGOCIO": row.numeroNegocio,
     "PROGRAMA": hasPrograma(row) ? "OK" : "PENDIENTE",
     "PROGRAMA ORIGINAL": row.programaOriginalUrl,
     "PROGRAMA PDF": row.programaPdfUrl,
@@ -870,6 +871,13 @@ function getAliasSortKey(value = "") {
 
 function cleanText(value = "") {
   return String(value ?? "").trim();
+}
+
+function formatGrupoId(row = {}) {
+  const id = row.idGrupo || row.id || "—";
+  const numeroNegocio = cleanText(row.numeroNegocio || "");
+
+  return numeroNegocio ? `ID ${id} (N° ${numeroNegocio})` : `ID ${id}`;
 }
 
 function setText(id, value) {
