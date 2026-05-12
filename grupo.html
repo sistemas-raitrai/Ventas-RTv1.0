@@ -1377,15 +1377,37 @@
       background: #efe7f8;
     }
 
-    .rich-tool-color{
-      width: 42px;
+    .rich-color-btn{
+      position: relative;
+      width: 38px;
+      min-width: 38px;
       height: 36px;
-      padding: 4px;
-      border: none;
-      border-radius: 10px;
-      background: #fff;
+      padding: 0 !important;
+      overflow: hidden;
+    
+      display: inline-flex !important;
+      align-items: center;
+      justify-content: center;
+    }
+    
+    .rich-color-btn input.rich-tool-color{
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      opacity: 0;
       cursor: pointer;
-      box-shadow: 0 2px 8px rgba(36,18,56,.06);
+    }
+    
+    .rich-color-swatch{
+      display: block;
+      flex: 0 0 auto;
+      width: 20px;
+      height: 20px;
+      border-radius: 6px;
+      border: 1px solid rgba(0,0,0,.20);
+      pointer-events: none;
+      z-index: 1;
     }
 
     .rich-editor{
@@ -2216,8 +2238,15 @@
                 <button class="rich-tool-btn" type="button" data-rich-cmd="insertUnorderedList" data-editor-target="s_obsAdmin">• Lista</button>
                 <button class="rich-tool-btn" type="button" data-rich-cmd="insertOrderedList" data-editor-target="s_obsAdmin">1. Lista</button>
                 <button class="rich-tool-btn" type="button" data-rich-cmd="removeFormat" data-editor-target="s_obsAdmin">Limpiar</button>
-                <input class="rich-tool-color" type="color" value="#000000" data-rich-color="foreColor" data-editor-target="s_obsAdmin" title="Color texto" />
-                <input class="rich-tool-color" type="color" value="#fff2a8" data-rich-color="hiliteColor" data-editor-target="s_obsAdmin" title="Resaltar" />
+                <label class="rich-tool-btn rich-color-btn" title="Color texto">
+                  <input class="rich-tool-color" type="color" value="#000000" data-rich-color="foreColor" data-editor-target="s_obsAdmin" />
+                  <span class="rich-color-swatch" style="background-color:#000000;"></span>
+                </label>
+                
+                <label class="rich-tool-btn rich-color-btn" title="Resaltar">
+                  <input class="rich-tool-color" type="color" value="#fff2a8" data-rich-color="hiliteColor" data-editor-target="s_obsAdmin" />
+                  <span class="rich-color-swatch" style="background-color:#fff2a8;"></span>
+                </label>
               </div>
 
               <div
@@ -2240,8 +2269,15 @@
                 <button class="rich-tool-btn" type="button" data-rich-cmd="insertUnorderedList" data-editor-target="s_obsOperaciones">• Lista</button>
                 <button class="rich-tool-btn" type="button" data-rich-cmd="insertOrderedList" data-editor-target="s_obsOperaciones">1. Lista</button>
                 <button class="rich-tool-btn" type="button" data-rich-cmd="removeFormat" data-editor-target="s_obsOperaciones">Limpiar</button>
-                <input class="rich-tool-color" type="color" value="#000000" data-rich-color="foreColor" data-editor-target="s_obsOperaciones" title="Color texto" />
-                <input class="rich-tool-color" type="color" value="#fff2a8" data-rich-color="hiliteColor" data-editor-target="s_obsOperaciones" title="Resaltar" />
+                <label class="rich-tool-btn rich-color-btn" title="Color texto">
+                  <input class="rich-tool-color" type="color" value="#000000" data-rich-color="foreColor" data-editor-target="s_obsOperaciones" />
+                  <span class="rich-color-swatch" style="background-color:#000000;"></span>
+                </label>
+                
+                <label class="rich-tool-btn rich-color-btn" title="Resaltar">
+                  <input class="rich-tool-color" type="color" value="#fff2a8" data-rich-color="hiliteColor" data-editor-target="s_obsOperaciones" />
+                  <span class="rich-color-swatch" style="background-color:#fff2a8;"></span>
+                </label>
               </div>
 
               <div
