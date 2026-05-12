@@ -60,7 +60,7 @@ const ICON_LOGOUT = `
   </svg>
 `;
 
-ffunction getInicioHref(user) {
+function getInicioHref(user) {
   const rol = String(user?.rol || "").toLowerCase();
   const email = String(user?.email || "").toLowerCase();
 
