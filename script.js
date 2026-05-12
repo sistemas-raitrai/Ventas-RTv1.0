@@ -748,23 +748,6 @@ function isPdfPendienteGeneracion(row = {}) {
   );
 }
 
-
-function tienePdfRealFicha(row = {}) {
-  return !!String(
-    row?.ficha?.pdfUrl ||
-    row?.fichaPdfUrl ||
-    row?.pdfUrl ||
-    ""
-  ).trim();
-}
-
-function isPdfPendienteGeneracion(row = {}) {
-  return (
-    row?.ficha?.pdfPendienteGeneracion === true ||
-    row?.pdfPendienteGeneracion === true ||
-    row?.fichaPdfPendienteGeneracion === true
-  );
-}
 function isCorreccionFichaPendiente(row = {}) {
   const flow = row.flowFicha || {};
   const estado = normalizeLoose(flow.correccionEstado || "");
