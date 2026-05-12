@@ -1612,7 +1612,9 @@ function renderSolicitudesActualizacionModal(rows = [], effectiveUser = null) {
         <div style="min-width:0;">
           <div style="font-weight:800; color:#31194b; font-size:16px; line-height:1.2;">
             ${escapeHtml(alias)}
-            ${escapeHtml(idNegocio)}<br>
+            <div style="margin-top:4px; color:#6a6078; font-size:12px; font-weight:700;">
+              ${escapeHtml(idNegocio)}
+            </div>
           </div>
 
           <div style="margin-top:6px; color:#6a6078; font-size:13px; line-height:1.45;">
@@ -1639,6 +1641,8 @@ function renderSolicitudesActualizacionModal(rows = [], effectiveUser = null) {
               ${escapeHtml(sol.respuestaAdministracion)}
             </div>
           ` : ""}
+
+          ${adminChangesHtml}
         </div>
 
         <a
