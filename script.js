@@ -5,6 +5,7 @@ import {
   collection,
   getDocs,
   doc,
+  updateDoc,
   getDoc,
   setDoc,
   deleteDoc,
