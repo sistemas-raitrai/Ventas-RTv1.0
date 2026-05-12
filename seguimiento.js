@@ -647,11 +647,13 @@ function renderRow(row) {
         </a>
       </td>
 
-      <td class="td-vendedor">
+      <td class="td-vendedor" title="${escapeAttr(row.vendedora || row.vendedoraCorreo || '—')}">
         ${escapeHtml(row.vendedora || row.vendedoraCorreo || "—")}
       </td>
 
-      <td class="seg-destino">${escapeHtml(row.destino || "Sin destino")}</td>
+      <td class="seg-destino" title="${escapeAttr(row.destino || 'Sin destino')}">
+        ${escapeHtml(row.destino || "Sin destino")}
+      </td>
 
       <td>${progressHtml}</td>
 
@@ -702,7 +704,7 @@ function renderProgress(estado) {
   return `
     <div class="seg-progress-wrap">
       <div class="seg-progress-bar">${blocks.join("")}</div>
-      <div class="seg-progress-label">${escapeHtml(meta.label)}</div>
+      <div class="seg-progress-label" title="${escapeAttr(meta.label)}">${escapeHtml(meta.label)}</div>
     </div>
   `;
 }
