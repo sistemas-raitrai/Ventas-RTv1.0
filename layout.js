@@ -60,6 +60,22 @@ const ICON_LOGOUT = `
   </svg>
 `;
 
+function getInicioHref(user) {
+  const rol = String(user?.rol || "").toLowerCase();
+  const email = String(user?.email || "").toLowerCase();
+
+  const correosHome = [
+    "administracion@raitrai.cl",
+    "yenny@raitrai.cl"
+  ];
+
+  if (rol === "registro" || correosHome.includes(email)) {
+    return "home.html";
+  }
+
+  return "index.html";
+}
+
 function getVisibleMenuItems(user) {
   const rol = user?.rol || "";
   if (!rol) return [];
@@ -71,7 +87,7 @@ function renderMenuLinks(user) {
 
   const homeLink = `
     <a
-      href="index.html"
+      href="${getInicioHref(user)}"
       class="menu-link menu-pill menu-link-home ${isHomeActive ? "active" : ""}"
       data-menu-key="home"
       aria-current="${isHomeActive ? "page" : "false"}"
@@ -105,7 +121,7 @@ function renderLayoutTop(user) {
     <header class="ventas-header app-header">
       <div class="ventas-header-inner">
         <div class="ventas-brand">
-          <a href="index.html" class="brand-link" aria-label="Ir al inicio">
+          <a href="${getInicioHref(user)}" class="brand-link" aria-label="Ir al inicio">
             <div class="logo-box brand-mark">
               <img src="IMG/logo-raitrai.png" alt="Logo Rai Trai" class="logo-img">
             </div>
@@ -124,7 +140,7 @@ function renderLayoutTop(user) {
 
         <div class="ventas-header-right header-actions">
           <a
-            href="index.html"
+            href="${getInicioHref(user)}"
             id="btn-home"
             class="header-icon icon-btn"
             title="Inicio"
