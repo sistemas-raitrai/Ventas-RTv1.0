@@ -2054,7 +2054,7 @@ function inicializarDashboardEnCeros() {
   setText("count-alertas-warning", "0");
   setText("count-reunion-3dias", "0");
   
-  syncAlertRowsByRole(viewUser);
+  syncAlertRowsByRole(getEffectiveUser());
 
   renderBucketLinks("contactados-top", "contactados", []);
   renderBucketLinks("cotizando-top", "cotizando", []);
