@@ -2947,3 +2947,56 @@ function initBuscadorDashboard() {
 }
 
 initPage();
+
+window.limpiarCorreccionesCerradasAntiguas = async function ({ aplicar = false } = {}) {
+  const snap = await getDocs(collection(db, "ventas_cotizaciones"));
+
+  const candidatas = [];
+
+  for (const d of snap.docs) {
+    const row = d.data() || {};
+    const flow = row.flowFicha || {};
+    const ficha = row.ficha || {};
+
+    const tienePdf = !!(ficha.pdfUrl || row.fichaPdfUrl || ficha.storagePathPdf);
+
+    const firmasCompletas =
+      !!flow?.vendedor?.firmado &&
+      !!flow?.jefaVentas?.firmado &&
+      !!flow?.administracion?.firmado;
+
+    const pdfPendiente = ficha.pdfPendienteGeneracion === true;
+    const flujoAbierto = row.fichaFlujoAbierto === true;
+
+    const correccionVieja =
+      flow.correccionPendiente === true ||
+      String(flow.correccionEstado || "").includes("pendiente") ||
+      flow.requiereRefirmaAdministracion === true;
+
+    if (tienePdf && firmasCompletas && !pdfPendiente && !flujoAbierto && correccionVieja) {
+      candidatas.push({
+        docId: d.id,
+        idGrupo: row.idGrupo || d.id,
+        aliasGrupo: row.aliasGrupo || row.nombreGrupo || "",
+        correccionEstado: flow.correccionEstado || "",
+        correccionPendiente: flow.correccionPendiente,
+        pdfUrl: ficha.pdfUrl || row.fichaPdfUrl || ""
+      });
+
+      if (aplicar) {
+        await updateDoc(doc(db, "ventas_cotizaciones", d.id), {
+          "flowFicha.correccionPendiente": false,
+          "flowFicha.correccionEstado": "cerrada",
+          "flowFicha.requiereRefirmaAdministracion": false,
+          "flowFicha.requiereActualizacion": false,
+          fichaFlujoAbierto: false,
+          "ficha.pdfPendienteGeneracion": false
+        });
+      }
+    }
+  }
+
+  console.table(candidatas);
+  console.log(aplicar ? "Limpieza aplicada." : "Simulación. Para aplicar ejecuta con { aplicar: true }.");
+  return candidatas;
+};
