@@ -1050,18 +1050,77 @@ function sanitizePdfFilePart(value = "") {
 }
 
 function buildConfirmedPdfName(versionLabel = "") {
-  const base =
-    sanitizePdfFilePart(
-    cleanText(state.group?.aliasGrupo) ||
+  const colegio = sanitizePdfFilePart(
+    cleanText(state.group?.colegio) ||
     cleanText(state.group?.nombreGrupo) ||
     cleanText(state.ficha?.nombreGrupo) ||
-      `Grupo ${state.groupId}`
-    ) || `Grupo ${state.groupId}`;
+    `Grupo ${state.groupId}`
+  );
 
-  const version =
-    sanitizePdfFilePart(versionLabel || "ORIGINAL") || "ORIGINAL";
+  const anoViaje = cleanText(state.group?.anoViaje || "");
 
-  return `Ficha ${base} - ${version}.pdf`;
+  const cursos = buildCursosPdfNamePart();
+
+  const esOriginal = normalizeSearchLocal(versionLabel).includes("original");
+
+  const tipoTexto = esOriginal ? "Original" : "Actualizada";
+
+  const fechaTexto = formatPdfDownloadDate(new Date());
+
+  const base = [
+    colegio,
+    cursos,
+    anoViaje ? `(${anoViaje})` : "",
+    tipoTexto,
+    fechaTexto
+  ].filter(Boolean).join(" ");
+
+  return `${sanitizePdfFilePart(base)}.pdf`;
+}
+
+function buildCursosPdfNamePart() {
+  const alias = cleanText(state.group?.aliasGrupo || state.ficha?.nombreGrupo || "");
+  const cursoActual = cleanText(state.group?.curso || "");
+  const anoViaje = String(state.group?.anoViaje || "").trim();
+
+  const cursosDesdeAlias = extractCursosFromAlias(alias);
+
+  if (cursosDesdeAlias) return cursosDesdeAlias;
+
+  if (cursoActual) return cursoActual.toUpperCase();
+
+  return "";
+}
+
+function extractCursosFromAlias(alias = "") {
+  const raw = String(alias || "").trim();
+  if (!raw) return "";
+
+  // Busca cursos tipo 1A, 2B, 8C, 3MEDIO, etc. seguidos opcionalmente por año entre paréntesis.
+  const matches = [...raw.matchAll(/\b(\d{1,2}\s*[A-ZÁÉÍÓÚÑ]{0,4})\s*(?:\(\d{4}\))?/gi)];
+
+  const cursos = matches
+    .map((m) => String(m[1] || "").replace(/\s+/g, "").toUpperCase())
+    .filter(Boolean);
+
+  const unicos = [...new Set(cursos)];
+
+  if (!unicos.length) return "";
+
+  // Máximo 2 cursos para que quede tipo: 1A - 2A
+  return unicos.slice(0, 2).join(" - ");
+}
+
+function formatPdfDownloadDate(date = new Date()) {
+  const pad = (n) => String(n).padStart(2, "0");
+
+  const dd = pad(date.getDate());
+  const mm = pad(date.getMonth() + 1);
+  const yy = String(date.getFullYear()).slice(-2);
+  const hh = pad(date.getHours());
+  const min = pad(date.getMinutes());
+
+  return `${dd}-${mm}-${yy} ${hh}.${min}`;
 }
 
 function buildStoragePdfPath(fileName = "") {
