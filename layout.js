@@ -66,7 +66,8 @@ function getInicioHref(user) {
 
   const correosHome = [
     "administracion@raitrai.cl",
-    "yenny@raitrai.cl"
+    "yenny@raitrai.cl",
+    "raitrai@raitrai.cl"
   ];
 
   if (rol === "registro" || correosHome.includes(email)) {
