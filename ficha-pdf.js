@@ -1261,14 +1261,24 @@ async function confirmOfficialPdfClosure({ preserveCurrentVersion = false } = {}
   const { downloadUrl, storagePath } = await uploadRealPdfToStorage(pdfBlob, pdfNombre);
 
   // 3) guardar URL real en Firestore
-  await updateDoc(groupRef, {
+   await updateDoc(groupRef, {
     fichaEstado: "confirmada_pdf",
   
     // Desde 2026 en adelante, autorizada significa PDF real creado en Storage.
     autorizada: true,
+  
+    // Al generar PDF real, se cierra cualquier flujo activo.
     fichaFlujoAbierto: false,
+    fichaFlujoModo: "v2",
+  
     ultimaGestionAt: serverTimestamp(),
     ultimaGestionTipo: "confirmacion_ficha_pdf",
+  
+    // Limpieza de flujos pendientes para que no siga apareciendo en alertas.
+    "flowFicha.correccionPendiente": false,
+    "flowFicha.correccionEstado": "cerrada",
+    "flowFicha.requiereRefirmaAdministracion": false,
+    "flowFicha.requiereActualizacion": false,
 
     fichaPdfUrl: downloadUrl,
     fichaPdfNombre: pdfNombre,
