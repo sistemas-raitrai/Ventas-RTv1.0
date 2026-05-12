@@ -1083,6 +1083,7 @@ function renderGroupCards(rows = [], options = {}) {
     const id = getRowId(row);
     const alias = getRowAlias(row);
     const vendedor = getRowVendorName(row) || row.vendedoraCorreo || "Sin vendedor";
+    const idNegocio = getIdNegocioLabel(row);
 
     const extra = typeof extraRenderer === "function"
       ? extraRenderer(row)
@@ -1094,6 +1095,7 @@ function renderGroupCards(rows = [], options = {}) {
           <div class="home-card-row-title">${escapeHtml(alias)}</div>
 
           <div class="home-card-row-text">
+            ${escapeHtml(idNegocio)}<br>
             Colegio: ${escapeHtml(row.colegio || "Sin colegio")}<br>
             Curso: ${escapeHtml(row.curso || "Sin curso")} · Año: ${escapeHtml(row.anoViaje || "Sin año")}<br>
             Apoderado: ${escapeHtml(getRowApoderado(row))}<br>
@@ -1162,11 +1164,15 @@ function renderAlertCards(rows = []) {
 function renderSolicitudesCards(rows = []) {
   if (!rows.length) return emptyHtml("No hay solicitudes de actualización abiertas.");
 
+  const effectiveUser = getEffectiveUser();
+
   return rows.map((sol) => {
     const groupRow = sol._groupRow || {};
     const idGrupo = String(sol.idGrupo || "").trim();
     const alias = getRowAlias(groupRow) || sol.aliasGrupo || `Grupo ${idGrupo}`;
     const vendedor = getRowVendorName(groupRow) || groupRow.vendedoraCorreo || sol.solicitadoPor || "Sin vendedor";
+    const idNegocio = getIdNegocioLabel(groupRow);
+    const adminChangesHtml = renderAdminImportantChanges(groupRow, effectiveUser);
 
     return `
       <div class="home-card-row">
@@ -1174,6 +1180,7 @@ function renderSolicitudesCards(rows = []) {
           <div class="home-card-row-title">${escapeHtml(alias)}</div>
 
           <div class="home-card-row-text">
+            ${escapeHtml(idNegocio)}<br>
             Vendedor(a): ${escapeHtml(vendedor)}<br>
             Estado: ${escapeHtml(getSolicitudEstadoLabel(sol))}<br>
             Fecha solicitud: ${escapeHtml(formatDate(sol.fechaSolicitud))}
@@ -1197,6 +1204,8 @@ function renderSolicitudesCards(rows = []) {
               ${escapeHtml(sol.respuestaAdministracion)}
             </div>
           ` : ""}
+
+          ${adminChangesHtml}
         </div>
 
         <a
@@ -1627,6 +1636,7 @@ function bindAlertButtons() {
             <div style="margin-top:10px; color:#3e3550; font-size:14px;">
               <strong>Corrección:</strong> ${escapeHtml(getFichaCorregidaLabel(row))}
             </div>
+            ${renderAdminImportantChanges(row, getEffectiveUser())}
           `
         })
       });
@@ -1749,6 +1759,7 @@ function bindAlertButtons() {
           <div style="margin-top:10px; color:#3e3550; font-size:14px;">
             <strong>Estado administrativo:</strong> ${escapeHtml(getFichaAdminMotivo(row))}
           </div>
+          ${renderAdminImportantChanges(row, getEffectiveUser())}
         `
       })
     });
