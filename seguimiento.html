@@ -382,17 +382,55 @@
     color:#0f766e;
   }
 
+  /* ===============================
+     DESTINO MÁS ANGOSTO + TOOLTIP
+  ================================= */
   .seg-destino{
-    min-width:180px;
+    width:95px;
+    max-width:95px;
+    min-width:95px;
     font-weight:700;
     color:#394150;
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
   }
-
+  
+  /* ===============================
+     PROGRESO AL MÍNIMO NECESARIO
+  ================================= */
   .seg-progress-wrap{
     display:flex;
     flex-direction:column;
-    gap:8px;
-    min-width:220px;
+    gap:6px;
+    width:150px;
+    min-width:150px;
+    max-width:150px;
+  }
+  
+  .seg-progress-label{
+    font-size:12px;
+    font-weight:700;
+    color:#5b536d;
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+  }
+  
+  /* ===============================
+     GRUPO MÁS ANCHO
+  ================================= */
+  .seg-group,
+  .seg-group-link{
+    min-width:420px;
+    max-width:420px;
+  }
+  
+  .seg-group-title{
+    max-width:380px;
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
   }
 
   .seg-progress-bar{
@@ -781,7 +819,7 @@
         <table class="seguimiento-table">
           <thead>
             <tr>
-              <th>
+              <th style="width:440px; min-width:440px;">
                 <button type="button" class="th-sort active" data-sort="grupo" data-default-sort="1">
                   <span>Grupo</span>
                   <span class="sort-arrow">↑</span>
@@ -795,14 +833,14 @@
                 </button>
               </th>
           
-              <th>
+              <th style="width:95px; min-width:95px;">
                 <button type="button" class="th-sort" data-sort="destino">
                   <span>Destino</span>
                   <span class="sort-arrow">↕</span>
                 </button>
               </th>
           
-              <th>
+              <th style="width:150px; min-width:150px;">
                 <button type="button" class="th-sort" data-sort="estado">
                   <span>Progreso</span>
                   <span class="sort-arrow">↕</span>
