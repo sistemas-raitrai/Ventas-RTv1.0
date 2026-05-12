@@ -101,6 +101,78 @@ const FICHA_FIELDS = [
   "pdfNombre"
 ];
 
+const ADMIN_IMPORTANT_FICHA_FIELDS = [
+  {
+    campo: "valorPrograma",
+    label: "Valor programa"
+  },
+  {
+    campo: "numeroPaxTotal",
+    label: "Número pax total"
+  },
+  {
+    campo: "tramo",
+    label: "Tramo"
+  },
+  {
+    campo: "liberados",
+    label: "Liberados"
+  },
+  {
+    campo: "asistenciaEnViajes",
+    label: "Asistencia en viajes"
+  }
+];
+
+function getAdminImportantFichaChanges(previousFicha = {}, nextFicha = {}) {
+  return ADMIN_IMPORTANT_FICHA_FIELDS
+    .map((item) => {
+      const anterior = previousFicha?.[item.campo] ?? "";
+      const nuevo = nextFicha?.[item.campo] ?? "";
+
+      if (sameValue(anterior, nuevo)) return null;
+
+      return {
+        campo: item.campo,
+        label: item.label,
+        anterior,
+        nuevo
+      };
+    })
+    .filter(Boolean);
+}
+
+function isFichaUpdateFlowOpen() {
+  const flow = state.group?.flowFicha || {};
+  return (
+    flow.requiereActualizacion === true ||
+    normalizeSearchLocal(flow.modo || "") === "actualizacion" ||
+    normalizeSearchLocal(flow.modo || "") === "v2" &&
+      getOpenFichaUpdateRequests().length > 0
+  );
+}
+
+function shouldCarolaOpenCorrectionOnSave() {
+  const email = normalizeEmail(state.effectiveEmail || "");
+  if (email !== "chernandez@raitrai.cl") return false;
+
+  const flow = state.group?.flowFicha || {};
+
+  const yaFirmoJefa =
+    !!flow?.jefaVentas?.firmado ||
+    !!flow?.jefaVentas?.firmadoAt ||
+    !!state.group?.firmaSupervision;
+
+  const yaFirmoAdmin =
+    !!flow?.administracion?.firmado ||
+    !!flow?.administracion?.firmadoAt ||
+    !!state.group?.firmaAdministracion;
+
+  const vieneDeActualizacionVendedor = isFichaUpdateFlowOpen();
+
+  return !vieneDeActualizacionVendedor && (yaFirmoJefa || yaFirmoAdmin);
+}
+
 const TOAST_HOST_ID = "appToastHost";
 let toastUiReady = false;
 
@@ -2706,7 +2778,20 @@ async function saveFicha({ silent = false, reloadAfterSave = true } = {}) {
     return { ok: true, changed: false };
   }
 
-  const reopenFlow = shouldReopenFlowAfterFichaSave(trackedChanges);
+  const adminImportantChanges = getAdminImportantFichaChanges(previousFichaView, values);
+
+  const reopenFlowByNormalRules = shouldReopenFlowAfterFichaSave(trackedChanges);
+  const reopenFlowByCarolaCorrection = shouldCarolaOpenCorrectionOnSave() && trackedChanges.length > 0;
+  
+  const reopenFlow = reopenFlowByNormalRules || reopenFlowByCarolaCorrection;
+  
+  const nextFlowMode = reopenFlowByCarolaCorrection
+    ? "correccion"
+    : (
+        isFichaUpdateFlowOpen()
+          ? "actualizacion"
+          : "v2"
+      );
 
   const nextFichaEstado = reopenFlow
     ? "lista_vendedor"
@@ -2749,6 +2834,7 @@ async function saveFicha({ silent = false, reloadAfterSave = true } = {}) {
     claveAdministrativa: values.claveAdministrativa,
     versionFicha: values.version,
     fechaActualizacionFicha: serverTimestamp(),
+    camposAdministracionModificados: adminImportantChanges,
     fechaDeViaje: values.fechaViajeTexto,
     fechaViaje: values.fechaViajeTexto,
     observacionesFicha: observacionesPlain,
@@ -2765,25 +2851,33 @@ async function saveFicha({ silent = false, reloadAfterSave = true } = {}) {
     patch.firmaAdministracion = "";
     patch.fichaPdfUrl = "";
     patch.fichaPdfNombre = "";
-
+    patch.fichaFlujoAbierto = true;
+    patch.fichaFlujoModo = nextFlowMode;
+  
     patch.ficha = {
       ...patch.ficha,
-      flujoModo: "v2",
-      estado: "lista_vendedor",
+      flujoModo: nextFlowMode,
+      estado: reopenFlowByCarolaCorrection ? "correccion_pendiente_jefa" : "lista_vendedor",
       confirmada: false,
       pdfPendienteGeneracion: true,
       pdfUrl: "",
-      pdfNombre: ""
+      pdfNombre: "",
+      camposAdministracionModificados: adminImportantChanges
     };
-
+  
     patch.flowFicha = {
       ...(state.group.flowFicha || {}),
-      modo: "v2",
+      modo: nextFlowMode,
       legacy: false,
-      estado: "lista_vendedor",
-      requiereActualizacion: false,
+      estado: reopenFlowByCarolaCorrection ? "correccion_pendiente_jefa" : "lista_vendedor",
+      requiereActualizacion: nextFlowMode === "actualizacion",
       requiereRefirmaAdministracion: true,
-
+  
+      correccionPendiente: reopenFlowByCarolaCorrection ? true : (state.group.flowFicha?.correccionPendiente || false),
+      correccionOrigen: reopenFlowByCarolaCorrection ? "jefa_ventas" : (state.group.flowFicha?.correccionOrigen || ""),
+      correccionEstado: reopenFlowByCarolaCorrection ? "pendiente_jefa" : (state.group.flowFicha?.correccionEstado || ""),
+      camposAdministracionModificados: adminImportantChanges,
+  
       jefaVentas: {
         ...(flow?.jefaVentas || {}),
         firmado: false,
@@ -2792,7 +2886,7 @@ async function saveFicha({ silent = false, reloadAfterSave = true } = {}) {
         firmadoPorCorreo: "",
         observacion: ""
       },
-
+  
       administracion: {
         ...(flow?.administracion || {}),
         firmado: false,
@@ -2802,12 +2896,12 @@ async function saveFicha({ silent = false, reloadAfterSave = true } = {}) {
         observacion: ""
       }
     };
-
+  
     patch.documentos = {
       ...(state.group.documentos || {}),
       fichaGrupo: {
         ...(state.group.documentos?.fichaGrupo || {}),
-        estado: "lista_vendedor"
+        estado: reopenFlowByCarolaCorrection ? "correccion_pendiente_jefa" : "lista_vendedor"
       }
     };
   }
