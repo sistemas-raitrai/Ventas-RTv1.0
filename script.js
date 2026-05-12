@@ -417,6 +417,57 @@ function getRowId(row = {}) {
   return String(row.idGrupo || row.id || "").trim();
 }
 
+function getNumeroNegocio(row = {}) {
+  return String(
+    row.numeroNegocio ||
+    row?.ficha?.numeroNegocio ||
+    ""
+  ).trim();
+}
+
+function getIdNegocioLabel(row = {}) {
+  const id = getRowId(row);
+  const numero = getNumeroNegocio(row);
+
+  return numero ? `ID: ${id} / N°: ${numero}` : `ID: ${id}`;
+}
+
+function getAdminImportantChanges(row = {}) {
+  const directos = Array.isArray(row.camposAdministracionModificados)
+    ? row.camposAdministracionModificados
+    : [];
+
+  const ficha = Array.isArray(row?.ficha?.camposAdministracionModificados)
+    ? row.ficha.camposAdministracionModificados
+    : [];
+
+  const flow = Array.isArray(row?.flowFicha?.camposAdministracionModificados)
+    ? row.flowFicha.camposAdministracionModificados
+    : [];
+
+  return [...directos, ...ficha, ...flow].filter(Boolean);
+}
+
+function renderAdminImportantChanges(row = {}, user = null) {
+  const effectiveUser = user || getEffectiveUser();
+  if (!isAdministracionDashboardUser(effectiveUser)) return "";
+
+  const changes = getAdminImportantChanges(row);
+  if (!changes.length) return "";
+
+  return `
+    <div style="margin-top:10px; padding:10px 12px; border-radius:14px; background:#fff1f1; border:1px solid #f0b4b4; color:#9f1d1d; font-size:13px; line-height:1.45;">
+      <strong>⚠ Campos administrativos modificados:</strong><br>
+      ${changes.map((c) => `
+        ${escapeHtml(c.label || c.campo || "Campo")} fue modificado de
+        <strong>${escapeHtml(String(c.anterior ?? ""))}</strong>
+        a
+        <strong>${escapeHtml(String(c.nuevo ?? ""))}</strong>
+      `).join("<br>")}
+    </div>
+  `;
+}
+
 function getRowAlias(row = {}) {
   return String(
     row.aliasGrupo ||
@@ -884,33 +935,51 @@ function isFichaPorFirmarSegunUsuario(row = {}, effectiveUser = null) {
 
   const ano = getAnoViajeNumber(row);
 
-  // Solo fichas 2026 en adelante
+  // Fichas por firmar SOLO aplica al flujo inicial 2026+
   if (!ano || ano < 2026) return false;
 
   // Solo grupos ganados
   if (!isGanadaComercial(row)) return false;
 
-  // Si está en corrección, no pertenece a fichas nuevas por firmar
-  if (isCorreccionFichaPendiente(row)) return false;
+  const flowMode = getFichaFlowModeRow(row);
+  const flow = row.flowFicha || {};
+
+  // Nunca entran acá actualización/corrección
+  if (
+    flowMode === "actualizacion" ||
+    flowMode === "correccion" ||
+    flow.correccionPendiente === true ||
+    flow.requiereActualizacion === true ||
+    row.fichaFlujoAbierto === true ||
+    isCorreccionFichaPendiente(row)
+  ) {
+    return false;
+  }
+
+  // Si ya tuvo PDF oficial, versión posterior o autorización, no es flujo inicial
+  if (
+    tienePdfRealFicha(row) ||
+    tuvoPdfOficialAlgunaVez(row) ||
+    row.autorizada === true ||
+    Number(row.versionFichaNumero || row?.ficha?.versionNumero || 0) > 1
+  ) {
+    return false;
+  }
 
   const firmas = getFichaFirmas(row);
 
-  // Vendedor: solo ve sus fichas donde falta su firma
   if (isVendedorRole(user)) {
     return !firmas.vendedor;
   }
 
-  // Jefa de ventas: solo ve las que ya firmó vendedor y falta ella
   if (isCaroDashboardUser(user)) {
     return firmas.vendedor && !firmas.jefa;
   }
 
-  // Administración: solo ve las que ya firmaron vendedor + jefa y falta admin
   if (isAdministracionDashboardUser(user)) {
     return firmas.vendedor && firmas.jefa && !firmas.admin;
   }
 
-  // Admin / otros roles internos: ven todas las incompletas
   return !hasAllThreeFichaFirmas(row);
 }
 
@@ -1216,6 +1285,7 @@ function renderFichasPorFirmarModal(rows = [], effectiveUser = null) {
   listEl.innerHTML = rows.map((row) => {
     const id = getRowId(row);
     const alias = getRowAlias(row);
+    const idNegocio = getIdNegocioLabel(row);
     const apoderado = getRowApoderado(row);
     const vendedor = getRowVendorName(row) || row.vendedoraCorreo || "Sin vendedor";
     const pendiente = getFichaPendienteLabel(row);
@@ -1228,6 +1298,7 @@ function renderFichasPorFirmarModal(rows = [], effectiveUser = null) {
           </div>
 
           <div style="margin-top:6px; color:#6a6078; font-size:13px; line-height:1.45;">
+            ${escapeHtml(idNegocio)}<br>
             Apoderado: ${escapeHtml(apoderado)}<br>
             Vendedor(a): ${escapeHtml(vendedor)}<br>
             Estado pendiente: ${escapeHtml(pendiente)}
@@ -1302,6 +1373,8 @@ function renderFichasCorregidasModal(rows = [], effectiveUser = null) {
   listEl.innerHTML = rows.map((row) => {
     const id = getRowId(row);
     const alias = getRowAlias(row);
+    const idNegocio = getIdNegocioLabel(row);
+    const adminChangesHtml = renderAdminImportantChanges(row, effectiveUser);
     const apoderado = getRowApoderado(row);
     const vendedor = getRowVendorName(row) || row.vendedoraCorreo || "Sin vendedor";
     const pendiente = getFichaCorregidaLabel(row);
@@ -1314,9 +1387,11 @@ function renderFichasCorregidasModal(rows = [], effectiveUser = null) {
           </div>
 
           <div style="margin-top:6px; color:#6a6078; font-size:13px; line-height:1.45;">
+            ${escapeHtml(idNegocio)}<br>
             Apoderado: ${escapeHtml(apoderado)}<br>
             Vendedor(a): ${escapeHtml(vendedor)}<br>
             Estado corrección: ${escapeHtml(pendiente)}
+            ${adminChangesHtml}
           </div>
         </div>
 
@@ -1515,6 +1590,8 @@ function renderSolicitudesActualizacionModal(rows = [], effectiveUser = null) {
 
   listEl.innerHTML = rows.map((sol) => {
     const groupRow = sol._groupRow || {};
+    const idNegocio = getIdNegocioLabel(groupRow);
+    const adminChangesHtml = renderAdminImportantChanges(groupRow, effectiveUser);
     const idGrupo = String(sol.idGrupo || "").trim();
     const alias = getRowAlias(groupRow) || sol.aliasGrupo || `Grupo ${idGrupo}`;
     const vendedor = getRowVendorName(groupRow) || groupRow.vendedoraCorreo || sol.solicitadoPor || "Sin vendedor";
@@ -1535,6 +1612,7 @@ function renderSolicitudesActualizacionModal(rows = [], effectiveUser = null) {
         <div style="min-width:0;">
           <div style="font-weight:800; color:#31194b; font-size:16px; line-height:1.2;">
             ${escapeHtml(alias)}
+            ${escapeHtml(idNegocio)}<br>
           </div>
 
           <div style="margin-top:6px; color:#6a6078; font-size:13px; line-height:1.45;">
