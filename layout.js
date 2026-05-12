@@ -206,6 +206,14 @@ function updateLayoutUser(user) {
     menuLinks.innerHTML = renderMenuLinks(user);
   }
 
+  const inicioHref = getInicioHref(user);
+
+  const brandLink = document.querySelector(".brand-link");
+  if (brandLink) brandLink.href = inicioHref;
+
+  const btnHome = document.getElementById("btn-home");
+  if (btnHome) btnHome.href = inicioHref;
+
   window.dispatchEvent(new CustomEvent("ventas-layout-ready", {
     detail: { user }
   }));
