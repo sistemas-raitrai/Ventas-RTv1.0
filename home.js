@@ -288,12 +288,24 @@ function isPdfPendienteGeneracion(row = {}) {
   );
 }
 
+function tuvoPdfOficialAlgunaVez(row = {}) {
+  return !!String(
+    row?.ficha?.storagePathPdf ||
+    row?.ficha?.confirmadaEl ||
+    row?.ficha?.confirmadaPor ||
+    row?.ultimaGestionTipo === "confirmacion_ficha_pdf" ||
+    row?.versionFichaNumero > 1 ||
+    row?.ficha?.versionNumero > 1 ||
+    ""
+  ).trim();
+}
+
 function isCorreccionFichaPendiente(row = {}) {
   const flow = row.flowFicha || {};
   const estado = normalizeLoose(flow.correccionEstado || "");
   const modo = normalizeLoose(flow.modo || row.fichaFlujoModo || "");
 
-  return (
+  const correccionDeclarada =
     flow.correccionPendiente === true ||
     estado === "pendiente_jefa" ||
     estado === "pendiente_administracion" ||
@@ -304,13 +316,31 @@ function isCorreccionFichaPendiente(row = {}) {
     (
       modo === "correccion" &&
       isPdfPendienteGeneracion(row)
-    )
-  );
+    );
+
+  const refirmaPorCorreccionPostPdf =
+    flow.requiereRefirmaAdministracion === true &&
+    tuvoPdfOficialAlgunaVez(row) &&
+    isPdfPendienteGeneracion(row);
+
+  return correccionDeclarada || refirmaPorCorreccionPostPdf;
 }
 
 function getCorreccionFichaEstado(row = {}) {
   const flow = row.flowFicha || {};
-  return normalizeLoose(flow.correccionEstado || "");
+  const estado = normalizeLoose(flow.correccionEstado || "");
+
+  if (estado) return estado;
+
+  if (
+    flow.requiereRefirmaAdministracion === true &&
+    tuvoPdfOficialAlgunaVez(row)
+  ) {
+    if (flow?.jefaVentas?.firmado) return "pendiente_administracion";
+    return "pendiente_jefa";
+  }
+
+  return "";
 }
 
 function isFichaCorregidaVisibleParaUsuario(row = {}, user = null) {
