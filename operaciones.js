@@ -220,9 +220,13 @@ function mapRow(docId, data = {}) {
   const programaOriginalNombre = cleanText(programa.archivoNombre || "");
   const programaOriginalTipo = cleanText(programa.archivoTipo || "");
 
+  const fichaProgramaPdfUrl = cleanText(ficha.programaPdfUrl || "");
+  const fichaProgramaPendiente = ficha.pdfPendienteGeneracion === true;
+  
   const programaPdfUrl = cleanText(
     programa.pdfUrl ||
     data.programaPdfUrl ||
+    (!fichaProgramaPendiente ? fichaProgramaPdfUrl : "") ||
     ""
   );
 
