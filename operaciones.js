@@ -197,6 +197,19 @@ async function loadOperaciones() {
   }
 }
 
+document.addEventListener("click", (e) => {
+  const btn = e.target.closest("[data-toggle-motivo]");
+  if (!btn) return;
+
+  const targetId = btn.dataset.toggleMotivo;
+  const box = document.getElementById(targetId);
+  if (!box) return;
+
+  const isHidden = box.hidden;
+  box.hidden = !isHidden;
+  btn.textContent = isHidden ? "Ocultar motivo" : "Ver motivo";
+});
+
 function mapRow(docId, data = {}) {
   const idGrupo = cleanText(data.idGrupo || docId);
   const programa = data.programaGrupo || {};
@@ -338,11 +351,23 @@ function buildSummarySets(rows = []) {
   const solicitudesCorreccionAbiertas = getSolicitudesAbiertas("correccion_ficha");
 
   state.sets.ganadas = rows;
-  state.sets.firmar = rows.filter(isFichaPorFirmarGeneral);
-  state.sets.actualizacion = rows.filter((row) => solicitudesActualizacionAbiertas.has(row.idGrupo));
-  state.sets.correccion = rows.filter((row) => {
-    return solicitudesCorreccionAbiertas.has(row.idGrupo) || isCorreccionFichaPendiente(row);
+
+  state.sets.actualizacion = rows.filter((row) =>
+    solicitudesActualizacionAbiertas.has(row.idGrupo)
+  );
+
+  state.sets.correccion = rows.filter((row) =>
+    solicitudesCorreccionAbiertas.has(row.idGrupo) || isCorreccionFichaPendiente(row)
+  );
+
+  state.sets.firmar = rows.filter((row) => {
+    if (solicitudesActualizacionAbiertas.has(row.idGrupo)) return false;
+    if (solicitudesCorreccionAbiertas.has(row.idGrupo)) return false;
+    if (isCorreccionFichaPendiente(row)) return false;
+    if (isActualizacionFichaPendiente(row)) return false;
+    return isFichaPorFirmarGeneral(row);
   });
+
   state.sets.programa = rows.filter((row) => !hasPrograma(row));
   state.sets.autorizadas = rows.filter((row) => row.autorizada === true && hasFichaPdfVigente(row));
 }
@@ -575,24 +600,45 @@ function renderModalRows(rows = []) {
     return;
   }
 
-  cont.innerHTML = rows.map((row) => `
-    <div class="ops-list-row">
-      <div style="min-width:0;">
-        <div class="ops-list-title">${escapeHtml(row.alias)}</div>
-        <div class="ops-list-text">
-          ${escapeHtml(formatGrupoId(row))}<br>
-          Colegio: ${escapeHtml(row.colegio || "Sin colegio")} · Curso: ${escapeHtml(row.curso || "Sin curso")} · Año: ${escapeHtml(row.anoViaje || "—")}<br>
-          Vendedor(a): ${escapeHtml(row.vendedora || row.vendedoraCorreo || "—")}<br>
-          Programa: ${hasPrograma(row) ? "OK" : "Pendiente"} · Ficha PDF: ${hasFichaPdfVigente(row) ? "OK" : "Pendiente"}
+  cont.innerHTML = rows.map((row) => {
+    const solActualizacion = getSolicitudByGrupo(row.idGrupo, "actualizacion_ficha");
+    const solCorreccion = getSolicitudByGrupo(row.idGrupo, "correccion_ficha");
+
+    const motivoActualizacion = solActualizacion?.detalle || "";
+    const motivoCorreccion = solCorreccion?.detalle || getCorreccionDetalle(row);
+
+    return `
+      <div class="ops-list-row">
+        <div style="min-width:0;">
+          <div class="ops-list-title">${escapeHtml(row.alias)}</div>
+
+          <div class="ops-list-text">
+            ${escapeHtml(formatGrupoId(row))}<br>
+            Colegio: ${escapeHtml(row.colegio || "Sin colegio")} · Curso: ${escapeHtml(row.curso || "Sin curso")} · Año: ${escapeHtml(row.anoViaje || "—")}<br>
+            Vendedor(a): ${escapeHtml(row.vendedora || row.vendedoraCorreo || "—")}<br>
+            Programa: ${hasPrograma(row) ? "OK" : "Pendiente"} · Ficha PDF: ${hasFichaPdfVigente(row) ? "OK" : "Pendiente"}
+          </div>
+
+          ${motivoActualizacion ? renderMotivoBox({
+            id: `actualizacion-${row.idGrupo}`,
+            titulo: "Motivo actualización",
+            texto: motivoActualizacion
+          }) : ""}
+
+          ${motivoCorreccion ? renderMotivoBox({
+            id: `correccion-${row.idGrupo}`,
+            titulo: "Motivo corrección",
+            texto: motivoCorreccion
+          }) : ""}
+        </div>
+
+        <div class="ops-docs">
+          <a class="ops-pill ops-muted" href="fichas.html?id=${encodeURIComponent(row.idGrupo)}" target="_blank" rel="noopener">Ficha</a>
+          <a class="ops-pill ops-muted" href="grupo.html?id=${encodeURIComponent(row.idGrupo)}" target="_blank" rel="noopener">Grupo</a>
         </div>
       </div>
-
-      <div class="ops-docs">
-        <a class="ops-pill ops-muted" href="fichas.html?id=${encodeURIComponent(row.idGrupo)}" target="_blank" rel="noopener">Ficha</a>
-        <a class="ops-pill ops-muted" href="grupo.html?id=${encodeURIComponent(row.idGrupo)}" target="_blank" rel="noopener">Grupo</a>
-      </div>
-    </div>
-  `).join("");
+    `;
+  }).join("");
 }
 
 function fillYearFilter() {
@@ -826,6 +872,68 @@ function getSolicitudesAbiertas(tipo = "") {
 /* =========================================================
    HELPERS
 ========================================================= */
+
+function getSolicitudByGrupo(idGrupo = "", tipo = "") {
+  return (state.solicitudesRows || []).find((sol) => {
+    const mismoGrupo = cleanText(sol.idGrupo || "") === cleanText(idGrupo);
+    const mismoTipo = normalizeSearch(sol.tipoSolicitud || "") === normalizeSearch(tipo);
+    const estado = normalizeSearch(sol.estadoSolicitud || "");
+
+    return (
+      mismoGrupo &&
+      mismoTipo &&
+      sol.resuelta !== true &&
+      estado !== "completada" &&
+      estado !== "cerrada"
+    );
+  }) || null;
+}
+
+function getCorreccionDetalle(row = {}) {
+  return cleanText(
+    row?.flow?.ultimaCorreccion?.detalle ||
+    row?.flow?.ultimaCorreccion?.asunto ||
+    row?.ultimaCorreccion?.detalle ||
+    row?.ultimaCorreccion?.asunto ||
+    ""
+  );
+}
+
+function getTextoResumen(texto = "", max = 90) {
+  const clean = cleanText(texto);
+  if (clean.length <= max) return clean;
+  return clean.slice(0, max).trim() + "...";
+}
+
+function renderMotivoBox({ id = "", titulo = "Motivo", texto = "" } = {}) {
+  const detalle = cleanText(texto);
+  if (!detalle) return "";
+
+  const uid = `ops-motivo-${id}`;
+
+  return `
+    <div style="margin-top:10px; padding:10px 12px; border-radius:14px; background:#fff8eb; border:1px solid #f0c27a; color:#5f3b00; font-size:13px; line-height:1.45;">
+      <strong>${escapeHtml(titulo)}:</strong> ${escapeHtml(getTextoResumen(detalle, 90))}
+
+      <button
+        type="button"
+        data-toggle-motivo="${escapeAttr(uid)}"
+        style="margin-left:8px; border:0; background:#f2dfbd; color:#4b2d00; border-radius:999px; padding:5px 9px; font-weight:800; cursor:pointer;"
+      >
+        Ver motivo
+      </button>
+
+      <div
+        id="${escapeAttr(uid)}"
+        hidden
+        style="margin-top:10px; padding-top:10px; border-top:1px solid #e8c98f;"
+      >
+        <strong>${escapeHtml(titulo)} completo:</strong><br>
+        ${escapeHtml(detalle)}
+      </div>
+    </div>
+  `;
+}
 
 function getAnoOperativoActual() {
   const now = new Date();
