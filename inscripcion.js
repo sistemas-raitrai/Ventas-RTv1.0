@@ -88,6 +88,9 @@ const situacionLegalDetalleWrap = $("situacionLegalDetalleWrap");
 
 const enfermedadBaseDetalleWrap = $("enfermedadBaseDetalleWrap");
 const saludGeneralDetalleWrap = $("saludGeneralDetalleWrap");
+const cirugiasPreviasDetalleWrap = $("cirugiasPreviasDetalleWrap");
+const emergenciaMedicaDetalleWrap = $("emergenciaMedicaDetalleWrap");
+
 const medicamentosWrap = $("medicamentosWrap");
 const medicamentosProhibidosDetalleWrap = $("medicamentosProhibidosDetalleWrap");
 const alergiasWrap = $("alergiasWrap");
@@ -101,6 +104,7 @@ const adultoCompromisoCard = $("adultoCompromisoCard");
 // -----------------------------------------------------------------------------
 const CORREO_ADMIN = "administracion@raitrai.cl";
 const TELEFONO_ADMIN = "+56 (2) 2236 3232";
+const WHATSAPP_ADMIN = "(+569) 9818 3857";
 const RUT_INTERNO_INICIAL = 90000000;
 
 // -----------------------------------------------------------------------------
@@ -210,6 +214,20 @@ function conectarEventos() {
   form?.addEventListener("submit", onSubmit);
   btnLimpiar?.addEventListener("click", onLimpiar);
 
+  $("btnInfoConoceRaitrai")?.addEventListener("click", () => {
+    $("modalConoceRaitrai")?.classList.remove("hidden");
+  });
+  
+  $("btnCerrarConoceRaitrai")?.addEventListener("click", () => {
+    $("modalConoceRaitrai")?.classList.add("hidden");
+  });
+  
+  $("modalConoceRaitrai")?.addEventListener("click", (event) => {
+    if (event.target?.id === "modalConoceRaitrai") {
+      $("modalConoceRaitrai")?.classList.add("hidden");
+    }
+  });
+
   form?.addEventListener("input", actualizarProgreso);
   form?.addEventListener("change", () => {
     aplicarEstadoUI();
@@ -250,6 +268,8 @@ function conectarEventos() {
 
   enlazarFlagDetalle("enfermedadBaseFlag", enfermedadBaseDetalleWrap, ["si"]);
   enlazarFlagDetalle("saludGeneralFlag", saludGeneralDetalleWrap, ["si"]);
+  enlazarFlagDetalle("cirugiasPreviasFlag", cirugiasPreviasDetalleWrap, ["si"]);
+  enlazarFlagDetalle("emergenciaMedicaFlag", emergenciaMedicaDetalleWrap, ["si"]);
   enlazarFlagDetalle("medicamentosFlag", medicamentosWrap, ["si"]);
   enlazarFlagDetalle("medicamentosProhibidosFlag", medicamentosProhibidosDetalleWrap, ["si"]);
   enlazarFlagDetalle("alergiasFlag", alergiasWrap, ["si"]);
@@ -396,7 +416,7 @@ function aplicarEstadoUI() {
   mostrar(generoOtroWrap, generoOtro);
   setRequired("generoOtro", generoOtro);
 
-  const nacionalidadDetalle = nacionalidadBase === "otra" || nacionalidadBase === "doble";
+  const nacionalidadDetalle = nacionalidadBase === "otra";
   mostrar(nacionalidadDetalleWrap, nacionalidadDetalle);
   setRequired("nacionalidadDetalle", nacionalidadDetalle);
 
@@ -450,7 +470,7 @@ function aplicarEstadoUI() {
 
   mostrar(bloqueInternacional, esInternacional);
 
-  const docsNoChile = esInternacional && nacionalidadDetalle;
+  const docsNoChile = esInternacional && nacionalidadBase !== "chilena";
   mostrar($("docsNoChileWrap"), docsNoChile);
 
   if (!docsNoChile) {
@@ -566,17 +586,17 @@ async function onSubmit(event) {
     if (error.message === "duplicate_document") {
       mostrarMensaje(
         "error",
-        `Ya existe una inscripción para este documento dentro del grupo. Comuníquese con <strong>${CORREO_ADMIN}</strong> o al <strong>${TELEFONO_ADMIN}</strong>.`
+        `Ya existe una inscripción para este documento dentro del grupo. Comuníquese con <strong>${CORREO_ADMIN}</strong>, al <strong>${TELEFONO_ADMIN}</strong> o al WhatsApp <strong>${WHATSAPP_ADMIN}</strong>.`
       );
     } else if (error.message === "duplicate_no_rut_name") {
       mostrarMensaje(
         "error",
-        `Ya existe una inscripción con esos nombres y apellidos en este grupo. Comuníquese con <strong>${CORREO_ADMIN}</strong> o al <strong>${TELEFONO_ADMIN}</strong>.`
+        `Ya existe una inscripción con esos nombres y apellidos en este grupo. Comuníquese con <strong>${CORREO_ADMIN}</strong>, al <strong>${TELEFONO_ADMIN}</strong> o al WhatsApp <strong>${WHATSAPP_ADMIN}</strong>.`
       );
     } else {
       mostrarMensaje(
         "error",
-        `No fue posible enviar la inscripción. Intente nuevamente o comuníquese con <strong>${CORREO_ADMIN}</strong>.`
+        `No fue posible enviar la inscripción. Intente nuevamente o comuníquese con <strong>${CORREO_ADMIN}</strong> o al WhatsApp <strong>${WHATSAPP_ADMIN}</strong>.`
       );
     }
 
@@ -782,10 +802,14 @@ function validarFormulario() {
 
   if (!$("nacionalidadBase")?.value) errores.push("Debe indicar la nacionalidad.");
 
-  if (["otra", "doble"].includes($("nacionalidadBase")?.value) && !limpiarTexto($("nacionalidadDetalle")?.value)) {
+  if ($("nacionalidadBase")?.value === "otra" && !limpiarTexto($("nacionalidadDetalle")?.value)) {
     errores.push("Debe especificar la nacionalidad.");
   }
 
+  if (!$("tallaPolera")?.value) {
+    errores.push("Debe indicar la talla de polera del viajante.");
+  }
+  
   if (!validarCorreo($("correoViajante")?.value)) {
     errores.push("Debe ingresar un correo válido del viajante.");
   }
@@ -861,7 +885,7 @@ function validarFormulario() {
     }
   }
 
-  if (esInternacional && ["otra", "doble"].includes($("nacionalidadBase")?.value)) {
+  if (esInternacional && $("nacionalidadBase")?.value !== "chilena") {
     if (!obtenerRadio("conoceDocsInternacionales")) errores.push("Debe indicar si conoce los documentos internacionales requeridos.");
   }
 
@@ -876,6 +900,14 @@ function validarFormulario() {
 
   if (obtenerRadio("saludGeneralFlag") === "si" && !limpiarTexto($("saludGeneralDetalle")?.value)) {
     errores.push("Debe detallar la condición de salud.");
+  }
+
+  if (obtenerRadio("cirugiasPreviasFlag") === "si" && !limpiarTexto($("cirugiasPreviasDetalle")?.value)) {
+    errores.push("Debe detallar las cirugías, hospitalizaciones o tratamientos relevantes.");
+  }
+  
+  if (obtenerRadio("emergenciaMedicaFlag") === "si" && !limpiarTexto($("emergenciaMedicaDetalle")?.value)) {
+    errores.push("Debe detallar el antecedente importante para una atención médica de emergencia.");
   }
 
   if (obtenerRadio("medicamentosFlag") === "si" && !limpiarTexto($("medicamentosDetalle")?.value)) {
@@ -1016,7 +1048,8 @@ function construirPayloadBase() {
 
       correoViajante: limpiarTexto($("correoViajante")?.value),
       telefonoViajante: esAdultoOperativo ? limpiarTexto($("telefonoViajante")?.value) : "",
-      telefonoViajanteEsWhatsapp: esAdultoOperativo ? !!$("telefonoViajanteEsWhatsapp")?.checked : false
+      telefonoViajanteEsWhatsapp: esAdultoOperativo ? !!$("telefonoViajanteEsWhatsapp")?.checked : false,
+      tallaPolera: $("tallaPolera")?.value || ""
     },
 
     profesor: {
@@ -1107,7 +1140,13 @@ function construirPayloadBase() {
 
       saludGeneralFlag: obtenerRadio("saludGeneralFlag") || "",
       saludGeneralDetalle: limpiarTexto($("saludGeneralDetalle")?.value),
-
+      
+      cirugiasPreviasFlag: obtenerRadio("cirugiasPreviasFlag") || "",
+      cirugiasPreviasDetalle: limpiarTexto($("cirugiasPreviasDetalle")?.value),
+      
+      emergenciaMedicaFlag: obtenerRadio("emergenciaMedicaFlag") || "",
+      emergenciaMedicaDetalle: limpiarTexto($("emergenciaMedicaDetalle")?.value),
+      
       medicamentosFlag: obtenerRadio("medicamentosFlag") || "",
       medicamentosDetalle: limpiarTexto($("medicamentosDetalle")?.value),
 
@@ -1136,7 +1175,8 @@ function construirPayloadBase() {
       aceptaUsoInterno: !!$("aceptaUsoInterno")?.checked,
       aceptaCambiosCorreo: !!$("aceptaCambiosCorreo")?.checked,
       correoCambios: CORREO_ADMIN,
-      telefonoCambios: TELEFONO_ADMIN
+      telefonoCambios: TELEFONO_ADMIN,
+      whatsappCambios: WHATSAPP_ADMIN
     },
 
     meta: {
@@ -1173,7 +1213,11 @@ async function crearCorreoConfirmacion(payload) {
       </p>
       <p>La información entregada será utilizada exclusivamente para la planificación, coordinación y operación segura del viaje.</p>
       <p>Si necesita corregir algún dato posteriormente, debe comunicarse con Turismo Rai Trai y asegurarse de recibir confirmación del cambio.</p>
-      <p>Correo: <strong>${escapeHtml(CORREO_ADMIN)}</strong><br>Teléfono: <strong>${escapeHtml(TELEFONO_ADMIN)}</strong></p>
+      <p>
+        Correo: <strong>${escapeHtml(CORREO_ADMIN)}</strong><br>
+        Teléfono: <strong>${escapeHtml(TELEFONO_ADMIN)}</strong><br>
+        WhatsApp: <strong>${escapeHtml(WHATSAPP_ADMIN)}</strong>
+      </p>
       <p>Atentamente,<br>Turismo Rai Trai</p>
     </div>
   `;
