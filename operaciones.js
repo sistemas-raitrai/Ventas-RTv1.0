@@ -356,9 +356,15 @@ function buildSummarySets(rows = []) {
     solicitudesActualizacionAbiertas.has(row.idGrupo)
   );
 
-  state.sets.correccion = rows.filter((row) =>
-    solicitudesCorreccionAbiertas.has(row.idGrupo) || isCorreccionFichaPendiente(row)
-  );
+  state.sets.correccion = rows.filter((row) => {
+    // Si el flujo real ya NO está pendiente, no mostrar aunque exista solicitud vieja.
+    if (!isCorreccionFichaPendiente(row)) return false;
+  
+    return (
+      solicitudesCorreccionAbiertas.has(row.idGrupo) ||
+      isCorreccionFichaPendiente(row)
+    );
+  });
 
   state.sets.firmar = rows.filter((row) => {
     if (solicitudesActualizacionAbiertas.has(row.idGrupo)) return false;
@@ -838,11 +844,34 @@ function isFichaPorFirmarGeneral(row = {}) {
 function isCorreccionFichaPendiente(row = {}) {
   const flow = row.flow || {};
   const modo = normalizeSearch(flow.modo || "");
+  const correccionEstado = normalizeSearch(flow.correccionEstado || "");
+
+  const firmasCompletas = !!(
+    flow?.vendedor?.firmado &&
+    flow?.jefaVentas?.firmado &&
+    flow?.administracion?.firmado
+  );
+
+  const pdfVigente = hasFichaPdfVigente(row);
+  const flujoCerrado = row.fichaFlujoAbierto !== true;
+
+  // Si ya está cerrada, firmada y con PDF vigente, NO debe caer en corrección.
+  if (
+    correccionEstado === "cerrada" ||
+    (
+      firmasCompletas &&
+      pdfVigente &&
+      flujoCerrado &&
+      flow.correccionPendiente !== true
+    )
+  ) {
+    return false;
+  }
 
   return (
     modo === "correccion" ||
     flow.correccionPendiente === true ||
-    normalizeSearch(flow.correccionEstado || "").startsWith("pendiente")
+    correccionEstado.startsWith("pendiente")
   );
 }
 
