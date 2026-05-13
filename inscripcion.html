@@ -344,10 +344,13 @@
       </div>
 
       <div class="notice privacy" style="margin-top:20px;">
-        🔒 <strong>Información confidencial y uso de datos personales.</strong><br />
-        Toda la información ingresada será tratada como confidencial, incluyendo antecedentes personales,
-        de salud, alimentación, documentación y contacto. Será utilizada exclusivamente por Turismo Rai Trai
-        para la correcta planificación, coordinación y operación segura del viaje.
+        🔒 <strong>Información confidencial y protección de datos personales.</strong><br />
+        La información proporcionada será tratada de manera confidencial y utilizada exclusivamente para fines relacionados
+        con la planificación, coordinación y seguridad del viaje, conforme a la normativa vigente sobre protección de datos
+        personales en Chile.
+        <br /><br />
+        Si posteriormente necesita solicitar actualización, corrección o eliminación de información, puede contactarnos
+        a través de nuestros canales oficiales.
       </div>
 
       <div class="notice time">
@@ -359,7 +362,8 @@
         y asegurarse de recibir confirmación del cambio.
         <br />
         Correo: <strong>administracion@raitrai.cl</strong><br />
-        Teléfono: <strong>+56 (2) 2236 3232</strong>
+        Teléfono: <strong>+56 (2) 2236 3232</strong><br />
+        WhatsApp: <strong>(+569) 9818 3857</strong>
       </div>
 
       <div id="msgBox" class="notice hidden"></div>
@@ -515,6 +519,40 @@
         </div>
       </section>
 
+      <section class="card">
+        <h2>• Talla de polera</h2>
+        <div class="sub">
+          Para preparar algunos elementos del viaje, indíquenos la talla de polera que normalmente utiliza el viajante.
+        </div>
+
+        <div class="form-grid">
+          <div class="field col-6">
+            <label for="tallaPolera">Talla de polera del viajante <span class="req">*</span></label>
+            <select id="tallaPolera" name="tallaPolera" required>
+              <option value="">Seleccione...</option>
+              <option value="S">S</option>
+              <option value="M">M</option>
+              <option value="L">L</option>
+              <option value="XL">XL</option>
+              <option value="2XL">2XL</option>
+              <option value="no_seguro">No está seguro/a</option>
+            </select>
+          </div>
+
+          <div class="field col-6">
+            <label>Referencia de medidas</label>
+            <img
+              src="IMG/tallas-polera-raitrai.png"
+              alt="Tabla de tallas de polera Rai Trai"
+              style="max-width:100%; border:1px solid var(--rt-border); border-radius:16px; background:#fff;"
+            />
+            <div class="hint">
+              Medidas referenciales: S 48x69 cm, M 51x71 cm, L 54x72 cm, XL 57x73 cm, 2XL 60x74 cm.
+            </div>
+          </div>
+        </div>
+      </section>
+
       <section id="bloqueProfesor" class="card hidden">
         <h2>• Datos del profesor</h2>
 
@@ -539,6 +577,10 @@
               <input type="checkbox" id="interesConoceRaitrai" name="interesConoceRaitrai" />
               Me interesa recibir información del programa “Conoce Rai Trai”
             </label>
+          
+            <button type="button" id="btnInfoConoceRaitrai" class="btn-secondary" style="width:max-content; padding:9px 13px;">
+              ¿Qué es esto?
+            </button>
           </div>
         </div>
       </section>
@@ -771,15 +813,16 @@
 
       <section id="bloqueInternacional" class="card hidden">
         <h2>• Documentación y autorizaciones de viaje</h2>
-        <div class="sub">
-          La documentación del viajante es de exclusiva responsabilidad del adulto responsable del estudiante, o de si mismo si es mayor de edad.
-        </div>
+          <div class="sub">
+            Para viajes internacionales, es importante revisar con anticipación la documentación y autorizaciones necesarias
+            según la situación particular del viajante. Ante cualquier duda, recomendamos consultar primero con el delegado
+            o representante de su curso y revisar directamente la información oficial del consulado del país de destino.
+          </div>
 
         <div class="form-grid">
           <div id="docsNoChileWrap" class="field">
             <label>
-            ¿Tiene conocimiento de los documentos requeridos para ingresar al país de destino? En caso de dudas debe contactarse con el consulado de este país
-              y consultar por el ingreso de menores de edad no acompañados de la nacionalidad del estudiante.
+              ¿El adulto responsable conoce o revisará los documentos requeridos para el país de destino?
             </label>
             <div class="radio-group">
               <label class="option-pill"><input type="radio" name="conoceDocsInternacionales" value="si" /> Sí</label>
@@ -845,6 +888,32 @@
           <div id="saludGeneralDetalleWrap" class="field hidden">
             <label for="saludGeneralDetalle">Descríbalo con la mayor claridad posible</label>
             <textarea id="saludGeneralDetalle" name="saludGeneralDetalle"></textarea>
+          </div>
+
+          <div class="field">
+            <label>¿Ha tenido cirugías, hospitalizaciones o tratamientos médicos relevantes que sea importante informar?</label>
+            <div class="radio-group">
+              <label class="option-pill"><input type="radio" name="cirugiasPreviasFlag" value="no" /> No</label>
+              <label class="option-pill"><input type="radio" name="cirugiasPreviasFlag" value="si" /> Sí</label>
+            </div>
+          </div>
+          
+          <div id="cirugiasPreviasDetalleWrap" class="field hidden">
+            <label for="cirugiasPreviasDetalle">Describa brevemente el antecedente, año aproximado y cualquier indicación relevante</label>
+            <textarea id="cirugiasPreviasDetalle" name="cirugiasPreviasDetalle"></textarea>
+          </div>
+          
+          <div class="field">
+            <label>En caso de una atención médica de emergencia, ¿existe algún antecedente importante que debamos conocer?</label>
+            <div class="radio-group">
+              <label class="option-pill"><input type="radio" name="emergenciaMedicaFlag" value="no" /> No</label>
+              <label class="option-pill"><input type="radio" name="emergenciaMedicaFlag" value="si" /> Sí</label>
+            </div>
+          </div>
+          
+          <div id="emergenciaMedicaDetalleWrap" class="field hidden">
+            <label for="emergenciaMedicaDetalle">Describa brevemente</label>
+            <textarea id="emergenciaMedicaDetalle" name="emergenciaMedicaDetalle"></textarea>
           </div>
 
           <div class="field">
@@ -1000,11 +1069,52 @@
 
         <div class="footer-note">
           En caso de necesitar ayuda, comuníquese con Turismo Rai Trai al correo
-          <strong>administracion@raitrai.cl</strong> o al teléfono <strong>+56 (2) 2236 3232</strong>.
+          <strong>administracion@raitrai.cl</strong>, al teléfono <strong>+56 (2) 2236 3232</strong>
+          o al WhatsApp <strong>(+569) 9818 3857</strong>.
         </div>
       </section>
     </form>
   </main>
+
+  <div id="modalConoceRaitrai" class="hidden" style="
+    position:fixed;
+    inset:0;
+    z-index:9999;
+    background:rgba(20,20,35,.45);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding:20px;
+  ">
+    <div style="
+      width:min(560px, 100%);
+      background:#fff;
+      border-radius:22px;
+      padding:24px;
+      box-shadow:0 24px 60px rgba(0,0,0,.25);
+      border:1px solid var(--rt-border);
+    ">
+      <h2 style="margin-top:0;">Conoce Rai Trai</h2>
+  
+      <p style="line-height:1.6; color:var(--rt-muted);">
+        Es una instancia pensada para profesores, representantes o personas interesadas en conocer más sobre Rai Trai,
+        nuestras experiencias de viaje, propuestas educativas y futuras oportunidades de vínculo.
+      </p>
+  
+      <p style="line-height:1.6; color:var(--rt-muted);">
+        Puede incluir información sobre programas, experiencias, beneficios, capacitaciones y formas de generar
+        una relación cercana con nuestra comunidad.
+      </p>
+  
+      <p style="line-height:1.6; color:var(--rt-muted);">
+        Es una invitación para conocer mejor cómo trabajamos y evaluar, si así lo desea, futuras oportunidades junto a nosotros.
+      </p>
+  
+      <div class="actions" style="justify-content:flex-end;">
+        <button type="button" id="btnCerrarConoceRaitrai" class="btn-primary">Entendido</button>
+      </div>
+    </div>
+  </div>
 
   <script type="module" src="./inscripcion.js"></script>
 </body>
