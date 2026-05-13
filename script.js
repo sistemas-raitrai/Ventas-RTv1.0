@@ -910,6 +910,54 @@ function getFichaCorregidaLabel(row = {}) {
   return "Corrección interna pendiente";
 }
 
+function getCorreccionDetalle(row = {}) {
+  return String(
+    row?.ultimaCorreccion?.detalle ||
+    row?.flowFicha?.ultimaCorreccion?.detalle ||
+    row?.ficha?.ultimaCorreccion?.detalle ||
+    row?.ultimaCorreccion?.asunto ||
+    row?.flowFicha?.ultimaCorreccion?.asunto ||
+    ""
+  ).trim();
+}
+
+function getTextoResumen(texto = "", max = 90) {
+  const clean = String(texto || "").trim();
+  if (clean.length <= max) return clean;
+  return clean.slice(0, max).trim() + "...";
+}
+
+function renderMotivoCorreccion(row = {}) {
+  const detalle = getCorreccionDetalle(row);
+  if (!detalle) return "";
+
+  const resumen = getTextoResumen(detalle, 90);
+  const uid = `motivo-correccion-${getRowId(row)}`;
+
+  return `
+    <div style="margin-top:10px; padding:10px 12px; border-radius:14px; background:#fff8eb; border:1px solid #f0c27a; color:#5f3b00; font-size:13px; line-height:1.45;">
+      <strong>Motivo:</strong> ${escapeHtml(resumen)}
+
+      <button
+        type="button"
+        data-toggle-motivo="${escapeHtml(uid)}"
+        style="margin-left:8px; border:0; background:#f2dfbd; color:#4b2d00; border-radius:999px; padding:5px 9px; font-weight:800; cursor:pointer;"
+      >
+        Ver motivo
+      </button>
+
+      <div
+        id="${escapeHtml(uid)}"
+        hidden
+        style="margin-top:10px; padding-top:10px; border-top:1px solid #e8c98f;"
+      >
+        <strong>Motivo completo:</strong><br>
+        ${escapeHtml(detalle)}
+      </div>
+    </div>
+  `;
+}
+
 function getFichasCorregidasSegunUsuario(rows = [], effectiveUser = null) {
   return dedupeRowsByGroup(rows)
     .filter((row) => isFichaCorregidaVisibleParaUsuario(row, effectiveUser))
@@ -1391,6 +1439,7 @@ function renderFichasCorregidasModal(rows = [], effectiveUser = null) {
             Apoderado: ${escapeHtml(apoderado)}<br>
             Vendedor(a): ${escapeHtml(vendedor)}<br>
             Estado corrección: ${escapeHtml(pendiente)}
+            ${renderMotivoCorreccion(row)}
             ${adminChangesHtml}
           </div>
         </div>
@@ -2660,6 +2709,19 @@ async function initPage() {
   const linkFichasCorregidas = $("link-fichas-corregidas");
   const btnCerrarFichasCorregidas = $("btn-cerrar-fichas-corregidas");
   const modalFichasCorregidas = $("modal-fichas-corregidas");
+
+  document.addEventListener("click", (e) => {
+    const btn = e.target.closest("[data-toggle-motivo]");
+    if (!btn) return;
+  
+    const targetId = btn.dataset.toggleMotivo;
+    const box = document.getElementById(targetId);
+    if (!box) return;
+  
+    const isHidden = box.hidden;
+    box.hidden = !isHidden;
+    btn.textContent = isHidden ? "Ocultar motivo" : "Ver motivo";
+  });
 
   const linkSolicitudesActualizacion = $("link-solicitudes-actualizacion");
   const btnCerrarSolicitudesActualizacion = $("btn-cerrar-solicitudes-actualizacion");
