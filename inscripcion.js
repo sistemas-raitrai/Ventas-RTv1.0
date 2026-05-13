@@ -1135,6 +1135,7 @@ function construirPayloadBase() {
     },
 
     salud: {
+      grupoSanguineo: $("grupoSanguineo")?.value || "",
       enfermedadBaseFlag: obtenerRadio("enfermedadBaseFlag") || "",
       enfermedadBaseDetalle: limpiarTexto($("enfermedadBaseDetalle")?.value),
 
