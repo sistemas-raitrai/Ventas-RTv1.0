@@ -222,7 +222,6 @@ function mapRow(docId, data = {}) {
 
   const programaPdfUrl = cleanText(
     programa.pdfUrl ||
-    ficha.programaPdfUrl ||
     data.programaPdfUrl ||
     ""
   );
@@ -792,7 +791,10 @@ function exportarXlsx() {
 ========================================================= */
 
 function hasPrograma(row = {}) {
-  return !!(row.programaOriginalUrl || row.programaPdfUrl);
+  return !!(
+    row.programaOriginalUrl ||
+    row.programaPdfUrl
+  );
 }
 
 function hasFichaPdfVigente(row = {}) {
