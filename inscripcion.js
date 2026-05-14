@@ -15,11 +15,6 @@ import {
   where
 } from "https://www.gstatic.com/firebasejs/11.7.3/firebase-firestore.js";
 
-import {
-  getFunctions,
-  httpsCallable
-} from "https://www.gstatic.com/firebasejs/11.7.3/firebase-functions.js";
-
 // -----------------------------------------------------------------------------
 // DOM
 // -----------------------------------------------------------------------------
@@ -97,8 +92,6 @@ const TELEFONO_ADMIN = "+56 (2) 2236 3232";
 const WHATSAPP_ADMIN = "(+569) 9818 3857";
 const RUT_INTERNO_INICIAL = 90000000;
 
-const functions = getFunctions(undefined, "southamerica-west1");
-const sendInscripcionEmail = httpsCallable(functions, "sendInscripcionEmail");
 
 // -----------------------------------------------------------------------------
 // ESTADO
@@ -1197,27 +1190,17 @@ async function enviarCorreoRespaldo(payload) {
     return;
   }
 
-  try {
-    await sendInscripcionEmail({
-      payload,
-      destinatario
-    });
+  await addDoc(collection(db, "correos_inscripcion_pendientes"), {
+    payload,
+    destinatario,
+    idGrupo,
+    documentoNormalizado: payload.identificacion?.documentoNormalizado || "",
+    nombreCompleto: payload.identificacion?.nombreCompleto || "",
+    estado: "pendiente",
+    creadoEn: serverTimestamp()
+  });
 
-    console.log("Correo de respaldo enviado correctamente:", destinatario);
-  } catch (error) {
-    console.error("Error enviando correo de respaldo:", error);
-
-    await addDoc(collection(db, "ventas_cotizaciones", idGrupo, "historial_inscripciones"), {
-      fecha: serverTimestamp(),
-      tipo: "error_correo_respaldo",
-      documentoNormalizado: payload.identificacion?.documentoNormalizado || "",
-      documento: payload.identificacion?.documento || "",
-      nombreCompleto: payload.identificacion?.nombreCompleto || "",
-      tipoViajante: payload.tipoViajante || "",
-      destinatario,
-      mensaje: "La inscripción fue guardada correctamente, pero no fue posible enviar el correo de respaldo."
-    });
-  }
+  console.log("Correo de respaldo encolado correctamente:", destinatario);
 }
 
 function obtenerDestinatarioCorreoRespaldo(payload) {
