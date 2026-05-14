@@ -403,16 +403,18 @@ function aplicarEstadoUI() {
   setRequired("telefonoViajante", esAdultoOperativo);
   setRequired("adultoAceptaCompromiso", esAdultoOperativo);
 
-  const muestraRut = tipoIdentificacion === "rut";
+  const sinRut = tipoIdentificacion === "sin_rut";
+  const muestraRut = !sinRut;
+  
   mostrar(rutCompletoWrap, muestraRut);
   mostrar(rutWrap, muestraRut);
   mostrar(dvWrap, muestraRut);
-  mostrar(sinRutNotice, tipoIdentificacion === "sin_rut");
-
+  mostrar(sinRutNotice, sinRut);
+  
   setRequired("rutNumero", muestraRut);
   setRequired("rutDv", muestraRut);
-
-  if (!muestraRut) {
+  
+  if (sinRut) {
     if ($("rutNumero")) $("rutNumero").value = "";
     if ($("rutDv")) $("rutDv").value = "";
     $("rutNumero")?.classList.remove("input-error");
