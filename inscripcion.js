@@ -1249,12 +1249,12 @@ function mostrarPantallaFinal(payload) {
       <p>
         📩 Se enviará un respaldo al correo
         <strong>${escapeHtml(destinatario || "indicado en el formulario")}</strong>.
-        Te recomendamos revisar también la carpeta de spam o correo no deseado.
+        Si no lo recibes en unos minutos, revisa spam / correos no deseados y si no está, contáctanos.
       </p>
 
       <p>
-        ✏️ Si necesita corregir, actualizar o eliminar información, comuníquese con Turismo Rai Trai
-        y asegúrese de recibir confirmación del cambio.
+        ✏️ Si necesitas corregir, actualizar o eliminar información, comunícate con Rai Trai
+        y asegúrate de recibir confirmación de tu solicitud.
       </p>
 
       <p>
