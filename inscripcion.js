@@ -1,17 +1,4 @@
 // inscripcion.js
-// -----------------------------------------------------------------------------
-// Formulario público de inscripción Rai Trai.
-// Incluye:
-// - Pantalla de bienvenida + botón comenzar
-// - Barra de progreso automática
-// - Tipo viajante: estudiante / profesor / adulto acompañante
-// - RUT / sin RUT con correlativo global
-// - Segundo apoderado opcional
-// - Segundo contacto de emergencia opcional
-// - Colección global inscripciones_sin_rut
-// - Colección global inscripciones_por_rut
-// - Historial del grupo
-// -----------------------------------------------------------------------------
 
 import { db } from "./firebase-init.js";
 
@@ -82,10 +69,7 @@ const emergencia2RelacionOtroWrap = $("emergencia2RelacionOtroWrap");
 const emergencia2WhatsappAlternativoWrap = $("emergencia2WhatsappAlternativoWrap");
 
 const bloqueInternacional = $("bloqueInternacional");
-const docsInternacionalesDetalleWrap = $("docsInternacionalesDetalleWrap");
-const permisoMenorWrap = $("permisoMenorWrap");
-const situacionLegalWrap = $("situacionLegalWrap");
-const situacionLegalDetalleWrap = $("situacionLegalDetalleWrap");
+const docsOtraNacionalidadWrap = $("docsOtraNacionalidadWrap");
 
 const enfermedadBaseDetalleWrap = $("enfermedadBaseDetalleWrap");
 const saludGeneralDetalleWrap = $("saludGeneralDetalleWrap");
@@ -476,25 +460,7 @@ function aplicarEstadoUI() {
 
   mostrar(bloqueInternacional, esInternacional);
 
-  const docsNoChile = esInternacional && nacionalidadBase !== "chilena";
-  mostrar($("docsNoChileWrap"), docsNoChile);
-
-  if (!docsNoChile) {
-    limpiarRadios("conoceDocsInternacionales");
-    if ($("docsInternacionalesDetalle")) $("docsInternacionalesDetalle").value = "";
-    mostrar(docsInternacionalesDetalleWrap, false);
-  }
-
-  const permisoMenor = esEstudiante && esInternacional && esMenor;
-  mostrar(permisoMenorWrap, permisoMenor);
-  mostrar(situacionLegalWrap, permisoMenor);
-
-  if (!permisoMenor) {
-    limpiarRadios("permisoMenorViaje");
-    limpiarRadios("situacionLegalAfecta");
-    if ($("situacionLegalDetalle")) $("situacionLegalDetalle").value = "";
-    mostrar(situacionLegalDetalleWrap, false);
-  }
+  mostrar(docsOtraNacionalidadWrap, esInternacional && nacionalidadBase === "otra");
 
   actualizarProgreso();
 }
@@ -891,13 +857,12 @@ function validarFormulario() {
     }
   }
 
-  if (esInternacional && $("nacionalidadBase")?.value !== "chilena") {
-    if (!obtenerRadio("conoceDocsInternacionales")) errores.push("Debe indicar si conoce los documentos internacionales requeridos.");
+  if (esInternacional && !$("declaraDocumentacionViaje")?.checked) {
+    errores.push("Debe declarar responsabilidad sobre la documentación del viaje.");
   }
-
-  if (esInternacional && esEstudiante && esMenor) {
-    if (!obtenerRadio("permisoMenorViaje")) errores.push("Debe indicar la situación de autorizaciones del menor.");
-    if (!obtenerRadio("situacionLegalAfecta")) errores.push("Debe indicar si existe una situación legal o familiar relevante.");
+  
+  if (esInternacional && $("nacionalidadBase")?.value === "otra" && !$("declaraRevisionConsulado")?.checked) {
+    errores.push("Debe confirmar revisión documental para nacionalidad especial.");
   }
 
   if (obtenerRadio("enfermedadBaseFlag") === "si" && !limpiarTexto($("enfermedadBaseDetalle")?.value)) {
@@ -1135,11 +1100,10 @@ function construirPayloadBase() {
 
     documentacion: {
       aplicaInternacional: esInternacional,
-      conoceDocsInternacionales: esInternacional ? (obtenerRadio("conoceDocsInternacionales") || "") : "",
-      docsInternacionalesDetalle: limpiarTexto($("docsInternacionalesDetalle")?.value),
-      permisoMenorViaje: esInternacional && esEstudiante && esMenor ? (obtenerRadio("permisoMenorViaje") || "") : "",
-      situacionLegalAfecta: esInternacional && esEstudiante && esMenor ? (obtenerRadio("situacionLegalAfecta") || "") : "",
-      situacionLegalDetalle: limpiarTexto($("situacionLegalDetalle")?.value)
+      declaraDocumentacionViaje: esInternacional ? !!$("declaraDocumentacionViaje")?.checked : false,
+      declaraRevisionConsulado: esInternacional && $("nacionalidadBase")?.value === "otra"
+        ? !!$("declaraRevisionConsulado")?.checked
+        : false
     },
 
     salud: {
