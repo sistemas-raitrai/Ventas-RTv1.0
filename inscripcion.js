@@ -415,7 +415,14 @@ function aplicarEstadoUI() {
   mostrar(generoOtroWrap, generoOtro);
   setRequired("generoOtro", generoOtro);
 
-  const nacionalidadDetalle = nacionalidadBase === "otra";
+  // Si no tiene RUT, no puede seleccionar nacionalidad chilena.
+  if (tipoIdentificacion === "sin_rut" && nacionalidadBase === "chilena") {
+    $("nacionalidadBase").value = "otra";
+  }
+  
+  const nacionalidadFinal = $("nacionalidadBase")?.value || "";
+  const nacionalidadDetalle = nacionalidadFinal === "otra";
+  
   mostrar(nacionalidadDetalleWrap, nacionalidadDetalle);
   setRequired("nacionalidadDetalle", nacionalidadDetalle);
 
@@ -784,6 +791,9 @@ function validarFormulario() {
   if (!$("fechaNacimiento")?.value) errores.push("Debe ingresar la fecha de nacimiento.");
 
   if (!$("nacionalidadBase")?.value) errores.push("Debe indicar la nacionalidad.");
+  if (tipoIdentificacion === "sin_rut" && $("nacionalidadBase")?.value === "chilena") {
+    errores.push("Si el viajante tiene nacionalidad chilena, debe ingresar RUT.");
+  }
 
   if ($("nacionalidadBase")?.value === "otra" && !limpiarTexto($("nacionalidadDetalle")?.value)) {
     errores.push("Debe especificar la nacionalidad.");
