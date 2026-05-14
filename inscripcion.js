@@ -15,6 +15,11 @@ import {
   where
 } from "https://www.gstatic.com/firebasejs/11.7.3/firebase-firestore.js";
 
+import {
+  getFunctions,
+  httpsCallable
+} from "https://www.gstatic.com/firebasejs/11.7.3/firebase-functions.js";
+
 // -----------------------------------------------------------------------------
 // DOM
 // -----------------------------------------------------------------------------
@@ -91,6 +96,9 @@ const CORREO_ADMIN = "administracion@raitrai.cl";
 const TELEFONO_ADMIN = "+56 (2) 2236 3232";
 const WHATSAPP_ADMIN = "(+569) 9818 3857";
 const RUT_INTERNO_INICIAL = 90000000;
+
+const functions = getFunctions(undefined, "southamerica-west1");
+const sendInscripcionEmail = httpsCallable(functions, "sendInscripcionEmail");
 
 // -----------------------------------------------------------------------------
 // ESTADO
@@ -558,7 +566,7 @@ async function onSubmit(event) {
     const payloadBase = construirPayloadBase();
     const payload = await guardarInscripcion(payloadBase);
 
-    await crearCorreoConfirmacion(payload);
+    await enviarCorreoRespaldo(payload);
     await registrarEventosEspeciales(payload);
     await detectarRutEnOtrosGrupos(payload);
     await verificarCupoCompleto();
@@ -1181,6 +1189,49 @@ function construirPayloadBase() {
       estado: "inscrito"
     }
   };
+}
+
+async function enviarCorreoRespaldo(payload) {
+  const destinatario = obtenerDestinatarioCorreoRespaldo(payload);
+
+  if (!destinatario) {
+    console.warn("No se encontró destinatario para el correo de respaldo.");
+    return;
+  }
+
+  try {
+    await sendInscripcionEmail({
+      payload,
+      destinatario
+    });
+
+    console.log("Correo de respaldo enviado correctamente:", destinatario);
+  } catch (error) {
+    console.error("Error enviando correo de respaldo:", error);
+
+    await addDoc(collection(db, "ventas_cotizaciones", idGrupo, "historial_inscripciones"), {
+      fecha: serverTimestamp(),
+      tipo: "error_correo_respaldo",
+      documentoNormalizado: payload.identificacion?.documentoNormalizado || "",
+      documento: payload.identificacion?.documento || "",
+      nombreCompleto: payload.identificacion?.nombreCompleto || "",
+      tipoViajante: payload.tipoViajante || "",
+      destinatario,
+      mensaje: "La inscripción fue guardada correctamente, pero no fue posible enviar el correo de respaldo."
+    });
+  }
+}
+
+function obtenerDestinatarioCorreoRespaldo(payload) {
+  if (payload?.tipoViajante === "estudiante") {
+    return limpiarTexto(payload?.contactoPrincipal?.correo);
+  }
+
+  if (payload?.tipoViajante === "profesor" || payload?.tipoViajante === "adulto_acompanante") {
+    return limpiarTexto(payload?.identificacion?.correoViajante);
+  }
+
+  return limpiarTexto(payload?.contactoPrincipal?.correo || payload?.identificacion?.correoViajante);
 }
 
 // -----------------------------------------------------------------------------
