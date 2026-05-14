@@ -571,12 +571,7 @@ async function onSubmit(event) {
     await detectarRutEnOtrosGrupos(payload);
     await verificarCupoCompleto();
 
-    mostrarMensaje("ok", "Inscripción enviada correctamente. ¡Gracias por confiar en Rai Trai!");
-    form.reset();
-    resetDefaults();
-    aplicarEstadoUI();
-    actualizarProgreso();
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    mostrarPantallaFinal(payload);
 
   } catch (error) {
     console.error(error);
@@ -1232,6 +1227,42 @@ function obtenerDestinatarioCorreoRespaldo(payload) {
   }
 
   return limpiarTexto(payload?.contactoPrincipal?.correo || payload?.identificacion?.correoViajante);
+}
+
+function mostrarPantallaFinal(payload) {
+  form?.classList.add("hidden");
+
+  mostrarMensaje(
+    "ok",
+    `
+      <h2 style="margin-top:0;">Inscripción enviada correctamente</h2>
+      <p>
+        Muchas gracias. Hemos recibido las respuestas de
+        <strong>${escapeHtml(payload?.identificacion?.nombreCompleto || "la persona inscrita")}</strong>.
+      </p>
+      <p>
+        Se enviará un respaldo al correo indicado en el formulario. Revisa la carpeta de SPAM.
+      </p>
+      <p>
+        Si necesita corregir, actualizar o eliminar información, comuníquese con Turismo Rai Trai
+        y asegúrese de recibir confirmación del cambio.
+      </p>
+      <p>
+        Correo:
+        <a href="mailto:administracion@raitrai.cl?subject=Sobre%20el%20formulario%20de%20registro">
+          administracion@raitrai.cl
+        </a><br>
+        Teléfono:
+        <a href="tel:+56222363232">+56 2 2236 3232</a><br>
+        WhatsApp:
+        <a href="https://wa.me/56998183857?text=Necesito%20ayuda%20con%20el%20formulario%20de%20registro" target="_blank" rel="noopener">
+          +56 9 9818 3857
+        </a>
+      </p>
+    `
+  );
+
+  window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
 // -----------------------------------------------------------------------------
