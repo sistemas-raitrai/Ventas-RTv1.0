@@ -251,9 +251,6 @@ function conectarEventos() {
   $("emergencia2Relacion")?.addEventListener("change", aplicarEstadoUI);
   $("emergencia2EsWhatsapp")?.addEventListener("change", aplicarEstadoUI);
 
-  enlazarFlagDetalle("conoceDocsInternacionales", docsInternacionalesDetalleWrap, ["no", "parcial"]);
-  enlazarFlagDetalle("situacionLegalAfecta", situacionLegalDetalleWrap, ["si", "privado"]);
-
   enlazarFlagDetalle("enfermedadBaseFlag", enfermedadBaseDetalleWrap, ["si"]);
   enlazarFlagDetalle("saludGeneralFlag", saludGeneralDetalleWrap, ["si"]);
   enlazarFlagDetalle("cirugiasPreviasFlag", cirugiasPreviasDetalleWrap, ["si"]);
@@ -1036,9 +1033,9 @@ function construirPayloadBase() {
       relacionCurso: esAcompanante ? relacionCursoFinal : "",
       relacionCursoBase: esAcompanante ? relacionCurso : "",
       relacionCursoOtro: esAcompanante ? relacionCursoOtro : "",
-      estudianteRelacionado: esAcompanante ? limpiarTexto($("estudianteRelacionado")?.value) : ""
+      estudianteRelacionado: esAcompanante ? limpiarTexto($("estudianteRelacionado")?.value) : "",
       acompananteTieneHijosViaje: esAcompanante ? (obtenerRadio("acompananteTieneHijosViaje") || "") : "",
-      interesConoceRaitrai: esAcompanante ? !!$("interesConoceRaitraiAcompanante")?.checked : false,
+      interesConoceRaitrai: esAcompanante ? !!$("interesConoceRaitraiAcompanante")?.checked : false
     },
 
     contactoPrincipal: {
