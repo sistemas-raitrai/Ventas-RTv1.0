@@ -216,6 +216,20 @@ function conectarEventos() {
     }
   });
 
+  $("btnAbrirTallas")?.addEventListener("click", () => {
+    $("modalTallasPolera")?.classList.remove("hidden");
+  });
+  
+  $("btnCerrarTallas")?.addEventListener("click", () => {
+    $("modalTallasPolera")?.classList.add("hidden");
+  });
+  
+  $("modalTallasPolera")?.addEventListener("click", (event) => {
+    if (event.target?.id === "modalTallasPolera") {
+      $("modalTallasPolera")?.classList.add("hidden");
+    }
+  });
+
   form?.addEventListener("input", actualizarProgreso);
   form?.addEventListener("change", () => {
     aplicarEstadoUI();
