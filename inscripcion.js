@@ -61,6 +61,7 @@ const bloqueProfesor = $("bloqueProfesor");
 const tipoProfesorOtroWrap = $("tipoProfesorOtroWrap");
 
 const bloqueAcompanante = $("bloqueAcompanante");
+const acompananteConoceWrap = $("acompananteConoceWrap");
 const relacionCursoOtroWrap = $("relacionCursoOtroWrap");
 
 const bloqueApoderado = $("bloqueApoderado");
@@ -215,6 +216,9 @@ function conectarEventos() {
   btnLimpiar?.addEventListener("click", onLimpiar);
 
   $("btnInfoConoceRaitrai")?.addEventListener("click", () => {
+  $("btnInfoConoceRaitraiAcompanante")?.addEventListener("click", () => {
+    $("modalConoceRaitrai")?.classList.remove("hidden");
+  });
     $("modalConoceRaitrai")?.classList.remove("hidden");
   });
   
@@ -430,6 +434,8 @@ function aplicarEstadoUI() {
   setRequired("relacionCurso", esAcompanante);
   setRequired("relacionCursoOtro", esAcompanante && relacionCursoOtro);
   setRequired("estudianteRelacionado", esAcompanante);
+  const tieneHijosViaje = obtenerRadio("acompananteTieneHijosViaje") === "si";
+  mostrar(acompananteConoceWrap, esAcompanante && tieneHijosViaje);
 
   setRequired("contactoPrincipalNombre", esEstudiante);
   setRequired("contactoPrincipalRelacion", esEstudiante);
@@ -1066,6 +1072,8 @@ function construirPayloadBase() {
       relacionCursoBase: esAcompanante ? relacionCurso : "",
       relacionCursoOtro: esAcompanante ? relacionCursoOtro : "",
       estudianteRelacionado: esAcompanante ? limpiarTexto($("estudianteRelacionado")?.value) : ""
+      acompananteTieneHijosViaje: esAcompanante ? (obtenerRadio("acompananteTieneHijosViaje") || "") : "",
+      interesConoceRaitrai: esAcompanante ? !!$("interesConoceRaitraiAcompanante")?.checked : false,
     },
 
     contactoPrincipal: {
