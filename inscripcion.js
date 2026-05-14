@@ -208,9 +208,10 @@ function conectarEventos() {
   btnLimpiar?.addEventListener("click", onLimpiar);
 
   $("btnInfoConoceRaitrai")?.addEventListener("click", () => {
-  $("btnInfoConoceRaitraiAcompanante")?.addEventListener("click", () => {
     $("modalConoceRaitrai")?.classList.remove("hidden");
   });
+  
+  $("btnInfoConoceRaitraiAcompanante")?.addEventListener("click", () => {
     $("modalConoceRaitrai")?.classList.remove("hidden");
   });
   
