@@ -851,40 +851,22 @@
           </div>
 
         <div class="form-grid">
-          <div id="docsNoChileWrap" class="field">
-            <label>
-              ¿El adulto responsable conoce o revisará los documentos requeridos para el país de destino?
-            </label>
-            <div class="radio-group">
-              <label class="option-pill"><input type="radio" name="conoceDocsInternacionales" value="si" /> Sí</label>
-              <label class="option-pill"><input type="radio" name="conoceDocsInternacionales" value="no" /> No</label>
-            </div>
+         <div class="field">
+          <label class="option-pill" style="border-radius:14px;">
+            <input type="checkbox" id="declaraDocumentacionViaje" name="declaraDocumentacionViaje" />
+            Declaro que el viajante contará, al momento del viaje, con su documentación vigente, permisos y autorizaciones necesarias según su situación particular, incluyendo autorizaciones notariales cuando corresponda.
+          </label>
+        
+          <div class="hint">
+            Recomendamos revisar con anticipación cédula o documento de viaje, permisos notariales cuando corresponda y copias necesarias.
           </div>
-
-          <div id="permisoMenorWrap" class="field hidden">
-            <label>
-              ¿El estudiante cuenta o contará con las autorizaciones necesarias
-              para viajar siendo menor de edad?
-            </label>
-            <div class="radio-group">
-              <label class="option-pill"><input type="radio" name="permisoMenorViaje" value="si_listo" /> Sí, ya están listas</label>
-              <label class="option-pill"><input type="radio" name="permisoMenorViaje" value="en_tramite" /> Aún no, pero las gestionaremos</label>
-              <label class="option-pill"><input type="radio" name="permisoMenorViaje" value="no_seguro" /> No </label>
-            </div>
-          </div>
-
-          <div id="situacionLegalWrap" class="field hidden">
-            <label>¿Existe alguna situación familiar, legal o de autorización que pueda afectar este proceso?</label>
-            <div class="radio-group">
-              <label class="option-pill"><input type="radio" name="situacionLegalAfecta" value="no" /> No</label>
-              <label class="option-pill"><input type="radio" name="situacionLegalAfecta" value="si" /> Sí</label>
-            </div>
-          </div>
-
-          <div id="situacionLegalDetalleWrap" class="field hidden">
-            <label for="situacionLegalDetalle">Describa brevemente la situación.</label>
-            <textarea id="situacionLegalDetalle" name="situacionLegalDetalle"></textarea>
-          </div>
+        </div>
+        
+        <div id="docsOtraNacionalidadWrap" class="field hidden">
+          <label class="option-pill" style="border-radius:14px;">
+            <input type="checkbox" id="declaraRevisionConsulado" name="declaraRevisionConsulado" />
+            Entiendo que, si el viajante tiene otra nacionalidad o una situación documental especial, revisaré los requisitos aplicables y consultaré fuentes oficiales como el consulado del país de destino en Chile en caso de dudas.
+          </label>
         </div>
       </section>
 
@@ -905,14 +887,14 @@
           
             <select id="grupoSanguineo" name="grupoSanguineo">
               <option value="">Seleccione...</option>
-              <option value="A+">A +</option>
-              <option value="A-">A -</option>
-              <option value="B+">B +</option>
-              <option value="B-">B -</option>
-              <option value="AB+">AB +</option>
-              <option value="AB-">AB -</option>
-              <option value="O+">O +</option>
-              <option value="O-">O -</option>
+              <option value="A+">A Rh+ (A positivo)</option>
+              <option value="A-">A Rh- (A negativo)</option>
+              <option value="B+">B Rh+ (B positivo)</option>
+              <option value="B-">B Rh- (B negativo)</option>
+              <option value="AB+">AB Rh+ (AB positivo)</option>
+              <option value="AB-">AB Rh- (AB negativo)</option>
+              <option value="O+">O Rh+ (O positivo)</option>
+              <option value="O-">O Rh- (O negativo)</option>
             </select>
           </div>
           
@@ -1111,7 +1093,10 @@
 
         <div class="notice ok" style="margin-top:20px;">
           ✨ Gracias por confiar en nosotros.<br />
-          Puede conocer más en <strong>raitrai.cl</strong> y seguirnos en Instagram <strong>@turismo_raitrai</strong>.
+          Puede conocer más en
+          <a href="https://www.raitrai.cl" target="_blank" rel="noopener">www.raitrai.cl</a>
+          y seguirnos en Instagram
+          <a href="https://www.instagram.com/turismo_raitrai" target="_blank" rel="noopener">@turismo_raitrai</a>.
         </div>
 
         <div class="actions">
