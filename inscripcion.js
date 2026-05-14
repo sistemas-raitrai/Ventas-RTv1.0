@@ -1231,6 +1231,8 @@ function obtenerDestinatarioCorreoRespaldo(payload) {
 
 function mostrarPantallaFinal(payload) {
   form?.classList.add("hidden");
+  pantallaBienvenida?.classList.add("hidden");
+  msgBox?.classList.remove("hidden");
 
   mostrarMensaje(
     "ok",
