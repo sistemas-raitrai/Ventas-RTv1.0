@@ -1234,29 +1234,39 @@ function mostrarPantallaFinal(payload) {
   pantallaBienvenida?.classList.add("hidden");
   msgBox?.classList.remove("hidden");
 
+  const destinatario = obtenerDestinatarioCorreoRespaldo(payload);
+
   mostrarMensaje(
     "ok",
     `
-      <h2 style="margin-top:0;">Inscripción enviada correctamente</h2>
+      <h2 style="margin-top:0;">✅ Inscripción enviada correctamente</h2>
+
       <p>
-        Muchas gracias. Hemos recibido las respuestas de
+        🎉 Muchas gracias. Hemos recibido las respuestas de
         <strong>${escapeHtml(payload?.identificacion?.nombreCompleto || "la persona inscrita")}</strong>.
       </p>
+
       <p>
-        Se enviará un respaldo al correo indicado en el formulario. Revisa la carpeta de SPAM.
+        📩 Se enviará un respaldo al correo
+        <strong>${escapeHtml(destinatario || "indicado en el formulario")}</strong>.
+        Te recomendamos revisar también la carpeta de spam o correo no deseado.
       </p>
+
       <p>
-        Si necesita corregir, actualizar o eliminar información, comuníquese con Turismo Rai Trai
+        ✏️ Si necesita corregir, actualizar o eliminar información, comuníquese con Turismo Rai Trai
         y asegúrese de recibir confirmación del cambio.
       </p>
+
       <p>
-        Correo:
+        📧 Correo:
         <a href="mailto:administracion@raitrai.cl?subject=Sobre%20el%20formulario%20de%20registro">
           administracion@raitrai.cl
         </a><br>
-        Teléfono:
+
+        ☎️ Teléfono:
         <a href="tel:+56222363232">+56 2 2236 3232</a><br>
-        WhatsApp:
+
+        💬 WhatsApp:
         <a href="https://wa.me/56998183857?text=Necesito%20ayuda%20con%20el%20formulario%20de%20registro" target="_blank" rel="noopener">
           +56 9 9818 3857
         </a>
