@@ -607,6 +607,38 @@
             <label for="estudianteRelacionado">Nombre del estudiante relacionado <span class="req">*</span></label>
             <input id="estudianteRelacionado" name="estudianteRelacionado" type="text" />
           </div>
+
+          <div class="field">
+            <label>¿Tiene hijos/as u otros estudiantes cercanos que en el futuro puedan vivir una experiencia de viaje de estudios?</label>
+          
+            <div class="radio-group">
+              <label class="option-pill">
+                <input type="radio" name="acompananteTieneHijosViaje" value="si" />
+                Sí
+              </label>
+          
+              <label class="option-pill">
+                <input type="radio" name="acompananteTieneHijosViaje" value="no" />
+                No
+              </label>
+          
+              <label class="option-pill">
+                <input type="radio" name="acompananteTieneHijosViaje" value="prefiere_no" />
+                Prefiero no responder
+              </label>
+            </div>
+          </div>
+          
+          <div id="acompananteConoceWrap" class="field hidden">
+            <label class="option-pill" style="border-radius:14px;">
+              <input type="checkbox" id="interesConoceRaitraiAcompanante" name="interesConoceRaitraiAcompanante" />
+              Me interesa recibir información del programa “Conoce Rai Trai”
+            </label>
+          
+            <button type="button" id="btnInfoConoceRaitraiAcompanante" class="btn-secondary" style="width:max-content; padding:9px 13px;">
+              ¿Qué es esto?
+            </button>
+          </div>
         </div>
       </section>
 
