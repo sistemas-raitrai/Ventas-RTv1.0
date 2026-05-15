@@ -504,12 +504,13 @@
             <select id="nacionalidadBase" name="nacionalidadBase" required>
               <option value="">Seleccione...</option>
               <option value="chilena">Chilena</option>
-              <option value="otra">Otra</option>
+              <option value="extranjera">Extranjera</option>
+              <option value="doble">Doble nacionalidad</option>
             </select>
           </div>
 
           <div id="nacionalidadDetalleWrap" class="field col-4 hidden">
-            <label for="nacionalidadDetalle">Especifique nacionalidad / nacionalidades <span class="req">*</span></label>
+            <label for="nacionalidadDetalle">Indique nacionalidad(es) <span class="req">*</span></label>
             <input id="nacionalidadDetalle" name="nacionalidadDetalle" type="text" />
           </div>
 
@@ -861,24 +862,68 @@
 
       <section id="bloqueInternacional" class="card hidden">
         <h2>• Documentación y autorizaciones de viaje</h2>
-          <div class="sub">
-            Para viajes internacionales, es importante revisar con anticipación cédula o documento de viaje, permisos notariales cuando corresponda y copias necesarias. 
-            Ante cualquier duda, recomendamos consultar primero con el delegado o representante de su curso y/o revisar directamente la información oficial del consulado del país de destino.
-          </div>
-
-        <div class="form-grid">
-         <div class="field">
-          <label class="option-pill" style="border-radius:14px;">
-            <input type="checkbox" id="declaraDocumentacionViaje" name="declaraDocumentacionViaje" />
-            Declaro que el viajante contará, al momento del viaje, con su documentación vigente, permisos y autorizaciones necesarias según su situación particular, incluyendo autorizaciones notariales cuando corresponda.
-          </label>
+      
+        <div class="sub">
+          Para viajes internacionales, es importante revisar con anticipación cédula o documento de viaje,
+          permisos notariales cuando corresponda, autorizaciones y copias necesarias según la situación particular
+          de la persona viajera.
         </div>
-        
-        <div id="docsOtraNacionalidadWrap" class="field hidden">
-          <label class="option-pill" style="border-radius:14px;">
-            <input type="checkbox" id="declaraRevisionConsulado" name="declaraRevisionConsulado" />
-            Entiendo que, si el viajante tiene otra nacionalidad o una situación documental especial, revisaré los requisitos aplicables y consultaré fuentes oficiales como el consulado del país de destino en Chile en caso de dudas.
-          </label>
+      
+        <div class="form-grid">
+          <div class="field">
+            <label class="option-pill" style="border-radius:14px;">
+              <input type="checkbox" id="declaraDocumentacionViaje" name="declaraDocumentacionViaje" />
+              Declaro que la persona viajera contará, al momento del viaje, con su documentación vigente,
+              permisos y autorizaciones necesarias según su situación particular.
+            </label>
+          </div>
+      
+          <div class="field">
+            <label for="nacionalidadPaisDestino">¿La persona viajera tiene nacionalidad del país de destino?</label>
+            <select id="nacionalidadPaisDestino" name="nacionalidadPaisDestino">
+              <option value="">Seleccione...</option>
+              <option value="no">No</option>
+              <option value="si">Sí</option>
+              <option value="no_lo_se">No lo sé</option>
+            </select>
+          </div>
+      
+          <div id="alertaNacionalidadDestinoWrap" class="field hidden">
+            <div class="notice time" style="margin:0;">
+              Si la persona viajera tiene nacionalidad del país de destino, doble nacionalidad o una situación documental
+              especial, es importante revisar los requisitos de ingreso y salida de ese país, especialmente en el caso de
+              menores de edad. Recomendamos consultar directamente con el consulado correspondiente o con las autoridades
+              competentes antes del viaje.
+            </div>
+          </div>
+      
+          <div id="docsOtraNacionalidadWrap" class="field hidden">
+            <label class="option-pill" style="border-radius:14px;">
+              <input type="checkbox" id="declaraRevisionConsulado" name="declaraRevisionConsulado" />
+              Entiendo que, si la persona viajera tiene doble nacionalidad, nacionalidad extranjera, nacionalidad del país
+              de destino o una situación documental especial, revisaré los requisitos aplicables con fuentes oficiales,
+              como el consulado del país de destino.
+            </label>
+          </div>
+      
+          <div class="field">
+            <a
+              href="assets/guia-documentacion-internacional.pdf"
+              target="_blank"
+              rel="noopener"
+              class="btn-secondary"
+              style="display:inline-block;text-decoration:none;width:max-content;"
+            >
+              Descargar guía práctica de documentación
+            </a>
+          </div>
+      
+          <div class="field">
+            <label class="option-pill" style="border-radius:14px;">
+              <input type="checkbox" id="declaraGuiaDocumentacion" name="declaraGuiaDocumentacion" />
+              Declaro haber recibido acceso a la guía práctica de documentación para viajes internacionales.
+            </label>
+          </div>
         </div>
       </section>
 
@@ -887,16 +932,297 @@
         <div class="sub">
           Estas preguntas permiten anticipar cuidados o apoyos importantes para el viaje.
         </div>
-
+      
         <div class="form-grid">
-          <div class="field col-4">
-            <label for="grupoSanguineo">
-              Grupo sanguíneo del viajante <span class="req">*</span>
-            </label>
-            <div class="hint">
-              Si no lo sabe, por favor verifíquelo antes de enviar la información.
+      
+          <div class="field">
+            <label>1. ¿La persona viajera presenta alguna condición de discapacidad que deba ser considerada durante el viaje?</label>
+            <div class="radio-group">
+              <label class="option-pill"><input type="radio" name="discapacidadFlag" value="no" /> No</label>
+              <label class="option-pill"><input type="radio" name="discapacidadFlag" value="si" /> Sí</label>
             </div>
-          
+          </div>
+      
+          <div id="discapacidadWrap" class="field hidden">
+            <label>Seleccione una o más opciones:</label>
+            <div class="check-group">
+              <label class="option-pill"><input type="checkbox" name="discapacidadTipos" value="fisica" /> Discapacidad física</label>
+              <label class="option-pill"><input type="checkbox" name="discapacidadTipos" value="visual" /> Discapacidad visual</label>
+              <label class="option-pill"><input type="checkbox" name="discapacidadTipos" value="auditiva" /> Discapacidad auditiva</label>
+              <label class="option-pill"><input type="checkbox" name="discapacidadTipos" value="cognitiva" /> Discapacidad cognitiva</label>
+            </div>
+      
+            <label for="discapacidadDescripcion">Descripción de la condición:</label>
+            <textarea id="discapacidadDescripcion" name="discapacidadDescripcion"></textarea>
+      
+            <label>¿Requiere apoyos, adaptaciones o consideraciones específicas durante el viaje?</label>
+            <div class="radio-group">
+              <label class="option-pill"><input type="radio" name="discapacidadApoyosFlag" value="no" /> No</label>
+              <label class="option-pill"><input type="radio" name="discapacidadApoyosFlag" value="si" /> Sí</label>
+            </div>
+      
+            <div id="discapacidadApoyosWrap" class="hidden">
+              <label for="discapacidadApoyoTipo">Tipo de apoyo o adaptación requerida:</label>
+              <textarea id="discapacidadApoyoTipo" name="discapacidadApoyoTipo"></textarea>
+      
+              <label for="discapacidadRecomendaciones">Recomendaciones importantes para el equipo organizador:</label>
+              <textarea id="discapacidadRecomendaciones" name="discapacidadRecomendaciones"></textarea>
+            </div>
+      
+            <label>¿Utiliza ayudas técnicas u otros elementos de apoyo?</label>
+            <div class="radio-group">
+              <label class="option-pill"><input type="radio" name="discapacidadAyudasTecnicasFlag" value="no" /> No</label>
+              <label class="option-pill"><input type="radio" name="discapacidadAyudasTecnicasFlag" value="si" /> Sí</label>
+            </div>
+      
+            <div id="discapacidadAyudasTecnicasWrap" class="hidden">
+              <label for="discapacidadAyudaTecnica">Dispositivo o ayuda técnica utilizada:</label>
+              <textarea id="discapacidadAyudaTecnica" name="discapacidadAyudaTecnica"></textarea>
+      
+              <label for="discapacidadAyudaIndicaciones">Indicaciones importantes para su uso o resguardo:</label>
+              <textarea id="discapacidadAyudaIndicaciones" name="discapacidadAyudaIndicaciones"></textarea>
+            </div>
+          </div>
+      
+          <div class="field">
+            <label>2. ¿La persona viajera presenta alguna condición asociada a neurodivergencia o neurodesarrollo?</label>
+            <div class="radio-group">
+              <label class="option-pill"><input type="radio" name="neurodivergenciaFlag" value="no" /> No</label>
+              <label class="option-pill"><input type="radio" name="neurodivergenciaFlag" value="si" /> Sí</label>
+            </div>
+          </div>
+      
+          <div id="neurodivergenciaWrap" class="field hidden">
+            <label>Tipo de condición o neurodivergencia:</label>
+            <div class="check-group">
+              <label class="option-pill"><input type="checkbox" name="neurodivergenciaTipos" value="cea_tea" /> Condición del espectro autista (CEA/TEA)</label>
+              <label class="option-pill"><input type="checkbox" name="neurodivergenciaTipos" value="tdah" /> TDAH</label>
+              <label class="option-pill"><input type="checkbox" name="neurodivergenciaTipos" value="dea" /> DEA</label>
+              <label class="option-pill"><input type="checkbox" name="neurodivergenciaTipos" value="otra" /> Otra</label>
+            </div>
+      
+            <label for="neurodivergenciaOtra">Si seleccionó otra, indique cuál:</label>
+            <input id="neurodivergenciaOtra" name="neurodivergenciaOtra" type="text" />
+      
+            <label for="neurodivergenciaDescripcion">Cuéntanos un poco más para poder brindarle el mejor apoyo:</label>
+            <textarea id="neurodivergenciaDescripcion" name="neurodivergenciaDescripcion"></textarea>
+      
+            <label>¿Existen situaciones que puedan generarle sobrecarga, desregulación o malestar durante el viaje?</label>
+            <div class="radio-group">
+              <label class="option-pill"><input type="radio" name="neuroSobrecargaFlag" value="no" /> No</label>
+              <label class="option-pill"><input type="radio" name="neuroSobrecargaFlag" value="si" /> Sí</label>
+            </div>
+      
+            <div id="neuroSobrecargaWrap" class="hidden">
+              <label for="neuroFactores">Situaciones o factores que podrían afectar el bienestar de la persona viajera:</label>
+              <textarea id="neuroFactores" name="neuroFactores"></textarea>
+      
+              <label for="neuroEstrategias">Estrategias, apoyos o recomendaciones que favorecen su bienestar y participación:</label>
+              <textarea id="neuroEstrategias" name="neuroEstrategias"></textarea>
+            </div>
+      
+            <label>¿Requiere acompañamiento, apoyos específicos o consideraciones particulares durante actividades grupales, traslados o espacios compartidos?</label>
+            <div class="radio-group">
+              <label class="option-pill"><input type="radio" name="neuroApoyosFlag" value="no" /> No</label>
+              <label class="option-pill"><input type="radio" name="neuroApoyosFlag" value="si" /> Sí</label>
+            </div>
+      
+            <div id="neuroApoyosWrap" class="hidden">
+              <label for="neuroApoyosDetalle">Detalle de apoyos o consideraciones necesarias:</label>
+              <textarea id="neuroApoyosDetalle" name="neuroApoyosDetalle"></textarea>
+            </div>
+          </div>
+      
+          <div class="field">
+            <label>3. ¿Existe alguna condición de salud mental que considere importante informar para el adecuado acompañamiento y bienestar de la persona viajera durante el viaje?</label>
+            <div class="radio-group">
+              <label class="option-pill"><input type="radio" name="saludMentalFlag" value="no" /> No</label>
+              <label class="option-pill"><input type="radio" name="saludMentalFlag" value="si" /> Sí</label>
+            </div>
+          </div>
+      
+          <div id="saludMentalWrap" class="field hidden">
+            <label for="saludMentalDetalle">Describa lo más claro posible:</label>
+            <textarea id="saludMentalDetalle" name="saludMentalDetalle"></textarea>
+          </div>
+      
+          <div class="field">
+            <label>4. ¿Sigue alguna dieta especial o tiene restricciones alimentarias que debamos respetar?</label>
+            <div class="radio-group">
+              <label class="option-pill"><input type="radio" name="dietaFlag" value="no" /> No</label>
+              <label class="option-pill"><input type="radio" name="dietaFlag" value="si" /> Sí</label>
+            </div>
+          </div>
+      
+          <div id="dietaWrap" class="field hidden">
+            <label>Tipo de dieta o restricción</label>
+            <div class="check-group">
+              <label class="option-pill"><input type="checkbox" name="dietaTipo" value="vegetariana" /> Vegetariana</label>
+              <label class="option-pill"><input type="checkbox" name="dietaTipo" value="vegana" /> Vegana</label>
+              <label class="option-pill"><input type="checkbox" name="dietaTipo" value="pescetariana" /> Pescetariana</label>
+              <label class="option-pill"><input type="checkbox" name="dietaTipo" value="sin_gluten" /> Sin gluten</label>
+              <label class="option-pill"><input type="checkbox" name="dietaTipo" value="sin_lactosa" /> Sin lactosa</label>
+              <label class="option-pill"><input type="checkbox" name="dietaTipo" value="otra" /> Otra</label>
+            </div>
+      
+            <label for="dietaDetalle">Observaciones al respecto</label>
+            <textarea id="dietaDetalle" name="dietaDetalle"></textarea>
+          </div>
+      
+          <div class="field">
+            <label>¿La persona viajera mantiene algún tipo de alergia alimentaria que deba ser considerada durante el viaje?</label>
+            <div class="radio-group">
+              <label class="option-pill"><input type="radio" name="alergiaAlimentariaFlag" value="no" /> No</label>
+              <label class="option-pill"><input type="radio" name="alergiaAlimentariaFlag" value="si" /> Sí</label>
+            </div>
+          </div>
+      
+          <div id="alergiasAlimentariasWrap" class="field hidden">
+            <div class="notice privacy">
+              Complete un bloque por cada alimento o alérgeno que deba ser considerado.
+            </div>
+      
+            <div class="alergia-alimentaria-item" data-alergia-index="1">
+              <h3>Alergia alimentaria 1</h3>
+      
+              <label for="alergiaAlimentaria1Alimento">Alimento que ocasiona la reacción alérgica:</label>
+              <input id="alergiaAlimentaria1Alimento" type="text" />
+      
+              <label for="alergiaAlimentaria1Reaccion">Tipo de reacción o síntomas que presenta:</label>
+              <textarea id="alergiaAlimentaria1Reaccion"></textarea>
+      
+              <label for="alergiaAlimentaria1Riesgo">Nivel de riesgo de la reacción alérgica:</label>
+              <select id="alergiaAlimentaria1Riesgo">
+                <option value="">Seleccione...</option>
+                <option value="leve">Leve</option>
+                <option value="moderada">Moderada</option>
+                <option value="severa">Severa</option>
+                <option value="anafilactica">Anafiláctica</option>
+              </select>
+      
+              <label>¿Requiere medicamentos o protocolo específico en caso de exposición?</label>
+              <div class="radio-group">
+                <label class="option-pill"><input type="radio" name="alergiaAlimentaria1ProtocoloFlag" value="no" /> No</label>
+                <label class="option-pill"><input type="radio" name="alergiaAlimentaria1ProtocoloFlag" value="si" /> Sí</label>
+              </div>
+      
+              <div id="alergiaAlimentaria1ProtocoloWrap" class="hidden">
+                <label for="alergiaAlimentaria1Protocolo">Medicamento, tratamiento o protocolo requerido:</label>
+                <textarea id="alergiaAlimentaria1Protocolo"></textarea>
+      
+                <label for="alergiaAlimentaria1Indicaciones">Indicaciones importantes para el equipo organizador o personal médico:</label>
+                <textarea id="alergiaAlimentaria1Indicaciones"></textarea>
+              </div>
+            </div>
+      
+            <div id="alergiaAlimentaria2Wrap" class="alergia-alimentaria-item hidden" data-alergia-index="2">
+              <h3>Alergia alimentaria 2</h3>
+              <label for="alergiaAlimentaria2Alimento">Alimento que ocasiona la reacción alérgica:</label>
+              <input id="alergiaAlimentaria2Alimento" type="text" />
+              <label for="alergiaAlimentaria2Reaccion">Tipo de reacción o síntomas que presenta:</label>
+              <textarea id="alergiaAlimentaria2Reaccion"></textarea>
+              <label for="alergiaAlimentaria2Riesgo">Nivel de riesgo:</label>
+              <select id="alergiaAlimentaria2Riesgo">
+                <option value="">Seleccione...</option>
+                <option value="leve">Leve</option>
+                <option value="moderada">Moderada</option>
+                <option value="severa">Severa</option>
+                <option value="anafilactica">Anafiláctica</option>
+              </select>
+              <label>¿Requiere medicamentos o protocolo específico?</label>
+              <div class="radio-group">
+                <label class="option-pill"><input type="radio" name="alergiaAlimentaria2ProtocoloFlag" value="no" /> No</label>
+                <label class="option-pill"><input type="radio" name="alergiaAlimentaria2ProtocoloFlag" value="si" /> Sí</label>
+              </div>
+              <div id="alergiaAlimentaria2ProtocoloWrap" class="hidden">
+                <label for="alergiaAlimentaria2Protocolo">Medicamento, tratamiento o protocolo requerido:</label>
+                <textarea id="alergiaAlimentaria2Protocolo"></textarea>
+                <label for="alergiaAlimentaria2Indicaciones">Indicaciones importantes:</label>
+                <textarea id="alergiaAlimentaria2Indicaciones"></textarea>
+              </div>
+            </div>
+      
+            <div id="alergiaAlimentaria3Wrap" class="alergia-alimentaria-item hidden" data-alergia-index="3">
+              <h3>Alergia alimentaria 3</h3>
+              <label for="alergiaAlimentaria3Alimento">Alimento que ocasiona la reacción alérgica:</label>
+              <input id="alergiaAlimentaria3Alimento" type="text" />
+              <label for="alergiaAlimentaria3Reaccion">Tipo de reacción o síntomas que presenta:</label>
+              <textarea id="alergiaAlimentaria3Reaccion"></textarea>
+              <label for="alergiaAlimentaria3Riesgo">Nivel de riesgo:</label>
+              <select id="alergiaAlimentaria3Riesgo">
+                <option value="">Seleccione...</option>
+                <option value="leve">Leve</option>
+                <option value="moderada">Moderada</option>
+                <option value="severa">Severa</option>
+                <option value="anafilactica">Anafiláctica</option>
+              </select>
+              <label>¿Requiere medicamentos o protocolo específico?</label>
+              <div class="radio-group">
+                <label class="option-pill"><input type="radio" name="alergiaAlimentaria3ProtocoloFlag" value="no" /> No</label>
+                <label class="option-pill"><input type="radio" name="alergiaAlimentaria3ProtocoloFlag" value="si" /> Sí</label>
+              </div>
+              <div id="alergiaAlimentaria3ProtocoloWrap" class="hidden">
+                <label for="alergiaAlimentaria3Protocolo">Medicamento, tratamiento o protocolo requerido:</label>
+                <textarea id="alergiaAlimentaria3Protocolo"></textarea>
+                <label for="alergiaAlimentaria3Indicaciones">Indicaciones importantes:</label>
+                <textarea id="alergiaAlimentaria3Indicaciones"></textarea>
+              </div>
+            </div>
+      
+            <button type="button" id="btnAgregarAlergiaAlimentaria" class="btn-secondary">
+              + Agregar otra alergia alimentaria
+            </button>
+          </div>
+      
+          <div class="field">
+            <label>5. ¿Tiene alguna enfermedad de base o condición médica permanente?</label>
+            <div class="radio-group">
+              <label class="option-pill"><input type="radio" name="enfermedadBaseFlag" value="no" /> No</label>
+              <label class="option-pill"><input type="radio" name="enfermedadBaseFlag" value="si" /> Sí</label>
+            </div>
+          </div>
+      
+          <div id="enfermedadBaseDetalleWrap" class="field hidden">
+            <label for="enfermedadBaseDetalle">Indique cuál o cuáles, y explique si requiere algún cuidado especial durante el viaje</label>
+            <textarea id="enfermedadBaseDetalle" name="enfermedadBaseDetalle"></textarea>
+          </div>
+      
+          <div class="field">
+            <label>6. ¿Hay algún diagnóstico o antecedente médico que considere importante informar?</label>
+            <div class="radio-group">
+              <label class="option-pill"><input type="radio" name="saludGeneralFlag" value="no" /> No</label>
+              <label class="option-pill"><input type="radio" name="saludGeneralFlag" value="si" /> Sí</label>
+            </div>
+          </div>
+      
+          <div id="saludGeneralDetalleWrap" class="field hidden">
+            <label for="saludGeneralDetalle">Descríbalo con la mayor claridad posible</label>
+            <textarea id="saludGeneralDetalle" name="saludGeneralDetalle"></textarea>
+          </div>
+      
+          <div class="field">
+            <label>7. En caso de una atención médica de emergencia, ¿existe algún antecedente importante que debamos conocer?</label>
+            <div class="radio-group">
+              <label class="option-pill"><input type="radio" name="emergenciaMedicaFlag" value="no" /> No</label>
+              <label class="option-pill"><input type="radio" name="emergenciaMedicaFlag" value="si" /> Sí</label>
+            </div>
+          </div>
+      
+          <div id="emergenciaMedicaDetalleWrap" class="field hidden">
+            <label for="emergenciaMedicaDetalle">Describa brevemente</label>
+            <textarea id="emergenciaMedicaDetalle" name="emergenciaMedicaDetalle"></textarea>
+          </div>
+      
+          <div class="field">
+            <label>8. ¿Conoce el grupo sanguíneo del viajante?</label>
+            <div class="radio-group">
+              <label class="option-pill"><input type="radio" name="conoceGrupoSanguineoFlag" value="no" /> No</label>
+              <label class="option-pill"><input type="radio" name="conoceGrupoSanguineoFlag" value="si" /> Sí</label>
+            </div>
+          </div>
+      
+          <div id="grupoSanguineoWrap" class="field col-4 hidden">
+            <label for="grupoSanguineo">Grupo sanguíneo del viajante</label>
             <select id="grupoSanguineo" name="grupoSanguineo">
               <option value="">Seleccione...</option>
               <option value="A+">A Rh+ (A positivo)</option>
@@ -909,119 +1235,57 @@
               <option value="O-">O Rh- (O negativo)</option>
             </select>
           </div>
-          
+      
           <div class="field">
-            <label>¿Tiene alguna enfermedad de base o condición médica permanente?</label>
-            <div class="radio-group">
-              <label class="option-pill"><input type="radio" name="enfermedadBaseFlag" value="no" /> No</label>
-              <label class="option-pill"><input type="radio" name="enfermedadBaseFlag" value="si" /> Sí</label>
-            </div>
-          </div>
-
-          <div id="enfermedadBaseDetalleWrap" class="field hidden">
-            <label for="enfermedadBaseDetalle">Indique cuál o cuáles, y explique si requiere algún cuidado especial durante el viaje</label>
-            <textarea id="enfermedadBaseDetalle" name="enfermedadBaseDetalle"></textarea>
-          </div>
-
-          <div class="field">
-            <label>¿Hay alguna condición de salud, diagnóstico o antecedente médico que considere importante informar?</label>
-            <div class="radio-group">
-              <label class="option-pill"><input type="radio" name="saludGeneralFlag" value="no" /> No</label>
-              <label class="option-pill"><input type="radio" name="saludGeneralFlag" value="si" /> Sí</label>
-            </div>
-          </div>
-
-          <div id="saludGeneralDetalleWrap" class="field hidden">
-            <label for="saludGeneralDetalle">Descríbalo con la mayor claridad posible</label>
-            <textarea id="saludGeneralDetalle" name="saludGeneralDetalle"></textarea>
-          </div>
-
-          <div class="field">
-            <label>¿Ha tenido cirugías, hospitalizaciones o tratamientos médicos relevantes que sea importante informar?</label>
+            <label>9. ¿Ha tenido cirugías, hospitalizaciones o tratamientos médicos relevantes que sea importante informar?</label>
             <div class="radio-group">
               <label class="option-pill"><input type="radio" name="cirugiasPreviasFlag" value="no" /> No</label>
               <label class="option-pill"><input type="radio" name="cirugiasPreviasFlag" value="si" /> Sí</label>
             </div>
           </div>
-          
+      
           <div id="cirugiasPreviasDetalleWrap" class="field hidden">
             <label for="cirugiasPreviasDetalle">Describa brevemente el antecedente, año aproximado y cualquier indicación relevante</label>
             <textarea id="cirugiasPreviasDetalle" name="cirugiasPreviasDetalle"></textarea>
           </div>
-          
+      
           <div class="field">
-            <label>En caso de una atención médica de emergencia, ¿existe algún antecedente importante que debamos conocer?</label>
-            <div class="radio-group">
-              <label class="option-pill"><input type="radio" name="emergenciaMedicaFlag" value="no" /> No</label>
-              <label class="option-pill"><input type="radio" name="emergenciaMedicaFlag" value="si" /> Sí</label>
-            </div>
-          </div>
-          
-          <div id="emergenciaMedicaDetalleWrap" class="field hidden">
-            <label for="emergenciaMedicaDetalle">Describa brevemente</label>
-            <textarea id="emergenciaMedicaDetalle" name="emergenciaMedicaDetalle"></textarea>
-          </div>
-
-          <div class="field">
-            <label>¿Toma actualmente medicamentos de forma regular?</label>
+            <label>10. ¿Toma actualmente medicamentos de forma regular?</label>
             <div class="radio-group">
               <label class="option-pill"><input type="radio" name="medicamentosFlag" value="no" /> No</label>
               <label class="option-pill"><input type="radio" name="medicamentosFlag" value="si" /> Sí</label>
             </div>
           </div>
-
+      
           <div id="medicamentosWrap" class="field hidden">
             <label for="medicamentosDetalle">Especifique</label>
             <textarea id="medicamentosDetalle" name="medicamentosDetalle"></textarea>
           </div>
-
+      
           <div class="field">
-            <label>¿Existe algún medicamento que no deba ser administrado bajo ninguna circunstancia?</label>
+            <label>11. ¿Existe algún medicamento que no deba ser administrado bajo ninguna circunstancia?</label>
             <div class="radio-group">
               <label class="option-pill"><input type="radio" name="medicamentosProhibidosFlag" value="no" /> No</label>
               <label class="option-pill"><input type="radio" name="medicamentosProhibidosFlag" value="si" /> Sí</label>
             </div>
           </div>
-
+      
           <div id="medicamentosProhibidosDetalleWrap" class="field hidden">
             <label for="medicamentosProhibidosDetalle">Indique cuál o cuáles y explique el motivo, si corresponde</label>
             <textarea id="medicamentosProhibidosDetalle" name="medicamentosProhibidosDetalle"></textarea>
           </div>
-
+      
           <div class="field">
-            <label>¿Tiene alguna alergia importante que debamos conocer?</label>
+            <label>12. ¿Tiene alguna alergia no alimentaria importante que debamos conocer?</label>
             <div class="radio-group">
               <label class="option-pill"><input type="radio" name="alergiasFlag" value="no" /> No</label>
               <label class="option-pill"><input type="radio" name="alergiasFlag" value="si" /> Sí</label>
             </div>
           </div>
-
+      
           <div id="alergiasWrap" class="field hidden">
             <label for="alergiasDetalle">Explique la alergia, sus síntomas habituales y qué debemos hacer en caso de reacción</label>
             <textarea id="alergiasDetalle" name="alergiasDetalle"></textarea>
-          </div>
-
-          <div class="field">
-            <label>¿Sigue alguna dieta especial o tiene restricciones alimentarias que debamos respetar?</label>
-            <div class="radio-group">
-              <label class="option-pill"><input type="radio" name="dietaFlag" value="no" /> No</label>
-              <label class="option-pill"><input type="radio" name="dietaFlag" value="si" /> Sí</label>
-            </div>
-          </div>
-
-          <div id="dietaWrap" class="field hidden">
-            <label>Tipo de dieta o restricción</label>
-            <div class="check-group">
-              <label class="option-pill"><input type="checkbox" name="dietaTipo" value="vegetariana" /> Vegetariana</label>
-              <label class="option-pill"><input type="checkbox" name="dietaTipo" value="vegana" /> Vegana</label>
-              <label class="option-pill"><input type="checkbox" name="dietaTipo" value="pescetariana" /> Pescetariana</label>
-              <label class="option-pill"><input type="checkbox" name="dietaTipo" value="sin_gluten" /> Sin gluten</label>
-              <label class="option-pill"><input type="checkbox" name="dietaTipo" value="sin_lactosa" /> Sin lactosa</label>
-              <label class="option-pill"><input type="checkbox" name="dietaTipo" value="otra" /> Otra</label>
-            </div>
-
-            <label for="dietaDetalle">Observaciones al respecto</label>
-            <textarea id="dietaDetalle" name="dietaDetalle"></textarea>
           </div>
         </div>
       </section>
