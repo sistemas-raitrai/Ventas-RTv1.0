@@ -69,7 +69,7 @@ const emergencia2RelacionOtroWrap = $("emergencia2RelacionOtroWrap");
 const emergencia2WhatsappAlternativoWrap = $("emergencia2WhatsappAlternativoWrap");
 
 const bloqueInternacional = $("bloqueInternacional");
-const docsOtraNacionalidadWrap = $("docsOtraNacionalidadWrap");
+const nacionalidadPaisDestinoWrap = $("nacionalidadPaisDestinoWrap");
 
 const alertaNacionalidadDestinoWrap = $("alertaNacionalidadDestinoWrap");
 
@@ -514,11 +514,23 @@ function aplicarEstadoUI() {
 
   mostrar(bloqueInternacional, esInternacional);
 
+  const debePreguntarNacionalidadDestino =
+    esInternacional &&
+    (nacionalidadFinal === "extranjera" || nacionalidadFinal === "doble");
+  
+  mostrar(nacionalidadPaisDestinoWrap, debePreguntarNacionalidadDestino);
+  
+  if (!debePreguntarNacionalidadDestino && $("nacionalidadPaisDestino")) {
+    $("nacionalidadPaisDestino").value = "";
+  }
+  
+  const nacionalidadPaisDestino = $("nacionalidadPaisDestino")?.value || "";
+  
   const tieneNacionalidadEspecial =
     nacionalidadFinal === "extranjera" ||
     nacionalidadFinal === "doble" ||
-    $("nacionalidadPaisDestino")?.value === "si" ||
-    $("nacionalidadPaisDestino")?.value === "no_lo_se";
+    nacionalidadPaisDestino === "si" ||
+    nacionalidadPaisDestino === "no_lo_se";
   
   mostrar(docsOtraNacionalidadWrap, esInternacional && tieneNacionalidadEspecial);
   mostrar(alertaNacionalidadDestinoWrap, esInternacional && tieneNacionalidadEspecial);
@@ -927,7 +939,11 @@ function validarFormulario() {
     ["extranjera", "doble"].includes($("nacionalidadBase")?.value) ||
     ["si", "no_lo_se"].includes($("nacionalidadPaisDestino")?.value);
   
-  if (esInternacional && !$("nacionalidadPaisDestino")?.value) {
+  const debePreguntarNacionalidadDestino =
+    esInternacional &&
+    ["extranjera", "doble"].includes($("nacionalidadBase")?.value);
+  
+  if (debePreguntarNacionalidadDestino && !$("nacionalidadPaisDestino")?.value) {
     errores.push("Debe indicar si la persona viajera tiene nacionalidad del país de destino.");
   }
   
