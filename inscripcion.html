@@ -8,114 +8,124 @@
 
   <link rel="stylesheet" href="./estilos.css" />
   <link rel="icon" type="image/png" href="IMG/logo-raitrai.png" />
-
   <style>
     :root{
-      --rt-primary:#6f58c9;
-      --rt-primary-soft:#efeafe;
-      --rt-border:#d9d9e6;
-      --rt-bg:#f7f7fb;
+      --rt-primary:#0b2b63;
+      --rt-primary-soft:#eef3fb;
+      --rt-accent:#f5b51b;
+      --rt-accent-soft:#fff7dd;
+      --rt-green:#009b45;
+      --rt-red:#d71920;
+  
+      --rt-border:#d8dfec;
+      --rt-bg:#f5f7fb;
       --rt-card:#ffffff;
-      --rt-text:#23232b;
-      --rt-muted:#6d6d7a;
-      --rt-success:#dff6e5;
-      --rt-success-text:#1f6d38;
-      --rt-danger:#ffe3e3;
+      --rt-text:#1f2937;
+      --rt-muted:#64748b;
+  
+      --rt-success:#e7f7ee;
+      --rt-success-text:#08743c;
+      --rt-danger:#ffe8e8;
       --rt-danger-text:#9b1c1c;
-      --rt-warning:#fff2d8;
-      --rt-warning-text:#8a5a00;
+      --rt-warning:#fff6df;
+      --rt-warning-text:#7a5300;
     }
-
+  
     * { box-sizing: border-box; }
-
+  
     html,
     body {
       min-height: 100%;
       margin: 0;
       font-family: Arial, Helvetica, sans-serif;
-      background: #f2f3f7 !important;
+      background: linear-gradient(180deg, #f8fbff 0%, #f3f6fb 100%) !important;
       color: var(--rt-text);
     }
-
+  
     .wrap {
       width: min(1100px, calc(100% - 32px));
       margin: 24px auto 60px;
     }
-
+  
     .hero {
-      background: linear-gradient(135deg, #ffffff 0%, #f6f2ff 100%);
+      background: linear-gradient(135deg, #ffffff 0%, #f8fbff 72%, #fff7dd 100%);
       border: 1px solid var(--rt-border);
+      border-top: 5px solid var(--rt-accent);
       border-radius: 24px;
       padding: 34px;
-      box-shadow: 0 24px 55px rgba(34, 28, 70, .14);
+      box-shadow: 0 18px 42px rgba(11, 43, 99, .10);
       margin-bottom: 22px;
     }
-
+  
     .hero h1 {
       margin: 0 0 10px;
       font-size: 32px;
+      color: var(--rt-primary);
     }
-
+  
     .hero p {
       margin: 0;
       color: var(--rt-muted);
       line-height: 1.55;
       font-size: 16px;
     }
-
+  
     .chips {
       display: grid;
       grid-template-columns: repeat(4, minmax(130px, 1fr));
       gap: 12px;
       margin-top: 22px;
     }
-
+  
     .chip {
       background: #fff;
       border: 1px solid var(--rt-border);
+      border-top: 3px solid var(--rt-accent);
       border-radius: 16px;
       padding: 12px 14px;
       font-size: 13px;
       line-height: 1.4;
     }
-
+  
     .chip span {
       display:block;
       color: var(--rt-muted);
       font-size: 12px;
       margin-bottom: 2px;
     }
-
+  
     .chip strong {
       font-size: 15px;
-      color: var(--rt-text);
+      color: var(--rt-primary);
     }
-
+  
     .grid {
       display: grid;
       grid-template-columns: 1fr;
       gap: 16px;
     }
-
+  
     .card {
-      background: #ffffff;
+      background: var(--rt-card);
       border: 1px solid var(--rt-border);
+      border-left: 5px solid rgba(245, 181, 27, .75);
       border-radius: 20px;
       padding: 24px;
-      box-shadow: 0 18px 42px rgba(34, 28, 70, .10);
+      box-shadow: 0 14px 34px rgba(11, 43, 99, .08);
     }
-
+  
     .card h2 {
       margin: 0 0 8px;
       font-size: 22px;
+      color: var(--rt-primary);
     }
-
+  
     .card .sub {
       color: var(--rt-muted);
       margin-bottom: 18px;
       line-height: 1.5;
     }
-
+  
     .notice {
       border-radius: 14px;
       padding: 14px 16px;
@@ -123,61 +133,62 @@
       line-height: 1.55;
       font-size: 14px;
     }
-
+  
     .notice.privacy {
-      background: #eef5ff;
-      color: #234a78;
-      border: 1px solid #cfe0fb;
+      background: #f8fbff;
+      color: var(--rt-primary);
+      border: 1px solid #d8e5f6;
     }
-
+  
     .notice.time {
       background: var(--rt-warning);
       color: var(--rt-warning-text);
-      border: 1px solid #f5d08a;
+      border: 1px solid #f2d28a;
     }
-
+  
     .notice.ok {
       background: var(--rt-success);
       color: var(--rt-success-text);
       border: 1px solid #bce8c7;
     }
-
+  
     .notice.error {
       background: var(--rt-danger);
       color: var(--rt-danger-text);
       border: 1px solid #ffc3c3;
     }
-
+  
     .form-grid {
       display: grid;
       grid-template-columns: repeat(12, 1fr);
       gap: 14px;
     }
-
+  
     .field {
       grid-column: span 12;
       display: flex;
       flex-direction: column;
       gap: 6px;
     }
-
+  
     .field.col-8 { grid-column: span 8; }
     .field.col-6 { grid-column: span 6; }
     .field.col-4 { grid-column: span 4; }
     .field.col-3 { grid-column: span 3; }
     .field.col-2 { grid-column: span 2; }
-
+  
     .field label {
       font-size: 14px;
       font-weight: 700;
+      color: #111827;
     }
-
+  
     .field .hint {
       font-size: 12px;
       color: var(--rt-muted);
       margin-top: -2px;
     }
-
+  
     input[type="text"],
     input[type="email"],
     input[type="tel"],
@@ -192,32 +203,32 @@
       background: #fff;
       color: var(--rt-text);
       outline: none;
-      transition: border-color .15s ease, box-shadow .15s ease;
+      transition: border-color .15s ease, box-shadow .15s ease, background .15s ease;
     }
-
+  
     input[readonly] {
-      background: #f7f7fb;
+      background: #f7f9fd;
       color: #575767;
     }
-
+  
     textarea {
       min-height: 100px;
       resize: vertical;
     }
-
+  
     input:focus,
     select:focus,
     textarea:focus {
       border-color: var(--rt-primary);
-      box-shadow: 0 0 0 4px rgba(111, 88, 201, .12);
+      box-shadow: 0 0 0 4px rgba(11, 43, 99, .10);
     }
-
+  
     .input-error {
       border-color: #b42318 !important;
       box-shadow: 0 0 0 4px rgba(180, 35, 24, .12) !important;
       background: #fffafa !important;
     }
-
+  
     .radio-group,
     .check-group {
       display: flex;
@@ -225,7 +236,7 @@
       gap: 10px 14px;
       margin-top: 2px;
     }
-
+  
     .option-pill {
       display: inline-flex;
       align-items: center;
@@ -237,23 +248,37 @@
       font-size: 14px;
       cursor: pointer;
       user-select: none;
+      color: var(--rt-text);
+      transition: border-color .15s ease, background .15s ease, color .15s ease;
     }
-
+  
+    .option-pill:hover {
+      border-color: var(--rt-accent);
+      background: #fffaf0;
+    }
+  
     .option-pill input {
       margin: 0;
+      accent-color: var(--rt-primary);
     }
-
+  
+    .option-pill:has(input:checked) {
+      border-color: var(--rt-primary);
+      background: var(--rt-primary-soft);
+      color: var(--rt-primary);
+    }
+  
     .hidden {
       display: none !important;
     }
-
+  
     .actions {
       display: flex;
       gap: 12px;
       flex-wrap: wrap;
       margin-top: 20px;
     }
-
+  
     button {
       border: 0;
       border-radius: 12px;
@@ -262,30 +287,40 @@
       font-weight: 700;
       cursor: pointer;
     }
-
+  
     .btn-primary {
       background: var(--rt-primary);
       color: #fff;
+      box-shadow: 0 8px 18px rgba(11, 43, 99, .18);
     }
-
+  
+    .btn-primary:hover {
+      filter: brightness(1.08);
+    }
+  
     .btn-secondary {
       background: #fff;
-      color: var(--rt-text);
+      color: var(--rt-primary);
       border: 1px solid var(--rt-border);
     }
-
+  
+    .btn-secondary:hover {
+      border-color: var(--rt-accent);
+      background: var(--rt-accent-soft);
+    }
+  
     .req {
-      color: #b42318;
+      color: var(--rt-red);
       margin-left: 4px;
     }
-
+  
     .footer-note {
       color: var(--rt-muted);
       font-size: 13px;
       line-height: 1.5;
       margin-top: 10px;
     }
-
+  
     .rut-linea {
       display: grid;
       grid-template-columns: 1fr 18px 80px;
@@ -299,7 +334,15 @@
       font-size: 22px;
       color: var(--rt-muted);
     }
-
+  
+    a {
+      color: var(--rt-primary);
+    }
+  
+    a:hover {
+      color: var(--rt-green);
+    }
+  
     @media (max-width: 880px) {
       .field.col-8,
       .field.col-6,
@@ -308,20 +351,39 @@
       .field.col-2 {
         grid-column: span 12;
       }
-
+  
       .chips {
         grid-template-columns: 1fr;
       }
-
+  
       .wrap {
         width: min(100% - 18px, 1000px);
+        margin-top: 12px;
       }
-
+  
+      .hero {
+        padding: 24px 20px;
+        border-radius: 20px;
+      }
+  
       .hero h1 {
         font-size: 25px;
       }
+  
+      .card {
+        padding: 20px;
+        border-radius: 18px;
+      }
+  
+      input,
+      select,
+      textarea,
+      button {
+        font-size: 16px;
+      }
     }
   </style>
+
 </head>
 
 <body>
