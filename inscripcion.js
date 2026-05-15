@@ -71,6 +71,20 @@ const emergencia2WhatsappAlternativoWrap = $("emergencia2WhatsappAlternativoWrap
 const bloqueInternacional = $("bloqueInternacional");
 const docsOtraNacionalidadWrap = $("docsOtraNacionalidadWrap");
 
+const alertaNacionalidadDestinoWrap = $("alertaNacionalidadDestinoWrap");
+
+const discapacidadWrap = $("discapacidadWrap");
+const discapacidadApoyosWrap = $("discapacidadApoyosWrap");
+const discapacidadAyudasTecnicasWrap = $("discapacidadAyudasTecnicasWrap");
+
+const neurodivergenciaWrap = $("neurodivergenciaWrap");
+const neuroSobrecargaWrap = $("neuroSobrecargaWrap");
+const neuroApoyosWrap = $("neuroApoyosWrap");
+
+const saludMentalWrap = $("saludMentalWrap");
+const alergiasAlimentariasWrap = $("alergiasAlimentariasWrap");
+const grupoSanguineoWrap = $("grupoSanguineoWrap");
+
 const enfermedadBaseDetalleWrap = $("enfermedadBaseDetalleWrap");
 const saludGeneralDetalleWrap = $("saludGeneralDetalleWrap");
 const cirugiasPreviasDetalleWrap = $("cirugiasPreviasDetalleWrap");
@@ -267,6 +281,24 @@ function conectarEventos() {
   $("emergencia2Relacion")?.addEventListener("change", aplicarEstadoUI);
   $("emergencia2EsWhatsapp")?.addEventListener("change", aplicarEstadoUI);
 
+  enlazarFlagDetalle("discapacidadFlag", discapacidadWrap, ["si"]);
+  enlazarFlagDetalle("discapacidadApoyosFlag", discapacidadApoyosWrap, ["si"]);
+  enlazarFlagDetalle("discapacidadAyudasTecnicasFlag", discapacidadAyudasTecnicasWrap, ["si"]);
+  
+  enlazarFlagDetalle("neurodivergenciaFlag", neurodivergenciaWrap, ["si"]);
+  enlazarFlagDetalle("neuroSobrecargaFlag", neuroSobrecargaWrap, ["si"]);
+  enlazarFlagDetalle("neuroApoyosFlag", neuroApoyosWrap, ["si"]);
+  
+  enlazarFlagDetalle("saludMentalFlag", saludMentalWrap, ["si"]);
+  enlazarFlagDetalle("alergiaAlimentariaFlag", alergiasAlimentariasWrap, ["si"]);
+  enlazarFlagDetalle("conoceGrupoSanguineoFlag", grupoSanguineoWrap, ["si"]);
+  
+  enlazarFlagDetalle("alergiaAlimentaria1ProtocoloFlag", $("alergiaAlimentaria1ProtocoloWrap"), ["si"]);
+  enlazarFlagDetalle("alergiaAlimentaria2ProtocoloFlag", $("alergiaAlimentaria2ProtocoloWrap"), ["si"]);
+  enlazarFlagDetalle("alergiaAlimentaria3ProtocoloFlag", $("alergiaAlimentaria3ProtocoloWrap"), ["si"]);
+  
+  $("btnAgregarAlergiaAlimentaria")?.addEventListener("click", agregarAlergiaAlimentaria);
+
   enlazarFlagDetalle("enfermedadBaseFlag", enfermedadBaseDetalleWrap, ["si"]);
   enlazarFlagDetalle("saludGeneralFlag", saludGeneralDetalleWrap, ["si"]);
   enlazarFlagDetalle("cirugiasPreviasFlag", cirugiasPreviasDetalleWrap, ["si"]);
@@ -425,7 +457,7 @@ function aplicarEstadoUI() {
   }
   
   const nacionalidadFinal = $("nacionalidadBase")?.value || "";
-  const nacionalidadDetalle = nacionalidadFinal === "otra";
+  const nacionalidadDetalle = nacionalidadFinal === "extranjera" || nacionalidadFinal === "doble";
   
   mostrar(nacionalidadDetalleWrap, nacionalidadDetalle);
   setRequired("nacionalidadDetalle", nacionalidadDetalle);
@@ -482,7 +514,14 @@ function aplicarEstadoUI() {
 
   mostrar(bloqueInternacional, esInternacional);
 
-  mostrar(docsOtraNacionalidadWrap, esInternacional && nacionalidadBase === "otra");
+  const tieneNacionalidadEspecial =
+    nacionalidadFinal === "extranjera" ||
+    nacionalidadFinal === "doble" ||
+    $("nacionalidadPaisDestino")?.value === "si" ||
+    $("nacionalidadPaisDestino")?.value === "no_lo_se";
+  
+  mostrar(docsOtraNacionalidadWrap, esInternacional && tieneNacionalidadEspecial);
+  mostrar(alertaNacionalidadDestinoWrap, esInternacional && tieneNacionalidadEspecial);
 
   actualizarProgreso();
 }
@@ -794,8 +833,11 @@ function validarFormulario() {
     errores.push("Si el viajante tiene nacionalidad chilena, debe ingresar RUT.");
   }
 
-  if ($("nacionalidadBase")?.value === "otra" && !limpiarTexto($("nacionalidadDetalle")?.value)) {
-    errores.push("Debe especificar la nacionalidad.");
+  if (
+    ["extranjera", "doble"].includes($("nacionalidadBase")?.value) &&
+    !limpiarTexto($("nacionalidadDetalle")?.value)
+  ) {
+    errores.push("Debe especificar la nacionalidad o nacionalidades.");
   }
 
   if (!$("tallaPolera")?.value) {
@@ -881,8 +923,59 @@ function validarFormulario() {
     errores.push("Debe declarar responsabilidad sobre la documentación del viaje.");
   }
   
-  if (esInternacional && $("nacionalidadBase")?.value === "otra" && !$("declaraRevisionConsulado")?.checked) {
-    errores.push("Debe confirmar revisión documental para nacionalidad especial.");
+  const nacionalidadEspecial =
+    ["extranjera", "doble"].includes($("nacionalidadBase")?.value) ||
+    ["si", "no_lo_se"].includes($("nacionalidadPaisDestino")?.value);
+  
+  if (esInternacional && !$("nacionalidadPaisDestino")?.value) {
+    errores.push("Debe indicar si la persona viajera tiene nacionalidad del país de destino.");
+  }
+  
+  if (esInternacional && nacionalidadEspecial && !$("declaraRevisionConsulado")?.checked) {
+    errores.push("Debe confirmar la revisión documental o consular aplicable.");
+  }
+  
+  if (esInternacional && !$("declaraGuiaDocumentacion")?.checked) {
+    errores.push("Debe confirmar que recibió acceso a la guía práctica de documentación.");
+  }
+
+  if (obtenerRadio("discapacidadFlag") === "si") {
+    if (!obtenerChecks("discapacidadTipos").length) errores.push("Debe seleccionar al menos un tipo de discapacidad.");
+    if (!limpiarTexto($("discapacidadDescripcion")?.value)) errores.push("Debe describir la condición de discapacidad.");
+  }
+  
+  if (obtenerRadio("discapacidadApoyosFlag") === "si") {
+    if (!limpiarTexto($("discapacidadApoyoTipo")?.value)) errores.push("Debe indicar el tipo de apoyo o adaptación requerida.");
+  }
+  
+  if (obtenerRadio("discapacidadAyudasTecnicasFlag") === "si") {
+    if (!limpiarTexto($("discapacidadAyudaTecnica")?.value)) errores.push("Debe indicar la ayuda técnica utilizada.");
+  }
+  
+  if (obtenerRadio("neurodivergenciaFlag") === "si") {
+    if (!obtenerChecks("neurodivergenciaTipos").length) errores.push("Debe seleccionar al menos un tipo de neurodivergencia.");
+    if (!limpiarTexto($("neurodivergenciaDescripcion")?.value)) errores.push("Debe describir la condición asociada a neurodivergencia.");
+  }
+  
+  if (obtenerRadio("neuroSobrecargaFlag") === "si") {
+    if (!limpiarTexto($("neuroFactores")?.value)) errores.push("Debe indicar situaciones o factores que podrían afectar el bienestar.");
+  }
+  
+  if (obtenerRadio("neuroApoyosFlag") === "si") {
+    if (!limpiarTexto($("neuroApoyosDetalle")?.value)) errores.push("Debe detallar apoyos o consideraciones necesarias.");
+  }
+  
+  if (obtenerRadio("saludMentalFlag") === "si" && !limpiarTexto($("saludMentalDetalle")?.value)) {
+    errores.push("Debe describir la condición de salud mental informada.");
+  }
+  
+  if (obtenerRadio("conoceGrupoSanguineoFlag") === "si" && !$("grupoSanguineo")?.value) {
+    errores.push("Debe seleccionar el grupo sanguíneo.");
+  }
+  
+  if (obtenerRadio("alergiaAlimentariaFlag") === "si") {
+    const alergias = obtenerAlergiasAlimentarias();
+    if (!alergias.length) errores.push("Debe ingresar al menos una alergia alimentaria.");
   }
 
   if (obtenerRadio("enfermedadBaseFlag") === "si" && !limpiarTexto($("enfermedadBaseDetalle")?.value)) {
@@ -1121,13 +1214,44 @@ function construirPayloadBase() {
     documentacion: {
       aplicaInternacional: esInternacional,
       declaraDocumentacionViaje: esInternacional ? !!$("declaraDocumentacionViaje")?.checked : false,
-      declaraRevisionConsulado: esInternacional && $("nacionalidadBase")?.value === "otra"
-        ? !!$("declaraRevisionConsulado")?.checked
-        : false
+      nacionalidadPaisDestino: esInternacional ? ($("nacionalidadPaisDestino")?.value || "") : "",
+      declaraRevisionConsulado: esInternacional ? !!$("declaraRevisionConsulado")?.checked : false,
+      declaraGuiaDocumentacion: esInternacional ? !!$("declaraGuiaDocumentacion")?.checked : false
     },
 
     salud: {
-      grupoSanguineo: $("grupoSanguineo")?.value || "",
+      discapacidadFlag: obtenerRadio("discapacidadFlag") || "",
+      discapacidadTipos: obtenerChecks("discapacidadTipos"),
+      discapacidadDescripcion: limpiarTexto($("discapacidadDescripcion")?.value),
+      
+      discapacidadApoyosFlag: obtenerRadio("discapacidadApoyosFlag") || "",
+      discapacidadApoyoTipo: limpiarTexto($("discapacidadApoyoTipo")?.value),
+      discapacidadRecomendaciones: limpiarTexto($("discapacidadRecomendaciones")?.value),
+      
+      discapacidadAyudasTecnicasFlag: obtenerRadio("discapacidadAyudasTecnicasFlag") || "",
+      discapacidadAyudaTecnica: limpiarTexto($("discapacidadAyudaTecnica")?.value),
+      discapacidadAyudaIndicaciones: limpiarTexto($("discapacidadAyudaIndicaciones")?.value),
+      
+      neurodivergenciaFlag: obtenerRadio("neurodivergenciaFlag") || "",
+      neurodivergenciaTipos: obtenerChecks("neurodivergenciaTipos"),
+      neurodivergenciaOtra: limpiarTexto($("neurodivergenciaOtra")?.value),
+      neurodivergenciaDescripcion: limpiarTexto($("neurodivergenciaDescripcion")?.value),
+      
+      neuroSobrecargaFlag: obtenerRadio("neuroSobrecargaFlag") || "",
+      neuroFactores: limpiarTexto($("neuroFactores")?.value),
+      neuroEstrategias: limpiarTexto($("neuroEstrategias")?.value),
+      
+      neuroApoyosFlag: obtenerRadio("neuroApoyosFlag") || "",
+      neuroApoyosDetalle: limpiarTexto($("neuroApoyosDetalle")?.value),
+      
+      saludMentalFlag: obtenerRadio("saludMentalFlag") || "",
+      saludMentalDetalle: limpiarTexto($("saludMentalDetalle")?.value),
+      
+      alergiaAlimentariaFlag: obtenerRadio("alergiaAlimentariaFlag") || "",
+      alergiasAlimentarias: obtenerAlergiasAlimentarias(),
+      
+      conoceGrupoSanguineoFlag: obtenerRadio("conoceGrupoSanguineoFlag") || "",
+      grupoSanguineo: obtenerRadio("conoceGrupoSanguineoFlag") === "si" ? ($("grupoSanguineo")?.value || "") : "",
       enfermedadBaseFlag: obtenerRadio("enfermedadBaseFlag") || "",
       enfermedadBaseDetalle: limpiarTexto($("enfermedadBaseDetalle")?.value),
 
@@ -1677,6 +1801,53 @@ function labelTipoViajante(tipo) {
   if (tipo === "profesor") return "profesor";
   if (tipo === "adulto_acompanante") return "adulto acompañante";
   return "viajante";
+}
+
+function agregarAlergiaAlimentaria() {
+  const bloque2 = $("alergiaAlimentaria2Wrap");
+  const bloque3 = $("alergiaAlimentaria3Wrap");
+
+  if (bloque2?.classList.contains("hidden")) {
+    bloque2.classList.remove("hidden");
+    actualizarProgreso();
+    return;
+  }
+
+  if (bloque3?.classList.contains("hidden")) {
+    bloque3.classList.remove("hidden");
+    $("btnAgregarAlergiaAlimentaria")?.classList.add("hidden");
+    actualizarProgreso();
+    return;
+  }
+}
+
+function obtenerAlergiasAlimentarias() {
+  const alergias = [];
+
+  [1, 2, 3].forEach((n) => {
+    const wrap = n === 1 ? $("alergiasAlimentariasWrap") : $(`alergiaAlimentaria${n}Wrap`);
+    if (!wrap || wrap.classList.contains("hidden")) return;
+
+    const alimento = limpiarTexto($(`alergiaAlimentaria${n}Alimento`)?.value);
+    const reaccion = limpiarTexto($(`alergiaAlimentaria${n}Reaccion`)?.value);
+    const nivelRiesgo = $(`alergiaAlimentaria${n}Riesgo`)?.value || "";
+    const protocoloFlag = obtenerRadio(`alergiaAlimentaria${n}ProtocoloFlag`);
+    const protocolo = limpiarTexto($(`alergiaAlimentaria${n}Protocolo`)?.value);
+    const indicaciones = limpiarTexto($(`alergiaAlimentaria${n}Indicaciones`)?.value);
+
+    if (!alimento && !reaccion && !nivelRiesgo && !protocolo && !indicaciones) return;
+
+    alergias.push({
+      alimento,
+      reaccion,
+      nivelRiesgo,
+      protocoloFlag,
+      protocolo,
+      indicaciones
+    });
+  });
+
+  return alergias;
 }
 
 function escapeHtml(value) {
