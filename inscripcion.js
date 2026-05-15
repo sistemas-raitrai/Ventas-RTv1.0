@@ -632,8 +632,13 @@ async function onSubmit(event) {
     mostrarPantallaFinal(payload);
 
   } catch (error) {
-    console.error(error);
-
+    console.error("ERROR INSCRIPCION:", {
+      message: error?.message,
+      code: error?.code,
+      name: error?.name,
+      stack: error?.stack
+    });
+  
     if (error.message === "duplicate_document") {
       mostrarMensaje(
         "error",
@@ -645,9 +650,19 @@ async function onSubmit(event) {
         `Ya existe una inscripción con esos nombres y apellidos en este grupo. Comuníquese con <strong>${CORREO_ADMIN}</strong>, al <strong>${TELEFONO_ADMIN}</strong> o al WhatsApp <strong>${WHATSAPP_ADMIN}</strong>.`
       );
     } else {
+      const codigoError = error?.code || error?.message || "error_desconocido";
+  
       mostrarMensaje(
         "error",
-        `No fue posible enviar la inscripción. Intente nuevamente o comuníquese con <strong>${CORREO_ADMIN}</strong> o al WhatsApp <strong>${WHATSAPP_ADMIN}</strong>.`
+        `
+          No fue posible completar la inscripción en este momento.
+          <br><br>
+          Por favor, intente nuevamente. Si el problema continúa, comuníquese con
+          <strong>${CORREO_ADMIN}</strong> o al WhatsApp <strong>${WHATSAPP_ADMIN}</strong>
+          e indique este código:
+          <br>
+          <strong>${escapeHtml(codigoError)}</strong>
+        `
       );
     }
 
@@ -690,13 +705,13 @@ async function guardarConRut(payloadBase) {
     `${documentoNormalizado}_${idGrupo}`
   );
 
-  const payload = {
+  const payload = limpiarPayloadFirestore({
     ...payloadBase,
     meta: {
       ...payloadBase.meta,
       fechaInscripcion: serverTimestamp()
     }
-  };
+  });
 
   await runTransaction(db, async (tx) => {
     const existente = await tx.get(refInscripcion);
@@ -756,7 +771,7 @@ async function guardarSinRut(payloadBase) {
     const documento = `${numero}-${rutDv}`;
     const documentoNormalizado = `SIN_RUT_${numero}-${rutDv}`;
 
-    const payload = {
+    const payload = limpiarPayloadFirestore({
       ...payloadBase,
       identificacion: {
         ...payloadBase.identificacion,
@@ -769,7 +784,7 @@ async function guardarSinRut(payloadBase) {
         ...payloadBase.meta,
         fechaInscripcion: serverTimestamp()
       }
-    };
+    });
 
     const refInscripcion = doc(
       db,
@@ -1884,6 +1899,32 @@ function obtenerAlergiasAlimentarias() {
   });
 
   return alergias;
+}
+
+function limpiarPayloadFirestore(value) {
+  if (value === undefined) return "";
+  if (value === null) return null;
+
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => limpiarPayloadFirestore(item))
+      .filter((item) => item !== undefined);
+  }
+
+  if (typeof value === "object") {
+    const limpio = {};
+
+    Object.entries(value).forEach(([key, val]) => {
+      const valorLimpio = limpiarPayloadFirestore(val);
+      if (valorLimpio !== undefined) {
+        limpio[key] = valorLimpio;
+      }
+    });
+
+    return limpio;
+  }
+
+  return value;
 }
 
 function escapeHtml(value) {
