@@ -412,6 +412,11 @@
                 Adulto acompañante
               </label>
             </div>
+            <div id="avisoAdultoResponsableWrap" class="field hidden">
+              <div class="notice privacy" style="margin:0;font-size:13px;line-height:1.5;">
+                Este formulario debe ser completado por el adulto responsable del estudiante, quien debe contar con información suficiente sobre sus datos de identidad, salud, documentación, alimentación y otros antecedentes relevantes para el viaje.
+              </div>
+            </div>
           </div>
         </div>
       </section>
@@ -523,13 +528,11 @@
           </div>
 
           <div id="telefonoViajanteWrap" class="field col-4 hidden">
-            <label for="telefonoViajante">Teléfono del viajante <span class="req">*</span></label>
+            <label for="telefonoViajante">WhatsApp del viajante <span class="req">*</span></label>
             <input id="telefonoViajante" name="telefonoViajante" type="tel" />
-
-            <label class="option-pill" style="border-radius:14px; margin-top:8px;">
-              <input type="checkbox" id="telefonoViajanteEsWhatsapp" name="telefonoViajanteEsWhatsapp" checked />
-              Este número también es WhatsApp
-            </label>
+            <div id="telefonoViajanteWhatsappHint" class="hint hidden">
+              Si ingresa un número extranjero, asegúrese de que corresponda a un WhatsApp activo.
+            </div>
           </div>
         </div>
       </section>
@@ -624,9 +627,19 @@
             <input id="relacionCursoOtro" name="relacionCursoOtro" type="text" />
           </div>
 
-          <div class="field col-8">
-            <label for="estudianteRelacionado">Nombre del estudiante relacionado <span class="req">*</span></label>
-            <input id="estudianteRelacionado" name="estudianteRelacionado" type="text" />
+          <div class="field col-4">
+            <label for="estudianteRelacionadoNombres">Nombres del estudiante relacionado <span class="req">*</span></label>
+            <input id="estudianteRelacionadoNombres" name="estudianteRelacionadoNombres" type="text" />
+          </div>
+          
+          <div class="field col-4">
+            <label for="estudianteRelacionadoPrimerApellido">Primer apellido del estudiante relacionado <span class="req">*</span></label>
+            <input id="estudianteRelacionadoPrimerApellido" name="estudianteRelacionadoPrimerApellido" type="text" />
+          </div>
+          
+          <div class="field col-4">
+            <label for="estudianteRelacionadoSegundoApellido">Segundo apellido del estudiante relacionado</label>
+            <input id="estudianteRelacionadoSegundoApellido" name="estudianteRelacionadoSegundoApellido" type="text" />
           </div>
 
           <div class="field">
@@ -692,18 +705,11 @@
           </div>
       
           <div class="field col-4">
-            <label for="contactoPrincipalTelefono">Teléfono apoderado 1 <span class="req">*</span></label>
+            <label for="contactoPrincipalTelefono">WhatsApp apoderado 1 <span class="req">*</span></label>
             <input id="contactoPrincipalTelefono" name="contactoPrincipalTelefono" type="tel" />
-      
-            <label class="option-pill" style="border-radius:14px; margin-top:8px;">
-              <input type="checkbox" id="contactoPrincipalEsWhatsapp" name="contactoPrincipalEsWhatsapp" checked />
-              Este número también es WhatsApp
-            </label>
-          </div>
-      
-          <div id="contactoPrincipalWhatsappAlternativoWrap" class="field col-4 hidden">
-            <label for="contactoPrincipalWhatsappAlternativo">Número válido para WhatsApp <span class="req">*</span></label>
-            <input id="contactoPrincipalWhatsappAlternativo" name="contactoPrincipalWhatsappAlternativo" type="tel" />
+            <div id="contactoPrincipalTelefonoWhatsappHint" class="hint hidden">
+              Si ingresa un número extranjero, asegúrese de que corresponda a un WhatsApp activo.
+            </div>
           </div>
       
           <div class="field col-6">
@@ -744,18 +750,11 @@
           </div>
       
           <div class="field col-4">
-            <label for="contactoSecundarioTelefono">Teléfono apoderado 2</label>
+            <label for="contactoSecundarioTelefono">WhatsApp apoderado 2</label>
             <input id="contactoSecundarioTelefono" name="contactoSecundarioTelefono" type="tel" />
-      
-            <label class="option-pill" style="border-radius:14px; margin-top:8px;">
-              <input type="checkbox" id="contactoSecundarioEsWhatsapp" name="contactoSecundarioEsWhatsapp" checked />
-              Este número también es WhatsApp
-            </label>
-          </div>
-      
-          <div id="contactoSecundarioWhatsappAlternativoWrap" class="field col-4 hidden">
-            <label for="contactoSecundarioWhatsappAlternativo">Número válido para WhatsApp</label>
-            <input id="contactoSecundarioWhatsappAlternativo" name="contactoSecundarioWhatsappAlternativo" type="tel" />
+            <div id="contactoSecundarioTelefonoWhatsappHint" class="hint hidden">
+              Si ingresa un número extranjero, asegúrese de que corresponda a un WhatsApp activo.
+            </div>
           </div>
       
           <div class="field col-6">
@@ -803,18 +802,11 @@
           </div>
       
           <div class="field col-4">
-            <label for="emergenciaTelefono">Teléfono emergencia 1 <span class="req">*</span></label>
+            <label for="emergenciaTelefono">WhatsApp emergencia 1 <span class="req">*</span></label>
             <input id="emergenciaTelefono" name="emergenciaTelefono" type="tel" required />
-      
-            <label class="option-pill" style="border-radius:14px; margin-top:8px;">
-              <input type="checkbox" id="emergenciaEsWhatsapp" name="emergenciaEsWhatsapp" checked />
-              Este número también es WhatsApp
-            </label>
-          </div>
-      
-          <div id="emergenciaWhatsappAlternativoWrap" class="field col-4 hidden">
-            <label for="emergenciaWhatsappAlternativo">Número válido para WhatsApp <span class="req">*</span></label>
-            <input id="emergenciaWhatsappAlternativo" name="emergenciaWhatsappAlternativo" type="tel" />
+            <div id="emergenciaTelefonoWhatsappHint" class="hint hidden">
+              Si ingresa un número extranjero, asegúrese de que corresponda a un WhatsApp activo.
+            </div>
           </div>
       
           <div class="field">
@@ -853,18 +845,11 @@
           </div>
       
           <div class="field col-4">
-            <label for="emergencia2Telefono">Teléfono emergencia 2</label>
+            <label for="emergencia2Telefono">WhatsApp emergencia 2</label>
             <input id="emergencia2Telefono" name="emergencia2Telefono" type="tel" />
-      
-            <label class="option-pill" style="border-radius:14px; margin-top:8px;">
-              <input type="checkbox" id="emergencia2EsWhatsapp" name="emergencia2EsWhatsapp" checked />
-              Este número también es WhatsApp
-            </label>
-          </div>
-      
-          <div id="emergencia2WhatsappAlternativoWrap" class="field col-4 hidden">
-            <label for="emergencia2WhatsappAlternativo">Número válido para WhatsApp</label>
-            <input id="emergencia2WhatsappAlternativo" name="emergencia2WhatsappAlternativo" type="tel" />
+            <div id="emergencia2TelefonoWhatsappHint" class="hint hidden">
+              Si ingresa un número extranjero, asegúrese de que corresponda a un WhatsApp activo.
+            </div>
           </div>
         </div>
       </section>
@@ -1007,8 +992,10 @@
               <label class="option-pill"><input type="checkbox" name="neurodivergenciaTipos" value="otra" /> Otra</label>
             </div>
       
-            <label for="neurodivergenciaOtra">Si seleccionó otra, indique cuál:</label>
-            <input id="neurodivergenciaOtra" name="neurodivergenciaOtra" type="text" />
+            <div id="neurodivergenciaOtraWrap" class="hidden">
+              <label for="neurodivergenciaOtra">Si seleccionó otra, indique cuál:</label>
+              <input id="neurodivergenciaOtra" name="neurodivergenciaOtra" type="text" />
+            </div>
       
             <label for="neurodivergenciaDescripcion">Cuéntanos un poco más para poder brindarle el mejor apoyo:</label>
             <textarea id="neurodivergenciaDescripcion" name="neurodivergenciaDescripcion"></textarea>
@@ -1063,11 +1050,20 @@
           <div id="dietaWrap" class="field hidden">
             <label>Tipo de dieta, alergia o restricción</label>
           
+            <div class="notice privacy" style="margin:0 0 10px;padding:10px 12px;font-size:12.5px;line-height:1.45;border-radius:12px;">
+              Este apartado está destinado únicamente a necesidades alimentarias permanentes, estilos de alimentación o condiciones que requieran consideración especial, no a gustos personales o preferencias sobre ingredientes específicos.
+            </div>
+            
             <div class="sub" style="margin-bottom:8px;">
               Puede seleccionar una opción de dieta principal y agregar restricciones adicionales si corresponde.
             </div>
           
             <div class="check-group">
+              <label class="option-pill">
+                <input type="radio" name="dietaPrincipal" value="" />
+                No aplica dieta principal
+              </label>
+              
               <label class="option-pill">
                 <input type="radio" name="dietaPrincipal" value="vegetariana" />
                 Vegetariana
@@ -1244,12 +1240,31 @@
             <textarea id="emergenciaMedicaDetalle" name="emergenciaMedicaDetalle"></textarea>
           </div>
       
-          <div class="field">
-            <label>8. ¿Conoce el grupo sanguíneo del viajante?</label>
-            <div class="radio-group">
-              <label class="option-pill"><input type="radio" name="conoceGrupoSanguineoFlag" value="no" /> No</label>
-              <label class="option-pill"><input type="radio" name="conoceGrupoSanguineoFlag" value="si" /> Sí</label>
+          <div class="field col-4">
+            <label for="grupoSanguineo">8. Grupo sanguíneo del viajante <span class="req">*</span></label>
+            <select id="grupoSanguineo" name="grupoSanguineo" required>
+              <option value="">Seleccione...</option>
+              <option value="no_lo_se">No lo sé</option>
+              <option value="A+">A Rh+ (A positivo)</option>
+              <option value="A-">A Rh- (A negativo)</option>
+              <option value="B+">B Rh+ (B positivo)</option>
+              <option value="B-">B Rh- (B negativo)</option>
+              <option value="AB+">AB Rh+ (AB positivo)</option>
+              <option value="AB-">AB Rh- (AB negativo)</option>
+              <option value="O+">O Rh+ (O positivo)</option>
+              <option value="O-">O Rh- (O negativo)</option>
+            </select>
+          </div>
+          
+          <div id="grupoSanguineoNoSeWrap" class="field hidden">
+            <div class="notice time" style="margin:0;">
+              Indicar el grupo sanguíneo puede ser importante en caso de una atención médica de emergencia. Recomendamos averiguarlo antes de continuar o, al menos, antes del viaje.
             </div>
+          
+            <label class="option-pill" style="border-radius:14px;">
+              <input type="checkbox" id="declaraGrupoSanguineoPendiente" name="declaraGrupoSanguineoPendiente" />
+              Tomo conocimiento de que no estoy informando el grupo sanguíneo en este momento y me comprometo a entregarlo antes del viaje si corresponde.
+            </label>
           </div>
       
           <div id="grupoSanguineoWrap" class="field col-4 hidden">
@@ -1289,6 +1304,10 @@
           </div>
       
           <div id="medicamentosWrap" class="field hidden">
+            <div class="notice privacy" style="margin:0 0 10px;padding:10px 12px;font-size:12.5px;line-height:1.45;border-radius:12px;">
+              Recuerde considerar, antes del viaje, llevar sus medicamentos de uso habitual en cantidad suficiente para toda la estadía, junto con la prescripción médica o indicación profesional correspondiente si aplica.
+            </div>
+          
             <label for="medicamentosDetalle">Especifique</label>
             <textarea id="medicamentosDetalle" name="medicamentosDetalle"></textarea>
           </div>
