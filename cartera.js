@@ -480,8 +480,14 @@ async function syncNumeroColegioInputForSelectedVendor() {
 
 function canEditCarteraRow(row = null) {
   if (canManageVentasRole(state.effectiveUser)) return true;
+
+  // Rol registro puede abrir el modal de edición,
+  // pero el guardado estará limitado solo al nombre del colegio.
+  if (isRegistroRole(state.effectiveUser)) return true;
+
   if (!isVendedorRole(state.effectiveUser)) return false;
   if (!row) return false;
+
   return normalizeEmail(row.correoVendedor) === normalizeEmail(state.effectiveUser?.email || "");
 }
 
@@ -491,6 +497,10 @@ function canDeleteCarteraRow() {
 
 function canCreateCarteraRow() {
   return canManageVentasRole(state.effectiveUser);
+}
+
+function isRegistroRole(user = state.effectiveUser) {
+  return normalizeText(user?.rol || "").toLowerCase() === "registro";
 }
 
 function buildHistorySummaryForChanges(changes = []) {
@@ -1686,6 +1696,46 @@ async function updateVendorPreview() {
   await syncNumeroColegioInputForSelectedVendor();
 }
 
+function setRegistroNameOnlyMode(enabled = false) {
+  const idsToLock = [
+    "numeroColegioInput",
+    "logoInput",
+    "quitarLogoCheck",
+    "vendedorSelectModal",
+    "comunaInput",
+    "ciudadInput",
+    "estatusInput",
+    "nivelesInput",
+    "observacionesInput",
+    "gestionTipoInput",
+    "gestionAsuntoInput",
+    "gestionMensajeInput",
+    "visitadoCheck",
+    "fechaVisitaInput",
+    "btnAgregarContacto"
+  ];
+
+  idsToLock.forEach((id) => {
+    const el = $(id);
+    if (el) el.disabled = enabled;
+  });
+
+  document
+    .querySelectorAll("#contactosContainer input, #contactosContainer select, #contactosContainer textarea, #contactosContainer button")
+    .forEach((el) => {
+      el.disabled = enabled;
+    });
+
+  const colegioInput = $("colegioInput");
+  if (colegioInput) colegioInput.disabled = false;
+
+  const hint = $("vendorEditHint");
+  if (hint && enabled) {
+    hint.classList.remove("hidden");
+    hint.textContent = "Rol registro: solo puedes modificar el nombre del colegio.";
+  }
+}
+
 async function openCreateModal() {
   state.modalMode = "create";
   state.editingOriginal = null;
@@ -1706,6 +1756,8 @@ async function openCreateModal() {
   renderContactos([createEmptyContact()]);
 
   $("modalForm").classList.add("show");
+
+  setRegistroNameOnlyMode(false);
 
   await syncNumeroColegioInputForSelectedVendor();
 }
@@ -1729,6 +1781,8 @@ async function openEditModal(row) {
   refreshLogoPreview();
 
   renderContactos(row.contactosColegio || [createEmptyContact()]);
+
+  setRegistroNameOnlyMode(isRegistroRole(state.effectiveUser));
 
   $("modalForm").classList.add("show");
 
@@ -1933,11 +1987,86 @@ function closeHistoryModal() {
   $("historyModal")?.classList.remove("show");
 }
 
+async function saveRegistroNombreOnly() {
+  const old = { ...state.editingOriginal };
+  const nuevoNombre = normalizeText($("colegioInput")?.value || "");
+
+  if (!nuevoNombre) {
+    alert("Debes indicar el nombre del colegio.");
+    return;
+  }
+
+  if (normalizeText(old.colegio) === nuevoNombre) {
+    closeModal();
+    return;
+  }
+
+  try {
+    setProgressStatus({
+      text: "Guardando nombre del colegio.",
+      meta: "Rol registro: solo se actualizará el nombre.",
+      progress: 40
+    });
+
+    const itemRef = doc(
+      db,
+      "ventas_cartera",
+      old.correoVendedor,
+      "items",
+      old.numeroColegio
+    );
+
+    await setDoc(itemRef, {
+      colegio: nuevoNombre,
+      colegioNormalizado: normalizeSearch(nuevoNombre),
+      actualizadoPor: normalizeEmail(state.realUser?.email || ""),
+      fechaActualizacion: serverTimestamp()
+    }, { merge: true });
+
+    await writeCarteraHistory({
+      correoVendedor: old.correoVendedor,
+      numeroColegio: old.numeroColegio,
+      tipo: "Edición registro",
+      asunto: "Cambio de nombre del colegio",
+      mensaje: `Rol registro modificó el nombre del colegio: ${old.colegio || "vacío"} → ${nuevoNombre}.`,
+      metadata: {
+        changes: [
+          {
+            key: "colegio",
+            label: "Colegio",
+            before: old.colegio || "",
+            after: nuevoNombre
+          }
+        ]
+      }
+    });
+
+    closeModal();
+
+    setProgressStatus({
+      text: "Nombre actualizado.",
+      meta: "Solo se modificó el nombre del colegio.",
+      progress: 100,
+      type: "success"
+    });
+
+    await loadData();
+  } catch (error) {
+    console.error(error);
+    alert("No se pudo guardar el nombre del colegio: " + (error.message || error));
+  }
+}
+
 async function saveModal() {
   const canCreate = state.modalMode === "create" && canCreateCarteraRow();
   const canEdit = state.modalMode === "edit" && canEditCarteraRow(state.editingOriginal);
 
   if (!canCreate && !canEdit) return;
+
+  if (state.modalMode === "edit" && isRegistroRole(state.effectiveUser)) {
+    await saveRegistroNombreOnly();
+    return;
+  }
 
   const input = readModalInput();
   const validation = validateRowInput(input);
