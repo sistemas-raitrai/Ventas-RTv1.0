@@ -1047,34 +1047,59 @@
           </div>
       
           <div class="field">
-            <label>4. ¿Sigue alguna dieta especial o tiene restricciones alimentarias que debamos respetar?</label>
+            <label>4. ¿Sigue alguna dieta especial o tiene alguna alergia o restricción alimentaria que debamos respetar?</label>
             <div class="radio-group">
               <label class="option-pill"><input type="radio" name="dietaFlag" value="no" /> No</label>
               <label class="option-pill"><input type="radio" name="dietaFlag" value="si" /> Sí</label>
             </div>
           </div>
-      
+          
           <div id="dietaWrap" class="field hidden">
-            <label>Tipo de dieta o restricción</label>
-            <div class="check-group">
-              <label class="option-pill"><input type="checkbox" name="dietaTipo" value="vegetariana" /> Vegetariana</label>
-              <label class="option-pill"><input type="checkbox" name="dietaTipo" value="vegana" /> Vegana</label>
-              <label class="option-pill"><input type="checkbox" name="dietaTipo" value="pescetariana" /> Pescetariana</label>
-              <label class="option-pill"><input type="checkbox" name="dietaTipo" value="sin_gluten" /> Sin gluten</label>
-              <label class="option-pill"><input type="checkbox" name="dietaTipo" value="sin_lactosa" /> Sin lactosa</label>
-              <label class="option-pill"><input type="checkbox" name="dietaTipo" value="otra" /> Otra</label>
+            <label>Tipo de dieta, alergia o restricción</label>
+          
+            <div class="sub" style="margin-bottom:8px;">
+              Puede seleccionar una opción de dieta principal y agregar restricciones adicionales si corresponde.
             </div>
-      
+          
+            <div class="check-group">
+              <label class="option-pill">
+                <input type="radio" name="dietaPrincipal" value="vegetariana" />
+                Vegetariana
+              </label>
+          
+              <label class="option-pill">
+                <input type="radio" name="dietaPrincipal" value="vegana" />
+                Vegana
+              </label>
+          
+              <label class="option-pill">
+                <input type="radio" name="dietaPrincipal" value="pescetariana" />
+                Pescetariana
+              </label>
+          
+              <label class="option-pill">
+                <input type="checkbox" name="dietaRestricciones" value="sin_gluten" />
+                Sin gluten
+              </label>
+          
+              <label class="option-pill">
+                <input type="checkbox" name="dietaRestricciones" value="sin_lactosa" />
+                Sin lactosa
+              </label>
+          
+              <label class="option-pill">
+                <input type="checkbox" name="dietaRestricciones" value="alergia_alimentaria" />
+                Alergia alimentaria
+              </label>
+          
+              <label class="option-pill">
+                <input type="checkbox" name="dietaRestricciones" value="otra" />
+                Otra
+              </label>
+            </div>
+          
             <label for="dietaDetalle">Observaciones al respecto</label>
             <textarea id="dietaDetalle" name="dietaDetalle"></textarea>
-          </div>
-      
-          <div class="field">
-            <label>¿La persona viajera mantiene algún tipo de alergia alimentaria que deba ser considerada durante el viaje?</label>
-            <div class="radio-group">
-              <label class="option-pill"><input type="radio" name="alergiaAlimentariaFlag" value="no" /> No</label>
-              <label class="option-pill"><input type="radio" name="alergiaAlimentariaFlag" value="si" /> Sí</label>
-            </div>
           </div>
       
           <div id="alergiasAlimentariasWrap" class="field hidden">
