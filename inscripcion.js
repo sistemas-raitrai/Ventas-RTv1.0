@@ -43,6 +43,7 @@ const rutHint = $("rutHint");
 
 const nacionalidadDetalleWrap = $("nacionalidadDetalleWrap");
 const telefonoViajanteWrap = $("telefonoViajanteWrap");
+const avisoAdultoResponsableWrap = $("avisoAdultoResponsableWrap");
 
 const bloqueProfesor = $("bloqueProfesor");
 const tipoProfesorOtroWrap = $("tipoProfesorOtroWrap");
@@ -53,20 +54,16 @@ const relacionCursoOtroWrap = $("relacionCursoOtroWrap");
 
 const bloqueApoderado = $("bloqueApoderado");
 const contactoPrincipalRelacionOtroWrap = $("contactoPrincipalRelacionOtroWrap");
-const contactoPrincipalWhatsappAlternativoWrap = $("contactoPrincipalWhatsappAlternativoWrap");
 
 const btnAgregarApoderado2 = $("btnAgregarApoderado2");
 const bloqueApoderado2 = $("bloqueApoderado2");
 const contactoSecundarioRelacionOtroWrap = $("contactoSecundarioRelacionOtroWrap");
-const contactoSecundarioWhatsappAlternativoWrap = $("contactoSecundarioWhatsappAlternativoWrap");
 
 const emergenciaRelacionOtroWrap = $("emergenciaRelacionOtroWrap");
-const emergenciaWhatsappAlternativoWrap = $("emergenciaWhatsappAlternativoWrap");
 
 const btnAgregarEmergencia2 = $("btnAgregarEmergencia2");
 const bloqueEmergencia2 = $("bloqueEmergencia2");
 const emergencia2RelacionOtroWrap = $("emergencia2RelacionOtroWrap");
-const emergencia2WhatsappAlternativoWrap = $("emergencia2WhatsappAlternativoWrap");
 
 const bloqueInternacional = $("bloqueInternacional");
 const nacionalidadPaisDestinoWrap = $("nacionalidadPaisDestinoWrap");
@@ -78,12 +75,14 @@ const discapacidadApoyosWrap = $("discapacidadApoyosWrap");
 const discapacidadAyudasTecnicasWrap = $("discapacidadAyudasTecnicasWrap");
 
 const neurodivergenciaWrap = $("neurodivergenciaWrap");
+const neurodivergenciaOtraWrap = $("neurodivergenciaOtraWrap");
 const neuroSobrecargaWrap = $("neuroSobrecargaWrap");
 const neuroApoyosWrap = $("neuroApoyosWrap");
 
 const saludMentalWrap = $("saludMentalWrap");
 const alergiasAlimentariasWrap = $("alergiasAlimentariasWrap");
 const grupoSanguineoWrap = $("grupoSanguineoWrap");
+const grupoSanguineoNoSeWrap = $("grupoSanguineoNoSeWrap");
 
 const enfermedadBaseDetalleWrap = $("enfermedadBaseDetalleWrap");
 const saludGeneralDetalleWrap = $("saludGeneralDetalleWrap");
@@ -276,10 +275,8 @@ function conectarEventos() {
   });
 
   $("contactoSecundarioRelacion")?.addEventListener("change", aplicarEstadoUI);
-  $("contactoSecundarioEsWhatsapp")?.addEventListener("change", aplicarEstadoUI);
 
   $("emergencia2Relacion")?.addEventListener("change", aplicarEstadoUI);
-  $("emergencia2EsWhatsapp")?.addEventListener("change", aplicarEstadoUI);
 
   enlazarFlagDetalle("discapacidadFlag", discapacidadWrap, ["si"]);
   enlazarFlagDetalle("discapacidadApoyosFlag", discapacidadApoyosWrap, ["si"]);
@@ -293,7 +290,7 @@ function conectarEventos() {
   document.querySelectorAll('input[name="dietaRestricciones"]').forEach((el) => {
     el.addEventListener("change", aplicarEstadoUI);
   });
-  enlazarFlagDetalle("conoceGrupoSanguineoFlag", grupoSanguineoWrap, ["si"]);
+  $("grupoSanguineo")?.addEventListener("change", aplicarEstadoUI);
   
   enlazarFlagDetalle("alergiaAlimentaria1ProtocoloFlag", $("alergiaAlimentaria1ProtocoloWrap"), ["si"]);
   enlazarFlagDetalle("alergiaAlimentaria2ProtocoloFlag", $("alergiaAlimentaria2ProtocoloWrap"), ["si"]);
@@ -314,14 +311,14 @@ function conectarEventos() {
   [
     "telefonoViajante",
     "contactoPrincipalTelefono",
-    "contactoPrincipalWhatsappAlternativo",
     "contactoSecundarioTelefono",
-    "contactoSecundarioWhatsappAlternativo",
     "emergenciaTelefono",
-    "emergenciaWhatsappAlternativo",
-    "emergencia2Telefono",
-    "emergencia2WhatsappAlternativo"
+    "emergencia2Telefono"
   ].forEach(bindPhoneInput);
+
+  document.querySelectorAll('input[name="neurodivergenciaTipos"]').forEach((el) => {
+    el.addEventListener("change", aplicarEstadoUI);
+  });
 
   setPhoneDefault("telefonoViajante");
   setPhoneDefault("contactoPrincipalTelefono");
@@ -423,6 +420,7 @@ function aplicarEstadoUI() {
   const esMenor = calcularEdad($("fechaNacimiento")?.value) < 18;
 
   mostrar(bloqueApoderado, esEstudiante);
+  mostrar(avisoAdultoResponsableWrap, esEstudiante);
   mostrar(bloqueProfesor, esProfesor);
   mostrar(bloqueAcompanante, esAcompanante);
   mostrar(adultoCompromisoCard, esAdultoOperativo);
@@ -486,33 +484,19 @@ function aplicarEstadoUI() {
   mostrar(contactoPrincipalRelacionOtroWrap, esEstudiante && relacionOtro);
   setRequired("contactoPrincipalRelacionOtro", esEstudiante && relacionOtro);
 
-  const contactoEsWhatsapp = !!$("contactoPrincipalEsWhatsapp")?.checked;
-  mostrar(contactoPrincipalWhatsappAlternativoWrap, esEstudiante && !contactoEsWhatsapp);
-  setRequired("contactoPrincipalWhatsappAlternativo", esEstudiante && !contactoEsWhatsapp);
-
   const hayApoderado2 = bloqueApoderado2 && !bloqueApoderado2.classList.contains("hidden");
 
   const contactoSecundarioOtro = $("contactoSecundarioRelacion")?.value === "otro";
   mostrar(contactoSecundarioRelacionOtroWrap, hayApoderado2 && contactoSecundarioOtro);
 
-  const contactoSecundarioWhatsapp = !!$("contactoSecundarioEsWhatsapp")?.checked;
-  mostrar(contactoSecundarioWhatsappAlternativoWrap, hayApoderado2 && !contactoSecundarioWhatsapp);
-
   const emergenciaOtro = $("emergenciaRelacion")?.value === "otro";
   mostrar(emergenciaRelacionOtroWrap, emergenciaOtro);
   setRequired("emergenciaRelacionOtro", emergenciaOtro);
-
-  const emergenciaEsWhatsapp = !!$("emergenciaEsWhatsapp")?.checked;
-  mostrar(emergenciaWhatsappAlternativoWrap, !emergenciaEsWhatsapp);
-  setRequired("emergenciaWhatsappAlternativo", !emergenciaEsWhatsapp);
 
   const hayEmergencia2 = bloqueEmergencia2 && !bloqueEmergencia2.classList.contains("hidden");
 
   const emergencia2Otro = $("emergencia2Relacion")?.value === "otro";
   mostrar(emergencia2RelacionOtroWrap, hayEmergencia2 && emergencia2Otro);
-
-  const emergencia2Whatsapp = !!$("emergencia2EsWhatsapp")?.checked;
-  mostrar(emergencia2WhatsappAlternativoWrap, hayEmergencia2 && !emergencia2Whatsapp);
 
   mostrar(bloqueInternacional, esInternacional);
 
@@ -545,6 +529,14 @@ function aplicarEstadoUI() {
   if (!dietaActiva || !tieneAlergiaAlimentaria) {
     ["alergiaAlimentaria1ProtocoloFlag", "alergiaAlimentaria2ProtocoloFlag", "alergiaAlimentaria3ProtocoloFlag"].forEach(limpiarRadios);
   }
+
+  const seleccionoNeuroOtra = obtenerChecks("neurodivergenciaTipos").includes("otra");
+  mostrar(neurodivergenciaOtraWrap, seleccionoNeuroOtra);
+  setRequired("neurodivergenciaOtra", seleccionoNeuroOtra);
+
+  const grupoSanguineo = $("grupoSanguineo")?.value || "";
+  mostrar(grupoSanguineoNoSeWrap, grupoSanguineo === "no_lo_se");
+  setRequired("declaraGrupoSanguineoPendiente", grupoSanguineo === "no_lo_se");
 
   actualizarProgreso();
 }
@@ -902,8 +894,12 @@ function validarFormulario() {
     if ($("relacionCurso")?.value === "otro" && !limpiarTexto($("relacionCursoOtro")?.value)) {
       errores.push("Debe especificar la relación con el curso.");
     }
-    if (!limpiarTexto($("estudianteRelacionado")?.value)) {
-      errores.push("Debe indicar el nombre del estudiante relacionado.");
+    if (!limpiarTexto($("estudianteRelacionadoNombres")?.value)) {
+      errores.push("Debe ingresar los nombres del estudiante relacionado.");
+    }
+    
+    if (!limpiarTexto($("estudianteRelacionadoPrimerApellido")?.value)) {
+      errores.push("Debe ingresar el primer apellido del estudiante relacionado.");
     }
   }
 
@@ -914,9 +910,6 @@ function validarFormulario() {
       errores.push("Debe especificar la relación del apoderado.");
     }
     if (!telefonoValido($("contactoPrincipalTelefono")?.value)) errores.push("Debe ingresar un teléfono válido del apoderado.");
-    if (!$("contactoPrincipalEsWhatsapp")?.checked && !telefonoValido($("contactoPrincipalWhatsappAlternativo")?.value)) {
-      errores.push("Debe ingresar un WhatsApp válido del apoderado.");
-    }
     if (!validarCorreo($("contactoPrincipalCorreo")?.value)) errores.push("Debe ingresar un correo válido del apoderado.");
 
     if (apoderado2Activo()) {
@@ -926,9 +919,6 @@ function validarFormulario() {
         errores.push("Debe especificar la relación del segundo apoderado.");
       }
       if (!telefonoValido($("contactoSecundarioTelefono")?.value)) errores.push("Debe ingresar un teléfono válido del segundo apoderado.");
-      if (!$("contactoSecundarioEsWhatsapp")?.checked && !telefonoValido($("contactoSecundarioWhatsappAlternativo")?.value)) {
-        errores.push("Debe ingresar un WhatsApp válido del segundo apoderado.");
-      }
       if ($("contactoSecundarioCorreo")?.value && !validarCorreo($("contactoSecundarioCorreo")?.value)) {
         errores.push("Debe ingresar un correo válido del segundo apoderado.");
       }
@@ -941,9 +931,6 @@ function validarFormulario() {
     errores.push("Debe especificar la relación del contacto de emergencia.");
   }
   if (!telefonoValido($("emergenciaTelefono")?.value)) errores.push("Debe ingresar un teléfono válido de emergencia.");
-  if (!$("emergenciaEsWhatsapp")?.checked && !telefonoValido($("emergenciaWhatsappAlternativo")?.value)) {
-    errores.push("Debe ingresar un WhatsApp válido de emergencia.");
-  }
 
   if (emergencia2Activa()) {
     if (!limpiarTexto($("emergencia2Nombre")?.value)) errores.push("Debe ingresar el nombre del segundo contacto de emergencia.");
@@ -952,9 +939,6 @@ function validarFormulario() {
       errores.push("Debe especificar la relación del segundo contacto de emergencia.");
     }
     if (!telefonoValido($("emergencia2Telefono")?.value)) errores.push("Debe ingresar un teléfono válido del segundo contacto de emergencia.");
-    if (!$("emergencia2EsWhatsapp")?.checked && !telefonoValido($("emergencia2WhatsappAlternativo")?.value)) {
-      errores.push("Debe ingresar un WhatsApp válido del segundo contacto de emergencia.");
-    }
   }
 
   if (esInternacional && !$("declaraDocumentacionViaje")?.checked) {
@@ -992,6 +976,9 @@ function validarFormulario() {
   
   if (obtenerRadio("neurodivergenciaFlag") === "si") {
     if (!obtenerChecks("neurodivergenciaTipos").length) errores.push("Debe seleccionar al menos un tipo de neurodivergencia.");
+    if (obtenerChecks("neurodivergenciaTipos").includes("otra") && !limpiarTexto($("neurodivergenciaOtra")?.value)) {
+      errores.push("Debe indicar cuál es la otra condición asociada a neurodivergencia.");
+    }
     if (!limpiarTexto($("neurodivergenciaDescripcion")?.value)) errores.push("Debe describir la condición asociada a neurodivergencia.");
   }
   
@@ -1007,8 +994,12 @@ function validarFormulario() {
     errores.push("Debe describir la condición de salud mental informada.");
   }
   
-  if (obtenerRadio("conoceGrupoSanguineoFlag") === "si" && !$("grupoSanguineo")?.value) {
-    errores.push("Debe seleccionar el grupo sanguíneo.");
+  if (!$("grupoSanguineo")?.value) {
+    errores.push("Debe seleccionar el grupo sanguíneo o indicar que no lo sabe.");
+  }
+  
+  if ($("grupoSanguineo")?.value === "no_lo_se" && !$("declaraGrupoSanguineoPendiente")?.checked) {
+    errores.push("Debe confirmar que toma conocimiento de no estar informando el grupo sanguíneo en este momento.");
   }
   
   if (obtenerRadio("enfermedadBaseFlag") === "si" && !limpiarTexto($("enfermedadBaseDetalle")?.value)) {
@@ -1126,6 +1117,15 @@ function construirPayloadBase() {
   const contactoSecundarioActivo = apoderado2Activo();
   const emergenciaSecundariaActiva = emergencia2Activa();
 
+  const estudianteRelacionadoNombres = limpiarTexto($("estudianteRelacionadoNombres")?.value);
+  const estudianteRelacionadoPrimerApellido = limpiarTexto($("estudianteRelacionadoPrimerApellido")?.value);
+  const estudianteRelacionadoSegundoApellido = limpiarTexto($("estudianteRelacionadoSegundoApellido")?.value);
+  const estudianteRelacionadoNombreCompleto = [
+    estudianteRelacionadoNombres,
+    estudianteRelacionadoPrimerApellido,
+    estudianteRelacionadoSegundoApellido
+  ].filter(Boolean).join(" ");
+
   return {
     tipoRegistro: "inscripcion_pasajero",
     tipoViajante,
@@ -1174,7 +1174,7 @@ function construirPayloadBase() {
 
       correoViajante: limpiarTexto($("correoViajante")?.value),
       telefonoViajante: esAdultoOperativo ? limpiarTexto($("telefonoViajante")?.value) : "",
-      telefonoViajanteEsWhatsapp: esAdultoOperativo ? !!$("telefonoViajanteEsWhatsapp")?.checked : false,
+      telefonoViajanteEsWhatsapp: esAdultoOperativo,
       tallaPolera: $("tallaPolera")?.value || ""
     },
 
@@ -1191,7 +1191,10 @@ function construirPayloadBase() {
       relacionCurso: esAcompanante ? relacionCursoFinal : "",
       relacionCursoBase: esAcompanante ? relacionCurso : "",
       relacionCursoOtro: esAcompanante ? relacionCursoOtro : "",
-      estudianteRelacionado: esAcompanante ? limpiarTexto($("estudianteRelacionado")?.value) : "",
+      estudianteRelacionado: esAcompanante ? estudianteRelacionadoNombreCompleto : "",
+      estudianteRelacionadoNombres: esAcompanante ? estudianteRelacionadoNombres : "",
+      estudianteRelacionadoPrimerApellido: esAcompanante ? estudianteRelacionadoPrimerApellido : "",
+      estudianteRelacionadoSegundoApellido: esAcompanante ? estudianteRelacionadoSegundoApellido : "",
       acompananteTieneHijosViaje: esAcompanante ? (obtenerRadio("acompananteTieneHijosViaje") || "") : "",
       interesConoceRaitrai: esAcompanante ? !!$("interesConoceRaitraiAcompanante")?.checked : false
     },
@@ -1202,10 +1205,8 @@ function construirPayloadBase() {
       relacion: esEstudiante ? contactoRelacionFinal : "mismo_viajante",
       relacionBase: esEstudiante ? contactoRelacion : "mismo_viajante",
       telefono: esEstudiante ? limpiarTexto($("contactoPrincipalTelefono")?.value) : limpiarTexto($("telefonoViajante")?.value),
-      esWhatsapp: esEstudiante ? !!$("contactoPrincipalEsWhatsapp")?.checked : !!$("telefonoViajanteEsWhatsapp")?.checked,
-      whatsappAlternativo: esEstudiante && !$("contactoPrincipalEsWhatsapp")?.checked
-        ? limpiarTexto($("contactoPrincipalWhatsappAlternativo")?.value)
-        : "",
+      esWhatsapp: true,
+      whatsappAlternativo: "",
       correo: esEstudiante ? limpiarTexto($("contactoPrincipalCorreo")?.value) : limpiarTexto($("correoViajante")?.value)
     },
 
@@ -1219,10 +1220,8 @@ function construirPayloadBase() {
         : "",
       relacionBase: contactoSecundarioActivo ? $("contactoSecundarioRelacion")?.value : "",
       telefono: contactoSecundarioActivo ? limpiarTexto($("contactoSecundarioTelefono")?.value) : "",
-      esWhatsapp: contactoSecundarioActivo ? !!$("contactoSecundarioEsWhatsapp")?.checked : false,
-      whatsappAlternativo: contactoSecundarioActivo && !$("contactoSecundarioEsWhatsapp")?.checked
-        ? limpiarTexto($("contactoSecundarioWhatsappAlternativo")?.value)
-        : "",
+      esWhatsapp: contactoSecundarioActivo,
+      whatsappAlternativo: "",
       correo: contactoSecundarioActivo ? limpiarTexto($("contactoSecundarioCorreo")?.value) : ""
     },
 
@@ -1231,10 +1230,8 @@ function construirPayloadBase() {
       relacion: emergenciaRelacionFinal,
       relacionBase: emergenciaRelacion,
       telefono: limpiarTexto($("emergenciaTelefono")?.value),
-      esWhatsapp: !!$("emergenciaEsWhatsapp")?.checked,
-      whatsappAlternativo: !$("emergenciaEsWhatsapp")?.checked
-        ? limpiarTexto($("emergenciaWhatsappAlternativo")?.value)
-        : ""
+      esWhatsapp: true,
+      whatsappAlternativo: ""
     },
 
     emergenciaSecundaria: {
@@ -1247,10 +1244,8 @@ function construirPayloadBase() {
         : "",
       relacionBase: emergenciaSecundariaActiva ? $("emergencia2Relacion")?.value : "",
       telefono: emergenciaSecundariaActiva ? limpiarTexto($("emergencia2Telefono")?.value) : "",
-      esWhatsapp: emergenciaSecundariaActiva ? !!$("emergencia2EsWhatsapp")?.checked : false,
-      whatsappAlternativo: emergenciaSecundariaActiva && !$("emergencia2EsWhatsapp")?.checked
-        ? limpiarTexto($("emergencia2WhatsappAlternativo")?.value)
-        : ""
+      esWhatsapp: emergenciaSecundariaActiva,
+      whatsappAlternativo: ""
     },
 
     documentacion: {
@@ -1297,8 +1292,11 @@ function construirPayloadBase() {
         ? obtenerAlergiasAlimentarias()
         : [],
       
-      conoceGrupoSanguineoFlag: obtenerRadio("conoceGrupoSanguineoFlag") || "",
-      grupoSanguineo: obtenerRadio("conoceGrupoSanguineoFlag") === "si" ? ($("grupoSanguineo")?.value || "") : "",
+      conoceGrupoSanguineoFlag: $("grupoSanguineo")?.value === "no_lo_se" ? "no" : "si",
+      grupoSanguineo: $("grupoSanguineo")?.value || "",
+      declaraGrupoSanguineoPendiente: $("grupoSanguineo")?.value === "no_lo_se"
+        ? !!$("declaraGrupoSanguineoPendiente")?.checked
+        : false,
       enfermedadBaseFlag: obtenerRadio("enfermedadBaseFlag") || "",
       enfermedadBaseDetalle: limpiarTexto($("enfermedadBaseDetalle")?.value),
 
@@ -1670,7 +1668,6 @@ function apoderado2Activo() {
       "contactoSecundarioRelacion",
       "contactoSecundarioRelacionOtro",
       "contactoSecundarioTelefono",
-      "contactoSecundarioWhatsappAlternativo",
       "contactoSecundarioCorreo"
     ]);
 }
@@ -1681,8 +1678,7 @@ function emergencia2Activa() {
       "emergencia2Nombre",
       "emergencia2Relacion",
       "emergencia2RelacionOtro",
-      "emergencia2Telefono",
-      "emergencia2WhatsappAlternativo"
+      "emergencia2Telefono"
     ]);
 }
 
@@ -1774,29 +1770,40 @@ function bindPhoneInput(id) {
     if (!limpiarTexto(el.value)) {
       el.value = "+569";
     }
+    actualizarHintWhatsapp(id);
   });
 
   el.addEventListener("input", () => {
     let raw = String(el.value || "");
-
-    // Mantener solo + y números
     let clean = raw.replace(/[^\d+]/g, "");
 
-    // Solo permitir + al inicio
     if (clean.includes("+")) {
       clean = clean[0] === "+"
         ? "+" + clean.slice(1).replace(/\+/g, "")
         : clean.replace(/\+/g, "");
     }
 
-    // Si comienza con +569 → máximo +569 + 8 dígitos
     if (clean.startsWith("+569")) {
       const resto = clean.slice(4).replace(/\D/g, "").slice(0, 8);
       clean = "+569" + resto;
     }
 
     el.value = clean;
+    actualizarHintWhatsapp(id);
   });
+
+  el.addEventListener("blur", () => actualizarHintWhatsapp(id));
+}
+
+function actualizarHintWhatsapp(id) {
+  const el = $(id);
+  const hint = $(`${id}WhatsappHint`);
+  if (!el || !hint) return;
+
+  const valor = limpiarTexto(el.value);
+  const mostrarHint = valor && !valor.startsWith("+569");
+
+  hint.classList.toggle("hidden", !mostrarHint);
 }
 
 function setPhoneDefault(id) {
