@@ -290,7 +290,9 @@ function conectarEventos() {
   enlazarFlagDetalle("neuroApoyosFlag", neuroApoyosWrap, ["si"]);
   
   enlazarFlagDetalle("saludMentalFlag", saludMentalWrap, ["si"]);
-  enlazarFlagDetalle("alergiaAlimentariaFlag", alergiasAlimentariasWrap, ["si"]);
+  document.querySelectorAll('input[name="dietaRestricciones"]').forEach((el) => {
+    el.addEventListener("change", aplicarEstadoUI);
+  });
   enlazarFlagDetalle("conoceGrupoSanguineoFlag", grupoSanguineoWrap, ["si"]);
   
   enlazarFlagDetalle("alergiaAlimentaria1ProtocoloFlag", $("alergiaAlimentaria1ProtocoloWrap"), ["si"]);
@@ -534,6 +536,15 @@ function aplicarEstadoUI() {
   
   mostrar(docsOtraNacionalidadWrap, esInternacional && tieneNacionalidadEspecial);
   mostrar(alertaNacionalidadDestinoWrap, esInternacional && tieneNacionalidadEspecial);
+
+  const dietaActiva = obtenerRadio("dietaFlag") === "si";
+  const tieneAlergiaAlimentaria = obtenerChecks("dietaRestricciones").includes("alergia_alimentaria");
+  
+  mostrar(alergiasAlimentariasWrap, dietaActiva && tieneAlergiaAlimentaria);
+  
+  if (!dietaActiva || !tieneAlergiaAlimentaria) {
+    ["alergiaAlimentaria1ProtocoloFlag", "alergiaAlimentaria2ProtocoloFlag", "alergiaAlimentaria3ProtocoloFlag"].forEach(limpiarRadios);
+  }
 
   actualizarProgreso();
 }
@@ -985,11 +996,6 @@ function validarFormulario() {
     errores.push("Debe seleccionar el grupo sanguíneo.");
   }
   
-  if (obtenerRadio("alergiaAlimentariaFlag") === "si") {
-    const alergias = obtenerAlergiasAlimentarias();
-    if (!alergias.length) errores.push("Debe ingresar al menos una alergia alimentaria.");
-  }
-
   if (obtenerRadio("enfermedadBaseFlag") === "si" && !limpiarTexto($("enfermedadBaseDetalle")?.value)) {
     errores.push("Debe detallar la enfermedad de base.");
   }
@@ -1019,8 +1025,17 @@ function validarFormulario() {
   }
 
   if (obtenerRadio("dietaFlag") === "si") {
-    if (!obtenerChecks("dietaTipo").length) errores.push("Debe seleccionar al menos un tipo de dieta.");
-    if (!limpiarTexto($("dietaDetalle")?.value)) errores.push("Debe detallar la dieta.");
+    const dietaPrincipal = obtenerRadio("dietaPrincipal");
+    const restricciones = obtenerChecks("dietaRestricciones");
+  
+    if (!dietaPrincipal && !restricciones.length) {
+      errores.push("Debe seleccionar al menos una dieta, alergia o restricción alimentaria.");
+    }
+  
+    if (restricciones.includes("alergia_alimentaria")) {
+      const alergias = obtenerAlergiasAlimentarias();
+      if (!alergias.length) errores.push("Debe ingresar al menos una alergia alimentaria.");
+    }
   }
 
   if (obtenerRadio("otrosAntecedentesFlag") === "si" && !limpiarTexto($("otrosAntecedentesDetalle")?.value)) {
@@ -1259,8 +1274,13 @@ function construirPayloadBase() {
       saludMentalFlag: obtenerRadio("saludMentalFlag") || "",
       saludMentalDetalle: limpiarTexto($("saludMentalDetalle")?.value),
       
-      alergiaAlimentariaFlag: obtenerRadio("alergiaAlimentariaFlag") || "",
-      alergiasAlimentarias: obtenerAlergiasAlimentarias(),
+      dietaPrincipal: obtenerRadio("dietaPrincipal") || "",
+      dietaRestricciones: obtenerChecks("dietaRestricciones"),
+      
+      alergiaAlimentariaFlag: obtenerChecks("dietaRestricciones").includes("alergia_alimentaria") ? "si" : "no",
+      alergiasAlimentarias: obtenerChecks("dietaRestricciones").includes("alergia_alimentaria")
+        ? obtenerAlergiasAlimentarias()
+        : [],
       
       conoceGrupoSanguineoFlag: obtenerRadio("conoceGrupoSanguineoFlag") || "",
       grupoSanguineo: obtenerRadio("conoceGrupoSanguineoFlag") === "si" ? ($("grupoSanguineo")?.value || "") : "",
@@ -1286,7 +1306,11 @@ function construirPayloadBase() {
       alergiasDetalle: limpiarTexto($("alergiasDetalle")?.value),
 
       dietaFlag: obtenerRadio("dietaFlag") || "",
-      dietaTipos: obtenerChecks("dietaTipo"),
+      dietaTipos: [
+        obtenerRadio("dietaPrincipal"),
+        ...obtenerChecks("dietaRestricciones")
+      ].filter(Boolean),
+      
       dietaDetalle: limpiarTexto($("dietaDetalle")?.value),
 
       otrosAntecedentesFlag: obtenerRadio("otrosAntecedentesFlag") || "",
