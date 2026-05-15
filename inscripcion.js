@@ -1777,13 +1777,22 @@ function bindPhoneInput(id) {
   });
 
   el.addEventListener("input", () => {
-    const raw = String(el.value || "");
+    let raw = String(el.value || "");
+
+    // Mantener solo + y números
     let clean = raw.replace(/[^\d+]/g, "");
 
+    // Solo permitir + al inicio
     if (clean.includes("+")) {
       clean = clean[0] === "+"
         ? "+" + clean.slice(1).replace(/\+/g, "")
         : clean.replace(/\+/g, "");
+    }
+
+    // Si comienza con +569 → máximo +569 + 8 dígitos
+    if (clean.startsWith("+569")) {
+      const resto = clean.slice(4).replace(/\D/g, "").slice(0, 8);
+      clean = "+569" + resto;
     }
 
     el.value = clean;
