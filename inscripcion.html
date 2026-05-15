@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-  <title>Inscripción de Pasajero | Rai Trai</title>
+  <title>Inscripción de la persona que viaja | Rai Trai</title>
 
   <link rel="stylesheet" href="./estilos.css" />
   <link rel="icon" type="image/png" href="IMG/logo-raitrai.png" />
@@ -332,7 +332,7 @@
 
       <p>
         Estamos felices de acompañarles en esta experiencia 🙌
-        Este formulario nos ayudará a conocer mejor al viajante y preparar todo para un viaje seguro,
+        Este formulario nos ayudará a conocer mejor a la persona que viaja y preparar todo para un viaje seguro,
         organizado y entretenido.
       </p>
 
@@ -388,14 +388,14 @@
 
     <form id="formInscripcion" class="grid hidden" novalidate>
       <section class="card">
-        <h2>• Tipo de viajante</h2>
+        <h2>• Tipo de participación en el viaje</h2>
         <div class="sub">
-          Indique si la persona que será inscrita corresponde a estudiante, profesor o adulto acompañante.
+          Indique qué rol tendrá en el viaje la persona que será inscrita en este formulario.
         </div>
 
         <div class="form-grid">
           <div class="field">
-            <label>Tipo de viajante <span class="req">*</span></label>
+            <label>Tipo de participación <span class="req">*</span></label>
             <div class="radio-group">
               <label class="option-pill">
                 <input type="radio" name="tipoViajante" value="estudiante" required />
@@ -404,17 +404,17 @@
 
               <label class="option-pill">
                 <input type="radio" name="tipoViajante" value="profesor" />
-                Profesor
+                Profesor(a)
               </label>
 
               <label class="option-pill">
                 <input type="radio" name="tipoViajante" value="adulto_acompanante" />
-                Adulto acompañante
+                Adulto(a) acompañante
               </label>
             </div>
             <div id="avisoAdultoResponsableWrap" class="field hidden">
               <div class="notice privacy" style="margin:0;font-size:13px;line-height:1.5;">
-                Este formulario debe ser completado por el adulto responsable del estudiante, quien debe contar con información suficiente sobre sus datos de identidad, salud, documentación, alimentación y otros antecedentes relevantes para el viaje.
+                Este formulario debe ser completado por la persona responsable de la persona que viaja, quien debe contar con información suficiente sobre identidad, salud, documentación, alimentación y otros antecedentes relevantes para el viaje.
               </div>
             </div>
           </div>
@@ -422,9 +422,9 @@
       </section>
 
       <section class="card">
-        <h2>• Datos del viajante</h2>
+        <h2>• Datos de la persona que viaja</h2>
         <div class="sub">
-          Ingrese los datos de la persona que viajará.
+          Complete la información personal de la persona que participará en el viaje.
         </div>
 
         <div class="form-grid">
@@ -495,7 +495,7 @@
 
           <div id="sinRutNotice" class="field hidden">
             <div class="notice time" style="margin:0;">
-              Una vez enviada la inscripción, nuestro equipo se pondrá en contacto para validar la documentación del viajante y completar la información necesaria para el viaje.
+              Una vez enviada la inscripción, nuestro equipo se pondrá en contacto para validar la documentación de la persona que viaja y completar la información necesaria para el viaje.
             </div>
           </div>
 
@@ -520,7 +520,7 @@
           </div>
 
           <div class="field col-6">
-            <label for="correoViajante">Correo electrónico del viajante <span class="req">*</span></label>
+            <label for="correoViajante">Correo electrónico <span class="req">*</span></label>
             <input id="correoViajante" name="correoViajante" type="email" required />
             <div class="hint">
               A este correo enviaremos el respaldo de este formulario. También podremos usarlo para comunicar información importante relacionada con la preparación del viaje.
@@ -528,7 +528,7 @@
           </div>
 
           <div id="telefonoViajanteWrap" class="field col-4 hidden">
-            <label for="telefonoViajante">WhatsApp del viajante <span class="req">*</span></label>
+            <label for="telefonoViajante">WhatsApp <span class="req">*</span></label>
             <input id="telefonoViajante" name="telefonoViajante" type="tel" />
             <div id="telefonoViajanteWhatsappHint" class="hint hidden">
               Si ingresa un número extranjero, asegúrese de que corresponda a un WhatsApp activo.
@@ -540,12 +540,12 @@
       <section class="card">
         <h2>• Talla de polera</h2>
         <div class="sub">
-          Para preparar algunos elementos del viaje, indíquenos la talla de polera que normalmente utiliza el viajante.
+          Para preparar algunos elementos del viaje, indíquenos la talla de polera que utiliza normalmente.
         </div>
 
         <div class="form-grid">
           <div class="field col-6">
-            <label for="tallaPolera">Talla de polera del viajante <span class="req">*</span></label>
+            <label for="tallaPolera">Talla de polera <span class="req">*</span></label>
             <select id="tallaPolera" name="tallaPolera" required>
               <option value="">Seleccione...</option>
               <option value="S">S</option>
@@ -577,11 +577,14 @@
       </section>
 
       <section id="bloqueProfesor" class="card hidden">
-        <h2>• Datos del profesor</h2>
+        <h2>• Datos de participación como profesor(a)</h2>
+        <div class="sub">
+          Complete esta sección si la persona que viaja participará en calidad de profesor(a).
+        </div>
 
         <div class="form-grid">
           <div class="field col-6">
-            <label for="tipoProfesor">Tipo de profesor <span class="req">*</span></label>
+            <label for="tipoProfesor">Tipo de profesor(a) <span class="req">*</span></label>
             <select id="tipoProfesor" name="tipoProfesor">
               <option value="">Seleccione...</option>
               <option value="profesor_jefe">Profesor jefe</option>
@@ -609,7 +612,10 @@
       </section>
 
       <section id="bloqueAcompanante" class="card hidden">
-        <h2>• Datos del adulto acompañante</h2>
+        <h2>• Datos de participación como adulto(a) acompañante</h2>
+        <div class="sub">
+          Complete esta sección si la persona que viaja participará como adulto(a) acompañante.
+        </div>
 
         <div class="form-grid">
           <div class="field col-6">
@@ -677,19 +683,19 @@
       </section>
 
       <section id="bloqueApoderado" class="card hidden">
-        <h2>• Datos del apoderado</h2>
+        <h2>• Datos de la persona responsable de la persona que viaja</h2>
         <div class="sub">
-          Esta información debe ser ingresada solo si el viajante es estudiante.
+          Esta sección debe ser completada cuando la persona que viaja sea estudiante.
         </div>
       
         <div class="form-grid">
           <div class="field col-6">
-            <label for="contactoPrincipalNombre">Nombre apoderado 1 <span class="req">*</span></label>
+            <label for="contactoPrincipalNombre">Nombre completo responsable 1 <span class="req">*</span></label>
             <input id="contactoPrincipalNombre" name="contactoPrincipalNombre" type="text" />
           </div>
       
           <div class="field col-3">
-            <label for="contactoPrincipalRelacion">Relación con estudiante <span class="req">*</span></label>
+            <label for="contactoPrincipalRelacion">Relación con la persona que viaja <span class="req">*</span></label>
             <select id="contactoPrincipalRelacion" name="contactoPrincipalRelacion">
               <option value="">Seleccione...</option>
               <option value="padre">Padre</option>
@@ -705,7 +711,7 @@
           </div>
       
           <div class="field col-4">
-            <label for="contactoPrincipalTelefono">WhatsApp apoderado 1 <span class="req">*</span></label>
+            <label for="contactoPrincipalTelefono">WhatsApp responsable 1 <span class="req">*</span></label>
             <input id="contactoPrincipalTelefono" name="contactoPrincipalTelefono" type="tel" />
             <div id="contactoPrincipalTelefonoWhatsappHint" class="hint hidden">
               Si ingresa un número extranjero, asegúrese de que corresponda a un WhatsApp activo.
@@ -713,7 +719,7 @@
           </div>
       
           <div class="field col-6">
-            <label for="contactoPrincipalCorreo">Correo apoderado 1 <span class="req">*</span></label>
+            <label for="contactoPrincipalCorreo">Correo electrónico responsable 1 <span class="req">*</span></label>
             <input id="contactoPrincipalCorreo" name="contactoPrincipalCorreo" type="email" />
             <div class="hint">
               A este correo enviaremos el respaldo de este formulario. También podremos usarlo para comunicar información importante relacionada con la preparación del viaje.
@@ -722,19 +728,19 @@
       
           <div class="field">
             <button type="button" id="btnAgregarApoderado2" class="btn-secondary">
-              + Agregar segundo apoderado
+              + Agregar segunda persona responsable
             </button>
           </div>
         </div>
       
         <div id="bloqueApoderado2" class="form-grid hidden" style="margin-top:18px;">
           <div class="field col-6">
-            <label for="contactoSecundarioNombre">Nombre apoderado 2</label>
+            <label for="contactoSecundarioNombre">Nombre completo responsable 2</label>
             <input id="contactoSecundarioNombre" name="contactoSecundarioNombre" type="text" />
           </div>
       
           <div class="field col-3">
-            <label for="contactoSecundarioRelacion">Relación con estudiante</label>
+            <label for="contactoSecundarioRelacion">Relación con la persona que viaja</label>
             <select id="contactoSecundarioRelacion" name="contactoSecundarioRelacion">
               <option value="">Seleccione...</option>
               <option value="padre">Padre</option>
@@ -750,7 +756,7 @@
           </div>
       
           <div class="field col-4">
-            <label for="contactoSecundarioTelefono">WhatsApp apoderado 2</label>
+            <label for="contactoSecundarioTelefono">WhatsApp responsable 2</label>
             <input id="contactoSecundarioTelefono" name="contactoSecundarioTelefono" type="tel" />
             <div id="contactoSecundarioTelefonoWhatsappHint" class="hint hidden">
               Si ingresa un número extranjero, asegúrese de que corresponda a un WhatsApp activo.
@@ -758,7 +764,7 @@
           </div>
       
           <div class="field col-6">
-            <label for="contactoSecundarioCorreo">Correo apoderado 2</label>
+            <label for="contactoSecundarioCorreo">Correo electrónico responsable 2</label>
             <input id="contactoSecundarioCorreo" name="contactoSecundarioCorreo" type="email" />
             <div class="hint">
               Si se informa este correo, también podrá ser utilizado para comunicaciones importantes relacionadas con la preparación del viaje.
@@ -768,19 +774,19 @@
       </section>
 
       <section class="card">
-        <h2>• Contacto de emergencia</h2>
+        <h2>• Contactos de emergencia</h2>
         <div class="sub">
-          Ingrese a una persona a quien podamos contactar si ocurriera una situación importante durante el viaje.
+          Indique a quién debemos contactar en caso de una situación importante relacionada con la persona que viaja.
         </div>
       
         <div class="form-grid">
           <div class="field col-6">
-            <label for="emergenciaNombre">Nombre contacto de emergencia 1 <span class="req">*</span></label>
+            <label for="emergenciaNombre">Nombre completo contacto de emergencia 1 <span class="req">*</span></label>
             <input id="emergenciaNombre" name="emergenciaNombre" type="text" required />
           </div>
       
           <div class="field col-3">
-            <label for="emergenciaRelacion">Relación con viajante <span class="req">*</span></label>
+            <label for="emergenciaRelacion">Relación con la persona que viaja <span class="req">*</span></label>
             <select id="emergenciaRelacion" name="emergenciaRelacion" required>
               <option value="">Seleccione...</option>
               <option value="padre_madre">Padre / Madre</option>
@@ -802,7 +808,7 @@
           </div>
       
           <div class="field col-4">
-            <label for="emergenciaTelefono">WhatsApp emergencia 1 <span class="req">*</span></label>
+            <label for="emergenciaTelefono">WhatsApp contacto de emergencia 1 <span class="req">*</span></label>
             <input id="emergenciaTelefono" name="emergenciaTelefono" type="tel" required />
             <div id="emergenciaTelefonoWhatsappHint" class="hint hidden">
               Si ingresa un número extranjero, asegúrese de que corresponda a un WhatsApp activo.
@@ -818,12 +824,12 @@
       
         <div id="bloqueEmergencia2" class="form-grid hidden" style="margin-top:18px;">
           <div class="field col-6">
-            <label for="emergencia2Nombre">Nombre contacto de emergencia 2</label>
+            <label for="emergencia2Nombre">Nombre completo contacto de emergencia 2</label>
             <input id="emergencia2Nombre" name="emergencia2Nombre" type="text" />
           </div>
       
           <div class="field col-3">
-            <label for="emergencia2Relacion">Relación con viajante</label>
+            <label for="emergencia2Relacion">Relación con la persona que viaja</label>
             <select id="emergencia2Relacion" name="emergencia2Relacion">
               <option value="">Seleccione...</option>
               <option value="padre_madre">Padre / Madre</option>
@@ -845,7 +851,7 @@
           </div>
       
           <div class="field col-4">
-            <label for="emergencia2Telefono">WhatsApp emergencia 2</label>
+            <label for="emergencia2Telefono">WhatsApp contacto de emergencia 2</label>
             <input id="emergencia2Telefono" name="emergencia2Telefono" type="tel" />
             <div id="emergencia2TelefonoWhatsappHint" class="hint hidden">
               Si ingresa un número extranjero, asegúrese de que corresponda a un WhatsApp activo.
@@ -860,20 +866,20 @@
         <div class="sub">
           Para viajes internacionales, es importante revisar con anticipación cédula o documento de viaje,
           permisos notariales cuando corresponda, autorizaciones y copias necesarias según la situación particular
-          de la persona viajera.
+          de la persona que viaja.
         </div>
       
         <div class="form-grid">
           <div class="field">
             <label class="option-pill" style="border-radius:14px;">
               <input type="checkbox" id="declaraDocumentacionViaje" name="declaraDocumentacionViaje" />
-              Declaro que la persona viajera contará, al momento del viaje, con su documentación vigente,
+              Declaro que la persona que viaja contará, al momento del viaje, con su documentación vigente,
               permisos y autorizaciones necesarias según su situación particular.
             </label>
           </div>
       
           <div id="nacionalidadPaisDestinoWrap" class="field hidden">
-            <label for="nacionalidadPaisDestino">¿La persona viajera tiene nacionalidad del país de destino?</label>
+            <label for="nacionalidadPaisDestino">¿La persona que viaja tiene nacionalidad del país de destino?</label>
             <select id="nacionalidadPaisDestino" name="nacionalidadPaisDestino">
               <option value="">Seleccione...</option>
               <option value="no">No</option>
@@ -884,7 +890,7 @@
       
           <div id="alertaNacionalidadDestinoWrap" class="field hidden">
             <div class="notice time" style="margin:0;">
-              Si la persona viajera tiene nacionalidad del país de destino, doble nacionalidad o una situación documental
+              Si la persona que viaja tiene nacionalidad del país de destino, doble nacionalidad o una situación documental
               especial, es importante revisar los requisitos de ingreso y salida de ese país, especialmente en el caso de
               menores de edad. Recomendamos consultar directamente con el consulado correspondiente o con las autoridades
               competentes antes del viaje.
@@ -894,7 +900,7 @@
           <div id="docsOtraNacionalidadWrap" class="field hidden">
             <label class="option-pill" style="border-radius:14px;">
               <input type="checkbox" id="declaraRevisionConsulado" name="declaraRevisionConsulado" />
-              Entiendo que, si la persona viajera tiene doble nacionalidad, nacionalidad extranjera, nacionalidad del país
+              Entiendo que, si la persona que viaja tiene doble nacionalidad, nacionalidad extranjera, nacionalidad del país
               de destino o una situación documental especial, revisaré los requisitos aplicables con fuentes oficiales,
               como el consulado del país de destino.
             </label>
@@ -902,7 +908,7 @@
 
           <div class="field">
             <div class="notice privacy" style="margin:0;padding:10px 12px;font-size:12.5px;line-height:1.45;border-radius:12px;">
-              Si la persona viajera se encuentra en una situación familiar, documental o migratoria particular,
+              Si la persona que viaja se encuentra en una situación familiar, documental o migratoria particular,
               recomendamos revisar la
               <a
                 href="./assets/guia-documentacion-internacional.pdf"
@@ -921,13 +927,13 @@
       <section class="card">
         <h2>• Salud general</h2>
         <div class="sub">
-          Estas preguntas permiten anticipar cuidados o apoyos importantes para el viaje.
+          Estas preguntas corresponden exclusivamente a la persona que viaja y permiten anticipar cuidados, apoyos o consideraciones importantes durante el viaje.
         </div>
       
         <div class="form-grid">
       
           <div class="field">
-            <label>1. ¿La persona viajera presenta alguna condición de discapacidad que deba ser considerada durante el viaje?</label>
+            <label>1. ¿Presenta alguna condición de discapacidad que deba ser considerada durante el viaje?</label>
             <div class="radio-group">
               <label class="option-pill"><input type="radio" name="discapacidadFlag" value="no" /> No</label>
               <label class="option-pill"><input type="radio" name="discapacidadFlag" value="si" /> Sí</label>
@@ -976,7 +982,7 @@
           </div>
       
           <div class="field">
-            <label>2. ¿La persona viajera presenta alguna condición asociada a neurodivergencia o neurodesarrollo?</label>
+            <label>2. ¿Presenta alguna condición asociada a neurodivergencia o neurodesarrollo?</label>
             <div class="radio-group">
               <label class="option-pill"><input type="radio" name="neurodivergenciaFlag" value="no" /> No</label>
               <label class="option-pill"><input type="radio" name="neurodivergenciaFlag" value="si" /> Sí</label>
@@ -1007,7 +1013,7 @@
             </div>
       
             <div id="neuroSobrecargaWrap" class="hidden">
-              <label for="neuroFactores">Situaciones o factores que podrían afectar el bienestar de la persona viajera:</label>
+              <label for="neuroFactores">Situaciones o factores que podrían afectar su bienestar:</label>
               <textarea id="neuroFactores" name="neuroFactores"></textarea>
       
               <label for="neuroEstrategias">Estrategias, apoyos o recomendaciones que favorecen su bienestar y participación:</label>
@@ -1027,7 +1033,7 @@
           </div>
       
           <div class="field">
-            <label>3. ¿Existe alguna condición de salud mental que considere importante informar para el adecuado acompañamiento y bienestar de la persona viajera durante el viaje?</label>
+            <label>3. ¿Existe alguna condición de salud mental importante que debamos considerar para su bienestar durante el viaje?</label>
             <div class="radio-group">
               <label class="option-pill"><input type="radio" name="saludMentalFlag" value="no" /> No</label>
               <label class="option-pill"><input type="radio" name="saludMentalFlag" value="si" /> Sí</label>
@@ -1040,7 +1046,7 @@
           </div>
       
           <div class="field">
-            <label>4. ¿Sigue alguna dieta especial o tiene alguna alergia o restricción alimentaria que debamos respetar?</label>
+            <label>4. ¿Tiene alguna dieta especial, alergia o restricción alimentaria que debamos considerar?</label>
             <div class="radio-group">
               <label class="option-pill"><input type="radio" name="dietaFlag" value="no" /> No</label>
               <label class="option-pill"><input type="radio" name="dietaFlag" value="si" /> Sí</label>
@@ -1241,7 +1247,7 @@
           </div>
       
           <div class="field col-4">
-            <label for="grupoSanguineo">8. Grupo sanguíneo del viajante <span class="req">*</span></label>
+            <label for="grupoSanguineo">8. Grupo sanguíneo <span class="req">*</span></label>
             <select id="grupoSanguineo" name="grupoSanguineo" required>
               <option value="">Seleccione...</option>
               <option value="no_lo_se">No lo sé</option>
@@ -1266,22 +1272,7 @@
               Tomo conocimiento de que no estoy informando el grupo sanguíneo en este momento y me comprometo a entregarlo antes del viaje si corresponde.
             </label>
           </div>
-      
-          <div id="grupoSanguineoWrap" class="field col-4 hidden">
-            <label for="grupoSanguineo">Grupo sanguíneo del viajante</label>
-            <select id="grupoSanguineo" name="grupoSanguineo">
-              <option value="">Seleccione...</option>
-              <option value="A+">A Rh+ (A positivo)</option>
-              <option value="A-">A Rh- (A negativo)</option>
-              <option value="B+">B Rh+ (B positivo)</option>
-              <option value="B-">B Rh- (B negativo)</option>
-              <option value="AB+">AB Rh+ (AB positivo)</option>
-              <option value="AB-">AB Rh- (AB negativo)</option>
-              <option value="O+">O Rh+ (O positivo)</option>
-              <option value="O-">O Rh- (O negativo)</option>
-            </select>
-          </div>
-      
+        
           <div class="field">
             <label>9. ¿Ha tenido cirugías, hospitalizaciones o tratamientos médicos relevantes que sea importante informar?</label>
             <div class="radio-group">
@@ -1341,14 +1332,14 @@
       </section>
 
       <section class="card">
-        <h2>• Información reservada y otros antecedentes</h2>
+        <h2>• Otros antecedentes relevantes</h2>
         <div class="sub">
-          Puede dejar aquí información adicional que considere importante para el viaje.
+          Puede informar aquí cualquier antecedente adicional que considere importante para la preparación y desarrollo del viaje.
         </div>
 
         <div class="form-grid">
           <div class="field">
-            <label>¿Hay alguna situación que Ud. crea importante sobre el pasajero que debamos anticipar durante el viaje?</label>
+            <label>¿Hay alguna situación adicional que debamos conocer para anticipar cuidados, apoyos o consideraciones durante el viaje?</label>
             <div class="radio-group">
               <label class="option-pill"><input type="radio" name="otrosAntecedentesFlag" value="no" /> No</label>
               <label class="option-pill"><input type="radio" name="otrosAntecedentesFlag" value="si" /> Sí</label>
@@ -1363,20 +1354,20 @@
       </section>
 
       <section id="adultoCompromisoCard" class="card hidden">
-        <h2>• Declaración para profesor o adulto acompañante</h2>
+        <h2>• Declaración para profesor(a) o adulto(a) acompañante</h2>
 
         <div class="notice privacy">
           Al continuar, usted declara que comprende que su participación en el viaje implica
           responsabilidad personal, cumplimiento de instrucciones operativas, respeto por las normas
           definidas para el grupo y comunicación oportuna de cualquier situación de salud o seguridad
-          que pueda afectar el desarrollo del viaje. Deberá firmar una carta compromiso que le haremos llegar previo al Viaje.
+          que pueda afectar el desarrollo del viaje. Deberá firmar una carta compromiso que le haremos llegar previo al viaje.
         </div>
 
         <div class="form-grid">
           <div class="field">
             <label class="option-pill" style="border-radius:14px;">
               <input type="checkbox" id="adultoAceptaCompromiso" name="adultoAceptaCompromiso" />
-              Declaro que acepto esta responsabilidad como profesor o adulto acompañante
+              Declaro que acepto esta responsabilidad como profesor(a) o adulto(a) acompañante
             </label>
           </div>
 
@@ -1390,14 +1381,14 @@
       <section class="card">
         <h2>• Confirmación final</h2>
         <div class="sub">
-          Revise la información antes de la.
+          Revise cuidadosamente la información antes de enviar el formulario.
         </div>
 
         <div class="form-grid">
           <div class="field">
             <label class="option-pill" style="border-radius:14px;">
               <input type="checkbox" id="aceptaVeracidad" name="aceptaVeracidad" required />
-              Declaro que la información entregada es verídica y corresponde al estado actual del viajante
+              Declaro que la información entregada es verídica y corresponde al estado actual de la persona que viaja
             </label>
           </div>
 
@@ -1418,7 +1409,7 @@
         </div>
 
         <div class="actions">
-          <button type="submit" id="btnEnviar" class="btn-primary">Enviar Formulario</button>
+          <button type="submit" id="btnEnviar" class="btn-primary">Enviar formulario</button>
           <button type="button" id="btnLimpiar" class="btn-secondary">Limpiar formulario</button>
         </div>
 
