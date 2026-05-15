@@ -950,10 +950,6 @@ function validarFormulario() {
   if (esInternacional && nacionalidadEspecial && !$("declaraRevisionConsulado")?.checked) {
     errores.push("Debe confirmar la revisión documental o consular aplicable.");
   }
-  
-  if (esInternacional && !$("declaraGuiaDocumentacion")?.checked) {
-    errores.push("Debe confirmar que recibió acceso a la guía práctica de documentación.");
-  }
 
   if (obtenerRadio("discapacidadFlag") === "si") {
     if (!obtenerChecks("discapacidadTipos").length) errores.push("Debe seleccionar al menos un tipo de discapacidad.");
@@ -1232,7 +1228,7 @@ function construirPayloadBase() {
       declaraDocumentacionViaje: esInternacional ? !!$("declaraDocumentacionViaje")?.checked : false,
       nacionalidadPaisDestino: esInternacional ? ($("nacionalidadPaisDestino")?.value || "") : "",
       declaraRevisionConsulado: esInternacional ? !!$("declaraRevisionConsulado")?.checked : false,
-      declaraGuiaDocumentacion: esInternacional ? !!$("declaraGuiaDocumentacion")?.checked : false
+      guiaCasosParticularesDisponible: esInternacional
     },
 
     salud: {
