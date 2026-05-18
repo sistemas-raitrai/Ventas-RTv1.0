@@ -371,7 +371,7 @@ function insertarBarraProgreso() {
       <span id="progresoPorcentaje" style="font-weight:800; color:#1e2559;">0%</span>
     </div>
   
-    <div style="height:10px; background:#eef3fb; border-radius:999px; overflow:hidden; border:1px solid #dbe4f0;">
+    <div style="height:10px; background:#fff7cc; border-radius:999px; overflow:hidden; border:1px solid #facc15;">
       <div id="progresoBarra" style="
         height:100%;
         width:0%;
