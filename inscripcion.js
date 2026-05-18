@@ -372,7 +372,14 @@ function insertarBarraProgreso() {
     </div>
   
     <div style="height:10px; background:#eef3fb; border-radius:999px; overflow:hidden; border:1px solid #dbe4f0;">
-      <div id="progresoBarra" style="height:100%; width:0%; background:linear-gradient(90deg,#1e2559,#2f6fed,#16a34a); border-radius:999px; transition:width .25s ease;"></div>
+      <div id="progresoBarra" style="
+        height:100%;
+        width:0%;
+        background:linear-gradient(90deg,#facc15,#f59e0b,#f97316);
+        border-radius:999px;
+        transition:width .25s ease;
+        box-shadow:0 0 8px rgba(250, 204, 21, 0.6);
+      "></div>
     </div>
   
     <div id="progresoAyuda" style="margin-top:8px; color:#64748b; font-size:12px;">
