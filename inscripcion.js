@@ -345,8 +345,8 @@ function insertarBarraProgreso() {
       <span id="progresoPorcentaje" style="font-weight:800; color:#1e2559;">0%</span>
     </div>
   
-    <div style="height:10px; background:#f8f9fc; border-radius:999px; overflow:hidden; border:1px solid #d8dfec;">
-      <div id="progresoBarra" style="height:100%; width:0%; background:linear-gradient(90deg,#1e2559,#3b82f6,#12a63d); border-radius:999px; transition:width .25s ease;"></div>
+    <div style="height:10px; background:#eef3fb; border-radius:999px; overflow:hidden; border:1px solid #dbe4f0;">
+      <div id="progresoBarra" style="height:100%; width:0%; background:linear-gradient(90deg,#1e2559,#2f6fed,#16a34a); border-radius:999px; transition:width .25s ease;"></div>
     </div>
   
     <div id="progresoAyuda" style="margin-top:8px; color:#64748b; font-size:12px;">
