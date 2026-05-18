@@ -341,15 +341,15 @@ function insertarBarraProgreso() {
 
   wrap.innerHTML = `
     <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:8px;">
-      <strong id="progresoTexto">Avance del formulario</strong>
-      <span id="progresoPorcentaje" style="font-weight:700; color:#6f58c9;">0%</span>
+      <strong id="progresoTexto" style="color:#1e2559;">Avance del formulario</strong>
+      <span id="progresoPorcentaje" style="font-weight:800; color:#1e2559;">0%</span>
     </div>
-
-    <div style="height:10px; background:#efeafe; border-radius:999px; overflow:hidden; border:1px solid #d9d9e6;">
-      <div id="progresoBarra" style="height:100%; width:0%; background:#6f58c9; border-radius:999px; transition:width .25s ease;"></div>
+  
+    <div style="height:10px; background:#f8f9fc; border-radius:999px; overflow:hidden; border:1px solid #d8dfec;">
+      <div id="progresoBarra" style="height:100%; width:0%; background:linear-gradient(90deg,#1e2559,#09832e); border-radius:999px; transition:width .25s ease;"></div>
     </div>
-
-    <div id="progresoAyuda" style="margin-top:8px; color:#6d6d7a; font-size:12px;">
+  
+    <div id="progresoAyuda" style="margin-top:8px; color:#64748b; font-size:12px;">
       Complete los campos requeridos para avanzar.
     </div>
   `;
