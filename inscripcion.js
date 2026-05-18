@@ -41,6 +41,12 @@ const dvWrap = $("dvWrap");
 const sinRutNotice = $("sinRutNotice");
 const rutHint = $("rutHint");
 
+const nombreDocumentoWrap = $("nombreDocumentoWrap");
+const datosDocumentoWrap = $("datosDocumentoWrap");
+const correoViajanteReq = $("correoViajanteReq");
+const autorizaCorreoViajanteWrap = $("autorizaCorreoViajanteWrap");
+const emergenciaMismoResponsableWrap = $("emergenciaMismoResponsableWrap");
+
 const nacionalidadDetalleWrap = $("nacionalidadDetalleWrap");
 const telefonoViajanteWrap = $("telefonoViajanteWrap");
 const avisoAdultoResponsableWrap = $("avisoAdultoResponsableWrap");
@@ -258,6 +264,25 @@ function conectarEventos() {
   $("rutNumero")?.addEventListener("input", onRutInput);
   $("rutDv")?.addEventListener("input", onRutInput);
 
+  document.querySelectorAll('input[name="nombreCoincideDocumento"]').forEach((el) => {
+    el.addEventListener("change", aplicarEstadoUI);
+  });
+  
+  $("correoViajante")?.addEventListener("input", aplicarEstadoUI);
+  
+  document.querySelectorAll('input[name="emergenciaMismoResponsable"]').forEach((el) => {
+    el.addEventListener("change", () => {
+      aplicarEmergenciaDesdeResponsable();
+      aplicarEstadoUI();
+      actualizarProgreso();
+    });
+  });
+  
+  ["contactoPrincipalNombre", "contactoPrincipalRelacion", "contactoPrincipalTelefono"].forEach((id) => {
+    $(id)?.addEventListener("input", aplicarEmergenciaDesdeResponsable);
+    $(id)?.addEventListener("change", aplicarEmergenciaDesdeResponsable);
+  });
+
   btnAgregarApoderado2?.addEventListener("click", () => {
     mostrar(bloqueApoderado2, true);
     btnAgregarApoderado2.classList.add("hidden");
@@ -419,6 +444,15 @@ function aplicarEstadoUI() {
   if (correoViajanteHint) {
     mostrar(correoViajanteHint, !esEstudiante);
   }
+  
+  if (correoViajanteReq) {
+    mostrar(correoViajanteReq, !esEstudiante);
+  }
+  
+  setRequired("correoViajante", !esEstudiante);
+  
+  const hayCorreoPersonaQueViaja = !!limpiarTexto($("correoViajante")?.value);
+  mostrar(autorizaCorreoViajanteWrap, esEstudiante && hayCorreoPersonaQueViaja);
 
   const tipoIdentificacion = $("tipoIdentificacion")?.value || "";
   const nacionalidadBase = $("nacionalidadBase")?.value || "";
@@ -437,7 +471,8 @@ function aplicarEstadoUI() {
 
   const sinRut = tipoIdentificacion === "sin_rut";
   const muestraRut = !sinRut;
-  
+  const tieneRut = tipoIdentificacion === "rut";
+
   mostrar(rutCompletoWrap, muestraRut);
   mostrar(rutWrap, muestraRut);
   mostrar(dvWrap, muestraRut);
@@ -445,6 +480,23 @@ function aplicarEstadoUI() {
   
   setRequired("rutNumero", muestraRut);
   setRequired("rutDv", muestraRut);
+
+  mostrar(nombreDocumentoWrap, tieneRut);
+
+  if (!tieneRut) {
+    limpiarRadios("nombreCoincideDocumento");
+    mostrar(datosDocumentoWrap, false);
+  }
+  
+  const nombreCoincideDocumento = obtenerRadio("nombreCoincideDocumento");
+  const debeCompletarDocumento = tieneRut && nombreCoincideDocumento === "no";
+  
+  mostrar(datosDocumentoWrap, debeCompletarDocumento);
+  
+  setRequired("nombresDocumento", debeCompletarDocumento);
+  setRequired("primerApellidoDocumento", debeCompletarDocumento);
+  setRequired("sexoDocumento", debeCompletarDocumento);
+  setRequired("declaraActualizacionDocumento", debeCompletarDocumento);
   
   if (sinRut) {
     if ($("rutNumero")) $("rutNumero").value = "";
@@ -495,6 +547,12 @@ function aplicarEstadoUI() {
   const contactoSecundarioOtro = $("contactoSecundarioRelacion")?.value === "otro";
   mostrar(contactoSecundarioRelacionOtroWrap, hayApoderado2 && contactoSecundarioOtro);
 
+  mostrar(emergenciaMismoResponsableWrap, esEstudiante);
+
+  if (!esEstudiante) {
+    limpiarRadios("emergenciaMismoResponsable");
+  }
+
   const emergenciaOtro = $("emergenciaRelacion")?.value === "otro";
   mostrar(emergenciaRelacionOtroWrap, emergenciaOtro);
   setRequired("emergenciaRelacionOtro", emergenciaOtro);
@@ -541,10 +599,26 @@ function aplicarEstadoUI() {
   setRequired("neurodivergenciaOtra", seleccionoNeuroOtra);
 
   const grupoSanguineo = $("grupoSanguineo")?.value || "";
-  mostrar(grupoSanguineoNoSeWrap, grupoSanguineo === "no_lo_se");
-  setRequired("declaraGrupoSanguineoPendiente", grupoSanguineo === "no_lo_se");
+  mostrar(grupoSanguineoNoSeWrap, grupoSanguineo === "no_informado");
+  setRequired("declaraGrupoSanguineoPendiente", grupoSanguineo === "no_informado");
 
   actualizarProgreso();
+}
+
+function aplicarEmergenciaDesdeResponsable() {
+  const tipoViajante = obtenerRadio("tipoViajante");
+  const esEstudiante = tipoViajante === "estudiante";
+  const usarResponsable = obtenerRadio("emergenciaMismoResponsable") === "si";
+
+  if (!esEstudiante || !usarResponsable) return;
+
+  const nombre = limpiarTexto($("contactoPrincipalNombre")?.value);
+  const relacion = $("contactoPrincipalRelacion")?.value || "";
+  const telefono = limpiarTexto($("contactoPrincipalTelefono")?.value);
+
+  if ($("emergenciaNombre")) $("emergenciaNombre").value = nombre;
+  if ($("emergenciaRelacion")) $("emergenciaRelacion").value = relacion;
+  if ($("emergenciaTelefono")) $("emergenciaTelefono").value = telefono;
 }
 
 // -----------------------------------------------------------------------------
@@ -877,11 +951,15 @@ function validarFormulario() {
   }
 
   if (!$("tallaPolera")?.value) {
-    errores.push("Debe indicar la talla de polera del viajante.");
+    errores.push("Debe indicar la talla de polera.");
   }
   
-  if (!validarCorreo($("correoViajante")?.value)) {
-    errores.push("Debe ingresar un correo válido del viajante.");
+  if (!esEstudiante && !validarCorreo($("correoViajante")?.value)) {
+    errores.push("Debe ingresar un correo válido de la persona que viaja.");
+  }
+  
+  if (esEstudiante && $("correoViajante")?.value && !validarCorreo($("correoViajante")?.value)) {
+    errores.push("Debe ingresar un correo válido de la persona que viaja o dejarlo vacío.");
   }
 
   if (esAdultoOperativo && !telefonoValido($("telefonoViajante")?.value)) {
@@ -1001,10 +1079,10 @@ function validarFormulario() {
   }
   
   if (!$("grupoSanguineo")?.value) {
-    errores.push("Debe seleccionar el grupo sanguíneo o indicar que no lo sabe.");
+    errores.push("Debe seleccionar el grupo sanguíneo o indicar No informado.");
   }
   
-  if ($("grupoSanguineo")?.value === "no_lo_se" && !$("declaraGrupoSanguineoPendiente")?.checked) {
+  if ($("grupoSanguineo")?.value === "no_informado" && !$("declaraGrupoSanguineoPendiente")?.checked) {
     errores.push("Debe confirmar que toma conocimiento de no estar informando el grupo sanguíneo en este momento.");
   }
   
@@ -1100,6 +1178,30 @@ function construirPayloadBase() {
     documentoNormalizado = normalizarRutDocumento(rutNumero, rutDv);
   }
 
+  const nombreCoincideDocumento = obtenerRadio("nombreCoincideDocumento");
+
+  if (!nombreCoincideDocumento) {
+    errores.push("Debe indicar si el nombre coincide con el documento de identidad.");
+  }
+  
+  if (nombreCoincideDocumento === "no") {
+    if (!limpiarTexto($("nombresDocumento")?.value)) {
+      errores.push("Debe ingresar los nombres según documento.");
+    }
+  
+    if (!limpiarTexto($("primerApellidoDocumento")?.value)) {
+      errores.push("Debe ingresar el primer apellido según documento.");
+    }
+  
+    if (!$("sexoDocumento")?.value) {
+      errores.push("Debe indicar el sexo que aparece en el documento.");
+    }
+  
+    if (!$("declaraActualizacionDocumento")?.checked) {
+      errores.push("Debe aceptar la declaración de actualización de documento antes del viaje.");
+    }
+  }
+
   const genero = $("genero")?.value || "";
   const generoOtro = limpiarTexto($("generoOtro")?.value);
   const generoFinal = genero === "otro" ? generoOtro : genero;
@@ -1181,7 +1283,34 @@ function construirPayloadBase() {
       correoViajante: limpiarTexto($("correoViajante")?.value),
       telefonoViajante: esAdultoOperativo ? limpiarTexto($("telefonoViajante")?.value) : "",
       telefonoViajanteEsWhatsapp: esAdultoOperativo,
-      tallaPolera: $("tallaPolera")?.value || ""
+      tallaPolera: $("tallaPolera")?.value || "",
+
+      correoPersonaQueViaja: limpiarTexto($("correoViajante")?.value),
+      autorizaCorreosPreviosPersonaQueViaja: esEstudiante
+        ? !!$("autorizaCorreoViajante")?.checked
+        : true
+    },
+
+    documentoIdentidad: {
+      aplica: tipoIdentificacion === "rut",
+      nombreCoincideDocumento: tipoIdentificacion === "rut"
+        ? obtenerRadio("nombreCoincideDocumento")
+        : "",
+      nombresDocumento: tipoIdentificacion === "rut" && obtenerRadio("nombreCoincideDocumento") === "no"
+        ? limpiarTexto($("nombresDocumento")?.value)
+        : "",
+      primerApellidoDocumento: tipoIdentificacion === "rut" && obtenerRadio("nombreCoincideDocumento") === "no"
+        ? limpiarTexto($("primerApellidoDocumento")?.value)
+        : "",
+      segundoApellidoDocumento: tipoIdentificacion === "rut" && obtenerRadio("nombreCoincideDocumento") === "no"
+        ? limpiarTexto($("segundoApellidoDocumento")?.value)
+        : "",
+      sexoDocumento: tipoIdentificacion === "rut" && obtenerRadio("nombreCoincideDocumento") === "no"
+        ? $("sexoDocumento")?.value || ""
+        : "",
+      declaraActualizacionDocumento: tipoIdentificacion === "rut" && obtenerRadio("nombreCoincideDocumento") === "no"
+        ? !!$("declaraActualizacionDocumento")?.checked
+        : false
     },
 
     profesor: {
@@ -1298,9 +1427,9 @@ function construirPayloadBase() {
         ? obtenerAlergiasAlimentarias()
         : [],
       
-      conoceGrupoSanguineoFlag: $("grupoSanguineo")?.value === "no_lo_se" ? "no" : "si",
+      conoceGrupoSanguineoFlag: $("grupoSanguineo")?.value === "no_informado" ? "no" : "si",
       grupoSanguineo: $("grupoSanguineo")?.value || "",
-      declaraGrupoSanguineoPendiente: $("grupoSanguineo")?.value === "no_lo_se"
+      declaraGrupoSanguineoPendiente: $("grupoSanguineo")?.value === "no_informado"
         ? !!$("declaraGrupoSanguineoPendiente")?.checked
         : false,
       enfermedadBaseFlag: obtenerRadio("enfermedadBaseFlag") || "",
@@ -1362,16 +1491,17 @@ function construirPayloadBase() {
 }
 
 async function enviarCorreoRespaldo(payload) {
-  const destinatario = obtenerDestinatarioCorreoRespaldo(payload);
+  const destinatarios = obtenerDestinatariosCorreoRespaldo(payload);
 
-  if (!destinatario) {
+  if (!destinatarios.length) {
     console.warn("No se encontró destinatario para el correo de respaldo.");
     return;
   }
 
   await addDoc(collection(db, "correos_inscripcion_pendientes"), {
     payload,
-    destinatario,
+    destinatario: destinatarios,
+    destinatarios,
     idGrupo,
     documentoNormalizado: payload.identificacion?.documentoNormalizado || "",
     nombreCompleto: payload.identificacion?.nombreCompleto || "",
@@ -1379,19 +1509,31 @@ async function enviarCorreoRespaldo(payload) {
     creadoEn: serverTimestamp()
   });
 
-  console.log("Correo de respaldo encolado correctamente:", destinatario);
+  console.log("Correo de respaldo encolado correctamente:", destinatarios);
+}
+
+function obtenerDestinatariosCorreoRespaldo(payload) {
+  const correos = [];
+
+  if (payload?.tipoViajante === "estudiante") {
+    const correo1 = limpiarTexto(payload?.contactoPrincipal?.correo);
+    const correo2 = limpiarTexto(payload?.contactoSecundario?.correo);
+
+    if (correo1) correos.push(correo1);
+    if (correo2) correos.push(correo2);
+  } else if (payload?.tipoViajante === "profesor" || payload?.tipoViajante === "adulto_acompanante") {
+    const correo = limpiarTexto(payload?.identificacion?.correoViajante);
+    if (correo) correos.push(correo);
+  } else {
+    const correo = limpiarTexto(payload?.contactoPrincipal?.correo || payload?.identificacion?.correoViajante);
+    if (correo) correos.push(correo);
+  }
+
+  return [...new Set(correos.filter(validarCorreo))];
 }
 
 function obtenerDestinatarioCorreoRespaldo(payload) {
-  if (payload?.tipoViajante === "estudiante") {
-    return limpiarTexto(payload?.contactoPrincipal?.correo);
-  }
-
-  if (payload?.tipoViajante === "profesor" || payload?.tipoViajante === "adulto_acompanante") {
-    return limpiarTexto(payload?.identificacion?.correoViajante);
-  }
-
-  return limpiarTexto(payload?.contactoPrincipal?.correo || payload?.identificacion?.correoViajante);
+  return obtenerDestinatariosCorreoRespaldo(payload)[0] || "";
 }
 
 function mostrarPantallaFinal(payload) {
@@ -1399,7 +1541,8 @@ function mostrarPantallaFinal(payload) {
   pantallaBienvenida?.classList.add("hidden");
   msgBox?.classList.remove("hidden");
 
-  const destinatario = obtenerDestinatarioCorreoRespaldo(payload);
+  const destinatarios = obtenerDestinatariosCorreoRespaldo(payload);
+  const destinatarioTexto = destinatarios.join(", ");
 
   mostrarMensaje(
     "ok",
@@ -1413,12 +1556,12 @@ function mostrarPantallaFinal(payload) {
 
       <p>
         📩 Se enviará un respaldo al correo
-        <strong>${escapeHtml(destinatario || "indicado en el formulario")}</strong>.
-        Si no lo recibes en unos minutos, revisa spam / correos no deseados y si no está, contáctanos.
+        <strong>${escapeHtml(destinatarioTexto || "indicado en el formulario")}</strong>.
+        Si no lo recibes en unos minutos, revisa especialmente <strong>spam / correos no deseados</strong>. Si no está, contáctanos.
       </p>
 
       <p>
-        ✏️ Si necesitas corregir, actualizar o eliminar información, comunícate con Rai Trai
+        ✏️ Si necesitas corregir, actualizar o eliminar información, comunícate con Turismo Rai Trai Viajes de Estudio
         y asegúrate de recibir confirmación de tu solicitud.
       </p>
 
