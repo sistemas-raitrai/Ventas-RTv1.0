@@ -187,7 +187,7 @@ async function cargarGrupo() {
   }
 
   if (chipColegio) chipColegio.textContent = limpiarTexto(grupoData.colegio) || "-";
-  if (chipCurso) chipCurso.textContent = limpiarTexto(grupoData.curso) || "-";
+  if (chipCurso) chipCurso.textContent = obtenerCursoActualInscripcion(grupoData);
 
   if (chipDestino) {
     chipDestino.textContent =
@@ -1829,6 +1829,88 @@ function calcularEdad(fechaIso) {
   }
 
   return edad;
+}
+
+function normalizarCursoInput(value = "") {
+  return limpiarTexto(value)
+    .toUpperCase()
+    .replace(/\s+/g, "");
+}
+
+function extraerNumeroCurso(value = "") {
+  const match = normalizarCursoInput(value).match(/^(11|10|[1-9])/);
+  return match ? Number(match[1]) : null;
+}
+
+function extraerLetrasCurso(value = "") {
+  const match = normalizarCursoInput(value).match(/^(?:11|10|[1-9])(.*)$/);
+  return match ? match[1] : "";
+}
+
+function siguienteCurso(numero) {
+  if (numero >= 1 && numero <= 7) return numero + 1;
+  if (numero === 8) return 1;
+  if (numero === 9) return 10;
+  if (numero === 10) return 11;
+  if (numero === 11) return 11;
+  return null;
+}
+
+function proyectarCursoPorAno(cursoBase = "", anoBase = "", anoDestino = "") {
+  const curso = normalizarCursoInput(cursoBase);
+  const numeroBase = extraerNumeroCurso(curso);
+  const letras = extraerLetrasCurso(curso);
+
+  const desde = Number(anoBase);
+  const hasta = Number(anoDestino);
+
+  if (!curso || numeroBase === null) return "";
+  if (!Number.isFinite(desde) || !Number.isFinite(hasta)) return curso;
+  if (hasta <= desde) return curso;
+
+  let numero = numeroBase;
+  const diferencia = hasta - desde;
+
+  for (let i = 0; i < diferencia; i += 1) {
+    const sig = siguienteCurso(numero);
+    if (sig === null) return "";
+    numero = sig;
+  }
+
+  return `${numero}${letras}`;
+}
+
+function obtenerAnoBaseCursoGrupo(data = {}) {
+  const anoBase = Number(data.anoBaseCurso || data.anoRegistroCurso || "");
+
+  if (Number.isFinite(anoBase) && anoBase > 0) {
+    return anoBase;
+  }
+
+  const fechaCreacion = data.fechaCreacion;
+
+  if (fechaCreacion?.toDate) {
+    return fechaCreacion.toDate().getFullYear();
+  }
+
+  return new Date().getFullYear();
+}
+
+function obtenerCursoActualInscripcion(data = {}) {
+  const cursoBase = limpiarTexto(data.curso || data.cursoBase || "");
+  const anoBase = obtenerAnoBaseCursoGrupo(data);
+  const anoViaje = Number(data.anoViaje || "");
+  const anoHoy = new Date().getFullYear();
+
+  const anoReferencia = Number.isFinite(anoViaje) && anoViaje > 0
+    ? Math.min(anoHoy, anoViaje)
+    : anoHoy;
+
+  const cursoActual = proyectarCursoPorAno(cursoBase, anoBase, anoReferencia);
+
+  if (!cursoActual) return cursoBase || "-";
+
+  return `${cursoActual} (${anoReferencia})`;
 }
 
 function grupoEsInternacional() {
