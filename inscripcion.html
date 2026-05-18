@@ -448,7 +448,7 @@
   <main class="wrap">
 
     <section id="pantallaBienvenida" class="hero">
-      <h1>✈️ ¡Bienvenido(a) a Rai Trai!</h1>
+      <h1>✈️ ¡Bienvenido(a) a tu viaje de estudio con Turismo Rai Trai!</h1>
 
       <p>
         Estamos felices de acompañarles en esta experiencia 🙌
@@ -478,7 +478,7 @@
       </div>
 
       <div class="notice privacy">
-        En caso de necesitar ayuda o modificar información posteriormente, deberá comunicarse con Turismo Rai Trai
+        En caso de necesitar ayuda o modificar información posteriormente, deberá comunicarse con Turismo Rai Trai Viajes de Estudio
         y asegurarse de recibir confirmación del cambio.
         <br />
         Correo:
@@ -619,6 +619,55 @@
             </div>
           </div>
 
+          <div id="nombreDocumentoWrap" class="field hidden">
+            <label>¿El nombre indicado anteriormente coincide con el nombre que aparece en el documento de identidad?</label>
+          
+            <div class="radio-group">
+              <label class="option-pill">
+                <input type="radio" name="nombreCoincideDocumento" value="si" />
+                Sí
+              </label>
+          
+              <label class="option-pill">
+                <input type="radio" name="nombreCoincideDocumento" value="no" />
+                No
+              </label>
+            </div>
+          </div>
+          
+          <div id="datosDocumentoWrap" class="form-grid hidden">
+            <div class="field col-4">
+              <label for="nombresDocumento">Nombres según documento <span class="req">*</span></label>
+              <input id="nombresDocumento" name="nombresDocumento" type="text" />
+            </div>
+          
+            <div class="field col-4">
+              <label for="primerApellidoDocumento">Primer apellido según documento <span class="req">*</span></label>
+              <input id="primerApellidoDocumento" name="primerApellidoDocumento" type="text" />
+            </div>
+          
+            <div class="field col-4">
+              <label for="segundoApellidoDocumento">Segundo apellido según documento</label>
+              <input id="segundoApellidoDocumento" name="segundoApellidoDocumento" type="text" />
+            </div>
+          
+            <div class="field col-4">
+              <label for="sexoDocumento">Sexo indicado en documento <span class="req">*</span></label>
+              <select id="sexoDocumento" name="sexoDocumento">
+                <option value="">Seleccione...</option>
+                <option value="masculino">Masculino</option>
+                <option value="femenino">Femenino</option>
+              </select>
+            </div>
+          
+            <div class="field">
+              <label class="option-pill" style="border-radius:14px;">
+                <input type="checkbox" id="declaraActualizacionDocumento" name="declaraActualizacionDocumento" />
+                Entiendo que si esta información cambia antes del viaje, debo comunicarlo a Turismo Rai Trai Viajes de Estudio con la debida anticipación.
+              </label>
+            </div>
+          </div>
+
           <div class="field col-4">
             <label for="fechaNacimiento">Fecha de nacimiento <span class="req">*</span></label>
             <input id="fechaNacimiento" name="fechaNacimiento" type="date" required />
@@ -640,11 +689,20 @@
           </div>
 
           <div class="field col-6">
-            <label for="correoViajante">Correo electrónico <span class="req">*</span></label>
+            <label for="correoViajante">
+              Correo electrónico <span id="correoViajanteReq" class="req">*</span>
+            </label>
+          
             <input id="correoViajante" name="correoViajante" type="email" required />
+          
             <div id="correoViajanteHint" class="hint">
               A este correo enviaremos el respaldo de este formulario. También podremos usarlo para comunicar información importante relacionada con la preparación del viaje.
             </div>
+          
+            <label id="autorizaCorreoViajanteWrap" class="option-pill hidden" style="border-radius:14px;margin-top:6px;">
+              <input type="checkbox" id="autorizaCorreoViajante" name="autorizaCorreoViajante" />
+              Autorizo que Turismo Rai Trai pueda enviar información o recomendaciones previas al viaje a este correo.
+            </label>
           </div>
 
           <div id="telefonoViajanteWrap" class="field col-4 hidden">
@@ -900,6 +958,23 @@
         </div>
       
         <div class="form-grid">
+        
+          <div id="emergenciaMismoResponsableWrap" class="field hidden">
+            <label>¿El contacto de emergencia es la misma persona responsable indicada anteriormente?</label>
+        
+            <div class="radio-group">
+              <label class="option-pill">
+                <input type="radio" name="emergenciaMismoResponsable" value="si" />
+                Sí, usar responsable 1
+              </label>
+        
+              <label class="option-pill">
+                <input type="radio" name="emergenciaMismoResponsable" value="no" />
+                No, ingresar otro contacto
+              </label>
+            </div>
+          </div>
+        
           <div class="field col-6">
             <label for="emergenciaNombre">Nombre completo contacto de emergencia 1 <span class="req">*</span></label>
             <input id="emergenciaNombre" name="emergenciaNombre" type="text" required />
@@ -909,7 +984,9 @@
             <label for="emergenciaRelacion">Relación con la persona que viaja <span class="req">*</span></label>
             <select id="emergenciaRelacion" name="emergenciaRelacion" required>
               <option value="">Seleccione...</option>
-              <option value="padre_madre">Padre / Madre</option>
+              <option value="padre">Padre</option>
+              <option value="madre">Madre</option>
+              <option value="tutor">Tutor(a)</option>
               <option value="hermano_a">Hermano(a)</option>
               <option value="tio_a">Tío(a)</option>
               <option value="abuelo_a">Abuelo(a)</option>
@@ -917,7 +994,6 @@
               <option value="pareja">Pareja</option>
               <option value="hijo_a">Hijo(a)</option>
               <option value="amigo_a">Amigo(a)</option>
-              <option value="tutor_a">Tutor(a)</option>
               <option value="otro">Otro</option>
             </select>
           </div>
@@ -1004,7 +1080,7 @@
               <option value="">Seleccione...</option>
               <option value="no">No</option>
               <option value="si">Sí</option>
-              <option value="no_lo_se">No lo sé</option>
+              <option value="no_informado">No informado</option>
             </select>
           </div>
       
@@ -1043,7 +1119,7 @@
                 >
                   📄 Ver documentos obligatorios
                 </a>
-          
+              
                 <a
                   href="./assets/guia-documentacion-internacional.pdf"
                   target="_blank"
@@ -1052,10 +1128,19 @@
                 >
                   📘 Ver casos particulares
                 </a>
+              
+                <a
+                  href="./assets/carnet-identidad-viaje.png"
+                  target="_blank"
+                  rel="noopener"
+                  class="docs-raitrai-link"
+                >
+                  🪪 Ver recomendaciones sobre documento de identidad
+                </a>
               </div>
           
               <div class="docs-raitrai-note">
-                Esta información también será enviada como documento adjunto en el correo de respaldo de este formulario.
+                Estos documentos también serán enviados como archivos adjuntos en el correo de respaldo de este formulario.
               </div>
             </div>
           </div>
@@ -1388,7 +1473,6 @@
             <label for="grupoSanguineo">8. Grupo sanguíneo <span class="req">*</span></label>
             <select id="grupoSanguineo" name="grupoSanguineo" required>
               <option value="">Seleccione...</option>
-              <option value="no_lo_se">No lo sé</option>
               <option value="A+">A Rh+ (A positivo)</option>
               <option value="A-">A Rh- (A negativo)</option>
               <option value="B+">B Rh+ (B positivo)</option>
@@ -1397,6 +1481,7 @@
               <option value="AB-">AB Rh- (AB negativo)</option>
               <option value="O+">O Rh+ (O positivo)</option>
               <option value="O-">O Rh- (O negativo)</option>
+              <option value="no_lo_se">Desconozco</option>
             </select>
           </div>
           
