@@ -9,26 +9,34 @@
   <link rel="stylesheet" href="./estilos.css" />
   <link rel="icon" type="image/png" href="IMG/logo-raitrai.png" />
   <style>
+
     :root{
       --rt-primary:#1e2559;
-      --rt-primary-soft:#eef1fb;
+      --rt-primary-soft:#f1f4ff;
+      --rt-primary-light:#eef4ff;
+    
       --rt-accent:#eebf00;
-      --rt-accent-soft:#fff8dd;
-      --rt-green:#09832e;
+      --rt-accent-soft:#fff9df;
+      --rt-accent-light:#fff3b8;
+    
+      --rt-green:#16a34a;
+      --rt-green-soft:#ecfdf3;
+    
       --rt-red:#ca0a1f;
-  
-      --rt-border:#d8dfec;
-      --rt-bg:#f5f7fb;
+      --rt-red-soft:#fff1f3;
+    
+      --rt-border:#dbe4f0;
+      --rt-bg:#f7faff;
       --rt-card:#ffffff;
       --rt-text:#1f2937;
-      --rt-muted:#64748b;
-  
-      --rt-success:#e7f7ee;
+      --rt-muted:#667085;
+    
+      --rt-success:#eafaf0;
       --rt-success-text:#08743c;
-      --rt-danger:#ffe8e8;
-      --rt-danger-text:#9b1c1c;
-      --rt-warning:#fff6df;
-      --rt-warning-text:#7a5300;
+      --rt-danger:#fff1f3;
+      --rt-danger-text:#9f1239;
+      --rt-warning:#fff8df;
+      --rt-warning-text:#8a5a00;
     }
   
     * { box-sizing: border-box; }
@@ -48,12 +56,15 @@
     }
   
     .hero {
-      background: linear-gradient(135deg, #ffffff 0%, #f8fbff 72%, #fff7dd 100%);
+      background:
+        radial-gradient(circle at top right, rgba(238,191,0,.20), transparent 34%),
+        radial-gradient(circle at bottom left, rgba(22,163,74,.10), transparent 30%),
+        #ffffff;
       border: 1px solid var(--rt-border);
-      border-top: 5px solid var(--rt-accent);
+      border-top: 4px solid var(--rt-accent);
       border-radius: 24px;
       padding: 34px;
-      box-shadow: 0 18px 42px rgba(11, 43, 99, .10);
+      box-shadow: 0 18px 42px rgba(30, 37, 89, .08);
       margin-bottom: 22px;
     }
   
@@ -78,13 +89,14 @@
     }
   
     .chip {
-      background: #fff;
+      background: linear-gradient(180deg, #ffffff 0%, #f9fbff 100%);
       border: 1px solid var(--rt-border);
       border-top: 3px solid var(--rt-accent);
       border-radius: 16px;
       padding: 12px 14px;
       font-size: 13px;
       line-height: 1.4;
+      box-shadow: 0 8px 20px rgba(30, 37, 89, .055);
     }
   
     .chip span {
@@ -106,12 +118,13 @@
     }
   
     .card {
-      background: var(--rt-card);
+      background:
+        linear-gradient(180deg, #ffffff 0%, #fcfdff 100%);
       border: 1px solid var(--rt-border);
-      border-left: 5px solid rgba(245, 181, 27, .75);
+      border-left: 4px solid var(--rt-accent);
       border-radius: 20px;
       padding: 24px;
-      box-shadow: 0 14px 34px rgba(11, 43, 99, .08);
+      box-shadow: 0 12px 30px rgba(30, 37, 89, .065);
     }
   
     .card h2 {
@@ -341,6 +354,54 @@
   
     a:hover {
       color: var(--rt-green);
+    }
+
+    .docs-raitrai-box {
+      background: #f9fbff;
+      border: 1px solid #dbe7f6;
+      border-left: 4px solid var(--rt-accent);
+      color: var(--rt-primary);
+      border-radius: 14px;
+      padding: 10px 12px;
+      font-size: 12px;
+      line-height: 1.45;
+    }
+    
+    .docs-raitrai-box strong {
+      color: var(--rt-primary);
+      font-size: 12.5px;
+    }
+    
+    .docs-raitrai-links {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 8px;
+    }
+    
+    .docs-raitrai-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      background: #ffffff;
+      color: var(--rt-primary) !important;
+      border: 1px solid #dbe4f0;
+      border-radius: 999px;
+      padding: 6px 10px;
+      font-size: 11.5px;
+      font-weight: 700;
+      text-decoration: none !important;
+    }
+    
+    .docs-raitrai-link:hover {
+      background: var(--rt-accent-soft);
+      border-color: var(--rt-accent);
+    }
+    
+    .docs-raitrai-note {
+      margin-top: 8px;
+      font-size: 11px;
+      color: var(--rt-muted);
     }
   
     @media (max-width: 880px) {
@@ -996,7 +1057,7 @@
                 </a>
               </div>
           
-              <div style="margin-top:10px;font-size:12px;opacity:.92;">
+              <div class="docs-raitrai-note">
                 Esta información también será enviada como documento adjunto en el correo de respaldo de este formulario.
               </div>
             </div>
