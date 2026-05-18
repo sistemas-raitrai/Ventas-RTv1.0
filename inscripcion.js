@@ -75,6 +75,7 @@ const bloqueInternacional = $("bloqueInternacional");
 const nacionalidadPaisDestinoWrap = $("nacionalidadPaisDestinoWrap");
 
 const alertaNacionalidadDestinoWrap = $("alertaNacionalidadDestinoWrap");
+const docsOtraNacionalidadWrap = $("docsOtraNacionalidadWrap");
 
 const discapacidadWrap = $("discapacidadWrap");
 const discapacidadApoyosWrap = $("discapacidadApoyosWrap");
@@ -926,13 +927,37 @@ function validarFormulario() {
   if (tipoIdentificacion === "rut") {
     const rutNumero = limpiarRutNumero($("rutNumero")?.value);
     const dv = limpiarTexto($("rutDv")?.value).toUpperCase();
-
+  
     if (!rutNumero || !dv) {
       errores.push("Debe ingresar el RUT completo.");
     } else if (!/^\d{7,8}$/.test(rutNumero)) {
       errores.push("Debe ingresar un RUT válido.");
     } else if (dv !== calcularDvRut(rutNumero)) {
       errores.push("El RUT ingresado es inválido.");
+    }
+  
+    const nombreCoincideDocumento = obtenerRadio("nombreCoincideDocumento");
+  
+    if (!nombreCoincideDocumento) {
+      errores.push("Debe indicar si el nombre coincide con el documento de identidad.");
+    }
+  
+    if (nombreCoincideDocumento === "no") {
+      if (!limpiarTexto($("nombresDocumento")?.value)) {
+        errores.push("Debe ingresar los nombres según documento.");
+      }
+  
+      if (!limpiarTexto($("primerApellidoDocumento")?.value)) {
+        errores.push("Debe ingresar el primer apellido según documento.");
+      }
+  
+      if (!$("sexoDocumento")?.value) {
+        errores.push("Debe indicar el sexo que aparece en el documento.");
+      }
+  
+      if (!$("declaraActualizacionDocumento")?.checked) {
+        errores.push("Debe aceptar la declaración de actualización de documento antes del viaje.");
+      }
     }
   }
 
@@ -1176,30 +1201,6 @@ function construirPayloadBase() {
     rut = `${rutNumero}-${rutDv}`;
     documento = rut;
     documentoNormalizado = normalizarRutDocumento(rutNumero, rutDv);
-  }
-
-  const nombreCoincideDocumento = obtenerRadio("nombreCoincideDocumento");
-
-  if (!nombreCoincideDocumento) {
-    errores.push("Debe indicar si el nombre coincide con el documento de identidad.");
-  }
-  
-  if (nombreCoincideDocumento === "no") {
-    if (!limpiarTexto($("nombresDocumento")?.value)) {
-      errores.push("Debe ingresar los nombres según documento.");
-    }
-  
-    if (!limpiarTexto($("primerApellidoDocumento")?.value)) {
-      errores.push("Debe ingresar el primer apellido según documento.");
-    }
-  
-    if (!$("sexoDocumento")?.value) {
-      errores.push("Debe indicar el sexo que aparece en el documento.");
-    }
-  
-    if (!$("declaraActualizacionDocumento")?.checked) {
-      errores.push("Debe aceptar la declaración de actualización de documento antes del viaje.");
-    }
   }
 
   const genero = $("genero")?.value || "";
