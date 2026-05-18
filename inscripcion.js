@@ -616,7 +616,7 @@ async function onSubmit(event) {
   }
 
   btnEnviar.disabled = true;
-  btnEnviar.textContent = "Enviando inscripción...";
+  btnEnviar.textContent = "Enviando formulario...";
 
   try {
     const payloadBase = construirPayloadBase();
