@@ -1249,6 +1249,7 @@ function construirPayloadBase() {
       nombreGrupo: limpiarTexto(grupoData?.nombreGrupo),
       colegio: limpiarTexto(grupoData?.colegio),
       cursoBase: limpiarTexto(grupoData?.curso),
+      cursoActualInscripcion: obtenerCursoActualInscripcion(grupoData),
       cantidadGrupo: grupoData?.cantidadGrupo ?? grupoData?.cantidadgrupo ?? null,
       anoViaje: grupoData?.anoViaje ?? null,
       destinoPrincipal: limpiarTexto(grupoData?.destinoPrincipal || grupoData?.destino),
