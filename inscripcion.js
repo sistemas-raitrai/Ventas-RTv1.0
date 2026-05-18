@@ -414,6 +414,12 @@ function aplicarEstadoUI() {
   const esAcompanante = tipoViajante === "adulto_acompanante";
   const esAdultoOperativo = esProfesor || esAcompanante;
 
+  const correoViajanteHint = $("correoViajanteHint");
+
+  if (correoViajanteHint) {
+    mostrar(correoViajanteHint, !esEstudiante);
+  }
+
   const tipoIdentificacion = $("tipoIdentificacion")?.value || "";
   const nacionalidadBase = $("nacionalidadBase")?.value || "";
   const esInternacional = grupoEsInternacional();
