@@ -4,15 +4,7 @@ import { db } from "./firebase-init.js";
 
 import {
   doc,
-  getDoc,
-  setDoc,
-  serverTimestamp,
-  runTransaction,
-  collection,
-  addDoc,
-  getDocs,
-  query,
-  where
+  getDoc
 } from "https://www.gstatic.com/firebasejs/11.7.3/firebase-firestore.js";
 
 // -----------------------------------------------------------------------------
@@ -110,7 +102,8 @@ const adultoCompromisoCard = $("adultoCompromisoCard");
 const CORREO_ADMIN = "administracion@raitrai.cl";
 const TELEFONO_ADMIN = "+56 (2) 2236 3232";
 const WHATSAPP_ADMIN = "(+569) 9818 3857";
-const RUT_INTERNO_INICIAL = 90000000;
+const URL_GUARDAR_INSCRIPCION =
+  "https://southamerica-west1-sist-op-rt.cloudfunctions.net/guardarInscripcionPublica";
 
 
 // -----------------------------------------------------------------------------
@@ -702,14 +695,14 @@ async function onSubmit(event) {
 
   try {
     const payloadBase = construirPayloadBase();
-    const payload = await guardarInscripcion(payloadBase);
-
-    await enviarCorreoRespaldo(payload);
-    await registrarEventosEspeciales(payload);
-    await detectarRutEnOtrosGrupos(payload);
-    await verificarCupoCompleto();
-
-    mostrarPantallaFinal(payload);
+    
+    const resultado = await enviarInscripcionAlBackend(payloadBase);
+    
+    if (!resultado?.ok) {
+      throw new Error(resultado?.code || resultado?.error || "error_guardando_inscripcion");
+    }
+    
+    mostrarPantallaFinal(payloadBase);
 
   } catch (error) {
     console.error("ERROR INSCRIPCION:", {
@@ -754,153 +747,30 @@ async function onSubmit(event) {
 }
 
 // -----------------------------------------------------------------------------
-// GUARDADO
+// GUARDADO EN BACKEND
 // -----------------------------------------------------------------------------
-async function guardarInscripcion(payloadBase) {
-  if (payloadBase.identificacion.tipoIdentificacion === "rut") {
-    return await guardarConRut(payloadBase);
+async function enviarInscripcionAlBackend(payloadBase) {
+  const response = await fetch(URL_GUARDAR_INSCRIPCION, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      idGrupo,
+      token: tokenUrl,
+      payload: payloadBase
+    })
+  });
+
+  const result = await response.json().catch(() => ({}));
+
+  if (!response.ok || !result.ok) {
+    const err = new Error(result?.code || result?.error || "error_guardando_inscripcion");
+    err.code = result?.code || "";
+    throw err;
   }
 
-  if (payloadBase.identificacion.tipoIdentificacion === "sin_rut") {
-    return await guardarSinRut(payloadBase);
-  }
-
-  throw new Error("tipo_identificacion_invalido");
-}
-
-async function guardarConRut(payloadBase) {
-  const documentoNormalizado = payloadBase.identificacion.documentoNormalizado;
-
-  const refInscripcion = doc(
-    db,
-    "ventas_cotizaciones",
-    idGrupo,
-    "inscripciones",
-    documentoNormalizado
-  );
-
-  const refRutGlobal = doc(
-    db,
-    "inscripciones_por_rut",
-    `${documentoNormalizado}_${idGrupo}`
-  );
-
-  const payload = limpiarPayloadFirestore({
-    ...payloadBase,
-    meta: {
-      ...payloadBase.meta,
-      fechaInscripcion: serverTimestamp()
-    }
-  });
-
-  await runTransaction(db, async (tx) => {
-    const existente = await tx.get(refInscripcion);
-
-    if (existente.exists()) {
-      throw new Error("duplicate_document");
-    }
-
-    tx.set(refInscripcion, payload);
-
-    tx.set(refRutGlobal, {
-      rutNormalizado: documentoNormalizado,
-      idGrupo,
-      nombreCompleto: payload.identificacion.nombreCompleto,
-      grupo: payload.grupo,
-      fechaRegistro: serverTimestamp()
-    });
-  });
-
-  return payload;
-}
-
-async function guardarSinRut(payloadBase) {
-  const nombreKey = construirNombreKey(
-    payloadBase.identificacion.nombres,
-    payloadBase.identificacion.primerApellido,
-    payloadBase.identificacion.segundoApellido
-  );
-
-  const refCounter = doc(db, "config", "contadorRutInterno");
-
-  const refNameIndex = doc(
-    db,
-    "ventas_cotizaciones",
-    idGrupo,
-    "sin_rut_name_index",
-    nombreKey
-  );
-
-  return await runTransaction(db, async (tx) => {
-    const snapIndex = await tx.get(refNameIndex);
-
-    if (snapIndex.exists()) {
-      throw new Error("duplicate_no_rut_name");
-    }
-
-    const snapCounter = await tx.get(refCounter);
-
-    let numero = RUT_INTERNO_INICIAL;
-
-    if (snapCounter.exists()) {
-      const ultimo = Number(snapCounter.data().ultimoNumero || RUT_INTERNO_INICIAL - 1);
-      numero = ultimo + 1;
-    }
-
-    const rutDv = calcularDvRut(String(numero));
-    const documento = `${numero}-${rutDv}`;
-    const documentoNormalizado = `SIN_RUT_${numero}-${rutDv}`;
-
-    const payload = limpiarPayloadFirestore({
-      ...payloadBase,
-      identificacion: {
-        ...payloadBase.identificacion,
-        documento,
-        documentoNormalizado,
-        rutInterno: documento,
-        esRutInterno: true
-      },
-      meta: {
-        ...payloadBase.meta,
-        fechaInscripcion: serverTimestamp()
-      }
-    });
-
-    const refInscripcion = doc(
-      db,
-      "ventas_cotizaciones",
-      idGrupo,
-      "inscripciones",
-      documentoNormalizado
-    );
-
-    const refSinRutGlobal = doc(db, "inscripciones_sin_rut", documentoNormalizado);
-
-    tx.set(refCounter, { ultimoNumero: numero }, { merge: true });
-
-    tx.set(refInscripcion, payload);
-
-    tx.set(refNameIndex, {
-      nombreKey,
-      documentoNormalizado,
-      idGrupo,
-      nombreCompleto: payload.identificacion.nombreCompleto,
-      fechaRegistro: serverTimestamp()
-    });
-
-    tx.set(refSinRutGlobal, {
-      documento,
-      documentoNormalizado,
-      nombreKey,
-      idGrupo,
-      grupo: payload.grupo,
-      identificacion: payload.identificacion,
-      fechaRegistro: serverTimestamp(),
-      estado: "activo"
-    });
-
-    return payload;
-  });
+  return result;
 }
 
 // -----------------------------------------------------------------------------
@@ -1499,28 +1369,6 @@ function construirPayloadBase() {
   };
 }
 
-async function enviarCorreoRespaldo(payload) {
-  const destinatarios = obtenerDestinatariosCorreoRespaldo(payload);
-
-  if (!destinatarios.length) {
-    console.warn("No se encontró destinatario para el correo de respaldo.");
-    return;
-  }
-
-  await addDoc(collection(db, "correos_inscripcion_pendientes"), {
-    payload,
-    destinatario: destinatarios,
-    destinatarios,
-    idGrupo,
-    documentoNormalizado: payload.identificacion?.documentoNormalizado || "",
-    nombreCompleto: payload.identificacion?.nombreCompleto || "",
-    estado: "pendiente",
-    creadoEn: serverTimestamp()
-  });
-
-  console.log("Correo de respaldo encolado correctamente:", destinatarios);
-}
-
 function obtenerDestinatariosCorreoRespaldo(payload) {
   const correos = [];
 
@@ -1541,8 +1389,21 @@ function obtenerDestinatariosCorreoRespaldo(payload) {
   return [...new Set(correos.filter(validarCorreo))];
 }
 
-function obtenerDestinatarioCorreoRespaldo(payload) {
-  return obtenerDestinatariosCorreoRespaldo(payload)[0] || "";
+function obtenerDestinatariosPantallaFinal(payload) {
+  const correos = [];
+
+  if (payload?.tipoViajante === "estudiante") {
+    const correo1 = limpiarTexto(payload?.contactoPrincipal?.correo);
+    const correo2 = limpiarTexto(payload?.contactoSecundario?.correo);
+
+    if (correo1) correos.push(correo1);
+    if (correo2) correos.push(correo2);
+  } else {
+    const correo = limpiarTexto(payload?.identificacion?.correoViajante);
+    if (correo) correos.push(correo);
+  }
+
+  return [...new Set(correos)].join(", ");
 }
 
 function mostrarPantallaFinal(payload) {
@@ -1550,8 +1411,7 @@ function mostrarPantallaFinal(payload) {
   pantallaBienvenida?.classList.add("hidden");
   msgBox?.classList.remove("hidden");
 
-  const destinatarios = obtenerDestinatariosCorreoRespaldo(payload);
-  const destinatarioTexto = destinatarios.join(", ");
+  const destinatarioTexto = obtenerDestinatariosPantallaFinal(payload);
 
   mostrarMensaje(
     "ok",
@@ -1566,12 +1426,16 @@ function mostrarPantallaFinal(payload) {
       <p>
         📩 Se enviará un respaldo al correo
         <strong>${escapeHtml(destinatarioTexto || "indicado en el formulario")}</strong>.
-        Si no lo recibes en unos minutos, revisa especialmente <strong>spam / correos no deseados</strong>. Si no está, contáctanos.
       </p>
 
+      <div class="notice time" style="margin-top:12px;">
+        Si no lo recibes en unos minutos, revisa especialmente
+        <strong>spam / correos no deseados</strong>.
+      </div>
+
       <p>
-        ✏️ Si necesitas corregir, actualizar o eliminar información, comunícate con Turismo Rai Trai Viajes de Estudio
-        y asegúrate de recibir confirmación de tu solicitud.
+        ✏️ Si necesitas corregir, actualizar o eliminar información, comunícate con
+        Turismo Rai Trai Viajes de Estudio y asegúrate de recibir confirmación de tu solicitud.
       </p>
 
       <p>
@@ -1592,153 +1456,6 @@ function mostrarPantallaFinal(payload) {
   );
 
   window.scrollTo({ top: 0, behavior: "smooth" });
-}
-
-// -----------------------------------------------------------------------------
-// CORREO
-// -----------------------------------------------------------------------------
-async function crearCorreoConfirmacion(payload) {
-  const destinatario = payload.contactoPrincipal?.correo || payload.identificacion?.correoViajante;
-  if (!destinatario) return;
-
-  const nombre = payload.identificacion?.nombreCompleto || "";
-  const destino = payload.grupo?.destinoPrincipal || "";
-  const aliasGrupo = payload.grupo?.aliasGrupo || payload.grupo?.nombreGrupo || payload.grupo?.idGrupo || idGrupo;
-  const tipoLabel = labelTipoViajante(payload.tipoViajante);
-  const documento = payload.identificacion?.documento || "";
-
-  const html = `
-    <div style="font-family: Arial, Helvetica, sans-serif; color:#222; line-height:1.6;">
-      <h2>Confirmación de inscripción recibida</h2>
-      <p>Hemos recibido correctamente la inscripción de <strong>${escapeHtml(nombre)}</strong> como <strong>${escapeHtml(tipoLabel)}</strong>.</p>
-      <p>
-        <strong>Grupo:</strong> ${escapeHtml(aliasGrupo)}<br>
-        <strong>Destino:</strong> ${escapeHtml(destino)}<br>
-        <strong>Documento:</strong> ${escapeHtml(documento)}
-      </p>
-      <p>La información entregada será utilizada exclusivamente para la planificación, coordinación y operación segura del viaje.</p>
-      <p>Si necesita corregir algún dato posteriormente, debe comunicarse con Turismo Rai Trai y asegurarse de recibir confirmación del cambio.</p>
-      <p>
-        Correo: <strong>${escapeHtml(CORREO_ADMIN)}</strong><br>
-        Teléfono: <strong>${escapeHtml(TELEFONO_ADMIN)}</strong><br>
-        WhatsApp: <strong>${escapeHtml(WHATSAPP_ADMIN)}</strong>
-      </p>
-      <p>Atentamente,<br>Turismo Rai Trai</p>
-    </div>
-  `;
-
-  await addDoc(collection(db, "mail"), {
-    to: [destinatario],
-    message: {
-      subject: `Confirmación de inscripción – ${nombre}`,
-      html
-    },
-    meta: {
-      tipo: "confirmacion_inscripcion_pasajero",
-      idGrupo,
-      documentoNormalizado: payload.identificacion?.documentoNormalizado || "",
-      creadoEn: serverTimestamp()
-    }
-  });
-}
-
-// -----------------------------------------------------------------------------
-// HISTORIAL
-// -----------------------------------------------------------------------------
-async function registrarEventosEspeciales(payload) {
-  const eventos = [];
-
-  eventos.push({
-    tipo: "inscripcion_publica",
-    mensaje: `Nueva inscripción recibida para ${payload.identificacion?.nombreCompleto || "viajante"}.`
-  });
-
-  if (payload.identificacion?.sinSegundoApellido) {
-    eventos.push({
-      tipo: "inscripcion_sin_segundo_apellido",
-      mensaje: `El viajante ${payload.identificacion.nombreCompleto} fue inscrito sin segundo apellido, confirmado por quien completó el formulario.`
-    });
-  }
-
-  if (payload.identificacion?.esRutInterno) {
-    eventos.push({
-      tipo: "inscripcion_sin_rut",
-      mensaje: `El viajante ${payload.identificacion.nombreCompleto} fue inscrito sin RUT. Se asignó documento interno ${payload.identificacion.documento}.`
-    });
-  }
-
-  for (const evento of eventos) {
-    await addDoc(collection(db, "ventas_cotizaciones", idGrupo, "historial_inscripciones"), {
-      fecha: serverTimestamp(),
-      tipo: evento.tipo,
-      documentoNormalizado: payload.identificacion?.documentoNormalizado || "",
-      documento: payload.identificacion?.documento || "",
-      nombreCompleto: payload.identificacion?.nombreCompleto || "",
-      tipoViajante: payload.tipoViajante || "",
-      mensaje: evento.mensaje
-    });
-  }
-}
-
-async function detectarRutEnOtrosGrupos(payload) {
-  if (payload.identificacion?.tipoIdentificacion !== "rut") return;
-
-  const rutNormalizado = payload.identificacion.documentoNormalizado;
-
-  const q = query(
-    collection(db, "inscripciones_por_rut"),
-    where("rutNormalizado", "==", rutNormalizado)
-  );
-
-  const snap = await getDocs(q);
-  const otros = snap.docs.map((d) => d.data()).filter((x) => x.idGrupo && x.idGrupo !== idGrupo);
-
-  if (!otros.length) return;
-
-  await addDoc(collection(db, "alertas_inscripciones"), {
-    fecha: serverTimestamp(),
-    tipo: "rut_repetido_otro_grupo",
-    prioridad: "media",
-    idGrupo,
-    rutNormalizado,
-    nombreCompleto: payload.identificacion.nombreCompleto,
-    grupoActual: payload.grupo,
-    coincidencias: otros,
-    mensaje: `El RUT ${rutNormalizado} fue inscrito en este grupo y ya existe en otro grupo. Revisar administrativamente.`
-  });
-}
-
-async function verificarCupoCompleto() {
-  const cantidadGrupo = normalizarNumeroGrupo(
-    grupoData?.cantidadGrupo ?? grupoData?.cantidadgrupo ?? grupoData?.cantidadGrupoCotizada
-  );
-
-  if (!cantidadGrupo) return;
-
-  const snap = await getDocs(collection(db, "ventas_cotizaciones", idGrupo, "inscripciones"));
-  const totalInscritos = snap.size;
-
-  if (totalInscritos !== cantidadGrupo) return;
-
-  const refControl = doc(db, "ventas_cotizaciones", idGrupo, "control_inscripcion", "cupo_completo");
-  const controlSnap = await getDoc(refControl);
-
-  if (controlSnap.exists()) return;
-
-  await setDoc(refControl, {
-    fecha: serverTimestamp(),
-    totalInscritos,
-    cantidadGrupo,
-    estado: "registrado"
-  });
-
-  await addDoc(collection(db, "ventas_cotizaciones", idGrupo, "historial_inscripciones"), {
-    fecha: serverTimestamp(),
-    tipo: "cupo_completo",
-    totalInscritos,
-    cantidadGrupo,
-    mensaje: `Cupo completo: se registraron ${totalInscritos} personas inscritas de ${cantidadGrupo} esperadas para el grupo.`
-  });
 }
 
 // -----------------------------------------------------------------------------
