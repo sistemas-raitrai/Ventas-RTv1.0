@@ -428,8 +428,6 @@ function isFichaCorregidaVisibleParaUsuario(row = {}, user = null) {
 }
 
 function getFichaCorregidaLabel(row = {}) {
-  const flow = row.flowFicha || {};
-  const origen = normalizeLoose(flow.correccionOrigen || "");
   const estado = getCorreccionFichaEstado(row);
 
   if (estado === "pendiente_jefa") {
@@ -440,15 +438,17 @@ function getFichaCorregidaLabel(row = {}) {
     return "Corrección pendiente de cierre administrativo";
   }
 
-  if (origen === "administracion") {
-    return "Corrección iniciada por administración";
+  const firmas = getFichaFirmas(row);
+
+  if (firmas.jefa && !firmas.admin) {
+    return "Corrección pendiente de cierre administrativo";
   }
 
-  if (origen === "jefaventas") {
-    return "Corrección iniciada por jefa de ventas";
+  if (!firmas.jefa) {
+    return "Corrección pendiente de revisión por jefa de ventas";
   }
 
-  return "Corrección interna pendiente";
+  return "Corrección pendiente";
 }
 
 function getCorreccionDetalle(row = {}) {
