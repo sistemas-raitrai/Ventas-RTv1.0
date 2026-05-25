@@ -39,6 +39,10 @@ const correoViajanteReq = $("correoViajanteReq");
 const autorizaCorreoViajanteWrap = $("autorizaCorreoViajanteWrap");
 const emergenciaMismoResponsableWrap = $("emergenciaMismoResponsableWrap");
 
+const emergenciaUsarResponsable2Wrap = $("emergenciaUsarResponsable2Wrap");
+const emergencia2MismoResponsableWrap = $("emergencia2MismoResponsableWrap");
+const emergencia2UsarResponsable2Wrap = $("emergencia2UsarResponsable2Wrap");
+
 const nacionalidadDetalleWrap = $("nacionalidadDetalleWrap");
 const telefonoViajanteWrap = $("telefonoViajanteWrap");
 const avisoAdultoResponsableWrap = $("avisoAdultoResponsableWrap");
@@ -266,15 +270,37 @@ function conectarEventos() {
   
   document.querySelectorAll('input[name="emergenciaMismoResponsable"]').forEach((el) => {
     el.addEventListener("change", () => {
-      aplicarEmergenciaDesdeResponsable();
+      aplicarEmergenciaDesdeResponsable(1);
       aplicarEstadoUI();
       actualizarProgreso();
     });
   });
   
-  ["contactoPrincipalNombre", "contactoPrincipalRelacion", "contactoPrincipalTelefono"].forEach((id) => {
-    $(id)?.addEventListener("input", aplicarEmergenciaDesdeResponsable);
-    $(id)?.addEventListener("change", aplicarEmergenciaDesdeResponsable);
+  document.querySelectorAll('input[name="emergencia2MismoResponsable"]').forEach((el) => {
+    el.addEventListener("change", () => {
+      aplicarEmergenciaDesdeResponsable(2);
+      aplicarEstadoUI();
+      actualizarProgreso();
+    });
+  });
+  
+  [
+    "contactoPrincipalNombre",
+    "contactoPrincipalRelacion",
+    "contactoPrincipalTelefono",
+    "contactoSecundarioNombre",
+    "contactoSecundarioRelacion",
+    "contactoSecundarioTelefono"
+  ].forEach((id) => {
+    $(id)?.addEventListener("input", () => {
+      aplicarEmergenciaDesdeResponsable(1);
+      aplicarEmergenciaDesdeResponsable(2);
+    });
+  
+    $(id)?.addEventListener("change", () => {
+      aplicarEmergenciaDesdeResponsable(1);
+      aplicarEmergenciaDesdeResponsable(2);
+    });
   });
 
   btnAgregarApoderado2?.addEventListener("click", () => {
@@ -549,7 +575,11 @@ function aplicarEstadoUI() {
   mostrar(contactoSecundarioRelacionOtroWrap, hayApoderado2 && contactoSecundarioOtro);
 
   mostrar(emergenciaMismoResponsableWrap, esEstudiante);
-
+  
+  const hayApoderado2Activo = bloqueApoderado2 && !bloqueApoderado2.classList.contains("hidden");
+  
+  mostrar(emergenciaUsarResponsable2Wrap, esEstudiante && hayApoderado2Activo);
+  
   if (!esEstudiante) {
     limpiarRadios("emergenciaMismoResponsable");
   }
@@ -559,7 +589,14 @@ function aplicarEstadoUI() {
   setRequired("emergenciaRelacionOtro", emergenciaOtro);
 
   const hayEmergencia2 = bloqueEmergencia2 && !bloqueEmergencia2.classList.contains("hidden");
-
+  
+  mostrar(emergencia2MismoResponsableWrap, esEstudiante && hayEmergencia2);
+  mostrar(emergencia2UsarResponsable2Wrap, esEstudiante && hayEmergencia2 && hayApoderado2Activo);
+  
+  if (!hayEmergencia2) {
+    limpiarRadios("emergencia2MismoResponsable");
+  }
+  
   const emergencia2Otro = $("emergencia2Relacion")?.value === "otro";
   mostrar(emergencia2RelacionOtroWrap, hayEmergencia2 && emergencia2Otro);
 
@@ -606,20 +643,53 @@ function aplicarEstadoUI() {
   actualizarProgreso();
 }
 
-function aplicarEmergenciaDesdeResponsable() {
+function obtenerResponsableParaEmergencia(valor = "") {
+  if (valor === "responsable_1") {
+    return {
+      nombre: limpiarTexto($("contactoPrincipalNombre")?.value),
+      relacion: $("contactoPrincipalRelacion")?.value || "",
+      telefono: limpiarTexto($("contactoPrincipalTelefono")?.value)
+    };
+  }
+
+  if (valor === "responsable_2") {
+    return {
+      nombre: limpiarTexto($("contactoSecundarioNombre")?.value),
+      relacion: $("contactoSecundarioRelacion")?.value || "",
+      telefono: limpiarTexto($("contactoSecundarioTelefono")?.value)
+    };
+  }
+
+  return null;
+}
+
+function aplicarEmergenciaDesdeResponsable(numero = 1) {
   const tipoViajante = obtenerRadio("tipoViajante");
   const esEstudiante = tipoViajante === "estudiante";
-  const usarResponsable = obtenerRadio("emergenciaMismoResponsable") === "si";
 
-  if (!esEstudiante || !usarResponsable) return;
+  if (!esEstudiante) return;
 
-  const nombre = limpiarTexto($("contactoPrincipalNombre")?.value);
-  const relacion = $("contactoPrincipalRelacion")?.value || "";
-  const telefono = limpiarTexto($("contactoPrincipalTelefono")?.value);
+  const nombreRadio = numero === 2
+    ? "emergencia2MismoResponsable"
+    : "emergenciaMismoResponsable";
 
-  if ($("emergenciaNombre")) $("emergenciaNombre").value = nombre;
-  if ($("emergenciaRelacion")) $("emergenciaRelacion").value = relacion;
-  if ($("emergenciaTelefono")) $("emergenciaTelefono").value = telefono;
+  const seleccion = obtenerRadio(nombreRadio);
+
+  if (!seleccion || seleccion === "manual") return;
+
+  const responsable = obtenerResponsableParaEmergencia(seleccion);
+
+  if (!responsable) return;
+
+  if (numero === 2) {
+    if ($("emergencia2Nombre")) $("emergencia2Nombre").value = responsable.nombre;
+    if ($("emergencia2Relacion")) $("emergencia2Relacion").value = responsable.relacion;
+    if ($("emergencia2Telefono")) $("emergencia2Telefono").value = responsable.telefono;
+  } else {
+    if ($("emergenciaNombre")) $("emergenciaNombre").value = responsable.nombre;
+    if ($("emergenciaRelacion")) $("emergenciaRelacion").value = responsable.relacion;
+    if ($("emergenciaTelefono")) $("emergenciaTelefono").value = responsable.telefono;
+  }
 }
 
 // -----------------------------------------------------------------------------
