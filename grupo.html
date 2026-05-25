@@ -239,6 +239,23 @@
       transition: transform .18s ease, box-shadow .18s ease, opacity .18s ease;
     }
 
+    .btn-ok{
+      min-height:44px;
+      padding:0 16px;
+      border-radius:14px;
+      border:none;
+      cursor:pointer;
+      font-size:14px;
+      font-weight:800;
+      background:#09832e;
+      color:#fff;
+      box-shadow:0 10px 22px rgba(9,131,46,.16);
+    }
+    .btn-ok:disabled{
+      opacity:.45;
+      cursor:not-allowed;
+    }
+
     .btn-pill:hover,
     .btn-light:hover,
     .btn-dark:hover,
@@ -1961,6 +1978,10 @@
             </div>
       
             <div class="grupo-hero-actions" style="margin-top:0;">
+              <button id="btnCopiarLinkInscripcion" class="btn-ok" type="button">
+                Copiar link
+              </button>
+              
               <button id="btnHabilitarInscripcion" class="btn-dark" type="button">
                 Habilitar inscripción
               </button>
@@ -1975,10 +1996,6 @@
             
               <button id="btnAbrirListaEspera" class="btn-pill" type="button">
                 Abrir lista de espera
-              </button>
-            
-              <button id="btnCopiarLinkInscripcion" class="btn-pill" type="button">
-                Copiar link
               </button>
             
               <button id="btnExportarInscripcionesExcel" class="btn-pill" type="button">
