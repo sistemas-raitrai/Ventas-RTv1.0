@@ -2140,7 +2140,7 @@ async function signFlowFromFicha(step) {
       flow?.correccionPendiente === true ||
       normalizeSearchLocal(flow?.modo || "") === "correccion";
   
-    if (flow?.jefaVentas?.firmado && !hadPendingRequest) {
+    if (flow?.jefaVentas?.firmado && !hadPendingRequest && !esCorreccionActiva) {
       alert("La firma de jefa de ventas ya está registrada.");
       return;
     }
@@ -2164,7 +2164,8 @@ async function signFlowFromFicha(step) {
       ...(state.group.flowFicha || {}),
       modo: "v2",
       legacy: false,
-      estado: "revisada_jefa_ventas",
+      modo: esCorreccionActiva ? "correccion" : "v2",
+      estado: esCorreccionActiva ? "correccion_pendiente_administracion" : "revisada_jefa_ventas",
       requiereActualizacion: hadPendingRequest,
       requiereRefirmaAdministracion: esCorreccionActiva ? true : flow?.requiereRefirmaAdministracion || false,
       correccionPendiente: esCorreccionActiva ? true : flow?.correccionPendiente || false,
@@ -2293,7 +2294,6 @@ async function signFlowFromFicha(step) {
       legacy: false,
       estado: "autorizada_admin",
       requiereActualizacion: false,
-      requiereRefirmaAdministracion: false,
       correccionPendiente: false,
       correccionEstado: "cerrada",
       requiereRefirmaAdministracion: false,
