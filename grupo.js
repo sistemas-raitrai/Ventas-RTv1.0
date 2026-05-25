@@ -1274,9 +1274,53 @@ function getFichaSummary() {
   };
 }
 
+function shouldShowInscripcionPanel() {
+  const isGanada = normalizeState(state.group?.estado) === "ganada";
+  const habilitada = !!state.group?.inscripcionHabilitada;
+  const tieneInscritos = Array.isArray(state.inscripciones) && state.inscripciones.length > 0;
+
+  return isGanada || habilitada || tieneInscritos;
+}
+
+function getInscripcionEstadoActual() {
+  return cleanText(
+    state.group?.inscripcionEstado ||
+    state.group?.inscripcion?.estado ||
+    state.group?.faseInscripcion ||
+    ""
+  ) || "cerrada";
+}
+
+function mapFaseToEstadoPersona(fase = "") {
+  const key = normalizeSearchLocal(fase);
+
+  if (key === "normal") return "normal";
+  if (key === "nuevos") return "nuevo_inscrito";
+  if (key === "lista_espera") return "lista_espera";
+
+  return key || "normal";
+}
+
+function getInscripcionFaseLabel(fase = "") {
+  const key = normalizeSearchLocal(fase);
+
+  if (key === "normal") return "Inscripción normal";
+  if (key === "nuevos") return "Nuevos participantes";
+  if (key === "lista_espera") return "Lista de espera";
+  if (key === "cerrada") return "Cerrada";
+
+  return formatInscripcionValue(fase);
+}
+
 function renderInscripcionPasajerosPanel() {
+  const panel = $("panelInscripcionPasajeros");
   const box = $("panelInscripcionPasajerosBody");
-  if (!box) return;
+  if (!panel || !box) return;
+
+  const visible = shouldShowInscripcionPanel();
+  panel.classList.toggle("hidden", !visible);
+
+  if (!visible) return;
 
   const total = state.inscripciones.length;
   const capacidad = Number(state.group?.cantidadGrupo || 0);
@@ -1293,11 +1337,7 @@ function renderInscripcionPasajerosPanel() {
     ["lista_espera", "espera"].includes(normalizeSearchLocal(x.estadoInscripcion || x.faseInscripcion || ""))
   ).length;
 
-  const estadoInscripcion =
-    state.group?.inscripcionEstado ||
-    state.group?.faseInscripcion ||
-    (state.group?.inscripcionHabilitada ? "normal" : "cerrada");
-
+  const estadoInscripcion = getInscripcionEstadoActual();
   const linkInfo = state.group?.inscripcion || {};
 
   const tabla = state.inscripciones.length
@@ -1330,7 +1370,7 @@ function renderInscripcionPasajerosPanel() {
                 <td>${escapeHtml(getInscripcionGenero(item))}</td>
                 <td>${escapeHtml(getResponsablePrincipalNombre(item))}</td>
                 <td>${escapeHtml(getByPath(item, "contactoPrincipal.correo") || "—")}</td>
-                <td>${escapeHtml(getByPath(item, "contactoPrincipal.telefono") || getByPath(item, "contactoPrincipal.whatsapp") || "—")}</td>
+                <td>${escapeHtml(getByPath(item, "contactoPrincipal.celular") || getByPath(item, "contactoPrincipal.telefono") || getByPath(item, "contactoPrincipal.whatsapp") || "—")}</td>
               </tr>
             `).join("")}
           </tbody>
@@ -1343,7 +1383,7 @@ function renderInscripcionPasajerosPanel() {
     <div class="grupo-kpi-list">
       <div class="grupo-kpi">
         <div class="info-label">Estado inscripción</div>
-        <div class="info-value">${escapeHtml(formatInscripcionValue(estadoInscripcion))}</div>
+        <div class="info-value">${escapeHtml(getInscripcionFaseLabel(estadoInscripcion))}</div>
       </div>
 
       <div class="grupo-kpi">
@@ -1363,18 +1403,10 @@ function renderInscripcionPasajerosPanel() {
     </div>
 
     <div class="inscripcion-traza">
-      <div>
-        <strong>Link:</strong>
-        ${state.group?.inscripcionHabilitada ? "Habilitado" : "No habilitado"}
-      </div>
-      <div>
-        <strong>Generado por:</strong>
-        ${escapeHtml(linkInfo.linkGeneradoPor || state.group?.inscripcionLinkGeneradoPor || "—")}
-      </div>
-      <div>
-        <strong>Fecha generación:</strong>
-        ${escapeHtml(formatDateTime(linkInfo.linkGeneradoAt || state.group?.fechaAperturaInscripcion))}
-      </div>
+      <div><strong>Link:</strong> ${state.group?.inscripcionHabilitada ? "Habilitado" : "No habilitado"}</div>
+      <div><strong>Fase actual:</strong> ${escapeHtml(getInscripcionFaseLabel(estadoInscripcion))}</div>
+      <div><strong>Generado por:</strong> ${escapeHtml(linkInfo.actualizadoPor || linkInfo.linkGeneradoPor || state.group?.inscripcionLinkGeneradoPor || "—")}</div>
+      <div><strong>Fecha generación:</strong> ${escapeHtml(formatDateTime(linkInfo.actualizadoAt || linkInfo.linkGeneradoAt || state.group?.fechaAperturaInscripcion))}</div>
     </div>
 
     ${tabla}
@@ -1407,11 +1439,19 @@ function getInscripcionApellidos(item = {}) {
 }
 
 function getInscripcionNacionalidad(item = {}) {
-  const nac = getByPath(item, "identificacion.nacionalidad") || "";
-  const otra = getByPath(item, "identificacion.nacionalidadOtra") || "";
-  return normalizeSearchLocal(nac) === "otra" && otra
+  const base =
+    getByPath(item, "identificacion.nacionalidadBase") ||
+    getByPath(item, "identificacion.nacionalidad") ||
+    "";
+
+  const otra =
+    getByPath(item, "identificacion.nacionalidadOtra") ||
+    getByPath(item, "identificacion.otraNacionalidad") ||
+    "";
+
+  return normalizeSearchLocal(base) === "otra" && otra
     ? otra
-    : (nac || "—");
+    : (base || otra || "—");
 }
 
 function getInscripcionGenero(item = {}) {
@@ -1426,8 +1466,12 @@ function getInscripcionGenero(item = {}) {
 }
 
 function getResponsablePrincipalNombre(item = {}) {
-  const nombreCompleto = getByPath(item, "contactoPrincipal.nombreCompleto");
-  if (nombreCompleto) return nombreCompleto;
+  const nombreDirecto =
+    getByPath(item, "contactoPrincipal.nombre") ||
+    getByPath(item, "Contacto principal.nombre") ||
+    getByPath(item, "contactoPrincipal.nombreCompleto");
+
+  if (nombreDirecto) return nombreDirecto;
 
   const nombres = getByPath(item, "contactoPrincipal.nombres") || "";
   const p1 = getByPath(item, "contactoPrincipal.primerApellido") || "";
@@ -2319,71 +2363,74 @@ function getInscripcionBaseUrl() {
   return new URL("inscripcion.html", window.location.href).href.split("?")[0];
 }
 
-function getInscripcionPublicLink(groupId, token) {
+function getInscripcionPublicLink(groupId, token, fase = "normal") {
   const base = getInscripcionBaseUrl();
-  return `${base}?grupo=${encodeURIComponent(groupId)}&token=${encodeURIComponent(token)}`;
+
+  return `${base}?grupo=${encodeURIComponent(groupId)}&fase=${encodeURIComponent(fase)}&token=${encodeURIComponent(token)}`;
 }
 
 async function enableGroupInscripcion() {
+  await cambiarFaseInscripcion("normal");
+}
+
+async function cambiarFaseInscripcion(fase = "normal") {
   if (!canEditGroup()) {
     alert(getBlockedEditMessage());
     return;
   }
 
   if (normalizeState(state.group?.estado) !== "ganada") {
-    alert("La inscripción solo se puede habilitar cuando el grupo está en estado GANADA.");
+    alert("La inscripción solo se puede administrar cuando el grupo está en estado GANADA.");
     return;
   }
 
-  const regenerando = !!state.group?.inscripcionHabilitada;
-  const ok = confirm(
-    regenerando
-      ? "Este grupo ya tiene inscripción habilitada. ¿Quieres regenerar el link público?"
-      : "¿Quieres habilitar la inscripción pública para este grupo?"
-  );
+  const faseNormalizada = normalizeSearchLocal(fase);
+  const label = getInscripcionFaseLabel(faseNormalizada);
+  const tokenInscripcion = generateInscripcionToken(32);
 
+  const ok = confirm(`¿Quieres abrir la fase "${label}" y generar un nuevo link público?`);
   if (!ok) return;
 
-  const tokenInscripcion = generateInscripcionToken(32);
+  const link = getInscripcionPublicLink(state.groupId, tokenInscripcion, faseNormalizada);
 
   const patch = {
     inscripcionHabilitada: true,
     tokenInscripcion,
-  
-    inscripcionEstado:
-      cleanText(state.group?.inscripcionEstado || "") || "normal",
-  
+    inscripcionEstado: faseNormalizada,
+    faseInscripcion: faseNormalizada,
+
     fechaAperturaInscripcion: serverTimestamp(),
-  
+
     inscripcion: {
       ...(state.group?.inscripcion || {}),
-      estado: cleanText(state.group?.inscripcion?.estado || state.group?.inscripcionEstado || "") || "normal",
-      linkGeneradoPor: getDisplayName(state.effectiveUser),
-      linkGeneradoPorCorreo: state.effectiveEmail,
-      linkGeneradoAt: state.group?.inscripcionHabilitada
-        ? (state.group?.inscripcion?.linkGeneradoAt || state.group?.fechaAperturaInscripcion || null)
-        : serverTimestamp(),
-      ultimaRegeneracionPor: state.group?.inscripcionHabilitada ? getDisplayName(state.effectiveUser) : "",
-      ultimaRegeneracionPorCorreo: state.group?.inscripcionHabilitada ? state.effectiveEmail : "",
-      ultimaRegeneracionAt: state.group?.inscripcionHabilitada ? serverTimestamp() : null
+      estado: faseNormalizada,
+      faseActual: faseNormalizada,
+      tokenActual: tokenInscripcion,
+      linkActual: link,
+
+      actualizadoPor: getDisplayName(state.effectiveUser),
+      actualizadoPorCorreo: state.effectiveEmail,
+      actualizadoAt: serverTimestamp(),
+
+      linkGeneradoPor: state.group?.inscripcion?.linkGeneradoPor || getDisplayName(state.effectiveUser),
+      linkGeneradoPorCorreo: state.group?.inscripcion?.linkGeneradoPorCorreo || state.effectiveEmail,
+      linkGeneradoAt: state.group?.inscripcion?.linkGeneradoAt || serverTimestamp()
     },
-  
+
     correoCambiosInscripcion:
       cleanText(state.group?.correoCambiosInscripcion || "") || DEFAULT_CORREO_CAMBIOS_INSCRIPCION
   };
 
   await saveGroupPatch(patch, {
-    tipoMovimiento: regenerando ? "inscripcion_regenerada" : "inscripcion_habilitada",
+    tipoMovimiento: `inscripcion_${faseNormalizada}_habilitada`,
     modulo: "inscripcion",
-    titulo: regenerando ? "Link de inscripción regenerado" : "Inscripción habilitada",
-    mensaje: regenerando
-      ? `${getDisplayName(state.effectiveUser)} regeneró el link público de inscripción del grupo.`
-      : `${getDisplayName(state.effectiveUser)} habilitó la inscripción pública del grupo.`,
+    titulo: `Inscripción abierta: ${label}`,
+    mensaje: `${getDisplayName(state.effectiveUser)} abrió la fase "${label}" y generó un nuevo link público.`,
     cambios: [
       {
-        campo: "inscripcionHabilitada",
-        anterior: !!state.group?.inscripcionHabilitada,
-        nuevo: true
+        campo: "inscripcionEstado",
+        anterior: getInscripcionEstadoActual(),
+        nuevo: faseNormalizada
       },
       {
         campo: "tokenInscripcion",
@@ -2393,15 +2440,65 @@ async function enableGroupInscripcion() {
     ]
   });
 
-  const link = getInscripcionPublicLink(state.groupId, tokenInscripcion);
-
   try {
     await navigator.clipboard.writeText(link);
-    showSaveNotice("Inscripción habilitada y link copiado.");
+    showSaveNotice(`${label} habilitada y link copiado.`);
   } catch {
-    showSaveNotice("Inscripción habilitada correctamente.");
+    showSaveNotice(`${label} habilitada correctamente.`);
     alert(`Link de inscripción:\n\n${link}`);
   }
+}
+
+async function cerrarInscripcion() {
+  if (!canEditGroup()) {
+    alert(getBlockedEditMessage());
+    return;
+  }
+
+  const ok = confirm("¿Quieres cerrar la inscripción pública de este grupo?");
+  if (!ok) return;
+
+  const estadoAnterior = getInscripcionEstadoActual();
+
+  await saveGroupPatch(
+    {
+      inscripcionHabilitada: false,
+      inscripcionEstado: "cerrada",
+      faseInscripcion: "cerrada",
+
+      inscripcion: {
+        ...(state.group?.inscripcion || {}),
+        estado: "cerrada",
+        faseActual: "cerrada",
+        actualizadoPor: getDisplayName(state.effectiveUser),
+        actualizadoPorCorreo: state.effectiveEmail,
+        actualizadoAt: serverTimestamp(),
+        cerradaPor: getDisplayName(state.effectiveUser),
+        cerradaPorCorreo: state.effectiveEmail,
+        cerradaAt: serverTimestamp()
+      }
+    },
+    {
+      tipoMovimiento: "inscripcion_cerrada",
+      modulo: "inscripcion",
+      titulo: "Inscripción cerrada",
+      mensaje: `${getDisplayName(state.effectiveUser)} cerró la inscripción pública del grupo.`,
+      cambios: [
+        {
+          campo: "inscripcionEstado",
+          anterior: estadoAnterior,
+          nuevo: "cerrada"
+        },
+        {
+          campo: "inscripcionHabilitada",
+          anterior: !!state.group?.inscripcionHabilitada,
+          nuevo: false
+        }
+      ]
+    }
+  );
+
+  showSaveNotice("Inscripción cerrada correctamente.");
 }
 
 async function copyGroupInscripcionLink() {
@@ -2410,7 +2507,8 @@ async function copyGroupInscripcionLink() {
     return;
   }
 
-  const link = getInscripcionPublicLink(state.groupId, state.group.tokenInscripcion);
+  const fase = getInscripcionEstadoActual();
+  const link = getInscripcionPublicLink(state.groupId, state.group.tokenInscripcion, fase);
 
   try {
     await navigator.clipboard.writeText(link);
@@ -2418,6 +2516,100 @@ async function copyGroupInscripcionLink() {
   } catch {
     alert(`No se pudo copiar automáticamente.\n\nCopia este link:\n\n${link}`);
   }
+}
+
+function buildInscripcionesExportRows() {
+  return state.inscripciones.map((item) => ({
+    documento: getInscripcionDocumento(item),
+    apellidos: getInscripcionApellidos(item),
+    nombres: getInscripcionNombres(item),
+    fechaNacimiento: formatDateOnlyForTable(getByPath(item, "identificacion.fechaNacimiento")),
+    tipoViajante: formatInscripcionValue(item.tipoViajante || item.tipoParticipacion || ""),
+    nacionalidad: getInscripcionNacionalidad(item),
+    generoSexo: getInscripcionGenero(item),
+    responsablePrincipal: getResponsablePrincipalNombre(item),
+    correoResponsable: getByPath(item, "contactoPrincipal.correo") || "",
+    celularResponsable:
+      getByPath(item, "contactoPrincipal.celular") ||
+      getByPath(item, "contactoPrincipal.telefono") ||
+      getByPath(item, "contactoPrincipal.whatsapp") ||
+      "",
+    estadoInscripcion: formatInscripcionValue(item.estadoInscripcion || item.faseInscripcion || "normal")
+  }));
+}
+
+function downloadTextFile(filename, content, mime = "text/plain;charset=utf-8") {
+  const blob = new Blob([content], { type: mime });
+  const url = URL.createObjectURL(blob);
+
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+function exportarInscripcionesCsv() {
+  const rows = buildInscripcionesExportRows();
+
+  if (!rows.length) {
+    alert("No hay inscripciones para exportar.");
+    return;
+  }
+
+  const headers = Object.keys(rows[0]);
+
+  const csv = [
+    headers.join(";"),
+    ...rows.map((row) =>
+      headers.map((key) => {
+        const value = String(row[key] ?? "").replaceAll('"', '""');
+        return `"${value}"`;
+      }).join(";")
+    )
+  ].join("\n");
+
+  const nombre = `inscripciones_${state.groupId}_${new Date().toISOString().slice(0, 10)}.csv`;
+  downloadTextFile(nombre, csv, "text/csv;charset=utf-8");
+}
+
+function exportarInscripcionesExcel() {
+  const rows = buildInscripcionesExportRows();
+
+  if (!rows.length) {
+    alert("No hay inscripciones para exportar.");
+    return;
+  }
+
+  const headers = Object.keys(rows[0]);
+
+  const html = `
+    <html>
+      <head>
+        <meta charset="UTF-8" />
+      </head>
+      <body>
+        <table>
+          <thead>
+            <tr>${headers.map((h) => `<th>${escapeHtml(h)}</th>`).join("")}</tr>
+          </thead>
+          <tbody>
+            ${rows.map((row) => `
+              <tr>
+                ${headers.map((h) => `<td>${escapeHtml(row[h] ?? "")}</td>`).join("")}
+              </tr>
+            `).join("")}
+          </tbody>
+        </table>
+      </body>
+    </html>
+  `;
+
+  const nombre = `inscripciones_${state.groupId}_${new Date().toISOString().slice(0, 10)}.xls`;
+  downloadTextFile(nombre, html, "application/vnd.ms-excel;charset=utf-8");
 }
 
 function prioritizeFichaPanelInLayout() {
@@ -3242,12 +3434,18 @@ function syncButtons() {
   if (btnAbrirFichaPdf) btnAbrirFichaPdf.disabled = !ficha.pdfUrl;
 
   const btnHabilitarInscripcion = $("btnHabilitarInscripcion");
+  const btnCerrarInscripcion = $("btnCerrarInscripcion");
+  const btnAbrirNuevosInscritos = $("btnAbrirNuevosInscritos");
+  const btnAbrirListaEspera = $("btnAbrirListaEspera");
   const btnCopiarLinkInscripcion = $("btnCopiarLinkInscripcion");
-
+  const btnExportarInscripcionesExcel = $("btnExportarInscripcionesExcel");
+  const btnExportarInscripcionesCsv = $("btnExportarInscripcionesCsv");
+  
   const canManageInscripcion = editable && isGanada;
   const inscripcionYaHabilitada = !!state.group?.inscripcionHabilitada;
+  const tieneInscripciones = state.inscripciones.length > 0;
 
-  if (btnHabilitarInscripcion) {
+    if (btnHabilitarInscripcion) {
     btnHabilitarInscripcion.disabled = !canManageInscripcion;
     btnHabilitarInscripcion.textContent = inscripcionYaHabilitada
       ? "Regenerar link inscripción"
@@ -3256,6 +3454,26 @@ function syncButtons() {
 
   if (btnCopiarLinkInscripcion) {
     btnCopiarLinkInscripcion.disabled = !inscripcionYaHabilitada;
+  }
+
+  if (btnCerrarInscripcion) {
+    btnCerrarInscripcion.disabled = !canManageInscripcion || !inscripcionYaHabilitada;
+  }
+  
+  if (btnAbrirNuevosInscritos) {
+    btnAbrirNuevosInscritos.disabled = !canManageInscripcion;
+  }
+  
+  if (btnAbrirListaEspera) {
+    btnAbrirListaEspera.disabled = !canManageInscripcion;
+  }
+  
+  if (btnExportarInscripcionesExcel) {
+    btnExportarInscripcionesExcel.disabled = !tieneInscripciones;
+  }
+  
+  if (btnExportarInscripcionesCsv) {
+    btnExportarInscripcionesCsv.disabled = !tieneInscripciones;
   }
 
   const btnContrato = $("btnCrearContrato");
@@ -3609,8 +3827,13 @@ function bindEvents() {
   
   $("btnCrearFicha")?.addEventListener("click", openFichaEditor);
   $("btnAbrirFichaPdf")?.addEventListener("click", openFichaPdf);
-  $("btnHabilitarInscripcion")?.addEventListener("click", enableGroupInscripcion);
+  $("btnHabilitarInscripcion")?.addEventListener("click", () => cambiarFaseInscripcion("normal"));
+  $("btnCerrarInscripcion")?.addEventListener("click", cerrarInscripcion);
+  $("btnAbrirNuevosInscritos")?.addEventListener("click", () => cambiarFaseInscripcion("nuevos"));
+  $("btnAbrirListaEspera")?.addEventListener("click", () => cambiarFaseInscripcion("lista_espera"));
   $("btnCopiarLinkInscripcion")?.addEventListener("click", copyGroupInscripcionLink);
+  $("btnExportarInscripcionesExcel")?.addEventListener("click", exportarInscripcionesExcel);
+  $("btnExportarInscripcionesCsv")?.addEventListener("click", exportarInscripcionesCsv);
 
   $("btnCrearContrato")?.addEventListener("click", () => {
     if (!state.group?.autorizada) {
