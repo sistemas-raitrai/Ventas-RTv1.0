@@ -962,17 +962,22 @@
         <div class="form-grid">
         
           <div id="emergenciaMismoResponsableWrap" class="field hidden">
-            <label>¿El contacto de emergencia es la misma persona responsable indicada anteriormente?</label>
-        
+            <label>¿El contacto de emergencia 1 corresponde a una de las personas responsables indicadas anteriormente?</label>
+          
             <div class="radio-group">
               <label class="option-pill">
-                <input type="radio" name="emergenciaMismoResponsable" value="si" />
-                Sí, usar responsable 1
+                <input type="radio" name="emergenciaMismoResponsable" value="responsable_1" />
+                Usar responsable 1
               </label>
-        
+          
+              <label id="emergenciaUsarResponsable2Wrap" class="option-pill hidden">
+                <input type="radio" name="emergenciaMismoResponsable" value="responsable_2" />
+                Usar responsable 2
+              </label>
+          
               <label class="option-pill">
-                <input type="radio" name="emergenciaMismoResponsable" value="no" />
-                No, ingresar otro contacto
+                <input type="radio" name="emergenciaMismoResponsable" value="manual" />
+                Ingresar otro contacto
               </label>
             </div>
           </div>
@@ -1021,6 +1026,27 @@
         </div>
       
         <div id="bloqueEmergencia2" class="form-grid hidden" style="margin-top:18px;">
+          <div id="emergencia2MismoResponsableWrap" class="field hidden">
+            <label>¿El contacto de emergencia 2 corresponde a una de las personas responsables indicadas anteriormente?</label>
+          
+            <div class="radio-group">
+              <label class="option-pill">
+                <input type="radio" name="emergencia2MismoResponsable" value="responsable_1" />
+                Usar responsable 1
+              </label>
+          
+              <label id="emergencia2UsarResponsable2Wrap" class="option-pill hidden">
+                <input type="radio" name="emergencia2MismoResponsable" value="responsable_2" />
+                Usar responsable 2
+              </label>
+          
+              <label class="option-pill">
+                <input type="radio" name="emergencia2MismoResponsable" value="manual" />
+                Ingresar otro contacto
+              </label>
+            </div>
+          </div>
+          
           <div class="field col-6">
             <label for="emergencia2Nombre">Nombre completo contacto de emergencia 2</label>
             <input id="emergencia2Nombre" name="emergencia2Nombre" type="text" />
