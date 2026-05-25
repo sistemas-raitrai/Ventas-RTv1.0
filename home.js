@@ -384,19 +384,21 @@ function isCorreccionFichaPendiente(row = {}) {
 
 function getCorreccionFichaEstado(row = {}) {
   const flow = row.flowFicha || {};
-  const estado = normalizeLoose(flow.correccionEstado || "");
+  const modo = normalizeLoose(flow.modo || row.fichaFlujoModo || "");
 
-  if (estado) return estado;
+  if (modo !== "correccion") return "";
 
-  if (
-    flow.requiereRefirmaAdministracion === true &&
-    tuvoPdfOficialAlgunaVez(row)
-  ) {
-    if (flow?.jefaVentas?.firmado) return "pendiente_administracion";
-    return "pendiente_jefa";
+  const firmas = getFichaFirmas(row);
+
+  if (firmas.vendedor && firmas.jefa && firmas.admin) {
+    return "";
   }
 
-  return "";
+  if (firmas.jefa) {
+    return "pendiente_administracion";
+  }
+
+  return "pendiente_jefa";
 }
 
 function isFichaCorregidaVisibleParaUsuario(row = {}, user = null) {
@@ -631,9 +633,11 @@ function isFichaAutorizadaAdministrativa(row = {}) {
 
 function getFichaAdminMotivo(row = {}) {
   if (isFichaAbiertaAdministrativa(row)) {
-    const estado = normalizeLoose(row?.flowFicha?.correccionEstado || "");
+    const estado = getCorreccionFichaEstado(row);
+
     if (estado === "pendiente_jefa") return "Corrección pendiente de jefa de ventas";
     if (estado === "pendiente_administracion") return "Corrección pendiente de administración";
+
     return "Solicitud de actualización o corrección abierta";
   }
 
