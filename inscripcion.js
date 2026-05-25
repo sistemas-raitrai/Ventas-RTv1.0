@@ -1169,8 +1169,24 @@ function construirPayloadBase() {
     estudianteRelacionadoSegundoApellido
   ].filter(Boolean).join(" ");
 
+  const faseInscripcionGrupo =
+    limpiarTexto(grupoData?.inscripcionEstado) ||
+    limpiarTexto(grupoData?.faseInscripcion) ||
+    "normal";
+  
   return {
     tipoRegistro: "inscripcion_pasajero",
+  
+    faseInscripcion: faseInscripcionGrupo,
+    estadoInscripcion: faseInscripcionGrupo,
+  
+    privacidad: {
+      estado: "activa",
+      anonimizada: false,
+      eliminada: false,
+      motivo: ""
+    },
+  
     tipoViajante,
     esEstudiante,
     esProfesor,
