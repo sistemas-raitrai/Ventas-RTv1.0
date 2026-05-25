@@ -66,6 +66,7 @@ const state = {
   history: [],
   alertsManual: [],
   requests: [],
+  inscripciones: [],
   editingMeetingId: "",
 
   autoAlerts: [],
@@ -380,7 +381,8 @@ async function loadAll() {
     loadHistory(),
     loadManualAlerts(),
     loadRequests(),
-    loadEmailTemplates()
+    loadEmailTemplates(),
+    loadInscripciones()
   ]);
 
   state.autoAlerts = buildAutomaticAlerts();
@@ -519,6 +521,30 @@ async function loadEmailTemplates() {
       });
   } catch (error) {
     console.error("[grupo] loadEmailTemplates", error);
+  }
+}
+
+async function loadInscripciones() {
+  state.inscripciones = [];
+
+  try {
+    const snap = await getDocs(
+      collection(db, "ventas_cotizaciones", String(state.groupDocId), "inscripciones")
+    );
+
+    state.inscripciones = snap.docs
+      .map((d) => ({
+        id: d.id,
+        ...d.data()
+      }))
+      .filter((item) => item?.privacidad?.estado !== "eliminada_logica")
+      .sort((a, b) => {
+        const apA = normalizeSearchLocal(getInscripcionApellidos(a));
+        const apB = normalizeSearchLocal(getInscripcionApellidos(b));
+        return apA.localeCompare(apB, "es");
+      });
+  } catch (error) {
+    console.error("[grupo] loadInscripciones", error);
   }
 }
 
@@ -1246,6 +1272,205 @@ function getFichaSummary() {
     hotel: hotel || "—",
     fechaTentativa: fechaTentativa || "—"
   };
+}
+
+function renderInscripcionPasajerosPanel() {
+  const box = $("panelInscripcionPasajerosBody");
+  if (!box) return;
+
+  const total = state.inscripciones.length;
+  const capacidad = Number(state.group?.cantidadGrupo || 0);
+
+  const normales = state.inscripciones.filter((x) =>
+    normalizeSearchLocal(x.estadoInscripcion || x.faseInscripcion || "normal") === "normal"
+  ).length;
+
+  const nuevos = state.inscripciones.filter((x) =>
+    ["nuevos", "nuevo_inscrito"].includes(normalizeSearchLocal(x.estadoInscripcion || x.faseInscripcion || ""))
+  ).length;
+
+  const espera = state.inscripciones.filter((x) =>
+    ["lista_espera", "espera"].includes(normalizeSearchLocal(x.estadoInscripcion || x.faseInscripcion || ""))
+  ).length;
+
+  const estadoInscripcion =
+    state.group?.inscripcionEstado ||
+    state.group?.faseInscripcion ||
+    (state.group?.inscripcionHabilitada ? "normal" : "cerrada");
+
+  const linkInfo = state.group?.inscripcion || {};
+
+  const tabla = state.inscripciones.length
+    ? `
+      <div class="inscripcion-table-wrap">
+        <table class="inscripcion-table">
+          <thead>
+            <tr>
+              <th>RUT / Documento</th>
+              <th>Apellidos</th>
+              <th>Nombres</th>
+              <th>Fecha nacimiento</th>
+              <th>Tipo</th>
+              <th>Nacionalidad</th>
+              <th>Sexo / género</th>
+              <th>Responsable</th>
+              <th>Correo responsable</th>
+              <th>Celular responsable</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${state.inscripciones.map((item) => `
+              <tr>
+                <td>${escapeHtml(getInscripcionDocumento(item))}</td>
+                <td>${escapeHtml(getInscripcionApellidos(item))}</td>
+                <td>${escapeHtml(getInscripcionNombres(item))}</td>
+                <td>${escapeHtml(formatDateOnlyForTable(getByPath(item, "identificacion.fechaNacimiento")))}</td>
+                <td>${escapeHtml(formatInscripcionValue(item.tipoViajante || item.tipoParticipacion || ""))}</td>
+                <td>${escapeHtml(getInscripcionNacionalidad(item))}</td>
+                <td>${escapeHtml(getInscripcionGenero(item))}</td>
+                <td>${escapeHtml(getResponsablePrincipalNombre(item))}</td>
+                <td>${escapeHtml(getByPath(item, "contactoPrincipal.correo") || "—")}</td>
+                <td>${escapeHtml(getByPath(item, "contactoPrincipal.telefono") || getByPath(item, "contactoPrincipal.whatsapp") || "—")}</td>
+              </tr>
+            `).join("")}
+          </tbody>
+        </table>
+      </div>
+    `
+    : `<div class="empty-box">Todavía no hay personas inscritas para este grupo.</div>`;
+
+  box.innerHTML = `
+    <div class="grupo-kpi-list">
+      <div class="grupo-kpi">
+        <div class="info-label">Estado inscripción</div>
+        <div class="info-value">${escapeHtml(formatInscripcionValue(estadoInscripcion))}</div>
+      </div>
+
+      <div class="grupo-kpi">
+        <div class="info-label">Total inscritos</div>
+        <div class="info-value">${escapeHtml(`${total}${capacidad ? ` / ${capacidad}` : ""}`)}</div>
+      </div>
+
+      <div class="grupo-kpi">
+        <div class="info-label">Normal</div>
+        <div class="info-value">${escapeHtml(normales)}</div>
+      </div>
+
+      <div class="grupo-kpi">
+        <div class="info-label">Nuevos / espera</div>
+        <div class="info-value">${escapeHtml(`${nuevos} / ${espera}`)}</div>
+      </div>
+    </div>
+
+    <div class="inscripcion-traza">
+      <div>
+        <strong>Link:</strong>
+        ${state.group?.inscripcionHabilitada ? "Habilitado" : "No habilitado"}
+      </div>
+      <div>
+        <strong>Generado por:</strong>
+        ${escapeHtml(linkInfo.linkGeneradoPor || state.group?.inscripcionLinkGeneradoPor || "—")}
+      </div>
+      <div>
+        <strong>Fecha generación:</strong>
+        ${escapeHtml(formatDateTime(linkInfo.linkGeneradoAt || state.group?.fechaAperturaInscripcion))}
+      </div>
+    </div>
+
+    ${tabla}
+  `;
+}
+
+function getInscripcionDocumento(item = {}) {
+  return (
+    getByPath(item, "identificacion.documento") ||
+    getByPath(item, "identificacion.rutCompleto") ||
+    getByPath(item, "identificacion.documentoNormalizado") ||
+    item.id ||
+    "—"
+  );
+}
+
+function getInscripcionNombres(item = {}) {
+  return (
+    getByPath(item, "identificacion.nombres") ||
+    getByPath(item, "identificacion.nombre") ||
+    "—"
+  );
+}
+
+function getInscripcionApellidos(item = {}) {
+  const p1 = getByPath(item, "identificacion.primerApellido") || "";
+  const p2 = getByPath(item, "identificacion.segundoApellido") || "";
+  const unidos = [p1, p2].filter(Boolean).join(" ");
+  return unidos || "—";
+}
+
+function getInscripcionNacionalidad(item = {}) {
+  const nac = getByPath(item, "identificacion.nacionalidad") || "";
+  const otra = getByPath(item, "identificacion.nacionalidadOtra") || "";
+  return normalizeSearchLocal(nac) === "otra" && otra
+    ? otra
+    : (nac || "—");
+}
+
+function getInscripcionGenero(item = {}) {
+  const genero = getByPath(item, "identificacion.genero") || "";
+  const generoOtro = getByPath(item, "identificacion.generoOtro") || "";
+  const sexoDocumento = getByPath(item, "documentoIdentidad.sexoDocumento") || "";
+
+  if (sexoDocumento) return formatInscripcionValue(sexoDocumento);
+  if (normalizeSearchLocal(genero) === "otro" && generoOtro) return generoOtro;
+
+  return genero ? formatInscripcionValue(genero) : "—";
+}
+
+function getResponsablePrincipalNombre(item = {}) {
+  const nombreCompleto = getByPath(item, "contactoPrincipal.nombreCompleto");
+  if (nombreCompleto) return nombreCompleto;
+
+  const nombres = getByPath(item, "contactoPrincipal.nombres") || "";
+  const p1 = getByPath(item, "contactoPrincipal.primerApellido") || "";
+  const p2 = getByPath(item, "contactoPrincipal.segundoApellido") || "";
+
+  return [nombres, p1, p2].filter(Boolean).join(" ") || "—";
+}
+
+function formatDateOnlyForTable(value) {
+  if (!value) return "—";
+
+  if (typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    const [yyyy, mm, dd] = value.split("-");
+    return `${dd}-${mm}-${yyyy}`;
+  }
+
+  const d = toDate(value);
+  if (!d) return String(value);
+
+  return d.toLocaleDateString("es-CL");
+}
+
+function formatInscripcionValue(value = "") {
+  const raw = String(value || "").trim();
+  if (!raw) return "—";
+
+  const map = {
+    estudiante: "Estudiante",
+    profesor: "Profesor(a)",
+    profesora: "Profesor(a)",
+    adulto_acompanante: "Adulto(a) acompañante",
+    adulto: "Adulto(a) acompañante",
+    normal: "Normal",
+    nuevos: "Nuevos inscritos",
+    nuevo_inscrito: "Nuevo inscrito",
+    lista_espera: "Lista de espera",
+    cerrada: "Cerrada",
+    masculino: "Masculino",
+    femenino: "Femenino"
+  };
+
+  const key = normalizeSearchLocal(raw).replace(/\s+/g, "_");
+  return map[key] || raw.replaceAll("_", " ");
 }
 
 function renderFichaPanel() {
@@ -2124,7 +2349,25 @@ async function enableGroupInscripcion() {
   const patch = {
     inscripcionHabilitada: true,
     tokenInscripcion,
+  
+    inscripcionEstado:
+      cleanText(state.group?.inscripcionEstado || "") || "normal",
+  
     fechaAperturaInscripcion: serverTimestamp(),
+  
+    inscripcion: {
+      ...(state.group?.inscripcion || {}),
+      estado: cleanText(state.group?.inscripcion?.estado || state.group?.inscripcionEstado || "") || "normal",
+      linkGeneradoPor: getDisplayName(state.effectiveUser),
+      linkGeneradoPorCorreo: state.effectiveEmail,
+      linkGeneradoAt: state.group?.inscripcionHabilitada
+        ? (state.group?.inscripcion?.linkGeneradoAt || state.group?.fechaAperturaInscripcion || null)
+        : serverTimestamp(),
+      ultimaRegeneracionPor: state.group?.inscripcionHabilitada ? getDisplayName(state.effectiveUser) : "",
+      ultimaRegeneracionPorCorreo: state.group?.inscripcionHabilitada ? state.effectiveEmail : "",
+      ultimaRegeneracionAt: state.group?.inscripcionHabilitada ? serverTimestamp() : null
+    },
+  
     correoCambiosInscripcion:
       cleanText(state.group?.correoCambiosInscripcion || "") || DEFAULT_CORREO_CAMBIOS_INSCRIPCION
   };
@@ -2248,6 +2491,7 @@ function renderGroup() {
   renderHero();
   renderSituacion();
   renderDatos();
+  renderInscripcionPasajerosPanel();
   renderFichaPanel();
   renderDocs();
   renderMeetings();
