@@ -2518,23 +2518,43 @@ async function copyGroupInscripcionLink() {
   }
 }
 
+function soloDigitos(value = "") {
+  return String(value || "").replace(/\D/g, "");
+}
+
 function buildInscripcionesExportRows() {
-  return state.inscripciones.map((item) => ({
-    documento: getInscripcionDocumento(item),
-    apellidos: getInscripcionApellidos(item),
-    nombres: getInscripcionNombres(item),
-    fechaNacimiento: formatDateOnlyForTable(getByPath(item, "identificacion.fechaNacimiento")),
-    tipoViajante: formatInscripcionValue(item.tipoViajante || item.tipoParticipacion || ""),
-    nacionalidad: getInscripcionNacionalidad(item),
-    generoSexo: getInscripcionGenero(item),
-    responsablePrincipal: getResponsablePrincipalNombre(item),
-    correoResponsable: getByPath(item, "contactoPrincipal.correo") || "",
-    celularResponsable:
+  return state.inscripciones.map((item, index) => ({
+    "Número": index + 1,
+
+    "1.- Rut": soloDigitos(getInscripcionDocumento(item)),
+
+    "2.- Apellidos del Alumno": getInscripcionApellidos(item),
+
+    "3.- Nombre del Alumno": getInscripcionNombres(item),
+
+    "4.- Fecha Nacimiento": formatDateOnlyForTable(
+      getByPath(item, "identificacion.fechaNacimiento")
+    ),
+
+    "5.- Tipo Pasajero": formatInscripcionValue(
+      item.tipoViajante || item.tipoParticipacion || ""
+    ),
+
+    "6.- Nacionalidad": getInscripcionNacionalidad(item),
+
+    "7.- Sexo": getInscripcionGenero(item),
+
+    "8.- Nombre del Apoderado": getResponsablePrincipalNombre(item),
+
+    "9.- Correo del Apoderado":
+      getByPath(item, "contactoPrincipal.correo") || "",
+
+    "10.- Celular Apoderado": soloDigitos(
       getByPath(item, "contactoPrincipal.celular") ||
       getByPath(item, "contactoPrincipal.telefono") ||
       getByPath(item, "contactoPrincipal.whatsapp") ||
-      "",
-    estadoInscripcion: formatInscripcionValue(item.estadoInscripcion || item.faseInscripcion || "normal")
+      ""
+    )
   }));
 }
 
