@@ -2518,6 +2518,22 @@ async function copyGroupInscripcionLink() {
   }
 }
 
+function normalizarTextoExport(value = "") {
+  const limpio = String(value || "")
+    .trim()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/\s+/g, " ");
+
+  if (!limpio) return "";
+
+  return limpio
+    .split(" ")
+    .map((p) => p ? p.charAt(0).toUpperCase() + p.slice(1) : "")
+    .join(" ");
+}
+
 function soloDigitos(value = "") {
   return String(value || "").replace(/\D/g, "");
 }
@@ -2528,9 +2544,9 @@ function buildInscripcionesExportRows() {
 
     "1.- Rut": soloDigitos(getInscripcionDocumento(item)),
 
-    "2.- Apellidos del Alumno": getInscripcionApellidos(item),
-
-    "3.- Nombre del Alumno": getInscripcionNombres(item),
+    "2.- Apellidos del Alumno": normalizarTextoExport(getInscripcionApellidos(item)),
+    
+    "3.- Nombre del Alumno": normalizarTextoExport(getInscripcionNombres(item)),
 
     "4.- Fecha Nacimiento": formatDateOnlyForTable(
       getByPath(item, "identificacion.fechaNacimiento")
@@ -2540,11 +2556,11 @@ function buildInscripcionesExportRows() {
       item.tipoViajante || item.tipoParticipacion || ""
     ),
 
-    "6.- Nacionalidad": getInscripcionNacionalidad(item),
-
-    "7.- Sexo": getInscripcionGenero(item),
-
-    "8.- Nombre del Apoderado": getResponsablePrincipalNombre(item),
+    "6.- Nacionalidad": normalizarTextoExport(getInscripcionNacionalidad(item)),
+    
+    "7.- Sexo": normalizarTextoExport(getInscripcionGenero(item)),
+    
+    "8.- Nombre del Apoderado": normalizarTextoExport(getResponsablePrincipalNombre(item)),
 
     "9.- Correo del Apoderado":
       getByPath(item, "contactoPrincipal.correo") || "",
