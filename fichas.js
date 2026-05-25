@@ -669,6 +669,32 @@ function getLatestOpenFichaUpdateRequest() {
   return getOpenFichaUpdateRequests()[0] || null;
 }
 
+function getOpenFichaCorrectionRequests() {
+  return state.requests.filter((item) => {
+    const tipo = normalizeSearchLocal(item.tipoSolicitud || "");
+    const estado = normalizeSearchLocal(item.estadoSolicitud || "");
+
+    return tipo === "correccion_ficha" &&
+      estado !== "completada" &&
+      estado !== "cerrada" &&
+      item.resuelta !== true;
+  });
+}
+
+function getPendingFichaCorrectionRequests() {
+  return getOpenFichaCorrectionRequests().filter((item) => {
+    return normalizeSearchLocal(item.estadoSolicitud || "") === "pendiente_jefa";
+  });
+}
+
+function getLatestPendingFichaCorrectionRequest() {
+  return getPendingFichaCorrectionRequests()[0] || null;
+}
+
+function getLatestOpenFichaCorrectionRequest() {
+  return getOpenFichaCorrectionRequests()[0] || null;
+}
+
 function isRealAdminRole() {
   return String(state.effectiveUser?.rol || "").toLowerCase() === "admin";
 }
@@ -2104,7 +2130,15 @@ async function signFlowFromFicha(step) {
     }
   
     const pendingRequest = getLatestPendingFichaUpdateRequest();
+    const pendingCorrection = getLatestPendingFichaCorrectionRequest();
+    
     const hadPendingRequest = !!pendingRequest;
+    const hadPendingCorrection = !!pendingCorrection;
+    
+    const esCorreccionActiva =
+      hadPendingCorrection ||
+      flow?.correccionPendiente === true ||
+      normalizeSearchLocal(flow?.modo || "") === "correccion";
   
     if (flow?.jefaVentas?.firmado && !hadPendingRequest) {
       alert("La firma de jefa de ventas ya está registrada.");
@@ -2132,6 +2166,9 @@ async function signFlowFromFicha(step) {
       legacy: false,
       estado: "revisada_jefa_ventas",
       requiereActualizacion: hadPendingRequest,
+      requiereRefirmaAdministracion: esCorreccionActiva ? true : flow?.requiereRefirmaAdministracion || false,
+      correccionPendiente: esCorreccionActiva ? true : flow?.correccionPendiente || false,
+      correccionEstado: esCorreccionActiva ? "pendiente_administracion" : flow?.correccionEstado || "",
       jefaVentas: {
         ...(state.group.flowFicha?.jefaVentas || {}),
         firmado: true,
@@ -2154,8 +2191,8 @@ async function signFlowFromFicha(step) {
     }
   
     const patch = {
-      fichaFlujoModo: "v2",
-      fichaEstado: "revisada_jefa_ventas",
+      fichaFlujoModo: esCorreccionActiva ? "correccion" : "v2",
+      fichaEstado: esCorreccionActiva ? "correccion_pendiente_administracion" : "revisada_jefa_ventas",
       firmaSupervision: nombre,
   
       documentos: {
@@ -2168,8 +2205,8 @@ async function signFlowFromFicha(step) {
   
       ficha: {
         ...(state.group.ficha || {}),
-        flujoModo: "v2",
-        estado: "revisada_jefa_ventas"
+        flujoModo: esCorreccionActiva ? "correccion" : "v2",
+        estado: esCorreccionActiva ? "correccion_pendiente_administracion" : "revisada_jefa_ventas"
       },
   
       flowFicha: flowPatch
@@ -2256,6 +2293,9 @@ async function signFlowFromFicha(step) {
       legacy: false,
       estado: "autorizada_admin",
       requiereActualizacion: false,
+      requiereRefirmaAdministracion: false,
+      correccionPendiente: false,
+      correccionEstado: "cerrada",
       requiereRefirmaAdministracion: false,
       administracion: {
         ...(state.group.flowFicha?.administracion || {}),
