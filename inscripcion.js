@@ -4,7 +4,10 @@ import { db } from "./firebase-init.js";
 
 import {
   doc,
-  getDoc
+  getDoc,
+  collection,
+  addDoc,
+  serverTimestamp
 } from "https://www.gstatic.com/firebasejs/11.7.3/firebase-firestore.js";
 
 // -----------------------------------------------------------------------------
@@ -106,8 +109,7 @@ const adultoCompromisoCard = $("adultoCompromisoCard");
 const CORREO_ADMIN = "administracion@raitrai.cl";
 const TELEFONO_ADMIN = "+56 (2) 2236 3232";
 const WHATSAPP_ADMIN = "(+569) 9818 3857";
-const URL_GUARDAR_INSCRIPCION =
-  "https://southamerica-west1-sist-op-rt.cloudfunctions.net/guardarInscripcionPublica";
+const COLECCION_INSCRIPCIONES_PENDIENTES = "inscripciones_pendientes_publicas";
 
 
 // -----------------------------------------------------------------------------
@@ -764,15 +766,11 @@ async function onSubmit(event) {
   btnEnviar.textContent = "Enviando formulario...";
 
   try {
-    const payloadBase = construirPayloadBase();
-    
-    const resultado = await enviarInscripcionAlBackend(payloadBase);
-    
-    if (!resultado?.ok) {
-      throw new Error(resultado?.code || resultado?.error || "error_guardando_inscripcion");
-    }
-    
-    mostrarPantallaFinal(payloadBase);
+      const payloadBase = construirPayloadBase();
+      
+      await enviarInscripcionPendiente(payloadBase);
+      
+      mostrarPantallaFinal(payloadBase);
 
   } catch (error) {
     console.error("ERROR INSCRIPCION:", {
@@ -819,28 +817,17 @@ async function onSubmit(event) {
 // -----------------------------------------------------------------------------
 // GUARDADO EN BACKEND
 // -----------------------------------------------------------------------------
-async function enviarInscripcionAlBackend(payloadBase) {
-  const response = await fetch(URL_GUARDAR_INSCRIPCION, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({
-      idGrupo,
-      token: tokenUrl,
-      payload: payloadBase
-    })
+async function enviarInscripcionPendiente(payloadBase) {
+  await addDoc(collection(db, COLECCION_INSCRIPCIONES_PENDIENTES), {
+    idGrupo,
+    token: tokenUrl,
+    payload: limpiarPayloadFirestore(payloadBase),
+    estado: "pendiente",
+    creadoEn: serverTimestamp(),
+    origen: "formulario_publico"
   });
 
-  const result = await response.json().catch(() => ({}));
-
-  if (!response.ok || !result.ok) {
-    const err = new Error(result?.code || result?.error || "error_guardando_inscripcion");
-    err.code = result?.code || "";
-    throw err;
-  }
-
-  return result;
+  return { ok: true };
 }
 
 // -----------------------------------------------------------------------------
