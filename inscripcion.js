@@ -118,6 +118,7 @@ const COLECCION_INSCRIPCIONES_PENDIENTES = "inscripciones_pendientes_publicas";
 let grupoData = null;
 let idGrupo = "";
 let tokenUrl = "";
+let faseUrl = "normal";
 let correoCambios = CORREO_ADMIN;
 
 // -----------------------------------------------------------------------------
@@ -132,6 +133,7 @@ async function init() {
   const params = new URLSearchParams(window.location.search);
   idGrupo = limpiarTexto(params.get("grupo"));
   tokenUrl = limpiarTexto(params.get("token"));
+  faseUrl = normalizarFaseInscripcion(params.get("fase"));
 
   if (!idGrupo) {
     mostrarMensaje("error", "Falta el identificador del grupo en el enlace.");
@@ -161,8 +163,21 @@ async function cargarGrupo() {
 
   grupoData = { id: snap.id, ...snap.data() };
 
-  const inscripcionHabilitada = !!grupoData.inscripcionHabilitada;
-  const tokenGrupo = limpiarTexto(grupoData.tokenInscripcion);
+  const esLinkLiberado = faseUrl === "liberado";
+  
+  const inscripcionHabilitada = esLinkLiberado
+    ? !!grupoData.linkLiberadosActivo
+    : !!grupoData.inscripcionHabilitada;
+  
+  const tokenGrupo = esLinkLiberado
+    ? limpiarTexto(grupoData.tokenInscripcionLiberados)
+    : limpiarTexto(grupoData.tokenInscripcion);
+
+  if (!esLinkLiberado && grupoData.inscripcionEstado === "cerrada") {
+    mostrarMensaje("error", "La inscripción para este grupo se encuentra cerrada.");
+    bloquearFormulario();
+    return;
+  }
 
   correoCambios = limpiarTexto(grupoData.correoCambiosInscripcion) || CORREO_ADMIN;
 
@@ -203,6 +218,8 @@ async function cargarGrupo() {
   }
 
   if (chipAno) chipAno.textContent = String(grupoData.anoViaje || "-");
+
+  renderBannerFaseInscripcion();
 }
 
 // -----------------------------------------------------------------------------
@@ -821,6 +838,7 @@ async function enviarInscripcionPendiente(payloadBase) {
   await addDoc(collection(db, COLECCION_INSCRIPCIONES_PENDIENTES), {
     idGrupo,
     token: tokenUrl,
+    fase: faseUrl,
     payload: limpiarPayloadFirestore(payloadBase),
     estado: "pendiente",
     creadoEn: serverTimestamp(),
@@ -1176,6 +1194,11 @@ function construirPayloadBase() {
   
   return {
     tipoRegistro: "inscripcion_pasajero",
+    
+    faseInscripcion: faseUrl,
+    tipoInscripcion: getTipoInscripcionActual(),
+    tipoInscripcionLabel: getTipoInscripcionLabelPublico(),
+    estadoCupo: getEstadoCupoActual(),
   
     faseInscripcion: faseInscripcionGrupo,
     estadoInscripcion: faseInscripcionGrupo,
@@ -1600,6 +1623,77 @@ function bloquearFormulario() {
   form?.querySelectorAll("input, select, textarea, button").forEach((el) => {
     el.disabled = true;
   });
+}
+
+function normalizarFaseInscripcion(value = "") {
+  const key = limpiarTexto(value)
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+
+  if (key === "nuevos") return "nuevos";
+  if (key === "lista_espera") return "lista_espera";
+  if (key === "liberado") return "liberado";
+
+  return "normal";
+}
+
+function getTipoInscripcionActual() {
+  if (faseUrl === "nuevos") return "nuevo_ingreso";
+  if (faseUrl === "lista_espera") return "lista_espera";
+  if (faseUrl === "liberado") return "liberado";
+
+  return "nomina_inicial";
+}
+
+function getEstadoCupoActual() {
+  if (faseUrl === "lista_espera") return "pendiente_confirmacion";
+
+  return "confirmado";
+}
+
+function getTipoInscripcionLabelPublico() {
+  if (faseUrl === "nuevos") return "Nuevo ingreso";
+  if (faseUrl === "lista_espera") return "Lista de espera";
+  if (faseUrl === "liberado") return "Cupo liberado";
+
+  return "Nómina inicial";
+}
+
+function renderBannerFaseInscripcion() {
+  const box = $("bannerFaseInscripcion");
+  if (!box) return;
+
+  let html = "";
+
+  if (faseUrl === "nuevos") {
+    box.className = "notice time";
+    html = `
+      <strong>Ingreso posterior a la nómina inicial.</strong><br>
+      Esta inscripción corresponde a un nuevo ingreso al grupo de viaje. La gestión de pagos o cuotas deberá ser confirmada con Administración, ya que podrían existir condiciones particulares según el avance del grupo.
+    `;
+  } else if (faseUrl === "lista_espera") {
+    box.className = "notice error";
+    html = `
+      <strong>Inscripción en lista de espera.</strong><br>
+      Esta inscripción no confirma cupo automáticamente. Turismo Rai Trai Viajes de Estudio informará posteriormente si el cupo queda confirmado.
+    `;
+  } else if (faseUrl === "liberado") {
+    box.className = "notice ok";
+    html = `
+      <strong>Cupo liberado.</strong><br>
+      Estás ingresando al grupo de viaje mediante un cupo liberado. Completa la información solicitada para registrar correctamente la participación.
+    `;
+  } else {
+    box.className = "notice privacy";
+    html = `
+      <strong>Inscripción inicial del grupo.</strong><br>
+      Completa este formulario para registrar a la persona que participará en el viaje.
+    `;
+  }
+
+  box.innerHTML = html;
+  box.classList.remove("hidden");
 }
 
 // -----------------------------------------------------------------------------
