@@ -588,8 +588,7 @@ async function countVisitsForRowInSeason(row = {}) {
     snap.forEach((docSnap) => {
       const item = docSnap.data() || {};
       if (!historyItemCountsAsVisit(item)) return;
-      if (!isDateWithinVisitSeason(item.fecha)) return;
-
+      
       const fechaGestion =
         item.metadata?.fechaGestion ||
         item.metadata?.fechaVisita ||
@@ -597,6 +596,8 @@ async function countVisitsForRowInSeason(row = {}) {
         item.fechaGestion ||
         item.fechaVisita ||
         item.fecha;
+      
+      if (!isDateWithinVisitSeason(fechaGestion)) return;
 
       const d = toDateValue(fechaGestion);
       if (!d) return;
@@ -1360,11 +1361,25 @@ function setTextSafe(id, value) {
   if (el) el.textContent = String(value ?? "");
 }
 
+function rowHasGestion(row = {}) {
+  return !!(
+    row.trabajado ||
+    row.visitado ||
+    row.metrics?.wasVisitedInSeason ||
+    row.ultimaGestionTipo ||
+    row.ultimaGestionAsunto ||
+    row.ultimaGestionMensaje ||
+    row.fechaUltimaVisita ||
+    row.ultimaGestionFechaText ||
+    row.ultimaGestionAt
+  );
+}
+
 function renderCarteraSummary(rows = []) {
   const total = rows.length;
-  const visitados = rows.filter((r) => r.metrics?.wasVisitedInSeason).length;
+  const visitados = rows.filter((r) => r.metrics?.wasVisitedInSeason || r.visitado).length;
   const gestionMes = rows.filter(isManagedLastMonth).length;
-  const sinGestion = rows.filter((r) => !r.trabajado && !r.ultimaGestionTipo && !r.ultimaGestionAsunto).length;
+  const sinGestion = rows.filter((r) => !rowHasGestion(r)).length;
   const conCotizacion = rows.filter((r) => (r.metrics?.totalQuotes || 0) > 0).length;
   const full = rows.filter(isFullCoverage).length;
   const top = getTopQuoteSchool(rows);
@@ -1388,7 +1403,7 @@ function renderCarteraSummary(rows = []) {
 
 function applyQuickFilter(rows = []) {
   if (state.quickFilter === "visitados") {
-    return rows.filter((r) => r.metrics?.wasVisitedInSeason);
+    return rows.filter((r) => r.metrics?.wasVisitedInSeason || r.visitado);
   }
 
   if (state.quickFilter === "gestionMes") {
@@ -1396,7 +1411,7 @@ function applyQuickFilter(rows = []) {
   }
 
   if (state.quickFilter === "sinGestion") {
-    return rows.filter((r) => !r.trabajado && !r.ultimaGestionTipo && !r.ultimaGestionAsunto);
+    return rows.filter((r) => !rowHasGestion(r));
   }
 
   if (state.quickFilter === "conCotizacion") {
