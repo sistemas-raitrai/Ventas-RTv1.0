@@ -73,6 +73,7 @@ const state = {
   vendorFilter: "",
   statusFilter: "ok",
   trabajoFilter: "all",
+  quickFilter: "all",
   includePastYears: false,
   search: "",
   modalMode: "create",
@@ -504,6 +505,13 @@ function isRegistroRole(user = state.effectiveUser) {
   return normalizeText(user?.rol || "").toLowerCase() === "registro";
 }
 
+function canManageCarteraStatus(user = state.effectiveUser) {
+  const email = normalizeEmail(user?.email || "");
+  const rol = normalizeText(user?.rol || "").toLowerCase();
+
+  return rol === "admin" || email === "chernandez@raitrai.cl";
+}
+
 function buildHistorySummaryForChanges(changes = []) {
   return changes
     .map((item) => `${item.label}: ${item.before || "vacío"} → ${item.after || "vacío"}`)
@@ -810,7 +818,9 @@ function buildItemPayload(input, existing = null) {
         ? input.ciudad
         : existing?.ciudad || ""
     ),
-    estatus: normalizeText(input.estatus),
+    estatus: canManageCarteraStatus()
+      ? normalizeText(input.estatus)
+      : normalizeText(existing?.estatus || input.estatus || "OK"),
     observaciones: normalizeText(
       input.observaciones !== undefined && input.observaciones !== null && input.observaciones !== ""
         ? input.observaciones
@@ -1119,8 +1129,7 @@ const SORTABLE_COLUMNS = [
   "trabajo",
   "visitasTemporada",
   "cotizaciones",
-  "faltantes",
-  "estatus"
+  "faltantes"
 ];
 
 const COLUMN_LABELS = {
@@ -1304,6 +1313,96 @@ function renderSortButton(key) {
   `;
 }
 
+function isManagedLastMonth(row = {}) {
+  const d = toDateValue(row.ultimaGestionAt || row.fechaUltimaVisita || row.ultimaGestionFechaText);
+  if (!d) return false;
+
+  const limitDate = new Date();
+  limitDate.setMonth(limitDate.getMonth() - 1);
+
+  return d >= limitDate;
+}
+
+function isFullCoverage(row = {}) {
+  const metrics = row.metrics || {};
+  const niveles = Array.isArray(row.nivelesColegio) ? row.nivelesColegio : [];
+
+  if (!niveles.length) return false;
+  return (metrics.faltantes || []).length === 0 && (metrics.totalQuotes || 0) > 0;
+}
+
+function getTopQuoteSchool(rows = []) {
+  const withQuotes = rows
+    .filter((row) => (row.metrics?.totalQuotes || 0) > 0)
+    .sort((a, b) => (b.metrics?.totalQuotes || 0) - (a.metrics?.totalQuotes || 0));
+
+  return withQuotes[0] || null;
+}
+
+function setTextSafe(id, value) {
+  const el = $(id);
+  if (el) el.textContent = String(value ?? "");
+}
+
+function renderCarteraSummary(rows = []) {
+  const total = rows.length;
+  const visitados = rows.filter((r) => r.metrics?.wasVisitedInSeason).length;
+  const gestionMes = rows.filter(isManagedLastMonth).length;
+  const sinGestion = rows.filter((r) => !r.trabajado && !r.ultimaGestionTipo && !r.ultimaGestionAsunto).length;
+  const conCotizacion = rows.filter((r) => (r.metrics?.totalQuotes || 0) > 0).length;
+  const full = rows.filter(isFullCoverage).length;
+  const top = getTopQuoteSchool(rows);
+
+  setTextSafe("sumCarteraTotal", total);
+  setTextSafe("sumCarteraVisitados", visitados);
+  setTextSafe("sumCarteraGestionMes", gestionMes);
+  setTextSafe("sumCarteraSinGestion", sinGestion);
+  setTextSafe("sumCarteraConCotizacion", conCotizacion);
+  setTextSafe("sumCarteraFull", full);
+
+  setTextSafe(
+    "sumCarteraTopCotizaciones",
+    top ? `${top.colegio || top.numeroColegio} · ${top.metrics?.totalQuotes || 0}` : "—"
+  );
+
+  document.querySelectorAll(".cartera-summary-card").forEach((btn) => {
+    btn.classList.toggle("is-active", btn.dataset.quickFilter === state.quickFilter);
+  });
+}
+
+function applyQuickFilter(rows = []) {
+  if (state.quickFilter === "visitados") {
+    return rows.filter((r) => r.metrics?.wasVisitedInSeason);
+  }
+
+  if (state.quickFilter === "gestionMes") {
+    return rows.filter(isManagedLastMonth);
+  }
+
+  if (state.quickFilter === "sinGestion") {
+    return rows.filter((r) => !r.trabajado && !r.ultimaGestionTipo && !r.ultimaGestionAsunto);
+  }
+
+  if (state.quickFilter === "conCotizacion") {
+    return rows.filter((r) => (r.metrics?.totalQuotes || 0) > 0);
+  }
+
+  if (state.quickFilter === "full") {
+    return rows.filter(isFullCoverage);
+  }
+
+  if (state.quickFilter === "topCotizaciones") {
+    const top = getTopQuoteSchool(rows);
+    if (!top) return [];
+    return rows.filter((r) =>
+      String(r.numeroColegio) === String(top.numeroColegio) &&
+      normalizeEmail(r.correoVendedor) === normalizeEmail(top.correoVendedor)
+    );
+  }
+
+  return rows;
+}
+
 function applyFilters() {
   let rows = [...state.rows];
 
@@ -1311,10 +1410,12 @@ function applyFilters() {
     rows = rows.filter(r => normalizeEmail(r.correoVendedor) === normalizeEmail(state.vendorFilter));
   }
 
-  if (state.statusFilter === "ok") {
-    rows = rows.filter(r => normalizeText(r.estatus) === "OK");
-  } else if (state.statusFilter === "pending") {
-    rows = rows.filter(r => normalizeText(r.estatus) !== "OK");
+  if (canManageCarteraStatus()) {
+    if (state.statusFilter === "ok") {
+      rows = rows.filter(r => normalizeText(r.estatus) === "OK");
+    } else if (state.statusFilter === "pending") {
+      rows = rows.filter(r => normalizeText(r.estatus) !== "OK");
+    }
   }
 
   if (state.trabajoFilter === "pendiente") {
@@ -1329,6 +1430,11 @@ function applyFilters() {
   if (q) {
     rows = rows.filter(r => getSearchTarget(r).includes(q));
   }
+
+  // Resumen primero: refleja filtros normales, antes del filtro rápido.
+  renderCarteraSummary(rows);
+
+  rows = applyQuickFilter(rows);
 
   state.filteredRows = rows;
   state.currentPage = 1;
@@ -1367,7 +1473,6 @@ function renderTable() {
       <th>${renderSortButton("visitasTemporada")}</th>
       <th>${renderSortButton("cotizaciones")}</th>
       <th>${renderSortButton("faltantes")}</th>
-      <th>${renderSortButton("estatus")}</th>
       <th class="actions-col actions-head">Acciones</th>
     </tr>
   `;
@@ -1396,6 +1501,7 @@ function renderTable() {
     const checked = state.selectedKeys.has(rowKey) ? "checked" : "";
     const canEdit = canEditCarteraRow(row);
     const canDelete = canDeleteCarteraRow();
+    const canSeeStatus = canManageCarteraStatus();
     const metrics = row.metrics || {
       totalQuotes: 0,
       yearlySummary: "—",
@@ -1457,7 +1563,16 @@ function renderTable() {
             />
           </td>
         ` : ""}
-        <td>${escapeHtml(row.numeroColegio)}</td>
+        <td>
+          <div class="numero-status-wrap">
+            <span>N° ${escapeHtml(row.numeroColegio)}</span>
+            ${canSeeStatus ? `
+              <span class="status-chip ${normalizeText(row.estatus) === "OK" ? "" : "pending"}">
+                ${escapeHtml(row.estatus || "SIN ESTATUS")}
+              </span>
+            ` : ""}
+          </div>
+        </td>
         <td>${escapeHtml(sellerName)}</td>
         <td class="logo-col">${logoHtml}</td>
         <td class="col-colegio">
@@ -1525,7 +1640,6 @@ function renderTable() {
             <strong class="cell-wrap" title="${escapeHtml(faltantesTxt)}">${escapeHtml(faltantesTxt)}</strong>
           </div>
         </td>
-        <td>${escapeHtml(row.estatus)}</td>
         <td class="actions-col">${actions}</td>
       </tr>
     `;
@@ -1777,7 +1891,8 @@ async function openCreateModal() {
   $("colegioInput").value = "";
   $("comunaInput").value = "";
   $("ciudadInput").value = "";
-  $("estatusInput").value = "";
+  $("estatusInput").value = "OK";
+  $("estatusModalField")?.classList.toggle("hidden", !canManageCarteraStatus());
   $("nivelesInput").value = "";
   $("observacionesInput").value = "";
 
@@ -1803,7 +1918,8 @@ async function openEditModal(row) {
   $("colegioInput").value = row.colegio || "";
   $("comunaInput").value = row.comuna || "";
   $("ciudadInput").value = row.ciudad || "";
-  $("estatusInput").value = row.estatus || "";
+  $("estatusInput").value = row.estatus || "OK";
+  $("estatusModalField")?.classList.toggle("hidden", !canManageCarteraStatus());
   $("nivelesInput").value = row.nivelesTexto || "";
   $("observacionesInput").value = row.observaciones || "";
 
@@ -1847,7 +1963,9 @@ function readModalInput() {
     colegio: normalizeText($("colegioInput")?.value || ""),
     comuna: normalizeText($("comunaInput")?.value || ""),
     ciudad: normalizeText($("ciudadInput")?.value || ""),
-    estatus: normalizeText($("estatusInput")?.value || ""),
+    estatus: canManageCarteraStatus()
+      ? normalizeText($("estatusInput")?.value || "")
+      : normalizeText(state.editingOriginal?.estatus || "OK"),
     observaciones: normalizeText($("observacionesInput")?.value || ""),
     correoVendedor: sellerEmail,
     nombreVendedor: vendor?.nombre || "",
@@ -1883,7 +2001,7 @@ function buildHistoryChanges(oldRow = {}, input = {}) {
     ["colegio", "Colegio"],
     ["comuna", "Comuna"],
     ["ciudad", "Ciudad"],
-    ["estatus", "Estatus"],
+    ...(canManageCarteraStatus() ? [["estatus", "Estatus"]] : []),
     ["observaciones", "Observaciones"],
     ["resumenNiveles", "Niveles"],
     ["ultimaGestionTipo", "Tipo gestión"],
@@ -2635,7 +2753,7 @@ function mapImportRow(rawRow) {
     numeroColegio: getAny("nro", "numero colegio", "número colegio", "numero", "número"),
     colegio: getAny("colegio", "nombre colegio"),
     comuna: getAny("comuna"),
-    estatus: getAny("estatus", "estado"),
+    estatus: canManageCarteraStatus() ? getAny("estatus", "estado") : "OK",
     observaciones: "",
     ciudad: "",
     nombreVendedor: vendor?.nombre || "",
@@ -2882,15 +3000,27 @@ async function exportXlsx() {
       progress: 15
     });
 
-    const exportRows = getSortedRows(state.filteredRows).map((row) => ({
-      "NRO": row.numeroColegio,
-      "VENDEDOR": `${row.nombreVendedor} ${row.apellidoVendedor}`.trim(),
-      "COLEGIO": row.colegio,
-      "COMUNA": row.comuna,
-      "ESTATUS": row.estatus,
-      "CIUDAD": row.ciudad,
-      "OBSERVACIONES": row.observaciones
-    }));
+    const exportRows = getSortedRows(state.filteredRows).map((row) => {
+      const base = {
+        "NRO": row.numeroColegio,
+        "VENDEDOR": `${row.nombreVendedor} ${row.apellidoVendedor}`.trim(),
+        "COLEGIO": row.colegio,
+        "COMUNA": row.comuna,
+        "CIUDAD": row.ciudad,
+        "NIVELES": row.resumenNiveles || "",
+        "VISITADO TEMPORADA": row.metrics?.wasVisitedInSeason ? "SI" : "NO",
+        "COTIZACIONES": row.metrics?.totalQuotes || 0,
+        "FALTANTES": (row.metrics?.faltantes || []).join(", "),
+        "ÚLTIMA GESTIÓN": [row.ultimaGestionTipo, row.ultimaGestionAsunto, row.ultimaGestionFechaText || row.fechaUltimaVisita].filter(Boolean).join(" · "),
+        "OBSERVACIONES": row.observaciones
+      };
+    
+      if (canManageCarteraStatus()) {
+        base["ESTATUS"] = row.estatus;
+      }
+    
+      return base;
+    });
 
     setProgressStatus({
       text: "Exportando XLSX...",
@@ -2969,6 +3099,7 @@ function bindPageEvents() {
   const modalBackdrop = $("modalForm");
   const btnAgregarContacto = $("btnAgregarContacto");
   const contactosContainer = $("contactosContainer");
+  const carteraSummary = $("carteraSummary");
 
   if (searchInput && !searchInput.dataset.bound) {
     searchInput.dataset.bound = "1";
@@ -2984,6 +3115,13 @@ function bindPageEvents() {
       state.vendorFilter = normalizeEmail(e.target.value || "");
       applyFilters();
     });
+  }
+
+  if (statusFilter) {
+    const statusWrap = statusFilter.closest(".field-wrap");
+    if (statusWrap) {
+      statusWrap.classList.toggle("hidden", !canManageCarteraStatus());
+    }
   }
 
     if (statusFilter && !statusFilter.dataset.bound) {
@@ -3314,6 +3452,19 @@ function bindPageEvents() {
       if (index < 0) return;
   
       removeContactoItemByIndex(index);
+    });
+  }
+
+  if (carteraSummary && !carteraSummary.dataset.bound) {
+    carteraSummary.dataset.bound = "1";
+  
+    carteraSummary.addEventListener("click", (e) => {
+      const btn = e.target.closest("[data-quick-filter]");
+      if (!btn) return;
+  
+      const filter = btn.dataset.quickFilter || "all";
+      state.quickFilter = state.quickFilter === filter ? "all" : filter;
+      applyFilters();
     });
   }
 }
