@@ -777,6 +777,88 @@
     }
 
     /* =========================================================
+       RESUMEN CARTERA TIPO SEGUIMIENTO
+    ========================================================= */
+    
+    .cartera-summary{
+      display:grid;
+      grid-template-columns:repeat(7, minmax(120px, 1fr));
+      gap:12px;
+      margin-bottom:18px;
+    }
+    
+    .cartera-summary-card{
+      background:#fff;
+      border:2px solid #d7dde6;
+      border-radius:12px;
+      padding:14px 16px;
+      min-height:86px;
+      display:flex;
+      flex-direction:column;
+      justify-content:center;
+      text-align:left;
+      cursor:pointer;
+      transition:transform .15s ease, box-shadow .15s ease, opacity .15s ease, border-color .15s ease;
+    }
+    
+    .cartera-summary-card:hover{
+      transform:translateY(-1px);
+      box-shadow:0 8px 18px rgba(36,18,56,.08);
+    }
+    
+    .cartera-summary-card.is-active{
+      border-color:rgba(58,42,82,.45);
+      box-shadow:0 8px 18px rgba(36,18,56,.08);
+    }
+    
+    .cartera-summary-card .label{
+      font-size:12px;
+      font-weight:800;
+      letter-spacing:.04em;
+      text-transform:uppercase;
+      color:#6d6480;
+      margin-bottom:6px;
+    }
+    
+    .cartera-summary-card .value{
+      font-size:30px;
+      font-weight:800;
+      color:var(--header);
+      line-height:1;
+    }
+    
+    .cartera-summary-card .value.small{
+      font-size:15px;
+      line-height:1.25;
+    }
+    
+    .status-chip{
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      min-height:22px;
+      padding:0 8px;
+      border-radius:999px;
+      font-size:11px;
+      font-weight:800;
+      background:#e7f8ee;
+      color:#18794e;
+      margin-top:4px;
+    }
+    
+    .status-chip.pending{
+      background:#fff3dd;
+      color:#8a5a00;
+    }
+    
+    .numero-status-wrap{
+      display:flex;
+      flex-direction:column;
+      gap:4px;
+      font-weight:800;
+    }
+
+    /* =========================================================
        MEJORAS TABLA CARTERA
     ========================================================= */
     
@@ -872,6 +954,24 @@
       display:flex;
       flex-direction:column;
       gap:6px;
+    }
+
+    @media (max-width: 1280px){
+      .cartera-summary{
+        grid-template-columns:repeat(4, minmax(120px, 1fr));
+      }
+    }
+    
+    @media (max-width: 760px){
+      .cartera-summary{
+        grid-template-columns:repeat(2, minmax(120px, 1fr));
+      }
+    }
+    
+    @media (max-width: 520px){
+      .cartera-summary{
+        grid-template-columns:1fr;
+      }
     }
     
     @media (max-width: 900px){
@@ -1011,6 +1111,43 @@
             <button id="btnRecargar" class="btn-page" type="button">Recargar</button>
           </div>
         </div>
+
+        <section class="cartera-summary" id="carteraSummary">
+          <button type="button" class="cartera-summary-card is-active" data-quick-filter="all">
+            <div class="label">Total colegios</div>
+            <div class="value" id="sumCarteraTotal">0</div>
+          </button>
+        
+          <button type="button" class="cartera-summary-card" data-quick-filter="visitados">
+            <div class="label">Visitados temporada</div>
+            <div class="value" id="sumCarteraVisitados">0</div>
+          </button>
+        
+          <button type="button" class="cartera-summary-card" data-quick-filter="gestionMes">
+            <div class="label">Gestión último mes</div>
+            <div class="value" id="sumCarteraGestionMes">0</div>
+          </button>
+        
+          <button type="button" class="cartera-summary-card" data-quick-filter="sinGestion">
+            <div class="label">Sin gestión</div>
+            <div class="value" id="sumCarteraSinGestion">0</div>
+          </button>
+        
+          <button type="button" class="cartera-summary-card" data-quick-filter="conCotizacion">
+            <div class="label">Con cotización</div>
+            <div class="value" id="sumCarteraConCotizacion">0</div>
+          </button>
+        
+          <button type="button" class="cartera-summary-card" data-quick-filter="full">
+            <div class="label">Full niveles</div>
+            <div class="value" id="sumCarteraFull">0</div>
+          </button>
+        
+          <button type="button" class="cartera-summary-card" data-quick-filter="topCotizaciones">
+            <div class="label">Más cotizaciones</div>
+            <div class="value small" id="sumCarteraTopCotizaciones">—</div>
+          </button>
+        </section>
   
         <div class="table-meta">
           <div id="tableSummary">0 registros</div>
@@ -1112,9 +1249,14 @@
             <input id="ciudadInput" type="text" />
           </div>
         
-          <div class="modal-field">
+          <div id="estatusModalField" class="modal-field hidden">
             <label for="estatusInput">Estatus</label>
-            <input id="estatusInput" type="text" />
+            <select id="estatusInput">
+              <option value="OK">OK</option>
+              <option value="PENDIENTE">PENDIENTE</option>
+              <option value="INACTIVO">INACTIVO</option>
+              <option value="REVISAR">REVISAR</option>
+            </select>
           </div>
         
           <div class="modal-field full">
