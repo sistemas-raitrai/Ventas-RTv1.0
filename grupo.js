@@ -1283,33 +1283,97 @@ function shouldShowInscripcionPanel() {
 }
 
 function getInscripcionEstadoActual() {
-  return cleanText(
+  const estado = cleanText(
     state.group?.inscripcionEstado ||
     state.group?.inscripcion?.estado ||
     state.group?.faseInscripcion ||
     ""
-  ) || "cerrada";
+  );
+
+  if (estado) return estado;
+
+  if (state.group?.inscripcionHabilitada) return "normal";
+
+  return "cerrada";
 }
 
-function mapFaseToEstadoPersona(fase = "") {
+function getTipoInscripcionFromFase(fase = "") {
   const key = normalizeSearchLocal(fase);
 
-  if (key === "normal") return "normal";
-  if (key === "nuevos") return "nuevo_inscrito";
+  if (key === "normal") return "nomina_inicial";
+  if (key === "nuevos") return "nuevo_ingreso";
   if (key === "lista_espera") return "lista_espera";
+  if (key === "liberado") return "liberado";
 
-  return key || "normal";
+  return "nomina_inicial";
+}
+
+function getEstadoCupoFromFase(fase = "") {
+  const key = normalizeSearchLocal(fase);
+
+  if (key === "lista_espera") return "pendiente_confirmacion";
+
+  return "confirmado";
 }
 
 function getInscripcionFaseLabel(fase = "") {
   const key = normalizeSearchLocal(fase);
 
-  if (key === "normal") return "Inscripción normal";
-  if (key === "nuevos") return "Nuevos participantes";
+  if (key === "normal") return "Inscripción inicial";
+  if (key === "nuevos") return "Nuevos ingresos";
   if (key === "lista_espera") return "Lista de espera";
+  if (key === "liberado") return "Liberados";
   if (key === "cerrada") return "Cerrada";
 
   return formatInscripcionValue(fase);
+}
+
+function getTipoInscripcionLabel(value = "") {
+  const key = normalizeSearchLocal(value);
+
+  if (key === "nomina_inicial") return "Nómina inicial";
+  if (key === "nuevo_ingreso") return "Nuevo ingreso";
+  if (key === "lista_espera") return "Lista de espera";
+  if (key === "lista_espera_confirmada") return "Lista de espera confirmada";
+  if (key === "liberado") return "Liberado";
+
+  return "Nómina inicial";
+}
+
+function getTipoInscripcionClass(item = {}) {
+  const tipo = normalizeSearchLocal(item.tipoInscripcion || item.estadoInscripcion || item.faseInscripcion || "nomina_inicial");
+  const estadoCupo = normalizeSearchLocal(item.estadoCupo || "");
+
+  if (tipo === "liberado") return "insc-liberado";
+  if (tipo === "lista_espera" && estadoCupo === "confirmado") return "insc-lista-espera-confirmada";
+  if (tipo === "lista_espera_confirmada") return "insc-lista-espera-confirmada";
+  if (tipo === "lista_espera") return "insc-lista-espera";
+  if (tipo === "nuevo_ingreso" || tipo === "nuevos") return "insc-nuevo-ingreso";
+
+  return "insc-nomina-inicial";
+}
+
+function getInscripcionTipoReal(item = {}) {
+  return (
+    item.tipoInscripcion ||
+    getTipoInscripcionFromFase(item.faseInscripcion || item.estadoInscripcion || "normal")
+  );
+}
+
+function getLiberadosPermitidos() {
+  return Number(
+    state.group?.liberados ||
+    state.group?.cantidadLiberados ||
+    state.group?.ficha?.liberados ||
+    state.group?.ficha?.cantidadLiberados ||
+    0
+  );
+}
+
+function getLiberadosUsados() {
+  return state.inscripciones.filter((item) =>
+    normalizeSearchLocal(getInscripcionTipoReal(item)) === "liberado"
+  ).length;
 }
 
 function renderInscripcionPasajerosPanel() {
@@ -1325,20 +1389,33 @@ function renderInscripcionPasajerosPanel() {
   const total = state.inscripciones.length;
   const capacidad = Number(state.group?.cantidadGrupo || 0);
 
-  const normales = state.inscripciones.filter((x) =>
-    normalizeSearchLocal(x.estadoInscripcion || x.faseInscripcion || "normal") === "normal"
+  const nominaInicial = state.inscripciones.filter((x) =>
+    normalizeSearchLocal(getInscripcionTipoReal(x)) === "nomina_inicial"
   ).length;
 
   const nuevos = state.inscripciones.filter((x) =>
-    ["nuevos", "nuevo_inscrito"].includes(normalizeSearchLocal(x.estadoInscripcion || x.faseInscripcion || ""))
+    normalizeSearchLocal(getInscripcionTipoReal(x)) === "nuevo_ingreso"
   ).length;
 
   const espera = state.inscripciones.filter((x) =>
-    ["lista_espera", "espera"].includes(normalizeSearchLocal(x.estadoInscripcion || x.faseInscripcion || ""))
+    normalizeSearchLocal(getInscripcionTipoReal(x)) === "lista_espera" &&
+    normalizeSearchLocal(x.estadoCupo || "") !== "confirmado"
   ).length;
+
+  const esperaConfirmada = state.inscripciones.filter((x) =>
+    normalizeSearchLocal(getInscripcionTipoReal(x)) === "lista_espera_confirmada" ||
+    (
+      normalizeSearchLocal(getInscripcionTipoReal(x)) === "lista_espera" &&
+      normalizeSearchLocal(x.estadoCupo || "") === "confirmado"
+    )
+  ).length;
+
+  const liberadosPermitidos = getLiberadosPermitidos();
+  const liberadosUsados = getLiberadosUsados();
 
   const estadoInscripcion = getInscripcionEstadoActual();
   const linkInfo = state.group?.inscripcion || {};
+  const liberadosInfo = state.group?.inscripcionLiberados || {};
 
   const tabla = state.inscripciones.length
     ? `
@@ -1346,33 +1423,52 @@ function renderInscripcionPasajerosPanel() {
         <table class="inscripcion-table">
           <thead>
             <tr>
+              <th>#</th>
+              <th>Tipo inscripción</th>
               <th>RUT / Documento</th>
               <th>Apellidos</th>
               <th>Nombres</th>
               <th>Fecha nacimiento</th>
-              <th>Tipo</th>
+              <th>Tipo pasajero</th>
               <th>Nacionalidad</th>
               <th>Sexo / género</th>
               <th>Responsable</th>
               <th>Correo responsable</th>
               <th>Celular responsable</th>
+              <th>Acciones</th>
             </tr>
           </thead>
           <tbody>
-            ${state.inscripciones.map((item) => `
-              <tr>
-                <td>${escapeHtml(getInscripcionDocumento(item))}</td>
-                <td>${escapeHtml(getInscripcionApellidos(item))}</td>
-                <td>${escapeHtml(getInscripcionNombres(item))}</td>
-                <td>${escapeHtml(formatDateOnlyForTable(getByPath(item, "identificacion.fechaNacimiento")))}</td>
-                <td>${escapeHtml(formatInscripcionValue(item.tipoViajante || item.tipoParticipacion || ""))}</td>
-                <td>${escapeHtml(getInscripcionNacionalidad(item))}</td>
-                <td>${escapeHtml(getInscripcionGenero(item))}</td>
-                <td>${escapeHtml(getResponsablePrincipalNombre(item))}</td>
-                <td>${escapeHtml(getByPath(item, "contactoPrincipal.correo") || "—")}</td>
-                <td>${escapeHtml(getByPath(item, "contactoPrincipal.celular") || getByPath(item, "contactoPrincipal.telefono") || getByPath(item, "contactoPrincipal.whatsapp") || "—")}</td>
-              </tr>
-            `).join("")}
+            ${state.inscripciones.map((item, index) => {
+              const tipoReal = getInscripcionTipoReal(item);
+              const esListaEsperaPendiente =
+                normalizeSearchLocal(tipoReal) === "lista_espera" &&
+                normalizeSearchLocal(item.estadoCupo || "") !== "confirmado";
+
+              return `
+                <tr class="${escapeHtml(getTipoInscripcionClass(item))}">
+                  <td>${index + 1}</td>
+                  <td>${escapeHtml(getTipoInscripcionLabel(tipoReal))}</td>
+                  <td>${escapeHtml(getInscripcionDocumento(item))}</td>
+                  <td>${escapeHtml(getInscripcionApellidos(item))}</td>
+                  <td>${escapeHtml(getInscripcionNombres(item))}</td>
+                  <td>${escapeHtml(formatDateOnlyForTable(getByPath(item, "identificacion.fechaNacimiento")))}</td>
+                  <td>${escapeHtml(formatInscripcionValue(item.tipoViajante || item.tipoParticipacion || ""))}</td>
+                  <td>${escapeHtml(getInscripcionNacionalidad(item))}</td>
+                  <td>${escapeHtml(getInscripcionGenero(item))}</td>
+                  <td>${escapeHtml(getResponsablePrincipalNombre(item))}</td>
+                  <td>${escapeHtml(getByPath(item, "contactoPrincipal.correo") || "—")}</td>
+                  <td>${escapeHtml(getByPath(item, "contactoPrincipal.celular") || getByPath(item, "contactoPrincipal.telefono") || getByPath(item, "contactoPrincipal.whatsapp") || "—")}</td>
+                  <td>
+                    ${
+                      esListaEsperaPendiente
+                        ? `<button class="inscripcion-action-btn" type="button" data-confirmar-cupo="${escapeHtml(item.id)}">Confirmar cupo</button>`
+                        : "—"
+                    }
+                  </td>
+                </tr>
+              `;
+            }).join("")}
           </tbody>
         </table>
       </div>
@@ -1392,21 +1488,33 @@ function renderInscripcionPasajerosPanel() {
       </div>
 
       <div class="grupo-kpi">
-        <div class="info-label">Normal</div>
-        <div class="info-value">${escapeHtml(normales)}</div>
+        <div class="info-label">Nómina inicial</div>
+        <div class="info-value">${escapeHtml(nominaInicial)}</div>
       </div>
 
       <div class="grupo-kpi">
-        <div class="info-label">Nuevos / espera</div>
-        <div class="info-value">${escapeHtml(`${nuevos} / ${espera}`)}</div>
+        <div class="info-label">Nuevos ingresos</div>
+        <div class="info-value">${escapeHtml(nuevos)}</div>
+      </div>
+
+      <div class="grupo-kpi">
+        <div class="info-label">Lista espera</div>
+        <div class="info-value">${escapeHtml(`${espera} pendientes / ${esperaConfirmada} confirmados`)}</div>
+      </div>
+
+      <div class="grupo-kpi">
+        <div class="info-label">Liberados</div>
+        <div class="info-value">${escapeHtml(`${liberadosUsados}${liberadosPermitidos ? ` / ${liberadosPermitidos}` : ""}`)}</div>
       </div>
     </div>
 
     <div class="inscripcion-traza">
-      <div><strong>Link:</strong> ${state.group?.inscripcionHabilitada ? "Habilitado" : "No habilitado"}</div>
-      <div><strong>Fase actual:</strong> ${escapeHtml(getInscripcionFaseLabel(estadoInscripcion))}</div>
+      <div><strong>Link principal:</strong> ${state.group?.inscripcionHabilitada ? "Habilitado" : "No habilitado"}</div>
+      <div><strong>Estado inscripción:</strong> ${escapeHtml(getInscripcionFaseLabel(estadoInscripcion))}</div>
       <div><strong>Generado por:</strong> ${escapeHtml(linkInfo.actualizadoPor || linkInfo.linkGeneradoPor || state.group?.inscripcionLinkGeneradoPor || "—")}</div>
       <div><strong>Fecha generación:</strong> ${escapeHtml(formatDateTime(linkInfo.actualizadoAt || linkInfo.linkGeneradoAt || state.group?.fechaAperturaInscripcion))}</div>
+      <div><strong>Link liberados:</strong> ${state.group?.linkLiberadosActivo ? "Habilitado" : "No habilitado"}</div>
+      <div><strong>Liberados generado por:</strong> ${escapeHtml(liberadosInfo.actualizadoPor || liberadosInfo.linkGeneradoPor || "—")}</div>
     </div>
 
     ${tabla}
@@ -2388,7 +2496,7 @@ async function cambiarFaseInscripcion(fase = "normal") {
   const label = getInscripcionFaseLabel(faseNormalizada);
   const tokenInscripcion = generateInscripcionToken(32);
 
-  const ok = confirm(`¿Quieres abrir la fase "${label}" y generar un nuevo link público?`);
+  const ok = confirm(`¿Quieres abrir "${label}" y generar un nuevo link público?`);
   if (!ok) return;
 
   const link = getInscripcionPublicLink(state.groupId, tokenInscripcion, faseNormalizada);
@@ -2405,6 +2513,8 @@ async function cambiarFaseInscripcion(fase = "normal") {
       ...(state.group?.inscripcion || {}),
       estado: faseNormalizada,
       faseActual: faseNormalizada,
+      tipoInscripcionActual: getTipoInscripcionFromFase(faseNormalizada),
+      estadoCupoActual: getEstadoCupoFromFase(faseNormalizada),
       tokenActual: tokenInscripcion,
       linkActual: link,
 
@@ -2425,12 +2535,17 @@ async function cambiarFaseInscripcion(fase = "normal") {
     tipoMovimiento: `inscripcion_${faseNormalizada}_habilitada`,
     modulo: "inscripcion",
     titulo: `Inscripción abierta: ${label}`,
-    mensaje: `${getDisplayName(state.effectiveUser)} abrió la fase "${label}" y generó un nuevo link público.`,
+    mensaje: `${getDisplayName(state.effectiveUser)} abrió "${label}" y generó un nuevo link público.`,
     cambios: [
       {
         campo: "inscripcionEstado",
         anterior: getInscripcionEstadoActual(),
         nuevo: faseNormalizada
+      },
+      {
+        campo: "tipoInscripcionActual",
+        anterior: state.group?.inscripcion?.tipoInscripcionActual || "",
+        nuevo: getTipoInscripcionFromFase(faseNormalizada)
       },
       {
         campo: "tokenInscripcion",
@@ -2446,6 +2561,84 @@ async function cambiarFaseInscripcion(fase = "normal") {
   } catch {
     showSaveNotice(`${label} habilitada correctamente.`);
     alert(`Link de inscripción:\n\n${link}`);
+  }
+}
+
+async function crearLinkLiberados() {
+  if (!canEditGroup()) {
+    alert(getBlockedEditMessage());
+    return;
+  }
+
+  if (normalizeState(state.group?.estado) !== "ganada") {
+    alert("El link de liberados solo se puede crear cuando el grupo está en estado GANADA.");
+    return;
+  }
+
+  const permitidos = getLiberadosPermitidos();
+  const usados = getLiberadosUsados();
+
+  if (permitidos && usados >= permitidos) {
+    const okCupo = confirm(
+      `Ya están usados ${usados} de ${permitidos} cupos liberados. ¿Quieres generar el link de todas formas?`
+    );
+    if (!okCupo) return;
+  }
+
+  const tokenLiberados = generateInscripcionToken(32);
+  const link = getInscripcionPublicLink(state.groupId, tokenLiberados, "liberado");
+
+  const ok = confirm("¿Quieres crear/regenerar el link para cupos liberados?");
+  if (!ok) return;
+
+  await saveGroupPatch(
+    {
+      linkLiberadosActivo: true,
+      tokenInscripcionLiberados: tokenLiberados,
+
+      inscripcionLiberados: {
+        ...(state.group?.inscripcionLiberados || {}),
+        activo: true,
+        tokenActual: tokenLiberados,
+        linkActual: link,
+        tipoInscripcionActual: "liberado",
+        estadoCupoActual: "confirmado",
+
+        actualizadoPor: getDisplayName(state.effectiveUser),
+        actualizadoPorCorreo: state.effectiveEmail,
+        actualizadoAt: serverTimestamp(),
+
+        linkGeneradoPor: state.group?.inscripcionLiberados?.linkGeneradoPor || getDisplayName(state.effectiveUser),
+        linkGeneradoPorCorreo: state.group?.inscripcionLiberados?.linkGeneradoPorCorreo || state.effectiveEmail,
+        linkGeneradoAt: state.group?.inscripcionLiberados?.linkGeneradoAt || serverTimestamp()
+      }
+    },
+    {
+      tipoMovimiento: "inscripcion_liberados_habilitada",
+      modulo: "inscripcion",
+      titulo: "Link de liberados habilitado",
+      mensaje: `${getDisplayName(state.effectiveUser)} creó/regeneró el link para cupos liberados.`,
+      cambios: [
+        {
+          campo: "tokenInscripcionLiberados",
+          anterior: state.group?.tokenInscripcionLiberados || "",
+          nuevo: tokenLiberados
+        },
+        {
+          campo: "linkLiberadosActivo",
+          anterior: !!state.group?.linkLiberadosActivo,
+          nuevo: true
+        }
+      ]
+    }
+  );
+
+  try {
+    await navigator.clipboard.writeText(link);
+    showSaveNotice("Link de liberados creado y copiado.");
+  } catch {
+    showSaveNotice("Link de liberados creado correctamente.");
+    alert(`Link liberados:\n\n${link}`);
   }
 }
 
@@ -2501,6 +2694,62 @@ async function cerrarInscripcion() {
   showSaveNotice("Inscripción cerrada correctamente.");
 }
 
+async function confirmarCupoListaEspera(inscripcionId = "") {
+  if (!canEditGroup()) {
+    alert(getBlockedEditMessage());
+    return;
+  }
+
+  const item = state.inscripciones.find((x) => x.id === inscripcionId);
+  if (!item) {
+    alert("No se encontró la inscripción seleccionada.");
+    return;
+  }
+
+  const nombre = [
+    getInscripcionNombres(item),
+    getInscripcionApellidos(item)
+  ].filter(Boolean).join(" ");
+
+  const ok = confirm(`¿Confirmar cupo para ${nombre || "esta persona"} desde lista de espera?`);
+  if (!ok) return;
+
+  const ref = doc(
+    db,
+    "ventas_cotizaciones",
+    String(state.groupDocId),
+    "inscripciones",
+    String(inscripcionId)
+  );
+
+  await updateDoc(ref, {
+    tipoInscripcion: "lista_espera_confirmada",
+    estadoCupo: "confirmado",
+    confirmadoDesdeListaEspera: true,
+    confirmadoCupoPor: getDisplayName(state.effectiveUser),
+    confirmadoCupoPorCorreo: state.effectiveEmail,
+    confirmadoCupoAt: serverTimestamp()
+  });
+
+  await createHistoryEntry({
+    tipoMovimiento: "inscripcion_lista_espera_confirmada",
+    modulo: "inscripcion",
+    titulo: "Cupo confirmado desde lista de espera",
+    mensaje: `${getDisplayName(state.effectiveUser)} confirmó cupo para ${nombre || "una persona"} desde lista de espera.`,
+    metadata: {
+      inscripcionId,
+      documento: getInscripcionDocumento(item),
+      nombreCompleto: nombre
+    }
+  });
+
+  await loadInscripciones();
+  renderInscripcionPasajerosPanel();
+  syncButtons();
+
+  showSaveNotice("Cupo confirmado correctamente.");
+}
+
 async function copyGroupInscripcionLink() {
   if (!state.group?.inscripcionHabilitada || !state.group?.tokenInscripcion) {
     alert("Este grupo todavía no tiene la inscripción habilitada.");
@@ -2542,24 +2791,28 @@ function buildInscripcionesExportRows() {
   return state.inscripciones.map((item, index) => ({
     "Número": index + 1,
 
+    "Tipo Inscripción": normalizarTextoExport(
+      getTipoInscripcionLabel(getInscripcionTipoReal(item))
+    ),
+
     "1.- Rut": soloDigitos(getInscripcionDocumento(item)),
 
     "2.- Apellidos del Alumno": normalizarTextoExport(getInscripcionApellidos(item)),
-    
+
     "3.- Nombre del Alumno": normalizarTextoExport(getInscripcionNombres(item)),
 
     "4.- Fecha Nacimiento": formatDateOnlyForTable(
       getByPath(item, "identificacion.fechaNacimiento")
     ),
 
-    "5.- Tipo Pasajero": formatInscripcionValue(
+    "5.- Tipo Pasajero": normalizarTextoExport(formatInscripcionValue(
       item.tipoViajante || item.tipoParticipacion || ""
-    ),
+    )),
 
     "6.- Nacionalidad": normalizarTextoExport(getInscripcionNacionalidad(item)),
-    
+
     "7.- Sexo": normalizarTextoExport(getInscripcionGenero(item)),
-    
+
     "8.- Nombre del Apoderado": normalizarTextoExport(getResponsablePrincipalNombre(item)),
 
     "9.- Correo del Apoderado":
@@ -3473,6 +3726,7 @@ function syncButtons() {
   const btnCerrarInscripcion = $("btnCerrarInscripcion");
   const btnAbrirNuevosInscritos = $("btnAbrirNuevosInscritos");
   const btnAbrirListaEspera = $("btnAbrirListaEspera");
+  const btnCrearLinkLiberados = $("btnCrearLinkLiberados");
   const btnCopiarLinkInscripcion = $("btnCopiarLinkInscripcion");
   const btnExportarInscripcionesExcel = $("btnExportarInscripcionesExcel");
   const btnExportarInscripcionesCsv = $("btnExportarInscripcionesCsv");
@@ -3480,18 +3734,18 @@ function syncButtons() {
   const canManageInscripcion = editable && isGanada;
   const inscripcionYaHabilitada = !!state.group?.inscripcionHabilitada;
   const tieneInscripciones = state.inscripciones.length > 0;
-
-    if (btnHabilitarInscripcion) {
+  
+  if (btnHabilitarInscripcion) {
     btnHabilitarInscripcion.disabled = !canManageInscripcion;
     btnHabilitarInscripcion.textContent = inscripcionYaHabilitada
-      ? "Regenerar link inscripción"
-      : "Habilitar inscripción";
+      ? "Regenerar inscripción inicial"
+      : "Abrir inscripción inicial";
   }
-
+  
   if (btnCopiarLinkInscripcion) {
     btnCopiarLinkInscripcion.disabled = !inscripcionYaHabilitada;
   }
-
+  
   if (btnCerrarInscripcion) {
     btnCerrarInscripcion.disabled = !canManageInscripcion || !inscripcionYaHabilitada;
   }
@@ -3502,6 +3756,13 @@ function syncButtons() {
   
   if (btnAbrirListaEspera) {
     btnAbrirListaEspera.disabled = !canManageInscripcion;
+  }
+  
+  if (btnCrearLinkLiberados) {
+    btnCrearLinkLiberados.disabled = !canManageInscripcion;
+    btnCrearLinkLiberados.textContent = state.group?.linkLiberadosActivo
+      ? "Regenerar link liberados"
+      : "Crear link liberados";
   }
   
   if (btnExportarInscripcionesExcel) {
@@ -3738,6 +3999,13 @@ function bindEvents() {
     btn.addEventListener("click", () => closeModal(btn.dataset.close));
   });
 
+  document.addEventListener("click", (event) => {
+    const btn = event.target.closest("[data-confirmar-cupo]");
+    if (!btn) return;
+  
+    confirmarCupoListaEspera(btn.dataset.confirmarCupo);
+  });
+
   document.addEventListener("click", (e) => {
     const btn = e.target.closest("[data-var]");
     if (!btn) return;
@@ -3867,6 +4135,7 @@ function bindEvents() {
   $("btnCerrarInscripcion")?.addEventListener("click", cerrarInscripcion);
   $("btnAbrirNuevosInscritos")?.addEventListener("click", () => cambiarFaseInscripcion("nuevos"));
   $("btnAbrirListaEspera")?.addEventListener("click", () => cambiarFaseInscripcion("lista_espera"));
+  $("btnCrearLinkLiberados")?.addEventListener("click", crearLinkLiberados);
   $("btnCopiarLinkInscripcion")?.addEventListener("click", copyGroupInscripcionLink);
   $("btnExportarInscripcionesExcel")?.addEventListener("click", exportarInscripcionesExcel);
   $("btnExportarInscripcionesCsv")?.addEventListener("click", exportarInscripcionesCsv);
