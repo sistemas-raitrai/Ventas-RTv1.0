@@ -953,6 +953,62 @@ function canEditGroup() {
   return canAccessGroup(state.group);
 }
 
+function isRolAdminOSupervision() {
+  const rol = String(state.effectiveUser?.rol || "").toLowerCase();
+  return rol === "admin" || rol === "supervision";
+}
+
+function isRolRegistro() {
+  const rol = String(state.effectiveUser?.rol || "").toLowerCase();
+  return rol === "registro";
+}
+
+function isRolAdministracionInscripcion() {
+  const email = normalizeEmail(state.effectiveEmail || "");
+
+  return (
+    isRolAdminOSupervision() ||
+    isRolRegistro() ||
+    email === "yenny@raitrai.cl" ||
+    email === "administracion@raitrai.cl" ||
+    email === "raitrai@raitrai.cl"
+  );
+}
+
+function isRolVendedorInscripcion() {
+  return String(state.effectiveUser?.rol || "").toLowerCase() === "vendedor";
+}
+
+function canGestionarInscripcionInicial() {
+  return normalizeState(state.group?.estado) === "ganada" && canEditGroup();
+}
+
+function canGestionarNuevosIngresos() {
+  return normalizeState(state.group?.estado) === "ganada" && (
+    canEditGroup() ||
+    isRolAdministracionInscripcion()
+  );
+}
+
+function canGestionarListaEspera() {
+  return normalizeState(state.group?.estado) === "ganada" && isRolAdministracionInscripcion();
+}
+
+function canGestionarLiberados() {
+  return normalizeState(state.group?.estado) === "ganada" && (
+    canEditGroup() ||
+    isRolAdministracionInscripcion()
+  );
+}
+
+function canConfirmarListaEspera() {
+  return normalizeState(state.group?.estado) === "ganada" && isRolAdministracionInscripcion();
+}
+
+function getBlockedInscripcionMessage() {
+  return "No tienes permisos para realizar esta acción de inscripción.";
+}
+
 function canManageMeetings() {
   if (!state.canModify) return false;
 
@@ -2482,17 +2538,23 @@ async function enableGroupInscripcion() {
 }
 
 async function cambiarFaseInscripcion(fase = "normal") {
-  if (!canEditGroup()) {
-    alert(getBlockedEditMessage());
-    return;
-  }
-
-  if (normalizeState(state.group?.estado) !== "ganada") {
-    alert("La inscripción solo se puede administrar cuando el grupo está en estado GANADA.");
-    return;
-  }
-
   const faseNormalizada = normalizeSearchLocal(fase);
+  
+  let puedeGestionar = false;
+  
+  if (faseNormalizada === "normal") {
+    puedeGestionar = canGestionarInscripcionInicial();
+  } else if (faseNormalizada === "nuevos") {
+    puedeGestionar = canGestionarNuevosIngresos();
+  } else if (faseNormalizada === "lista_espera") {
+    puedeGestionar = canGestionarListaEspera();
+  }
+  
+  if (!puedeGestionar) {
+    alert(getBlockedInscripcionMessage());
+    return;
+  }
+
   const label = getInscripcionFaseLabel(faseNormalizada);
   const tokenInscripcion = generateInscripcionToken(32);
 
@@ -2565,8 +2627,8 @@ async function cambiarFaseInscripcion(fase = "normal") {
 }
 
 async function crearLinkLiberados() {
-  if (!canEditGroup()) {
-    alert(getBlockedEditMessage());
+  if (!canGestionarLiberados()) {
+    alert(getBlockedInscripcionMessage());
     return;
   }
 
@@ -2643,8 +2705,8 @@ async function crearLinkLiberados() {
 }
 
 async function cerrarInscripcion() {
-  if (!canEditGroup()) {
-    alert(getBlockedEditMessage());
+  if (!canGestionarInscripcionInicial() && !canGestionarNuevosIngresos() && !canGestionarListaEspera()) {
+    alert(getBlockedInscripcionMessage());
     return;
   }
 
@@ -2695,8 +2757,8 @@ async function cerrarInscripcion() {
 }
 
 async function confirmarCupoListaEspera(inscripcionId = "") {
-  if (!canEditGroup()) {
-    alert(getBlockedEditMessage());
+  if (!canConfirmarListaEspera()) {
+    alert(getBlockedInscripcionMessage());
     return;
   }
 
@@ -3731,12 +3793,16 @@ function syncButtons() {
   const btnExportarInscripcionesExcel = $("btnExportarInscripcionesExcel");
   const btnExportarInscripcionesCsv = $("btnExportarInscripcionesCsv");
   
-  const canManageInscripcion = editable && isGanada;
+  const puedeInicial = canGestionarInscripcionInicial();
+  const puedeNuevos = canGestionarNuevosIngresos();
+  const puedeListaEspera = canGestionarListaEspera();
+  const puedeLiberados = canGestionarLiberados();
+  
   const inscripcionYaHabilitada = !!state.group?.inscripcionHabilitada;
   const tieneInscripciones = state.inscripciones.length > 0;
   
   if (btnHabilitarInscripcion) {
-    btnHabilitarInscripcion.disabled = !canManageInscripcion;
+    btnHabilitarInscripcion.disabled = !puedeInicial;
     btnHabilitarInscripcion.textContent = inscripcionYaHabilitada
       ? "Regenerar inscripción inicial"
       : "Abrir inscripción inicial";
@@ -3747,19 +3813,19 @@ function syncButtons() {
   }
   
   if (btnCerrarInscripcion) {
-    btnCerrarInscripcion.disabled = !canManageInscripcion || !inscripcionYaHabilitada;
+    btnCerrarInscripcion.disabled = !inscripcionYaHabilitada || (!puedeInicial && !puedeNuevos && !puedeListaEspera);
   }
   
   if (btnAbrirNuevosInscritos) {
-    btnAbrirNuevosInscritos.disabled = !canManageInscripcion;
+    btnAbrirNuevosInscritos.disabled = !puedeNuevos;
   }
   
   if (btnAbrirListaEspera) {
-    btnAbrirListaEspera.disabled = !canManageInscripcion;
+    btnAbrirListaEspera.disabled = !puedeListaEspera;
   }
   
   if (btnCrearLinkLiberados) {
-    btnCrearLinkLiberados.disabled = !canManageInscripcion;
+    btnCrearLinkLiberados.disabled = !puedeLiberados;
     btnCrearLinkLiberados.textContent = state.group?.linkLiberadosActivo
       ? "Regenerar link liberados"
       : "Crear link liberados";
