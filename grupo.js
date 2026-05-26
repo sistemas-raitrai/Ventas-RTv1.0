@@ -980,7 +980,11 @@ function isRolVendedorInscripcion() {
 }
 
 function canGestionarInscripcionInicial() {
-  return normalizeState(state.group?.estado) === "ganada" && canEditGroup();
+  return normalizeState(state.group?.estado) === "ganada" && (
+    canEditGroup() ||
+    (isRolVendedorInscripcion() && canAccessGroup(state.group)) ||
+    isRolAdministracionInscripcion()
+  );
 }
 
 function canGestionarNuevosIngresos() {
