@@ -1041,7 +1041,17 @@ function canGestionarListaEspera() {
 }
 
 function canGestionarLiberados() {
-  return normalizeState(state.group?.estado) === "ganada" && (
+  if (normalizeState(state.group?.estado) !== "ganada") return false;
+
+  // Liberados se habilita solo desde que ya existe inscripción inicial abierta o creada.
+  const yaExisteInscripcionInicial =
+    !!state.group?.inscripcionHabilitada ||
+    !!state.group?.tokenInscripcion ||
+    !!state.group?.inscripcion?.tokenActual;
+
+  if (!yaExisteInscripcionInicial) return false;
+
+  return (
     canEditGroup() ||
     (isRolVendedorInscripcion() && canAccessGroup(state.group)) ||
     isRolAdministracionInscripcion()
