@@ -583,16 +583,32 @@ async function countVisitsForRowInSeason(row = {}) {
   try {
     const snap = await getDocs(getHistoryCollectionRef(row.correoVendedor, row.numeroColegio));
 
-    let count = 0;
+    const fechasVisitadas = new Set();
 
     snap.forEach((docSnap) => {
       const item = docSnap.data() || {};
       if (!historyItemCountsAsVisit(item)) return;
       if (!isDateWithinVisitSeason(item.fecha)) return;
-      count += 1;
+
+      const fechaGestion =
+        item.metadata?.fechaGestion ||
+        item.metadata?.fechaVisita ||
+        item.metadata?.seguimientoFecha ||
+        item.fechaGestion ||
+        item.fechaVisita ||
+        item.fecha;
+
+      const d = toDateValue(fechaGestion);
+      if (!d) return;
+
+      const yyyy = d.getFullYear();
+      const mm = String(d.getMonth() + 1).padStart(2, "0");
+      const dd = String(d.getDate()).padStart(2, "0");
+
+      fechasVisitadas.add(`${yyyy}-${mm}-${dd}`);
     });
 
-    return count;
+    return fechasVisitadas.size;
   } catch (error) {
     console.warn("No se pudo contar visitas del colegio:", row.numeroColegio, error);
     return 0;
@@ -1864,11 +1880,6 @@ function setRegistroNameOnlyMode(enabled = false) {
     "estatusInput",
     "nivelesInput",
     "observacionesInput",
-    "gestionTipoInput",
-    "gestionAsuntoInput",
-    "gestionMensajeInput",
-    "visitadoCheck",
-    "fechaVisitaInput",
     "btnAgregarContacto"
   ];
 
@@ -2016,10 +2027,6 @@ function buildHistoryChanges(oldRow = {}, input = {}) {
     ...(canManageCarteraStatus() ? [["estatus", "Estatus"]] : []),
     ["observaciones", "Observaciones"],
     ["resumenNiveles", "Niveles"],
-    ["ultimaGestionTipo", "Tipo gestión"],
-    ["ultimaGestionAsunto", "Asunto gestión"],
-    ["ultimaGestionMensaje", "Mensaje gestión"],
-    ["fechaUltimaVisita", "Fecha visita"]
   ];
 
   const changes = [];
@@ -2342,7 +2349,9 @@ async function saveSeguimientoModal() {
       asunto: asunto || tipo || "Seguimiento comercial",
       mensaje: mensaje || `Se registró seguimiento comercial: ${tipo || "sin tipo"}.`,
       metadata: {
-        changes: [
+        fechaGestion: fecha,
+        fechaVisita: visitado ? fecha : "",
+        changes: [  
           {
             key: "seguimiento",
             label: "Seguimiento",
@@ -2597,15 +2606,6 @@ async function saveModal() {
       }
 
       const changes = buildHistoryChanges(old, input);
-
-      if (input.trabajado && (input.ultimaGestionTipo || input.ultimaGestionAsunto || input.ultimaGestionMensaje || input.fechaUltimaVisita)) {
-        changes.push({
-          key: "seguimiento",
-          label: "Seguimiento",
-          before: normalizeText(old.ultimaGestionTipo || ""),
-          after: [input.ultimaGestionTipo, input.ultimaGestionAsunto, input.fechaUltimaVisita].filter(Boolean).join(" · ")
-        });
-      }
 
       if (samePath) {
         await setDoc(newParentRef, buildParentVendorPayload(input), { merge: true });
