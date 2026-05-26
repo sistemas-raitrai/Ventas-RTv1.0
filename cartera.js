@@ -1602,7 +1602,7 @@ function renderTable() {
             </div>
             <button
               type="button"
-              class="btn-link-table"
+              class="btn-inline-action green"
               data-action="seguimiento"
               data-id="${escapeHtml(row.numeroColegio)}"
               data-email="${escapeHtml(row.correoVendedor)}"
@@ -1613,7 +1613,19 @@ function renderTable() {
         </td>
         <td>
           <div class="stack-tight">
-            <strong>${escapeHtml(visitadoTxt)}</strong>
+            ${metrics.wasVisitedInSeason ? `
+              <button
+                type="button"
+                class="btn-link-table"
+                data-action="visit-detail"
+                data-id="${escapeHtml(row.numeroColegio)}"
+                data-email="${escapeHtml(row.correoVendedor)}"
+              >
+                ${escapeHtml(visitadoTxt)}
+              </button>
+            ` : `
+              <strong>${escapeHtml(visitadoTxt)}</strong>
+            `}
             <div class="table-note">${escapeHtml(visitadoDetalleTxt)}</div>
           </div>
         </td>
@@ -2196,6 +2208,64 @@ function openQuotesModal(row) {
 
 function closeQuotesModal() {
   $("quotesModal")?.classList.remove("show");
+}
+
+async function openVisitDetailModal(row) {
+  const modal = $("historyModal");
+  const body = $("historyBody");
+  const title = $("historyTitle");
+
+  if (!modal || !body || !title || !row) return;
+
+  title.textContent = `Visitas · ${row.colegio || row.numeroColegio}`;
+  body.innerHTML = `<div class="history-empty">Cargando visitas...</div>`;
+  modal.classList.add("show");
+
+  try {
+    const qy = query(
+      getHistoryCollectionRef(row.correoVendedor, row.numeroColegio),
+      orderBy("fecha", "desc"),
+      limit(50)
+    );
+
+    const snap = await getDocs(qy);
+    const visitas = [];
+
+    snap.forEach((docSnap) => {
+      const item = docSnap.data() || {};
+      if (historyItemCountsAsVisit(item)) visitas.push(item);
+    });
+
+    if (!visitas.length) {
+      body.innerHTML = `
+        <div class="history-empty">
+          Este colegio figura como visitado, pero no se encontró detalle de visita en historial.
+        </div>
+      `;
+      return;
+    }
+
+    body.innerHTML = visitas.map((item) => `
+      <div class="history-item">
+        <div class="history-top">
+          <strong>${escapeHtml(item.tipo || "Visita")}</strong>
+          <span>${escapeHtml(formatDateOnly(item.fecha) || "Sin fecha")}</span>
+        </div>
+
+        ${item.asunto ? `<div class="history-line"><strong>Asunto:</strong> ${escapeHtml(item.asunto)}</div>` : ""}
+        ${item.mensaje ? `<div class="history-line"><strong>Detalle:</strong> ${escapeHtml(item.mensaje)}</div>` : ""}
+
+        <div class="history-line">
+          <strong>Hecho por:</strong>
+          ${escapeHtml(item.hechoPor || "—")}
+          ${item.hechoPorCorreo ? ` · ${escapeHtml(normalizeEmail(item.hechoPorCorreo))}` : ""}
+        </div>
+      </div>
+    `).join("");
+  } catch (error) {
+    console.error(error);
+    body.innerHTML = `<div class="history-empty">No se pudo cargar el detalle de visitas.</div>`;
+  }
 }
 
 function openSeguimientoModal(row) {
@@ -3335,6 +3405,7 @@ function bindPageEvents() {
       if (action === "edit") openEditModal(row);
       if (action === "seguimiento") openSeguimientoModal(row);
       if (action === "quotes") openQuotesModal(row);
+      if (action === "visit-detail") await openVisitDetailModal(row);
       if (action === "delete") await deleteRow(numeroColegio, correoVendedor);
       if (action === "history") await openHistoryModal(row);
     });
