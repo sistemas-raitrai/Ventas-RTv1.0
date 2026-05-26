@@ -1507,6 +1507,43 @@
       border-bottom:none;
     }
 
+    .inscripcion-table tr.insc-nomina-inicial td{
+      background:#ffffff;
+    }
+    
+    .inscripcion-table tr.insc-nuevo-ingreso td{
+      background:#fff8dc;
+    }
+    
+    .inscripcion-table tr.insc-lista-espera td{
+      background:#fff1f3;
+    }
+    
+    .inscripcion-table tr.insc-lista-espera-confirmada td{
+      background:#ffe7b8;
+    }
+    
+    .inscripcion-table tr.insc-liberado td{
+      background:#eafaf0;
+    }
+    
+    .inscripcion-action-btn{
+      min-height:30px;
+      padding:0 10px;
+      border-radius:999px;
+      border:none;
+      background:#09832e;
+      color:#fff;
+      font-size:12px;
+      font-weight:900;
+      cursor:pointer;
+    }
+    
+    .inscripcion-action-btn:disabled{
+      opacity:.45;
+      cursor:not-allowed;
+    }
+
     .hidden{
       display: none !important;
     }
@@ -1979,11 +2016,11 @@
       
             <div class="grupo-hero-actions" style="margin-top:0;">
               <button id="btnCopiarLinkInscripcion" class="btn-ok" type="button">
-                Copiar link
+                Copiar link activo
               </button>
-              
+            
               <button id="btnHabilitarInscripcion" class="btn-dark" type="button">
-                Habilitar inscripción
+                Abrir inscripción inicial
               </button>
             
               <button id="btnCerrarInscripcion" class="btn-danger" type="button">
@@ -1991,11 +2028,15 @@
               </button>
             
               <button id="btnAbrirNuevosInscritos" class="btn-pill" type="button">
-                Abrir nuevos participantes
+                Abrir nuevos ingresos
               </button>
             
               <button id="btnAbrirListaEspera" class="btn-pill" type="button">
                 Abrir lista de espera
+              </button>
+            
+              <button id="btnCrearLinkLiberados" class="btn-pill" type="button">
+                Crear link liberados
               </button>
             
               <button id="btnExportarInscripcionesExcel" class="btn-pill" type="button">
