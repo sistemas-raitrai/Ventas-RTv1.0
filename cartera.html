@@ -775,6 +775,104 @@
       display:flex;
       justify-content:flex-start;
     }
+
+    /* =========================================================
+       MEJORAS TABLA CARTERA
+    ========================================================= */
+    
+    .cartera-table{
+      min-width:1600px;
+    }
+    
+    .cartera-table tbody td{
+      white-space:normal;
+    }
+    
+    .col-niveles,
+    .col-faltantes{
+      width:280px;
+      min-width:280px;
+      max-width:280px;
+    }
+    
+    .col-colegio{
+      width:280px;
+      min-width:280px;
+      max-width:280px;
+    }
+    
+    .col-seguimiento{
+      width:220px;
+      min-width:220px;
+      max-width:220px;
+    }
+    
+    .col-cotizaciones{
+      width:150px;
+      min-width:150px;
+      max-width:150px;
+    }
+    
+    .cell-wrap{
+      white-space:normal;
+      overflow:hidden;
+      display:-webkit-box;
+      -webkit-line-clamp:3;
+      -webkit-box-orient:vertical;
+      line-height:1.35;
+    }
+    
+    .cell-wrap.expanded{
+      -webkit-line-clamp:unset;
+    }
+    
+    .btn-link-table{
+      border:none;
+      background:transparent;
+      color:var(--header);
+      font-weight:800;
+      cursor:pointer;
+      padding:0;
+      text-decoration:underline;
+      text-align:left;
+    }
+    
+    .btn-link-table:hover{
+      opacity:.75;
+    }
+    
+    .btn-seguimiento{
+      background:#0f766e;
+    }
+    
+    .quote-list{
+      display:flex;
+      flex-direction:column;
+      gap:10px;
+    }
+    
+    .quote-card{
+      border:1px solid #d8c9ef;
+      background:#faf8fd;
+      border-radius:12px;
+      padding:12px;
+    }
+    
+    .quote-card strong{
+      color:var(--header);
+    }
+    
+    .quote-meta{
+      font-size:13px;
+      color:#5a5862;
+      margin-top:4px;
+    }
+    
+    .seguimiento-resumen{
+      display:flex;
+      flex-direction:column;
+      gap:6px;
+    }
     
     @media (max-width: 900px){
       .contacto-grid{
@@ -1102,6 +1200,71 @@
         <div class="modal-foot">
           <button id="btnCancelarModal" class="btn-page sec" type="button">Cancelar</button>
           <button id="btnGuardarModal" class="btn-page green" type="button">Guardar</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="quotesModal" class="simple-modal">
+      <div class="history-modal-card">
+        <div class="simple-modal-head">
+          <h3 id="quotesTitle">Cotizaciones</h3>
+          <button id="quotesCloseBtn" type="button" class="modal-close-btn">✕</button>
+        </div>
+    
+        <div id="quotesBody" class="history-body"></div>
+    
+        <div class="simple-modal-actions">
+          <button id="quotesCloseBtn2" type="button" class="btn-page sec">Cerrar</button>
+        </div>
+      </div>
+    </div>
+    
+    <div id="seguimientoModal" class="simple-modal">
+      <div class="history-modal-card">
+        <div class="simple-modal-head">
+          <h3 id="seguimientoTitle">Seguimiento comercial</h3>
+          <button id="seguimientoCloseBtn" type="button" class="modal-close-btn">✕</button>
+        </div>
+    
+        <div class="modal-body" style="display:grid;">
+          <div class="modal-field">
+            <label for="seguimientoTipoInput">Tipo de gestión</label>
+            <select id="seguimientoTipoInput">
+              <option value="">Sin registrar</option>
+              <option value="LLAMADA">LLAMADA</option>
+              <option value="CORREO">CORREO</option>
+              <option value="VISITA">VISITA</option>
+              <option value="REUNION">REUNIÓN</option>
+              <option value="OTRO">OTRO</option>
+            </select>
+          </div>
+    
+          <div class="modal-field">
+            <label for="seguimientoFechaInput">Fecha gestión</label>
+            <input id="seguimientoFechaInput" type="date" />
+          </div>
+    
+          <div class="modal-field full">
+            <label for="seguimientoAsuntoInput">Asunto</label>
+            <input id="seguimientoAsuntoInput" type="text" />
+          </div>
+    
+          <div class="modal-field full">
+            <label for="seguimientoMensajeInput">Mensaje / detalle</label>
+            <textarea id="seguimientoMensajeInput"></textarea>
+          </div>
+    
+          <div class="modal-field full">
+            <label class="logo-remove-row" style="margin-top:0;">
+              <input id="seguimientoVisitadoCheck" type="checkbox" />
+              Marcar como visitado
+            </label>
+          </div>
+        </div>
+    
+        <div class="simple-modal-actions">
+          <button id="seguimientoCancelBtn" type="button" class="btn-page sec">Cancelar</button>
+          <button id="seguimientoSaveBtn" type="button" class="btn-page green">Guardar seguimiento</button>
         </div>
       </div>
     </div>
