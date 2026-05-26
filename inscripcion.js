@@ -1187,21 +1187,14 @@ function construirPayloadBase() {
     estudianteRelacionadoSegundoApellido
   ].filter(Boolean).join(" ");
 
-  const faseInscripcionGrupo =
-    limpiarTexto(grupoData?.inscripcionEstado) ||
-    limpiarTexto(grupoData?.faseInscripcion) ||
-    "normal";
-  
   return {
     tipoRegistro: "inscripcion_pasajero",
     
     faseInscripcion: faseUrl,
+    estadoInscripcion: getTipoInscripcionActual(),
     tipoInscripcion: getTipoInscripcionActual(),
     tipoInscripcionLabel: getTipoInscripcionLabelPublico(),
     estadoCupo: getEstadoCupoActual(),
-  
-    faseInscripcion: faseInscripcionGrupo,
-    estadoInscripcion: faseInscripcionGrupo,
   
     privacidad: {
       estado: "activa",
