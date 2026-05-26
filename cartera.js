@@ -77,6 +77,7 @@ const state = {
   search: "",
   modalMode: "create",
   editingOriginal: null,
+  seguimientoRow: null,
   vendors: [],
   selectedKeys: new Set(),
   pendingLogoFile: null,
@@ -1408,6 +1409,7 @@ function renderTable() {
     const actions = `
       <div class="table-actions">
         ${canEdit ? `<button class="btn-mini edit" data-action="edit" data-id="${escapeHtml(row.numeroColegio)}" data-email="${escapeHtml(row.correoVendedor)}">Editar</button>` : ""}
+        <button class="btn-mini btn-seguimiento" data-action="seguimiento" data-id="${escapeHtml(row.numeroColegio)}" data-email="${escapeHtml(row.correoVendedor)}">Seguimiento</button>
         ${canDelete ? `<button class="btn-mini delete" data-action="delete" data-id="${escapeHtml(row.numeroColegio)}" data-email="${escapeHtml(row.correoVendedor)}">Eliminar</button>` : ""}
         <button class="btn-mini view" data-action="history" data-id="${escapeHtml(row.numeroColegio)}" data-email="${escapeHtml(row.correoVendedor)}">Historial</button>
       </div>
@@ -1458,23 +1460,40 @@ function renderTable() {
         <td>${escapeHtml(row.numeroColegio)}</td>
         <td>${escapeHtml(sellerName)}</td>
         <td class="logo-col">${logoHtml}</td>
-        <td>
+        <td class="col-colegio">
           <div class="stack-tight">
-            <strong>${escapeHtml(row.colegio)}</strong>
-            <div class="table-note">${escapeHtml((row.contactosColegio || []).map(c => c.nombre).filter(Boolean).join(" · ") || "Sin contactos cargados")}</div>
+            <strong class="cell-wrap" title="${escapeHtml(row.colegio)}">${escapeHtml(row.colegio)}</strong>
+            <div class="table-note cell-wrap" title="${escapeHtml((row.contactosColegio || []).map(c => c.nombre).filter(Boolean).join(" · ") || "Sin contactos cargados")}">
+              ${escapeHtml((row.contactosColegio || []).map(c => c.nombre).filter(Boolean).join(" · ") || "Sin contactos cargados")}
+            </div>
           </div>
         </td>
         <td>${escapeHtml(row.comuna || row.ciudad || "—")}</td>
-        <td>
+        <td class="col-niveles">
           <div class="stack-tight">
-            <strong>${escapeHtml(row.resumenNiveles || "Sin definir")}</strong>
-            <div class="table-note">${escapeHtml(sinDetalleTxt || "—")}</div>
+            <strong class="cell-wrap" title="${escapeHtml(row.resumenNiveles || "Sin definir")}">
+              ${escapeHtml(row.resumenNiveles || "Sin definir")}
+            </strong>
+            <div class="table-note cell-wrap" title="${escapeHtml(sinDetalleTxt || "—")}">
+              ${escapeHtml(sinDetalleTxt || "—")}
+            </div>
           </div>
         </td>
-        <td>
-          <div class="stack-tight">
+        <td class="col-seguimiento">
+          <div class="seguimiento-resumen">
             <div>${trabajoChips}</div>
-            <div class="table-note">${escapeHtml(ultimaGestionTxt || "Sin gestión registrada")}</div>
+            <div class="table-note cell-wrap" title="${escapeHtml(ultimaGestionTxt || "Sin gestión registrada")}">
+              ${escapeHtml(ultimaGestionTxt || "Sin gestión registrada")}
+            </div>
+            <button
+              type="button"
+              class="btn-link-table"
+              data-action="seguimiento"
+              data-id="${escapeHtml(row.numeroColegio)}"
+              data-email="${escapeHtml(row.correoVendedor)}"
+            >
+              + Registrar gestión
+            </button>
           </div>
         </td>
         <td>
@@ -1483,15 +1502,27 @@ function renderTable() {
             <div class="table-note">${escapeHtml(visitadoDetalleTxt)}</div>
           </div>
         </td>
-        <td>
+        <td class="col-cotizaciones">
           <div class="stack-tight">
-            <strong>${escapeHtml(String(metrics.totalQuotes || 0))}</strong>
+            ${metrics.totalQuotes > 0 ? `
+              <button
+                type="button"
+                class="btn-link-table"
+                data-action="quotes"
+                data-id="${escapeHtml(row.numeroColegio)}"
+                data-email="${escapeHtml(row.correoVendedor)}"
+              >
+                ${escapeHtml(String(metrics.totalQuotes))} cotización${metrics.totalQuotes === 1 ? "" : "es"}
+              </button>
+            ` : `
+              <strong>0</strong>
+            `}
             <div class="table-note">${escapeHtml(metrics.yearlySummary || "—")}</div>
           </div>
         </td>
-        <td>
+        <td class="col-faltantes">
           <div class="stack-tight">
-            <strong>${escapeHtml(faltantesTxt)}</strong>
+            <strong class="cell-wrap" title="${escapeHtml(faltantesTxt)}">${escapeHtml(faltantesTxt)}</strong>
           </div>
         </td>
         <td>${escapeHtml(row.estatus)}</td>
@@ -1985,6 +2016,181 @@ async function openHistoryModal(row) {
 
 function closeHistoryModal() {
   $("historyModal")?.classList.remove("show");
+}
+
+function openQuotesModal(row) {
+  const modal = $("quotesModal");
+  const body = $("quotesBody");
+  const title = $("quotesTitle");
+
+  if (!modal || !body || !title || !row) return;
+
+  const quotes = row.metrics?.quotes || getQuotesForRow(row) || [];
+
+  title.textContent = `Cotizaciones · ${row.colegio || row.numeroColegio}`;
+
+  if (!quotes.length) {
+    body.innerHTML = `<div class="history-empty">No hay cotizaciones asociadas a este colegio.</div>`;
+    modal.classList.add("show");
+    return;
+  }
+
+  body.innerHTML = `
+    <div class="quote-list">
+      ${quotes.map((quote) => {
+        const nombreGrupo = quote.aliasGrupo || quote.nombreGrupo || quote.colegio || "Grupo sin nombre";
+        const curso = quote.cursoViaje || quote.curso || "Sin curso";
+        const anoViaje = quote.anoViaje || "Sin año";
+        const estado = quote.estado || quote.estadoComercial || "Sin estado";
+        const idGrupo = quote.id || quote.idGrupo || "";
+
+        return `
+          <div class="quote-card">
+            <strong>${escapeHtml(nombreGrupo)}</strong>
+            <div class="quote-meta">
+              Curso: ${escapeHtml(curso)} · Año: ${escapeHtml(String(anoViaje))} · Estado: ${escapeHtml(estado)}
+            </div>
+
+            <div class="quote-meta">
+              ID: ${escapeHtml(idGrupo || "—")}
+            </div>
+
+            ${idGrupo ? `
+              <div style="margin-top:10px;">
+                <button
+                  type="button"
+                  class="btn-mini view"
+                  data-action="go-quote"
+                  data-id="${escapeHtml(idGrupo)}"
+                >
+                  Ir al grupo
+                </button>
+              </div>
+            ` : ""}
+          </div>
+        `;
+      }).join("")}
+    </div>
+  `;
+
+  modal.classList.add("show");
+}
+
+function closeQuotesModal() {
+  $("quotesModal")?.classList.remove("show");
+}
+
+function openSeguimientoModal(row) {
+  const modal = $("seguimientoModal");
+  const title = $("seguimientoTitle");
+
+  if (!modal || !title || !row) return;
+
+  state.seguimientoRow = { ...row };
+
+  title.textContent = `Seguimiento comercial · ${row.colegio || row.numeroColegio}`;
+
+  $("seguimientoTipoInput").value = row.ultimaGestionTipo || "";
+  $("seguimientoFechaInput").value = row.fechaUltimaVisita || getDefaultCurrentDateInput();
+  $("seguimientoAsuntoInput").value = row.ultimaGestionAsunto || "";
+  $("seguimientoMensajeInput").value = row.ultimaGestionMensaje || "";
+  $("seguimientoVisitadoCheck").checked = !!row.visitado;
+
+  modal.classList.add("show");
+}
+
+function closeSeguimientoModal() {
+  state.seguimientoRow = null;
+  $("seguimientoModal")?.classList.remove("show");
+}
+
+async function saveSeguimientoModal() {
+  const row = state.seguimientoRow;
+  if (!row) return;
+
+  const tipo = normalizeText($("seguimientoTipoInput")?.value || "");
+  const fecha = normalizeText($("seguimientoFechaInput")?.value || "");
+  const asunto = normalizeText($("seguimientoAsuntoInput")?.value || "");
+  const mensaje = normalizeText($("seguimientoMensajeInput")?.value || "");
+  const visitado = !!$("seguimientoVisitadoCheck")?.checked || tipo === "VISITA";
+
+  if (!tipo && !asunto && !mensaje && !fecha && !visitado) {
+    alert("Debes registrar al menos un dato de seguimiento.");
+    return;
+  }
+
+  try {
+    setProgressStatus({
+      text: "Guardando seguimiento...",
+      meta: row.colegio || row.numeroColegio,
+      progress: 35
+    });
+
+    const itemRef = doc(
+      db,
+      "ventas_cartera",
+      normalizeEmail(row.correoVendedor),
+      "items",
+      String(row.numeroColegio)
+    );
+
+    await setDoc(itemRef, {
+      trabajado: true,
+      visitado,
+      fechaUltimaVisita: fecha,
+      ultimaGestionTipo: tipo,
+      ultimaGestionAsunto: asunto,
+      ultimaGestionMensaje: mensaje,
+      ultimaGestionFechaText: fecha,
+      ultimaGestionAt: serverTimestamp(),
+      actualizadoPor: normalizeEmail(state.realUser?.email || ""),
+      fechaActualizacion: serverTimestamp()
+    }, { merge: true });
+
+    await writeCarteraHistory({
+      correoVendedor: row.correoVendedor,
+      numeroColegio: row.numeroColegio,
+      tipo: visitado ? "Seguimiento / visita" : "Seguimiento comercial",
+      asunto: asunto || tipo || "Seguimiento comercial",
+      mensaje: mensaje || `Se registró seguimiento comercial: ${tipo || "sin tipo"}.`,
+      metadata: {
+        changes: [
+          {
+            key: "seguimiento",
+            label: "Seguimiento",
+            before: row.ultimaGestionAsunto || row.ultimaGestionTipo || "Sin gestión registrada",
+            after: [tipo, asunto, fecha].filter(Boolean).join(" · ")
+          },
+          {
+            key: "visitado",
+            label: "Visitado",
+            before: row.visitado ? "Sí" : "No",
+            after: visitado ? "Sí" : "No"
+          }
+        ]
+      }
+    });
+
+    closeSeguimientoModal();
+
+    setProgressStatus({
+      text: "Seguimiento guardado.",
+      meta: "La gestión quedó registrada en historial.",
+      progress: 100,
+      type: "success"
+    });
+
+    clearProgressStatus();
+    await loadData();
+  } catch (error) {
+    console.error(error);
+    setProgressStatus({
+      text: "Error guardando seguimiento.",
+      meta: error.message || "No se pudo guardar.",
+      progress: 100,
+      type: "error"
+    });
+  }
 }
 
 async function saveRegistroNombreOnly() {
@@ -2733,6 +2939,14 @@ function bindPageEvents() {
   const historyModal = $("historyModal");
   const historyCloseBtn = $("historyCloseBtn");
   const historyCloseBtn2 = $("historyCloseBtn2");
+  const quotesModal = $("quotesModal");
+  const quotesCloseBtn = $("quotesCloseBtn");
+  const quotesCloseBtn2 = $("quotesCloseBtn2");
+  
+  const seguimientoModal = $("seguimientoModal");
+  const seguimientoCloseBtn = $("seguimientoCloseBtn");
+  const seguimientoCancelBtn = $("seguimientoCancelBtn");
+  const seguimientoSaveBtn = $("seguimientoSaveBtn");
   const searchInput = $("searchInput");
   const vendorFilter = $("vendorFilter");
   const statusFilter = $("statusFilter");
@@ -2981,6 +3195,8 @@ function bindPageEvents() {
       if (!row) return;
 
       if (action === "edit") openEditModal(row);
+      if (action === "seguimiento") openSeguimientoModal(row);
+      if (action === "quotes") openQuotesModal(row);
       if (action === "delete") await deleteRow(numeroColegio, correoVendedor);
       if (action === "history") await openHistoryModal(row);
     });
@@ -3026,6 +3242,54 @@ function bindPageEvents() {
     historyModal.dataset.bound = "1";
     historyModal.addEventListener("click", (e) => {
       if (e.target === historyModal) closeHistoryModal();
+    });
+  }
+
+  if (quotesCloseBtn && !quotesCloseBtn.dataset.bound) {
+    quotesCloseBtn.dataset.bound = "1";
+    quotesCloseBtn.addEventListener("click", closeQuotesModal);
+  }
+  
+  if (quotesCloseBtn2 && !quotesCloseBtn2.dataset.bound) {
+    quotesCloseBtn2.dataset.bound = "1";
+    quotesCloseBtn2.addEventListener("click", closeQuotesModal);
+  }
+  
+  if (quotesModal && !quotesModal.dataset.bound) {
+    quotesModal.dataset.bound = "1";
+  
+    quotesModal.addEventListener("click", (e) => {
+      if (e.target === quotesModal) closeQuotesModal();
+  
+      const btn = e.target.closest('button[data-action="go-quote"]');
+      if (!btn) return;
+  
+      const idGrupo = btn.dataset.id || "";
+      if (!idGrupo) return;
+  
+      window.location.href = `grupo.html?id=${encodeURIComponent(idGrupo)}`;
+    });
+  }
+  
+  if (seguimientoCloseBtn && !seguimientoCloseBtn.dataset.bound) {
+    seguimientoCloseBtn.dataset.bound = "1";
+    seguimientoCloseBtn.addEventListener("click", closeSeguimientoModal);
+  }
+  
+  if (seguimientoCancelBtn && !seguimientoCancelBtn.dataset.bound) {
+    seguimientoCancelBtn.dataset.bound = "1";
+    seguimientoCancelBtn.addEventListener("click", closeSeguimientoModal);
+  }
+  
+  if (seguimientoSaveBtn && !seguimientoSaveBtn.dataset.bound) {
+    seguimientoSaveBtn.dataset.bound = "1";
+    seguimientoSaveBtn.addEventListener("click", saveSeguimientoModal);
+  }
+  
+  if (seguimientoModal && !seguimientoModal.dataset.bound) {
+    seguimientoModal.dataset.bound = "1";
+    seguimientoModal.addEventListener("click", (e) => {
+      if (e.target === seguimientoModal) closeSeguimientoModal();
     });
   }
 
