@@ -979,6 +979,33 @@ function isRolVendedorInscripcion() {
   return String(state.effectiveUser?.rol || "").toLowerCase() === "vendedor";
 }
 
+function getAnoViajeInscripcion() {
+  return Number(state.group?.anoViaje || 0);
+}
+
+function inscripcionPrincipalEstaCerrada() {
+  return !state.group?.inscripcionHabilitada || getInscripcionEstadoActual() === "cerrada";
+}
+
+function esFechaListaEsperaAutomatica() {
+  const anoViaje = getAnoViajeInscripcion();
+  if (!anoViaje || anoViaje < 2027) return false;
+
+  const hoy = new Date();
+  const inicioListaEspera = new Date(anoViaje, 2, 16, 0, 0, 0); // 16 marzo
+
+  return hoy >= inicioListaEspera;
+}
+
+function debeSugerirListaEspera() {
+  const anoViaje = getAnoViajeInscripcion();
+
+  if (anoViaje === 2026 && inscripcionPrincipalEstaCerrada()) return true;
+  if (anoViaje >= 2027 && esFechaListaEsperaAutomatica()) return true;
+
+  return false;
+}
+
 function canGestionarInscripcionInicial() {
   return normalizeState(state.group?.estado) === "ganada" && (
     canEditGroup() ||
@@ -988,7 +1015,18 @@ function canGestionarInscripcionInicial() {
 }
 
 function canGestionarNuevosIngresos() {
-  return normalizeState(state.group?.estado) === "ganada" && (
+  const anoViaje = getAnoViajeInscripcion();
+
+  if (normalizeState(state.group?.estado) !== "ganada") return false;
+  if (!inscripcionPrincipalEstaCerrada()) return false;
+
+  // Para 2026, después del cierre debe ir directo a lista de espera.
+  if (anoViaje === 2026) return false;
+
+  // Desde 2027, si ya llegó el 16 de marzo, también corresponde lista de espera.
+  if (anoViaje >= 2027 && esFechaListaEsperaAutomatica()) return false;
+
+  return (
     canEditGroup() ||
     (isRolVendedorInscripcion() && canAccessGroup(state.group)) ||
     isRolAdministracionInscripcion()
@@ -996,7 +1034,10 @@ function canGestionarNuevosIngresos() {
 }
 
 function canGestionarListaEspera() {
-  return normalizeState(state.group?.estado) === "ganada" && isRolAdministracionInscripcion();
+  if (normalizeState(state.group?.estado) !== "ganada") return false;
+  if (!inscripcionPrincipalEstaCerrada()) return false;
+
+  return isRolAdministracionInscripcion();
 }
 
 function canGestionarLiberados() {
@@ -3824,10 +3865,19 @@ function syncButtons() {
   
   if (btnAbrirNuevosInscritos) {
     btnAbrirNuevosInscritos.disabled = !puedeNuevos;
+  
+    if (!inscripcionPrincipalEstaCerrada()) {
+      btnAbrirNuevosInscritos.textContent = "Nuevos ingresos (cerrar inscripción primero)";
+    } else {
+      btnAbrirNuevosInscritos.textContent = "Abrir nuevos ingresos";
+    }
   }
   
   if (btnAbrirListaEspera) {
     btnAbrirListaEspera.disabled = !puedeListaEspera;
+    btnAbrirListaEspera.textContent = debeSugerirListaEspera()
+      ? "Abrir lista de espera sugerida"
+      : "Abrir lista de espera";
   }
   
   if (btnCrearLinkLiberados) {
