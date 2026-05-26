@@ -986,6 +986,7 @@ function canGestionarInscripcionInicial() {
 function canGestionarNuevosIngresos() {
   return normalizeState(state.group?.estado) === "ganada" && (
     canEditGroup() ||
+    (isRolVendedorInscripcion() && canAccessGroup(state.group)) ||
     isRolAdministracionInscripcion()
   );
 }
@@ -997,6 +998,7 @@ function canGestionarListaEspera() {
 function canGestionarLiberados() {
   return normalizeState(state.group?.estado) === "ganada" && (
     canEditGroup() ||
+    (isRolVendedorInscripcion() && canAccessGroup(state.group)) ||
     isRolAdministracionInscripcion()
   );
 }
