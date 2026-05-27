@@ -1633,6 +1633,35 @@
         </div>
       </section>
 
+      <section id="bloqueArchivosEspeciales" class="card hidden">
+        <h2>• Archivos obligatorios</h2>
+
+        <div class="sub" id="textoArchivosEspeciales">
+          Adjunta los documentos solicitados para continuar con este proceso.
+        </div>
+
+        <div class="notice time">
+          Los archivos pueden ser imagen o PDF. Tamaño máximo recomendado: 8 MB por archivo.
+        </div>
+
+        <div class="form-grid">
+          <div id="wrapCarnetFrente" class="field col-6 hidden">
+            <label for="carnetFrenteFile">Cédula de identidad / documento — Frente <span class="req">*</span></label>
+            <input id="carnetFrenteFile" type="file" accept="image/*,.pdf" />
+          </div>
+
+          <div id="wrapCarnetReverso" class="field col-6 hidden">
+            <label for="carnetReversoFile">Cédula de identidad / documento — Reverso <span class="req">*</span></label>
+            <input id="carnetReversoFile" type="file" accept="image/*,.pdf" />
+          </div>
+
+          <div id="wrapComprobantePago" class="field hidden">
+            <label for="comprobantePagoFile">Comprobante de transferencia <span class="req">*</span></label>
+            <input id="comprobantePagoFile" type="file" accept="image/*,.pdf" />
+          </div>
+        </div>
+      </section>
+
       <section class="card">
         <h2>• Confirmación final</h2>
         <div class="sub">
