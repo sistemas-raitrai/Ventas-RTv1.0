@@ -1643,7 +1643,8 @@ function grupoTieneFirmaVendedor(data = {}) {
     data?.firmaVendedorNombre ||
     data?.firmaVendedoraNombre ||
     data?.firmas?.vendedor?.fecha ||
-    data?.firmas?.vendedora?.fecha
+    data?.firmas?.vendedora?.fecha ||
+    data?.flowFicha?.vendedor?.firmado
   );
 }
 
@@ -1711,6 +1712,17 @@ function renderBannerFaseInscripcion() {
   if (!box) return;
 
   const contexto = getContextoFormulario();
+
+  const titulo = $("tituloFormularioPublico");
+  const btn = $("btnComenzar");
+  
+  if (titulo) {
+    titulo.textContent = contexto.tipoInscripcionLabel;
+  }
+  
+  if (btn) {
+    btn.textContent = `Comenzar ${contexto.tipoInscripcionLabel.toLowerCase()}`;
+  }
 
   if (contexto.clave === "nuevo_ingreso") {
     box.className = "notice time";
