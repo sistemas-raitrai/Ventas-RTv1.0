@@ -1546,7 +1546,6 @@ function renderTable() {
     const actions = `
       <div class="table-actions">
         ${canEdit ? `<button class="btn-mini edit" data-action="edit" data-id="${escapeHtml(row.numeroColegio)}" data-email="${escapeHtml(row.correoVendedor)}">Editar</button>` : ""}
-        <button class="btn-mini btn-seguimiento" data-action="seguimiento" data-id="${escapeHtml(row.numeroColegio)}" data-email="${escapeHtml(row.correoVendedor)}">Seguimiento</button>
         ${canDelete ? `<button class="btn-mini delete" data-action="delete" data-id="${escapeHtml(row.numeroColegio)}" data-email="${escapeHtml(row.correoVendedor)}">Eliminar</button>` : ""}
         <button class="btn-mini view" data-action="history" data-id="${escapeHtml(row.numeroColegio)}" data-email="${escapeHtml(row.correoVendedor)}">Historial</button>
       </div>
