@@ -1187,14 +1187,17 @@ function construirPayloadBase() {
     estudianteRelacionadoSegundoApellido
   ].filter(Boolean).join(" ");
 
+  const contextoFormulario = getContextoFormulario();
+  
   return {
     tipoRegistro: "inscripcion_pasajero",
     
     faseInscripcion: faseUrl,
-    estadoInscripcion: getTipoInscripcionActual(),
-    tipoInscripcion: getTipoInscripcionActual(),
-    tipoInscripcionLabel: getTipoInscripcionLabelPublico(),
-    estadoCupo: getEstadoCupoActual(),
+    contextoFormulario: contextoFormulario.clave,
+    estadoInscripcion: contextoFormulario.tipoInscripcion,
+    tipoInscripcion: contextoFormulario.tipoInscripcion,
+    tipoInscripcionLabel: contextoFormulario.tipoInscripcionLabel,
+    estadoCupo: contextoFormulario.estadoCupo,
   
     privacidad: {
       estado: "activa",
@@ -1631,61 +1634,116 @@ function normalizarFaseInscripcion(value = "") {
   return "normal";
 }
 
-function getTipoInscripcionActual() {
-  if (faseUrl === "nuevos") return "nuevo_ingreso";
-  if (faseUrl === "lista_espera") return "lista_espera";
-  if (faseUrl === "liberado") return "liberado";
+function grupoTieneFirmaVendedor(data = {}) {
+  return !!(
+    data?.firmaVendedor ||
+    data?.firmaVendedora ||
+    data?.firmaVendedorFecha ||
+    data?.firmaVendedoraFecha ||
+    data?.firmaVendedorNombre ||
+    data?.firmaVendedoraNombre ||
+    data?.firmas?.vendedor?.fecha ||
+    data?.firmas?.vendedora?.fecha
+  );
+}
 
-  return "nomina_inicial";
+function getContextoFormulario() {
+  const tieneFirmaVendedor = grupoTieneFirmaVendedor(grupoData || {});
+
+  if (faseUrl === "nuevos") {
+    return {
+      clave: "nuevo_ingreso",
+      tipoInscripcion: "nuevo_ingreso",
+      tipoInscripcionLabel: "Nuevo ingreso",
+      estadoCupo: "confirmado"
+    };
+  }
+
+  if (faseUrl === "lista_espera") {
+    return {
+      clave: "lista_espera",
+      tipoInscripcion: "lista_espera",
+      tipoInscripcionLabel: "Lista de espera",
+      estadoCupo: "pendiente_confirmacion"
+    };
+  }
+
+  if (faseUrl === "liberado") {
+    return {
+      clave: "liberado",
+      tipoInscripcion: "liberado",
+      tipoInscripcionLabel: "Cupo liberado",
+      estadoCupo: "confirmado"
+    };
+  }
+
+  if (tieneFirmaVendedor) {
+    return {
+      clave: "nomina_final",
+      tipoInscripcion: "nomina_inicial",
+      tipoInscripcionLabel: "Nómina final / ficha médica",
+      estadoCupo: "confirmado"
+    };
+  }
+
+  return {
+    clave: "inscripcion_inicial",
+    tipoInscripcion: "nomina_inicial",
+    tipoInscripcionLabel: "Inscripción inicial",
+    estadoCupo: "confirmado"
+  };
+}
+
+function getTipoInscripcionActual() {
+  return getContextoFormulario().tipoInscripcion;
 }
 
 function getEstadoCupoActual() {
-  if (faseUrl === "lista_espera") return "pendiente_confirmacion";
-
-  return "confirmado";
+  return getContextoFormulario().estadoCupo;
 }
 
 function getTipoInscripcionLabelPublico() {
-  if (faseUrl === "nuevos") return "Nuevo ingreso";
-  if (faseUrl === "lista_espera") return "Lista de espera";
-  if (faseUrl === "liberado") return "Cupo liberado";
-
-  return "Nómina inicial";
+  return getContextoFormulario().tipoInscripcionLabel;
 }
 
 function renderBannerFaseInscripcion() {
   const box = $("bannerFaseInscripcion");
   if (!box) return;
 
-  let html = "";
+  const contexto = getContextoFormulario();
 
-  if (faseUrl === "nuevos") {
+  if (contexto.clave === "nuevo_ingreso") {
     box.className = "notice time";
-    html = `
-      <strong>Ingreso posterior a la nómina inicial.</strong><br>
-      Esta inscripción corresponde a un nuevo ingreso al grupo de viaje. La gestión de pagos o cuotas deberá ser confirmada con Administración, ya que podrían existir condiciones particulares según el avance del grupo.
+    box.innerHTML = `
+      <strong>Nuevo ingreso al grupo de viaje.</strong><br>
+      Te estás incorporando al grupo después de la nómina inicial. La gestión de pagos y cuotas deberá ser confirmada con Administración, ya que podrían existir cuotas retroactivas o condiciones particulares según la fecha de incorporación.
     `;
-  } else if (faseUrl === "lista_espera") {
+  } else if (contexto.clave === "lista_espera") {
     box.className = "notice error";
-    html = `
-      <strong>Inscripción en lista de espera.</strong><br>
-      Esta inscripción no confirma cupo automáticamente. Turismo Rai Trai Viajes de Estudio informará posteriormente si el cupo queda confirmado.
+    box.innerHTML = `
+      <strong>Lista de espera.</strong><br>
+      Estás ingresando a la lista de espera del grupo de viaje. El cupo aún no se encuentra confirmado. Para continuar, debes realizar el abono inicial indicado por Turismo Rai Trai Viajes de Estudio y tener disponible el comprobante de pago junto con la imagen de la cédula de identidad por ambos lados.
     `;
-  } else if (faseUrl === "liberado") {
+  } else if (contexto.clave === "liberado") {
     box.className = "notice ok";
-    html = `
+    box.innerHTML = `
       <strong>Cupo liberado.</strong><br>
-      Estás ingresando al grupo de viaje mediante un cupo liberado. Completa la información solicitada para registrar correctamente la participación.
+      Estás ingresando al grupo mediante un cupo liberado. Completa la información solicitada para registrar correctamente la participación en el viaje.
+    `;
+  } else if (contexto.clave === "nomina_final") {
+    box.className = "notice privacy";
+    box.innerHTML = `
+      <strong>Nómina final y ficha médica.</strong><br>
+      Este formulario permitirá completar la nómina definitiva del viaje y registrar información médica, documental y operacional necesaria para la participación.
     `;
   } else {
     box.className = "notice privacy";
-    html = `
-      <strong>Inscripción inicial del grupo.</strong><br>
-      Completa este formulario para registrar a la persona que participará en el viaje.
+    box.innerHTML = `
+      <strong>Inscripción inicial.</strong><br>
+      Completa este formulario para registrar a la persona que participará en el viaje de estudio.
     `;
   }
 
-  box.innerHTML = html;
   box.classList.remove("hidden");
 }
 
