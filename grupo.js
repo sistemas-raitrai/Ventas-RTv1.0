@@ -1410,47 +1410,114 @@ function getInscripcionEstadoActual() {
   return "cerrada";
 }
 
-function getTipoInscripcionFromFase(fase = "") {
+function grupoTieneFirmaVendedor(data = state.group || {}) {
+  return !!(
+    data?.firmaVendedor ||
+    data?.firmaVendedora ||
+    data?.firmaVendedorFecha ||
+    data?.firmaVendedoraFecha ||
+    data?.firmaVendedorNombre ||
+    data?.firmaVendedoraNombre ||
+    data?.firmas?.vendedor?.fecha ||
+    data?.firmas?.vendedora?.fecha ||
+    data?.flowFicha?.vendedor?.firmado
+  );
+}
+
+function getContextoInscripcionGrupo(fase = "normal", groupData = state.group || {}) {
   const key = normalizeSearchLocal(fase);
+  const tieneFirmaVendedor = grupoTieneFirmaVendedor(groupData);
 
-  if (key === "normal") return "nomina_inicial";
-  if (key === "nuevos") return "nuevo_ingreso";
-  if (key === "lista_espera") return "lista_espera";
-  if (key === "liberado") return "liberado";
+  if (key === "nuevos") {
+    return {
+      clave: "nuevo_ingreso",
+      faseInscripcion: "nuevos",
+      tipoInscripcion: "nuevo_ingreso",
+      labelFase: "Nuevo ingreso",
+      labelTipo: "Nuevo ingreso",
+      estadoCupo: "confirmado"
+    };
+  }
 
-  return "nomina_inicial";
+  if (key === "lista_espera") {
+    return {
+      clave: "lista_espera",
+      faseInscripcion: "lista_espera",
+      tipoInscripcion: "lista_espera",
+      labelFase: "Lista de espera",
+      labelTipo: "Lista de espera",
+      estadoCupo: "pendiente_confirmacion"
+    };
+  }
+
+  if (key === "liberado") {
+    return {
+      clave: "liberado",
+      faseInscripcion: "liberado",
+      tipoInscripcion: "liberado",
+      labelFase: "Cupo liberado",
+      labelTipo: "Cupo liberado",
+      estadoCupo: "confirmado"
+    };
+  }
+
+  if (key === "cerrada") {
+    return {
+      clave: "cerrada",
+      faseInscripcion: "cerrada",
+      tipoInscripcion: "",
+      labelFase: "Cerrada",
+      labelTipo: "Cerrada",
+      estadoCupo: ""
+    };
+  }
+
+  if (tieneFirmaVendedor) {
+    return {
+      clave: "nomina_final",
+      faseInscripcion: "normal",
+      tipoInscripcion: "nomina_inicial",
+      labelFase: "Nómina final / ficha médica",
+      labelTipo: "Nómina final / ficha médica",
+      estadoCupo: "confirmado"
+    };
+  }
+
+  return {
+    clave: "inscripcion_inicial",
+    faseInscripcion: "normal",
+    tipoInscripcion: "nomina_inicial",
+    labelFase: "Inscripción inicial",
+    labelTipo: "Inscripción inicial",
+    estadoCupo: "confirmado"
+  };
+}
+
+function getTipoInscripcionFromFase(fase = "") {
+  return getContextoInscripcionGrupo(fase).tipoInscripcion || "nomina_inicial";
 }
 
 function getEstadoCupoFromFase(fase = "") {
-  const key = normalizeSearchLocal(fase);
-
-  if (key === "lista_espera") return "pendiente_confirmacion";
-
-  return "confirmado";
+  return getContextoInscripcionGrupo(fase).estadoCupo || "confirmado";
 }
 
 function getInscripcionFaseLabel(fase = "") {
-  const key = normalizeSearchLocal(fase);
-
-  if (key === "normal") return "Inscripción inicial";
-  if (key === "nuevos") return "Nuevos ingresos";
-  if (key === "lista_espera") return "Lista de espera";
-  if (key === "liberado") return "Liberados";
-  if (key === "cerrada") return "Cerrada";
-
-  return formatInscripcionValue(fase);
+  return getContextoInscripcionGrupo(fase).labelFase || formatInscripcionValue(fase);
 }
 
 function getTipoInscripcionLabel(value = "") {
   const key = normalizeSearchLocal(value);
 
-  if (key === "nomina_inicial") return "Nómina inicial";
+  if (key === "nomina_inicial") {
+    return grupoTieneFirmaVendedor() ? "Nómina final / ficha médica" : "Inscripción inicial";
+  }
+
   if (key === "nuevo_ingreso") return "Nuevo ingreso";
   if (key === "lista_espera") return "Lista de espera";
   if (key === "lista_espera_confirmada") return "Lista de espera confirmada";
-  if (key === "liberado") return "Liberado";
+  if (key === "liberado") return "Cupo liberado";
 
-  return "Nómina inicial";
+  return "Inscripción inicial";
 }
 
 function getTipoInscripcionClass(item = {}) {
