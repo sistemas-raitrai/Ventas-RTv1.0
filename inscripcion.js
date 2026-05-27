@@ -1667,7 +1667,7 @@ function getContextoFormulario() {
     return {
       clave: "nuevo_ingreso",
       tipoInscripcion: "nuevo_ingreso",
-      tipoInscripcionLabel: "Nuevo ingreso",
+      tipoInscripcionLabel: "Formulario de Nuevo ingreso",
       estadoCupo: "confirmado"
     };
   }
@@ -1676,7 +1676,7 @@ function getContextoFormulario() {
     return {
       clave: "lista_espera",
       tipoInscripcion: "lista_espera",
-      tipoInscripcionLabel: "Lista de espera",
+      tipoInscripcionLabel: "Formulario de Lista de espera",
       estadoCupo: "pendiente_confirmacion"
     };
   }
@@ -1685,7 +1685,7 @@ function getContextoFormulario() {
     return {
       clave: "liberado",
       tipoInscripcion: "liberado",
-      tipoInscripcionLabel: "Cupo liberado",
+      tipoInscripcionLabel: "Formulario de Registro de Adulto",
       estadoCupo: "confirmado"
     };
   }
@@ -1694,7 +1694,7 @@ function getContextoFormulario() {
     return {
       clave: "nomina_final",
       tipoInscripcion: "nomina_final",
-      tipoInscripcionLabel: "Nómina final / ficha médica",
+      tipoInscripcionLabel: "Formulario Nómina final / Ficha médica",
       estadoCupo: "confirmado"
     };
   }
@@ -1702,7 +1702,7 @@ function getContextoFormulario() {
   return {
     clave: "inscripcion_inicial",
     tipoInscripcion: "inscripcion_comercial",
-    tipoInscripcionLabel: "Inscripción inicial",
+    tipoInscripcionLabel: "Formulario de Inscripción inicial",
     estadoCupo: "confirmado"
   };
 }
@@ -1772,7 +1772,7 @@ function renderBannerFaseInscripcion() {
       Rut Empresa: 78.384.230-0<br>
       Banco: Banco de Chile<br>
       Cuenta Corriente N°: 033 98-07<br>
-      Correo comprobantes: giras@raitrai.cl
+      Correo comprobantes: trasnferencias@raitrai.cl
     
       <br><br>
     
@@ -1782,8 +1782,8 @@ function renderBannerFaseInscripcion() {
   } else if (contexto.clave === "liberado") {
     box.className = "notice ok";
     box.innerHTML = `
-      <strong>Cupo liberado.</strong><br>
-      Estás ingresando al grupo mediante un cupo liberado. Completa la información solicitada para registrar correctamente la participación en el viaje.
+      <strong>Registro Adultos.</strong><br>
+      Estás ingresando al grupo mediante un cupo liberado completo o parcial. A continuación registra la información solicitada para registrar correctamente la participación en el viaje.
     `;
   } else if (contexto.clave === "nomina_final") {
     box.className = "notice privacy";
