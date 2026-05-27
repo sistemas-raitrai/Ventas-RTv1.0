@@ -1508,7 +1508,19 @@ function mostrarPantallaFinal(payload) {
   mostrarMensaje(
     "ok",
     `
-      <h2 style="margin-top:0;">✅ Inscripción enviada correctamente</h2>
+      <h2 style="margin-top:0;">
+        ${
+          payload?.tipoInscripcion === "lista_espera"
+            ? "🟡 Solicitud de lista de espera enviada"
+            : payload?.tipoInscripcion === "nuevo_ingreso"
+            ? "🟣 Solicitud de nuevo ingreso enviada"
+            : payload?.tipoInscripcion === "nomina_final"
+            ? "🩺 Nómina final enviada correctamente"
+            : payload?.tipoInscripcion === "liberado"
+            ? "🔵 Registro de cupo liberado enviado"
+            : "✅ Inscripción enviada correctamente"
+        }
+      </h2>
 
       <p>
         🎉 Muchas gracias. Hemos recibido las respuestas de
@@ -1681,15 +1693,15 @@ function getContextoFormulario() {
   if (tieneFirmaVendedor) {
     return {
       clave: "nomina_final",
-      tipoInscripcion: "nomina_inicial",
+      tipoInscripcion: "nomina_final",
       tipoInscripcionLabel: "Nómina final / ficha médica",
       estadoCupo: "confirmado"
     };
   }
-
+  
   return {
     clave: "inscripcion_inicial",
-    tipoInscripcion: "nomina_inicial",
+    tipoInscripcion: "inscripcion_comercial",
     tipoInscripcionLabel: "Inscripción inicial",
     estadoCupo: "confirmado"
   };
@@ -1733,8 +1745,38 @@ function renderBannerFaseInscripcion() {
   } else if (contexto.clave === "lista_espera") {
     box.className = "notice error";
     box.innerHTML = `
-      <strong>Lista de espera.</strong><br>
-      Estás ingresando a la lista de espera del grupo de viaje. El cupo aún no se encuentra confirmado. Para continuar, debes realizar el abono inicial indicado por Turismo Rai Trai Viajes de Estudio y tener disponible el comprobante de pago junto con la imagen de la cédula de identidad por ambos lados.
+      <strong>Lista de espera.</strong><br><br>
+    
+      Estás ingresando a la lista de espera del grupo de viaje.
+      El cupo aún NO se encuentra confirmado.
+    
+      <br><br>
+    
+      Para mantener activa esta solicitud, debes realizar el abono inicial
+      indicado por Turismo Rai Trai Viajes de Estudio y enviar el comprobante
+      correspondiente.
+    
+      <br><br>
+    
+      También debes tener disponible:
+    
+      <ul style="margin-top:8px;">
+        <li>Cédula de identidad vigente por ambos lados</li>
+        <li>Comprobante de pago</li>
+      </ul>
+    
+      <hr style="margin:14px 0;">
+    
+      <strong>Datos de transferencia:</strong><br>
+      Turismo Rai Trai Viajes de Estudio<br>
+      Banco: XXXXX<br>
+      Cuenta: XXXXX<br>
+      Correo comprobantes: administracion@raitrai.cl
+    
+      <br><br>
+    
+      El equipo de Administración confirmará posteriormente si el cupo
+      puede ser asignado definitivamente.
     `;
   } else if (contexto.clave === "liberado") {
     box.className = "notice ok";
