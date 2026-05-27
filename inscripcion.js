@@ -1769,9 +1769,10 @@ function renderBannerFaseInscripcion() {
     
       <strong>Datos de transferencia:</strong><br>
       Turismo Rai Trai Viajes de Estudio<br>
-      Banco: XXXXX<br>
-      Cuenta: XXXXX<br>
-      Correo comprobantes: administracion@raitrai.cl
+      Rut Empresa: 78.384.230-0<br>
+      Banco: Banco de Chile<br>
+      Cuenta Corriente N°: 033 98-07<br>
+      Correo comprobantes: giras@raitrai.cl
     
       <br><br>
     
