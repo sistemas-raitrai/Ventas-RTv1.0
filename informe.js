@@ -87,6 +87,24 @@ function normalizeLoose(value = "") {
     .trim();
 }
 
+function normalizeVendorName(value = "") {
+  const normalized = normalizeText(value || "");
+
+  // =====================================================
+  // UNIFICACIONES MANUALES
+  // =====================================================
+
+  if (
+    normalized === "Carola" ||
+    normalized === "Carolina Hernandez" ||
+    normalized === "Carolina Hernández"
+  ) {
+    return "Carolina";
+  }
+
+  return normalized;
+}
+
 function getRoleKey(user = {}) {
   return normalizeLoose(user?.rol || "");
 }
@@ -141,7 +159,9 @@ function getVendorOptions() {
   return getVendorUsers()
     .map((user) => ({
       email: normalizeEmail(user.email || ""),
-      nombre: normalizeText(`${user.nombre || ""} ${user.apellido || ""}`.trim() || user.nombre || "")
+      nombre: normalizeVendorName(
+        `${user.nombre || ""} ${user.apellido || ""}`.trim() || user.nombre || ""
+      )
     }))
     .filter((item) => item.email && item.nombre)
     .sort((a, b) => a.nombre.localeCompare(b.nombre, "es", { sensitivity: "base" }));
@@ -163,7 +183,7 @@ function getRowVendorEmail(row = {}) {
 }
 
 function getRowVendorName(row = {}) {
-  return normalizeText(row.vendedora || "");
+  return normalizeVendorName(row.vendedora || "");
 }
 
 function isSinAsignar(row = {}) {
@@ -454,7 +474,7 @@ function closeEvidenceModal() {
 }
 
 function getVendorRows(rows = [], vendorName = "") {
-  return rows.filter((row) => normalizeText(row.vendedora) === normalizeText(vendorName));
+  return rows.filter((row) => normalizeVendorName(row.vendedora) === normalizeText(vendorName));
 }
 
 function getRowsByStage(rows = [], stageKey = "") {
@@ -465,7 +485,7 @@ function getRowsWithMeetingHistory(rows = [], historyRows = [], vendorName = "")
   const historyMap = buildHistoryMap(historyRows);
 
   return rows.filter((row) => {
-    if (vendorName && normalizeText(row.vendedora) !== normalizeText(vendorName)) return false;
+    if (vendorName && normalizeVendorName(row.vendedora) !== normalizeText(vendorName)) return false;
     const groupHistory = historyMap.get(String(getRowId(row))) || [];
     const events = detectHistoryEvents(groupHistory);
     return events.hasMeeting;
@@ -476,7 +496,7 @@ function getRowsWonAfterMeeting(rows = [], historyRows = [], vendorName = "") {
   const historyMap = buildHistoryMap(historyRows);
 
   return rows.filter((row) => {
-    if (vendorName && normalizeText(row.vendedora) !== normalizeText(vendorName)) return false;
+    if (vendorName && normalizeVendorName(row.vendedora) !== normalizeText(vendorName)) return false;
     const groupHistory = historyMap.get(String(getRowId(row))) || [];
     const events = detectHistoryEvents(groupHistory);
     return events.wonAfterMeeting;
@@ -913,7 +933,7 @@ function buildAlerts(rows = [], vendorKpis = []) {
     .slice(0, 5)
     .forEach((item) => {
       const evidenceRows = rows.filter((row) => {
-        return normalizeText(row.vendedora) === normalizeText(item.vendorName) &&
+        return normalizeVendorName(row.vendedora) === normalizeText(item.vendorName) &&
           normalizeStage(row.estado || "") === "a_contactar";
       });
 
@@ -959,7 +979,7 @@ function buildOpportunities(rows = [], vendorKpis = []) {
     .slice(0, 5)
     .forEach((item) => {
       const evidenceRows = rows.filter((row) => {
-        return normalizeText(row.vendedora) === normalizeText(item.vendorName);
+        return normalizeVendorName(row.vendedora) === normalizeText(item.vendorName);
       });
 
       opportunities.push({
@@ -1737,7 +1757,7 @@ function buildRowsForVsSnapshot({ rows = [], anoViaje, cutDate, vendorName = "" 
       const rowYear = getAnoViajeNumber(row);
       if (rowYear !== Number(anoViaje)) return false;
 
-      if (vendorName && normalizeText(row.vendedora) !== normalizeText(vendorName)) return false;
+      if (vendorName && normalizeVendorName(row.vendedora) !== normalizeText(vendorName)) return false;
 
       // Primero: el grupo debe existir al corte.
       return rowExistsAtCutDate(row, cutDate);
@@ -1812,7 +1832,7 @@ function filterRowsForVs({ rows = [], anoViaje, cutDate, vendorName = "" } = {})
     const rowYear = getAnoViajeNumber(row);
     if (rowYear !== Number(anoViaje)) return false;
 
-    if (vendorName && normalizeText(row.vendedora) !== normalizeText(vendorName)) return false;
+    if (vendorName && normalizeVendorName(row.vendedora) !== normalizeText(vendorName)) return false;
 
     return rowExistsAtCutDate(row, cutDate);
   });
@@ -1854,7 +1874,7 @@ function buildVsMonthlyMovement({ rows = [], anoViaje, startDate, endDate, vendo
     const rowYear = getAnoViajeNumber(row);
     if (rowYear !== Number(anoViaje)) return false;
 
-    if (vendorName && normalizeText(row.vendedora) !== normalizeText(vendorName)) return false;
+    if (vendorName && normalizeVendorName(row.vendedora) !== normalizeText(vendorName)) return false;
 
     return true;
   });
@@ -2731,7 +2751,7 @@ function applyFilters() {
   }
 
   if (state.filters.vendedora) {
-    rows = rows.filter((row) => normalizeText(row.vendedora) === state.filters.vendedora);
+    rows = rows.filter((row) => normalizeVendorName(row.vendedora) === state.filters.vendedora);
   }
 
   if (state.filters.comuna) {
