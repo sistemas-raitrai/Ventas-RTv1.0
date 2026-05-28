@@ -1891,15 +1891,10 @@ function renderBannerFaseInscripcion() {
 
   const contexto = getContextoFormulario();
 
-  const titulo = $("tituloFormularioPublico");
   const btn = $("btnComenzar");
-  
-  if (titulo) {
-    titulo.textContent = contexto.tipoInscripcionLabel;
-  }
-  
+
   if (btn) {
-    btn.textContent = `Comenzar ${contexto.tipoInscripcionLabel.toLowerCase()}`;
+    btn.textContent = "Comenzar formulario";
   }
 
   if (contexto.clave === "nuevo_ingreso") {
@@ -1911,39 +1906,66 @@ function renderBannerFaseInscripcion() {
   } else if (contexto.clave === "lista_espera") {
     box.className = "notice error";
     box.innerHTML = `
-      <strong>Lista de espera.</strong><br><br>
-    
-      Estás ingresando a la lista de espera del grupo de viaje.
-      El cupo aún NO se encuentra confirmado.
-    
+      <strong>Formulario de Lista de espera:</strong><br><br>
+      
+      Estás solicitando ingresar a la lista de espera del grupo de viaje.
+      Actualmente el cupo <strong>aún no se encuentra confirmado</strong> y dependerá de la disponibilidad final del grupo.
+      
       <br><br>
-    
-      Para mantener activa esta solicitud, debes realizar el abono inicial
-      indicado por Turismo Rai Trai Viajes de Estudio y enviar el comprobante
-      correspondiente.
-    
+      
+      Para solicitar el ingreso, se debe realizar un abono inicial de
+      <strong>$100.000 CLP</strong> y completar este formulario con la documentación solicitada.
+      
       <br><br>
-    
-      También debes tener disponible:
-    
+      
+      <strong>Importante:</strong>
+      
+      <ol style="margin-top:8px; padding-left:20px;">
+        <li>
+          El abono y el envío de este formulario no garantizan automáticamente la asignación del cupo.
+        </li>
+      
+        <li>
+          Si el cupo es confirmado, existirá un plazo de <strong>48 horas</strong> para regularizar el pago retroactivo correspondiente a las cuotas ya pagadas por el grupo y quedar al día.
+        </li>
+      
+        <li>
+          Si el pago no se regulariza dentro del plazo indicado, la reserva podrá cancelarse y el cupo podrá ser asignado a otro pasajero en lista de espera.
+        </li>
+      
+        <li>
+          Una vez confirmado e incorporado al grupo, el viaje quedará sujeto a las condiciones generales contratadas por el curso.
+        </li>
+      
+        <li>
+          En caso de desistimiento voluntario, rechazo del cupo confirmado o incumplimiento de los plazos indicados, el abono realizado no será reembolsable.
+        </li>
+      
+        <li>
+          Si Turismo Rai Trai no logra confirmar el cupo, se realizará la devolución total del abono efectuado.
+        </li>
+      </ol>
+      
+      <hr style="margin:14px 0;">
+      
+      <strong>Datos de transferencia:</strong><br>
+      Turismo Raitrai<br>
+      RUT: 78.384.230-0<br>
+      Banco Chile<br>
+      Cuenta Corriente N° 033 98-07<br>
+      Correo comprobante: transferencia@raitrai.cl
+      
+      <br><br>
+      
+      <strong>Antes de comenzar debes tener disponible:</strong>
+      
       <ul style="margin-top:8px;">
         <li>Cédula de identidad vigente por ambos lados</li>
         <li>Comprobante de pago</li>
+        <li>Información médica y personal del pasajero</li>
       </ul>
-    
-      <hr style="margin:14px 0;">
-    
-      <strong>Datos de transferencia:</strong><br>
-      Turismo Rai Trai Viajes de Estudio<br>
-      Rut Empresa: 78.384.230-0<br>
-      Banco: Banco de Chile<br>
-      Cuenta Corriente N°: 033 98-07<br>
-      Correo comprobantes: transferencias@raitrai.cl
-    
-      <br><br>
-    
-      El equipo de Administración confirmará posteriormente si el cupo
-      puede ser asignado definitivamente.
+      
+      El equipo de Administración revisará posteriormente la solicitud e informará si el cupo puede ser asignado definitivamente.
     `;
   } else if (contexto.clave === "liberado") {
     box.className = "notice ok";
@@ -1954,13 +1976,13 @@ function renderBannerFaseInscripcion() {
   } else if (contexto.clave === "nomina_final") {
     box.className = "notice privacy";
     box.innerHTML = `
-      <strong>Nómina final y ficha médica.</strong><br>
+      <strong>Formulario para Nómina final y ficha médica.</strong><br>
       Este formulario permitirá completar la nómina definitiva del viaje y registrar información médica, documental y operacional necesaria para la participación.
     `;
   } else {
     box.className = "notice privacy";
     box.innerHTML = `
-      <strong>Inscripción inicial.</strong><br>
+      <strong>Formulario de Inscripción inicial.</strong><br>
       Completa este formulario para registrar a la persona que participará en el viaje de estudio.
     `;
   }
