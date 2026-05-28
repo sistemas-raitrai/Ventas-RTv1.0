@@ -7,6 +7,7 @@ import {
   signOut
 } from "https://www.gstatic.com/firebasejs/11.7.3/firebase-auth.js";
 import { initializeFirestore } from "https://www.gstatic.com/firebasejs/11.7.3/firebase-firestore.js";
+import { getStorage } from "https://www.gstatic.com/firebasejs/11.7.3/firebase-storage.js";
 import { firebaseConfig } from "./firebase-config.js";
 
 export const app = initializeApp(firebaseConfig);
@@ -14,6 +15,7 @@ export const auth = getAuth(app);
 export const db = initializeFirestore(app, {
   experimentalAutoDetectLongPolling: true
 });
+export const storage = getStorage(app);
 
 /* =========================================================
    USUARIOS / ROLES DE VENTAS (FASE 1 SIMPLE)
