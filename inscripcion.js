@@ -1900,8 +1900,19 @@ function renderBannerFaseInscripcion() {
   if (contexto.clave === "nuevo_ingreso") {
     box.className = "notice time";
     box.innerHTML = `
-      <strong>Nuevo ingreso al grupo de viaje.</strong><br>
-      Te estás incorporando al grupo después de la nómina inicial. La gestión de pagos y cuotas deberá ser confirmada con Administración, ya que podrían existir cuotas retroactivas o condiciones particulares según la fecha de incorporación.
+      <strong>Formulario de Nuevo ingreso:</strong><br><br>
+    
+      Estás solicitando incorporarte al grupo de viaje después de la nómina inicial.
+      Nuestro equipo revisará la solicitud y realizará la gestión correspondiente para habilitar el sistema de pago.
+    
+      <br><br>
+    
+      Es posible que existan cuotas retroactivas o condiciones particulares según la fecha de incorporación.
+      Administración informará los pasos a seguir para regularizar la incorporación al grupo.
+    
+      <br><br>
+    
+      Antes de comenzar, debes tener disponible la cédula de identidad vigente por ambos lados.
     `;
   } else if (contexto.clave === "lista_espera") {
     box.className = "notice error";
