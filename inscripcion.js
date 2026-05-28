@@ -13,7 +13,6 @@ import {
 import {
   ref as storageRef,
   uploadBytes,
-  getDownloadURL
 } from "https://www.gstatic.com/firebasejs/11.7.3/firebase-storage.js";
 
 // -----------------------------------------------------------------------------
@@ -930,7 +929,6 @@ async function subirArchivoEspecial({ file, tipo, documentoNormalizado }) {
     contentType: file.type || "",
     size: file.size || 0,
     ruta,
-    url,
     subidoEnCliente: new Date().toISOString()
   };
 }
