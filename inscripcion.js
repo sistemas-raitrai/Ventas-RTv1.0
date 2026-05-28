@@ -1,6 +1,6 @@
 // inscripcion.js
 
-import { db } from "./firebase-init.js";
+import { db, storage } from "./firebase-init.js";
 
 import {
   doc,
@@ -9,6 +9,12 @@ import {
   addDoc,
   serverTimestamp
 } from "https://www.gstatic.com/firebasejs/11.7.3/firebase-firestore.js";
+
+import {
+  ref as storageRef,
+  uploadBytes,
+  getDownloadURL
+} from "https://www.gstatic.com/firebasejs/11.7.3/firebase-storage.js";
 
 // -----------------------------------------------------------------------------
 // DOM
@@ -102,6 +108,17 @@ const dietaWrap = $("dietaWrap");
 const otrosAntecedentesDetalleWrap = $("otrosAntecedentesDetalleWrap");
 
 const adultoCompromisoCard = $("adultoCompromisoCard");
+
+const bloqueArchivosEspeciales = $("bloqueArchivosEspeciales");
+const textoArchivosEspeciales = $("textoArchivosEspeciales");
+
+const wrapCarnetFrente = $("wrapCarnetFrente");
+const wrapCarnetReverso = $("wrapCarnetReverso");
+const wrapComprobantePago = $("wrapComprobantePago");
+
+const carnetFrenteFile = $("carnetFrenteFile");
+const carnetReversoFile = $("carnetReversoFile");
+const comprobantePagoFile = $("comprobantePagoFile");
 
 // -----------------------------------------------------------------------------
 // CONSTANTES
@@ -659,6 +676,23 @@ function aplicarEstadoUI() {
   mostrar(grupoSanguineoNoSeWrap, grupoSanguineo === "no_informado");
   setRequired("declaraGrupoSanguineoPendiente", grupoSanguineo === "no_informado");
 
+  const debeMostrarArchivos = requiereCarnetIdentidad() || requiereComprobantePago();
+
+  mostrar(bloqueArchivosEspeciales, debeMostrarArchivos);
+  mostrar(wrapCarnetFrente, requiereCarnetIdentidad());
+  mostrar(wrapCarnetReverso, requiereCarnetIdentidad());
+  mostrar(wrapComprobantePago, requiereComprobantePago());
+
+  if (textoArchivosEspeciales) {
+    textoArchivosEspeciales.textContent = requiereComprobantePago()
+      ? "Para lista de espera debes adjuntar comprobante de transferencia y documento de identidad por ambos lados."
+      : "Para nuevo ingreso debes adjuntar documento de identidad por ambos lados.";
+  }
+
+  setRequired("carnetFrenteFile", requiereCarnetIdentidad());
+  setRequired("carnetReversoFile", requiereCarnetIdentidad());
+  setRequired("comprobantePagoFile", requiereComprobantePago());
+
   actualizarProgreso();
 }
 
@@ -784,7 +818,13 @@ async function onSubmit(event) {
 
   try {
       const payloadBase = construirPayloadBase();
+
+      if (requiereCarnetIdentidad() || requiereComprobantePago()) {
+        btnEnviar.textContent = "Subiendo archivos...";
+        payloadBase.archivosEspeciales = await subirArchivosEspeciales(payloadBase);
+      }
       
+      btnEnviar.textContent = "Enviando formulario...";
       await enviarInscripcionPendiente(payloadBase);
       
       mostrarPantallaFinal(payloadBase);
@@ -834,6 +874,103 @@ async function onSubmit(event) {
 // -----------------------------------------------------------------------------
 // GUARDADO EN BACKEND
 // -----------------------------------------------------------------------------
+
+function obtenerExtensionArchivo(file) {
+  const nombre = file?.name || "";
+  const ext = nombre.includes(".") ? nombre.split(".").pop().toLowerCase() : "archivo";
+  return ext.replace(/[^a-z0-9]/g, "") || "archivo";
+}
+
+function validarArchivoEspecial(file, label) {
+  if (!file) throw new Error(`Falta archivo: ${label}`);
+
+  const maxBytes = 8 * 1024 * 1024;
+
+  if (file.size > maxBytes) {
+    throw new Error(`${label} supera el máximo permitido de 8 MB.`);
+  }
+
+  const tipo = file.type || "";
+
+  if (!tipo.startsWith("image/") && tipo !== "application/pdf") {
+    throw new Error(`${label} debe ser imagen o PDF.`);
+  }
+}
+
+async function subirArchivoEspecial({ file, tipo, documentoNormalizado }) {
+  validarArchivoEspecial(file, tipo);
+
+  const ext = obtenerExtensionArchivo(file);
+  const timestamp = Date.now();
+
+  const ruta = [
+    "inscripciones-publicas",
+    idGrupo,
+    faseUrl,
+    documentoNormalizado || "sin_documento",
+    `${tipo}-${timestamp}.${ext}`
+  ].join("/");
+
+  const refArchivo = storageRef(storage, ruta);
+
+  await uploadBytes(refArchivo, file, {
+    contentType: file.type || "application/octet-stream",
+    customMetadata: {
+      idGrupo,
+      fase: faseUrl,
+      tipo
+    }
+  });
+
+  const url = await getDownloadURL(refArchivo);
+
+  return {
+    tipo,
+    nombreOriginal: file.name || "",
+    contentType: file.type || "",
+    size: file.size || 0,
+    ruta,
+    url,
+    subidoEnCliente: new Date().toISOString()
+  };
+}
+
+async function subirArchivosEspeciales(payloadBase) {
+  const documentoNormalizado =
+    payloadBase?.identificacion?.documentoNormalizado ||
+    construirNombreKey(
+      payloadBase?.identificacion?.nombres,
+      payloadBase?.identificacion?.primerApellido,
+      payloadBase?.identificacion?.segundoApellido
+    );
+
+  const archivos = {};
+
+  if (requiereCarnetIdentidad()) {
+    archivos.carnetFrente = await subirArchivoEspecial({
+      file: carnetFrenteFile.files[0],
+      tipo: "carnet-frente",
+      documentoNormalizado
+    });
+
+    archivos.carnetReverso = await subirArchivoEspecial({
+      file: carnetReversoFile.files[0],
+      tipo: "carnet-reverso",
+      documentoNormalizado
+    });
+  }
+
+  if (requiereComprobantePago()) {
+    archivos.comprobantePago = await subirArchivoEspecial({
+      file: comprobantePagoFile.files[0],
+      tipo: "comprobante-pago",
+      documentoNormalizado
+    });
+  }
+
+  return archivos;
+}
+
 async function enviarInscripcionPendiente(payloadBase) {
   await addDoc(collection(db, COLECCION_INSCRIPCIONES_PENDIENTES), {
     idGrupo,
@@ -1113,6 +1250,20 @@ function validarFormulario() {
     errores.push("Debe aceptar la declaración de responsabilidad.");
   }
 
+    if (requiereCarnetIdentidad()) {
+      if (!carnetFrenteFile?.files?.length) {
+        errores.push("Debe adjuntar la imagen o PDF del documento de identidad por el frente.");
+      }
+  
+      if (!carnetReversoFile?.files?.length) {
+        errores.push("Debe adjuntar la imagen o PDF del documento de identidad por el reverso.");
+      }
+    }
+  
+    if (requiereComprobantePago() && !comprobantePagoFile?.files?.length) {
+      errores.push("Debe adjuntar el comprobante de transferencia.");
+    }
+
   if (!$("aceptaVeracidad")?.checked) errores.push("Debe aceptar la declaración de veracidad.");
   if (!$("aceptaUsoInterno")?.checked) errores.push("Debe autorizar el uso interno de la información.");
   if (!$("aceptaCambiosCorreo")?.checked) errores.push("Debe aceptar la condición de modificación posterior.");
@@ -1198,6 +1349,11 @@ function construirPayloadBase() {
     tipoInscripcion: contextoFormulario.tipoInscripcion,
     tipoInscripcionLabel: contextoFormulario.tipoInscripcionLabel,
     estadoCupo: contextoFormulario.estadoCupo,
+
+    requiereArchivosEspeciales: requiereCarnetIdentidad() || requiereComprobantePago(),
+    requiereCarnetIdentidad: requiereCarnetIdentidad(),
+    requiereComprobantePago: requiereComprobantePago(),
+    archivosEspeciales: {},
   
     privacidad: {
       estado: "activa",
@@ -1707,6 +1863,16 @@ function getContextoFormulario() {
   };
 }
 
+function requiereCarnetIdentidad() {
+  const contexto = getContextoFormulario();
+  return ["nuevo_ingreso", "lista_espera"].includes(contexto.clave);
+}
+
+function requiereComprobantePago() {
+  const contexto = getContextoFormulario();
+  return contexto.clave === "lista_espera";
+}
+
 function getTipoInscripcionActual() {
   return getContextoFormulario().tipoInscripcion;
 }
@@ -1772,7 +1938,7 @@ function renderBannerFaseInscripcion() {
       Rut Empresa: 78.384.230-0<br>
       Banco: Banco de Chile<br>
       Cuenta Corriente N°: 033 98-07<br>
-      Correo comprobantes: trasnferencias@raitrai.cl
+      Correo comprobantes: transferencias@raitrai.cl
     
       <br><br>
     
