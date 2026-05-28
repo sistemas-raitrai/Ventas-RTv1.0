@@ -1,5 +1,11 @@
 import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.7.3/firebase-auth.js";
-import { collection, getDocs } from "https://www.gstatic.com/firebasejs/11.7.3/firebase-firestore.js";
+import {
+  collection,
+  getDocs,
+  query,
+  orderBy,
+  limit
+} from "https://www.gstatic.com/firebasejs/11.7.3/firebase-firestore.js";
 
 import { auth, db, VENTAS_USERS } from "./firebase-init.js";
 
@@ -41,6 +47,7 @@ const state = {
   effectiveUser: null,
   quoteRows: [],
   historyRows: [],
+  carteraRows: [],
   filteredRows: [],
   filters: {
     anoViaje: "",
@@ -832,6 +839,7 @@ function computeGlobalKpis(rows = []) {
 function buildVendorKpis(rows = [], historyRows = []) {
   const vendorOptions = getVendorOptions();
   const historyMap = buildHistoryMap(historyRows);
+  const carteraKpisMap = buildCarteraKpisByVendor(state.carteraRows || []);
 
   const vendorMap = new Map(
     vendorOptions.map((v) => [v.email, createVendorKpiBase(v.email, v.nombre)])
@@ -886,6 +894,15 @@ function buildVendorKpis(rows = [], historyRows = []) {
     : 0;
 
   list.forEach((rec) => {
+
+    const carteraRec = carteraKpisMap.get(normalizeEmail(rec.vendorEmail)) || {};
+
+      rec.carteraTotal = carteraRec.carteraTotal || 0;
+      rec.carteraGestionada = carteraRec.carteraGestionada || 0;
+      rec.carteraSinGestion = carteraRec.carteraSinGestion || 0;
+      rec.carteraGestion30Dias = carteraRec.carteraGestion30Dias || 0;
+      rec.carteraVisitada = carteraRec.carteraVisitada || 0;
+      rec.carteraRatioGestion = carteraRec.carteraRatioGestion || 0;
     // Base real del flujo ACTUAL (solo grupos en proceso del año actual)
     // = cartera actual - ganadas (las pérdidas ya no están en juego)
     const baseFlujoActual =
@@ -1216,6 +1233,11 @@ function renderVendorTable(vendorKpis = []) {
       <td>${item.cotizandoCount}</td>
       <td>${item.currentReunionCount}</td>
       <td>${item.currentGanadaCount}</td>
+      <td>${item.carteraTotal || 0}</td>
+      <td>${item.carteraGestionada || 0}</td>
+      <td>${item.carteraSinGestion || 0}</td>
+      <td>${item.carteraGestion30Dias || 0}</td>
+      <td>${Math.round((item.carteraRatioGestion || 0) * 100)}%</td>
       <td>
         ${Math.round(item.reunionRateCurrent * 100)}%
         <small style="display:block;color:#6d6480;">
@@ -2625,6 +2647,125 @@ function exportPdf() {
 /* =========================================================
    CARGA
 ========================================================= */
+function getCarteraVendorName(row = {}) {
+  return normalizeText(
+    `${row.nombreVendedor || ""} ${row.apellidoVendedor || ""}`.trim()
+  );
+}
+
+function carteraHasGestion(row = {}) {
+  return !!(
+    row.trabajado ||
+    row.visitado ||
+    row.ultimaGestionTipo ||
+    row.ultimaGestionAsunto ||
+    row.ultimaGestionMensaje ||
+    row.fechaUltimaVisita ||
+    row.ultimaGestionFechaText ||
+    row.ultimaGestionAt ||
+    row._hasHistoryGestion
+  );
+}
+
+function isCarteraGestionLast30Days(row = {}) {
+  const raw =
+    row.ultimaGestionAt ||
+    row.fechaUltimaVisita ||
+    row.ultimaGestionFechaText ||
+    row._lastHistoryGestionDate ||
+    null;
+
+  let d = null;
+
+  if (typeof raw?.toDate === "function") d = raw.toDate();
+  else if (raw) d = new Date(raw);
+
+  if (!d || Number.isNaN(d.getTime())) return false;
+
+  const limitDate = new Date();
+  limitDate.setDate(limitDate.getDate() - 30);
+
+  return d >= limitDate;
+}
+
+async function loadCarteraRowsForInforme() {
+  const rows = [];
+  const sellersSnap = await getDocs(collection(db, "ventas_cartera"));
+
+  for (const sellerDoc of sellersSnap.docs) {
+    const sellerEmail = normalizeEmail(sellerDoc.id || "");
+    if (!sellerEmail || !sellerEmail.includes("@")) continue;
+
+    const itemsSnap = await getDocs(collection(db, "ventas_cartera", sellerEmail, "items"));
+
+    for (const itemDoc of itemsSnap.docs) {
+      const data = itemDoc.data() || {};
+
+      rows.push({
+        id: itemDoc.id,
+        numeroColegio: data.numeroColegio || itemDoc.id,
+        correoVendedor: normalizeEmail(data.correoVendedor || sellerEmail),
+        nombreVendedor: normalizeText(data.nombreVendedor || ""),
+        apellidoVendedor: normalizeText(data.apellidoVendedor || ""),
+        colegio: normalizeText(data.colegio || ""),
+        comuna: normalizeText(data.comuna || ""),
+        trabajado: !!data.trabajado,
+        visitado: !!data.visitado,
+        ultimaGestionTipo: normalizeText(data.ultimaGestionTipo || ""),
+        ultimaGestionAsunto: normalizeText(data.ultimaGestionAsunto || ""),
+        ultimaGestionMensaje: normalizeText(data.ultimaGestionMensaje || ""),
+        ultimaGestionFechaText: normalizeText(data.ultimaGestionFechaText || ""),
+        fechaUltimaVisita: normalizeText(data.fechaUltimaVisita || ""),
+        ultimaGestionAt: data.ultimaGestionAt || null
+      });
+    }
+  }
+
+  return rows;
+}
+
+function buildCarteraKpisByVendor(carteraRows = []) {
+  const map = new Map();
+
+  carteraRows.forEach((row) => {
+    const email = normalizeEmail(row.correoVendedor || "");
+    if (!email) return;
+
+    const vendorName = getCarteraVendorName(row) || email;
+
+    if (!map.has(email)) {
+      map.set(email, {
+        vendorEmail: email,
+        vendorName,
+        carteraTotal: 0,
+        carteraGestionada: 0,
+        carteraSinGestion: 0,
+        carteraGestion30Dias: 0,
+        carteraVisitada: 0,
+        carteraRatioGestion: 0
+      });
+    }
+
+    const rec = map.get(email);
+
+    rec.carteraTotal += 1;
+
+    if (carteraHasGestion(row)) rec.carteraGestionada += 1;
+    else rec.carteraSinGestion += 1;
+
+    if (isCarteraGestionLast30Days(row)) rec.carteraGestion30Dias += 1;
+    if (row.visitado) rec.carteraVisitada += 1;
+  });
+
+  map.forEach((rec) => {
+    rec.carteraRatioGestion = rec.carteraTotal
+      ? rec.carteraGestionada / rec.carteraTotal
+      : 0;
+  });
+
+  return map;
+}
+
 async function loadData() {
   try {
     setProgressStatus({
@@ -2658,6 +2799,8 @@ async function loadData() {
       id: docSnap.id,
       ...(docSnap.data() || {})
     }));
+
+    state.carteraRows = await loadCarteraRowsForInforme();
 
     setProgressStatus({
       text: "Cargando informe...",
