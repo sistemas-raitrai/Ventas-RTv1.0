@@ -616,6 +616,79 @@ async function countVisitsForRowInSeason(row = {}) {
   }
 }
 
+async function getGestionSummaryFromHistory(row = {}) {
+  try {
+    const qy = query(
+      getHistoryCollectionRef(row.correoVendedor, row.numeroColegio),
+      orderBy("fecha", "desc"),
+      limit(50)
+    );
+
+    const snap = await getDocs(qy);
+
+    let latestGestion = null;
+    let hasGestion = false;
+    let gestionMes = false;
+
+    const limitDate = new Date();
+    limitDate.setMonth(limitDate.getMonth() - 1);
+
+    snap.forEach((docSnap) => {
+      const item = docSnap.data() || {};
+
+      const tipo = normalizeText(item.tipo || "");
+      const asunto = normalizeText(item.asunto || "");
+      const mensaje = normalizeText(item.mensaje || "");
+
+      const isGestion = !!(
+        tipo ||
+        asunto ||
+        mensaje ||
+        item.metadata?.fechaGestion ||
+        item.metadata?.fechaVisita
+      );
+
+      if (!isGestion) return;
+
+      hasGestion = true;
+
+      const fechaBase =
+        item.metadata?.fechaGestion ||
+        item.metadata?.fechaVisita ||
+        item.fechaGestion ||
+        item.fechaVisita ||
+        item.fecha;
+
+      const d = toDateValue(fechaBase);
+
+      if (d && d >= limitDate) gestionMes = true;
+
+      if (!latestGestion) {
+        latestGestion = {
+          tipo,
+          asunto,
+          mensaje,
+          fechaText: formatDateOnly(fechaBase),
+          fechaRaw: fechaBase
+        };
+      }
+    });
+
+    return {
+      hasGestion,
+      gestionMes,
+      latestGestion
+    };
+  } catch (error) {
+    console.warn("No se pudo leer historial de gestión:", row.numeroColegio, error);
+    return {
+      hasGestion: false,
+      gestionMes: false,
+      latestGestion: null
+    };
+  }
+}
+
 function computeRowMetrics(row = {}) {
   const currentYear = new Date().getFullYear();
 
@@ -1331,6 +1404,8 @@ function renderSortButton(key) {
 }
 
 function isManagedLastMonth(row = {}) {
+  if (row.metrics?.gestionMes) return true;
+
   const d = toDateValue(row.ultimaGestionAt || row.fechaUltimaVisita || row.ultimaGestionFechaText);
   if (!d) return false;
 
@@ -1363,6 +1438,7 @@ function setTextSafe(id, value) {
 
 function rowHasGestion(row = {}) {
   return !!(
+    row.metrics?.hasGestion ||
     row.trabajado ||
     row.visitado ||
     row.metrics?.wasVisitedInSeason ||
@@ -1822,13 +1898,26 @@ async function loadData() {
       state.rows.map(async (row) => {
         const metrics = computeRowMetrics(row);
         const visitCountSeason = await countVisitsForRowInSeason(row);
+        const gestionSummary = await getGestionSummaryFromHistory(row);
+    
+        const latest = gestionSummary.latestGestion;
     
         return {
           ...row,
+    
+          // Si el documento principal no tiene última gestión,
+          // se completa desde el historial real.
+          ultimaGestionTipo: row.ultimaGestionTipo || latest?.tipo || "",
+          ultimaGestionAsunto: row.ultimaGestionAsunto || latest?.asunto || "",
+          ultimaGestionMensaje: row.ultimaGestionMensaje || latest?.mensaje || "",
+          ultimaGestionFechaText: row.ultimaGestionFechaText || latest?.fechaText || "",
+    
           metrics: {
             ...metrics,
             visitCountSeason,
-            wasVisitedInSeason: visitCountSeason > 0
+            wasVisitedInSeason: visitCountSeason > 0,
+            hasGestion: gestionSummary.hasGestion,
+            gestionMes: gestionSummary.gestionMes
           }
         };
       })
