@@ -48,6 +48,7 @@ const state = {
   quoteRows: [],
   historyRows: [],
   carteraRows: [],
+  carteraHistoryRows: [],
   filteredRows: [],
   filters: {
     anoViaje: "",
@@ -2150,6 +2151,20 @@ function buildVsReport() {
     vendorName
   });
 
+  const currentCarteraMovement = buildCarteraVsMovement({
+    historyRows: state.carteraHistoryRows || [],
+    startDate: currentMonthStartDate,
+    endDate: currentCutDate,
+    vendorName
+  });
+  
+  const previousCarteraMovement = buildCarteraVsMovement({
+    historyRows: state.carteraHistoryRows || [],
+    startDate: previousMonthStartDate,
+    endDate: previousCutDate,
+    vendorName
+  });
+
   const stageRows = buildStageVsRows(currentKpis, previousKpis);
   const monthlyRows = buildMonthlyVsRows(currentMonthly, previousMonthly);
   const vendorRows = buildVendorVsRows(currentRows, previousRows);
@@ -2174,6 +2189,8 @@ function buildVsReport() {
     monthlyRows,
     currentMonthly,
     previousMonthly,
+    currentCarteraMovement,
+    previousCarteraMovement,
     vendorRows
   };
 }
@@ -2329,6 +2346,40 @@ function renderVsReport(report) {
           `).join("")}
         </tbody>
       </table>
+    </div>
+
+    <h3 class="section-title" style="margin:16px 0 10px;">Gestión de cartera / trabajo comercial</h3>
+
+    <div class="vs-summary">
+      <div class="vs-card">
+        <div class="label">Gestiones registradas</div>
+        <div class="value">
+          ${report.currentCarteraMovement?.gestiones || 0} / ${report.previousCarteraMovement?.gestiones || 0}
+        </div>
+        <div class="meta">
+          Dif: ${formatDiff((report.currentCarteraMovement?.gestiones || 0) - (report.previousCarteraMovement?.gestiones || 0))}
+        </div>
+      </div>
+    
+      <div class="vs-card">
+        <div class="label">Colegios gestionados</div>
+        <div class="value">
+          ${report.currentCarteraMovement?.colegiosGestionados || 0} / ${report.previousCarteraMovement?.colegiosGestionados || 0}
+        </div>
+        <div class="meta">
+          Dif: ${formatDiff((report.currentCarteraMovement?.colegiosGestionados || 0) - (report.previousCarteraMovement?.colegiosGestionados || 0))}
+        </div>
+      </div>
+    
+      <div class="vs-card">
+        <div class="label">Visitas registradas</div>
+        <div class="value">
+          ${report.currentCarteraMovement?.visitas || 0} / ${report.previousCarteraMovement?.visitas || 0}
+        </div>
+        <div class="meta">
+          Dif: ${formatDiff((report.currentCarteraMovement?.visitas || 0) - (report.previousCarteraMovement?.visitas || 0))}
+        </div>
+      </div>
     </div>
 
     <h3 class="section-title" style="margin:10px 0;">Comparativo por vendedor(a)</h3>
@@ -2766,6 +2817,121 @@ function buildCarteraKpisByVendor(carteraRows = []) {
   return map;
 }
 
+async function loadCarteraHistoryRowsForInforme() {
+  const out = [];
+  const sellersSnap = await getDocs(collection(db, "ventas_cartera"));
+
+  for (const sellerDoc of sellersSnap.docs) {
+    const sellerEmail = normalizeEmail(sellerDoc.id || "");
+    if (!sellerEmail || !sellerEmail.includes("@")) continue;
+
+    const itemsSnap = await getDocs(collection(db, "ventas_cartera", sellerEmail, "items"));
+
+    for (const itemDoc of itemsSnap.docs) {
+      const numeroColegio = String(itemDoc.id || "").trim();
+      const itemData = itemDoc.data() || "";
+
+      const histSnap = await getDocs(
+        collection(db, "ventas_cartera", sellerEmail, "items", numeroColegio, "historial")
+      );
+
+      histSnap.forEach((h) => {
+        const data = h.data() || {};
+
+        out.push({
+          id: h.id,
+          correoVendedor: sellerEmail,
+          numeroColegio,
+          colegio: itemData.colegio || "",
+          nombreVendedor: itemData.nombreVendedor || "",
+          apellidoVendedor: itemData.apellidoVendedor || "",
+          ...(data || {})
+        });
+      });
+    }
+  }
+
+  return out;
+}
+
+function getCarteraHistoryDate(item = {}) {
+  const raw =
+    item.metadata?.fechaGestion ||
+    item.metadata?.fechaVisita ||
+    item.fechaGestion ||
+    item.fechaVisita ||
+    item.fecha ||
+    null;
+
+  if (!raw) return null;
+  if (typeof raw?.toDate === "function") return raw.toDate();
+
+  const d = new Date(raw);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+function isCarteraHistoryGestion(item = {}) {
+  const tipo = normalizeSearch(item.tipo || "");
+  const asunto = normalizeSearch(item.asunto || "");
+  const mensaje = normalizeSearch(item.mensaje || "");
+
+  const joined = `${tipo} ${asunto} ${mensaje}`;
+
+  return !!(
+    joined.includes("seguimiento") ||
+    joined.includes("gestion") ||
+    joined.includes("gestión") ||
+    joined.includes("visita") ||
+    item.metadata?.fechaGestion ||
+    item.metadata?.fechaVisita
+  );
+}
+
+function isCarteraHistoryVisit(item = {}) {
+  const tipo = normalizeSearch(item.tipo || "");
+  const asunto = normalizeSearch(item.asunto || "");
+  const mensaje = normalizeSearch(item.mensaje || "");
+
+  const joined = `${tipo} ${asunto} ${mensaje}`;
+
+  return !!(
+    joined.includes("visita") ||
+    item.metadata?.fechaVisita
+  );
+}
+
+function buildCarteraVsMovement({ historyRows = [], startDate, endDate, vendorName = "" } = {}) {
+  const rowsInPeriod = historyRows.filter((item) => {
+    const d = getCarteraHistoryDate(item);
+    if (!d || d < startDate || d > endDate) return false;
+
+    if (vendorName) {
+      const sellerName = normalizeText(
+        `${item.nombreVendedor || ""} ${item.apellidoVendedor || ""}`.trim()
+      );
+
+      if (sellerName !== normalizeText(vendorName)) return false;
+    }
+
+    return isCarteraHistoryGestion(item);
+  });
+
+  const colegiosGestionados = new Set();
+  const visitas = [];
+
+  rowsInPeriod.forEach((item) => {
+    colegiosGestionados.add(`${item.correoVendedor}__${item.numeroColegio}`);
+    if (isCarteraHistoryVisit(item)) visitas.push(item);
+  });
+
+  return {
+    gestiones: rowsInPeriod.length,
+    colegiosGestionados: colegiosGestionados.size,
+    visitas: visitas.length,
+    rows: rowsInPeriod
+  };
+}
+
 async function loadData() {
   try {
     setProgressStatus({
@@ -2801,6 +2967,7 @@ async function loadData() {
     }));
 
     state.carteraRows = await loadCarteraRowsForInforme();
+    state.carteraHistoryRows = await loadCarteraHistoryRowsForInforme();
 
     setProgressStatus({
       text: "Cargando informe...",
