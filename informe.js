@@ -96,21 +96,19 @@ function normalizeLoose(value = "") {
 }
 
 function normalizeVendorName(value = "") {
-  const normalized = normalizeText(value || "");
+  const raw = normalizeSearch(value || "");
 
-  // =====================================================
-  // UNIFICACIONES MANUALES
-  // =====================================================
-
+  // Unificación SOLO de la vendedora Carolina / Carola
   if (
-    normalized === "Carola" ||
-    normalized === "Carolina Hernandez" ||
-    normalized === "Carolina Hernández"
+    raw === "carola" ||
+    raw === "carolina" ||
+    raw.includes("carola gayoso") ||
+    raw.includes("carolina gayoso")
   ) {
     return "Carolina";
   }
 
-  return normalized;
+  return normalizeText(value || "");
 }
 
 function getRoleKey(user = {}) {
@@ -482,7 +480,7 @@ function closeEvidenceModal() {
 }
 
 function getVendorRows(rows = [], vendorName = "") {
-  return rows.filter((row) => normalizeVendorName(row.vendedora) === normalizeText(vendorName));
+  return rows.filter((row) => normalizeVendorName(row.vendedora) === normalizeVendorName(vendorName));
 }
 
 function getRowsByStage(rows = [], stageKey = "") {
@@ -493,7 +491,7 @@ function getRowsWithMeetingHistory(rows = [], historyRows = [], vendorName = "")
   const historyMap = buildHistoryMap(historyRows);
 
   return rows.filter((row) => {
-    if (vendorName && normalizeVendorName(row.vendedora) !== normalizeText(vendorName)) return false;
+    if (vendorName && normalizeVendorName(row.vendedora) !== normalizeVendorName(vendorName)) return false;
     const groupHistory = historyMap.get(String(getRowId(row))) || [];
     const events = detectHistoryEvents(groupHistory);
     return events.hasMeeting;
@@ -504,7 +502,7 @@ function getRowsWonAfterMeeting(rows = [], historyRows = [], vendorName = "") {
   const historyMap = buildHistoryMap(historyRows);
 
   return rows.filter((row) => {
-    if (vendorName && normalizeVendorName(row.vendedora) !== normalizeText(vendorName)) return false;
+    if (vendorName && normalizeVendorName(row.vendedora) !== normalizeVendorName(vendorName)) return false;
     const groupHistory = historyMap.get(String(getRowId(row))) || [];
     const events = detectHistoryEvents(groupHistory);
     return events.wonAfterMeeting;
@@ -1780,7 +1778,7 @@ function buildRowsForVsSnapshot({ rows = [], anoViaje, cutDate, vendorName = "" 
       const rowYear = getAnoViajeNumber(row);
       if (rowYear !== Number(anoViaje)) return false;
 
-      if (vendorName && normalizeVendorName(row.vendedora) !== normalizeText(vendorName)) return false;
+      if (vendorName && normalizeVendorName(row.vendedora) !== normalizeVendorName(vendorName)) return false;
 
       // Primero: el grupo debe existir al corte.
       return rowExistsAtCutDate(row, cutDate);
@@ -2050,7 +2048,7 @@ function buildVendorVsRows(currentRows = [], previousRows = []) {
   const vendors = new Map();
 
   function ensureVendor(name = "") {
-    const key = normalizeText(name || "Sin asignar") || "Sin asignar";
+    const key = normalizeVendorName(name || "Sin asignar") || "Sin asignar";
 
     if (!vendors.has(key)) {
       vendors.set(key, {
@@ -2699,7 +2697,7 @@ function exportPdf() {
    CARGA
 ========================================================= */
 function getCarteraVendorName(row = {}) {
-  return normalizeText(
+  return normalizeVendorName(
     `${row.nombreVendedor || ""} ${row.apellidoVendedor || ""}`.trim()
   );
 }
@@ -2910,7 +2908,7 @@ function buildCarteraVsMovement({ historyRows = [], startDate, endDate, vendorNa
         `${item.nombreVendedor || ""} ${item.apellidoVendedor || ""}`.trim()
       );
 
-      if (sellerName !== normalizeText(vendorName)) return false;
+      if (normalizeVendorName(sellerName) !== normalizeVendorName(vendorName)) return false;
     }
 
     return isCarteraHistoryGestion(item);
