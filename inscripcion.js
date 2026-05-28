@@ -921,8 +921,6 @@ async function subirArchivoEspecial({ file, tipo, documentoNormalizado }) {
     }
   });
 
-  const url = await getDownloadURL(refArchivo);
-
   return {
     tipo,
     nombreOriginal: file.name || "",
