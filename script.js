@@ -1203,7 +1203,7 @@ function syncSeguimientoGriverosPanel(effectiveUser = null) {
 
   const anoActual = new Date().getFullYear();
 
-  iframe.src = `seguimiento.html?embedded=1&vendor=griveros@raitrai.cl&anoViaje=${anoActual}`;
+  iframe.src = `seguimiento.html?embedded=1&vendor=griveros@raitrai.cl&ano=${anoActual}`;
 }
 
 function isReunionEnProximosTresDias(row = {}) {
