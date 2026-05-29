@@ -1190,12 +1190,20 @@ function syncAlertRowsByRole(effectiveUser = null) {
 function syncSeguimientoGriverosPanel(effectiveUser = null) {
   const user = effectiveUser || getEffectiveUser();
   const panel = $("panel-seguimiento-griveros");
+  const iframe = $("iframe-seguimiento-griveros");
 
   if (!panel) return;
 
   const email = normalizeEmail(user?.email || "");
+  const esGriveros = email === "griveros@raitrai.cl";
 
-  panel.hidden = email !== "griveros@raitrai.cl";
+  panel.hidden = !esGriveros;
+
+  if (!esGriveros || !iframe) return;
+
+  const anoActual = new Date().getFullYear();
+
+  iframe.src = `seguimiento.html?embedded=1&vendor=griveros@raitrai.cl&anoViaje=${anoActual}`;
 }
 
 function isReunionEnProximosTresDias(row = {}) {
