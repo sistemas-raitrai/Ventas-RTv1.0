@@ -1767,6 +1767,7 @@ function renderInscripcionPasajerosPanel() {
             <tr>
               <th>#</th>
               <th>Tipo inscripción</th>
+              <th>Fecha formulario</th>
               <th>RUT / Documento</th>
               <th>Apellidos</th>
               <th>Nombres</th>
@@ -1790,7 +1791,8 @@ function renderInscripcionPasajerosPanel() {
               return `
                 <tr class="${escapeHtml(getTipoInscripcionClass(item))}">
                   <td>${index + 1}</td>
-                  <td>${escapeHtml(getTipoInscripcionLabel(tipoReal))}</td>
+                  <td>${escapeHtml(getEstadoOperativoInscripcionLabel(item))}</td>
+                  <td>${escapeHtml(formatFechaFormularioTabla(getFechaFormularioInscripcion(item)))}</td>
                   <td>${escapeHtml(getInscripcionDocumento(item))}</td>
                   <td>${escapeHtml(getInscripcionApellidos(item))}</td>
                   <td>${escapeHtml(getInscripcionNombres(item))}</td>
@@ -1803,11 +1805,14 @@ function renderInscripcionPasajerosPanel() {
                   <td>${escapeHtml(getByPath(item, "contactoPrincipal.celular") || getByPath(item, "contactoPrincipal.telefono") || getByPath(item, "contactoPrincipal.whatsapp") || "—")}</td>
                   <td>
                     ${
-                      esListaEsperaPendiente && normalizeSearchLocal(item.estadoCupo || "") !== "pagado"
-                        ? `<button class="inscripcion-action-btn" type="button" data-marcar-lista-pagada="${escapeHtml(item.id)}">Marcar pagado</button>`
-                        : esListaEsperaPendiente && normalizeSearchLocal(item.estadoCupo || "") === "pagado"
-                          ? `<button class="inscripcion-action-btn" type="button" data-confirmar-cupo="${escapeHtml(item.id)}">Confirmar cupo</button>`
-                          : "—"
+                      normalizeSearchLocal(tipoReal) === "nuevo_ingreso" &&
+                      normalizeSearchLocal(item.estadoCupo || "") !== "confirmado"
+                        ? `<button class="inscripcion-action-btn" type="button" data-confirmar-nuevo-ingreso="${escapeHtml(item.id)}">Confirmar nuevo ingreso</button>`
+                        : esListaEsperaPendiente && normalizeSearchLocal(item.estadoCupo || "") !== "pagado"
+                          ? `<button class="inscripcion-action-btn" type="button" data-marcar-lista-pagada="${escapeHtml(item.id)}">Marcar pagado</button>`
+                          : esListaEsperaPendiente && normalizeSearchLocal(item.estadoCupo || "") === "pagado"
+                            ? `<button class="inscripcion-action-btn" type="button" data-confirmar-cupo="${escapeHtml(item.id)}">Confirmar cupo</button>`
+                            : "—"
                     }
                   </td>
                 </tr>
@@ -4582,6 +4587,13 @@ function bindEvents() {
     if (!btn) return;
   
     confirmarCupoListaEspera(btn.dataset.confirmarCupo);
+  });
+
+  document.addEventListener("click", (event) => {
+    const btn = event.target.closest("[data-confirmar-nuevo-ingreso]");
+    if (!btn) return;
+  
+    confirmarNuevoIngreso(btn.dataset.confirmarNuevoIngreso);
   });
 
   document.addEventListener("click", (event) => {
