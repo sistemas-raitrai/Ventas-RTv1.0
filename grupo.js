@@ -1545,7 +1545,7 @@ function getContextoInscripcionGrupo(fase = "normal", groupData = state.group ||
       tipoInscripcion: "nuevo_ingreso",
       labelFase: "Nuevo ingreso",
       labelTipo: "Nuevo ingreso",
-      estadoCupo: "confirmado"
+      estadoCupo: "pendiente_confirmacion"
     };
   }
 
@@ -1602,6 +1602,69 @@ function getEstadoCupoFromFase(fase = "") {
 
 function getInscripcionFaseLabel(fase = "") {
   return getContextoInscripcionGrupo(fase).labelFase || formatInscripcionValue(fase);
+}
+
+function getEstadoOperativoInscripcionLabel(item = {}) {
+  const tipo = normalizeSearchLocal(getInscripcionTipoReal(item));
+  const estadoCupo = normalizeSearchLocal(item.estadoCupo || "");
+
+  if (tipo === "nuevo_ingreso" && estadoCupo !== "confirmado") {
+    return "Nuevo ingreso pendiente";
+  }
+
+  if (
+    (tipo === "nuevo_ingreso" || tipo === "nuevo_ingreso_confirmado") &&
+    estadoCupo === "confirmado"
+  ) {
+    return "Nuevo ingreso confirmado";
+  }
+
+  if (tipo === "lista_espera" && estadoCupo === "pendiente_pago") {
+    return "Lista de espera pendiente";
+  }
+
+  if (
+    (tipo === "lista_espera" || tipo === "lista_espera_pagada") &&
+    estadoCupo === "pagado"
+  ) {
+    return "Lista de espera pagada";
+  }
+
+  if (
+    tipo === "lista_espera_confirmada" ||
+    (tipo === "lista_espera" && estadoCupo === "confirmado")
+  ) {
+    return "Lista de espera confirmada";
+  }
+
+  return getTipoInscripcionLabel(tipo);
+}
+
+function getFechaFormularioInscripcion(item = {}) {
+  return (
+    item?.meta?.fechaInscripcion ||
+    item?.meta?.fechaFormularioCliente ||
+    item?.fechaInscripcion ||
+    item?.fechaFormularioCliente ||
+    item?.creadoEn ||
+    item?.createdAt ||
+    item?.fechaCreacion ||
+    item?.fechaAprobacion ||
+    ""
+  );
+}
+
+function formatFechaFormularioTabla(value) {
+  const d = toDate(value);
+  if (!d) return "—";
+
+  const dd = String(d.getDate()).padStart(2, "0");
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const yy = String(d.getFullYear()).slice(-2);
+  const hh = String(d.getHours()).padStart(2, "0");
+  const min = String(d.getMinutes()).padStart(2, "0");
+
+  return `${dd}-${mm}-${yy} ${hh}:${min}`;
 }
 
 function getTipoInscripcionLabel(value = "") {
@@ -3066,6 +3129,7 @@ async function marcarListaEsperaPagada(inscripcionId = "") {
   );
 
   await updateDoc(ref, {
+    tipoInscripcion: "lista_espera_pagada",
     estadoCupo: "pagado",
     listaEsperaPagada: true,
     listaEsperaPagadaPor: getDisplayName(state.effectiveUser),
@@ -3151,6 +3215,62 @@ async function confirmarCupoListaEspera(inscripcionId = "") {
   syncButtons();
 
   showSaveNotice("Cupo confirmado correctamente.");
+}
+
+async function confirmarNuevoIngreso(inscripcionId = "") {
+  if (!canConfirmarListaEspera()) {
+    alert("Solo Registro, Administración o Admin pueden confirmar nuevos ingresos.");
+    return;
+  }
+
+  const item = state.inscripciones.find((x) => x.id === inscripcionId);
+  if (!item) {
+    alert("No se encontró la inscripción seleccionada.");
+    return;
+  }
+
+  const nombre = [
+    getInscripcionNombres(item),
+    getInscripcionApellidos(item)
+  ].filter(Boolean).join(" ");
+
+  const ok = confirm(`¿Confirmar nuevo ingreso para ${nombre || "esta persona"}?`);
+  if (!ok) return;
+
+  const ref = doc(
+    db,
+    "ventas_cotizaciones",
+    String(state.groupDocId),
+    "inscripciones",
+    String(inscripcionId)
+  );
+
+  await updateDoc(ref, {
+    tipoInscripcion: "nuevo_ingreso_confirmado",
+    estadoCupo: "confirmado",
+    nuevoIngresoConfirmado: true,
+    nuevoIngresoConfirmadoPor: getDisplayName(state.effectiveUser),
+    nuevoIngresoConfirmadoPorCorreo: state.effectiveEmail,
+    nuevoIngresoConfirmadoAt: serverTimestamp()
+  });
+
+  await createHistoryEntry({
+    tipoMovimiento: "inscripcion_nuevo_ingreso_confirmado",
+    modulo: "inscripcion",
+    titulo: "Nuevo ingreso confirmado",
+    mensaje: `${getDisplayName(state.effectiveUser)} confirmó nuevo ingreso para ${nombre || "una persona"}.`,
+    metadata: {
+      inscripcionId,
+      documento: getInscripcionDocumento(item),
+      nombreCompleto: nombre
+    }
+  });
+
+  await loadInscripciones();
+  renderInscripcionPasajerosPanel();
+  syncButtons();
+
+  showSaveNotice("Nuevo ingreso confirmado correctamente.");
 }
 
 async function copyGroupInscripcionLink() {
