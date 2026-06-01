@@ -1012,38 +1012,115 @@ function puedeAbrirCerrarFasesInscripcion() {
   const rol = String(state.effectiveUser?.rol || "").toLowerCase();
 
   if (rol === "admin" || rol === "supervision") return true;
-
   if (rol === "vendedor" && canAccessGroup(state.group)) return true;
 
   return false;
 }
 
-function puedeRegenerarLinkInscripcionInicial() {
+function puedeReabrirFasePasada() {
   const rol = String(state.effectiveUser?.rol || "").toLowerCase();
+  const email = normalizeEmail(state.effectiveEmail || "");
 
-  return normalizeState(state.group?.estado) === "ganada" &&
-    (rol === "admin" || rol === "supervision");
+  return rol === "admin" || email === "chernandez@raitrai.cl";
+}
+
+function puedeOperarListaEsperaAdministrativa() {
+  const rol = String(state.effectiveUser?.rol || "").toLowerCase();
+  const email = normalizeEmail(state.effectiveEmail || "");
+
+  return (
+    rol === "admin" ||
+    rol === "registro" ||
+    email === "administracion@raitrai.cl" ||
+    email === "yenny@raitrai.cl" ||
+    email === "raitrai@raitrai.cl"
+  );
+}
+
+function puedeExportarCsvInscripciones() {
+  return puedeOperarListaEsperaAdministrativa();
+}
+
+function grupoVieneSistemaAntiguo() {
+  return grupoTieneFirmaVendedor(state.group);
+}
+
+function getFasesCerradasInscripcion() {
+  return state.group?.inscripcion?.fasesCerradas || {};
+}
+
+function faseInscripcionYaCerrada(clave = "") {
+  return !!getFasesCerradasInscripcion()[clave];
+}
+
+function inscripcionInicialYaCerrada() {
+  return faseInscripcionYaCerrada("inscripcion_inicial");
+}
+
+function nominaFinalYaCerrada() {
+  return faseInscripcionYaCerrada("nomina_final");
+}
+
+function correspondeListaEsperaPorFecha() {
+  const anoViaje = getAnoViajeInscripcion();
+
+  if (anoViaje === 2026) return true;
+  if (!anoViaje || anoViaje < 2027) return false;
+
+  return esFechaListaEsperaAutomatica();
+}
+
+function correspondeNuevosIngresosPorFecha() {
+  const anoViaje = getAnoViajeInscripcion();
+
+  if (!anoViaje || anoViaje < 2027) return false;
+  if (anoViaje === 2026) return false;
+
+  return !esFechaListaEsperaAutomatica();
 }
 
 function puedeMarcarListaEsperaPagada() {
-  const rol = String(state.effectiveUser?.rol || "").toLowerCase();
-
   return normalizeState(state.group?.estado) === "ganada" &&
-    (rol === "admin" || rol === "supervision");
+    puedeOperarListaEsperaAdministrativa();
 }
 
 function canGestionarInscripcionInicial() {
-  return puedeAbrirCerrarFasesInscripcion();
-}
-
-function canGestionarNuevosIngresos() {
-  const anoViaje = getAnoViajeInscripcion();
-
   if (!puedeAbrirCerrarFasesInscripcion()) return false;
   if (!inscripcionPrincipalEstaCerrada()) return false;
 
-  if (anoViaje === 2026) return false;
-  if (anoViaje >= 2027 && esFechaListaEsperaAutomatica()) return false;
+  // Si tiene firma vendedor, viene del sistema antiguo:
+  // no debe abrir inscripción inicial, sino nómina final.
+  if (grupoVieneSistemaAntiguo()) return false;
+
+  // Si ya se cerró la inscripción inicial, no vuelve a aparecer,
+  // salvo Admin o Jefa de ventas.
+  if (inscripcionInicialYaCerrada() && !puedeReabrirFasePasada()) return false;
+
+  return true;
+}
+
+function canGestionarNominaFinal() {
+  if (!puedeAbrirCerrarFasesInscripcion()) return false;
+  if (!inscripcionPrincipalEstaCerrada()) return false;
+
+  // Solo grupos con firma vendedor vienen del sistema antiguo.
+  if (!grupoVieneSistemaAntiguo()) return false;
+
+  // Si ya se cerró la nómina final, no vuelve a aparecer,
+  // salvo Admin o Jefa de ventas.
+  if (nominaFinalYaCerrada() && !puedeReabrirFasePasada()) return false;
+
+  return true;
+}
+
+function canGestionarNuevosIngresos() {
+  if (!puedeAbrirCerrarFasesInscripcion()) return false;
+  if (!inscripcionPrincipalEstaCerrada()) return false;
+
+  if (!correspondeNuevosIngresosPorFecha()) return false;
+
+  // Si NO viene del sistema antiguo, primero debe haber cerrado inscripción inicial.
+  if (!grupoVieneSistemaAntiguo() && !inscripcionInicialYaCerrada()) return false;
 
   return true;
 }
@@ -1052,27 +1129,37 @@ function canGestionarListaEspera() {
   if (!puedeAbrirCerrarFasesInscripcion()) return false;
   if (!inscripcionPrincipalEstaCerrada()) return false;
 
+  if (!correspondeListaEsperaPorFecha()) return false;
+
+  // Si NO viene del sistema antiguo, primero debe haber cerrado inscripción inicial.
+  if (!grupoVieneSistemaAntiguo() && !inscripcionInicialYaCerrada()) return false;
+
   return true;
 }
 
 function canGestionarLiberados() {
   if (normalizeState(state.group?.estado) !== "ganada") return false;
 
-  const yaExisteInscripcionInicial =
+  // Sistema antiguo: puede habilitar liberados cuando estime.
+  if (grupoVieneSistemaAntiguo()) {
+    return puedeAbrirCerrarFasesInscripcion();
+  }
+
+  // Sistema nuevo: primero debe existir o haberse cerrado la inscripción inicial.
+  const yaExisteFlujo =
     !!state.group?.inscripcionHabilitada ||
     !!state.group?.tokenInscripcion ||
-    !!state.group?.inscripcion?.tokenActual;
+    !!state.group?.inscripcion?.tokenActual ||
+    inscripcionInicialYaCerrada();
 
-  if (!yaExisteInscripcionInicial) return false;
+  if (!yaExisteFlujo) return false;
 
   return puedeAbrirCerrarFasesInscripcion();
 }
 
 function canConfirmarListaEspera() {
-  const rol = String(state.effectiveUser?.rol || "").toLowerCase();
-
   return normalizeState(state.group?.estado) === "ganada" &&
-    (rol === "admin" || rol === "supervision");
+    puedeOperarListaEsperaAdministrativa();
 }
 
 function getBlockedInscripcionMessage() {
@@ -1439,7 +1526,17 @@ function grupoTieneFirmaVendedor(data = state.group || {}) {
 
 function getContextoInscripcionGrupo(fase = "normal", groupData = state.group || {}) {
   const key = normalizeSearchLocal(fase);
-  const tieneFirmaVendedor = grupoTieneFirmaVendedor(groupData);
+
+  if (key === "nomina_final") {
+    return {
+      clave: "nomina_final",
+      faseInscripcion: "nomina_final",
+      tipoInscripcion: "nomina_final",
+      labelFase: "Nómina final / ficha médica",
+      labelTipo: "Nómina final / ficha médica",
+      estadoCupo: "confirmado"
+    };
+  }
 
   if (key === "nuevos") {
     return {
@@ -1485,17 +1582,6 @@ function getContextoInscripcionGrupo(fase = "normal", groupData = state.group ||
     };
   }
 
-  if (tieneFirmaVendedor) {
-    return {
-      clave: "nomina_final",
-      faseInscripcion: "normal",
-      tipoInscripcion: "nomina_inicial",
-      labelFase: "Nómina final / ficha médica",
-      labelTipo: "Nómina final / ficha médica",
-      estadoCupo: "confirmado"
-    };
-  }
-
   return {
     clave: "inscripcion_inicial",
     faseInscripcion: "normal",
@@ -1521,9 +1607,8 @@ function getInscripcionFaseLabel(fase = "") {
 function getTipoInscripcionLabel(value = "") {
   const key = normalizeSearchLocal(value);
 
-  if (key === "nomina_inicial") {
-    return grupoTieneFirmaVendedor() ? "Nómina final / ficha médica" : "Inscripción inicial";
-  }
+  if (key === "nomina_inicial") return "Inscripción inicial";
+  if (key === "nomina_final") return "Nómina final / ficha médica";
 
   if (key === "nuevo_ingreso") return "Nuevo ingreso";
   if (key === "lista_espera") return "Lista de espera";
@@ -1537,6 +1622,7 @@ function getTipoInscripcionClass(item = {}) {
   const tipo = normalizeSearchLocal(item.tipoInscripcion || item.estadoInscripcion || item.faseInscripcion || "nomina_inicial");
   const estadoCupo = normalizeSearchLocal(item.estadoCupo || "");
 
+  if (tipo === "nomina_final") return "insc-nomina-final";
   if (tipo === "liberado") return "insc-liberado";
   if (tipo === "lista_espera" && estadoCupo === "confirmado") return "insc-lista-espera-confirmada";
   if (tipo === "lista_espera_confirmada") return "insc-lista-espera-confirmada";
@@ -2672,29 +2758,46 @@ function getInscripcionPublicLink(groupId, token, fase = "normal") {
   return `${base}?grupo=${encodeURIComponent(groupId)}&fase=${encodeURIComponent(fase)}&token=${encodeURIComponent(token)}`;
 }
 
+async function abrirInscripcionPrincipalDesdeBoton() {
+  if (canGestionarInscripcionInicial()) {
+    await cambiarFaseInscripcion("normal");
+    return;
+  }
+
+  if (canGestionarNominaFinal()) {
+    await cambiarFaseInscripcion("nomina_final");
+    return;
+  }
+
+  alert(getBlockedInscripcionMessage());
+}
+
 async function enableGroupInscripcion() {
-  await cambiarFaseInscripcion("normal");
+  await abrirInscripcionPrincipalDesdeBoton();
 }
 
 async function cambiarFaseInscripcion(fase = "normal") {
   const faseNormalizada = normalizeSearchLocal(fase);
-  
+
   let puedeGestionar = false;
-  
+
   if (faseNormalizada === "normal") {
     puedeGestionar = canGestionarInscripcionInicial();
+  } else if (faseNormalizada === "nomina_final") {
+    puedeGestionar = canGestionarNominaFinal();
   } else if (faseNormalizada === "nuevos") {
     puedeGestionar = canGestionarNuevosIngresos();
   } else if (faseNormalizada === "lista_espera") {
     puedeGestionar = canGestionarListaEspera();
   }
-  
+
   if (!puedeGestionar) {
     alert(getBlockedInscripcionMessage());
     return;
   }
 
-  const label = getInscripcionFaseLabel(faseNormalizada);
+  const contexto = getContextoInscripcionGrupo(faseNormalizada);
+  const label = contexto.labelFase;
   const tokenInscripcion = generateInscripcionToken(32);
 
   const ok = confirm(`¿Quieres abrir "${label}" y generar un nuevo link público?`);
@@ -2714,8 +2817,12 @@ async function cambiarFaseInscripcion(fase = "normal") {
       ...(state.group?.inscripcion || {}),
       estado: faseNormalizada,
       faseActual: faseNormalizada,
-      tipoInscripcionActual: getTipoInscripcionFromFase(faseNormalizada),
-      estadoCupoActual: getEstadoCupoFromFase(faseNormalizada),
+
+      claveActual: contexto.clave,
+      labelActual: contexto.labelFase,
+      tipoInscripcionActual: contexto.tipoInscripcion,
+      estadoCupoActual: contexto.estadoCupo,
+
       tokenActual: tokenInscripcion,
       linkActual: link,
 
@@ -2723,9 +2830,9 @@ async function cambiarFaseInscripcion(fase = "normal") {
       actualizadoPorCorreo: state.effectiveEmail,
       actualizadoAt: serverTimestamp(),
 
-      linkGeneradoPor: state.group?.inscripcion?.linkGeneradoPor || getDisplayName(state.effectiveUser),
-      linkGeneradoPorCorreo: state.group?.inscripcion?.linkGeneradoPorCorreo || state.effectiveEmail,
-      linkGeneradoAt: state.group?.inscripcion?.linkGeneradoAt || serverTimestamp()
+      linkGeneradoPor: getDisplayName(state.effectiveUser),
+      linkGeneradoPorCorreo: state.effectiveEmail,
+      linkGeneradoAt: serverTimestamp()
     },
 
     correoCambiosInscripcion:
@@ -2746,7 +2853,7 @@ async function cambiarFaseInscripcion(fase = "normal") {
       {
         campo: "tipoInscripcionActual",
         anterior: state.group?.inscripcion?.tipoInscripcionActual || "",
-        nuevo: getTipoInscripcionFromFase(faseNormalizada)
+        nuevo: contexto.tipoInscripcion
       },
       {
         campo: "tokenInscripcion",
@@ -2844,15 +2951,36 @@ async function crearLinkLiberados() {
 }
 
 async function cerrarInscripcion() {
-  if (!canGestionarInscripcionInicial() && !canGestionarNuevosIngresos() && !canGestionarListaEspera()) {
+  const puedeCerrar =
+    puedeAbrirCerrarFasesInscripcion() ||
+    puedeReabrirFasePasada();
+
+  if (!puedeCerrar) {
     alert(getBlockedInscripcionMessage());
     return;
   }
 
-  const ok = confirm("¿Quieres cerrar la inscripción pública de este grupo?");
-  if (!ok) return;
+  if (!state.group?.inscripcionHabilitada) {
+    alert("No hay una inscripción activa para cerrar.");
+    return;
+  }
 
   const estadoAnterior = getInscripcionEstadoActual();
+
+  const contextoActivo = {
+    clave:
+      state.group?.inscripcion?.claveActual ||
+      getContextoInscripcionGrupo(estadoAnterior).clave,
+
+    label:
+      state.group?.inscripcion?.labelActual ||
+      getContextoInscripcionGrupo(estadoAnterior).labelFase
+  };
+
+  const ok = confirm(`¿Quieres cerrar "${contextoActivo.label}"?`);
+  if (!ok) return;
+
+  const fasesCerradasActuales = state.group?.inscripcion?.fasesCerradas || {};
 
   await saveGroupPatch(
     {
@@ -2864,24 +2992,38 @@ async function cerrarInscripcion() {
         ...(state.group?.inscripcion || {}),
         estado: "cerrada",
         faseActual: "cerrada",
+
+        fasesCerradas: {
+          ...fasesCerradasActuales,
+          [contextoActivo.clave]: true
+        },
+
         actualizadoPor: getDisplayName(state.effectiveUser),
         actualizadoPorCorreo: state.effectiveEmail,
         actualizadoAt: serverTimestamp(),
+
         cerradaPor: getDisplayName(state.effectiveUser),
         cerradaPorCorreo: state.effectiveEmail,
-        cerradaAt: serverTimestamp()
+        cerradaAt: serverTimestamp(),
+        ultimaFaseCerrada: contextoActivo.clave,
+        ultimaFaseCerradaLabel: contextoActivo.label
       }
     },
     {
       tipoMovimiento: "inscripcion_cerrada",
       modulo: "inscripcion",
-      titulo: "Inscripción cerrada",
-      mensaje: `${getDisplayName(state.effectiveUser)} cerró la inscripción pública del grupo.`,
+      titulo: `Inscripción cerrada: ${contextoActivo.label}`,
+      mensaje: `${getDisplayName(state.effectiveUser)} cerró "${contextoActivo.label}".`,
       cambios: [
         {
           campo: "inscripcionEstado",
           anterior: estadoAnterior,
           nuevo: "cerrada"
+        },
+        {
+          campo: "faseCerrada",
+          anterior: "",
+          nuevo: contextoActivo.clave
         },
         {
           campo: "inscripcionHabilitada",
@@ -2892,12 +3034,12 @@ async function cerrarInscripcion() {
     }
   );
 
-  showSaveNotice("Inscripción cerrada correctamente.");
+  showSaveNotice(`${contextoActivo.label} cerrada correctamente.`);
 }
 
 async function marcarListaEsperaPagada(inscripcionId = "") {
   if (!puedeMarcarListaEsperaPagada()) {
-    alert("Solo Supervisión o Admin pueden marcar lista de espera como pagada.");
+    alert("Solo Administración o Admin pueden marcar lista de espera como pagada.");
     return;
   }
 
@@ -2963,7 +3105,7 @@ async function confirmarCupoListaEspera(inscripcionId = "") {
   }
 
   if (normalizeSearchLocal(item.estadoCupo || "") !== "pagado") {
-    alert("Antes de confirmar el cupo, Supervisión o Admin debe marcar esta lista de espera como pagada.");
+    alert("Antes de confirmar el cupo, Administración o Admin debe marcar esta lista de espera como pagada.");
     return;
   }
 
@@ -3013,16 +3155,23 @@ async function confirmarCupoListaEspera(inscripcionId = "") {
 
 async function copyGroupInscripcionLink() {
   if (!state.group?.inscripcionHabilitada || !state.group?.tokenInscripcion) {
-    alert("Este grupo todavía no tiene la inscripción habilitada.");
+    alert("Este grupo todavía no tiene una inscripción habilitada.");
     return;
   }
 
-  const fase = getInscripcionEstadoActual();
+  const fase =
+    state.group?.inscripcion?.faseActual ||
+    getInscripcionEstadoActual();
+
+  const label =
+    state.group?.inscripcion?.labelActual ||
+    getInscripcionFaseLabel(fase);
+
   const link = getInscripcionPublicLink(state.groupId, state.group.tokenInscripcion, fase);
 
   try {
     await navigator.clipboard.writeText(link);
-    showSaveNotice("Link de inscripción copiado.");
+    showSaveNotice(`Link copiado: ${label}.`);
   } catch {
     alert(`No se pudo copiar automáticamente.\n\nCopia este link:\n\n${link}`);
   }
@@ -3104,6 +3253,11 @@ function downloadTextFile(filename, content, mime = "text/plain;charset=utf-8") 
 
 function exportarInscripcionesCsv() {
   const rows = buildInscripcionesExportRows();
+
+  if (!puedeExportarCsvInscripciones()) {
+    alert("Solo Registro, Administración o Admin pueden exportar CSV.");
+    return;
+  }
 
   if (!rows.length) {
     alert("No hay inscripciones para exportar.");
@@ -3939,7 +4093,7 @@ function syncButtons() {
     const el = $(id);
     if (el) el.disabled = !editable;
   });
-  
+
   [
     "btnNuevaReunionHero",
     "btnNuevaReunion",
@@ -3948,7 +4102,7 @@ function syncButtons() {
     const el = $(id);
     if (el) el.disabled = !canManageMeetings();
   });
-  
+
   [
     "btnEditarSituacionHero",
     "btnEditarSituacion"
@@ -3965,6 +4119,7 @@ function syncButtons() {
     const el = $(id);
     if (el) el.disabled = !canAlertsComments;
   });
+
   const btnEditarDocumentos = $("btnEditarDocumentos");
   if (btnEditarDocumentos) {
     const canDocs = canEditDocuments();
@@ -3975,7 +4130,6 @@ function syncButtons() {
   const btnFicha = $("btnCrearFicha");
   if (btnFicha) {
     const fichaButtonMode = getFichaMainButtonMode();
-  
     btnFicha.textContent = fichaButtonMode.label;
     btnFicha.disabled = fichaButtonMode.disabled;
   }
@@ -3991,65 +4145,90 @@ function syncButtons() {
   const btnCopiarLinkInscripcion = $("btnCopiarLinkInscripcion");
   const btnExportarInscripcionesExcel = $("btnExportarInscripcionesExcel");
   const btnExportarInscripcionesCsv = $("btnExportarInscripcionesCsv");
-  
+
   const puedeInicial = canGestionarInscripcionInicial();
+  const puedeNominaFinal = canGestionarNominaFinal();
   const puedeNuevos = canGestionarNuevosIngresos();
   const puedeListaEspera = canGestionarListaEspera();
   const puedeLiberados = canGestionarLiberados();
-  
+
   const inscripcionYaHabilitada = !!state.group?.inscripcionHabilitada;
   const tieneInscripciones = state.inscripciones.length > 0;
-  
+
+  const labelActivo =
+    state.group?.inscripcion?.labelActual ||
+    getInscripcionFaseLabel(getInscripcionEstadoActual());
+
   if (btnHabilitarInscripcion) {
-    const esRegenerarInicial = inscripcionYaHabilitada && getInscripcionEstadoActual() === "normal";
-  
-    btnHabilitarInscripcion.disabled = esRegenerarInicial
-      ? !puedeRegenerarLinkInscripcionInicial()
-      : !puedeInicial;
-  
-    btnHabilitarInscripcion.textContent = esRegenerarInicial
-      ? "Regenerar inscripción inicial"
-      : "Abrir inscripción inicial";
+    if (grupoVieneSistemaAntiguo()) {
+      btnHabilitarInscripcion.textContent = puedeReabrirFasePasada() && nominaFinalYaCerrada()
+        ? "Reabrir nómina final / ficha médica"
+        : "Abrir nómina final / ficha médica";
+
+      btnHabilitarInscripcion.disabled = !puedeNominaFinal;
+    } else {
+      btnHabilitarInscripcion.textContent = puedeReabrirFasePasada() && inscripcionInicialYaCerrada()
+        ? "Reabrir inscripción inicial"
+        : "Abrir inscripción inicial";
+
+      btnHabilitarInscripcion.disabled = !puedeInicial;
+    }
   }
-  
+
   if (btnCopiarLinkInscripcion) {
     btnCopiarLinkInscripcion.disabled = !inscripcionYaHabilitada;
+    btnCopiarLinkInscripcion.textContent = inscripcionYaHabilitada
+      ? "Copiar link activo"
+      : "Sin link activo";
   }
-  
+
   if (btnCerrarInscripcion) {
-    btnCerrarInscripcion.disabled = !inscripcionYaHabilitada || (!puedeInicial && !puedeNuevos && !puedeListaEspera);
+    btnCerrarInscripcion.disabled = !inscripcionYaHabilitada || !puedeAbrirCerrarFasesInscripcion();
+    btnCerrarInscripcion.textContent = inscripcionYaHabilitada
+      ? `Cerrar ${labelActivo}`
+      : "Cerrar inscripción";
   }
-  
+
   if (btnAbrirNuevosInscritos) {
     btnAbrirNuevosInscritos.disabled = !puedeNuevos;
-  
+
     if (!inscripcionPrincipalEstaCerrada()) {
-      btnAbrirNuevosInscritos.textContent = "Nuevos ingresos (cerrar inscripción primero)";
+      btnAbrirNuevosInscritos.textContent = "Nuevos ingresos (cerrar link activo primero)";
+    } else if (!correspondeNuevosIngresosPorFecha()) {
+      btnAbrirNuevosInscritos.textContent = "Nuevos ingresos no corresponde por fecha";
     } else {
       btnAbrirNuevosInscritos.textContent = "Abrir nuevos ingresos";
     }
   }
-  
+
   if (btnAbrirListaEspera) {
     btnAbrirListaEspera.disabled = !puedeListaEspera;
-    btnAbrirListaEspera.textContent = debeSugerirListaEspera()
-      ? "Abrir lista de espera sugerida"
-      : "Abrir lista de espera";
+
+    if (!inscripcionPrincipalEstaCerrada()) {
+      btnAbrirListaEspera.textContent = "Lista de espera (cerrar link activo primero)";
+    } else if (!correspondeListaEsperaPorFecha()) {
+      btnAbrirListaEspera.textContent = "Lista de espera aún no corresponde";
+    } else {
+      btnAbrirListaEspera.textContent = "Abrir lista de espera";
+    }
   }
-  
+
   if (btnCrearLinkLiberados) {
     btnCrearLinkLiberados.disabled = !puedeLiberados;
     btnCrearLinkLiberados.textContent = state.group?.linkLiberadosActivo
       ? "Regenerar link liberados"
       : "Crear link liberados";
   }
-  
+
   if (btnExportarInscripcionesExcel) {
     btnExportarInscripcionesExcel.disabled = !tieneInscripciones;
   }
-  
+
   if (btnExportarInscripcionesCsv) {
-    btnExportarInscripcionesCsv.disabled = !tieneInscripciones;
+    const puedeCsv = puedeExportarCsvInscripciones();
+
+    btnExportarInscripcionesCsv.disabled = !tieneInscripciones || !puedeCsv;
+    btnExportarInscripcionesCsv.classList.toggle("hidden", !puedeCsv);
   }
 
   const btnContrato = $("btnCrearContrato");
@@ -4417,7 +4596,7 @@ function bindEvents() {
   
   $("btnCrearFicha")?.addEventListener("click", openFichaEditor);
   $("btnAbrirFichaPdf")?.addEventListener("click", openFichaPdf);
-  $("btnHabilitarInscripcion")?.addEventListener("click", () => cambiarFaseInscripcion("normal"));
+  $("btnHabilitarInscripcion")?.addEventListener("click", abrirInscripcionPrincipalDesdeBoton);
   $("btnCerrarInscripcion")?.addEventListener("click", cerrarInscripcion);
   $("btnAbrirNuevosInscritos")?.addEventListener("click", () => cambiarFaseInscripcion("nuevos"));
   $("btnAbrirListaEspera")?.addEventListener("click", () => cambiarFaseInscripcion("lista_espera"));
