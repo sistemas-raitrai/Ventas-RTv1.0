@@ -1937,14 +1937,19 @@ function getInscripcionNacionalidad(item = {}) {
     getByPath(item, "identificacion.nacionalidad") ||
     "";
 
-  const otra =
+  const detalle =
+    getByPath(item, "identificacion.nacionalidadDetalle") ||
     getByPath(item, "identificacion.nacionalidadOtra") ||
     getByPath(item, "identificacion.otraNacionalidad") ||
     "";
 
-  return normalizeSearchLocal(base) === "otra" && otra
-    ? otra
-    : (base || otra || "—");
+  const baseKey = normalizeSearchLocal(base);
+
+  if ((baseKey === "doble" || baseKey === "extranjera" || baseKey === "otra") && detalle) {
+    return detalle;
+  }
+
+  return base || detalle || "—";
 }
 
 function getInscripcionGenero(item = {}) {
