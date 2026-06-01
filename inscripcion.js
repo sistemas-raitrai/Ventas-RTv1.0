@@ -683,9 +683,11 @@ function aplicarEstadoUI() {
   mostrar(wrapComprobantePago, requiereComprobantePago());
 
   if (textoArchivosEspeciales) {
-    textoArchivosEspeciales.textContent = requiereComprobantePago()
+    const contexto = getContextoFormulario();
+  
+    textoArchivosEspeciales.textContent = contexto.clave === "lista_espera"
       ? "Para lista de espera debes adjuntar comprobante de transferencia y documento de identidad por ambos lados."
-      : "Para nuevo ingreso debes adjuntar documento de identidad por ambos lados.";
+      : "Para este formulario debes adjuntar documento de identidad por ambos lados.";
   }
 
   setRequired("carnetFrenteFile", requiereCarnetIdentidad());
@@ -1794,10 +1796,10 @@ function normalizarFaseInscripcion(value = "") {
   if (key === "nuevos") return "nuevos";
   if (key === "lista_espera") return "lista_espera";
   if (key === "liberado") return "liberado";
+  if (key === "nomina_final") return "nomina_final";
 
   return "normal";
 }
-
 function grupoTieneFirmaVendedor(data = {}) {
   return !!(
     data?.firmaVendedor ||
@@ -1813,8 +1815,6 @@ function grupoTieneFirmaVendedor(data = {}) {
 }
 
 function getContextoFormulario() {
-  const tieneFirmaVendedor = grupoTieneFirmaVendedor(grupoData || {});
-
   if (faseUrl === "nuevos") {
     return {
       clave: "nuevo_ingreso",
@@ -1829,7 +1829,7 @@ function getContextoFormulario() {
       clave: "lista_espera",
       tipoInscripcion: "lista_espera",
       tipoInscripcionLabel: "Formulario de Lista de espera",
-      estadoCupo: "pendiente_confirmacion"
+      estadoCupo: "pendiente_pago"
     };
   }
 
@@ -1837,12 +1837,12 @@ function getContextoFormulario() {
     return {
       clave: "liberado",
       tipoInscripcion: "liberado",
-      tipoInscripcionLabel: "Formulario de Registro de Adulto",
+      tipoInscripcionLabel: "Formulario de Registro de Cupo liberado",
       estadoCupo: "confirmado"
     };
   }
 
-  if (tieneFirmaVendedor) {
+  if (faseUrl === "nomina_final") {
     return {
       clave: "nomina_final",
       tipoInscripcion: "nomina_final",
@@ -1850,7 +1850,7 @@ function getContextoFormulario() {
       estadoCupo: "confirmado"
     };
   }
-  
+
   return {
     clave: "inscripcion_inicial",
     tipoInscripcion: "inscripcion_comercial",
