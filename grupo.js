@@ -1897,6 +1897,8 @@ function renderInscripcionPasajerosPanel() {
       </div>
     </div>
 
+    ${tabla}
+
     <div class="inscripcion-traza">
       <div><strong>Link principal:</strong> ${state.group?.inscripcionHabilitada ? "Habilitado" : "No habilitado"}</div>
       <div><strong>Estado inscripción:</strong> ${escapeHtml(getInscripcionFaseLabel(estadoInscripcion))}</div>
@@ -1905,8 +1907,6 @@ function renderInscripcionPasajerosPanel() {
       <div><strong>Link liberados:</strong> ${state.group?.linkLiberadosActivo ? "Habilitado" : "No habilitado"}</div>
       <div><strong>Liberados generado por:</strong> ${escapeHtml(liberadosInfo.actualizadoPor || liberadosInfo.linkGeneradoPor || "—")}</div>
     </div>
-
-    ${tabla}
   `;
 }
 
