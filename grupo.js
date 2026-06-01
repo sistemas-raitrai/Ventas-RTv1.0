@@ -539,9 +539,15 @@ async function loadInscripciones() {
       }))
       .filter((item) => item?.privacidad?.estado !== "eliminada_logica")
       .sort((a, b) => {
-        const apA = normalizeSearchLocal(getInscripcionApellidos(a));
-        const apB = normalizeSearchLocal(getInscripcionApellidos(b));
-        return apA.localeCompare(apB, "es");
+        const ordenA = getOrdenOperativoInscripcion(a);
+        const ordenB = getOrdenOperativoInscripcion(b);
+      
+        if (ordenA !== ordenB) return ordenA - ordenB;
+      
+        const fechaA = dateValue(getFechaFormularioInscripcion(a));
+        const fechaB = dateValue(getFechaFormularioInscripcion(b));
+      
+        return fechaA - fechaB;
       });
   } catch (error) {
     console.error("[grupo] loadInscripciones", error);
@@ -1638,6 +1644,36 @@ function getEstadoOperativoInscripcionLabel(item = {}) {
   }
 
   return getTipoInscripcionLabel(tipo);
+}
+
+function getOrdenOperativoInscripcion(item = {}) {
+  const tipo = normalizeSearchLocal(getInscripcionTipoReal(item));
+  const estadoCupo = normalizeSearchLocal(item.estadoCupo || "");
+
+  if (tipo === "nomina_inicial" || tipo === "nomina_final") return 1;
+
+  if (
+    tipo === "nuevo_ingreso_confirmado" ||
+    (tipo === "nuevo_ingreso" && estadoCupo === "confirmado")
+  ) return 2;
+
+  if (
+    tipo === "lista_espera_confirmada" ||
+    (tipo === "lista_espera" && estadoCupo === "confirmado")
+  ) return 3;
+
+  if (tipo === "nuevo_ingreso") return 4;
+
+  if (
+    tipo === "lista_espera_pagada" ||
+    (tipo === "lista_espera" && estadoCupo === "pagado")
+  ) return 5;
+
+  if (tipo === "lista_espera") return 6;
+
+  if (tipo === "liberado") return 7;
+
+  return 99;
 }
 
 function getFechaFormularioInscripcion(item = {}) {
