@@ -547,7 +547,7 @@ async function loadInscripciones() {
         const fechaA = dateValue(getFechaFormularioInscripcion(a));
         const fechaB = dateValue(getFechaFormularioInscripcion(b));
       
-        return fechaA - fechaB;
+        return fechaB - fechaA;
       });
   } catch (error) {
     console.error("[grupo] loadInscripciones", error);
@@ -1650,27 +1650,31 @@ function getOrdenOperativoInscripcion(item = {}) {
   const tipo = normalizeSearchLocal(getInscripcionTipoReal(item));
   const estadoCupo = normalizeSearchLocal(item.estadoCupo || "");
 
-  if (tipo === "nomina_inicial" || tipo === "nomina_final") return 1;
-
-  if (
-    tipo === "nuevo_ingreso_confirmado" ||
-    (tipo === "nuevo_ingreso" && estadoCupo === "confirmado")
-  ) return 2;
-
+  // 1. Lista de espera, con sus variantes
   if (
     tipo === "lista_espera_confirmada" ||
     (tipo === "lista_espera" && estadoCupo === "confirmado")
-  ) return 3;
-
-  if (tipo === "nuevo_ingreso") return 4;
+  ) return 1;
 
   if (
     tipo === "lista_espera_pagada" ||
     (tipo === "lista_espera" && estadoCupo === "pagado")
-  ) return 5;
+  ) return 2;
 
-  if (tipo === "lista_espera") return 6;
+  if (tipo === "lista_espera") return 3;
 
+  // 2. Nuevos ingresos, con sus variantes
+  if (
+    tipo === "nuevo_ingreso_confirmado" ||
+    (tipo === "nuevo_ingreso" && estadoCupo === "confirmado")
+  ) return 4;
+
+  if (tipo === "nuevo_ingreso") return 5;
+
+  // 3. Inscripción inicial / nómina final
+  if (tipo === "nomina_inicial" || tipo === "nomina_final") return 6;
+
+  // 4. Otros
   if (tipo === "liberado") return 7;
 
   return 99;
