@@ -1006,44 +1006,58 @@ function debeSugerirListaEspera() {
   return false;
 }
 
+function puedeAbrirCerrarFasesInscripcion() {
+  if (normalizeState(state.group?.estado) !== "ganada") return false;
+
+  const rol = String(state.effectiveUser?.rol || "").toLowerCase();
+
+  if (rol === "admin" || rol === "supervision") return true;
+
+  if (rol === "vendedor" && canAccessGroup(state.group)) return true;
+
+  return false;
+}
+
+function puedeRegenerarLinkInscripcionInicial() {
+  const rol = String(state.effectiveUser?.rol || "").toLowerCase();
+
+  return normalizeState(state.group?.estado) === "ganada" &&
+    (rol === "admin" || rol === "supervision");
+}
+
+function puedeMarcarListaEsperaPagada() {
+  const rol = String(state.effectiveUser?.rol || "").toLowerCase();
+
+  return normalizeState(state.group?.estado) === "ganada" &&
+    (rol === "admin" || rol === "supervision");
+}
+
 function canGestionarInscripcionInicial() {
-  return normalizeState(state.group?.estado) === "ganada" && (
-    canEditGroup() ||
-    (isRolVendedorInscripcion() && canAccessGroup(state.group)) ||
-    isRolAdministracionInscripcion()
-  );
+  return puedeAbrirCerrarFasesInscripcion();
 }
 
 function canGestionarNuevosIngresos() {
   const anoViaje = getAnoViajeInscripcion();
 
-  if (normalizeState(state.group?.estado) !== "ganada") return false;
+  if (!puedeAbrirCerrarFasesInscripcion()) return false;
   if (!inscripcionPrincipalEstaCerrada()) return false;
 
-  // Para 2026, después del cierre debe ir directo a lista de espera.
   if (anoViaje === 2026) return false;
-
-  // Desde 2027, si ya llegó el 16 de marzo, también corresponde lista de espera.
   if (anoViaje >= 2027 && esFechaListaEsperaAutomatica()) return false;
 
-  return (
-    canEditGroup() ||
-    (isRolVendedorInscripcion() && canAccessGroup(state.group)) ||
-    isRolAdministracionInscripcion()
-  );
+  return true;
 }
 
 function canGestionarListaEspera() {
-  if (normalizeState(state.group?.estado) !== "ganada") return false;
+  if (!puedeAbrirCerrarFasesInscripcion()) return false;
   if (!inscripcionPrincipalEstaCerrada()) return false;
 
-  return isRolAdministracionInscripcion();
+  return true;
 }
 
 function canGestionarLiberados() {
   if (normalizeState(state.group?.estado) !== "ganada") return false;
 
-  // Liberados se habilita solo desde que ya existe inscripción inicial abierta o creada.
   const yaExisteInscripcionInicial =
     !!state.group?.inscripcionHabilitada ||
     !!state.group?.tokenInscripcion ||
@@ -1051,15 +1065,14 @@ function canGestionarLiberados() {
 
   if (!yaExisteInscripcionInicial) return false;
 
-  return (
-    canEditGroup() ||
-    (isRolVendedorInscripcion() && canAccessGroup(state.group)) ||
-    isRolAdministracionInscripcion()
-  );
+  return puedeAbrirCerrarFasesInscripcion();
 }
 
 function canConfirmarListaEspera() {
-  return normalizeState(state.group?.estado) === "ganada" && isRolAdministracionInscripcion();
+  const rol = String(state.effectiveUser?.rol || "").toLowerCase();
+
+  return normalizeState(state.group?.estado) === "ganada" &&
+    (rol === "admin" || rol === "supervision");
 }
 
 function getBlockedInscripcionMessage() {
@@ -1446,7 +1459,7 @@ function getContextoInscripcionGrupo(fase = "normal", groupData = state.group ||
       tipoInscripcion: "lista_espera",
       labelFase: "Lista de espera",
       labelTipo: "Lista de espera",
-      estadoCupo: "pendiente_confirmacion"
+      estadoCupo: "pendiente_pago"
     };
   }
 
@@ -1641,9 +1654,11 @@ function renderInscripcionPasajerosPanel() {
                   <td>${escapeHtml(getByPath(item, "contactoPrincipal.celular") || getByPath(item, "contactoPrincipal.telefono") || getByPath(item, "contactoPrincipal.whatsapp") || "—")}</td>
                   <td>
                     ${
-                      esListaEsperaPendiente
-                        ? `<button class="inscripcion-action-btn" type="button" data-confirmar-cupo="${escapeHtml(item.id)}">Confirmar cupo</button>`
-                        : "—"
+                      esListaEsperaPendiente && normalizeSearchLocal(item.estadoCupo || "") !== "pagado"
+                        ? `<button class="inscripcion-action-btn" type="button" data-marcar-lista-pagada="${escapeHtml(item.id)}">Marcar pagado</button>`
+                        : esListaEsperaPendiente && normalizeSearchLocal(item.estadoCupo || "") === "pagado"
+                          ? `<button class="inscripcion-action-btn" type="button" data-confirmar-cupo="${escapeHtml(item.id)}">Confirmar cupo</button>`
+                          : "—"
                     }
                   </td>
                 </tr>
@@ -2880,9 +2895,9 @@ async function cerrarInscripcion() {
   showSaveNotice("Inscripción cerrada correctamente.");
 }
 
-async function confirmarCupoListaEspera(inscripcionId = "") {
-  if (!canConfirmarListaEspera()) {
-    alert(getBlockedInscripcionMessage());
+async function marcarListaEsperaPagada(inscripcionId = "") {
+  if (!puedeMarcarListaEsperaPagada()) {
+    alert("Solo Supervisión o Admin pueden marcar lista de espera como pagada.");
     return;
   }
 
@@ -2897,7 +2912,67 @@ async function confirmarCupoListaEspera(inscripcionId = "") {
     getInscripcionApellidos(item)
   ].filter(Boolean).join(" ");
 
-  const ok = confirm(`¿Confirmar cupo para ${nombre || "esta persona"} desde lista de espera?`);
+  const ok = confirm(`¿Confirmar que ${nombre || "esta persona"} pagó los $100.000 de lista de espera?`);
+  if (!ok) return;
+
+  const ref = doc(
+    db,
+    "ventas_cotizaciones",
+    String(state.groupDocId),
+    "inscripciones",
+    String(inscripcionId)
+  );
+
+  await updateDoc(ref, {
+    estadoCupo: "pagado",
+    listaEsperaPagada: true,
+    listaEsperaPagadaPor: getDisplayName(state.effectiveUser),
+    listaEsperaPagadaPorCorreo: state.effectiveEmail,
+    listaEsperaPagadaAt: serverTimestamp()
+  });
+
+  await createHistoryEntry({
+    tipoMovimiento: "inscripcion_lista_espera_pagada",
+    modulo: "inscripcion",
+    titulo: "Lista de espera pagada",
+    mensaje: `${getDisplayName(state.effectiveUser)} marcó como pagada la lista de espera de ${nombre || "una persona"}.`,
+    metadata: {
+      inscripcionId,
+      documento: getInscripcionDocumento(item),
+      nombreCompleto: nombre
+    }
+  });
+
+  await loadInscripciones();
+  renderInscripcionPasajerosPanel();
+  syncButtons();
+
+  showSaveNotice("Lista de espera marcada como pagada.");
+}
+
+async function confirmarCupoListaEspera(inscripcionId = "") {
+  if (!canConfirmarListaEspera()) {
+    alert(getBlockedInscripcionMessage());
+    return;
+  }
+
+  const item = state.inscripciones.find((x) => x.id === inscripcionId);
+  if (!item) {
+    alert("No se encontró la inscripción seleccionada.");
+    return;
+  }
+
+  if (normalizeSearchLocal(item.estadoCupo || "") !== "pagado") {
+    alert("Antes de confirmar el cupo, Supervisión o Admin debe marcar esta lista de espera como pagada.");
+    return;
+  }
+
+  const nombre = [
+    getInscripcionNombres(item),
+    getInscripcionApellidos(item)
+  ].filter(Boolean).join(" ");
+
+  const ok = confirm(`¿Confirmar cupo para ${nombre || "esta persona"} desde lista de espera pagada?`);
   if (!ok) return;
 
   const ref = doc(
@@ -2920,8 +2995,8 @@ async function confirmarCupoListaEspera(inscripcionId = "") {
   await createHistoryEntry({
     tipoMovimiento: "inscripcion_lista_espera_confirmada",
     modulo: "inscripcion",
-    titulo: "Cupo confirmado desde lista de espera",
-    mensaje: `${getDisplayName(state.effectiveUser)} confirmó cupo para ${nombre || "una persona"} desde lista de espera.`,
+    titulo: "Cupo confirmado desde lista de espera pagada",
+    mensaje: `${getDisplayName(state.effectiveUser)} confirmó cupo para ${nombre || "una persona"} desde lista de espera pagada.`,
     metadata: {
       inscripcionId,
       documento: getInscripcionDocumento(item),
@@ -3926,8 +4001,13 @@ function syncButtons() {
   const tieneInscripciones = state.inscripciones.length > 0;
   
   if (btnHabilitarInscripcion) {
-    btnHabilitarInscripcion.disabled = !puedeInicial;
-    btnHabilitarInscripcion.textContent = inscripcionYaHabilitada
+    const esRegenerarInicial = inscripcionYaHabilitada && getInscripcionEstadoActual() === "normal";
+  
+    btnHabilitarInscripcion.disabled = esRegenerarInicial
+      ? !puedeRegenerarLinkInscripcionInicial()
+      : !puedeInicial;
+  
+    btnHabilitarInscripcion.textContent = esRegenerarInicial
       ? "Regenerar inscripción inicial"
       : "Abrir inscripción inicial";
   }
@@ -4203,6 +4283,13 @@ function bindEvents() {
     if (!btn) return;
   
     confirmarCupoListaEspera(btn.dataset.confirmarCupo);
+  });
+
+  document.addEventListener("click", (event) => {
+  const btn = event.target.closest("[data-marcar-lista-pagada]");
+    if (!btn) return;
+  
+    marcarListaEsperaPagada(btn.dataset.marcarListaPagada);
   });
 
   document.addEventListener("click", (e) => {
