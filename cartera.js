@@ -618,13 +618,7 @@ async function countVisitsForRowInSeason(row = {}) {
 
 async function getGestionSummaryFromHistory(row = {}) {
   try {
-    const qy = query(
-      getHistoryCollectionRef(row.correoVendedor, row.numeroColegio),
-      orderBy("fecha", "desc"),
-      limit(50)
-    );
-
-    const snap = await getDocs(qy);
+    const snap = await getDocs(getHistoryCollectionRef(row.correoVendedor, row.numeroColegio));
 
     let latestGestion = null;
     let hasGestion = false;
