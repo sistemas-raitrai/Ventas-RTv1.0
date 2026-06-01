@@ -1606,7 +1606,8 @@ function construirPayloadBase() {
     },
 
     meta: {
-      fechaInscripcion: null,
+      fechaInscripcion: new Date().toISOString(),
+      fechaFormularioCliente: new Date().toISOString(),
       canal: "formulario_publico",
       versionFormulario: 4,
       creadoDesde: window.location.href,
@@ -1819,8 +1820,8 @@ function getContextoFormulario() {
     return {
       clave: "nuevo_ingreso",
       tipoInscripcion: "nuevo_ingreso",
-      tipoInscripcionLabel: "Formulario de Nuevo ingreso",
-      estadoCupo: "confirmado"
+      tipoInscripcionLabel: "Nuevo ingreso pendiente",
+      estadoCupo: "pendiente_confirmacion"
     };
   }
 
@@ -1828,7 +1829,7 @@ function getContextoFormulario() {
     return {
       clave: "lista_espera",
       tipoInscripcion: "lista_espera",
-      tipoInscripcionLabel: "Formulario de Lista de espera",
+      tipoInscripcionLabel: "Lista de espera pendiente",
       estadoCupo: "pendiente_pago"
     };
   }
@@ -1837,7 +1838,7 @@ function getContextoFormulario() {
     return {
       clave: "liberado",
       tipoInscripcion: "liberado",
-      tipoInscripcionLabel: "Formulario de Registro de Cupo liberado",
+      tipoInscripcionLabel: "Cupo liberado",
       estadoCupo: "confirmado"
     };
   }
@@ -1846,15 +1847,15 @@ function getContextoFormulario() {
     return {
       clave: "nomina_final",
       tipoInscripcion: "nomina_final",
-      tipoInscripcionLabel: "Formulario Nómina final / Ficha médica",
+      tipoInscripcionLabel: "Nómina final / ficha médica",
       estadoCupo: "confirmado"
     };
   }
 
   return {
     clave: "inscripcion_inicial",
-    tipoInscripcion: "inscripcion_comercial",
-    tipoInscripcionLabel: "Formulario de Inscripción inicial",
+    tipoInscripcion: "nomina_inicial",
+    tipoInscripcionLabel: "Inscripción inicial",
     estadoCupo: "confirmado"
   };
 }
