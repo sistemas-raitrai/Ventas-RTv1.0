@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dashboard Inscritos / Pagos</title>
+
+  <link rel="stylesheet" href="estilos.css" />
+
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      background: #f4f6f8;
+      color: #222;
+    }
+
+    header {
+      background: #003366;
+      color: white;
+      padding: 16px 24px;
+    }
+
+    main {
+      padding: 24px;
+    }
+
+    .panel {
+      background: white;
+      padding: 18px;
+      border-radius: 10px;
+      margin-bottom: 18px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    }
+
+    .busqueda {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    input {
+      padding: 10px;
+      min-width: 220px;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+    }
+
+    button {
+      padding: 10px 14px;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      background: #003366;
+      color: white;
+      font-weight: bold;
+    }
+
+    button.secondary {
+      background: #666;
+    }
+
+    .kpis {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 12px;
+    }
+
+    .kpi {
+      background: #f7f9fb;
+      border-left: 5px solid #003366;
+      padding: 12px;
+      border-radius: 8px;
+    }
+
+    .kpi strong {
+      display: block;
+      font-size: 22px;
+      margin-top: 6px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: white;
+      font-size: 13px;
+    }
+
+    th, td {
+      border: 1px solid #ddd;
+      padding: 8px;
+      vertical-align: top;
+    }
+
+    th {
+      background: #003366;
+      color: white;
+      position: sticky;
+      top: 0;
+      z-index: 2;
+    }
+
+    .tabla-wrap {
+      max-height: 65vh;
+      overflow: auto;
+    }
+
+    .ok {
+      color: #0a7a2f;
+      font-weight: bold;
+    }
+
+    .warning {
+      color: #b36b00;
+      font-weight: bold;
+    }
+
+    .danger {
+      color: #b00020;
+      font-weight: bold;
+    }
+
+    .muted {
+      color: #777;
+    }
+
+    .tag {
+      display: inline-block;
+      padding: 3px 7px;
+      border-radius: 999px;
+      font-size: 12px;
+      background: #eee;
+    }
+
+    .tag.ok {
+      background: #dff5e5;
+    }
+
+    .tag.warning {
+      background: #fff0d6;
+    }
+
+    .tag.danger {
+      background: #ffe0e0;
+    }
+  </style>
+</head>
+
+<body>
+  <header>
+    <h1>Dashboard Inscritos / Pagos</h1>
+  </header>
+
+  <main>
+    <section class="panel">
+      <h2>Buscar grupo</h2>
+
+      <div class="busqueda">
+        <input id="inputNumeroNegocio" type="text" placeholder="Número de negocio" />
+        <button id="btnBuscar">Buscar</button>
+        <button id="btnLimpiar" class="secondary">Limpiar</button>
+      </div>
+
+      <p id="estadoCarga" class="muted"></p>
+    </section>
+
+    <section class="panel">
+      <h2>Resumen grupo</h2>
+      <div id="resumenGrupo" class="kpis"></div>
+    </section>
+
+    <section class="panel">
+      <h2>Comparativo</h2>
+      <div id="resumenComparativo" class="kpis"></div>
+    </section>
+
+    <section class="panel">
+      <h2>Nómina pasajeros</h2>
+      <div class="tabla-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Estado</th>
+              <th>RUT</th>
+              <th>Nombre</th>
+              <th>Fecha nacimiento</th>
+              <th>Sexo</th>
+              <th>Subocupación</th>
+              <th>Pago inscripción</th>
+              <th>Total pagado</th>
+              <th>Saldo</th>
+              <th>Estado pago</th>
+              <th>Última cuota</th>
+              <th>Fecha anulación</th>
+              <th>Credencial</th>
+            </tr>
+          </thead>
+          <tbody id="tbodyPasajeros"></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <script type="module" src="./dashboard-inscritos.js"></script>
+</body>
+</html>
