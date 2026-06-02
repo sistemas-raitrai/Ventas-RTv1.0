@@ -10,7 +10,12 @@
 
   <style>
     .pagos-page{ padding:18px 30px 30px; }
-    .pagos-panel-main{ background:#efefef; border:3px dashed var(--line); padding:20px 22px; }
+    .pagos-panel-main{
+      background:#efefef;
+      border:0;
+      padding:20px 22px;
+      border-radius:18px;
+    }
     .pagos-topbar{ display:flex; justify-content:space-between; align-items:flex-start; gap:18px; flex-wrap:wrap; margin-bottom:18px; }
     .pagos-title-wrap h2{ margin:0 0 6px; font-size:30px; color:var(--header); }
     .pagos-title-wrap p{ margin:0; color:#5a5862; font-size:14px; }
@@ -104,6 +109,48 @@
     .detalle-head h3{ margin:0; color:var(--header); font-size:20px; }
 
     .hidden{ display:none !important; }
+
+    .detalle-modal{
+      position:fixed;
+      inset:0;
+      z-index:9999;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      padding:24px;
+    }
+    
+    .detalle-modal.hidden{
+      display:none !important;
+    }
+    
+    .detalle-modal-backdrop{
+      position:absolute;
+      inset:0;
+      background:rgba(15, 8, 28, .55);
+    }
+    
+    .detalle-modal-card{
+      position:relative;
+      width:min(1240px, 96vw);
+      max-height:88vh;
+      overflow:auto;
+      background:#fff;
+      border-radius:18px;
+      box-shadow:0 24px 70px rgba(0,0,0,.25);
+    }
+    
+    .detalle-modal-card .pagos-table-wrap{
+      max-height:52vh;
+      overflow:auto;
+    }
+    
+    .detalle-head{
+      position:sticky;
+      top:0;
+      background:#fff;
+      z-index:10;
+    }
 
     @media (max-width:1280px){
       .toolbar-left{ grid-template-columns:repeat(2,minmax(0,1fr)); }
@@ -212,7 +259,9 @@
         </div>
       </div>
 
-      <section id="detalleGrupoBox" class="detalle-box hidden">
+      <section id="detalleGrupoBox" class="detalle-modal hidden">
+        <div class="detalle-modal-backdrop" id="detalleBackdrop"></div>
+        <div class="detalle-modal-card">
         <div class="detalle-head">
           <h3 id="detalleTitulo">Detalle grupo</h3>
           <button id="btnCerrarDetalle" class="btn-page sec" type="button">Cerrar detalle</button>
@@ -222,8 +271,8 @@
           <div class="pagos-summary-card"><div class="label">Pasajeros</div><div class="value" id="detPasajeros">0</div></div>
           <div class="pagos-summary-card"><div class="label">Viajan</div><div class="value" id="detViajan">0</div></div>
           <div class="pagos-summary-card"><div class="label">No viajan</div><div class="value" id="detNoViajan">0</div></div>
-          <div class="pagos-summary-card"><div class="label">Con credencial</div><div class="value" id="detCredencial">0</div></div>
-          <div class="pagos-summary-card"><div class="label">Sin credencial</div><div class="value" id="detSinCredencial">0</div></div>
+          <div class="pagos-summary-card"><div class="label">Con carnet</div><div class="value" id="detCredencial">0</div></div>
+          <div class="pagos-summary-card"><div class="label">Sin carnet</div><div class="value" id="detSinCredencial">0</div></div>
           <div class="pagos-summary-card"><div class="label">Pagado</div><div class="value" id="detPagado">$0</div></div>
           <div class="pagos-summary-card"><div class="label">Saldo</div><div class="value" id="detSaldo">$0</div></div>
         </section>
@@ -241,7 +290,7 @@
                 <th>Saldo</th>
                 <th>Estado pago</th>
                 <th>Último pago</th>
-                <th>Credencial</th>
+                <th>Carnet</th>
               </tr>
             </thead>
             <tbody id="tbodyDetallePasajeros">
@@ -250,7 +299,7 @@
           </table>
         </div>
       </section>
-
+      </div>
     </section>
   </main>
 
