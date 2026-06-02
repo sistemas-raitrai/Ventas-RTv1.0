@@ -448,6 +448,14 @@ function formatearFecha(fecha) {
   return d.toLocaleDateString("es-CL");
 }
 
+function normalizarTexto(txt) {
+  return String(txt || "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim();
+}
+
 function obtenerAnoOperativo() {
   const hoy = new Date();
   const anoActual = hoy.getFullYear();
