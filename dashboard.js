@@ -27,6 +27,7 @@ const els = {
   sumConSaldo: $("sumConSaldo"),
 
   detalleGrupoBox: $("detalleGrupoBox"),
+  detalleBackdrop: $("detalleBackdrop"),
   detalleTitulo: $("detalleTitulo"),
   btnCerrarDetalle: $("btnCerrarDetalle"),
   tbodyDetallePasajeros: $("tbodyDetallePasajeros"),
@@ -46,6 +47,10 @@ function initDashboardPagos() {
   els.btnRecargarPagos.addEventListener("click", cargarGruposPagos);
   els.btnExportarPagos.addEventListener("click", exportarGruposPagos);
   els.btnCerrarDetalle.addEventListener("click", cerrarDetalle);
+
+  if (els.detalleBackdrop) {
+    els.detalleBackdrop.addEventListener("click", cerrarDetalle);
+  }
 
   [
     els.filtroAno,
@@ -82,6 +87,8 @@ async function cargarGruposPagos() {
 
 async function cargarDetalleGrupo(numeroNegocio) {
   els.detalleGrupoBox.classList.remove("hidden");
+  document.body.style.overflow = "hidden";
+
   els.detalleTitulo.textContent = `Cargando detalle N° ${numeroNegocio}...`;
   els.tbodyDetallePasajeros.innerHTML =
     `<tr><td colspan="10" class="seg-empty">Cargando pasajeros...</td></tr>`;
@@ -109,8 +116,6 @@ async function cargarDetalleGrupo(numeroNegocio) {
     renderResumenDetalle(resumen);
     renderTablaDetalle(pasajeros);
 
-    els.detalleGrupoBox.scrollIntoView({ behavior: "smooth", block: "start" });
-
   } catch (error) {
     console.error("Error cargando detalle:", error);
     els.tbodyDetallePasajeros.innerHTML =
@@ -119,14 +124,30 @@ async function cargarDetalleGrupo(numeroNegocio) {
 }
 
 function cargarFiltros() {
-  const anos = [...new Set(gruposOriginales.map(g => g.anoViaje).filter(Boolean))].sort();
-  const destinos = [...new Set(gruposOriginales.map(g => g.destino).filter(Boolean))].sort();
+  const anoOperativo = obtenerAnoOperativo();
 
-  els.filtroAno.innerHTML = `<option value="todos">Todos</option>` +
+  const anos = [...new Set(
+    gruposOriginales
+      .map(g => Number(g.anoViaje))
+      .filter(a => a && a >= anoOperativo)
+  )].sort((a, b) => a - b);
+
+  const destinos = [...new Set(
+    gruposOriginales
+      .filter(g => Number(g.anoViaje) >= anoOperativo)
+      .map(g => g.destino)
+      .filter(Boolean)
+  )].sort();
+
+  els.filtroAno.innerHTML =
+    `<option value="desde_actual">Desde ${anoOperativo}</option>` +
     anos.map(a => `<option value="${escapeHtml(a)}">${escapeHtml(a)}</option>`).join("");
 
-  els.filtroDestino.innerHTML = `<option value="todos">Todos</option>` +
+  els.filtroDestino.innerHTML =
+    `<option value="todos">Todos</option>` +
     destinos.map(d => `<option value="${escapeHtml(d)}">${escapeHtml(d)}</option>`).join("");
+
+  els.filtroAno.value = "desde_actual";
 }
 
 function aplicarFiltros() {
@@ -137,7 +158,12 @@ function aplicarFiltros() {
   const q = normalizarTexto(els.buscadorPagos.value);
 
   gruposFiltrados = gruposOriginales.filter((g) => {
-    if (ano !== "todos" && String(g.anoViaje) !== String(ano)) return false;
+    if (ano === "desde_actual") {
+      const anoOperativo = obtenerAnoOperativo();
+      if (Number(g.anoViaje) < anoOperativo) return false;
+    } else if (ano !== "todos" && String(g.anoViaje) !== String(ano)) {
+      return false;
+    }
     if (moneda !== "todos" && g.monedaTexto !== moneda) return false;
     if (destino !== "todos" && g.destino !== destino) return false;
 
@@ -256,8 +282,8 @@ function renderTablaDetalle(items) {
       : `<span class="badge badge-danger">No viaja</span>`;
 
     const credencial = p.tieneCredencial
-      ? `<span class="badge badge-ok">Cargada</span>`
-      : `<span class="badge badge-warn">Sin credencial</span>`;
+      ? `<span class="badge badge-ok">Con carnet</span>`
+      : `<span class="badge badge-warn">Sin carnet</span>`;
 
     const estadoPago = p.saldoPendiente <= 0
       ? `<span class="badge badge-ok">Pagado</span>`
@@ -285,6 +311,7 @@ function renderTablaDetalle(items) {
 function cerrarDetalle() {
   detalleActual = null;
   els.detalleGrupoBox.classList.add("hidden");
+  document.body.style.overflow = "";
 }
 
 function exportarGruposPagos() {
@@ -421,12 +448,17 @@ function formatearFecha(fecha) {
   return d.toLocaleDateString("es-CL");
 }
 
-function normalizarTexto(txt) {
-  return String(txt || "")
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .trim();
+function obtenerAnoOperativo() {
+  const hoy = new Date();
+  const anoActual = hoy.getFullYear();
+  const mes = hoy.getMonth() + 1;
+  const dia = hoy.getDate();
+
+  if (mes < 3 || (mes === 3 && dia < 1)) {
+    return anoActual - 1;
+  }
+
+  return anoActual;
 }
 
 function escapeHtml(str) {
