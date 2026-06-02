@@ -1,7 +1,6 @@
 // dashboard.js
 
-const API_PAGOS_URL =
-  "https://southamerica-west1-sist-op-rt.cloudfunctions.net/apiPagos";
+const API_PAGOS_URL = "/api/pagos";
 
 let gruposOriginales = [];
 let gruposFiltrados = [];
