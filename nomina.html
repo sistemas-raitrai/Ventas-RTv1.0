@@ -4,38 +4,161 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Nómina del grupo | Rai Trai</title>
-  <link rel="stylesheet" href="estilos.css" />
   <link rel="icon" type="image/png" href="IMG/logo-raitrai.png" />
+
+  <style>
+    body{
+      margin:0;
+      font-family: Arial, sans-serif;
+      background:#f4f6fb;
+      color:#1e2559;
+    }
+
+    .page{
+      max-width:900px;
+      margin:0 auto;
+      padding:34px 18px;
+    }
+
+    .card{
+      background:#fff;
+      border-radius:24px;
+      overflow:hidden;
+      box-shadow:0 18px 45px rgba(30,37,89,.14);
+      border:1px solid #e5e7eb;
+    }
+
+    .hero{
+      background:linear-gradient(135deg,#1e2559,#2d3678);
+      color:#fff;
+      padding:30px;
+      text-align:center;
+    }
+
+    .logo{
+      width:90px;
+      height:auto;
+      margin-bottom:16px;
+    }
+
+    .hero h1{
+      margin:0;
+      font-size:30px;
+      line-height:1.2;
+      font-weight:900;
+    }
+
+    .hero p{
+      margin:12px 0 0;
+      color:#e8ecff;
+      font-size:16px;
+    }
+
+    .info{
+      display:grid;
+      grid-template-columns:repeat(3,1fr);
+      gap:14px;
+      padding:24px 30px 10px;
+    }
+
+    .info-box{
+      background:#f8fafc;
+      border:1px solid #e5e7eb;
+      border-radius:16px;
+      padding:14px;
+    }
+
+    .label{
+      font-size:12px;
+      font-weight:800;
+      text-transform:uppercase;
+      color:#64748b;
+      margin-bottom:6px;
+    }
+
+    .value{
+      font-size:18px;
+      font-weight:900;
+      color:#1e2559;
+    }
+
+    .table-wrap{
+      padding:20px 30px 30px;
+    }
+
+    table{
+      width:100%;
+      border-collapse:collapse;
+      overflow:hidden;
+      border-radius:16px;
+      border:1px solid #dbe2ea;
+    }
+
+    th{
+      background:#1e2559;
+      color:#fff;
+      padding:13px;
+      text-align:left;
+      font-size:14px;
+    }
+
+    td{
+      padding:12px 13px;
+      border-bottom:1px solid #edf1f5;
+      font-size:15px;
+    }
+
+    td:first-child,
+    th:first-child{
+      width:70px;
+      text-align:center;
+    }
+
+    tr:nth-child(even) td{
+      background:#f8fafc;
+    }
+
+    .footer{
+      padding:18px 30px 26px;
+      border-top:1px solid #edf1f5;
+      color:#64748b;
+      font-size:13px;
+      text-align:center;
+    }
+
+    @media(max-width:700px){
+      .hero h1{font-size:24px;}
+      .info{grid-template-columns:1fr;}
+      .page{padding:18px 12px;}
+    }
+  </style>
 </head>
 
 <body>
-  <main class="grupo-shell" style="max-width:900px;">
-    <section class="grupo-panel">
-      <div class="grupo-panel-head">
-        <div>
-          <h1 class="grupo-panel-title" id="tituloNomina">Nómina del grupo</h1>
-          <p class="grupo-panel-sub" id="subtituloNomina">Cargando información.</p>
-        </div>
+  <main class="page">
+    <section class="card">
+      <div class="hero">
+        <img class="logo" src="IMG/logo-raitrai.png" alt="Rai Trai" />
+        <h1 id="tituloNomina">Nómina del grupo</h1>
+        <p id="subtituloNomina">Cargando información.</p>
       </div>
 
-      <div class="grupo-panel-body">
-        <div id="datosGrupoNomina" class="grupo-data-card-grid"></div>
+      <div class="info" id="datosGrupoNomina"></div>
 
-        <div class="inscripcion-table-wrap">
-          <table class="inscripcion-table" style="min-width:0;">
-            <thead>
-              <tr>
-                <th style="width:70px;">N°</th>
-                <th>Nombre y apellidos</th>
-              </tr>
-            </thead>
-            <tbody id="tablaNominaPublica"></tbody>
-          </table>
-        </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>N°</th>
+              <th>Nombre y apellidos</th>
+            </tr>
+          </thead>
+          <tbody id="tablaNominaPublica"></tbody>
+        </table>
+      </div>
 
-        <p class="small muted" style="margin-top:16px;">
-          Esta nómina muestra solo nombres y apellidos para revisión del grupo.
-        </p>
+      <div class="footer">
+        Esta nómina muestra solo nombres y apellidos para revisión del grupo.
       </div>
     </section>
   </main>
