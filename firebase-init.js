@@ -221,7 +221,8 @@ export function puedeCrearCotizaciones(email = "") {
 ========================================================= */
 const PUBLIC_PAGES = new Set([
   "login.html",
-  "inscripcion.html"
+  "inscripcion.html",
+  "nomina.html"
 ]);
 
 onAuthStateChanged(auth, async (user) => {
