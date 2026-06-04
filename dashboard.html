@@ -115,9 +115,10 @@
       inset:0;
       z-index:9999;
       display:flex;
-      align-items:center;
+      align-items:flex-start;
       justify-content:center;
-      padding:24px;
+      padding:18px 24px;
+      overflow:hidden;
     }
     
     .detalle-modal.hidden{
@@ -132,16 +133,21 @@
     
     .detalle-modal-card{
       position:relative;
-      width:min(1240px, 96vw);
-      max-height:88vh;
-      overflow:auto;
+      width:min(1280px, 96vw);
+      height:calc(100vh - 36px);
+      max-height:calc(100vh - 36px);
+      overflow:hidden;
       background:#fff;
       border-radius:18px;
       box-shadow:0 24px 70px rgba(0,0,0,.25);
+      display:flex;
+      flex-direction:column;
     }
     
     .detalle-modal-card .pagos-table-wrap{
-      max-height:52vh;
+      flex:1;
+      min-height:0;
+      max-height:none;
       overflow:auto;
     }
     
