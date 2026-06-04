@@ -2026,7 +2026,7 @@ function renderBannerFaseInscripcion() {
   
       <br><br>
   
-      Cuando el grupo complete el proceso de <strong>Nómina Final</strong>, Turismo Rai Trai enviará un correo electrónico con la habilitación de pagos, el enlace correspondiente y las instrucciones necesarias para continuar.
+      Cuando el grupo complete el proceso de <strong>Nómina del Viaje</strong>, Turismo Rai Trai enviará un correo electrónico con la habilitación de pagos, el enlace correspondiente y las instrucciones necesarias para continuar.
     `;
   }
 
