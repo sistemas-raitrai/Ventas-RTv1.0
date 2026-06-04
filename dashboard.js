@@ -89,6 +89,9 @@ async function cargarGruposPagos() {
 
 async function cargarDetalleGrupo(numeroNegocio) {
   els.detalleGrupoBox.classList.remove("hidden");
+
+  // Evita que se mueva la página de fondo mientras el modal está abierto.
+  document.documentElement.style.overflow = "hidden";
   document.body.style.overflow = "hidden";
 
   els.detalleTitulo.textContent = `Cargando detalle N° ${numeroNegocio}...`;
@@ -313,6 +316,8 @@ function renderTablaDetalle(items) {
 function cerrarDetalle() {
   detalleActual = null;
   els.detalleGrupoBox.classList.add("hidden");
+
+  document.documentElement.style.overflow = "";
   document.body.style.overflow = "";
 }
 
