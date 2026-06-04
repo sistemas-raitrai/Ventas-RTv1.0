@@ -1,9 +1,21 @@
-import { db } from "./firebase-init.js";
-
+import { initializeApp } from "https://www.gstatic.com/firebasejs/11.7.3/firebase-app.js";
 import {
+  getFirestore,
   doc,
   getDoc
 } from "https://www.gstatic.com/firebasejs/11.7.3/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "COPIA_AQUI_TU_API_KEY_REAL",
+  authDomain: "COPIA_AQUI_TU_AUTH_DOMAIN_REAL",
+  projectId: "COPIA_AQUI_TU_PROJECT_ID_REAL",
+  storageBucket: "COPIA_AQUI_TU_STORAGE_BUCKET_REAL",
+  messagingSenderId: "COPIA_AQUI_TU_MESSAGING_SENDER_ID_REAL",
+  appId: "COPIA_AQUI_TU_APP_ID_REAL"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
 
 const $ = (id) => document.getElementById(id);
 
