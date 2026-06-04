@@ -30,6 +30,7 @@ const els = {
   detalleBackdrop: $("detalleBackdrop"),
   detalleTitulo: $("detalleTitulo"),
   btnCerrarDetalle: $("btnCerrarDetalle"),
+  btnExportarDetalle: $("btnExportarDetalle"),
   tbodyDetallePasajeros: $("tbodyDetallePasajeros"),
 
   detPasajeros: $("detPasajeros"),
@@ -47,6 +48,7 @@ function initDashboardPagos() {
   els.btnRecargarPagos.addEventListener("click", cargarGruposPagos);
   els.btnExportarPagos.addEventListener("click", exportarGruposPagos);
   els.btnCerrarDetalle.addEventListener("click", cerrarDetalle);
+  els.btnExportarDetalle.addEventListener("click", exportarDetalleNomina);
 
   if (els.detalleBackdrop) {
     els.detalleBackdrop.addEventListener("click", cerrarDetalle);
@@ -314,6 +316,59 @@ function cerrarDetalle() {
   document.body.style.overflow = "";
 }
 
+function exportarDetalleNomina() {
+  if (!detalleActual) {
+    alert("Primero debes abrir una nómina.");
+    return;
+  }
+
+  const numeroNegocio = detalleActual.numeroNegocio || "";
+
+  const grupo = gruposOriginales.find(
+    (g) => String(g.numeroNegocio) === String(numeroNegocio)
+  );
+
+  const pasajerosRaw =
+    detalleActual?.nominas?.data?.pasajeros ||
+    detalleActual?.saldos?.data?.detalle_pasajeros ||
+    [];
+
+  const pasajeros = pasajerosRaw.map(normalizarPasajero);
+
+  const rows = pasajeros.map((p) => ({
+    numeroNegocio,
+    grupo: grupo?.nombreGrupo || "",
+    anoViaje: grupo?.anoViaje || "",
+    destino: grupo?.destino || "",
+    rut: p.rut || "",
+    nombreCompleto: p.nombreCompleto || "",
+    categoria: p.categoria || "",
+    viaja: p.viaja ? "Sí" : "No",
+    total: p.totalDebe,
+    pagado: p.totalPagado,
+    saldo: p.saldoPendiente,
+    estadoPago:
+      p.saldoPendiente <= 0
+        ? "Pagado"
+        : p.totalPagado <= 0
+          ? "Sin pagos"
+          : "Parcial",
+    ultimoPagoFecha: p.ultimoPagoFecha || "",
+    ultimoPagoMonto: p.ultimoPagoMonto || 0,
+    carnet: p.tieneCredencial ? "Con carnet" : "Sin carnet"
+  }));
+
+  const ws = XLSX.utils.json_to_sheet(rows);
+  const wb = XLSX.utils.book_new();
+
+  XLSX.utils.book_append_sheet(wb, ws, "Nomina");
+
+  const nombreArchivo =
+    `nomina_${numeroNegocio}_${limpiarNombreArchivo(grupo?.nombreGrupo || "grupo")}.xlsx`;
+
+  XLSX.writeFile(wb, nombreArchivo);
+}
+
 function exportarGruposPagos() {
   const rows = gruposFiltrados.map((g) => ({
     numeroNegocio: g.numeroNegocio,
@@ -467,6 +522,16 @@ function obtenerAnoOperativo() {
   }
 
   return anoActual;
+}
+
+function limpiarNombreArchivo(txt) {
+  return String(txt || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-zA-Z0-9_-]+/g, "_")
+    .replace(/_+/g, "_")
+    .replace(/^_+|_+$/g, "")
+    .slice(0, 80);
 }
 
 function escapeHtml(str) {
