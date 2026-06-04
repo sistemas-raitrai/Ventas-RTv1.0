@@ -1687,6 +1687,28 @@ function mostrarPantallaFinal(payload) {
         <strong>${escapeHtml(destinatarioTexto || "indicado en el formulario")}</strong>.
       </p>
 
+      ${
+        payload?.tipoInscripcion === "nomina_inicial"
+          ? `
+            <div class="notice privacy" style="margin-top:16px;">
+              <strong>Sobre la habilitación de pagos</strong><br><br>
+      
+              Esta etapa corresponde a la <strong>Inscripción Inicial</strong>.
+              La habilitación del sistema de pagos se realizará posteriormente,
+              una vez que el grupo complete el proceso de <strong>Nómina Final</strong>.
+      
+              <br><br>
+      
+              Cuando ello ocurra, Turismo Rai Trai enviará un correo electrónico con el enlace de acceso al sistema de pagos y las instrucciones necesarias para continuar.
+      
+              <br><br>
+      
+              Por el momento no es necesario realizar ninguna gestión adicional.
+            </div>
+          `
+          : ""
+      }
+
       <div class="notice time" style="margin-top:12px;">
         Si no lo recibes en unos minutos, revisa especialmente
         <strong>spam / correos no deseados</strong>.
@@ -1990,8 +2012,21 @@ function renderBannerFaseInscripcion() {
   } else {
     box.className = "notice privacy";
     box.innerHTML = `
-      <strong>Formulario de Inscripción inicial.</strong><br>
-      Completa este formulario para registrar a la persona que participará en el viaje de estudio.
+      <strong>Formulario de Inscripción Inicial.</strong><br><br>
+  
+      Este formulario corresponde a la <strong>Inscripción Inicial</strong> de la persona que viaja.
+  
+      <br><br>
+  
+      Una vez enviado, la información será recibida y revisada por el equipo de Turismo Rai Trai como parte del proceso administrativo del viaje.
+  
+      <br><br>
+  
+      En esta etapa <strong>aún no se habilita el sistema de pagos</strong>.
+  
+      <br><br>
+  
+      Cuando el grupo complete el proceso de <strong>Nómina Final</strong>, Turismo Rai Trai enviará un correo electrónico con la habilitación de pagos, el enlace correspondiente y las instrucciones necesarias para continuar.
     `;
   }
 
