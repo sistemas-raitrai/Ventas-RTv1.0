@@ -111,13 +111,18 @@
     .hidden{ display:none !important; }
 
     .detalle-modal{
-      position:fixed;
-      inset:0;
-      z-index:9999;
+      position:fixed !important;
+      top:0 !important;
+      left:0 !important;
+      right:0 !important;
+      bottom:0 !important;
+      width:100vw !important;
+      height:100vh !important;
+      z-index:999999 !important;
       display:flex;
       align-items:flex-start;
       justify-content:center;
-      padding:18px 24px;
+      padding:14px 18px;
       overflow:hidden;
     }
     
@@ -133,9 +138,9 @@
     
     .detalle-modal-card{
       position:relative;
-      width:min(1280px, 96vw);
-      height:calc(100vh - 36px);
-      max-height:calc(100vh - 36px);
+      width:min(1320px, calc(100vw - 36px));
+      height:calc(100vh - 28px);
+      max-height:calc(100vh - 28px);
       overflow:hidden;
       background:#fff;
       border-radius:18px;
