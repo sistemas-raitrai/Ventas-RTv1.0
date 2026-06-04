@@ -80,6 +80,7 @@ function renderNomina(data = {}) {
         <tr>
           <td style="text-align:center;">${i + 1}</td>
           <td>${escapeHtml(p.nombre || "")}</td>
+          <td>${escapeHtml(p.fechaInscripcion || "—")}</td>
         </tr>
       `).join("")
     : `<tr><td colspan="2">No hay pasajeros publicados.</td></tr>`;
