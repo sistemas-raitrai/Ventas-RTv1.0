@@ -45,6 +45,12 @@ const els = {
 document.addEventListener("DOMContentLoaded", initDashboardPagos);
 
 function initDashboardPagos() {
+  // Mueve el modal fuera del panel principal.
+  // Así no queda cortado por el contenedor del dashboard.
+  if (els.detalleGrupoBox && els.detalleGrupoBox.parentElement !== document.body) {
+    document.body.appendChild(els.detalleGrupoBox);
+  }
+
   els.btnRecargarPagos.addEventListener("click", cargarGruposPagos);
   els.btnExportarPagos.addEventListener("click", exportarGruposPagos);
   els.btnCerrarDetalle.addEventListener("click", cerrarDetalle);
