@@ -4779,6 +4779,7 @@ function bindEvents() {
   $("btnAbrirListaEspera")?.addEventListener("click", () => cambiarFaseInscripcion("lista_espera"));
   $("btnCrearLinkLiberados")?.addEventListener("click", crearLinkLiberados);
   $("btnCopiarLinkInscripcion")?.addEventListener("click", copyGroupInscripcionLink);
+  $("btnGenerarLinkNominaPublica")?.addEventListener("click", generarLinkNominaPublica);
   $("btnExportarInscripcionesExcel")?.addEventListener("click", exportarInscripcionesExcel);
   $("btnExportarInscripcionesCsv")?.addEventListener("click", exportarInscripcionesCsv);
 
@@ -7510,4 +7511,119 @@ function escapeHtml(value = "") {
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#39;");
+}
+
+function getNombrePublicoInscripcion(item = {}) {
+  const nombres =
+    getByPath(item, "identificacion.nombres") ||
+    item.nombres ||
+    "";
+
+  const primerApellido =
+    getByPath(item, "identificacion.primerApellido") ||
+    item.primerApellido ||
+    "";
+
+  const segundoApellido =
+    getByPath(item, "identificacion.segundoApellido") ||
+    item.segundoApellido ||
+    "";
+
+  const nombreCompleto =
+    getByPath(item, "identificacion.nombreCompleto") ||
+    item.nombreCompleto ||
+    "";
+
+  return cleanText(
+    nombreCompleto || [nombres, primerApellido, segundoApellido].filter(Boolean).join(" ")
+  );
+}
+
+function buildNominaPublicaRows() {
+  return state.inscripciones
+    .filter((item) => item?.privacidad?.estado !== "eliminada_logica")
+    .map((item) => ({
+      nombre: getNombrePublicoInscripcion(item),
+      tipo: formatInscripcionValue(item.tipoViajante || item.tipoParticipacion || "")
+    }))
+    .filter((x) => x.nombre)
+    .sort((a, b) => a.nombre.localeCompare(b.nombre, "es"));
+}
+
+function getNominaPublicaLink(token = "") {
+  return `${location.origin}${location.pathname.replace(/grupo\.html$/i, "nomina.html")}?t=${encodeURIComponent(token)}`;
+}
+
+async function generarLinkNominaPublica() {
+  if (!state.groupDocId || !state.groupId) {
+    alert("No se pudo identificar el grupo.");
+    return;
+  }
+
+  const pasajeros = buildNominaPublicaRows();
+
+  if (!pasajeros.length) {
+    alert("No hay nombres en la nómina para publicar.");
+    return;
+  }
+
+  const ok = confirm(
+    "Se generará un link público con SOLO nombres y apellidos de la nómina. No incluirá RUT, salud, correos ni teléfonos. ¿Continuar?"
+  );
+
+  if (!ok) return;
+
+  const token = generateInscripcionToken(40);
+  const link = getNominaPublicaLink(token);
+
+  await setDoc(doc(db, "nominas_publicas", token), {
+    token,
+    activo: true,
+
+    idGrupo: String(state.groupId),
+    groupDocId: String(state.groupDocId),
+
+    colegio: cleanText(state.group?.colegio || ""),
+    curso: cleanText(state.group?.curso || ""),
+    anoViaje: cleanText(state.group?.anoViaje || ""),
+    destino:
+      cleanText(state.group?.destinoPrincipal || "") ||
+      cleanText(state.group?.destino || ""),
+    nombreGrupo:
+      cleanText(state.group?.aliasGrupo || "") ||
+      cleanText(state.group?.nombreGrupo || "") ||
+      cleanText(state.group?.colegio || ""),
+
+    pasajeros,
+
+    creadoPor: getDisplayName(state.effectiveUser),
+    creadoPorCorreo: state.effectiveEmail,
+    creadoEn: serverTimestamp()
+  });
+
+  await saveGroupPatch(
+    {
+      nominaPublica: {
+        activo: true,
+        token,
+        link,
+        actualizadoEn: serverTimestamp(),
+        actualizadoPor: getDisplayName(state.effectiveUser),
+        actualizadoPorCorreo: state.effectiveEmail
+      }
+    },
+    {
+      tipoMovimiento: "nomina_publica_generada",
+      modulo: "inscripcion",
+      titulo: "Link público de nómina generado",
+      mensaje: `${getDisplayName(state.effectiveUser)} generó un link público de nómina simple.`
+    }
+  );
+
+  try {
+    await navigator.clipboard.writeText(link);
+    showSaveNotice("Link de nómina copiado.");
+  } catch {
+    alert(`Link de nómina:\n\n${link}`);
+  }
 }
