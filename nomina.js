@@ -6,12 +6,12 @@ import {
 } from "https://www.gstatic.com/firebasejs/11.7.3/firebase-firestore.js";
 
 const firebaseConfig = {
-  apiKey: "COPIA_AQUI_TU_API_KEY_REAL",
-  authDomain: "COPIA_AQUI_TU_AUTH_DOMAIN_REAL",
-  projectId: "COPIA_AQUI_TU_PROJECT_ID_REAL",
-  storageBucket: "COPIA_AQUI_TU_STORAGE_BUCKET_REAL",
-  messagingSenderId: "COPIA_AQUI_TU_MESSAGING_SENDER_ID_REAL",
-  appId: "COPIA_AQUI_TU_APP_ID_REAL"
+  apiKey: "AIzaSyAdx9nVcV-UiGER3mcz-w9BcSSIZd-t5nE",
+  authDomain: "sist-op-rt.firebaseapp.com",
+  projectId: "sist-op-rt",
+  storageBucket: "sist-op-rt.firebasestorage.app",
+  messagingSenderId: "438607695630",
+  appId: "1:438607695630:web:f5a16f319e3ea17fbfd15f"
 };
 
 const app = initializeApp(firebaseConfig);
