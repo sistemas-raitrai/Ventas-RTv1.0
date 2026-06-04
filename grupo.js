@@ -7552,8 +7552,19 @@ function buildNominaPublicaRows() {
 }
 
 function formatPublicDateTime(value) {
-  const d = toDateSafe(value);
-  if (!d) return "—";
+  let d = null;
+
+  if (!value) return "—";
+
+  if (value?.toDate) {
+    d = value.toDate();
+  } else if (value instanceof Date) {
+    d = value;
+  } else {
+    d = new Date(value);
+  }
+
+  if (!d || Number.isNaN(d.getTime())) return "—";
 
   return d.toLocaleString("es-CL", {
     day: "2-digit",
