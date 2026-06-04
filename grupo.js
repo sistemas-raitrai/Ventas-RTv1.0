@@ -7542,13 +7542,18 @@ function getNombrePublicoInscripcion(item = {}) {
 function buildNominaPublicaRows() {
   return state.inscripciones
     .filter((item) => item?.privacidad?.estado !== "eliminada_logica")
-    .map((item) => ({
-      nombre: getNombrePublicoInscripcion(item),
-      fechaInscripcion: formatPublicDateTime(getFechaFormularioInscripcion(item)),
-      tipo: formatInscripcionValue(item.tipoViajante || item.tipoParticipacion || "")
-    }))
+    .map((item) => {
+      const fechaOriginal = getFechaFormularioInscripcion(item);
+
+      return {
+        nombre: getNombrePublicoInscripcion(item),
+        fechaInscripcion: formatPublicDateTime(fechaOriginal),
+        fechaOrden: getPublicDateTimeMs(fechaOriginal),
+        tipo: formatInscripcionValue(item.tipoViajante || item.tipoParticipacion || "")
+      };
+    })
     .filter((x) => x.nombre)
-    .sort((a, b) => a.nombre.localeCompare(b.nombre, "es"));
+    .sort((a, b) => a.fechaOrden - b.fechaOrden);
 }
 
 function formatPublicDateTime(value) {
@@ -7573,6 +7578,24 @@ function formatPublicDateTime(value) {
     hour: "2-digit",
     minute: "2-digit"
   });
+}
+
+function getPublicDateTimeMs(value) {
+  let d = null;
+
+  if (!value) return 0;
+
+  if (value?.toDate) {
+    d = value.toDate();
+  } else if (value instanceof Date) {
+    d = value;
+  } else {
+    d = new Date(value);
+  }
+
+  if (!d || Number.isNaN(d.getTime())) return 0;
+
+  return d.getTime();
 }
 
 function getNominaPublicaLink(token = "") {
