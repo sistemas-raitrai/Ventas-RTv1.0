@@ -58,22 +58,21 @@ function renderNomina(data = {}) {
   ].filter(Boolean).join(" · ");
 
   $("datosGrupoNomina").innerHTML = `
-    <div class="grupo-data-card is-strong">
-      <div class="info-label">Colegio</div>
-      <div class="info-value">${escapeHtml(data.colegio || "—")}</div>
+    <div class="info-box">
+      <div class="label">Colegio</div>
+      <div class="value">${escapeHtml(data.colegio || "—")}</div>
     </div>
-
-    <div class="grupo-data-card is-strong">
-      <div class="info-label">Curso</div>
-      <div class="info-value">${escapeHtml(data.curso || "—")}</div>
+  
+    <div class="info-box">
+      <div class="label">Curso</div>
+      <div class="value">${escapeHtml(data.curso || "—")}</div>
     </div>
-
-    <div class="grupo-data-card is-strong">
-      <div class="info-label">Año viaje</div>
-      <div class="info-value">${escapeHtml(data.anoViaje || "—")}</div>
+  
+    <div class="info-box">
+      <div class="label">Año viaje</div>
+      <div class="value">${escapeHtml(data.anoViaje || "—")}</div>
     </div>
   `;
-
   const pasajeros = Array.isArray(data.pasajeros) ? data.pasajeros : [];
 
   $("tablaNominaPublica").innerHTML = pasajeros.length
