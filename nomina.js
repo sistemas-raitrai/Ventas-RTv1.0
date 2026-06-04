@@ -48,7 +48,7 @@ async function init() {
 }
 
 function renderNomina(data = {}) {
-  $("tituloNomina").textContent = data.nombreGrupo || "Nómina del grupo";
+  $("tituloNomina").textContent = String(data.nombreGrupo || "Nómina del grupo").toUpperCase();
 
   $("subtituloNomina").textContent = [
     data.colegio,
@@ -79,7 +79,7 @@ function renderNomina(data = {}) {
     ? pasajeros.map((p, i) => `
         <tr>
           <td style="text-align:center;">${i + 1}</td>
-          <td>${escapeHtml(p.nombre || "")}</td>
+          <td>${escapeHtml(String(p.nombre || "").toUpperCase())}</td>
           <td>${escapeHtml(p.fechaInscripcion || "—")}</td>
         </tr>
       `).join("")
