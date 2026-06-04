@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Nómina del grupo | Rai Trai</title>
+  <link rel="stylesheet" href="estilos.css" />
+  <link rel="icon" type="image/png" href="IMG/logo-raitrai.png" />
+</head>
+
+<body>
+  <main class="grupo-shell" style="max-width:900px;">
+    <section class="grupo-panel">
+      <div class="grupo-panel-head">
+        <div>
+          <h1 class="grupo-panel-title" id="tituloNomina">Nómina del grupo</h1>
+          <p class="grupo-panel-sub" id="subtituloNomina">Cargando información.</p>
+        </div>
+      </div>
+
+      <div class="grupo-panel-body">
+        <div id="datosGrupoNomina" class="grupo-data-card-grid"></div>
+
+        <div class="inscripcion-table-wrap">
+          <table class="inscripcion-table" style="min-width:0;">
+            <thead>
+              <tr>
+                <th style="width:70px;">N°</th>
+                <th>Nombre y apellidos</th>
+              </tr>
+            </thead>
+            <tbody id="tablaNominaPublica"></tbody>
+          </table>
+        </div>
+
+        <p class="small muted" style="margin-top:16px;">
+          Esta nómina muestra solo nombres y apellidos para revisión del grupo.
+        </p>
+      </div>
+    </section>
+  </main>
+
+  <script type="module" src="nomina.js"></script>
+</body>
+</html>
