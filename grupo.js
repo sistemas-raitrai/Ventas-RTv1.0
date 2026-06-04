@@ -7544,10 +7544,24 @@ function buildNominaPublicaRows() {
     .filter((item) => item?.privacidad?.estado !== "eliminada_logica")
     .map((item) => ({
       nombre: getNombrePublicoInscripcion(item),
+      fechaInscripcion: formatPublicDateTime(getFechaFormularioInscripcion(item)),
       tipo: formatInscripcionValue(item.tipoViajante || item.tipoParticipacion || "")
     }))
     .filter((x) => x.nombre)
     .sort((a, b) => a.nombre.localeCompare(b.nombre, "es"));
+}
+
+function formatPublicDateTime(value) {
+  const d = toDateSafe(value);
+  if (!d) return "—";
+
+  return d.toLocaleString("es-CL", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit"
+  });
 }
 
 function getNominaPublicaLink(token = "") {
