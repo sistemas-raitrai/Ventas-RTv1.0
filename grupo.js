@@ -7618,11 +7618,10 @@ async function generarLinkNominaPublica() {
   const token = tokenExistente || generateInscripcionToken(40);
   const link = getNominaPublicaLink(token);
 
-  await setDoc(doc(db, "nominas_publicas", token), {
+  const payloadNominaPublica = {
     token,
     activo: true,
 
-    // CLAVE: el link apunta al grupo, no guarda pasajeros congelados
     idGrupo: String(state.groupId),
     groupDocId: String(state.groupDocId),
 
@@ -7640,10 +7639,18 @@ async function generarLinkNominaPublica() {
     tipo: "nomina_viva",
     actualizadoEn: serverTimestamp(),
     actualizadoPor: getDisplayName(state.effectiveUser),
-    actualizadoPorCorreo: state.effectiveEmail,
+    actualizadoPorCorreo: state.effectiveEmail || ""
+  };
 
-    creadoEn: state.group?.nominaPublica?.token ? undefined : serverTimestamp()
-  }, { merge: true });
+  if (!tokenExistente) {
+    payloadNominaPublica.creadoEn = serverTimestamp();
+  }
+
+  await setDoc(
+    doc(db, "nominas_publicas", token),
+    payloadNominaPublica,
+    { merge: true }
+  );
 
   await saveGroupPatch(
     {
@@ -7654,7 +7661,7 @@ async function generarLinkNominaPublica() {
         tipo: "nomina_viva",
         actualizadoEn: serverTimestamp(),
         actualizadoPor: getDisplayName(state.effectiveUser),
-        actualizadoPorCorreo: state.effectiveEmail
+        actualizadoPorCorreo: state.effectiveEmail || ""
       }
     },
     {
