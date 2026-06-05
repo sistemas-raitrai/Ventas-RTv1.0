@@ -4,7 +4,9 @@ import {
   doc,
   getDoc,
   collection,
-  getDocs
+  getDocs,
+  query,
+  where
 } from "https://www.gstatic.com/firebasejs/11.7.3/firebase-firestore.js";
 
 const firebaseConfig = {
@@ -64,26 +66,42 @@ async function init() {
     const grupo = grupoSnap.data() || {};
 
     const inscSnap = await getDocs(
-      collection(db, "ventas_cotizaciones", groupDocId, "inscripciones")
+      query(
+        collection(db, "inscripciones_pendientes_publicas"),
+        where("idGrupo", "==", groupDocId)
+      )
     );
-
-    const pasajeros = inscSnap.docs
+    
+    let pasajeros = inscSnap.docs
       .map((d) => ({
         id: d.id,
         ...d.data()
       }))
-      .filter((item) => item?.privacidad?.estado !== "eliminada_logica")
+      .filter((item) => item?.estado !== "eliminada_logica")
+      .filter((item) => item?.payload?.privacidad?.estado !== "eliminada_logica")
       .map((item) => {
-        const fechaOriginal = getFechaFormularioInscripcion(item);
-
+        const payload = item.payload || {};
+        const fechaOriginal = getFechaFormularioInscripcion(payload) || item.creadoEn;
+    
         return {
-          nombre: getNombrePublicoInscripcion(item),
+          nombre: getNombrePublicoInscripcion(payload),
           fechaInscripcion: formatPublicDateTime(fechaOriginal),
           fechaOrden: getPublicDateTimeMs(fechaOriginal)
         };
       })
       .filter((p) => p.nombre)
       .sort((a, b) => a.fechaOrden - b.fechaOrden);
+    
+    // Respaldo para links antiguos tipo “foto”
+    if (!pasajeros.length && Array.isArray(tokenData.pasajeros)) {
+      pasajeros = tokenData.pasajeros
+        .map((p) => ({
+          nombre: p.nombre || "",
+          fechaInscripcion: p.fechaInscripcion || "—",
+          fechaOrden: 0
+        }))
+        .filter((p) => p.nombre);
+    }
 
     renderNomina({
       ...tokenData,
@@ -146,14 +164,17 @@ function renderNomina(data = {}) {
 }
 
 function getNombrePublicoInscripcion(item = {}) {
+  const identificacion = item.identificacion || {};
+
   const nombreCompleto = [
-    item.nombres,
-    item.primerApellido,
-    item.segundoApellido
+    identificacion.nombres || item.nombres,
+    identificacion.primerApellido || item.primerApellido,
+    identificacion.segundoApellido || item.segundoApellido
   ].filter(Boolean).join(" ");
 
   return cleanText(
     nombreCompleto ||
+    identificacion.nombreCompleto ||
     item.nombreCompleto ||
     item.nombre ||
     item.pasajero ||
