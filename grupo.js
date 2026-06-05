@@ -7608,26 +7608,21 @@ async function generarLinkNominaPublica() {
     return;
   }
 
-  const pasajeros = buildNominaPublicaRows();
-
-  if (!pasajeros.length) {
-    alert("No hay nombres en la nómina para publicar.");
-    return;
-  }
-
   const ok = confirm(
-    "Se generará un link público con SOLO nombres y apellidos de la nómina. No incluirá RUT, salud, correos ni teléfonos. ¿Continuar?"
+    "Se generará un link público de nómina viva. Cada vez que se abra, mostrará la nómina actual del grupo. Solo incluirá nombres, apellidos y fecha de inscripción. ¿Continuar?"
   );
 
   if (!ok) return;
 
-  const token = generateInscripcionToken(40);
+  const tokenExistente = cleanText(state.group?.nominaPublica?.token || "");
+  const token = tokenExistente || generateInscripcionToken(40);
   const link = getNominaPublicaLink(token);
 
   await setDoc(doc(db, "nominas_publicas", token), {
     token,
     activo: true,
 
+    // CLAVE: el link apunta al grupo, no guarda pasajeros congelados
     idGrupo: String(state.groupId),
     groupDocId: String(state.groupDocId),
 
@@ -7642,12 +7637,13 @@ async function generarLinkNominaPublica() {
       cleanText(state.group?.nombreGrupo || "") ||
       cleanText(state.group?.colegio || ""),
 
-    pasajeros,
+    tipo: "nomina_viva",
+    actualizadoEn: serverTimestamp(),
+    actualizadoPor: getDisplayName(state.effectiveUser),
+    actualizadoPorCorreo: state.effectiveEmail,
 
-    creadoPor: getDisplayName(state.effectiveUser),
-    creadoPorCorreo: state.effectiveEmail,
-    creadoEn: serverTimestamp()
-  });
+    creadoEn: state.group?.nominaPublica?.token ? undefined : serverTimestamp()
+  }, { merge: true });
 
   await saveGroupPatch(
     {
@@ -7655,6 +7651,7 @@ async function generarLinkNominaPublica() {
         activo: true,
         token,
         link,
+        tipo: "nomina_viva",
         actualizadoEn: serverTimestamp(),
         actualizadoPor: getDisplayName(state.effectiveUser),
         actualizadoPorCorreo: state.effectiveEmail
@@ -7663,15 +7660,15 @@ async function generarLinkNominaPublica() {
     {
       tipoMovimiento: "nomina_publica_generada",
       modulo: "inscripcion",
-      titulo: "Link público de nómina generado",
-      mensaje: `${getDisplayName(state.effectiveUser)} generó un link público de nómina simple.`
+      titulo: "Link público de nómina viva generado",
+      mensaje: `${getDisplayName(state.effectiveUser)} generó o actualizó el link público de nómina viva.`
     }
   );
 
   try {
     await navigator.clipboard.writeText(link);
-    showSaveNotice("Link de nómina copiado.");
+    showSaveNotice("Link de nómina viva copiado.");
   } catch {
-    alert(`Link de nómina:\n\n${link}`);
+    alert(`Link de nómina viva:\n\n${link}`);
   }
 }
