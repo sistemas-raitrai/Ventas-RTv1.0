@@ -859,12 +859,23 @@ async function ensureProgramaPdfReady(groupRef) {
   const originalPath = getProgramaOriginalStoragePath();
   const originalNombre = getProgramaOriginalNombre();
 
+  const expectedPdfPath = originalPath
+    ? originalPath
+        .replace("programas-originales", "programas-pdf")
+        .replace(/\.(docx|doc)$/i, ".pdf")
+    : "";
+  
   const pdfDetectado = cleanText(
-    getProgramaPdfUrl() ||
-    state.ficha?.programaPdfUrl ||
-    getByPath(state.group, "ficha.programaPdfUrl") ||
-    state.group?.programaPdfUrl ||
-    ""
+    (
+      programa.pdfUrl &&
+      (
+        programa.storagePath === expectedPdfPath ||
+        programa.pdfStoragePath === expectedPdfPath ||
+        programa.pdfOriginalPath === originalPath
+      )
+    )
+      ? programa.pdfUrl
+      : ""
   );
 
   console.log("[ficha-pdf] ensureProgramaPdfReady", {
@@ -908,9 +919,7 @@ async function ensureProgramaPdfReady(groupRef) {
   }
 
   // Caso 5: DOC/DOCX actual: buscar/esperar conversión.
-  const expectedPdfPath = originalPath
-    .replace("programas-originales", "programas-pdf")
-    .replace(/\.(docx|doc)$/i, ".pdf");
+  // expectedPdfPath ya fue calculado arriba
 
   const expectedPdfNombre = String(originalNombre || "programa.docx")
     .replace(/\.(docx|doc)$/i, ".pdf");
