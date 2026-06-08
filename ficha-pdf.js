@@ -614,41 +614,39 @@ function getDisplayName(user = {}) {
 function resolveNextFichaVersion() {
   const fichaActual = getByPath(state.group, "ficha") || {};
 
-  const prevNumeroRaw = pick(
-    fichaActual.versionNumero,
-    state.group?.versionFichaNumero,
+  const tienePdfAnterior = !!cleanText(
+    fichaActual.pdfUrl ||
+    state.group?.fichaPdfUrl ||
     ""
   );
 
-  const prevNumero = Number(prevNumeroRaw);
+  const estabaReabierta =
+    state.group?.fichaFlujoAbierto === true ||
+    fichaActual.pdfPendienteGeneracion === true ||
+    normalizeSearchLocal(state.group?.flowFicha?.modo || "") === "actualizacion" ||
+    normalizeSearchLocal(state.group?.fichaFlujoModo || "") === "actualizacion";
 
-  const prevTipo = normalizeSearchLocal(
+  const prevNumero = Number(
     pick(
-      fichaActual.tipoVersion,
-      fichaActual.version,
-      state.group?.tipoVersionFicha,
-      state.group?.versionFicha,
-      ""
+      fichaActual.versionNumero,
+      state.group?.versionFichaNumero,
+      0
     )
   );
 
-  const hasPreviousVersion =
-    (Number.isFinite(prevNumero) && prevNumero > 0) ||
-    prevTipo.includes("original") ||
-    prevTipo.includes("actualiz");
-
-  if (!hasPreviousVersion) {
+  // Si ya hubo PDF o está en flujo de actualización, nunca puede volver a ORIGINAL.
+  if (tienePdfAnterior || estabaReabierta || prevNumero >= 1) {
     return {
-      tipoVersion: "original",
-      version: "ORIGINAL",
-      versionNumero: 1
+      tipoVersion: "actualizacion",
+      version: "ACTUALIZACIÓN",
+      versionNumero: Number.isFinite(prevNumero) && prevNumero > 0 ? prevNumero + 1 : 2
     };
   }
 
   return {
-    tipoVersion: "actualizacion",
-    version: "ACTUALIZACIÓN",
-    versionNumero: Number.isFinite(prevNumero) && prevNumero > 0 ? prevNumero + 1 : 2
+    tipoVersion: "original",
+    version: "ORIGINAL",
+    versionNumero: 1
   };
 }
 
@@ -1537,9 +1535,9 @@ function hydrateFicha(group = {}) {
     ),
 
     nombrePrograma: pick(
-      ficha.nombrePrograma,
       group.programaOtro,
       group.programa,
+      ficha.nombrePrograma,
       ""
     ),
 
