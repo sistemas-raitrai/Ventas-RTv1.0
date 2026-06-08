@@ -82,15 +82,18 @@ async function init() {
       .map((item) => {
         const payload = item.payload || {};
         const fechaOriginal = getFechaFormularioInscripcion(payload) || item.creadoEn;
-    
+
         return {
           nombre: getNombrePublicoInscripcion(payload),
+          rutKey: getRutKeyInscripcion(payload),
           fechaInscripcion: formatPublicDateTime(fechaOriginal),
           fechaOrden: getPublicDateTimeMs(fechaOriginal)
         };
       })
-      .filter((p) => p.nombre)
-      .sort((a, b) => a.fechaOrden - b.fechaOrden);
+      .filter((p) => p.nombre);
+      
+      pasajeros = deduplicarPasajeros(pasajeros)
+        .sort((a, b) => a.fechaOrden - b.fechaOrden);
     
     // Respaldo para links antiguos tipo “foto”
     if (!pasajeros.length && Array.isArray(tokenData.pasajeros)) {
@@ -232,6 +235,64 @@ function renderError(msg) {
 
 function cleanText(value = "") {
   return String(value ?? "").trim();
+}
+
+function deduplicarPasajeros(lista = []) {
+  const map = new Map();
+
+  lista.forEach((p) => {
+    // Primero intenta deduplicar por RUT/documento.
+    // Si no tiene RUT, usa nombre normalizado como respaldo.
+    const key = p.rutKey || normalizarNombreParaComparar(p.nombre);
+
+    if (!key) return;
+
+    const existente = map.get(key);
+
+    // Si ya existe, conserva el registro más reciente.
+    if (!existente || p.fechaOrden > existente.fechaOrden) {
+      map.set(key, p);
+    }
+  });
+
+  return Array.from(map.values());
+}
+
+function getRutKeyInscripcion(item = {}) {
+  const identificacion = item.identificacion || {};
+
+  const documento =
+    identificacion.documentoNormalizado ||
+    identificacion.rut ||
+    identificacion.documento ||
+    [
+      identificacion.rutNumero,
+      identificacion.rutDv
+    ].filter(Boolean).join("-") ||
+    item.documentoNormalizado ||
+    item.rut ||
+    item.documento ||
+    "";
+
+  return normalizarRutKey(documento);
+}
+
+function normalizarRutKey(value = "") {
+  return String(value || "")
+    .toUpperCase()
+    .replace(/\./g, "")
+    .replace(/-/g, "")
+    .replace(/\s+/g, "")
+    .trim();
+}
+
+function normalizarNombreParaComparar(value = "") {
+  return String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toUpperCase()
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 function escapeHtml(value = "") {
