@@ -1230,6 +1230,10 @@ async function saveProgramaGrupo() {
 
     patch.programa = nombreProgramaGrupo || "";
     patch.programaOtro = nombreProgramaGrupo || "";
+    
+    // CLAVE: mantener sincronizado el programa visible en la ficha.
+    // Si se cambia el programa en una actualización, el PDF debe tomar este nuevo valor.
+    setNestedValue(patch, "ficha.nombrePrograma", nombreProgramaGrupo || "");
 
     patch.cantidadGrupo = fichaValues.numeroPaxTotal || "";
     patch.tramo = tramoGrupo || "";
