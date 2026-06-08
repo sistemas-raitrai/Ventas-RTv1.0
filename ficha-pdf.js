@@ -989,14 +989,10 @@ async function mergeFichaAndProgramaPdf(fichaBlob, programaPdfUrl) {
   fichaPages.forEach((page) => mergedPdf.addPage(page));
 
   // ===== PROGRAMA =====
-  const programaBytes = await fetchPdfBytesFromUrl(
-    programaPdfUrl,
-    getByPath(state.group, "programaGrupo.storagePath") ||
-    getByPath(state.group, "programaGrupo.pdfStoragePath") ||
-    getByPath(state.group, "ficha.programaPdfStoragePath") ||
-    state.group?.programaPdfStoragePath ||
-    ""
-  );
+  // IMPORTANTE:
+  // Usamos directamente la URL resuelta del programa actual.
+  // No pasamos storagePath porque podría apuntar a un programa anterior.
+  const programaBytes = await fetchPdfBytesFromUrl(programaPdfUrl, "");
   const programaPdf = await PDFDocument.load(programaBytes);
 
   let programaIndices = programaPdf.getPageIndices();
