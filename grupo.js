@@ -3553,6 +3553,299 @@ function getFichaMainButtonMode() {
 /* =========================================================
    RENDER
 ========================================================= */
+/* =========================================================
+   NÓMINA INICIAL · SISTEMA DE PAGOS
+========================================================= */
+
+function getInscripcionesNominaInicial() {
+  return state.inscripciones.filter((item) =>
+    normalizeSearchLocal(getInscripcionTipoReal(item)) === "nomina_inicial"
+  );
+}
+
+function getEstadoNominaInicialPagos() {
+  const pagos = state.group?.sistemaPagos?.nominaInicial || {};
+  return {
+    cargada: pagos.cargada === true,
+    totalInscripciones: Number(pagos.totalInscripciones || 0),
+    totalCorreos: Number(pagos.totalCorreos || 0),
+    cargadaAt: pagos.cargadaAt || null,
+    cargadaPor: pagos.cargadaPor || "",
+    batchId: pagos.batchId || ""
+  };
+}
+
+function buildNombreCompletoInscripcion(item = {}) {
+  return [
+    getInscripcionNombres(item),
+    getInscripcionApellidos(item)
+  ]
+    .filter((x) => x && x !== "—")
+    .join(" ")
+    .trim();
+}
+
+function getCorreoViajanteAdulto(item = {}) {
+  return normalizeEmail(
+    getByPath(item, "contactoViajante.correo") ||
+    getByPath(item, "viajante.correo") ||
+    getByPath(item, "identificacion.correo") ||
+    getByPath(item, "contacto.correo") ||
+    ""
+  );
+}
+
+function getDestinatarioNominaInicial(item = {}) {
+  const tipo = normalizeSearchLocal(item.tipoViajante || item.tipoParticipacion || "");
+  const esEstudiante = !tipo || tipo === "estudiante";
+
+  const nombreParticipante = buildNombreCompletoInscripcion(item);
+  const documento = getInscripcionDocumento(item);
+
+  const responsableNombre = getResponsablePrincipalNombre(item);
+  const correoResponsable = normalizeEmail(getByPath(item, "contactoPrincipal.correo") || "");
+
+  const correoAdulto = getCorreoViajanteAdulto(item);
+
+  const correo = esEstudiante
+    ? correoResponsable
+    : (correoAdulto || correoResponsable);
+
+  const nombreResponsable = esEstudiante
+    ? responsableNombre
+    : (nombreParticipante || responsableNombre);
+
+  return {
+    inscripcionId: item.id,
+    item,
+    nombreParticipante,
+    documento,
+    nombreResponsable,
+    correo,
+    estado: correo ? "listo" : "sin_correo"
+  };
+}
+
+function buildDestinatariosNominaInicial() {
+  return getInscripcionesNominaInicial().map(getDestinatarioNominaInicial);
+}
+
+function buildAsuntoNominaInicialPagos() {
+  const colegio = normalizeTextUpper(state.group?.colegio || "");
+  const curso = normalizeTextUpper(state.group?.curso || "");
+  const ano = cleanText(state.group?.anoViaje || "");
+
+  return `Sistema de pagos habilitado · ${[colegio, curso, ano].filter(Boolean).join(" ")}`.trim();
+}
+
+function buildCuerpoNominaInicialPagos() {
+  const grupo =
+    cleanText(state.group?.aliasGrupo) ||
+    cleanText(state.group?.nombreGrupo) ||
+    normalizeTextUpper(state.group?.colegio || "");
+
+  return `
+Junto con saludar, informamos que la inscripción inicial del viaje de estudios ${grupo ? `del grupo ${grupo}` : ""} ya fue cargada en el sistema de pagos de Turismo Rai Trai.
+
+Desde ahora podrá ingresar al portal de pagos:
+
+https://pagos.turismoraitrai.cl/payment/
+
+Para acceder debe utilizar:
+Usuario: RUT del/de la viajante.
+Contraseña: últimos 4 dígitos del RUT.
+
+En el sistema podrá revisar y efectuar los pagos correspondientes al viaje de estudios.
+
+Saludos cordiales,
+Turismo Rai Trai
+`.trim();
+}
+
+function setNominaPagosProgress(done = 0, total = 0) {
+  const pct = total ? Math.round((done / total) * 100) : 0;
+
+  setText("nominaPagosProgresoTxt", `${done} / ${total}`);
+  const bar = $("nominaPagosProgresoBar");
+  if (bar) bar.style.width = `${pct}%`;
+}
+
+function renderNominaPagosDestinatarios(destinatarios = []) {
+  const tbody = $("nominaPagosDestinatariosBody");
+  if (!tbody) return;
+
+  tbody.innerHTML = destinatarios.map((d, index) => `
+    <tr>
+      <td>${index + 1}</td>
+      <td>${escapeHtml(d.nombreParticipante || "—")}</td>
+      <td>${escapeHtml(d.nombreResponsable || "—")}</td>
+      <td>${escapeHtml(d.correo || "—")}</td>
+      <td>${d.correo ? "Listo" : "Sin correo"}</td>
+    </tr>
+  `).join("");
+}
+
+function openNominaInicialPagosModal() {
+  if (!puedeOperarListaEsperaAdministrativa()) {
+    alert("Solo Registro, Administración o Admin pueden realizar esta acción.");
+    return;
+  }
+
+  const destinatarios = buildDestinatariosNominaInicial();
+  const validos = destinatarios.filter((d) => d.correo);
+  const sinCorreo = destinatarios.filter((d) => !d.correo);
+
+  if (!destinatarios.length) {
+    alert("No hay inscripciones iniciales para este grupo.");
+    return;
+  }
+
+  setText(
+    "nominaPagosResumen",
+    `Grupo: ${state.group?.aliasGrupo || state.group?.nombreGrupo || state.group?.colegio || state.groupId}
+Participantes inscripción inicial: ${destinatarios.length}
+Correos válidos: ${validos.length}
+Sin correo: ${sinCorreo.length}`
+  );
+
+  setFormValue("nominaPagosAsunto", buildAsuntoNominaInicialPagos());
+  setFormValue("nominaPagosCuerpo", buildCuerpoNominaInicialPagos());
+
+  renderNominaPagosDestinatarios(destinatarios);
+  setNominaPagosProgress(0, validos.length);
+
+  openModal("modalNominaInicialPagos");
+}
+
+async function enviarNominaInicialPagos() {
+  if (!puedeOperarListaEsperaAdministrativa()) {
+    alert("Solo Registro, Administración o Admin pueden realizar esta acción.");
+    return;
+  }
+
+  const asunto = String($("nominaPagosAsunto")?.value || "").trim();
+  const cuerpo = String($("nominaPagosCuerpo")?.value || "").trim();
+
+  if (!asunto || !cuerpo) {
+    alert("Debes ingresar asunto y cuerpo del correo.");
+    return;
+  }
+
+  const destinatarios = buildDestinatariosNominaInicial();
+  const validos = destinatarios.filter((d) => d.correo);
+  const sinCorreo = destinatarios.filter((d) => !d.correo);
+
+  if (!validos.length) {
+    alert("No hay correos válidos para enviar.");
+    return;
+  }
+
+  const ok = confirm(`Se enviarán ${validos.length} correos. ${sinCorreo.length} participantes serán omitidos por no tener correo. ¿Continuar?`);
+  if (!ok) return;
+
+  const btn = $("btnEnviarNominaInicialPagos");
+  if (btn) btn.disabled = true;
+
+  const batchId = `nomina_inicial_pagos_${state.groupId}_${Date.now()}`;
+  let enviados = 0;
+
+  try {
+    for (const d of validos) {
+      await addDoc(collection(db, "correos_nomina_inicial_pagos"), {
+        batchId,
+        estado: "pendiente",
+
+        destinatario: d.correo,
+        to: d.correo,
+        asunto,
+        subject: asunto,
+        cuerpo,
+        body: cuerpo,
+
+        idGrupo: String(state.groupId || ""),
+        groupDocId: String(state.groupDocId || ""),
+        inscripcionId: d.inscripcionId,
+
+        grupo:
+          cleanText(state.group?.aliasGrupo) ||
+          cleanText(state.group?.nombreGrupo) ||
+          normalizeTextUpper(state.group?.colegio || ""),
+
+        colegio: normalizeTextUpper(state.group?.colegio || ""),
+        curso: normalizeTextUpper(state.group?.curso || ""),
+        anoViaje: cleanText(state.group?.anoViaje || ""),
+        documento: d.documento,
+        nombreParticipante: d.nombreParticipante,
+        nombreResponsable: d.nombreResponsable,
+
+        creadoPor: getDisplayName(state.effectiveUser),
+        creadoPorCorreo: state.effectiveEmail,
+        creadoAt: serverTimestamp()
+      });
+
+      const inscRef = doc(
+        db,
+        "ventas_cotizaciones",
+        String(state.groupDocId),
+        "inscripciones",
+        String(d.inscripcionId)
+      );
+
+      await updateDoc(inscRef, {
+        "sistemaPagos.nominaInicialCargada": true,
+        "sistemaPagos.nominaInicialCargadaAt": serverTimestamp(),
+        "sistemaPagos.nominaInicialCargadaPor": getDisplayName(state.effectiveUser),
+        "sistemaPagos.nominaInicialCargadaPorCorreo": state.effectiveEmail,
+        "sistemaPagos.correoPagosBatchId": batchId,
+        "sistemaPagos.correoPagosDestinatario": d.correo
+      });
+
+      enviados += 1;
+      setNominaPagosProgress(enviados, validos.length);
+    }
+
+    await saveGroupPatch(
+      {
+        sistemaPagos: {
+          ...(state.group?.sistemaPagos || {}),
+          nominaInicial: {
+            ...(state.group?.sistemaPagos?.nominaInicial || {}),
+            cargada: true,
+            cargadaAt: serverTimestamp(),
+            cargadaPor: getDisplayName(state.effectiveUser),
+            cargadaPorCorreo: state.effectiveEmail,
+            batchId,
+            totalInscripciones: destinatarios.length,
+            totalCorreos: validos.length,
+            totalSinCorreo: sinCorreo.length,
+            asuntoUltimoEnvio: asunto
+          }
+        }
+      },
+      {
+        tipoMovimiento: "nomina_inicial_cargada_pagos",
+        modulo: "inscripcion",
+        titulo: "Nómina inicial cargada en sistema de pagos",
+        mensaje: `${getDisplayName(state.effectiveUser)} marcó la nómina inicial como cargada en sistema de pagos y generó ${validos.length} correo(s).`,
+        metadata: {
+          batchId,
+          totalInscripciones: destinatarios.length,
+          totalCorreos: validos.length,
+          totalSinCorreo: sinCorreo.length
+        }
+      }
+    );
+
+    closeModal("modalNominaInicialPagos");
+    showSaveNotice(`Nómina inicial marcada como cargada. Correos generados: ${validos.length}.`);
+  } catch (error) {
+    console.error("[grupo] enviarNominaInicialPagos", error);
+    alert("Error al generar correos de nómina inicial: " + error.message);
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
 function renderGroup() {
   renderHero();
   renderSituacion();
@@ -3654,7 +3947,6 @@ function renderHeroBadges() {
 
   const anoViajeNum = Number(state.group?.anoViaje || 0);
   const esLegacy2025 = anoViajeNum <= 2025;
-
   const flujoAbierto = !!state.group?.fichaFlujoAbierto;
 
   const tienePdf = !!cleanText(
@@ -3669,20 +3961,22 @@ function renderHeroBadges() {
 
   const pdfVigente = tienePdf && !flujoAbierto;
   const pdfAnterior = tienePdf && flujoAbierto;
-  
+
+  const pagos = getEstadoNominaInicialPagos();
+
   box.innerHTML = `
     <span class="g-badge ${estadoMeta.css}">
       Estado: ${escapeHtml(estadoMeta.label)}
     </span>
-  
+
     <span class="f-badge ${flujoAbierto ? "warn" : "ok"}">
       ${flujoAbierto ? "Ficha abierta" : "Ficha cerrada"}
     </span>
-  
+
     <span class="f-badge ${autorizadaVisual ? "ok" : "warn"}">
       ${autorizadaVisual ? "Autorizada" : "No autorizada"}
     </span>
-  
+
     <span class="f-badge ${pdfVigente ? "ok" : "warn"}">
       ${
         pdfVigente
@@ -3690,6 +3984,14 @@ function renderHeroBadges() {
           : pdfAnterior
             ? "PDF anterior"
             : "PDF pendiente"
+      }
+    </span>
+
+    <span class="f-badge ${pagos.cargada ? "ok" : "warn"}">
+      ${
+        pagos.cargada
+          ? `Pagos: nómina inicial cargada (${pagos.totalCorreos || 0} correos)`
+          : "Pagos: nómina inicial pendiente"
       }
     </span>
   `;
@@ -4315,6 +4617,7 @@ function syncButtons() {
   const btnCopiarLinkInscripcion = $("btnCopiarLinkInscripcion");
   const btnExportarInscripcionesExcel = $("btnExportarInscripcionesExcel");
   const btnExportarInscripcionesCsv = $("btnExportarInscripcionesCsv");
+  const btnNominaInicialPagos = $("btnNominaInicialPagos");
 
   const puedeInicial = canGestionarInscripcionInicial();
   const puedeNominaFinal = canGestionarNominaFinal();
@@ -4399,6 +4702,20 @@ function syncButtons() {
 
     btnExportarInscripcionesCsv.disabled = !tieneInscripciones || !puedeCsv;
     btnExportarInscripcionesCsv.classList.toggle("hidden", !puedeCsv);
+  }
+
+  if (btnNominaInicialPagos) {
+    const puedeGestionarPagos = puedeOperarListaEsperaAdministrativa();
+    const tieneNominaInicial = getInscripcionesNominaInicial().length > 0;
+  
+    btnNominaInicialPagos.classList.toggle("hidden", !puedeGestionarPagos);
+    btnNominaInicialPagos.disabled = !puedeGestionarPagos || !tieneNominaInicial;
+  
+    const estadoPagos = getEstadoNominaInicialPagos();
+  
+    btnNominaInicialPagos.textContent = estadoPagos.cargada
+      ? "Reenviar aviso / actualizar carga pagos"
+      : "Marcar nómina inicial cargada en pagos";
   }
 
   const btnContrato = $("btnCrearContrato");
@@ -4700,6 +5017,10 @@ function bindEvents() {
     if (e.target === $("modalTemplateEmail")) closeModal("modalTemplateEmail");
   });
 
+  $("modalNominaInicialPagos")?.addEventListener("click", (e) => {
+    if (e.target === $("modalNominaInicialPagos")) closeModal("modalNominaInicialPagos");
+  });
+
   $("btnEditarDatosHero")?.addEventListener("click", openDatosModal);
   $("btnEditarDatos")?.addEventListener("click", openDatosModal);
 
@@ -4780,6 +5101,8 @@ function bindEvents() {
   $("btnCrearLinkLiberados")?.addEventListener("click", crearLinkLiberados);
   $("btnCopiarLinkInscripcion")?.addEventListener("click", copyGroupInscripcionLink);
   $("btnGenerarLinkNominaPublica")?.addEventListener("click", generarLinkNominaPublica);
+  $("btnNominaInicialPagos")?.addEventListener("click", openNominaInicialPagosModal);
+  $("btnEnviarNominaInicialPagos")?.addEventListener("click", enviarNominaInicialPagos);
   $("btnExportarInscripcionesExcel")?.addEventListener("click", exportarInscripcionesExcel);
   $("btnExportarInscripcionesCsv")?.addEventListener("click", exportarInscripcionesCsv);
 
