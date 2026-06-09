@@ -2046,6 +2046,10 @@
               <button id="btnExportarInscripcionesExcel" class="btn-pill" type="button">
                 Exportar Excel
               </button>
+
+              <button id="btnNominaInicialPagos" class="btn-ok hidden" type="button">
+                Cargardo en Pagos
+              </button>
             
               <button id="btnExportarInscripcionesCsv" class="btn-pill" type="button">
                 Exportar CSV
@@ -2719,7 +2723,64 @@
     </div>
   </div>
 
-    <!-- MODAL PLANTILLA CORREO -->
+  <!-- MODAL NÓMINA INICIAL SISTEMA DE PAGOS -->
+  <div class="modal" id="modalNominaInicialPagos">
+    <div class="modal-card">
+      <div class="modal-head">
+        <h3 class="modal-title">Nómina inicial cargada en sistema de pagos</h3>
+        <button class="modal-close" type="button" data-close="modalNominaInicialPagos">×</button>
+      </div>
+  
+      <div class="modal-body">
+        <div class="inscripcion-traza" id="nominaPagosResumen">
+          Preparando información...
+        </div>
+  
+        <div class="form-grid" style="margin-top:16px;">
+          <div class="form-field span-3">
+            <label for="nominaPagosAsunto">Asunto</label>
+            <input id="nominaPagosAsunto" type="text" />
+          </div>
+  
+          <div class="form-field span-3">
+            <label for="nominaPagosCuerpo">Cuerpo del correo</label>
+            <textarea id="nominaPagosCuerpo"></textarea>
+          </div>
+        </div>
+  
+        <div class="inscripcion-table-wrap">
+          <table class="inscripcion-table">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Participante</th>
+                <th>Responsable</th>
+                <th>Correo</th>
+                <th>Estado</th>
+              </tr>
+            </thead>
+            <tbody id="nominaPagosDestinatariosBody"></tbody>
+          </table>
+        </div>
+  
+        <div class="inscripcion-traza" style="margin-top:16px;">
+          <div><strong>Progreso:</strong> <span id="nominaPagosProgresoTxt">0 / 0</span></div>
+          <div style="height:14px;background:#eee;border-radius:999px;overflow:hidden;">
+            <div id="nominaPagosProgresoBar" style="height:14px;width:0%;background:#09832e;"></div>
+          </div>
+        </div>
+      </div>
+  
+      <div class="modal-actions">
+        <button class="btn-pill" type="button" data-close="modalNominaInicialPagos">Cancelar</button>
+        <button class="btn-dark" type="button" id="btnEnviarNominaInicialPagos">
+          Enviar correos y marcar cargado
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL PLANTILLA CORREO -->
   <div class="modal" id="modalTemplateEmail">
     <div class="modal-card">
       <div class="modal-head">
