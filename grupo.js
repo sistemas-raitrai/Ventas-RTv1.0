@@ -4715,7 +4715,7 @@ function syncButtons() {
   
     btnNominaInicialPagos.textContent = estadoPagos.cargada
       ? "Reenviar aviso / actualizar carga pagos"
-      : "Marcar nómina inicial cargada en pagos";
+      : "Cargado a Pagos";
   }
 
   const btnContrato = $("btnCrearContrato");
