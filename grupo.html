@@ -1868,6 +1868,62 @@
       opacity:.45;
       cursor:not-allowed;
     }
+
+    .btn-editar-nomina{
+      min-height:44px;
+      padding:0 16px;
+      border-radius:14px;
+      border:none;
+      cursor:pointer;
+      font-size:14px;
+      font-weight:900;
+      background:#facc15;
+      color:#3b2b00;
+      box-shadow:0 10px 22px rgba(250,204,21,.22);
+    }
+    
+    .btn-editar-nomina:disabled{
+      opacity:.45;
+      cursor:not-allowed;
+    }
+    
+    .nomina-edit-table-wrap{
+      overflow:auto;
+      border-radius:18px;
+      border:1px solid rgba(58,42,82,.10);
+    }
+    
+    .nomina-edit-table{
+      width:100%;
+      min-width:1500px;
+      border-collapse:collapse;
+      font-size:13px;
+    }
+    
+    .nomina-edit-table th,
+    .nomina-edit-table td{
+      padding:8px;
+      border-bottom:1px solid rgba(58,42,82,.08);
+      vertical-align:top;
+    }
+    
+    .nomina-edit-table th{
+      background:#fff7cc;
+      color:#3b2b00;
+      font-size:11px;
+      text-transform:uppercase;
+      font-weight:900;
+    }
+    
+    .nomina-edit-table input,
+    .nomina-edit-table select{
+      width:100%;
+      min-height:38px;
+      border-radius:10px;
+      border:1px solid rgba(58,42,82,.16);
+      padding:0 8px;
+      font-size:13px;
+    }
   </style>
 </head>
 
@@ -2070,6 +2126,10 @@
             
               <button id="btnExportarInscripcionesCsv" class="btn-pill" type="button">
                 Exportar CSV
+              </button>
+
+              <button id="btnEditarNominaInscripcion" class="btn-editar-nomina hidden" type="button">
+                Editar Nómina
               </button>
 
               <button id="btnResetearCicloInscripcion" class="btn-reset-admin hidden" type="button">
@@ -2898,6 +2958,49 @@
         <button class="btn-reset-admin" id="btnConfirmarResetCicloInscripcion" type="button">
           Confirmar reset
         </button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal" id="modalEditarNominaInscripcion">
+    <div class="modal-card" style="width:min(1280px,100%);">
+      <div class="modal-head">
+        <h3 class="modal-title">Editar nómina</h3>
+        <button class="modal-close" type="button" data-close="modalEditarNominaInscripcion">×</button>
+      </div>
+  
+      <div class="modal-body">
+        <div class="empty-box" style="text-align:left;">
+          Edita solo la información visible en la tabla. Los cambios quedarán registrados en historial.
+          Archivar saca a la persona de la nómina visible, pero no la borra.
+        </div>
+  
+        <div class="nomina-edit-table-wrap" style="margin-top:16px;">
+          <table class="nomina-edit-table">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Tipo inscripción</th>
+                <th>RUT / Documento</th>
+                <th>Apellidos</th>
+                <th>Nombres</th>
+                <th>Fecha nacimiento</th>
+                <th>Tipo pasajero</th>
+                <th>Nacionalidad</th>
+                <th>Sexo</th>
+                <th>Responsable</th>
+                <th>Correo responsable</th>
+                <th>Celular responsable</th>
+                <th>Acciones</th>
+              </tr>
+            </thead>
+            <tbody id="editarNominaBody"></tbody>
+          </table>
+        </div>
+      </div>
+  
+      <div class="modal-actions">
+        <button class="btn-pill" type="button" data-close="modalEditarNominaInscripcion">Cerrar</button>
       </div>
     </div>
   </div>
