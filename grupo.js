@@ -3436,6 +3436,32 @@ function canResetearCicloInscripcion() {
   return rol === "admin" || email === "chernandez@raitrai.cl";
 }
 
+function canEditarNominaInscripcion() {
+  const rol = String(state.effectiveUser?.rol || "").toLowerCase();
+  const email = normalizeEmail(state.effectiveEmail || "");
+
+  if (rol === "admin") return true;
+  if (rol === "registro") return true;
+
+  if (
+    email === "administracion@raitrai.cl" ||
+    email === "yenny@raitrai.cl" ||
+    email === "raitrai@raitrai.cl"
+  ) {
+    return true;
+  }
+
+  if (email === "chernandez@raitrai.cl") {
+    return !state.group?.flowFicha?.jefaVentas?.firmado;
+  }
+
+  return false;
+}
+
+function canEditarRutYTipoInscripcionNomina() {
+  return String(state.effectiveUser?.rol || "").toLowerCase() === "admin";
+}
+
 function getFaseResetInscripcionSeleccionada() {
   const seleccion = normalizeSearchLocal($("reset_tipo_ciclo")?.value || "auto");
 
@@ -3447,7 +3473,7 @@ function getFaseResetInscripcionSeleccionada() {
 
 function openResetCicloInscripcionModal() {
   if (!canResetearCicloInscripcion()) {
-    alert("Solo Admin puede resetear el ciclo de inscripción.");
+    alert("Solo Admin o Jefa de Ventas puede resetear el ciclo de inscripción.");
     return;
   }
 
@@ -3460,7 +3486,7 @@ function openResetCicloInscripcionModal() {
 
 async function resetearCicloInscripcion() {
   if (!canResetearCicloInscripcion()) {
-    alert("Solo Admin puede resetear el ciclo de inscripción.");
+    alert("Solo Admin o Jefa de Ventas puede resetear el ciclo de inscripción.");
     return;
   }
 
@@ -4906,6 +4932,7 @@ function syncButtons() {
   const btnExportarInscripcionesExcel = $("btnExportarInscripcionesExcel");
   const btnExportarInscripcionesCsv = $("btnExportarInscripcionesCsv");
   const btnResetearCicloInscripcion = $("btnResetearCicloInscripcion");
+  const btnEditarNominaInscripcion = $("btnEditarNominaInscripcion");
   const btnNominaInicialPagos = $("btnNominaInicialPagos");
 
   const puedeInicial = canGestionarInscripcionInicial();
@@ -4998,6 +5025,13 @@ function syncButtons() {
   
     btnResetearCicloInscripcion.classList.toggle("hidden", !puedeReset);
     btnResetearCicloInscripcion.disabled = !puedeReset;
+  }
+
+  if (btnEditarNominaInscripcion) {
+    const puedeEditarNomina = canEditarNominaInscripcion();
+  
+    btnEditarNominaInscripcion.classList.toggle("hidden", !puedeEditarNomina);
+    btnEditarNominaInscripcion.disabled = !puedeEditarNomina || !tieneInscripciones;
   }
 
   if (btnNominaInicialPagos) {
@@ -5229,6 +5263,357 @@ window.repararHistorialSolicitudesFicha = async function () {
   console.log(`Historial reconstruido. Entradas creadas: ${creadas}`);
 };
 
+function getTipoInscripcionEditableOptions() {
+  return [
+    { value: "nomina_inicial", label: "Inscripción inicial" },
+    { value: "nomina_final", label: "Nómina final / ficha médica" },
+    { value: "nuevo_ingreso", label: "Nuevo ingreso" },
+    { value: "lista_espera", label: "Lista de espera" },
+    { value: "lista_espera_pagada", label: "Lista de espera pagada" },
+    { value: "lista_espera_confirmada", label: "Lista de espera confirmada" },
+    { value: "liberado", label: "Cupo liberado" }
+  ];
+}
+
+function getTipoPasajeroEditableOptions() {
+  return [
+    { value: "estudiante", label: "Estudiante" },
+    { value: "adulto_acompanante", label: "Adulto(a) acompañante" },
+    { value: "profesor", label: "Profesor(a)" }
+  ];
+}
+
+function getGeneroEditableOptions() {
+  return [
+    { value: "masculino", label: "Masculino" },
+    { value: "femenino", label: "Femenino" },
+    { value: "otro", label: "Otro" }
+  ];
+}
+
+function optionHtml(options = [], selected = "") {
+  const selectedKey = normalizeSearchLocal(selected || "");
+
+  return options.map((opt) => {
+    const optKey = normalizeSearchLocal(opt.value || "");
+    return `
+      <option value="${escapeHtml(opt.value)}" ${optKey === selectedKey ? "selected" : ""}>
+        ${escapeHtml(opt.label)}
+      </option>
+    `;
+  }).join("");
+}
+
+function openEditarNominaInscripcionModal() {
+  if (!canEditarNominaInscripcion()) {
+    alert("No tienes permisos para editar la nómina.");
+    return;
+  }
+
+  renderEditarNominaInscripcionModal();
+  openModal("modalEditarNominaInscripcion");
+}
+
+function renderEditarNominaInscripcionModal() {
+  const tbody = $("editarNominaBody");
+  if (!tbody) return;
+
+  const puedeEditarRutTipo = canEditarRutYTipoInscripcionNomina();
+
+  tbody.innerHTML = state.inscripciones.map((item, index) => {
+    const tipoReal = getInscripcionTipoReal(item);
+    const tipoPasajero = item.tipoViajante || item.tipoParticipacion || "";
+    const genero = getByPath(item, "identificacion.genero") || getByPath(item, "documentoIdentidad.sexoDocumento") || "";
+
+    return `
+      <tr data-inscripcion-edit-row="${escapeHtml(item.id)}">
+        <td>${index + 1}</td>
+
+        <td>
+          <select data-field="tipoInscripcion" ${puedeEditarRutTipo ? "" : "disabled"}>
+            ${optionHtml(getTipoInscripcionEditableOptions(), tipoReal)}
+          </select>
+        </td>
+
+        <td>
+          <input data-field="documento" value="${escapeHtml(getInscripcionDocumento(item))}" ${puedeEditarRutTipo ? "" : "disabled"} />
+        </td>
+
+        <td>
+          <input data-field="apellidos" value="${escapeHtml(getInscripcionApellidos(item))}" />
+        </td>
+
+        <td>
+          <input data-field="nombres" value="${escapeHtml(getInscripcionNombres(item))}" />
+        </td>
+
+        <td>
+          <input data-field="fechaNacimiento" type="date" value="${escapeHtml(getFechaNacimientoInputValue(item))}" />
+        </td>
+
+        <td>
+          <select data-field="tipoViajante">
+            ${optionHtml(getTipoPasajeroEditableOptions(), tipoPasajero)}
+          </select>
+        </td>
+
+        <td>
+          <input data-field="nacionalidad" value="${escapeHtml(getInscripcionNacionalidad(item))}" />
+        </td>
+
+        <td>
+          <select data-field="genero">
+            ${optionHtml(getGeneroEditableOptions(), genero)}
+          </select>
+        </td>
+
+        <td>
+          <input data-field="responsable" value="${escapeHtml(getResponsablePrincipalNombre(item))}" />
+        </td>
+
+        <td>
+          <input data-field="correoResponsable" value="${escapeHtml(getByPath(item, "contactoPrincipal.correo") || "")}" />
+        </td>
+
+        <td>
+          <input data-field="celularResponsable" value="${escapeHtml(getByPath(item, "contactoPrincipal.celular") || getByPath(item, "contactoPrincipal.telefono") || getByPath(item, "contactoPrincipal.whatsapp") || "")}" />
+        </td>
+
+        <td>
+          <button class="btn-ok" type="button" data-action="guardar-nomina-inscripcion" data-id="${escapeHtml(item.id)}">
+            Guardar
+          </button>
+          <button class="btn-danger" type="button" data-action="archivar-nomina-inscripcion" data-id="${escapeHtml(item.id)}">
+            Archivar
+          </button>
+        </td>
+      </tr>
+    `;
+  }).join("");
+}
+
+function getFechaNacimientoInputValue(item = {}) {
+  const raw = getByPath(item, "identificacion.fechaNacimiento") || "";
+  if (!raw) return "";
+
+  if (typeof raw === "string" && /^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw;
+
+  if (typeof raw === "string" && /^\d{2}-\d{2}-\d{4}$/.test(raw)) {
+    const [dd, mm, yyyy] = raw.split("-");
+    return `${yyyy}-${mm}-${dd}`;
+  }
+
+  const d = toDate(raw);
+  if (!d) return "";
+
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+function splitApellidosNomina(value = "") {
+  const partes = cleanText(value || "").split(/\s+/).filter(Boolean);
+
+  return {
+    primerApellido: partes[0] || "",
+    segundoApellido: partes.slice(1).join(" ")
+  };
+}
+
+function buildNominaEditPatch(item = {}, values = {}) {
+  const patch = {};
+  const cambios = [];
+  const puedeEditarRutTipo = canEditarRutYTipoInscripcionNomina();
+
+  const addChange = (campo, anterior, nuevo) => {
+    if (sameValue(anterior, nuevo)) return;
+    setNestedValue(patch, campo, nuevo);
+    cambios.push({ campo, anterior, nuevo });
+  };
+
+  const apellidos = splitApellidosNomina(values.apellidos);
+
+  addChange("identificacion.primerApellido", getByPath(item, "identificacion.primerApellido") || "", normalizeTextUpper(apellidos.primerApellido));
+  addChange("identificacion.segundoApellido", getByPath(item, "identificacion.segundoApellido") || "", normalizeTextUpper(apellidos.segundoApellido));
+  addChange("identificacion.nombres", getByPath(item, "identificacion.nombres") || "", normalizeTextUpper(values.nombres || ""));
+  addChange("identificacion.fechaNacimiento", getByPath(item, "identificacion.fechaNacimiento") || "", values.fechaNacimiento || "");
+  addChange("tipoViajante", item.tipoViajante || "", values.tipoViajante || "");
+  addChange("tipoParticipacion", item.tipoParticipacion || "", values.tipoViajante || "");
+  addChange("identificacion.nacionalidad", getByPath(item, "identificacion.nacionalidad") || "", normalizarTextoExport(values.nacionalidad || ""));
+  addChange("identificacion.nacionalidadBase", getByPath(item, "identificacion.nacionalidadBase") || "", normalizarTextoExport(values.nacionalidad || ""));
+  addChange("identificacion.genero", getByPath(item, "identificacion.genero") || "", values.genero || "");
+  addChange("documentoIdentidad.sexoDocumento", getByPath(item, "documentoIdentidad.sexoDocumento") || "", values.genero || "");
+  addChange("contactoPrincipal.nombre", getByPath(item, "contactoPrincipal.nombre") || "", normalizeTextUpper(values.responsable || ""));
+  addChange("contactoPrincipal.correo", getByPath(item, "contactoPrincipal.correo") || "", normalizeEmail(values.correoResponsable || ""));
+  addChange("contactoPrincipal.celular", getByPath(item, "contactoPrincipal.celular") || "", cleanText(values.celularResponsable || ""));
+
+  if (puedeEditarRutTipo) {
+    const documentoNuevo = cleanText(values.documento || "");
+    addChange("identificacion.documento", getByPath(item, "identificacion.documento") || "", documentoNuevo);
+    addChange("identificacion.rutCompleto", getByPath(item, "identificacion.rutCompleto") || "", documentoNuevo);
+    addChange("tipoInscripcion", item.tipoInscripcion || "", values.tipoInscripcion || "");
+    addChange("faseInscripcion", item.faseInscripcion || "", getFaseDesdeTipoInscripcionEditable(values.tipoInscripcion || ""));
+    addChange("estadoCupo", item.estadoCupo || "", getEstadoCupoDesdeTipoInscripcionEditable(values.tipoInscripcion || ""));
+  }
+
+  return { patch, cambios };
+}
+
+function getFaseDesdeTipoInscripcionEditable(tipo = "") {
+  const key = normalizeSearchLocal(tipo);
+
+  if (key === "nomina_final") return "nomina_final";
+  if (key === "nuevo_ingreso") return "nuevos";
+  if (key === "lista_espera" || key === "lista_espera_pagada" || key === "lista_espera_confirmada") return "lista_espera";
+  if (key === "liberado") return "liberado";
+
+  return "normal";
+}
+
+function getEstadoCupoDesdeTipoInscripcionEditable(tipo = "") {
+  const key = normalizeSearchLocal(tipo);
+
+  if (key === "lista_espera_pagada") return "pagado";
+  if (key === "lista_espera_confirmada") return "confirmado";
+  if (key === "nuevo_ingreso") return "pendiente_confirmacion";
+
+  return "confirmado";
+}
+
+function getNominaEditValuesFromRow(row) {
+  const get = (field) => row.querySelector(`[data-field="${field}"]`)?.value || "";
+
+  return {
+    tipoInscripcion: get("tipoInscripcion"),
+    documento: get("documento"),
+    apellidos: get("apellidos"),
+    nombres: get("nombres"),
+    fechaNacimiento: get("fechaNacimiento"),
+    tipoViajante: get("tipoViajante"),
+    nacionalidad: get("nacionalidad"),
+    genero: get("genero"),
+    responsable: get("responsable"),
+    correoResponsable: get("correoResponsable"),
+    celularResponsable: get("celularResponsable")
+  };
+}
+
+async function guardarNominaInscripcion(inscripcionId = "") {
+  if (!canEditarNominaInscripcion()) {
+    alert("No tienes permisos para editar la nómina.");
+    return;
+  }
+
+  const item = state.inscripciones.find((x) => x.id === inscripcionId);
+  if (!item) {
+    alert("No se encontró la inscripción.");
+    return;
+  }
+
+  const row = document.querySelector(`[data-inscripcion-edit-row="${CSS.escape(inscripcionId)}"]`);
+  if (!row) return;
+
+  const values = getNominaEditValuesFromRow(row);
+  const { patch, cambios } = buildNominaEditPatch(item, values);
+
+  if (!cambios.length) {
+    showSaveNotice("No hay cambios para guardar.");
+    return;
+  }
+
+  const ref = doc(
+    db,
+    "ventas_cotizaciones",
+    String(state.groupDocId),
+    "inscripciones",
+    String(inscripcionId)
+  );
+
+  await updateDoc(ref, {
+    ...patch,
+    actualizadoPor: getDisplayName(state.effectiveUser),
+    actualizadoPorCorreo: state.effectiveEmail,
+    actualizadoAt: serverTimestamp()
+  });
+
+  await createHistoryEntry({
+    tipoMovimiento: "edicion_nomina_inscripcion",
+    modulo: "inscripcion",
+    titulo: "Edición de nómina",
+    mensaje: `${getDisplayName(state.effectiveUser)} editó la inscripción de ${getInscripcionNombres(item)} ${getInscripcionApellidos(item)}.`,
+    metadata: {
+      inscripcionId,
+      documento: getInscripcionDocumento(item),
+      cambios
+    }
+  });
+
+  await loadInscripciones();
+  renderInscripcionPasajerosPanel();
+  renderEditarNominaInscripcionModal();
+  syncButtons();
+
+  showSaveNotice("Inscripción actualizada.");
+}
+
+async function archivarNominaInscripcion(inscripcionId = "") {
+  if (!canEditarNominaInscripcion()) {
+    alert("No tienes permisos para archivar inscritos.");
+    return;
+  }
+
+  const item = state.inscripciones.find((x) => x.id === inscripcionId);
+  if (!item) {
+    alert("No se encontró la inscripción.");
+    return;
+  }
+
+  const nombre = `${getInscripcionNombres(item)} ${getInscripcionApellidos(item)}`.trim();
+
+  const ok = confirm(`¿Archivar a ${nombre || "esta persona"}?\n\nNo se borrará, solo saldrá de la nómina visible.`);
+  if (!ok) return;
+
+  const ref = doc(
+    db,
+    "ventas_cotizaciones",
+    String(state.groupDocId),
+    "inscripciones",
+    String(inscripcionId)
+  );
+
+  await updateDoc(ref, {
+    privacidad: {
+      ...(item.privacidad || {}),
+      estado: "archivada",
+      archivadaAt: serverTimestamp(),
+      archivadaPor: getDisplayName(state.effectiveUser),
+      archivadaPorCorreo: state.effectiveEmail,
+      motivoArchivo: "Archivado manual desde Editar Nómina"
+    }
+  });
+
+  await createHistoryEntry({
+    tipoMovimiento: "archivo_nomina_inscripcion",
+    modulo: "inscripcion",
+    titulo: "Inscripción archivada",
+    mensaje: `${getDisplayName(state.effectiveUser)} archivó de la nómina a ${nombre || "una persona"}.`,
+    metadata: {
+      inscripcionId,
+      documento: getInscripcionDocumento(item),
+      nombreCompleto: nombre
+    }
+  });
+
+  await loadInscripciones();
+  renderInscripcionPasajerosPanel();
+  renderEditarNominaInscripcionModal();
+  syncButtons();
+
+  showSaveNotice("Inscripción archivada.");
+}
+
 /* =========================================================
    MODALS / EVENTS
 ========================================================= */
@@ -5321,6 +5706,10 @@ function bindEvents() {
     if (e.target === $("modalResetCicloInscripcion")) closeModal("modalResetCicloInscripcion");
   });
 
+  $("modalEditarNominaInscripcion")?.addEventListener("click", (e) => {
+    if (e.target === $("modalEditarNominaInscripcion")) closeModal("modalEditarNominaInscripcion");
+  });
+
   $("btnEditarDatosHero")?.addEventListener("click", openDatosModal);
   $("btnEditarDatos")?.addEventListener("click", openDatosModal);
 
@@ -5406,6 +5795,7 @@ function bindEvents() {
   $("btnExportarInscripcionesExcel")?.addEventListener("click", exportarInscripcionesExcel);
   $("btnExportarInscripcionesCsv")?.addEventListener("click", exportarInscripcionesCsv);
   $("btnResetearCicloInscripcion")?.addEventListener("click", openResetCicloInscripcionModal);
+  $("btnEditarNominaInscripcion")?.addEventListener("click", openEditarNominaInscripcionModal);
   $("btnConfirmarResetCicloInscripcion")?.addEventListener("click", resetearCicloInscripcion);
 
   $("btnCrearContrato")?.addEventListener("click", () => {
@@ -5414,6 +5804,23 @@ function bindEvents() {
       return;
     }
     alert("Aquí conectarás el generador de contrato.");
+  });
+
+  $("editarNominaBody")?.addEventListener("click", async (e) => {
+    const btn = e.target.closest("[data-action]");
+    if (!btn) return;
+  
+    const id = btn.dataset.id || "";
+    const action = btn.dataset.action || "";
+  
+    if (action === "guardar-nomina-inscripcion") {
+      await guardarNominaInscripcion(id);
+      return;
+    }
+  
+    if (action === "archivar-nomina-inscripcion") {
+      await archivarNominaInscripcion(id);
+    }
   });
 
   $("alertsList")?.addEventListener("click", async (e) => {
