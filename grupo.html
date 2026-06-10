@@ -1851,6 +1851,23 @@
       border-color:rgba(107, 77, 146, .12);
       color:#645572;
     }
+    .btn-reset-admin{
+      min-height:44px;
+      padding:0 16px;
+      border-radius:14px;
+      border:none;
+      cursor:pointer;
+      font-size:14px;
+      font-weight:900;
+      background:#f97316;
+      color:#fff;
+      box-shadow:0 10px 22px rgba(249,115,22,.18);
+    }
+    
+    .btn-reset-admin:disabled{
+      opacity:.45;
+      cursor:not-allowed;
+    }
   </style>
 </head>
 
@@ -2053,6 +2070,10 @@
             
               <button id="btnExportarInscripcionesCsv" class="btn-pill" type="button">
                 Exportar CSV
+              </button>
+
+              <button id="btnResetearCicloInscripcion" class="btn-reset-admin hidden" type="button">
+                Resetear
               </button>
             </div>
           </div>
@@ -2831,6 +2852,52 @@
       <div class="modal-actions">
         <button class="btn-pill" type="button" data-close="modalPlantillaCorreo">Cancelar</button>
         <button class="btn-dark" type="button" id="btnSaveEmailTemplate">Guardar plantilla</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal" id="modalResetCicloInscripcion">
+    <div class="modal-card">
+      <div class="modal-head">
+        <h3 class="modal-title">Resetear ciclo de inscripción</h3>
+        <button class="modal-close" type="button" data-close="modalResetCicloInscripcion">×</button>
+      </div>
+  
+      <div class="modal-body">
+        <div class="empty-box" style="text-align:left;">
+          Esta acción es administrativa. Puedes resetear solo el ciclo o también archivar la nómina actual.
+        </div>
+  
+        <div class="form-grid" style="margin-top:18px;">
+          <div class="form-field span-3">
+            <label for="reset_tipo_ciclo">Nuevo ciclo</label>
+            <select id="reset_tipo_ciclo">
+              <option value="auto">Automático según grupo</option>
+              <option value="normal">Inscripción inicial</option>
+              <option value="nomina_final">Nómina final / ficha médica</option>
+            </select>
+          </div>
+  
+          <div class="form-field span-3">
+            <label for="reset_accion_inscritos">Qué hacer con inscritos actuales</label>
+            <select id="reset_accion_inscritos">
+              <option value="conservar">Conservar inscritos actuales</option>
+              <option value="archivar">Archivar inscritos actuales y limpiar nómina</option>
+            </select>
+          </div>
+  
+          <div class="form-field span-3">
+            <label for="reset_motivo">Motivo / observación</label>
+            <textarea id="reset_motivo" placeholder="Ej: Corrección de ciclo, reapertura solicitada por administración, etc."></textarea>
+          </div>
+        </div>
+      </div>
+  
+      <div class="modal-actions">
+        <button class="btn-pill" type="button" data-close="modalResetCicloInscripcion">Cancelar</button>
+        <button class="btn-reset-admin" id="btnConfirmarResetCicloInscripcion" type="button">
+          Confirmar reset
+        </button>
       </div>
     </div>
   </div>
