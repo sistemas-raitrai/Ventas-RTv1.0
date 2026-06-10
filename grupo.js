@@ -4010,7 +4010,14 @@ function openNominaInicialPagosModal() {
   const sinCorreo = destinatarios.filter((d) => !d.correo);
 
   if (!destinatarios.length) {
-    alert("No hay inscripciones iniciales para este grupo.");
+    const rol = String(state.effectiveUser?.rol || "").toLowerCase();
+  
+    if (rol === "admin") {
+      alert("No hay inscripciones iniciales para cargar a pagos. Revisa Editar Nómina y cambia el Tipo inscripción a Inscripción inicial si corresponde.");
+    } else {
+      alert("No hay inscripciones iniciales para este grupo.");
+    }
+  
     return;
   }
 
@@ -5035,11 +5042,16 @@ function syncButtons() {
   }
 
   if (btnNominaInicialPagos) {
+    const rol = String(state.effectiveUser?.rol || "").toLowerCase();
+    const esAdmin = rol === "admin";
     const puedeGestionarPagos = puedeOperarListaEsperaAdministrativa();
     const tieneNominaInicial = getInscripcionesNominaInicial().length > 0;
   
     btnNominaInicialPagos.classList.toggle("hidden", !puedeGestionarPagos);
-    btnNominaInicialPagos.disabled = !puedeGestionarPagos || !tieneNominaInicial;
+  
+    // Admin lo ve y puede apretarlo siempre.
+    // Los demás solo si hay nómina inicial.
+    btnNominaInicialPagos.disabled = !puedeGestionarPagos || (!esAdmin && !tieneNominaInicial);
   
     const estadoPagos = getEstadoNominaInicialPagos();
   
@@ -5047,7 +5059,7 @@ function syncButtons() {
       ? "Reenviar aviso / actualizar carga pagos"
       : "Cargado a Pagos";
   }
-
+  
   const btnContrato = $("btnCrearContrato");
   if (btnContrato) btnContrato.disabled = !autorizada;
 
