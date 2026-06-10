@@ -695,6 +695,14 @@ function getLatestOpenFichaCorrectionRequest() {
   return getOpenFichaCorrectionRequests()[0] || null;
 }
 
+function inscripcionInicialEstaCerradaParaFirma() {
+  return !!state.group?.inscripcion?.fasesCerradas?.inscripcion_inicial;
+}
+
+function nominaInicialEstaCargadaEnPagos() {
+  return state.group?.sistemaPagos?.nominaInicial?.cargada === true;
+}
+
 function isRealAdminRole() {
   return String(state.effectiveUser?.rol || "").toLowerCase() === "admin";
 }
@@ -2061,8 +2069,11 @@ async function signFlowFromFicha(step) {
       return;
     }
     
-    if (!hasProgramaOriginal()) {
-      alert("Debes subir el programa antes de firmar la ficha.");
+    if (!isRealAdminRole() && !inscripcionInicialEstaCerradaParaFirma()) {
+      alert(
+        "Antes de firmar la ficha debes cerrar la Inscripción Inicial del grupo.\n\n" +
+        "Ve a la ficha del grupo, sección Inscripciones, cierra la Inscripción Inicial y luego vuelve a firmar."
+      );
       return;
     }
 
@@ -2264,10 +2275,13 @@ async function signFlowFromFicha(step) {
       return;
     }
 
-    if (!flow?.jefaVentas?.firmado) {
-      alert("Primero debe firmar jefa de ventas.");
-      return;
-    }
+  if (!isRealAdminRole() && !nominaInicialEstaCargadaEnPagos()) {
+    alert(
+      "Antes de firmar como Administración debes marcar la nómina inicial como Cargado a Pagos.\n\n" +
+      "Ve al Portafolio del grupo, hace clic al botón Cargado a Pagos y luego vuelve a firmar."
+    );
+    return;
+  }
 
     const pendingRequest = getLatestOpenFichaUpdateRequest();
     const hadPendingRequest = !!pendingRequest;
