@@ -3430,7 +3430,10 @@ async function copyGroupInscripcionLink() {
 }
 
 function canResetearCicloInscripcion() {
-  return String(state.effectiveUser?.rol || "").toLowerCase() === "admin";
+  const rol = String(state.effectiveUser?.rol || "").toLowerCase();
+  const email = normalizeEmail(state.effectiveEmail || "");
+
+  return rol === "admin" || email === "chernandez@raitrai.cl";
 }
 
 function getFaseResetInscripcionSeleccionada() {
