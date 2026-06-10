@@ -537,7 +537,10 @@ async function loadInscripciones() {
         id: d.id,
         ...d.data()
       }))
-      .filter((item) => item?.privacidad?.estado !== "eliminada_logica")
+      .filter((item) => {
+        const estadoPrivacidad = normalizeSearchLocal(item?.privacidad?.estado || "");
+        return estadoPrivacidad !== "eliminada_logica" && estadoPrivacidad !== "archivada";
+      })
       .sort((a, b) => {
         const ordenA = getOrdenOperativoInscripcion(a);
         const ordenB = getOrdenOperativoInscripcion(b);
@@ -3426,6 +3429,193 @@ async function copyGroupInscripcionLink() {
   }
 }
 
+function canResetearCicloInscripcion() {
+  return String(state.effectiveUser?.rol || "").toLowerCase() === "admin";
+}
+
+function getFaseResetInscripcionSeleccionada() {
+  const seleccion = normalizeSearchLocal($("reset_tipo_ciclo")?.value || "auto");
+
+  if (seleccion === "normal") return "normal";
+  if (seleccion === "nomina_final") return "nomina_final";
+
+  return grupoVieneSistemaAntiguo() ? "nomina_final" : "normal";
+}
+
+function openResetCicloInscripcionModal() {
+  if (!canResetearCicloInscripcion()) {
+    alert("Solo Admin puede resetear el ciclo de inscripción.");
+    return;
+  }
+
+  setFormValue("reset_tipo_ciclo", "auto");
+  setFormValue("reset_accion_inscritos", "conservar");
+  setFormValue("reset_motivo", "");
+
+  openModal("modalResetCicloInscripcion");
+}
+
+async function resetearCicloInscripcion() {
+  if (!canResetearCicloInscripcion()) {
+    alert("Solo Admin puede resetear el ciclo de inscripción.");
+    return;
+  }
+
+  const faseNueva = getFaseResetInscripcionSeleccionada();
+  const contexto = getContextoInscripcionGrupo(faseNueva);
+  const accionInscritos = normalizeSearchLocal($("reset_accion_inscritos")?.value || "conservar");
+  const debeArchivar = accionInscritos === "archivar";
+  const motivo = cleanText($("reset_motivo")?.value || "");
+
+  const totalInscritos = state.inscripciones.length;
+
+  const mensajeConfirmacion = [
+    "¿Confirmas resetear el ciclo de inscripción?",
+    "",
+    `Nuevo ciclo: ${contexto.labelFase}`,
+    debeArchivar
+      ? `Se archivarán ${totalInscritos} inscrito(s) y la nómina visible quedará limpia.`
+      : "Se conservarán los inscritos actuales.",
+    "",
+    "Esta acción quedará registrada en el historial."
+  ].join("\n");
+
+  const ok = confirm(mensajeConfirmacion);
+  if (!ok) return;
+
+  const btn = $("btnConfirmarResetCicloInscripcion");
+  if (btn) btn.disabled = true;
+
+  try {
+    const tokenNuevo = generateInscripcionToken(32);
+    const linkNuevo = getInscripcionPublicLink(state.groupId, tokenNuevo, faseNueva);
+    const archivoId = `reset_${state.groupId}_${Date.now()}`;
+
+    if (debeArchivar && totalInscritos) {
+      const archivoRef = doc(
+        db,
+        "ventas_cotizaciones",
+        String(state.groupDocId),
+        "inscripciones_archivadas",
+        archivoId
+      );
+
+      await setDoc(archivoRef, {
+        archivoId,
+        tipoArchivo: "reset_ciclo_inscripcion",
+        idGrupo: String(state.groupId || ""),
+        groupDocId: String(state.groupDocId || ""),
+
+        faseAnterior: getInscripcionEstadoActual(),
+        faseNueva,
+        labelFaseNueva: contexto.labelFase,
+
+        totalInscritos,
+        motivo: motivo || "Reset ciclo inscripción",
+
+        creadoPor: getDisplayName(state.effectiveUser),
+        creadoPorCorreo: state.effectiveEmail,
+        creadoAt: serverTimestamp()
+      });
+
+      for (const item of state.inscripciones) {
+        const inscRef = doc(
+          db,
+          "ventas_cotizaciones",
+          String(state.groupDocId),
+          "inscripciones",
+          String(item.id)
+        );
+
+        await updateDoc(inscRef, {
+          privacidad: {
+            ...(item.privacidad || {}),
+            estado: "archivada",
+            archivoId,
+            archivadaAt: serverTimestamp(),
+            archivadaPor: getDisplayName(state.effectiveUser),
+            archivadaPorCorreo: state.effectiveEmail,
+            motivoArchivo: motivo || "Reset ciclo inscripción"
+          }
+        });
+      }
+    }
+
+    await saveGroupPatch(
+      {
+        inscripcionHabilitada: true,
+        tokenInscripcion: tokenNuevo,
+        inscripcionEstado: faseNueva,
+        faseInscripcion: faseNueva,
+
+        fechaAperturaInscripcion: serverTimestamp(),
+
+        inscripcion: {
+          ...(state.group?.inscripcion || {}),
+          estado: faseNueva,
+          faseActual: faseNueva,
+
+          claveActual: contexto.clave,
+          labelActual: contexto.labelFase,
+          tipoInscripcionActual: contexto.tipoInscripcion,
+          estadoCupoActual: contexto.estadoCupo,
+
+          tokenActual: tokenNuevo,
+          linkActual: linkNuevo,
+
+          resetCicloAt: serverTimestamp(),
+          resetCicloPor: getDisplayName(state.effectiveUser),
+          resetCicloPorCorreo: state.effectiveEmail,
+          resetCicloMotivo: motivo || "",
+          resetCicloArchivoId: debeArchivar ? archivoId : "",
+          resetCicloArchivoInscritos: debeArchivar,
+
+          actualizadoPor: getDisplayName(state.effectiveUser),
+          actualizadoPorCorreo: state.effectiveEmail,
+          actualizadoAt: serverTimestamp(),
+
+          linkGeneradoPor: getDisplayName(state.effectiveUser),
+          linkGeneradoPorCorreo: state.effectiveEmail,
+          linkGeneradoAt: serverTimestamp()
+        }
+      },
+      {
+        tipoMovimiento: "reset_ciclo_inscripcion",
+        modulo: "inscripcion",
+        titulo: "Reset de ciclo de inscripción",
+        mensaje: `${getDisplayName(state.effectiveUser)} reseteó el ciclo de inscripción a "${contexto.labelFase}". ${
+          debeArchivar
+            ? `Se archivaron ${totalInscritos} inscrito(s).`
+            : "Se conservaron los inscritos actuales."
+        }${motivo ? ` Motivo: ${motivo}` : ""}`,
+        metadata: {
+          faseNueva,
+          labelFaseNueva: contexto.labelFase,
+          archivoId: debeArchivar ? archivoId : "",
+          inscritosArchivados: debeArchivar ? totalInscritos : 0,
+          inscritosConservados: debeArchivar ? 0 : totalInscritos
+        }
+      }
+    );
+
+    try {
+      await navigator.clipboard.writeText(linkNuevo);
+      showSaveNotice("Ciclo reseteado y nuevo link copiado.");
+    } catch {
+      showSaveNotice("Ciclo reseteado correctamente.");
+      alert(`Nuevo link:\n\n${linkNuevo}`);
+    }
+
+    closeModal("modalResetCicloInscripcion");
+    await loadAll();
+  } catch (error) {
+    console.error("[grupo] resetearCicloInscripcion", error);
+    alert("Error al resetear ciclo de inscripción: " + error.message);
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
 function normalizarTextoExport(value = "") {
   const limpio = String(value || "")
     .trim()
@@ -4712,6 +4902,7 @@ function syncButtons() {
   const btnCopiarLinkInscripcion = $("btnCopiarLinkInscripcion");
   const btnExportarInscripcionesExcel = $("btnExportarInscripcionesExcel");
   const btnExportarInscripcionesCsv = $("btnExportarInscripcionesCsv");
+  const btnResetearCicloInscripcion = $("btnResetearCicloInscripcion");
   const btnNominaInicialPagos = $("btnNominaInicialPagos");
 
   const puedeInicial = canGestionarInscripcionInicial();
@@ -4797,6 +4988,13 @@ function syncButtons() {
 
     btnExportarInscripcionesCsv.disabled = !tieneInscripciones || !puedeCsv;
     btnExportarInscripcionesCsv.classList.toggle("hidden", !puedeCsv);
+  }
+
+  if (btnResetearCicloInscripcion) {
+    const puedeReset = canResetearCicloInscripcion();
+  
+    btnResetearCicloInscripcion.classList.toggle("hidden", !puedeReset);
+    btnResetearCicloInscripcion.disabled = !puedeReset;
   }
 
   if (btnNominaInicialPagos) {
@@ -5116,6 +5314,10 @@ function bindEvents() {
     if (e.target === $("modalNominaInicialPagos")) closeModal("modalNominaInicialPagos");
   });
 
+  $("modalResetCicloInscripcion")?.addEventListener("click", (e) => {
+    if (e.target === $("modalResetCicloInscripcion")) closeModal("modalResetCicloInscripcion");
+  });
+
   $("btnEditarDatosHero")?.addEventListener("click", openDatosModal);
   $("btnEditarDatos")?.addEventListener("click", openDatosModal);
 
@@ -5200,6 +5402,8 @@ function bindEvents() {
   $("btnEnviarNominaInicialPagos")?.addEventListener("click", enviarNominaInicialPagos);
   $("btnExportarInscripcionesExcel")?.addEventListener("click", exportarInscripcionesExcel);
   $("btnExportarInscripcionesCsv")?.addEventListener("click", exportarInscripcionesCsv);
+  $("btnResetearCicloInscripcion")?.addEventListener("click", openResetCicloInscripcionModal);
+  $("btnConfirmarResetCicloInscripcion")?.addEventListener("click", resetearCicloInscripcion);
 
   $("btnCrearContrato")?.addEventListener("click", () => {
     if (!state.group?.autorizada) {
