@@ -2829,10 +2829,89 @@ function bindDatosModalControls() {
   bindPhoneModalInput("d_celularCliente2");
 }
 
+function groupValueIsEmpty(value) {
+  if (value === null || value === undefined) return true;
+  return String(value).trim() === "";
+}
+
+function getGrupoDatoFinal(campo = "") {
+  if (campo === "destinoPrincipal") {
+    const base = cleanText(state.group?.destinoPrincipal || "");
+    if (normalizeSearchLocal(base) === "otro") {
+      return cleanText(state.group?.destinoPrincipalOtro || "");
+    }
+    return base;
+  }
+
+  if (campo === "programa") {
+    const base = cleanText(state.group?.programa || "");
+    if (normalizeSearchLocal(base) === "otro") {
+      return cleanText(state.group?.programaOtro || "");
+    }
+    return base;
+  }
+
+  if (campo === "tramo") {
+    const base = cleanText(state.group?.tramo || "");
+    if (normalizeSearchLocal(base) === "otro") {
+      return cleanText(state.group?.tramoOtro || "");
+    }
+    return base;
+  }
+
+  if (campo === "mesViaje") {
+    const base = cleanText(state.group?.mesViaje || "");
+    if (normalizeSearchLocal(base) === "otro") {
+      return cleanText(state.group?.mesViajeOtro || state.group?.semanaViaje || "");
+    }
+    return base || cleanText(state.group?.semanaViaje || "");
+  }
+
+  return cleanText(state.group?.[campo] || "");
+}
+
+function getDatosGrupoFaltantesParaFicha() {
+  const campos = [
+    { campo: "colegio", label: "Colegio" },
+    { campo: "curso", label: "Curso" },
+    { campo: "anoViaje", label: "Año de viaje" },
+    { campo: "cantidadGrupo", label: "Cantidad grupo" },
+    { campo: "destinoPrincipal", label: "Destino principal" },
+    { campo: "programa", label: "Programa" },
+    { campo: "tramo", label: "Tramo" },
+    { campo: "mesViaje", label: "Mes / fecha de viaje" },
+    { campo: "nombreCliente", label: "Contacto principal" },
+    { campo: "correoCliente", label: "Correo contacto principal" },
+    { campo: "celularCliente", label: "Teléfono contacto principal" }
+  ];
+
+  return campos
+    .filter((item) => groupValueIsEmpty(getGrupoDatoFinal(item.campo)))
+    .map((item) => item.label);
+}
+
 function openFichaEditor() {
   if (!canCreateFichaFromEstado()) {
     alert("La ficha solo se habilita cuando el grupo está en estado GANADA.");
     return;
+  }
+
+  const faltantes = getDatosGrupoFaltantesParaFicha();
+
+  if (faltantes.length) {
+    const mensaje =
+      "Faltan datos del grupo que deberían completarse antes de editar la ficha.\n\n" +
+      faltantes.map((x) => `- ${x}`).join("\n") +
+      "\n\nPuedes ir a Editar Grupo o continuar con información incompleta.\n\n" +
+      "Aceptar: continuar a ficha.\n" +
+      "Cancelar: volver para editar el grupo.";
+
+    const continuar = confirm(mensaje);
+
+    if (!continuar) {
+      openDatosModal();
+      return;
+    }
   }
 
   location.href = `fichas.html?id=${encodeURIComponent(state.groupId)}`;
