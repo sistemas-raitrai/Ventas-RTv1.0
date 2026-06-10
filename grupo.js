@@ -3872,9 +3872,18 @@ function getFichaMainButtonMode() {
 ========================================================= */
 
 function getInscripcionesNominaInicial() {
-  return state.inscripciones.filter((item) =>
-    normalizeSearchLocal(getInscripcionTipoReal(item)) === "nomina_inicial"
-  );
+  return state.inscripciones.filter((item) => {
+    const tipo = normalizeSearchLocal(getInscripcionTipoReal(item));
+    const tipoLabel = normalizeSearchLocal(item.tipoInscripcionLabel || "");
+    const fase = normalizeSearchLocal(item.faseInscripcion || item?.meta?.faseInscripcion || "");
+
+    return (
+      tipo === "nomina_inicial" ||
+      tipo === "inscripcion_comercial" ||
+      tipoLabel === "inscripcion_inicial" ||
+      fase === "normal"
+    );
+  });
 }
 
 function getEstadoNominaInicialPagos() {
