@@ -1548,14 +1548,19 @@ function renderFichaBaseMissingNotice() {
     notice.id = "fichaBaseMissingNotice";
     notice.className = "ficha-base-missing-notice";
 
-    const form = document.querySelector("#formFicha") || document.querySelector(".ficha-shell") || document.querySelector("main");
-    form?.prepend(notice);
+    const form = document.querySelector("#formFicha");
+
+    // Lo insertamos ANTES del form, no dentro del form-grid.
+    form?.parentNode?.insertBefore(notice, form);
   }
 
   notice.innerHTML = `
-    <strong>Faltan datos necesarios para completar la ficha.</strong>
-    <br>
-    Estos datos deberían venir desde Editar Grupo o completarse antes de firmar.
+    <div class="ficha-base-missing-title">
+      Faltan datos necesarios para completar la ficha.
+    </div>
+    <div class="ficha-base-missing-text">
+      Estos datos deberían venir desde Editar Grupo o completarse antes de firmar.
+    </div>
     <ul>
       ${faltantes.map((x) => `<li>${escapeHtml(x)}</li>`).join("")}
     </ul>
