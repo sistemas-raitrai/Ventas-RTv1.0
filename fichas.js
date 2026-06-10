@@ -1449,8 +1449,117 @@ function renderPage() {
   renderResumenGrupo();
   renderWorkflowPanel();
   fillForm();
+  renderFichaBaseMissingNotice();
   syncButtons();
   syncAdminLimitedFichaFields(); 
+}
+
+function fichaValueIsEmpty(value) {
+  if (value === null || value === undefined) return true;
+  return String(value).trim() === "";
+}
+
+function getFichaDatoFinal(campoFicha = "", campoGrupo = "") {
+  const fichaValue = cleanText(state.ficha?.[campoFicha] || "");
+  if (fichaValue) return fichaValue;
+
+  const grupoValue = cleanText(state.group?.[campoGrupo || campoFicha] || "");
+  return grupoValue;
+}
+
+function getFichaDatoFinalConOtro(campoFicha = "", campoGrupo = "", campoOtroGrupo = "") {
+  const fichaValue = cleanText(state.ficha?.[campoFicha] || "");
+  if (fichaValue) return fichaValue;
+
+  const grupoValue = cleanText(state.group?.[campoGrupo] || "");
+
+  if (normalizeSearchLocal(grupoValue) === "otro") {
+    return cleanText(state.group?.[campoOtroGrupo] || "");
+  }
+
+  return grupoValue;
+}
+
+function getDatosFaltantesParaCompletarFicha() {
+  const fechaGrupo =
+    cleanText(state.group?.fechaViaje || "") ||
+    cleanText(state.group?.fechaDeViaje || "") ||
+    cleanText(state.group?.semanaViaje || "") ||
+    cleanText(state.group?.mesViaje || "");
+
+  const campos = [
+    {
+      label: "Nombre grupo",
+      value: getFichaDatoFinal("nombreGrupo", "nombreGrupo") ||
+        cleanText(state.group?.aliasGrupo || "") ||
+        cleanText(state.group?.colegio || "")
+    },
+    {
+      label: "Apoderado encargado",
+      value: getFichaDatoFinal("apoderadoEncargado", "nombreCliente")
+    },
+    {
+      label: "Teléfono",
+      value: getFichaDatoFinal("telefono", "celularCliente")
+    },
+    {
+      label: "Correo",
+      value: getFichaDatoFinal("correo", "correoCliente")
+    },
+    {
+      label: "Programa",
+      value: getFichaDatoFinalConOtro("nombrePrograma", "programa", "programaOtro")
+    },
+    {
+      label: "Número pax total",
+      value: getFichaDatoFinal("numeroPaxTotal", "cantidadGrupo")
+    },
+    {
+      label: "Tramo",
+      value: getFichaDatoFinalConOtro("tramo", "tramo", "tramoOtro")
+    },
+    {
+      label: "Fecha / mes de viaje",
+      value: cleanText(state.ficha?.fechaViajeTexto || "") || fechaGrupo
+    },
+    {
+      label: "Nombre vendedor",
+      value: getFichaDatoFinal("nombreVendedor", "vendedora")
+    }
+  ];
+
+  return campos
+    .filter((item) => fichaValueIsEmpty(item.value))
+    .map((item) => item.label);
+}
+
+function renderFichaBaseMissingNotice() {
+  const faltantes = getDatosFaltantesParaCompletarFicha();
+
+  let notice = document.getElementById("fichaBaseMissingNotice");
+
+  if (!faltantes.length) {
+    notice?.remove();
+    return;
+  }
+
+  if (!notice) {
+    notice = document.createElement("div");
+    notice.id = "fichaBaseMissingNotice";
+    notice.className = "ficha-base-missing-notice";
+
+    const form = document.querySelector("#formFicha") || document.querySelector(".ficha-shell") || document.querySelector("main");
+    form?.prepend(notice);
+  }
+
+  notice.innerHTML = `
+    <strong>Faltan datos necesarios para completar la ficha.</strong>
+    <br>
+    Estos datos deberían venir desde Editar Grupo o completarse antes de firmar.
+    <ul>
+      ${faltantes.map((x) => `<li>${escapeHtml(x)}</li>`).join("")}
+    </ul>
+  `;
 }
 
 function syncAdminLimitedFichaFields() {
@@ -2073,6 +2182,17 @@ async function signFlowFromFicha(step) {
       alert(
         "Antes de firmar la ficha debes cerrar la Inscripción Inicial del grupo.\n\n" +
         "Ve a la ficha del grupo, sección Inscripciones, cierra la Inscripción Inicial y luego vuelve a firmar."
+      );
+      return;
+    }
+
+    const faltantesFicha = getDatosFaltantesParaCompletarFicha();
+
+    if (!isRealAdminRole() && faltantesFicha.length) {
+      alert(
+        "No puedes firmar la ficha porque faltan datos necesarios:\n\n" +
+        faltantesFicha.map((x) => `- ${x}`).join("\n") +
+        "\n\nCompleta estos datos en Editar Grupo o directamente en la ficha antes de firmar."
       );
       return;
     }
