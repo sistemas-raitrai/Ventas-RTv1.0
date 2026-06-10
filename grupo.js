@@ -3446,13 +3446,31 @@ function soloDigitos(value = "") {
   return String(value || "").replace(/\D/g, "");
 }
 
+function normalizarTipoPasajeroExport(item = {}) {
+  const tipoRaw = item.tipoViajante || item.tipoParticipacion || "";
+  const tipoKey = normalizeSearchLocal(tipoRaw);
+
+  return tipoKey === "estudiante" ? "Estudiante" : "Adulto";
+}
+
+function normalizarNacionalidadExport(item = {}) {
+  const raw = getInscripcionNacionalidad(item);
+  const partes = String(raw || "")
+    .split(/[,;/|]+|\s+y\s+/i)
+    .map((x) => normalizarTextoExport(x))
+    .filter(Boolean);
+
+  if (!partes.length) return "";
+
+  const chilena = partes.find((x) => normalizeSearchLocal(x) === "chilena");
+  if (chilena) return "Chilena";
+
+  return partes[0];
+}
+
 function buildInscripcionesExportRows() {
   return state.inscripciones.map((item, index) => ({
-    "Número": index + 1,
-
-    "Tipo Inscripción": normalizarTextoExport(
-      getTipoInscripcionLabel(getInscripcionTipoReal(item))
-    ),
+    "Numero": index + 1,
 
     "1.- Rut": soloDigitos(getInscripcionDocumento(item)),
 
@@ -3464,11 +3482,9 @@ function buildInscripcionesExportRows() {
       getByPath(item, "identificacion.fechaNacimiento")
     ),
 
-    "5.- Tipo Pasajero": normalizarTextoExport(formatInscripcionValue(
-      item.tipoViajante || item.tipoParticipacion || ""
-    )),
+    "5.- Tipo Pasajero": normalizarTipoPasajeroExport(item),
 
-    "6.- Nacionalidad": normalizarTextoExport(getInscripcionNacionalidad(item)),
+    "6.- Nacionalidad": normalizarNacionalidadExport(item),
 
     "7.- Sexo": normalizarTextoExport(getInscripcionGenero(item)),
 
