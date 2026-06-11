@@ -8764,6 +8764,15 @@ async function generarLinkNominaPublica() {
 
 const API_PAGOS_DETALLE_URL = "/api/pagos";
 
+function capitalizarNombrePagos(value = "") {
+  return cleanText(value)
+    .toLowerCase()
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((p) => p.charAt(0).toUpperCase() + p.slice(1))
+    .join(" ");
+}
+
 function normalizarRutPagos(value = "") {
   return String(value || "")
     .toUpperCase()
@@ -8808,7 +8817,7 @@ function formatearRutDesdePagos(rutRaw = "") {
 }
 
 function separarApellidosPagos(apellidos = "") {
-  const partes = cleanText(apellidos).split(/\s+/).filter(Boolean);
+  const partes = capitalizarNombrePagos(apellidos).split(/\s+/).filter(Boolean);
 
   return {
     primerApellido: partes[0] || "",
@@ -8836,11 +8845,12 @@ function buildPayloadInscripcionDesdePagos(p = {}, grupo = {}, groupDocId = "") 
   const apellidos = separarApellidosPagos(p.apellidos || "");
   const genero = generoDesdeSexoPagos(p.sexo || "");
   const tipoViajante = tipoViajanteDesdeCategoriaPagos(p.ocupacion_categoria || "");
+
   const esEstudiante = tipoViajante === "estudiante";
   const esProfesor = tipoViajante === "profesor";
   const esAcompanante = tipoViajante === "adulto_acompanante";
 
-  const nombres = cleanText(p.nombres || "");
+  const nombres = capitalizarNombrePagos(p.nombres || "");
   const nombreCompleto = [
     nombres,
     apellidos.primerApellido,
@@ -8854,7 +8864,7 @@ function buildPayloadInscripcionDesdePagos(p = {}, grupo = {}, groupDocId = "") 
     contextoFormulario: "sistema_pagos",
     estadoInscripcion: "sistema_pagos",
     tipoInscripcion: "sistema_pagos",
-    tipoInscripcionLabel: "Sistema de pagos",
+    tipoInscripcionLabel: "Sistema de Pagos",
     estadoCupo: "confirmado",
 
     tipoViajante,
@@ -9043,9 +9053,7 @@ async function consultarNominaPagos(numeroNegocio) {
   const url = `${API_PAGOS_DETALLE_URL}?modo=detalle&numeroNegocio=${encodeURIComponent(numeroNegocio)}`;
   const res = await fetch(url);
 
-  if (!res.ok) {
-    throw new Error(`Error consultando pagos HTTP ${res.status}`);
-  }
+  if (!res.ok) throw new Error(`Error consultando pagos HTTP ${res.status}`);
 
   const data = await res.json();
   const pasajeros = data?.nominas?.data?.pasajeros || [];
@@ -9077,7 +9085,7 @@ window.importarNominaPagosPorNumeroNegocio = async function (numeroNegocio, opti
       resultado.omitidosSinRut += 1;
       resultado.detalle.push({
         accion: "omitido_sin_rut",
-        nombre: `${p.nombres || ""} ${p.apellidos || ""}`.trim()
+        nombre: capitalizarNombrePagos(`${p.nombres || ""} ${p.apellidos || ""}`)
       });
       continue;
     }
@@ -9085,6 +9093,7 @@ window.importarNominaPagosPorNumeroNegocio = async function (numeroNegocio, opti
     const docId = rutInfo.documentoNormalizado;
     const ref = doc(db, "ventas_cotizaciones", grupo.docId, "inscripciones", docId);
     const snap = await getDoc(ref);
+    const payload = buildPayloadInscripcionDesdePagos(p, grupo.data, grupo.docId);
 
     if (snap.exists()) {
       resultado.existentes += 1;
@@ -9092,12 +9101,10 @@ window.importarNominaPagosPorNumeroNegocio = async function (numeroNegocio, opti
         accion: "ya_existia",
         docId,
         rut: rutInfo.rut,
-        nombre: `${p.nombres || ""} ${p.apellidos || ""}`.trim()
+        nombre: payload.identificacion.nombreCompleto
       });
       continue;
     }
-
-    const payload = buildPayloadInscripcionDesdePagos(p, grupo.data, grupo.docId);
 
     resultado.detalle.push({
       accion: dryRun ? "simular_creacion" : "creado",
