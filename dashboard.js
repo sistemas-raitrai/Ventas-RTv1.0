@@ -117,6 +117,10 @@ async function cargarDetalleGrupo(numeroNegocio) {
       data?.saldos?.data?.detalle_pasajeros ||
       [];
 
+    console.log("DATA COMPLETA PAGOS:", data);
+    console.log("PRIMER PASAJERO RAW:", pasajeros[0]);
+    console.log("PASAJEROS RAW:", pasajeros);
+
     const grupo = gruposOriginales.find(
       (g) => String(g.numeroNegocio) === String(numeroNegocio)
     );
