@@ -285,7 +285,7 @@ function renderResumenDetalle(resumen) {
 function renderTablaDetalle(items) {
   if (!items.length) {
     els.tbodyDetallePasajeros.innerHTML =
-      `<tr><td colspan="10" class="seg-empty">No hay pasajeros para mostrar.</td></tr>`;
+      `<tr><td colspan="13" class="seg-empty">No hay pasajeros para mostrar.</td></tr>`;
     return;
   }
 
@@ -311,6 +311,9 @@ function renderTablaDetalle(items) {
         <td>${estadoViaje}</td>
         <td>${escapeHtml(p.rut || "-")}</td>
         <td>${escapeHtml(p.nombreCompleto || "-")}</td>
+        <td>${escapeHtml(p.nombreApoderado || "-")}</td>
+        <td>${escapeHtml(p.correoApoderado || "-")}</td>
+        <td>${escapeHtml(p.celularApoderado || "-")}</td>
         <td>${escapeHtml(p.categoria || "-")}</td>
         <td>${formatoCLP(p.totalDebe)}</td>
         <td>${formatoCLP(p.totalPagado)}</td>
@@ -357,6 +360,9 @@ function exportarDetalleNomina() {
     destino: grupo?.destino || "",
     rut: p.rut || "",
     nombreCompleto: p.nombreCompleto || "",
+    nombreApoderado: p.nombreApoderado || "",
+    correoApoderado: p.correoApoderado || "",
+    celularApoderado: p.celularApoderado || "",
     categoria: p.categoria || "",
     viaja: p.viaja ? "Sí" : "No",
     total: p.totalDebe,
@@ -433,6 +439,11 @@ function normalizarPasajero(item) {
     return {
       rut: p.rut || "",
       nombreCompleto: `${p.nombres || ""} ${p.apellidos || ""}`.trim(),
+
+      nombreApoderado: p.nombre_apoderado || "",
+      correoApoderado: p.correo_apoderado || "",
+      celularApoderado: p.celular_apoderado || "",
+
       categoria: p.ocupacion_categoria || "",
       viaja: Number(p.viaja) === 1,
       tieneCredencial: Number(p.tiene_credencial) === 1,
@@ -447,6 +458,11 @@ function normalizarPasajero(item) {
   return {
     rut: item.rut || "",
     nombreCompleto: item.nombre_completo || "",
+
+    nombreApoderado: item.nombre_apoderado || "",
+    correoApoderado: item.correo_apoderado || "",
+    celularApoderado: item.celular_apoderado || "",
+
     categoria: "",
     viaja: String(item.viaja || "").toLowerCase() !== "no",
     tieneCredencial: Number(item.tiene_credencial) === 1,
