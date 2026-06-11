@@ -1745,6 +1745,20 @@ function getInscripcionTipoReal(item = {}) {
   );
 }
 
+function esNominaFinalOperativa(item = {}) {
+  const tipo = normalizeSearchLocal(getInscripcionTipoReal(item));
+  const estadoCupo = normalizeSearchLocal(item.estadoCupo || "");
+
+  return (
+    tipo === "nomina_final" ||
+    tipo === "nuevo_ingreso_confirmado" ||
+    tipo === "lista_espera_confirmada" ||
+    tipo === "liberado" ||
+    (tipo === "nuevo_ingreso" && estadoCupo === "confirmado") ||
+    (tipo === "lista_espera" && estadoCupo === "confirmado")
+  );
+}
+
 function getLiberadosPermitidos() {
   return Number(
     state.group?.liberados ||
@@ -1777,6 +1791,8 @@ function renderInscripcionPasajerosPanel() {
   const nominaInicial = state.inscripciones.filter((x) =>
     normalizeSearchLocal(getInscripcionTipoReal(x)) === "nomina_inicial"
   ).length;
+
+  const nominaFinalOperativa = state.inscripciones.filter(esNominaFinalOperativa).length;
 
   const nuevos = state.inscripciones.filter((x) =>
     normalizeSearchLocal(getInscripcionTipoReal(x)) === "nuevo_ingreso"
@@ -3688,7 +3704,9 @@ function normalizarNacionalidadExport(item = {}) {
 }
 
 function buildInscripcionesExportRows() {
-  return state.inscripciones.map((item, index) => ({
+  const items = state.inscripciones.filter(esNominaFinalOperativa);
+
+  return items.map((item, index) => ({
     "Numero": index + 1,
 
     "1.- Rut": soloDigitos(getInscripcionDocumento(item)),
