@@ -1788,9 +1788,7 @@ function renderInscripcionPasajerosPanel() {
   const total = state.inscripciones.length;
   const capacidad = Number(state.group?.cantidadGrupo || 0);
 
-  const nominaInicial = state.inscripciones.filter((x) =>
-    normalizeSearchLocal(getInscripcionTipoReal(x)) === "nomina_inicial"
-  ).length;
+  const nominaInicial = getInscripcionesNominaInicial().length;
 
   const nominaFinalOperativa = state.inscripciones.filter(esNominaFinalOperativa).length;
 
@@ -3897,14 +3895,17 @@ function getFichaMainButtonMode() {
 function getInscripcionesNominaInicial() {
   return state.inscripciones.filter((item) => {
     const tipo = normalizeSearchLocal(getInscripcionTipoReal(item));
-    const tipoLabel = normalizeSearchLocal(item.tipoInscripcionLabel || "");
     const fase = normalizeSearchLocal(item.faseInscripcion || item?.meta?.faseInscripcion || "");
+    const estado = normalizeSearchLocal(item.estadoInscripcion || "");
+    const label = normalizeSearchLocal(getEstadoOperativoInscripcionLabel(item));
 
     return (
       tipo === "nomina_inicial" ||
+      tipo === "inscripcion_inicial" ||
       tipo === "inscripcion_comercial" ||
-      tipoLabel === "inscripcion_inicial" ||
-      fase === "normal"
+      fase === "normal" ||
+      estado === "normal" ||
+      label === "inscripcion_inicial"
     );
   });
 }
