@@ -119,6 +119,7 @@ async function cargarDetalleGrupo(numeroNegocio) {
 
     console.log("DATA COMPLETA PAGOS:", data);
     console.log("PRIMER PASAJERO RAW:", pasajeros[0]);
+    console.log("PRIMER PASAJERO JSON:", JSON.stringify(pasajeros[0], null, 2));
     console.log("PASAJEROS RAW:", pasajeros);
 
     const grupo = gruposOriginales.find(
@@ -311,10 +312,10 @@ function renderTablaDetalle(items) {
         <td>${estadoViaje}</td>
         <td>${escapeHtml(p.rut || "-")}</td>
         <td>${escapeHtml(p.nombreCompleto || "-")}</td>
+        <td>${escapeHtml(p.categoria || "-")}</td>
         <td>${escapeHtml(p.nombreApoderado || "-")}</td>
         <td>${escapeHtml(p.correoApoderado || "-")}</td>
         <td>${escapeHtml(p.celularApoderado || "-")}</td>
-        <td>${escapeHtml(p.categoria || "-")}</td>
         <td>${formatoCLP(p.totalDebe)}</td>
         <td>${formatoCLP(p.totalPagado)}</td>
         <td>${formatoCLP(p.saldoPendiente)}</td>
