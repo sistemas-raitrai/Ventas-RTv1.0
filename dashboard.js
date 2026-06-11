@@ -449,12 +449,15 @@ function normalizarPasajero(item) {
     return {
       rut: p.rut || "",
       nombreCompleto: `${p.nombres || ""} ${p.apellidos || ""}`.trim(),
-
-      nombreApoderado: p.nombre_apoderado || "",
-      correoApoderado: p.correo_apoderado || "",
-      celularApoderado: p.celular_apoderado || "",
-
       categoria: p.ocupacion_categoria || "",
+
+      // Standby: cuando la API lo entregue, lo conectamos acá.
+      nombreApoderado: "",
+
+      // Estos campos sí vienen desde pagos y corresponden al contacto/apoderado.
+      correoApoderado: p.email || "",
+      celularApoderado: p.telefono || "",
+
       viaja: Number(p.viaja) === 1,
       tieneCredencial: Number(p.tiene_credencial) === 1,
       totalDebe: numero(s.monto_total),
@@ -468,12 +471,10 @@ function normalizarPasajero(item) {
   return {
     rut: item.rut || "",
     nombreCompleto: item.nombre_completo || "",
-
-    nombreApoderado: item.nombre_apoderado || "",
-    correoApoderado: item.correo_apoderado || "",
-    celularApoderado: item.celular_apoderado || "",
-
     categoria: "",
+    nombreApoderado: "",
+    correoApoderado: "",
+    celularApoderado: "",
     viaja: String(item.viaja || "").toLowerCase() !== "no",
     tieneCredencial: Number(item.tiene_credencial) === 1,
     totalDebe: numero(item.total_debe),
