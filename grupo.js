@@ -8756,3 +8756,383 @@ async function generarLinkNominaPublica() {
     alert(`Link de nómina viva:\n\n${link}`);
   }
 }
+
+/* =========================================================
+   IMPORTAR NÓMINA DESDE SISTEMA DE PAGOS · CONSOLA
+========================================================= */
+
+const API_PAGOS_DETALLE_URL = "/api/pagos";
+
+function normalizarRutPagos(value = "") {
+  return String(value || "")
+    .toUpperCase()
+    .replace(/\./g, "")
+    .replace(/-/g, "")
+    .replace(/\s+/g, "")
+    .trim();
+}
+
+function calcularDvRutImport(cuerpo = "") {
+  const rut = String(cuerpo || "").replace(/\D/g, "");
+  if (!rut) return "";
+
+  let suma = 0;
+  let multiplo = 2;
+
+  for (let i = rut.length - 1; i >= 0; i--) {
+    suma += Number(rut[i]) * multiplo;
+    multiplo = multiplo === 7 ? 2 : multiplo + 1;
+  }
+
+  const resto = 11 - (suma % 11);
+  if (resto === 11) return "0";
+  if (resto === 10) return "K";
+  return String(resto);
+}
+
+function formatearRutDesdePagos(rutRaw = "") {
+  const limpio = normalizarRutPagos(rutRaw);
+  if (!limpio) return { rut: "", rutNumero: "", rutDv: "", documentoNormalizado: "" };
+
+  const cuerpo = limpio.slice(0, -1);
+  const dv = limpio.slice(-1) || calcularDvRutImport(cuerpo);
+  const rut = cuerpo && dv ? `${cuerpo}-${dv}` : limpio;
+
+  return {
+    rut,
+    rutNumero: cuerpo,
+    rutDv: dv,
+    documentoNormalizado: `RUT_${rut}`
+  };
+}
+
+function separarApellidosPagos(apellidos = "") {
+  const partes = cleanText(apellidos).split(/\s+/).filter(Boolean);
+
+  return {
+    primerApellido: partes[0] || "",
+    segundoApellido: partes.slice(1).join(" ")
+  };
+}
+
+function generoDesdeSexoPagos(sexo = "") {
+  const s = String(sexo || "").toUpperCase().trim();
+  if (s === "M") return "masculino";
+  if (s === "F") return "femenino";
+  return "";
+}
+
+function tipoViajanteDesdeCategoriaPagos(categoria = "") {
+  const c = normalizeSearchLocal(categoria || "");
+
+  if (c.includes("estudiante")) return "estudiante";
+  if (c.includes("profesor") || c.includes("docente") || c.includes("coordinador")) return "profesor";
+  return "adulto_acompanante";
+}
+
+function buildPayloadInscripcionDesdePagos(p = {}, grupo = {}, groupDocId = "") {
+  const rutInfo = formatearRutDesdePagos(p.rut || "");
+  const apellidos = separarApellidosPagos(p.apellidos || "");
+  const genero = generoDesdeSexoPagos(p.sexo || "");
+  const tipoViajante = tipoViajanteDesdeCategoriaPagos(p.ocupacion_categoria || "");
+  const esEstudiante = tipoViajante === "estudiante";
+  const esProfesor = tipoViajante === "profesor";
+  const esAcompanante = tipoViajante === "adulto_acompanante";
+
+  const nombres = cleanText(p.nombres || "");
+  const nombreCompleto = [
+    nombres,
+    apellidos.primerApellido,
+    apellidos.segundoApellido
+  ].filter(Boolean).join(" ");
+
+  return {
+    tipoRegistro: "inscripcion_pasajero",
+
+    faseInscripcion: "nomina_final",
+    contextoFormulario: "sistema_pagos",
+    estadoInscripcion: "sistema_pagos",
+    tipoInscripcion: "sistema_pagos",
+    tipoInscripcionLabel: "Sistema de pagos",
+    estadoCupo: "confirmado",
+
+    tipoViajante,
+    tipoParticipacion: tipoViajante,
+    esEstudiante,
+    esProfesor,
+    esAcompanante,
+    esAdulto: !esEstudiante,
+    esMenor: false,
+
+    grupo: {
+      idGrupo: String(groupDocId || ""),
+      aliasGrupo: cleanText(grupo.aliasGrupo || ""),
+      nombreGrupo: cleanText(grupo.nombreGrupo || ""),
+      colegio: cleanText(grupo.colegio || ""),
+      cursoBase: cleanText(grupo.curso || grupo.cursoBase || ""),
+      cursoActualInscripcion: cleanText(grupo.curso || grupo.cursoBase || ""),
+      cantidadGrupo: grupo.cantidadGrupo ?? grupo.cantidadgrupo ?? null,
+      anoViaje: grupo.anoViaje ?? null,
+      destinoPrincipal: cleanText(grupo.destinoPrincipal || grupo.destino || ""),
+      internacional: false
+    },
+
+    identificacion: {
+      tipoIdentificacion: rutInfo.rut ? "rut" : "sin_rut",
+      documento: rutInfo.rut,
+      documentoNormalizado: rutInfo.documentoNormalizado,
+      rut: rutInfo.rut,
+      rutNumero: rutInfo.rutNumero,
+      rutDv: rutInfo.rutDv,
+
+      nombres,
+      primerApellido: apellidos.primerApellido,
+      segundoApellido: apellidos.segundoApellido,
+      sinSegundoApellido: !apellidos.segundoApellido,
+      nombreCompleto,
+
+      fechaNacimiento: p.fecha_nacimiento || "",
+      genero,
+      generoFinal: genero,
+      sexoPagos: p.sexo || "",
+      ocupacionCategoriaPagos: p.ocupacion_categoria || "",
+
+      nacionalidadBase: "",
+      nacionalidadDetalle: "",
+
+      correoViajante: "",
+      telefonoViajante: "",
+      tallaPolera: ""
+    },
+
+    contactoPrincipal: {
+      aplica: true,
+      nombre: "",
+      relacion: "",
+      relacionBase: "",
+      telefono: cleanText(p.telefono || ""),
+      celular: cleanText(p.telefono || ""),
+      esWhatsapp: true,
+      whatsappAlternativo: "",
+      correo: normalizeEmail(p.email || "")
+    },
+
+    contactoSecundario: {
+      aplica: false,
+      nombre: "",
+      relacion: "",
+      relacionBase: "",
+      telefono: "",
+      celular: "",
+      correo: "",
+      esWhatsapp: false,
+      whatsappAlternativo: ""
+    },
+
+    documentoIdentidad: {
+      aplica: !!rutInfo.rut,
+      nombreCoincideDocumento: "si",
+      nombresDocumento: "",
+      primerApellidoDocumento: "",
+      segundoApellidoDocumento: "",
+      sexoDocumento: genero,
+      declaraActualizacionDocumento: false
+    },
+
+    emergencia: {
+      nombre: "",
+      relacion: "",
+      relacionBase: "",
+      telefono: "",
+      esWhatsapp: false,
+      whatsappAlternativo: ""
+    },
+
+    emergenciaSecundaria: {
+      aplica: false,
+      nombre: "",
+      relacion: "",
+      relacionBase: "",
+      telefono: "",
+      esWhatsapp: false,
+      whatsappAlternativo: ""
+    },
+
+    profesor: {
+      aplica: esProfesor,
+      tipoProfesor: "",
+      tipoProfesorBase: "",
+      tipoProfesorOtro: "",
+      interesConoceRaitrai: false
+    },
+
+    adultoAcompanante: {
+      aplica: esAcompanante,
+      relacionCurso: "",
+      relacionCursoBase: "",
+      relacionCursoOtro: "",
+      estudianteRelacionado: "",
+      estudianteRelacionadoNombres: "",
+      estudianteRelacionadoPrimerApellido: "",
+      estudianteRelacionadoSegundoApellido: "",
+      acompananteTieneHijosViaje: "",
+      interesConoceRaitrai: false
+    },
+
+    adultoCompromiso: {
+      aplica: !esEstudiante,
+      aceptaCompromiso: false,
+      observaciones: ""
+    },
+
+    salud: {},
+
+    privacidad: {
+      estado: "activa",
+      anonimizada: false,
+      eliminada: false,
+      motivo: ""
+    },
+
+    sistemaPagos: {
+      origen: "importado_desde_pagos",
+      pasajeroId: p.pasajero_id || "",
+      viaja: Number(p.viaja) === 1,
+      bloqueado: Number(p.bloqueado) === 1,
+      tieneCredencial: Number(p.tiene_credencial) === 1,
+      tipoPago: p.tipo_pago || "",
+      ocupacionCategoria: p.ocupacion_categoria || "",
+      importadoAtCliente: new Date().toISOString()
+    },
+
+    meta: {
+      canal: "sistema_pagos",
+      estado: "precargado_desde_pagos",
+      requiereCompletarNominaFinal: true,
+      fechaInscripcion: new Date().toISOString(),
+      fechaFormularioCliente: new Date().toISOString(),
+      versionFormulario: 4,
+      creadoDesde: "importacion_consola_grupo_js"
+    }
+  };
+}
+
+async function buscarGrupoPorNumeroNegocio(numeroNegocio) {
+  const n = String(numeroNegocio || "").trim();
+
+  const intentos = [
+    query(collection(db, "ventas_cotizaciones"), where("numeroNegocio", "==", n)),
+    query(collection(db, "ventas_cotizaciones"), where("numeroNegocio", "==", Number(n))),
+    query(collection(db, "ventas_cotizaciones"), where("ficha.numeroNegocio", "==", n)),
+    query(collection(db, "ventas_cotizaciones"), where("ficha.numeroNegocio", "==", Number(n)))
+  ];
+
+  for (const qRef of intentos) {
+    const snap = await getDocs(qRef);
+    if (!snap.empty) {
+      const d = snap.docs[0];
+      return { docId: d.id, data: d.data() || {} };
+    }
+  }
+
+  throw new Error(`No encontré grupo con numeroNegocio ${n}`);
+}
+
+async function consultarNominaPagos(numeroNegocio) {
+  const url = `${API_PAGOS_DETALLE_URL}?modo=detalle&numeroNegocio=${encodeURIComponent(numeroNegocio)}`;
+  const res = await fetch(url);
+
+  if (!res.ok) {
+    throw new Error(`Error consultando pagos HTTP ${res.status}`);
+  }
+
+  const data = await res.json();
+  const pasajeros = data?.nominas?.data?.pasajeros || [];
+
+  return pasajeros.map((x) => x.pasajero || {}).filter((p) => p && Object.keys(p).length);
+}
+
+window.importarNominaPagosPorNumeroNegocio = async function (numeroNegocio, options = {}) {
+  const dryRun = options.dryRun !== false;
+
+  const grupo = await buscarGrupoPorNumeroNegocio(numeroNegocio);
+  const pasajeros = await consultarNominaPagos(numeroNegocio);
+
+  const resultado = {
+    numeroNegocio: String(numeroNegocio),
+    groupDocId: grupo.docId,
+    totalPagos: pasajeros.length,
+    creados: 0,
+    existentes: 0,
+    omitidosSinRut: 0,
+    dryRun,
+    detalle: []
+  };
+
+  for (const p of pasajeros) {
+    const rutInfo = formatearRutDesdePagos(p.rut || "");
+
+    if (!rutInfo.rut) {
+      resultado.omitidosSinRut += 1;
+      resultado.detalle.push({
+        accion: "omitido_sin_rut",
+        nombre: `${p.nombres || ""} ${p.apellidos || ""}`.trim()
+      });
+      continue;
+    }
+
+    const docId = rutInfo.documentoNormalizado;
+    const ref = doc(db, "ventas_cotizaciones", grupo.docId, "inscripciones", docId);
+    const snap = await getDoc(ref);
+
+    if (snap.exists()) {
+      resultado.existentes += 1;
+      resultado.detalle.push({
+        accion: "ya_existia",
+        docId,
+        rut: rutInfo.rut,
+        nombre: `${p.nombres || ""} ${p.apellidos || ""}`.trim()
+      });
+      continue;
+    }
+
+    const payload = buildPayloadInscripcionDesdePagos(p, grupo.data, grupo.docId);
+
+    resultado.detalle.push({
+      accion: dryRun ? "simular_creacion" : "creado",
+      docId,
+      rut: rutInfo.rut,
+      nombre: payload.identificacion.nombreCompleto,
+      tipoViajante: payload.tipoViajante,
+      correo: payload.contactoPrincipal.correo,
+      telefono: payload.contactoPrincipal.telefono,
+      viaja: payload.sistemaPagos.viaja
+    });
+
+    if (!dryRun) {
+      await setDoc(ref, {
+        ...payload,
+        creadoPor: getDisplayName(state.effectiveUser),
+        creadoPorCorreo: state.effectiveEmail,
+        creadoAt: serverTimestamp(),
+        actualizadoPor: getDisplayName(state.effectiveUser),
+        actualizadoPorCorreo: state.effectiveEmail,
+        actualizadoAt: serverTimestamp()
+      });
+    }
+
+    resultado.creados += 1;
+  }
+
+  console.table(resultado.detalle);
+  console.log("RESULTADO IMPORTACIÓN:", resultado);
+
+  if (!dryRun) {
+    await loadInscripciones();
+    renderInscripcionPasajerosPanel();
+    syncButtons();
+    showSaveNotice(`Importación lista: ${resultado.creados} creados, ${resultado.existentes} ya existían.`);
+  }
+
+  return resultado;
+};
