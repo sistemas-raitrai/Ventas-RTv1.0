@@ -111,6 +111,18 @@ async function cargarDetalleGrupo(numeroNegocio) {
 
     detalleActual = data;
 
+    console.log("NOMINAS COMPLETO:", JSON.stringify(data?.nominas, null, 2));
+    console.log("SALDOS COMPLETO:", JSON.stringify(data?.saldos, null, 2));
+    
+    const primerPasajeroNomina = data?.nominas?.data?.pasajeros?.[0]?.pasajero;
+    const primerPasajeroSaldo = data?.saldos?.data?.detalle_pasajeros?.[0];
+    
+    console.log("CAMPOS NOMINA:", Object.keys(primerPasajeroNomina || {}));
+    console.log("CAMPOS SALDOS:", Object.keys(primerPasajeroSaldo || {}));
+    
+    console.log("PRIMER PASAJERO NOMINA:", JSON.stringify(primerPasajeroNomina, null, 2));
+    console.log("PRIMER PASAJERO SALDOS:", JSON.stringify(primerPasajeroSaldo, null, 2));
+
     const resumen = data?.saldos?.data?.resumen_grupo || {};
     const pasajeros =
       data?.nominas?.data?.pasajeros ||
