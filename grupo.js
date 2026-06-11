@@ -1896,6 +1896,11 @@ function renderInscripcionPasajerosPanel() {
       </div>
 
       <div class="grupo-kpi">
+        <div class="info-label">Nómina final</div>
+        <div class="info-value">${escapeHtml(nominaFinalOperativa)}</div>
+      </div>
+
+      <div class="grupo-kpi">
         <div class="info-label">Nómina inicial</div>
         <div class="info-value">${escapeHtml(nominaInicial)}</div>
       </div>
