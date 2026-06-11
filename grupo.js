@@ -1675,7 +1675,7 @@ function getOrdenOperativoInscripcion(item = {}) {
   if (tipo === "nuevo_ingreso") return 5;
 
   // 3. Inscripción inicial / nómina final
-  if (tipo === "nomina_inicial" || tipo === "nomina_final") return 6;
+  if (tipo === "nomina_inicial" || tipo === "nomina_final" || tipo === "sistema_pagos") return 6;
 
   // 4. Otros
   if (tipo === "liberado") return 7;
@@ -1712,7 +1712,8 @@ function formatFechaFormularioTabla(value) {
 
 function getTipoInscripcionLabel(value = "") {
   const key = normalizeSearchLocal(value);
-
+  
+  if (key === "sistema_pagos") return "Sistema de Pagos";
   if (key === "nomina_inicial") return "Inscripción inicial";
   if (key === "nomina_final") return "Nómina final / ficha médica";
 
