@@ -1050,8 +1050,30 @@ function puedeExportarCsvInscripciones() {
   return puedeOperarListaEsperaAdministrativa();
 }
 
+function getOrigenNominaGrupo() {
+  const origenGuardado = normalizeSearchLocal(
+    state.group?.origenNomina ||
+    state.group?.nominaOrigen ||
+    state.group?.inscripcion?.origenNomina ||
+    ""
+  );
+
+  if (origenGuardado === "sistema_pagos") return "sistema_pagos";
+  if (origenGuardado === "inscripcion_inicial") return "inscripcion_inicial";
+
+  if (getInscripcionesSistemaPagos().length > 0) return "sistema_pagos";
+
+  return "inscripcion_inicial";
+}
+
 function grupoVieneSistemaAntiguo() {
-  return grupoTieneFirmaVendedor(state.group) || getInscripcionesSistemaPagos().length > 0;
+  return getOrigenNominaGrupo() === "sistema_pagos";
+}
+
+function getOrigenNominaLabel() {
+  return getOrigenNominaGrupo() === "sistema_pagos"
+    ? "Sistema de Pagos"
+    : "Inscripción inicial";
 }
 
 function getFasesCerradasInscripcion() {
@@ -1768,13 +1790,31 @@ function getInscripcionesSistemaPagos() {
   );
 }
 
-function getEstadoListaPasajerosLabel() {
-  if (!state.inscripciones.length) {
-    return "Sin inscripciones";
-  }
+function fichaMedicaPendiente(item = {}) {
+  const tipo = normalizeSearchLocal(getInscripcionTipoReal(item));
 
-  if (getInscripcionesSistemaPagos().length > 0) {
-    return "Debe enviar link de Ficha Médica";
+  if (tipo === "sistema_pagos") return true;
+
+  return item.fichaMedicaCompleta === false ||
+    item.fichaMedicaEstado === "pendiente" ||
+    item.nominaFinalCompleta === false;
+}
+
+function getInscripcionesConFichaMedicaPendiente() {
+  return state.inscripciones.filter((item) =>
+    esNominaFinalOperativa(item) && fichaMedicaPendiente(item)
+  );
+}
+
+function getInscripcionesConFichaMedicaCompleta() {
+  return state.inscripciones.filter((item) =>
+    esNominaFinalOperativa(item) && !fichaMedicaPendiente(item)
+  );
+}
+
+function getEstadoListaPasajerosLabel() {
+  if (!state.inscripciones.length && !state.group?.inscripcionHabilitada) {
+    return "Sin inscripciones";
   }
 
   const estado = normalizeSearchLocal(getInscripcionEstadoActual());
@@ -1785,7 +1825,7 @@ function getEstadoListaPasajerosLabel() {
   }
 
   if (estado === "nomina_final") {
-    return abierta ? "Nómina final abierta" : "Nómina final cerrada";
+    return abierta ? "Nómina final / ficha médica abierta" : "Nómina final / ficha médica cerrada";
   }
 
   if (estado === "nuevos") {
@@ -1825,13 +1865,14 @@ function renderInscripcionPasajerosPanel() {
 
   if (!visible) return;
 
-  const total = state.inscripciones.length;
   const totalBruto = state.inscripciones.length;
   const capacidad = Number(state.group?.cantidadGrupo || 0);
   
   const nominaFinalOperativa = state.inscripciones.filter(esNominaFinalOperativa).length;
   const nominaInicial = getInscripcionesNominaInicial().length;
-  const sinFichaMedica = getInscripcionesSistemaPagos().length;
+  
+  const fichaPendiente = getInscripcionesConFichaMedicaPendiente().length;
+  const fichaCompleta = getInscripcionesConFichaMedicaCompleta().length;
   
   const nuevosConfirmados = state.inscripciones.filter((x) => {
     const tipo = normalizeSearchLocal(getInscripcionTipoReal(x));
@@ -1938,18 +1979,23 @@ function renderInscripcionPasajerosPanel() {
   box.innerHTML = `
     <div class="grupo-kpi-list">
       <div class="grupo-kpi">
-        <div class="info-label">Estado lista pasajeros</div>
+        <div class="info-label">Origen nómina</div>
+        <div class="info-value">${escapeHtml(getOrigenNominaLabel())}</div>
+      </div>
+    
+      <div class="grupo-kpi">
+        <div class="info-label">Estado inscripción</div>
         <div class="info-value">${escapeHtml(getEstadoListaPasajerosLabel())}</div>
       </div>
     
       <div class="grupo-kpi">
         <div class="info-label">Total inscritos</div>
-        <div class="info-value">${escapeHtml(`${nominaFinalOperativa} Total que viajan / ${totalBruto} Total Inscritos`)}</div>
+        <div class="info-value">${escapeHtml(`${nominaFinalOperativa} viajan / ${totalBruto} inscritos`)}</div>
       </div>
     
       <div class="grupo-kpi">
-        <div class="info-label">Sin ficha médica</div>
-        <div class="info-value">${escapeHtml(`${sinFichaMedica} pasajeros`)}</div>
+        <div class="info-label">Ficha médica</div>
+        <div class="info-value">${escapeHtml(`${fichaCompleta} completas / ${fichaPendiente} pendientes`)}</div>
       </div>
     
       <div class="grupo-kpi">
@@ -1971,17 +2017,6 @@ function renderInscripcionPasajerosPanel() {
         <div class="info-label">Liberados</div>
         <div class="info-value">${escapeHtml(`${liberadosUsados} confirmados${liberadosPermitidos ? ` de ${liberadosPermitidos} cupos liberados` : ""}`)}</div>
       </div>
-    </div>
-
-    ${tabla}
-
-    <div class="inscripcion-traza">
-      <div><strong>Link principal:</strong> ${state.group?.inscripcionHabilitada ? "Habilitado" : "No habilitado"}</div>
-      <div><strong>Estado inscripción:</strong> ${escapeHtml(getInscripcionFaseLabel(estadoInscripcion))}</div>
-      <div><strong>Generado por:</strong> ${escapeHtml(linkInfo.actualizadoPor || linkInfo.linkGeneradoPor || state.group?.inscripcionLinkGeneradoPor || "—")}</div>
-      <div><strong>Fecha generación:</strong> ${escapeHtml(formatDateTime(linkInfo.actualizadoAt || linkInfo.linkGeneradoAt || state.group?.fechaAperturaInscripcion))}</div>
-      <div><strong>Link liberados:</strong> ${state.group?.linkLiberadosActivo ? "Habilitado" : "No habilitado"}</div>
-      <div><strong>Liberados generado por:</strong> ${escapeHtml(liberadosInfo.actualizadoPor || liberadosInfo.linkGeneradoPor || "—")}</div>
     </div>
   `;
 }
