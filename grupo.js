@@ -3893,6 +3893,10 @@ function getFichaMainButtonMode() {
    NÓMINA INICIAL · SISTEMA DE PAGOS
 ========================================================= */
 
+function esInscripcionSistemaPagos(item = {}) {
+  return normalizeSearchLocal(getInscripcionTipoReal(item)) === "sistema_pagos";
+}
+
 function getInscripcionesNominaInicial() {
   return state.inscripciones.filter((item) => {
     const tipo = normalizeSearchLocal(getInscripcionTipoReal(item));
@@ -3901,6 +3905,7 @@ function getInscripcionesNominaInicial() {
     const label = normalizeSearchLocal(getEstadoOperativoInscripcionLabel(item));
 
     return (
+      tipo === "sistema_pagos" ||
       tipo === "nomina_inicial" ||
       tipo === "inscripcion_inicial" ||
       tipo === "inscripcion_comercial" ||
@@ -4146,14 +4151,27 @@ async function enviarNominaInicialPagos() {
         String(d.inscripcionId)
       );
 
-      await updateDoc(inscRef, {
-        "sistemaPagos.nominaInicialCargada": true,
-        "sistemaPagos.nominaInicialCargadaAt": serverTimestamp(),
-        "sistemaPagos.nominaInicialCargadaPor": getDisplayName(state.effectiveUser),
-        "sistemaPagos.nominaInicialCargadaPorCorreo": state.effectiveEmail,
-        "sistemaPagos.correoPagosBatchId": batchId,
-        "sistemaPagos.correoPagosDestinatario": d.correo
-      });
+      const esSistemaPagos = esInscripcionSistemaPagos(d.item);
+      
+      const patchCorreoPagos = esSistemaPagos
+        ? {
+            "sistemaPagos.correoPagosEnviado": true,
+            "sistemaPagos.correoPagosEnviadoAt": serverTimestamp(),
+            "sistemaPagos.correoPagosEnviadoPor": getDisplayName(state.effectiveUser),
+            "sistemaPagos.correoPagosEnviadoPorCorreo": state.effectiveEmail,
+            "sistemaPagos.correoPagosBatchId": batchId,
+            "sistemaPagos.correoPagosDestinatario": d.correo
+          }
+        : {
+            "sistemaPagos.nominaInicialCargada": true,
+            "sistemaPagos.nominaInicialCargadaAt": serverTimestamp(),
+            "sistemaPagos.nominaInicialCargadaPor": getDisplayName(state.effectiveUser),
+            "sistemaPagos.nominaInicialCargadaPorCorreo": state.effectiveEmail,
+            "sistemaPagos.correoPagosBatchId": batchId,
+            "sistemaPagos.correoPagosDestinatario": d.correo
+          };
+      
+      await updateDoc(inscRef, patchCorreoPagos);
 
       enviados += 1;
       setNominaPagosProgress(enviados, validos.length);
@@ -5311,6 +5329,7 @@ window.repararHistorialSolicitudesFicha = async function () {
 
 function getTipoInscripcionEditableOptions() {
   return [
+    { value: "sistema_pagos", label: "Sistema de Pagos" },
     { value: "nomina_inicial", label: "Inscripción inicial" },
     { value: "nomina_final", label: "Nómina final / ficha médica" },
     { value: "nuevo_ingreso", label: "Nuevo ingreso" },
