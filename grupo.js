@@ -5250,16 +5250,10 @@ function syncButtons() {
   }
 
   if (btnNominaInicialPagos) {
-    const rol = String(state.effectiveUser?.rol || "").toLowerCase();
-    const esAdmin = rol === "admin";
     const puedeGestionarPagos = puedeOperarListaEsperaAdministrativa();
-    const tieneNominaInicial = getInscripcionesNominaInicial().length > 0;
   
     btnNominaInicialPagos.classList.toggle("hidden", !puedeGestionarPagos);
-  
-    // Admin lo ve y puede apretarlo siempre.
-    // Los demás solo si hay nómina inicial.
-    btnNominaInicialPagos.disabled = !puedeGestionarPagos || (!esAdmin && !tieneNominaInicial);
+    btnNominaInicialPagos.disabled = !puedeGestionarPagos;
   
     const estadoPagos = getEstadoNominaInicialPagos();
   
