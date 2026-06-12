@@ -3739,11 +3739,16 @@ function soloDigitos(value = "") {
 }
 
 function normalizarRutExport(value = "") {
-  return String(value || "")
+  const limpio = String(value || "")
     .trim()
     .replace(/\./g, "")
+    .replace(/-/g, "")
     .replace(/\s+/g, "")
     .toUpperCase();
+
+  if (limpio === "—") return "";
+
+  return limpio;
 }
 
 function normalizarTipoPasajeroExport(item = {}) {
