@@ -3897,6 +3897,26 @@ function esInscripcionSistemaPagos(item = {}) {
   return normalizeSearchLocal(getInscripcionTipoReal(item)) === "sistema_pagos";
 }
 
+function getCorreoVendedoraGrupoParaCopia() {
+  const vendedor = normalizeSearchLocal(state.group?.vendedora || "");
+
+  const MAP_VENDEDORAS_CORREO = [
+    { claves: ["giselle"], correo: "griveros@raitrai.cl" },
+    { claves: ["elias"], correo: "elagos@raitrai.cl" },
+    { claves: ["claudio"], correo: "crojas@raitrai.cl" },
+    { claves: ["alejandra"], correo: "aflores@raitrai.cl" },
+    { claves: ["orietta"], correo: "orietta@raitrai.cl" },
+    { claves: ["carolina", "carola"], correo: "ccayoso@raitrai.cl" },
+    { claves: ["juan pablo", "juanpablo"], correo: "jpino@raitrai.cl" }
+  ];
+
+  const match = MAP_VENDEDORAS_CORREO.find((item) =>
+    item.claves.some((clave) => vendedor.includes(normalizeSearchLocal(clave)))
+  );
+
+  return match?.correo || "";
+}
+
 function getInscripcionesNominaInicial() {
   return state.inscripciones.filter((item) => {
     const tipo = normalizeSearchLocal(getInscripcionTipoReal(item));
@@ -4117,6 +4137,9 @@ async function enviarNominaInicialPagos() {
 
         destinatario: d.correo,
         to: d.correo,
+        cc: getCorreoVendedoraGrupoParaCopia(),
+        correoVendedoraGrupo: getCorreoVendedoraGrupoParaCopia(),
+        vendedoraGrupo: cleanText(state.group?.vendedora || ""),
         asunto,
         subject: asunto,
         cuerpo,
