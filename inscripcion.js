@@ -27,6 +27,12 @@ const btnLimpiar = $("btnLimpiar");
 const btnComenzar = $("btnComenzar");
 const pantallaBienvenida = $("pantallaBienvenida");
 
+const cardValidacionNominaFinal = $("cardValidacionNominaFinal");
+const rutValidacionNumero = $("rutValidacionNumero");
+const rutValidacionDv = $("rutValidacionDv");
+const rutValidacionHint = $("rutValidacionHint");
+const btnValidarRutNominaFinal = $("btnValidarRutNominaFinal");
+
 const chipGrupo = $("chipGrupo");
 const chipColegio = $("chipColegio");
 const chipCurso = $("chipCurso");
@@ -137,6 +143,10 @@ let tokenUrl = "";
 let faseUrl = "normal";
 let correoCambios = CORREO_ADMIN;
 
+let pasajeroSistemaPagosValidado = null;
+let pasajeroSistemaPagosDocId = "";
+let nominaFinalRutValidado = false;
+
 // -----------------------------------------------------------------------------
 // INICIO
 // -----------------------------------------------------------------------------
@@ -244,10 +254,21 @@ async function cargarGrupo() {
 function conectarEventos() {
   btnComenzar?.addEventListener("click", () => {
     pantallaBienvenida?.classList.add("hidden");
-    form?.classList.remove("hidden");
+  
+    if (faseUrl === "nomina_final") {
+      cardValidacionNominaFinal?.classList.remove("hidden");
+    } else {
+      form?.classList.remove("hidden");
+    }
+  
     window.scrollTo({ top: 0, behavior: "smooth" });
     actualizarProgreso();
   });
+  
+  btnValidarRutNominaFinal?.addEventListener("click", validarRutNominaFinal);
+  
+  rutValidacionNumero?.addEventListener("input", normalizarRutValidacion);
+  rutValidacionDv?.addEventListener("input", normalizarRutValidacion);
 
   form?.addEventListener("submit", onSubmit);
   btnLimpiar?.addEventListener("click", onLimpiar);
@@ -779,6 +800,156 @@ function onRutInput() {
   }
 }
 
+function normalizarRutValidacion() {
+  if (!rutValidacionNumero || !rutValidacionDv) return;
+
+  rutValidacionNumero.value = limpiarRutNumero(rutValidacionNumero.value).slice(0, 8);
+  rutValidacionDv.value = limpiarTexto(rutValidacionDv.value)
+    .toUpperCase()
+    .replace(/[^0-9K]/g, "")
+    .slice(0, 1);
+
+  if (rutValidacionHint) {
+    rutValidacionHint.textContent = "Ingrese el RUT para buscarlo en la nómina base del grupo.";
+  }
+}
+
+function getRutValidacionNormalizado() {
+  const numero = limpiarRutNumero(rutValidacionNumero?.value || "");
+  const dv = limpiarTexto(rutValidacionDv?.value || "").toUpperCase();
+
+  if (!numero || !dv) return "";
+
+  if (!/^\d{7,8}$/.test(numero)) return "";
+
+  if (dv !== calcularDvRut(numero)) return "";
+
+  return normalizarRutDocumento(numero, dv);
+}
+
+function fichaMedicaYaCompletaPublica(item = {}) {
+  return (
+    item.fichaMedicaCompleta === true ||
+    item.nominaFinalCompleta === true ||
+    item.fichaMedicaEstado === "completa" ||
+    item.fichaMedicaEstado === "completada"
+  );
+}
+
+async function validarRutNominaFinal() {
+  ocultarMensaje();
+
+  const documentoNormalizado = getRutValidacionNormalizado();
+
+  if (!documentoNormalizado) {
+    mostrarMensaje("error", "Debe ingresar un RUT válido.");
+    return;
+  }
+
+  btnValidarRutNominaFinal.disabled = true;
+  btnValidarRutNominaFinal.textContent = "Validando...";
+
+  try {
+    const ref = doc(
+      db,
+      "ventas_cotizaciones",
+      idGrupo,
+      "inscripciones",
+      documentoNormalizado
+    );
+
+    const snap = await getDoc(ref);
+
+    if (!snap.exists()) {
+      mostrarMensaje(
+        "error",
+        "No encontramos este RUT en la nómina base del grupo. Verifique el número ingresado o comuníquese con Administración."
+      );
+      return;
+    }
+
+    const data = snap.data() || {};
+
+    if (data.tipoInscripcion !== "sistema_pagos") {
+      mostrarMensaje(
+        "error",
+        "Este RUT no corresponde a un pasajero importado desde Sistema de Pagos para este grupo."
+      );
+      return;
+    }
+
+    if (fichaMedicaYaCompletaPublica(data)) {
+      mostrarMensaje(
+        "error",
+        "La ficha médica de este pasajero ya fue completada. Si necesita corregir información, comuníquese con Administración."
+      );
+      return;
+    }
+
+    pasajeroSistemaPagosValidado = data;
+    pasajeroSistemaPagosDocId = snap.id;
+    nominaFinalRutValidado = true;
+
+    precargarFormularioDesdeSistemaPagos(data);
+
+    cardValidacionNominaFinal?.classList.add("hidden");
+    form?.classList.remove("hidden");
+
+    mostrarMensaje(
+      "ok",
+      `Pasajero validado correctamente: <strong>${escapeHtml(data?.identificacion?.nombreCompleto || "RUT encontrado")}</strong>. Ahora puede completar la ficha médica.`
+    );
+
+    window.scrollTo({ top: 0, behavior: "smooth" });
+    aplicarEstadoUI();
+    actualizarProgreso();
+  } catch (error) {
+    console.error("Error validando RUT nómina final:", error);
+    mostrarMensaje("error", "No fue posible validar el RUT. Intente nuevamente.");
+  } finally {
+    btnValidarRutNominaFinal.disabled = false;
+    btnValidarRutNominaFinal.textContent = "Validar RUT";
+  }
+}
+
+function precargarFormularioDesdeSistemaPagos(item = {}) {
+  const id = item.identificacion || {};
+  const contacto = item.contactoPrincipal || {};
+
+  if ($("tipoIdentificacion")) $("tipoIdentificacion").value = "rut";
+  if ($("rutNumero")) $("rutNumero").value = id.rutNumero || "";
+  if ($("rutDv")) $("rutDv").value = id.rutDv || "";
+
+  if ($("nombres")) $("nombres").value = id.nombres || "";
+  if ($("primerApellido")) $("primerApellido").value = id.primerApellido || "";
+  if ($("segundoApellido")) $("segundoApellido").value = id.segundoApellido || "";
+
+  if ($("fechaNacimiento")) $("fechaNacimiento").value = id.fechaNacimiento || "";
+  if ($("genero")) $("genero").value = id.genero || id.generoFinal || "";
+
+  if ($("correoViajante") && id.correoViajante) {
+    $("correoViajante").value = id.correoViajante;
+  }
+
+  if ($("contactoPrincipalCorreo") && contacto.correo) {
+    $("contactoPrincipalCorreo").value = contacto.correo;
+  }
+
+  if ($("contactoPrincipalTelefono") && contacto.telefono) {
+    $("contactoPrincipalTelefono").value = contacto.telefono;
+  }
+
+  const tipo = item.tipoViajante || item.tipoParticipacion || "";
+
+  if (tipo) {
+    const radio = document.querySelector(`input[name="tipoViajante"][value="${tipo}"]`);
+    if (radio) radio.checked = true;
+  }
+
+  const coincide = document.querySelector(`input[name="nombreCoincideDocumento"][value="si"]`);
+  if (coincide) coincide.checked = true;
+}
+
 // -----------------------------------------------------------------------------
 // SUBMIT
 // -----------------------------------------------------------------------------
@@ -792,7 +963,13 @@ async function onSubmit(event) {
   }
 
   aplicarEstadoUI();
-
+  
+  if (faseUrl === "nomina_final" && !nominaFinalRutValidado) {
+    mostrarMensaje("error", "Primero debe validar el RUT del pasajero en la nómina base del grupo.");
+    window.scrollTo({ top: 0, behavior: "smooth" });
+    return;
+  }
+  
   const errores = validarFormulario();
 
   if (errores.length) {
@@ -1347,6 +1524,12 @@ function construirPayloadBase() {
     tipoInscripcion: contextoFormulario.tipoInscripcion,
     tipoInscripcionLabel: contextoFormulario.tipoInscripcionLabel,
     estadoCupo: contextoFormulario.estadoCupo,
+
+    inscripcionSistemaPagosDocId: pasajeroSistemaPagosDocId || "",
+    actualizaInscripcionExistente: faseUrl === "nomina_final" && !!pasajeroSistemaPagosDocId,
+    fichaMedicaCompleta: faseUrl === "nomina_final",
+    nominaFinalCompleta: faseUrl === "nomina_final",
+    fichaMedicaEstado: faseUrl === "nomina_final" ? "completa" : "pendiente",
 
     requiereArchivosEspeciales: requiereCarnetIdentidad() || requiereComprobantePago(),
     requiereCarnetIdentidad: requiereCarnetIdentidad(),
