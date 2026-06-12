@@ -455,9 +455,12 @@ function mapClienteDoc(id, data) {
     subtitleParts,
     hasAlias: !!aliasGrupo,
     avatarBaseText: colegio || nombreGrupo || nombreApoderado || displayTitle,
-    searchIndex: normalizeText([
+    searchIndex: buildSearchIndex([
       id,
-      data.idGrupo || id,
+      data.idGrupo || "",
+      data.numeroNegocio || "",
+      data.numero_negocio || "",
+      data.codigo || "",
       aliasGrupo,
       nombreApoderado,
       nombreGrupo,
@@ -467,7 +470,7 @@ function mapClienteDoc(id, data) {
       vendedora,
       vendedoraCorreo,
       anoViaje
-    ].join(" "))
+    ])
   };
 }
 
@@ -1231,6 +1234,20 @@ function buildGrupoSortTitle(displayTitle = "", colegioFallback = "") {
     .replace(/\s+(\d{1,2}[a-zñ]*\s*\(\d{4}\)\s*(?:-|–|—)?\s*)+$/i, "")
     .replace(/\s+/g, " ")
     .trim();
+}
+
+function buildSearchIndex(values = []) {
+  const raw = values
+    .filter((v) => v !== null && v !== undefined)
+    .map((v) => String(v))
+    .join(" ");
+
+  const normalized = normalizeText(raw);
+
+  // Versión solo números para que encuentre 1596 aunque venga como "N° 1596" o "1596-2026"
+  const numericOnly = raw.replace(/\D/g, " ");
+
+  return normalizeText(`${normalized} ${numericOnly}`);
 }
 
 function normalizeText(value) {
