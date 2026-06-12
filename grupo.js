@@ -1668,6 +1668,12 @@ function getEstadoOperativoInscripcionLabel(item = {}) {
     return "Lista de espera confirmada";
   }
 
+  if (tipo === "sistema_pagos") {
+    return fichaMedicaPendiente(item)
+      ? "Sistema de Pagos · Ficha pendiente"
+      : "Sistema de Pagos · Ficha completa";
+  }
+  
   return getTipoInscripcionLabel(tipo);
 }
 
@@ -1814,13 +1820,12 @@ function getInscripcionesSistemaPagos() {
 }
 
 function fichaMedicaPendiente(item = {}) {
-  const tipo = normalizeSearchLocal(getInscripcionTipoReal(item));
-
-  if (tipo === "sistema_pagos") return true;
-
-  return item.fichaMedicaCompleta === false ||
-    item.fichaMedicaEstado === "pendiente" ||
-    item.nominaFinalCompleta === false;
+  return !(
+    item.fichaMedicaCompleta === true ||
+    item.nominaFinalCompleta === true ||
+    item.fichaMedicaEstado === "completa" ||
+    item.fichaMedicaEstado === "completada"
+  );
 }
 
 function getInscripcionesConFichaMedicaPendiente() {
