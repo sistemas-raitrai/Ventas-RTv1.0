@@ -4116,7 +4116,21 @@ function getDestinatarioNominaInicial(item = {}) {
 }
 
 function buildDestinatariosNominaInicial() {
-  return getInscripcionesNominaInicial().map(getDestinatarioNominaInicial);
+  const base = [
+    ...getInscripcionesNominaInicial(),
+    ...getInscripcionesSistemaPagos()
+  ];
+
+  const vistos = new Set();
+
+  return base
+    .filter((item) => {
+      const key = item.id || getInscripcionDocumento(item);
+      if (vistos.has(key)) return false;
+      vistos.add(key);
+      return true;
+    })
+    .map(getDestinatarioNominaInicial);
 }
 
 function buildAsuntoNominaInicialPagos() {
