@@ -1944,7 +1944,7 @@ function renderInscripcionPasajerosPanel() {
     
       <div class="grupo-kpi">
         <div class="info-label">Total inscritos</div>
-        <div class="info-value">${escapeHtml(`${nominaFinalOperativa} nómina final / ${totalBruto} nómina en bruto`)}</div>
+        <div class="info-value">${escapeHtml(`${nominaFinalOperativa} Total que viajan / ${totalBruto} Total Inscritos`)}</div>
       </div>
     
       <div class="grupo-kpi">
@@ -3978,12 +3978,17 @@ function getInscripcionesNominaInicial() {
     const label = normalizeSearchLocal(getEstadoOperativoInscripcionLabel(item));
 
     return (
-      tipo === "sistema_pagos" ||
       tipo === "nomina_inicial" ||
       tipo === "inscripcion_inicial" ||
       tipo === "inscripcion_comercial" ||
-      fase === "normal" ||
-      estado === "normal" ||
+      (
+        tipo !== "sistema_pagos" &&
+        fase === "normal"
+      ) ||
+      (
+        tipo !== "sistema_pagos" &&
+        estado === "normal"
+      ) ||
       label === "inscripcion_inicial"
     );
   });
