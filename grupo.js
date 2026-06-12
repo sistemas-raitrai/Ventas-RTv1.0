@@ -1762,10 +1762,23 @@ function getTipoInscripcionClass(item = {}) {
 }
 
 function getInscripcionTipoReal(item = {}) {
-  return (
-    item.tipoInscripcion ||
-    getTipoInscripcionFromFase(item.faseInscripcion || item.estadoInscripcion || "normal")
-  );
+  const raw = item.tipoInscripcion || "";
+  const key = normalizeSearchLocal(raw).replace(/\s+/g, "_");
+
+  if (key === "inscripcion_inicial") return "nomina_inicial";
+  if (key === "nomina_inicial") return "nomina_inicial";
+  if (key === "nomina_final") return "nomina_final";
+  if (key === "nomina_final_ficha_medica") return "nomina_final";
+  if (key === "sistema_de_pagos") return "sistema_pagos";
+  if (key === "sistema_pagos") return "sistema_pagos";
+  if (key === "nuevo_ingreso") return "nuevo_ingreso";
+  if (key === "nuevo_ingreso_confirmado") return "nuevo_ingreso_confirmado";
+  if (key === "lista_espera") return "lista_espera";
+  if (key === "lista_espera_pagada") return "lista_espera_pagada";
+  if (key === "lista_espera_confirmada") return "lista_espera_confirmada";
+  if (key === "liberado" || key === "cupo_liberado") return "liberado";
+
+  return getTipoInscripcionFromFase(item.faseInscripcion || item.estadoInscripcion || "normal");
 }
 
 function esNominaFinalOperativa(item = {}) {
