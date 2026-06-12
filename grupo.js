@@ -4080,12 +4080,15 @@ function openNominaInicialPagosModal() {
     return;
   }
 
+  const correoVendedoraCopia = getCorreoVendedoraGrupoParaCopia();
+  
   setText(
     "nominaPagosResumen",
     `Grupo: ${state.group?.aliasGrupo || state.group?.nombreGrupo || state.group?.colegio || state.groupId}
-Participantes inscripción inicial: ${destinatarios.length}
-Correos válidos: ${validos.length}
-Sin correo: ${sinCorreo.length}`
+  Participantes inscripción inicial: ${destinatarios.length}
+  Correos válidos: ${validos.length}
+  Sin correo: ${sinCorreo.length}
+  Copia a vendedora: ${correoVendedoraCopia || "No detectada"}`
   );
 
   setFormValue("nominaPagosAsunto", buildAsuntoNominaInicialPagos());
