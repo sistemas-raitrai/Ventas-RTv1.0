@@ -508,6 +508,35 @@
 
     <div id="msgBox" class="notice hidden"></div>
 
+    <section id="cardValidacionNominaFinal" class="card hidden">
+      <h2>• Validación de pasajero</h2>
+      <div class="sub">
+        Para completar la Nómina Final / Ficha Médica, primero ingrese el RUT de la persona que viaja.
+      </div>
+    
+      <div class="form-grid">
+        <div class="field col-6">
+          <label>RUT del pasajero <span class="req">*</span></label>
+    
+          <div class="rut-linea">
+            <input id="rutValidacionNumero" type="text" inputmode="numeric" placeholder="12345678" />
+            <span class="rut-guion">-</span>
+            <input id="rutValidacionDv" type="text" maxlength="1" placeholder="K" />
+          </div>
+    
+          <div id="rutValidacionHint" class="hint">
+            Ingrese el RUT para buscarlo en la nómina base del grupo.
+          </div>
+        </div>
+    
+        <div class="field col-6" style="justify-content:flex-end;">
+          <button type="button" id="btnValidarRutNominaFinal" class="btn-primary">
+            Validar RUT
+          </button>
+        </div>
+      </div>
+    </section>
+
     <form id="formInscripcion" class="grid hidden" novalidate>
       <section class="card">
         <h2>• Tipo de participación en el viaje</h2>
