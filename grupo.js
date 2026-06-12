@@ -1051,7 +1051,7 @@ function puedeExportarCsvInscripciones() {
 }
 
 function grupoVieneSistemaAntiguo() {
-  return grupoTieneFirmaVendedor(state.group);
+  return grupoTieneFirmaVendedor(state.group) || getInscripcionesSistemaPagos().length > 0;
 }
 
 function getFasesCerradasInscripcion() {
