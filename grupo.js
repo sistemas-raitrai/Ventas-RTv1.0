@@ -3738,6 +3738,14 @@ function soloDigitos(value = "") {
   return String(value || "").replace(/\D/g, "");
 }
 
+function normalizarRutExport(value = "") {
+  return String(value || "")
+    .trim()
+    .replace(/\./g, "")
+    .replace(/\s+/g, "")
+    .toUpperCase();
+}
+
 function normalizarTipoPasajeroExport(item = {}) {
   const tipoRaw = item.tipoViajante || item.tipoParticipacion || "";
   const tipoKey = normalizeSearchLocal(tipoRaw);
@@ -3781,7 +3789,7 @@ function buildInscripcionesExportRows() {
   const rows = items.map((item, index) => ({
     "Numero": index + 1,
 
-    "1.- Rut": soloDigitos(getInscripcionDocumento(item)),
+    "1.- Rut": normalizarRutExport(getInscripcionDocumento(item)),
 
     "2.- Apellidos del Alumno": normalizarTextoExport(getInscripcionApellidos(item)),
 
