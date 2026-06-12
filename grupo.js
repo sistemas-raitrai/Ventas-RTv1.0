@@ -3760,10 +3760,25 @@ function normalizarNacionalidadExport(item = {}) {
   return partes[0];
 }
 
+function getCantidadLiberadosAnonimosExport() {
+  const raw =
+    state.group?.liberados ??
+    state.group?.cantidadLiberados ??
+    state.group?.ficha?.liberados ??
+    state.group?.ficha?.cantidadLiberados ??
+    0;
+
+  const numero = Number(String(raw).replace(",", "."));
+
+  if (!Number.isFinite(numero) || numero <= 0) return 0;
+
+  return Math.ceil(numero);
+}
+
 function buildInscripcionesExportRows() {
   const items = state.inscripciones.filter(esNominaFinalOperativa);
 
-  return items.map((item, index) => ({
+  const rows = items.map((item, index) => ({
     "Numero": index + 1,
 
     "1.- Rut": soloDigitos(getInscripcionDocumento(item)),
@@ -3794,6 +3809,36 @@ function buildInscripcionesExportRows() {
       ""
     )
   }));
+
+  const cantidadLiberadosAnonimos = getCantidadLiberadosAnonimosExport();
+
+  for (let i = 0; i < cantidadLiberadosAnonimos; i += 1) {
+    rows.push({
+      "Numero": rows.length + 1,
+
+      "1.- Rut": "",
+
+      "2.- Apellidos del Alumno": "",
+
+      "3.- Nombre del Alumno": `Apoderado ${i + 1}`,
+
+      "4.- Fecha Nacimiento": "",
+
+      "5.- Tipo Pasajero": "Adulto",
+
+      "6.- Nacionalidad": "",
+
+      "7.- Sexo": "",
+
+      "8.- Nombre del Apoderado": "",
+
+      "9.- Correo del Apoderado": "",
+
+      "10.- Celular Apoderado": ""
+    });
+  }
+
+  return rows;
 }
 
 function downloadTextFile(filename, content, mime = "text/plain;charset=utf-8") {
