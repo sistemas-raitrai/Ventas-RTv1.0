@@ -1751,13 +1751,52 @@ function esNominaFinalOperativa(item = {}) {
   const estadoCupo = normalizeSearchLocal(item.estadoCupo || "");
 
   return (
+    tipo === "nomina_inicial" ||
     tipo === "nomina_final" ||
+    tipo === "sistema_pagos" ||
     tipo === "nuevo_ingreso_confirmado" ||
     tipo === "lista_espera_confirmada" ||
     tipo === "liberado" ||
     (tipo === "nuevo_ingreso" && estadoCupo === "confirmado") ||
     (tipo === "lista_espera" && estadoCupo === "confirmado")
   );
+}
+
+function getInscripcionesSistemaPagos() {
+  return state.inscripciones.filter((item) =>
+    normalizeSearchLocal(getInscripcionTipoReal(item)) === "sistema_pagos"
+  );
+}
+
+function getEstadoListaPasajerosLabel() {
+  if (!state.inscripciones.length) {
+    return "Sin inscripciones";
+  }
+
+  if (getInscripcionesSistemaPagos().length > 0) {
+    return "A la espera de Nómina Final / Ficha Médica";
+  }
+
+  const estado = normalizeSearchLocal(getInscripcionEstadoActual());
+  const abierta = !!state.group?.inscripcionHabilitada;
+
+  if (estado === "normal") {
+    return abierta ? "Inscripción inicial abierta" : "Inscripción inicial cerrada";
+  }
+
+  if (estado === "nomina_final") {
+    return abierta ? "Nómina final abierta" : "Nómina final cerrada";
+  }
+
+  if (estado === "nuevos") {
+    return abierta ? "Nuevos ingresos abierta" : "Nuevos ingresos cerrada";
+  }
+
+  if (estado === "lista_espera") {
+    return abierta ? "Lista de espera abierta" : "Lista de espera cerrada";
+  }
+
+  return "Inscripción cerrada";
 }
 
 function getLiberadosPermitidos() {
@@ -1787,28 +1826,42 @@ function renderInscripcionPasajerosPanel() {
   if (!visible) return;
 
   const total = state.inscripciones.length;
+  const totalBruto = state.inscripciones.length;
   const capacidad = Number(state.group?.cantidadGrupo || 0);
-
-  const nominaInicial = getInscripcionesNominaInicial().length;
-
+  
   const nominaFinalOperativa = state.inscripciones.filter(esNominaFinalOperativa).length;
-
-  const nuevos = state.inscripciones.filter((x) =>
-    normalizeSearchLocal(getInscripcionTipoReal(x)) === "nuevo_ingreso"
-  ).length;
-
-  const espera = state.inscripciones.filter((x) =>
-    normalizeSearchLocal(getInscripcionTipoReal(x)) === "lista_espera" &&
-    normalizeSearchLocal(x.estadoCupo || "") !== "confirmado"
-  ).length;
-
-  const esperaConfirmada = state.inscripciones.filter((x) =>
-    normalizeSearchLocal(getInscripcionTipoReal(x)) === "lista_espera_confirmada" ||
-    (
-      normalizeSearchLocal(getInscripcionTipoReal(x)) === "lista_espera" &&
-      normalizeSearchLocal(x.estadoCupo || "") === "confirmado"
-    )
-  ).length;
+  const nominaInicial = getInscripcionesNominaInicial().length;
+  const sinFichaMedica = getInscripcionesSistemaPagos().length;
+  
+  const nuevosConfirmados = state.inscripciones.filter((x) => {
+    const tipo = normalizeSearchLocal(getInscripcionTipoReal(x));
+    const estadoCupo = normalizeSearchLocal(x.estadoCupo || "");
+    return tipo === "nuevo_ingreso_confirmado" || (tipo === "nuevo_ingreso" && estadoCupo === "confirmado");
+  }).length;
+  
+  const nuevosPendientes = state.inscripciones.filter((x) => {
+    const tipo = normalizeSearchLocal(getInscripcionTipoReal(x));
+    const estadoCupo = normalizeSearchLocal(x.estadoCupo || "");
+    return tipo === "nuevo_ingreso" && estadoCupo !== "confirmado";
+  }).length;
+  
+  const esperaPendiente = state.inscripciones.filter((x) => {
+    const tipo = normalizeSearchLocal(getInscripcionTipoReal(x));
+    const estadoCupo = normalizeSearchLocal(x.estadoCupo || "");
+    return tipo === "lista_espera" && estadoCupo !== "pagado" && estadoCupo !== "confirmado";
+  }).length;
+  
+  const esperaPagada = state.inscripciones.filter((x) => {
+    const tipo = normalizeSearchLocal(getInscripcionTipoReal(x));
+    const estadoCupo = normalizeSearchLocal(x.estadoCupo || "");
+    return tipo === "lista_espera_pagada" || (tipo === "lista_espera" && estadoCupo === "pagado");
+  }).length;
+  
+  const esperaConfirmada = state.inscripciones.filter((x) => {
+    const tipo = normalizeSearchLocal(getInscripcionTipoReal(x));
+    const estadoCupo = normalizeSearchLocal(x.estadoCupo || "");
+    return tipo === "lista_espera_confirmada" || (tipo === "lista_espera" && estadoCupo === "confirmado");
+  }).length;
 
   const liberadosPermitidos = getLiberadosPermitidos();
   const liberadosUsados = getLiberadosUsados();
@@ -1885,38 +1938,38 @@ function renderInscripcionPasajerosPanel() {
   box.innerHTML = `
     <div class="grupo-kpi-list">
       <div class="grupo-kpi">
-        <div class="info-label">Estado inscripción</div>
-        <div class="info-value">${escapeHtml(getInscripcionFaseLabel(estadoInscripcion))}</div>
+        <div class="info-label">Estado lista pasajeros</div>
+        <div class="info-value">${escapeHtml(getEstadoListaPasajerosLabel())}</div>
       </div>
-
+    
       <div class="grupo-kpi">
         <div class="info-label">Total inscritos</div>
-        <div class="info-value">${escapeHtml(`${total}${capacidad ? ` / ${capacidad}` : ""}`)}</div>
+        <div class="info-value">${escapeHtml(`${nominaFinalOperativa} nómina final / ${totalBruto} nómina en bruto`)}</div>
       </div>
-
+    
       <div class="grupo-kpi">
-        <div class="info-label">Nómina final</div>
-        <div class="info-value">${escapeHtml(nominaFinalOperativa)}</div>
+        <div class="info-label">Sin ficha médica</div>
+        <div class="info-value">${escapeHtml(`${sinFichaMedica} pasajeros`)}</div>
       </div>
-
+    
       <div class="grupo-kpi">
         <div class="info-label">Nómina inicial</div>
-        <div class="info-value">${escapeHtml(nominaInicial)}</div>
+        <div class="info-value">${escapeHtml(`${nominaInicial}${capacidad ? ` / ${capacidad}` : ""} pasajeros`)}</div>
       </div>
-
+    
       <div class="grupo-kpi">
         <div class="info-label">Nuevos ingresos</div>
-        <div class="info-value">${escapeHtml(nuevos)}</div>
+        <div class="info-value">${escapeHtml(`${nuevosConfirmados} confirmados / ${nuevosPendientes} pendientes`)}</div>
       </div>
-
+    
       <div class="grupo-kpi">
         <div class="info-label">Lista espera</div>
-        <div class="info-value">${escapeHtml(`${espera} pendientes / ${esperaConfirmada} confirmados`)}</div>
+        <div class="info-value">${escapeHtml(`${esperaConfirmada} confirmados / ${esperaPagada} pagados / ${esperaPendiente} pendientes`)}</div>
       </div>
-
+    
       <div class="grupo-kpi">
         <div class="info-label">Liberados</div>
-        <div class="info-value">${escapeHtml(`${liberadosUsados}${liberadosPermitidos ? ` / ${liberadosPermitidos}` : ""}`)}</div>
+        <div class="info-value">${escapeHtml(`${liberadosUsados} confirmados${liberadosPermitidos ? ` de ${liberadosPermitidos} cupos liberados` : ""}`)}</div>
       </div>
     </div>
 
