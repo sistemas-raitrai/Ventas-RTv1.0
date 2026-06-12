@@ -1982,41 +1982,52 @@ function renderInscripcionPasajerosPanel() {
         <div class="info-label">Origen nómina</div>
         <div class="info-value">${escapeHtml(getOrigenNominaLabel())}</div>
       </div>
-    
+
       <div class="grupo-kpi">
         <div class="info-label">Estado inscripción</div>
         <div class="info-value">${escapeHtml(getEstadoListaPasajerosLabel())}</div>
       </div>
-    
+
       <div class="grupo-kpi">
         <div class="info-label">Total inscritos</div>
         <div class="info-value">${escapeHtml(`${nominaFinalOperativa} viajan / ${totalBruto} inscritos`)}</div>
       </div>
-    
+
       <div class="grupo-kpi">
         <div class="info-label">Ficha médica</div>
         <div class="info-value">${escapeHtml(`${fichaCompleta} completas / ${fichaPendiente} pendientes`)}</div>
       </div>
-    
+
       <div class="grupo-kpi">
         <div class="info-label">Nómina inicial</div>
         <div class="info-value">${escapeHtml(`${nominaInicial}${capacidad ? ` / ${capacidad}` : ""} pasajeros`)}</div>
       </div>
-    
+
       <div class="grupo-kpi">
         <div class="info-label">Nuevos ingresos</div>
         <div class="info-value">${escapeHtml(`${nuevosConfirmados} confirmados / ${nuevosPendientes} pendientes`)}</div>
       </div>
-    
+
       <div class="grupo-kpi">
         <div class="info-label">Lista espera</div>
         <div class="info-value">${escapeHtml(`${esperaConfirmada} confirmados / ${esperaPagada} pagados / ${esperaPendiente} pendientes`)}</div>
       </div>
-    
+
       <div class="grupo-kpi">
         <div class="info-label">Liberados</div>
         <div class="info-value">${escapeHtml(`${liberadosUsados} confirmados${liberadosPermitidos ? ` de ${liberadosPermitidos} cupos liberados` : ""}`)}</div>
       </div>
+    </div>
+
+    ${tabla}
+
+    <div class="inscripcion-traza">
+      <div><strong>Link principal:</strong> ${state.group?.inscripcionHabilitada ? "Habilitado" : "No habilitado"}</div>
+      <div><strong>Estado inscripción:</strong> ${escapeHtml(getInscripcionFaseLabel(estadoInscripcion))}</div>
+      <div><strong>Generado por:</strong> ${escapeHtml(linkInfo.actualizadoPor || linkInfo.linkGeneradoPor || state.group?.inscripcionLinkGeneradoPor || "—")}</div>
+      <div><strong>Fecha generación:</strong> ${escapeHtml(formatDateTime(linkInfo.actualizadoAt || linkInfo.linkGeneradoAt || state.group?.fechaAperturaInscripcion))}</div>
+      <div><strong>Link liberados:</strong> ${state.group?.linkLiberadosActivo ? "Habilitado" : "No habilitado"}</div>
+      <div><strong>Liberados generado por:</strong> ${escapeHtml(liberadosInfo.actualizadoPor || liberadosInfo.linkGeneradoPor || "—")}</div>
     </div>
   `;
 }
