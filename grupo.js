@@ -1774,7 +1774,7 @@ function getEstadoListaPasajerosLabel() {
   }
 
   if (getInscripcionesSistemaPagos().length > 0) {
-    return "A la espera de Nómina Final / Ficha Médica";
+    return "Debe enviar link de Ficha Médica";
   }
 
   const estado = normalizeSearchLocal(getInscripcionEstadoActual());
