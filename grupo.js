@@ -4287,7 +4287,7 @@ function openNominaInicialPagosModal() {
   Participantes inscripción inicial: ${destinatarios.length}
   Correos válidos: ${validos.length}
   Sin correo: ${sinCorreo.length}
-  Copia a vendedora: ${correoVendedoraCopia || "No detectada"}`
+  Resumen a vendedora: ${correoVendedoraCopia || "No detectada"}`
   );
 
   setFormValue("nominaPagosAsunto", buildAsuntoNominaInicialPagos());
@@ -4339,9 +4339,6 @@ async function enviarNominaInicialPagos() {
 
         destinatario: d.correo,
         to: d.correo,
-        cc: getCorreoVendedoraGrupoParaCopia(),
-        correoVendedoraGrupo: getCorreoVendedoraGrupoParaCopia(),
-        vendedoraGrupo: cleanText(state.group?.vendedora || ""),
         asunto,
         subject: asunto,
         cuerpo,
@@ -4400,6 +4397,73 @@ async function enviarNominaInicialPagos() {
 
       enviados += 1;
       setNominaPagosProgress(enviados, validos.length);
+    }
+
+    const correoVendedora = getCorreoVendedoraGrupoParaCopia();
+
+    if (correoVendedora) {
+      const ejemplo = validos[0];
+    
+      const resumenVendedora = `
+    Se realizó el envío de correos de acceso al sistema de pagos.
+    
+    Grupo: ${state.group?.aliasGrupo || state.group?.nombreGrupo || state.group?.colegio || state.groupId}
+    Vendedora: ${state.group?.vendedora || "—"}
+    Total enviados: ${validos.length}
+    Total sin correo: ${sinCorreo.length}
+    
+    Correos enviados:
+    ${validos.map((d) => `- ${d.nombreParticipante || "Participante"} · ${d.correo}`).join("\n")}
+    
+    Participantes sin correo:
+    ${sinCorreo.length
+      ? sinCorreo.map((d) => `- ${d.nombreParticipante || "Participante"} · ${d.documento || "sin documento"}`).join("\n")
+      : "- Ninguno"}
+    
+    ----------------------------------------
+    EJEMPLO DEL CORREO ENVIADO A APODERADOS
+    ----------------------------------------
+    
+    ${cuerpo}
+    `.trim();
+    
+      await addDoc(collection(db, "correos_nomina_inicial_pagos"), {
+        batchId,
+        tipoCorreo: "resumen_vendedora",
+        estado: "pendiente",
+    
+        destinatario: correoVendedora,
+        to: correoVendedora,
+    
+        asunto: `Resumen envío pagos · ${state.group?.aliasGrupo || state.group?.colegio || state.groupId}`,
+        subject: `Resumen envío pagos · ${state.group?.aliasGrupo || state.group?.colegio || state.groupId}`,
+    
+        cuerpo: resumenVendedora,
+        body: resumenVendedora,
+    
+        idGrupo: String(state.groupId || ""),
+        groupDocId: String(state.groupDocId || ""),
+    
+        grupo:
+          cleanText(state.group?.aliasGrupo) ||
+          cleanText(state.group?.nombreGrupo) ||
+          normalizeTextUpper(state.group?.colegio || ""),
+    
+        colegio: normalizeTextUpper(state.group?.colegio || ""),
+        curso: normalizeTextUpper(state.group?.curso || ""),
+        anoViaje: cleanText(state.group?.anoViaje || ""),
+    
+        documento: ejemplo?.documento || "",
+        nombreParticipante: ejemplo?.nombreParticipante || "",
+        nombreResponsable: "Vendedora",
+    
+        totalCorreos: validos.length,
+        totalSinCorreo: sinCorreo.length,
+    
+        creadoPor: getDisplayName(state.effectiveUser),
+        creadoPorCorreo: state.effectiveEmail,
+        creadoAt: serverTimestamp()
+      });
     }
 
     await saveGroupPatch(
