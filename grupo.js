@@ -1772,15 +1772,25 @@ function esNominaFinalOperativa(item = {}) {
   const tipo = normalizeSearchLocal(getInscripcionTipoReal(item));
   const estadoCupo = normalizeSearchLocal(item.estadoCupo || "");
 
+  if (tipo === "nuevo_ingreso") {
+    return estadoCupo === "confirmado";
+  }
+
+  if (tipo === "lista_espera") {
+    return estadoCupo === "confirmado";
+  }
+
+  if (tipo === "lista_espera_pagada") {
+    return false;
+  }
+
   return (
     tipo === "nomina_inicial" ||
     tipo === "nomina_final" ||
     tipo === "sistema_pagos" ||
     tipo === "nuevo_ingreso_confirmado" ||
     tipo === "lista_espera_confirmada" ||
-    tipo === "liberado" ||
-    (tipo === "nuevo_ingreso" && estadoCupo === "confirmado") ||
-    (tipo === "lista_espera" && estadoCupo === "confirmado")
+    tipo === "liberado"
   );
 }
 
