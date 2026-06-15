@@ -9583,3 +9583,62 @@ function getNombrePublicoInscripcionGrupo(item = {}) {
     ""
   );
 }
+
+async function marcarInscripcionPublicaComoEliminada(inscripcionOficial = {}) {
+  const rutKey = normalizarRutKeyGrupo(
+    getInscripcionDocumento(inscripcionOficial) || inscripcionOficial.id || ""
+  );
+
+  const nombreKey = normalizeSearchLocal(
+    `${getInscripcionNombres(inscripcionOficial)} ${getInscripcionApellidos(inscripcionOficial)}`
+  );
+
+  const publicaSnap = await getDocs(
+    query(
+      collection(db, "inscripciones_pendientes_publicas"),
+      where("idGrupo", "==", String(state.groupDocId))
+    )
+  );
+
+  for (const docPub of publicaSnap.docs) {
+    const itemPub = { id: docPub.id, ...docPub.data() };
+    const payload = itemPub.payload || {};
+
+    const rutPub = normalizarRutKeyGrupo(
+      getRutKeyInscripcionPublicaGrupo(payload) || itemPub.id || ""
+    );
+
+    const nombrePub = normalizeSearchLocal(
+      getNombrePublicoInscripcionGrupo(payload)
+    );
+
+    const coincide =
+      (rutKey && rutPub && rutKey === rutPub) ||
+      (nombreKey && nombrePub && nombreKey === nombrePub);
+
+    if (!coincide) continue;
+
+    await updateDoc(doc(db, "inscripciones_pendientes_publicas", docPub.id), {
+      estado: "eliminada_logica",
+      "payload.privacidad.estado": "eliminada_logica",
+      eliminadaPorSyncNomina: true,
+      eliminadaPorSyncAt: serverTimestamp(),
+      eliminadaPorSyncGrupo: String(state.groupDocId || ""),
+      eliminadaPorSyncInscripcionId: String(inscripcionOficial.id || "")
+    });
+
+    console.log("[sync pública] marcada eliminada:", {
+      idPublico: docPub.id,
+      nombre: getNombrePublicoInscripcionGrupo(payload),
+      rutPub
+    });
+  }
+}
+
+async function sincronizarInscripcionPublicaPostEdicion(inscripcionOficial = {}) {
+  const estadoPrivacidad = normalizeSearchLocal(inscripcionOficial?.privacidad?.estado || "");
+
+  if (estadoPrivacidad === "archivada" || estadoPrivacidad === "eliminada_logica") {
+    await marcarInscripcionPublicaComoEliminada(inscripcionOficial);
+  }
+}
