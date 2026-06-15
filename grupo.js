@@ -9451,3 +9451,135 @@ window.importarNominaPagosPorNumeroNegocio = async function (numeroNegocio, opti
 
   return resultado;
 };
+
+window.sincronizarNominaPublicaConOficial = async function (groupDocIdParam = "") {
+  const groupDocId = String(groupDocIdParam || state.groupDocId || "").trim();
+
+  if (!groupDocId) {
+    console.error("Falta groupDocId.");
+    return;
+  }
+
+  const oficialSnap = await getDocs(
+    collection(db, "ventas_cotizaciones", groupDocId, "inscripciones")
+  );
+
+  const oficialesActivos = new Set();
+
+  oficialSnap.docs.forEach((d) => {
+    const item = { id: d.id, ...d.data() };
+
+    const estadoPrivacidad = normalizeSearchLocal(item?.privacidad?.estado || "");
+    if (estadoPrivacidad === "archivada" || estadoPrivacidad === "eliminada_logica") return;
+
+    const rutKey = normalizarRutKeyGrupo(
+      getInscripcionDocumento(item) || item.id || ""
+    );
+
+    const nombreKey = normalizeSearchLocal(
+      `${getInscripcionNombres(item)} ${getInscripcionApellidos(item)}`
+    );
+
+    if (rutKey) oficialesActivos.add(`rut:${rutKey}`);
+    if (nombreKey) oficialesActivos.add(`nombre:${nombreKey}`);
+  });
+
+  const publicaSnap = await getDocs(
+    query(
+      collection(db, "inscripciones_pendientes_publicas"),
+      where("idGrupo", "==", groupDocId)
+    )
+  );
+
+  let revisados = 0;
+  let eliminados = 0;
+
+  for (const docPub of publicaSnap.docs) {
+    revisados++;
+
+    const item = { id: docPub.id, ...docPub.data() };
+    const payload = item.payload || {};
+
+    const rutKey = normalizarRutKeyGrupo(
+      getRutKeyInscripcionPublicaGrupo(payload) || item.id || ""
+    );
+
+    const nombreKey = normalizeSearchLocal(
+      getNombrePublicoInscripcionGrupo(payload)
+    );
+
+    const existeEnOficial =
+      (rutKey && oficialesActivos.has(`rut:${rutKey}`)) ||
+      (nombreKey && oficialesActivos.has(`nombre:${nombreKey}`));
+
+    if (existeEnOficial) continue;
+
+    await updateDoc(doc(db, "inscripciones_pendientes_publicas", docPub.id), {
+      estado: "eliminada_logica",
+      "payload.privacidad.estado": "eliminada_logica",
+      eliminadaPorSyncNomina: true,
+      eliminadaPorSyncAt: serverTimestamp(),
+      eliminadaPorSyncGrupo: groupDocId
+    });
+
+    eliminados++;
+    console.log("Eliminada de nómina pública:", {
+      id: docPub.id,
+      nombre: getNombrePublicoInscripcionGrupo(payload),
+      rutKey
+    });
+  }
+
+  console.log("Sync nómina pública terminado:", {
+    groupDocId,
+    revisados,
+    eliminados,
+    oficialesActivos: oficialesActivos.size
+  });
+
+  alert(`Sync terminado. Revisados: ${revisados}. Eliminados de pública: ${eliminados}.`);
+};
+
+function normalizarRutKeyGrupo(value = "") {
+  return String(value || "")
+    .toUpperCase()
+    .replace(/\./g, "")
+    .replace(/-/g, "")
+    .replace(/\s+/g, "")
+    .trim();
+}
+
+function getRutKeyInscripcionPublicaGrupo(item = {}) {
+  const identificacion = item.identificacion || {};
+
+  const documento =
+    identificacion.documentoNormalizado ||
+    identificacion.rut ||
+    identificacion.documento ||
+    [
+      identificacion.rutNumero,
+      identificacion.rutDv
+    ].filter(Boolean).join("-") ||
+    item.documentoNormalizado ||
+    item.rut ||
+    item.documento ||
+    "";
+
+  return normalizarRutKeyGrupo(documento);
+}
+
+function getNombrePublicoInscripcionGrupo(item = {}) {
+  const identificacion = item.identificacion || {};
+
+  return cleanText([
+    identificacion.nombres || item.nombres,
+    identificacion.primerApellido || item.primerApellido,
+    identificacion.segundoApellido || item.segundoApellido
+  ].filter(Boolean).join(" ") ||
+    identificacion.nombreCompleto ||
+    item.nombreCompleto ||
+    item.nombre ||
+    item.pasajero ||
+    ""
+  );
+}
