@@ -77,7 +77,9 @@ async function init() {
         id: d.id,
         ...d.data()
       }))
-        .filter(esInscripcionPublicaVisible)
+        .filter((item) => item?.estado !== "eliminada_logica")
+        .filter((item) => item?.payload?.privacidad?.estado !== "eliminada_logica")
+        .filter((item) => item?.payload?.privacidad?.estado !== "archivada")
         .map((item) => {
         const payload = item.payload || {};
         const fechaOriginal = getFechaFormularioInscripcion(payload) || item.creadoEn;
@@ -182,36 +184,6 @@ function getNombrePublicoInscripcion(item = {}) {
     item.pasajero ||
     ""
   );
-}
-
-function esInscripcionPublicaVisible(item = {}) {
-  const payload = item.payload || {};
-
-  const estado = normalizarNombreParaComparar(item.estado || "");
-  const estadoPayload = normalizarNombreParaComparar(payload.estado || "");
-  const estadoPrivacidad = normalizarNombreParaComparar(payload?.privacidad?.estado || "");
-
-  if (estado === "ELIMINADA_LOGICA") return false;
-  if (estadoPrivacidad === "ELIMINADA_LOGICA") return false;
-  if (estadoPrivacidad === "ARCHIVADA") return false;
-
-  const enviado =
-    item.formularioEnviado === true ||
-    item.enviado === true ||
-    item.finalizado === true ||
-    item.completado === true ||
-    payload.formularioEnviado === true ||
-    payload.enviado === true ||
-    payload.finalizado === true ||
-    payload.completado === true ||
-    payload?.meta?.formularioEnviado === true ||
-    payload?.meta?.enviado === true ||
-    payload?.meta?.finalizado === true ||
-    payload?.meta?.completado === true ||
-    ["ENVIADA", "ENVIADO", "CONFIRMADA", "CONFIRMADO", "COMPLETADA", "COMPLETADO"].includes(estado) ||
-    ["ENVIADA", "ENVIADO", "CONFIRMADA", "CONFIRMADO", "COMPLETADA", "COMPLETADO"].includes(estadoPayload);
-
-  return enviado;
 }
 
 function getFechaFormularioInscripcion(item = {}) {
