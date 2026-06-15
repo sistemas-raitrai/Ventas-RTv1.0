@@ -5947,6 +5947,14 @@ async function archivarNominaInscripcion(inscripcionId = "") {
     }
   });
 
+  await marcarInscripcionPublicaComoEliminada({
+    ...item,
+    privacidad: {
+      ...(item.privacidad || {}),
+      estado: "archivada"
+    }
+  });
+
   await createHistoryEntry({
     tipoMovimiento: "archivo_nomina_inscripcion",
     modulo: "inscripcion",
