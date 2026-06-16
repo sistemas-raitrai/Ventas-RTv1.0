@@ -9463,34 +9463,19 @@ window.importarNominaPagosPorNumeroNegocio = async function (numeroNegocio, opti
 window.importarTodasNominasPagos = async function (options = {}) {
   const {
     dryRun = true,
-    soloSiNoTieneNomina = true,
-    anoDesde = 2026
+    soloSiNoTieneNomina = true
   } = options;
-
-  console.log("=== IMPORTAR TODAS LAS NÓMINAS DESDE SISTEMA DE PAGOS ===");
-  console.log({ dryRun, soloSiNoTieneNomina, anoDesde });
 
   const gruposSnap = await getDocs(collection(db, "ventas_cotizaciones"));
 
-  let revisados = 0;
   let procesados = 0;
   let importados = 0;
   let omitidosSinNumeroNegocio = 0;
-  let omitidosPorAno = 0;
   let omitidosConNomina = 0;
   let errores = 0;
 
   for (const grupoDoc of gruposSnap.docs) {
-    revisados++;
-
     const grupo = grupoDoc.data() || {};
-    const anoViaje = Number(grupo.anoViaje || grupo.ficha?.anoViaje || 0);
-
-    if (!anoViaje || anoViaje < Number(anoDesde)) {
-      omitidosPorAno++;
-      console.log(`⏭️ ${grupoDoc.id}: omitido por año (${anoViaje || "sin año"}).`);
-      continue;
-    }
 
     const numeroNegocio = String(
       grupo.numeroNegocio ||
@@ -9500,7 +9485,7 @@ window.importarTodasNominasPagos = async function (options = {}) {
 
     if (!numeroNegocio) {
       omitidosSinNumeroNegocio++;
-      console.log(`⏭️ ${grupoDoc.id}: omitido, no tiene numeroNegocio.`);
+      console.log(`⏭️ ${grupoDoc.id}: sin numeroNegocio.`);
       continue;
     }
 
@@ -9517,45 +9502,38 @@ window.importarTodasNominasPagos = async function (options = {}) {
           const estadoPrivacidad = normalizeSearchLocal(data?.privacidad?.estado || "");
 
           return estadoPrivacidad !== "archivada" &&
-            estadoPrivacidad !== "eliminada_logica";
+                 estadoPrivacidad !== "eliminada_logica";
         });
 
         if (tieneNominaVisible) {
           omitidosConNomina++;
-          console.log(`⏭️ ${numeroNegocio}: ya tiene nómina, se omite.`);
+          console.log(`⏭️ ${numeroNegocio}: ya tiene nómina.`);
           continue;
         }
       }
 
-      console.log(`▶️ Importando numeroNegocio ${numeroNegocio} · año ${anoViaje} · doc ${grupoDoc.id}`);
+      console.log(`▶️ Importando numeroNegocio ${numeroNegocio} · doc ${grupoDoc.id}`);
 
-      await window.importarNominaPagosPorNumeroNegocio(numeroNegocio, {
-        dryRun
-      });
+      await window.importarNominaPagosPorNumeroNegocio(numeroNegocio, { dryRun });
 
       importados++;
     } catch (error) {
       errores++;
-      console.error(`❌ Error importando numeroNegocio ${numeroNegocio}:`, error);
+      console.error(`❌ Error importando ${numeroNegocio}:`, error);
     }
   }
 
   const resumen = {
     dryRun,
     soloSiNoTieneNomina,
-    anoDesde,
-    revisados,
     procesados,
     importados,
-    omitidosPorAno,
     omitidosSinNumeroNegocio,
     omitidosConNomina,
     errores
   };
 
-  console.log("=== RESUMEN IMPORTACIÓN MASIVA ===");
   console.table([resumen]);
-
   return resumen;
 };
 
