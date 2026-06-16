@@ -1304,7 +1304,14 @@ async function confirmOfficialPdfClosure({ preserveCurrentVersion = false } = {}
 
   const versionLabel = getFichaVersionLabel(versionData);
   const pdfNombre = buildConfirmedPdfName(versionLabel);
-
+  
+  // Actualiza la versión visible ANTES de generar el PDF visual
+  state.ficha.version = versionData.version;
+  state.ficha.tipoVersion = versionData.tipoVersion;
+  state.ficha.versionNumero = versionData.versionNumero;
+  
+  setText("pdfVersionFicha", versionLabel);
+  
   const programaReady = await ensureProgramaPdfReady(groupRef);
   const programaPdfUrl = programaReady.pdfUrl;
   const programaPdfNombre = programaReady.pdfNombre;
