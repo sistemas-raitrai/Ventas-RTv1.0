@@ -9463,30 +9463,46 @@ window.importarNominaPagosPorNumeroNegocio = async function (numeroNegocio, opti
 window.importarTodasNominasPagos = async function (options = {}) {
   const {
     dryRun = true,
-    soloSiNoTieneNomina = true
+    soloSiNoTieneNomina = true,
+    anoDesde = 2026
   } = options;
 
   console.log("=== IMPORTAR TODAS LAS NÓMINAS DESDE SISTEMA DE PAGOS ===");
-  console.log({ dryRun, soloSiNoTieneNomina });
+  console.log({ dryRun, soloSiNoTieneNomina, anoDesde });
 
   const gruposSnap = await getDocs(collection(db, "ventas_cotizaciones"));
 
+  let revisados = 0;
   let procesados = 0;
   let importados = 0;
+  let omitidosSinNumeroNegocio = 0;
+  let omitidosPorAno = 0;
   let omitidosConNomina = 0;
   let errores = 0;
 
   for (const grupoDoc of gruposSnap.docs) {
+    revisados++;
+
     const grupo = grupoDoc.data() || {};
+    const anoViaje = Number(grupo.anoViaje || grupo.ficha?.anoViaje || 0);
+
+    if (!anoViaje || anoViaje < Number(anoDesde)) {
+      omitidosPorAno++;
+      console.log(`⏭️ ${grupoDoc.id}: omitido por año (${anoViaje || "sin año"}).`);
+      continue;
+    }
 
     const numeroNegocio = String(
       grupo.numeroNegocio ||
-      grupo.idGrupo ||
-      grupoDoc.id ||
+      grupo.ficha?.numeroNegocio ||
       ""
     ).trim();
 
-    if (!numeroNegocio) continue;
+    if (!numeroNegocio) {
+      omitidosSinNumeroNegocio++;
+      console.log(`⏭️ ${grupoDoc.id}: omitido, no tiene numeroNegocio.`);
+      continue;
+    }
 
     procesados++;
 
@@ -9511,7 +9527,7 @@ window.importarTodasNominasPagos = async function (options = {}) {
         }
       }
 
-      console.log(`▶️ Importando ${numeroNegocio}...`);
+      console.log(`▶️ Importando numeroNegocio ${numeroNegocio} · año ${anoViaje} · doc ${grupoDoc.id}`);
 
       await window.importarNominaPagosPorNumeroNegocio(numeroNegocio, {
         dryRun
@@ -9520,21 +9536,25 @@ window.importarTodasNominasPagos = async function (options = {}) {
       importados++;
     } catch (error) {
       errores++;
-      console.error(`❌ Error importando ${numeroNegocio}:`, error);
+      console.error(`❌ Error importando numeroNegocio ${numeroNegocio}:`, error);
     }
   }
 
   const resumen = {
     dryRun,
     soloSiNoTieneNomina,
+    anoDesde,
+    revisados,
     procesados,
     importados,
+    omitidosPorAno,
+    omitidosSinNumeroNegocio,
     omitidosConNomina,
     errores
   };
 
   console.log("=== RESUMEN IMPORTACIÓN MASIVA ===");
-  console.table(resumen);
+  console.table([resumen]);
 
   return resumen;
 };
