@@ -9460,6 +9460,85 @@ window.importarNominaPagosPorNumeroNegocio = async function (numeroNegocio, opti
   return resultado;
 };
 
+window.importarTodasNominasPagos = async function (options = {}) {
+  const {
+    dryRun = true,
+    soloSiNoTieneNomina = true
+  } = options;
+
+  console.log("=== IMPORTAR TODAS LAS NÓMINAS DESDE SISTEMA DE PAGOS ===");
+  console.log({ dryRun, soloSiNoTieneNomina });
+
+  const gruposSnap = await getDocs(collection(db, "ventas_cotizaciones"));
+
+  let procesados = 0;
+  let importados = 0;
+  let omitidosConNomina = 0;
+  let errores = 0;
+
+  for (const grupoDoc of gruposSnap.docs) {
+    const grupo = grupoDoc.data() || {};
+
+    const numeroNegocio = String(
+      grupo.numeroNegocio ||
+      grupo.idGrupo ||
+      grupoDoc.id ||
+      ""
+    ).trim();
+
+    if (!numeroNegocio) continue;
+
+    procesados++;
+
+    try {
+      if (soloSiNoTieneNomina) {
+        const inscSnap = await getDocs(
+          collection(db, "ventas_cotizaciones", grupoDoc.id, "inscripciones")
+        );
+
+        const tieneNominaVisible = inscSnap.docs.some((d) => {
+          const data = d.data() || {};
+          const estadoPrivacidad = normalizeSearchLocal(data?.privacidad?.estado || "");
+
+          return estadoPrivacidad !== "archivada" &&
+            estadoPrivacidad !== "eliminada_logica";
+        });
+
+        if (tieneNominaVisible) {
+          omitidosConNomina++;
+          console.log(`⏭️ ${numeroNegocio}: ya tiene nómina, se omite.`);
+          continue;
+        }
+      }
+
+      console.log(`▶️ Importando ${numeroNegocio}...`);
+
+      await window.importarNominaPagosPorNumeroNegocio(numeroNegocio, {
+        dryRun
+      });
+
+      importados++;
+    } catch (error) {
+      errores++;
+      console.error(`❌ Error importando ${numeroNegocio}:`, error);
+    }
+  }
+
+  const resumen = {
+    dryRun,
+    soloSiNoTieneNomina,
+    procesados,
+    importados,
+    omitidosConNomina,
+    errores
+  };
+
+  console.log("=== RESUMEN IMPORTACIÓN MASIVA ===");
+  console.table(resumen);
+
+  return resumen;
+};
+
 window.sincronizarNominaPublicaConOficial = async function (groupDocIdParam = "") {
   const groupDocId = String(groupDocIdParam || state.groupDocId || "").trim();
 
