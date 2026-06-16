@@ -703,6 +703,24 @@ function nominaInicialEstaCargadaEnPagos() {
   return state.group?.sistemaPagos?.nominaInicial?.cargada === true;
 }
 
+async function obtenerResumenNominaParaFirmaAdmin() {
+  const snap = await getDocs(
+    collection(db, "ventas_cotizaciones", state.groupDocId, "inscripciones")
+  );
+
+  const existeNomina = !snap.empty;
+
+  const tieneSistemaPagos = snap.docs.some((d) => {
+    const data = d.data() || {};
+    return normalizeSearchLocal(data.tipoInscripcion || "") === "sistema de pagos";
+  });
+
+  return {
+    existeNomina,
+    tieneSistemaPagos
+  };
+}
+
 function isRealAdminRole() {
   return String(state.effectiveUser?.rol || "").toLowerCase() === "admin";
 }
@@ -2400,7 +2418,15 @@ async function signFlowFromFicha(step) {
       return;
     }
 
-  if (!isRealAdminRole() && !nominaInicialEstaCargadaEnPagos()) {
+  const resumenNomina = await obtenerResumenNominaParaFirmaAdmin();
+  
+  const debeBloquearFirmaAdmin =
+    !isRealAdminRole() &&
+    resumenNomina.existeNomina &&
+    !resumenNomina.tieneSistemaPagos &&
+    !nominaInicialEstaCargadaEnPagos();
+  
+  if (debeBloquearFirmaAdmin) {
     alert(
       "Antes de firmar como Administración debes marcar la nómina inicial como Cargado a Pagos.\n\n" +
       "Ve al Portafolio del grupo, hace clic al botón Cargado a Pagos y luego vuelve a firmar."
