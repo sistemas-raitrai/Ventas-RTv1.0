@@ -9855,40 +9855,4 @@ window.buscarCorreosEnInscripciones = async function (correos = []) {
   return resultados;
 };
 
-window.repararYeliannaNombre = async function () {
-  const inscripcionId = "RUT_25656777-6";
 
-  const ref = doc(
-    db,
-    "ventas_cotizaciones",
-    "11157",
-    "inscripciones",
-    inscripcionId
-  );
-
-  await updateDoc(ref, {
-    "identificacion.nombres": "YELIANNA JOSÉ",
-    "identificacion.primerApellido": "PICHARDO",
-    "identificacion.segundoApellido": "SÁNCHEZ",
-    "identificacion.nombreCompleto": "YELIANNA JOSÉ PICHARDO SÁNCHEZ",
-
-    actualizadoPor: getDisplayName(state.effectiveUser),
-    actualizadoPorCorreo: state.effectiveEmail,
-    actualizadoAt: serverTimestamp()
-  });
-
-  await createHistoryEntry({
-    tipoMovimiento: "reparacion_nomina_inscripcion",
-    modulo: "inscripcion",
-    titulo: "Reparación nombres inscripción",
-    mensaje: `${getDisplayName(state.effectiveUser)} restauró nombres y apellidos de YELIANNA JOSÉ PICHARDO SÁNCHEZ.`,
-    metadata: {
-      inscripcionId,
-      documento: "25656777-6",
-      reparacion: true
-    }
-  });
-
-  await loadAll();
-  showSaveNotice("Nombre de Yelianna restaurado.");
-};
