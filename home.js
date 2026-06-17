@@ -1263,58 +1263,75 @@ function getTiposAlertaPersonaPago(p = {}, grupo = {}) {
 
   return alertas;
 }
-function getTipoAlertaGrupoPago(grupo = {}, pasajeros = []) {
+function getTiposAlertaGrupoPago(grupo = {}, pasajeros = []) {
   const viajan = pasajeros.filter((p) => p.viaja);
   const conDeuda = viajan.filter((p) => p.saldoPendiente > 0);
 
   const totalViajan = viajan.length;
   const totalConDeuda = conDeuda.length;
 
-  let porcentajeDebe = 0;
+  const totalViaje = Number(grupo.totalViaje || 0);
+  const saldoPendienteGrupo = Number(grupo.saldoPendiente || 0);
+  const porcentajeSaldoPendiente =
+    totalViaje > 0 ? (saldoPendienteGrupo / totalViaje) * 100 : 0;
 
-  if (totalViajan > 0) {
-    porcentajeDebe = (totalConDeuda / totalViajan) * 100;
-  } else if (grupo.totalViaje > 0 && grupo.saldoPendiente > 0) {
-    porcentajeDebe = (grupo.saldoPendiente / grupo.totalViaje) * 100;
-  } else if (grupo.totalPagado <= 0 && grupo.totalViaje > 0) {
-    porcentajeDebe = 100;
-  }
+  const moneda = String(grupo.monedaTexto || "").toUpperCase();
 
-  if (porcentajeDebe <= 0) return null;
+  const limiteCercaCerrar =
+    moneda === "USD" || moneda === "EUR"
+      ? 5000
+      : moneda === "CLP"
+        ? 5000000
+        : null;
 
-  if (porcentajeDebe > 50) {
-    return {
-      tipo: "grupo_mas_50_debe",
+  const alertas = [];
+
+  // 1) Grupo crítico: debe más del 50% del valor total
+  if (porcentajeSaldoPendiente > 50) {
+    alertas.push({
+      tipo: "grupo_critico_saldo_50",
       nivel: "critica",
-      label: "Más del 50% del grupo debe",
-      gravedad: 3,
-      porcentajeDebe,
+      label: "Grupo crítico: saldo pendiente mayor al 50%",
+      gravedad: 4,
+      porcentajeSaldoPendiente,
       totalViajan,
       totalConDeuda
-    };
+    });
   }
 
-  if (porcentajeDebe >= 20) {
-    return {
-      tipo: "grupo_20_49_debe",
+  // 2) Grupo cerca de cerrar: saldo bajo, pero todavía pendiente
+  if (
+    limiteCercaCerrar !== null &&
+    saldoPendienteGrupo > 0 &&
+    saldoPendienteGrupo <= limiteCercaCerrar
+  ) {
+    alertas.push({
+      tipo: "grupo_cerca_cerrar",
       nivel: "warning",
-      label: "Entre 20% y 49% del grupo debe",
-      gravedad: 2,
-      porcentajeDebe,
+      label: moneda === "CLP"
+        ? "Grupo cerca de cerrar: saldo menor o igual a $5.000.000 CLP"
+        : `Grupo cerca de cerrar: saldo menor o igual a 5.000 ${moneda}`,
+      gravedad: 3,
+      porcentajeSaldoPendiente,
       totalViajan,
       totalConDeuda
-    };
+    });
   }
 
-  return {
-    tipo: "grupo_0_19_debe",
-    nivel: "info",
-    label: "Entre 0% y 19% del grupo debe",
-    gravedad: 1,
-    porcentajeDebe,
-    totalViajan,
-    totalConDeuda
-  };
+  // 3) Grupo con muchos morosos
+  if (totalConDeuda >= 10) {
+    alertas.push({
+      tipo: "grupo_muchos_morosos",
+      nivel: "warning",
+      label: "Grupo con 10 o más pasajeros con deuda",
+      gravedad: 2,
+      porcentajeSaldoPendiente,
+      totalViajan,
+      totalConDeuda
+    });
+  }
+
+  return alertas;
 }
 
 function calcularPrioridadPersona(tipoInfo, grupoInfo = {}) {
@@ -1342,27 +1359,26 @@ function calcularPrioridadGrupo(tipoInfo, grupo = {}) {
 function getPrioridadPagoKey(alerta = {}) {
   const tipo = String(alerta.tipo || "");
   const saldo = Number(alerta.saldoPendiente || alerta.saldoPendienteGrupo || 0);
-  const porcentajeGrupoDebe = Number(alerta.porcentajeGrupoDebe || 0);
 
   if (
     tipo === "persona_sin_pagos" ||
     tipo === "persona_pago_bajo" ||
-    tipo === "grupo_mas_50_debe"
+    tipo === "grupo_critico_saldo_50"
   ) {
     return "critica";
   }
 
   if (
     tipo === "persona_sin_pago_3_meses" ||
-    (tipo === "persona_pago_parcial_con_saldo" && saldo > 1000) ||
-    porcentajeGrupoDebe >= 40
+    tipo === "grupo_muchos_morosos" ||
+    (tipo === "persona_pago_parcial_con_saldo" && saldo > 1000)
   ) {
     return "alta";
   }
 
   if (
     tipo === "persona_pago_parcial_con_saldo" ||
-    tipo === "grupo_20_49_debe"
+    tipo === "grupo_cerca_cerrar"
   ) {
     return "media";
   }
@@ -1499,9 +1515,10 @@ function getTiposAlertasPagosUI() {
     { tipo: "persona_pago_bajo", label: "Personas: Pago bajo" },
     { tipo: "persona_sin_pago_3_meses", label: "Sin pago +3 meses" },
     { tipo: "persona_pago_parcial_con_saldo", label: "Pago parcial" },
-    { tipo: "grupo_mas_50_debe", label: "Grupo >50%" },
-    { tipo: "grupo_20_49_debe", label: "Grupo 20%-49%" },
-    { tipo: "grupo_0_19_debe", label: "Grupo 0%-19%" }
+
+    { tipo: "grupo_critico_saldo_50", label: "Grupo crítico" },
+    { tipo: "grupo_cerca_cerrar", label: "Grupo cerca de cerrar" },
+    { tipo: "grupo_muchos_morosos", label: "Grupo muchos morosos" }
   ];
 }
 
@@ -1817,7 +1834,7 @@ function renderAlertaPagoCard(alerta = {}) {
           <div style="margin-top:10px; color:#3e3550; font-size:14px; line-height:1.5;">
             <strong>Total viajan:</strong> ${escapeHtml(alerta.totalViajan || 0)}<br>
             <strong>Con deuda:</strong> ${escapeHtml(alerta.totalConDeuda || 0)}<br>
-            <strong>% grupo debe:</strong> ${escapeHtml(Number(alerta.porcentajeGrupoDebe || 0).toFixed(1))}%<br>
+            <strong>% saldo pendiente grupo:</strong> ${escapeHtml(Number(alerta.porcentajeGrupoDebe || 0).toFixed(1))}%<br>
             <strong>Saldo pendiente grupo:</strong> ${escapeHtml(formatoMontoPago(alerta.saldoPendienteGrupo, alerta.moneda))}
           </div>
         `}
@@ -2017,6 +2034,10 @@ async function actualizarAlertasPagos() {
 
     const alertas = [];
 
+    const alertasAnterioresMap = new Map(
+      (state.alertasPagosRows || []).map((a) => [String(a.id), a])
+    );
+
     for (let i = 0; i < gruposPagos.length; i++) {
       const grupoPago = gruposPagos[i];
       if (!grupoPago.numeroNegocio) continue;
@@ -2048,11 +2069,11 @@ async function actualizarAlertasPagos() {
 
       const pasajeros = pasajerosRaw.map(normalizarPasajeroPagos);
 
-      const grupoAlertaInfo = getTipoAlertaGrupoPago(grupoPago, pasajeros);
-
-      if (grupoAlertaInfo) {
+      const gruposAlertaInfo = getTiposAlertaGrupoPago(grupoPago, pasajeros);
+      
+      gruposAlertaInfo.forEach((grupoAlertaInfo) => {
         const id = `grupo_${grupoPago.numeroNegocio}_${grupoAlertaInfo.tipo}`;
-
+      
         alertas.push({
           id,
           categoriaAlerta: "grupo",
@@ -2069,14 +2090,15 @@ async function actualizarAlertasPagos() {
           moneda: grupoPago.monedaTexto,
           vendedor: getRowVendorName(grupoRt) || grupoRt.vendedoraCorreo || "",
           vendedoraCorreo: normalizeEmail(grupoRt.vendedoraCorreo || ""),
-          porcentajeGrupoDebe: grupoAlertaInfo.porcentajeDebe,
+          porcentajeGrupoDebe: grupoAlertaInfo.porcentajeSaldoPendiente,
+          porcentajeSaldoPendiente: grupoAlertaInfo.porcentajeSaldoPendiente,
           totalViajan: grupoAlertaInfo.totalViajan,
           totalConDeuda: grupoAlertaInfo.totalConDeuda,
           saldoPendienteGrupo: grupoPago.saldoPendiente,
+          totalViajeGrupo: grupoPago.totalViaje,
           actualizadoAt: new Date().toISOString()
         });
-      }
-
+      });
       const viajan = pasajeros.filter((p) => p.viaja);
       const conDeuda = viajan.filter((p) => p.saldoPendiente > 0);
       const porcentajeGrupoDebe = viajan.length > 0 ? (conDeuda.length / viajan.length) * 100 : 0;
@@ -2136,7 +2158,17 @@ async function actualizarAlertasPagos() {
     abrirModalAlertasPagos();
 
     for (const alerta of alertas) {
-      const anterior = state.alertasPagosRows.find((a) => String(a.id) === String(alerta.id));
+      const idsNuevasAlertas = new Set(alertas.map((a) => String(a.id)));
+
+      for (const alertaAnterior of state.alertasPagosRows || []) {
+        if (!idsNuevasAlertas.has(String(alertaAnterior.id))) {
+          await setDoc(doc(db, ALERTAS_PAGOS_COLLECTION, alertaAnterior.id), {
+            activa: false,
+            actualizadoAt: new Date().toISOString()
+          }, { merge: true });
+        }
+      }
+      const anterior = alertasAnterioresMap.get(String(alerta.id));
 
       await setDoc(doc(db, ALERTAS_PAGOS_COLLECTION, alerta.id), {
         ...alerta,
