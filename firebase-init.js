@@ -158,6 +158,28 @@ export function getVentasUser(email = "") {
   }) || null;
 }
 
+export function getLandingPageVentas(userOrEmail = "") {
+  const user =
+    typeof userOrEmail === "string"
+      ? getVentasUser(userOrEmail)
+      : userOrEmail;
+
+  if (!user) return "login.html";
+
+  const email = normalizeEmail(user.email || "");
+
+  const esAdministracionHome =
+    email === "administracion@raitrai.cl" ||
+    email === "yenny@raitrai.cl" ||
+    email === "raitrai@raitrai.cl";
+
+  if (esAdministracionHome || user.rol === "registro") {
+    return "home.html";
+  }
+
+  return "index.html";
+}
+
 export function getVentasUserEmails(userOrEmail = "") {
   const user =
     typeof userOrEmail === "string"
@@ -256,6 +278,12 @@ onAuthStateChanged(auth, async (user) => {
 
   // Si ya está logueado y entra a login, lo mandamos al home
   if (currentPage === "login.html") {
-    location.replace("index.html");
+    location.replace(getLandingPageVentas(ventasUser));
+    return;
+  }
+  
+  if (currentPage === "index.html" && getLandingPageVentas(ventasUser) === "home.html") {
+    location.replace("home.html");
+    return;
   }
 });
