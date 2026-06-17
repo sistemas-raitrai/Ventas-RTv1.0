@@ -102,7 +102,7 @@
           return;
         }
 
-        location.href = "index.html";
+        location.href = getLandingPageVentas(ventasUser);
       } catch (error) {
         errorBox.textContent = "❌ Error de acceso: " + error.message;
       }
@@ -115,7 +115,7 @@
       const ventasUser = getVentasUser(email);
 
       if (ventasUser) {
-        location.replace("index.html");
+        location.replace(getLandingPageVentas(ventasUser));
       }
     });
   </script>
