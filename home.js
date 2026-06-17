@@ -1193,21 +1193,13 @@ function diasDesdeFechaPago(fecha) {
   return Math.floor(diff / (1000 * 60 * 60 * 24));
 }
 
-function getTipoAlertaPersonaPago(p = {}, grupo = {}) {
-  if (!p.viaja) return null;
-  if (p.saldoPendiente <= 0) return null;
+function getTiposAlertaPersonaPago(p = {}, grupo = {}) {
+  if (!p.viaja) return [];
+  if (p.saldoPendiente <= 0) return [];
 
   const moneda = String(grupo.monedaTexto || "").toUpperCase();
   const diasUltimoPago = diasDesdeFechaPago(p.ultimoPagoFecha);
-
-  if (p.totalPagado <= 0) {
-    return {
-      tipo: "persona_sin_pagos",
-      nivel: "critica",
-      label: "Nunca ha pagado",
-      gravedad: 5
-    };
-  }
+  const alertas = [];
 
   const limitePagoBajo =
     moneda === "USD" || moneda === "EUR"
@@ -1215,39 +1207,59 @@ function getTipoAlertaPersonaPago(p = {}, grupo = {}) {
       : moneda === "CLP"
         ? 500000
         : null;
-  
+
+  // 1) Nunca pagó
+  if (p.totalPagado <= 0) {
+    alertas.push({
+      tipo: "persona_sin_pagos",
+      nivel: "critica",
+      label: "Nunca ha pagado",
+      gravedad: 5
+    });
+
+    return alertas;
+  }
+
+  // 2) Pago bajo
   if (limitePagoBajo !== null && p.totalPagado > 0 && p.totalPagado <= limitePagoBajo) {
-    return {
+    alertas.push({
       tipo: "persona_pago_bajo",
       nivel: "critica",
       label: moneda === "CLP"
         ? "Pagado menor o igual a $500.000 CLP"
         : `Pagado menor o igual a 550 ${moneda}`,
       gravedad: 4
-    };
+    });
   }
 
+  // 3) Sin pago hace más de 3 meses
   if (diasUltimoPago !== null && diasUltimoPago > 90) {
-    return {
+    alertas.push({
       tipo: "persona_sin_pago_3_meses",
       nivel: "warning",
       label: "No paga hace más de 3 meses",
       gravedad: 3
-    };
+    });
   }
 
-  if (p.totalPagado > 50 && p.saldoPendiente > 0) {
-    return {
+  // 4) Pago parcial
+  // Para no duplicar "Pago bajo", solo entra aquí si pagó más que el límite bajo.
+  const superaPagoBajo =
+    limitePagoBajo === null
+      ? p.totalPagado > 50
+      : p.totalPagado > limitePagoBajo;
+
+  if (superaPagoBajo && p.saldoPendiente > 0) {
+    alertas.push({
       tipo: "persona_pago_parcial_con_saldo",
       nivel: "warning",
       label: "Pago parcial con saldo pendiente",
       gravedad: 2
-    };
+    });
   }
 
-  return null;
+  return alertas;
 }
-
 function getTipoAlertaGrupoPago(grupo = {}, pasajeros = []) {
   const viajan = pasajeros.filter((p) => p.viaja);
   const conDeuda = viajan.filter((p) => p.saldoPendiente > 0);
@@ -1605,7 +1617,11 @@ function filtrarAlertasPagosModal(rows = []) {
     if (moneda && String(row.moneda || "") !== moneda) return false;
     if (prioridad && getPrioridadPagoKey(row) !== prioridad) return false;
 
-    if (tiposActivos.size && !tiposActivos.has(String(row.tipo || ""))) return false;
+    // Si no hay ninguna pestaña activa, no mostrar nada.
+    if (!tiposActivos.size) return false;
+
+    // Si hay pestañas activas, mostrar las alertas cuyo tipo esté activo.
+    if (!tiposActivos.has(String(row.tipo || ""))) return false;
 
     if (q) {
       const texto = buildSearchText(row);
@@ -2012,44 +2028,46 @@ async function actualizarAlertasPagos() {
       const porcentajeGrupoDebe = viajan.length > 0 ? (conDeuda.length / viajan.length) * 100 : 0;
 
       pasajeros.forEach((p) => {
-        const tipoInfo = getTipoAlertaPersonaPago(p, grupoPago);
-        if (!tipoInfo) return;
-
+        const tiposInfo = getTiposAlertaPersonaPago(p, grupoPago);
+        if (!tiposInfo.length) return;
+        
         const rutKey = String(p.rut || p.nombreCompleto || "")
           .replace(/[^a-zA-Z0-9]/g, "_")
           .slice(0, 80);
-
-        const id = `persona_${grupoPago.numeroNegocio}_${rutKey}_${tipoInfo.tipo}`;
-
-        alertas.push({
-          id,
-          categoriaAlerta: "persona",
-          tipo: tipoInfo.tipo,
-          label: tipoInfo.label,
-          nivel: tipoInfo.nivel,
-          activa: true,
-          prioridad: calcularPrioridadPersona(tipoInfo, { porcentajeDebe: porcentajeGrupoDebe }),
-          numeroNegocio: grupoPago.numeroNegocio,
-          idGrupo: getRowId(grupoRt),
-          grupo: getRowAlias(grupoRt),
-          anoViaje: String(grupoPago.anoViaje || getAnoViajeNumber(grupoRt) || ""),
-          destino: grupoPago.destino || grupoRt.destino || grupoRt.destinoPrincipal || "",
-          moneda: grupoPago.monedaTexto,
-          vendedor: getRowVendorName(grupoRt) || grupoRt.vendedoraCorreo || "",
-          vendedoraCorreo: normalizeEmail(grupoRt.vendedoraCorreo || ""),
-          rut: p.rut,
-          participante: p.nombreCompleto,
-          categoria: p.categoria,
-          responsable: p.responsable,
-          correoResponsable: p.correoResponsable,
-          telefonoResponsable: p.telefonoResponsable,
-          totalDebe: p.totalDebe,
-          totalPagado: p.totalPagado,
-          saldoPendiente: p.saldoPendiente,
-          ultimoPagoFecha: p.ultimoPagoFecha,
-          ultimoPagoMonto: p.ultimoPagoMonto,
-          porcentajeGrupoDebe,
-          actualizadoAt: new Date().toISOString()
+        
+        tiposInfo.forEach((tipoInfo) => {
+          const id = `persona_${grupoPago.numeroNegocio}_${rutKey}_${tipoInfo.tipo}`;
+        
+          alertas.push({
+            id,
+            categoriaAlerta: "persona",
+            tipo: tipoInfo.tipo,
+            label: tipoInfo.label,
+            nivel: tipoInfo.nivel,
+            activa: true,
+            prioridad: calcularPrioridadPersona(tipoInfo, { porcentajeDebe: porcentajeGrupoDebe }),
+            numeroNegocio: grupoPago.numeroNegocio,
+            idGrupo: getRowId(grupoRt),
+            grupo: getRowAlias(grupoRt),
+            anoViaje: String(grupoPago.anoViaje || getAnoViajeNumber(grupoRt) || ""),
+            destino: grupoPago.destino || grupoRt.destino || grupoRt.destinoPrincipal || "",
+            moneda: grupoPago.monedaTexto,
+            vendedor: getRowVendorName(grupoRt) || grupoRt.vendedoraCorreo || "",
+            vendedoraCorreo: normalizeEmail(grupoRt.vendedoraCorreo || ""),
+            rut: p.rut,
+            participante: p.nombreCompleto,
+            categoria: p.categoria,
+            responsable: p.responsable,
+            correoResponsable: p.correoResponsable,
+            telefonoResponsable: p.telefonoResponsable,
+            totalDebe: p.totalDebe,
+            totalPagado: p.totalPagado,
+            saldoPendiente: p.saldoPendiente,
+            ultimoPagoFecha: p.ultimoPagoFecha,
+            ultimoPagoMonto: p.ultimoPagoMonto,
+            porcentajeGrupoDebe,
+            actualizadoAt: new Date().toISOString()
+          });
         });
       });
     }
