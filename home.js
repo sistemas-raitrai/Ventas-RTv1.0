@@ -1314,17 +1314,39 @@ function calcularPrioridadGrupo(tipoInfo, grupo = {}) {
   );
 }
 
-function getPrioridadPagoKey(valor = 0) {
-  const n = Number(valor || 0);
+function getPrioridadPagoKey(alerta = {}) {
+  const tipo = String(alerta.tipo || "");
+  const saldo = Number(alerta.saldoPendiente || alerta.saldoPendienteGrupo || 0);
+  const porcentajeGrupoDebe = Number(alerta.porcentajeGrupoDebe || 0);
 
-  if (n >= 5000) return "critica";
-  if (n >= 4000) return "alta";
-  if (n >= 3000) return "media";
+  if (
+    tipo === "persona_sin_pagos" ||
+    tipo === "persona_pago_bajo" ||
+    tipo === "grupo_mas_50_debe"
+  ) {
+    return "critica";
+  }
+
+  if (
+    tipo === "persona_sin_pago_3_meses" ||
+    (tipo === "persona_pago_parcial_con_saldo" && saldo > 1000) ||
+    porcentajeGrupoDebe >= 40
+  ) {
+    return "alta";
+  }
+
+  if (
+    tipo === "persona_pago_parcial_con_saldo" ||
+    tipo === "grupo_20_49_debe"
+  ) {
+    return "media";
+  }
+
   return "baja";
 }
 
-function getPrioridadPagoLabel(valor = 0) {
-  const key = getPrioridadPagoKey(valor);
+function getPrioridadPagoLabel(alerta = {}) {
+  const key = getPrioridadPagoKey(alerta);
 
   if (key === "critica") return "Crítica";
   if (key === "alta") return "Alta";
@@ -1563,13 +1585,14 @@ function filtrarAlertasPagosModal(rows = []) {
   const ano = $("filtro-alerta-pago-ano")?.value || "";
   const vendedor = $("filtro-alerta-pago-vendedor")?.value || "";
   const moneda = $("filtro-alerta-pago-moneda")?.value || "";
+  const prioridad = $("filtro-alerta-pago-prioridad")?.value || "";
   const q = normalizeLoose($("filtro-alerta-pago-buscar")?.value || "");
   const tiposActivos = getTiposActivosAlertasPagos();
 
   return ordenarAlertasPagos(rows.filter((row) => {
     if (ano && String(row.anoViaje || "") !== ano) return false;
     if (vendedor && normalizeEmail(row.vendedoraCorreo || "") !== vendedor) return false;
-    if (moneda && String(row.moneda || "") !== moneda) return false;
+    if (prioridad && getPrioridadPagoKey(row) !== prioridad) return false;
 
     if (tiposActivos.size && !tiposActivos.has(String(row.tipo || ""))) return false;
 
@@ -1682,7 +1705,7 @@ function renderAlertaPagoCard(alerta = {}) {
           <strong>Razón:</strong> ${escapeHtml(alerta.label || alerta.tipo || "Alerta de pago")}<br>
           Grupo: ${escapeHtml(alerta.grupo || "-")} · N° ${escapeHtml(alerta.numeroNegocio || "-")}<br>
           Año: ${escapeHtml(alerta.anoViaje || "-")} · Vendedor(a): ${escapeHtml(alerta.vendedor || "Sin vendedor")}<br>
-          Moneda: ${escapeHtml(alerta.moneda || "-")} · Prioridad: ${escapeHtml(getPrioridadPagoLabel(alerta.prioridad))}
+          Moneda: ${escapeHtml(alerta.moneda || "-")} · Prioridad: ${escapeHtml(getPrioridadPagoLabel(alerta))}
         </div>
 
         ${esPersona ? `
@@ -2091,7 +2114,7 @@ function abrirModalAlertasPagos() {
       renderAlertasPagosListado(filtradas);
     };
 
-    ["filtro-alerta-pago-ano", "filtro-alerta-pago-vendedor", "filtro-alerta-pago-moneda", "filtro-alerta-pago-buscar"]
+    ["filtro-alerta-pago-ano", "filtro-alerta-pago-vendedor", "filtro-alerta-pago-moneda", "filtro-alerta-pago-prioridad", "filtro-alerta-pago-buscar"]
       .forEach((id) => {
         const el = $(id);
         if (!el || el.dataset.bound) return;
