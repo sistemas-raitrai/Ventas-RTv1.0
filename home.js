@@ -3,7 +3,11 @@
 import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.7.3/firebase-auth.js";
 import {
   collection,
-  getDocs
+  getDocs,
+  doc,
+  setDoc,
+  addDoc,
+  serverTimestamp
 } from "https://www.gstatic.com/firebasejs/11.7.3/firebase-firestore.js";
 
 import { auth, db, VENTAS_USERS } from "./firebase-init.js";
@@ -40,6 +44,10 @@ const GITHUB_HOME_URL = "https://sistemas-raitrai.github.io/Ventas-RT/home.html"
 const ALERTAS_COLLECTION = "ventas_alertas";
 const SOLICITUDES_COLLECTION = "ventas_solicitudes_actualizacion";
 
+const API_PAGOS_URL = "/api/pagos";
+const ALERTAS_PAGOS_COLLECTION = "ventas_alertas_pagos";
+const ALERTAS_PAGOS_HISTORIAL_COLLECTION = "ventas_alertas_pagos_historial";
+
 /* =========================================================
    ESTADO
 ========================================================= */
@@ -49,6 +57,8 @@ const state = {
   rowsById: new Map(),
   alertRows: [],
   solicitudesRows: [],
+  alertasPagosRows: [],
+  alertasPagosUltimaActualizacion: null,
   anoFichaFiltro: String(new Date().getFullYear()),
 
   scopedRows: [],
@@ -62,6 +72,7 @@ const state = {
   solicitudesActualizacionRows: [],
   alertasCriticasRows: [],
   alertasWarningRows: [],
+  alertasPagosFiltradasRows: [],
   reuniones3DiasRows: []
 };
 
@@ -526,6 +537,7 @@ function syncAlertRowsByRole(effectiveUser = null) {
   setAlertRowVisibleByChild("link-solicitudes-actualizacion", !!user);
   setAlertRowVisibleByChild("link-alertas-criticas", !!user);
   setAlertRowVisibleByChild("link-alertas-warning", !!user);
+  setAlertRowVisibleByChild("link-alertas-pagos", !!user);
   setAlertRowVisibleByChild("link-reunion-3dias", !!user);
 }
 
@@ -852,10 +864,11 @@ function getAlertsForScope(rows = [], predicate = () => false) {
 ========================================================= */
 
 async function loadHomeData() {
-  const [groupsSnap, alertsSnap, solicitudesSnap] = await Promise.all([
+  const [groupsSnap, alertsSnap, solicitudesSnap, alertasPagosSnap] = await Promise.all([
     getDocs(collection(db, "ventas_cotizaciones")),
     getDocs(collection(db, ALERTAS_COLLECTION)),
-    getDocs(collection(db, SOLICITUDES_COLLECTION))
+    getDocs(collection(db, SOLICITUDES_COLLECTION)),
+    getDocs(collection(db, ALERTAS_PAGOS_COLLECTION))
   ]);
 
   state.rows = groupsSnap.docs.map((docSnap) => {
@@ -881,6 +894,20 @@ async function loadHomeData() {
     id: docSnap.id,
     ...docSnap.data()
   }));
+
+  state.alertasPagosRows = alertasPagosSnap.docs
+    .map((docSnap) => ({
+      id: docSnap.id,
+      ...docSnap.data()
+    }))
+    .filter((row) => row.activa !== false)
+    .sort((a, b) => Number(b.prioridad || 0) - Number(a.prioridad || 0));
+
+  state.alertasPagosUltimaActualizacion =
+    state.alertasPagosRows
+      .map((row) => timestampLikeToDate(row.actualizadoAt))
+      .filter(Boolean)
+      .sort((a, b) => b.getTime() - a.getTime())[0] || null;
 }
 
 /* =========================================================
@@ -1021,6 +1048,9 @@ function renderHome() {
 
   state.alertasCriticasRows = getAlertsForScope(scopedRows, isCriticalIndexAlert);
   state.alertasWarningRows = getAlertsForScope(scopedRows, isWarningIndexAlert);
+  
+  state.alertasPagosFiltradasRows = getAlertasPagosForScope(scopedRows);
+  
   state.reuniones3DiasRows = sortRowsByAlias(scopedRows.filter(isReunionEnProximosTresDias));
 
   setText("count-sin-asignar", state.sinAsignarRows.length);
@@ -1033,9 +1063,707 @@ function renderHome() {
   setText("count-solicitudes-actualizacion", state.solicitudesActualizacionRows.length);
   setText("count-alertas-criticas", state.alertasCriticasRows.length);
   setText("count-alertas-warning", state.alertasWarningRows.length);
+  setText("count-alertas-pagos", state.alertasPagosFiltradasRows.length);
   setText("count-reunion-3dias", state.reuniones3DiasRows.length);
 
   syncAlertRowsByRole(effectiveUser);
+}
+
+/* =========================================================
+   ALERTAS DE PAGOS
+========================================================= */
+
+function numeroPago(v) {
+  if (v === null || v === undefined || v === "") return 0;
+  const n = Number(String(v).replace(/\./g, "").replace(",", "."));
+  return Number.isFinite(n) ? n : 0;
+}
+
+function formatoMontoPago(v, moneda = "") {
+  const currency = String(moneda || "").toUpperCase();
+
+  if (currency === "USD" || currency === "EUR") {
+    return Number(v || 0).toLocaleString("es-CL", {
+      style: "currency",
+      currency,
+      maximumFractionDigits: 0
+    });
+  }
+
+  return Number(v || 0).toLocaleString("es-CL", {
+    maximumFractionDigits: 0
+  });
+}
+
+function normalizarGrupoPagos(g = {}) {
+  return {
+    numeroNegocio: String(g.negocio_id || "").trim(),
+    nombreGrupo: String(g.nombre_colegio || "").trim(),
+    anoViaje: String(g.ano_viaje || "").trim(),
+    fechaSalida: String(g.fecha_salida || "").trim(),
+    destino: String(g.destino || "").trim(),
+    monedaTexto: String(g.moneda_texto || "").trim().toUpperCase(),
+    totalViaje: numeroPago(g.total_viaje),
+    totalPagado: numeroPago(g.total_pagado),
+    saldoPendiente: numeroPago(g.saldo_pendiente)
+  };
+}
+
+function normalizarPasajeroPagos(item = {}) {
+  if (item.pasajero) {
+    const p = item.pasajero || {};
+    const s = item.situacion_pagos || {};
+
+    return {
+      rut: String(p.rut || "").trim(),
+      nombreCompleto: `${p.nombres || ""} ${p.apellidos || ""}`.trim(),
+      categoria: String(p.ocupacion_categoria || "").trim(),
+      responsable: String(p.nombre_apoderado || p.apoderado || "").trim(),
+      correoResponsable: String(p.email || "").trim(),
+      telefonoResponsable: String(p.telefono || "").trim(),
+      viaja: Number(p.viaja) === 1,
+      totalDebe: numeroPago(s.monto_total),
+      totalPagado: numeroPago(s.monto_total_pagado),
+      saldoPendiente: numeroPago(s.saldo_pendiente),
+      ultimoPagoFecha: s.ultimo_pago?.fecha || "",
+      ultimoPagoMonto: numeroPago(s.ultimo_pago?.monto)
+    };
+  }
+
+  return {
+    rut: String(item.rut || "").trim(),
+    nombreCompleto: String(item.nombre_completo || "").trim(),
+    categoria: "",
+    responsable: String(item.nombre_apoderado || item.apoderado || "").trim(),
+    correoResponsable: String(item.email || item.correo || "").trim(),
+    telefonoResponsable: String(item.telefono || item.celular || "").trim(),
+    viaja: String(item.viaja || "").toLowerCase() !== "no",
+    totalDebe: numeroPago(item.total_debe),
+    totalPagado: numeroPago(item.total_pagado),
+    saldoPendiente: numeroPago(item.saldo_pendiente),
+    ultimoPagoFecha: item.ultimo_pago_fecha || "",
+    ultimoPagoMonto: numeroPago(item.ultimo_pago_monto)
+  };
+}
+
+async function fetchJsonPagos(url) {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return await res.json();
+}
+
+function buscarGrupoRtPorNumeroNegocio(numeroNegocio) {
+  const numero = String(numeroNegocio || "").trim();
+
+  return state.rows.find((row) =>
+    String(getNumeroNegocio(row) || "").trim() === numero
+  ) || null;
+}
+
+function diasDesdeFechaPago(fecha) {
+  const d = timestampLikeToDate(fecha);
+  if (!d) return null;
+
+  const now = new Date();
+  const diff = now.getTime() - d.getTime();
+
+  return Math.floor(diff / (1000 * 60 * 60 * 24));
+}
+
+function getTipoAlertaPersonaPago(p = {}, grupo = {}) {
+  if (!p.viaja) return null;
+  if (p.saldoPendiente <= 0) return null;
+
+  const moneda = String(grupo.monedaTexto || "").toUpperCase();
+  const diasUltimoPago = diasDesdeFechaPago(p.ultimoPagoFecha);
+
+  if (p.totalPagado <= 0) {
+    return {
+      tipo: "persona_sin_pagos",
+      nivel: "critica",
+      label: "Nunca ha pagado",
+      gravedad: 5
+    };
+  }
+
+  if ((moneda === "USD" || moneda === "EUR") && p.totalPagado <= 550) {
+    return {
+      tipo: "persona_pagado_550_o_menos",
+      nivel: "critica",
+      label: `Pagado igual o menor a 550 ${moneda}`,
+      gravedad: 4
+    };
+  }
+
+  if (diasUltimoPago !== null && diasUltimoPago > 90) {
+    return {
+      tipo: "persona_sin_pago_3_meses",
+      nivel: "warning",
+      label: "No paga hace más de 3 meses",
+      gravedad: 3
+    };
+  }
+
+  if (p.totalPagado > 50 && p.saldoPendiente > 0) {
+    return {
+      tipo: "persona_pago_parcial_con_saldo",
+      nivel: "warning",
+      label: "Pago parcial con saldo pendiente",
+      gravedad: 2
+    };
+  }
+
+  return null;
+}
+
+function getTipoAlertaGrupoPago(grupo = {}, pasajeros = []) {
+  const viajan = pasajeros.filter((p) => p.viaja);
+  const conDeuda = viajan.filter((p) => p.saldoPendiente > 0);
+
+  const totalViajan = viajan.length;
+  const totalConDeuda = conDeuda.length;
+  const porcentajeDebe = totalViajan > 0 ? (totalConDeuda / totalViajan) * 100 : 0;
+
+  if (!totalViajan || !totalConDeuda) return null;
+
+  if (porcentajeDebe > 50) {
+    return {
+      tipo: "grupo_mas_50_debe",
+      nivel: "critica",
+      label: "Más del 50% del grupo debe",
+      gravedad: 3,
+      porcentajeDebe,
+      totalViajan,
+      totalConDeuda
+    };
+  }
+
+  if (porcentajeDebe >= 20 && porcentajeDebe <= 49) {
+    return {
+      tipo: "grupo_20_49_debe",
+      nivel: "warning",
+      label: "Entre 20% y 49% del grupo debe",
+      gravedad: 2,
+      porcentajeDebe,
+      totalViajan,
+      totalConDeuda
+    };
+  }
+
+  if (porcentajeDebe > 0 && porcentajeDebe < 20) {
+    return {
+      tipo: "grupo_0_19_debe",
+      nivel: "info",
+      label: "Entre 0% y 19% del grupo debe",
+      gravedad: 1,
+      porcentajeDebe,
+      totalViajan,
+      totalConDeuda
+    };
+  }
+
+  return null;
+}
+
+function calcularPrioridadPersona(tipoInfo, grupoInfo = {}) {
+  const porcentajeGrupoDebe = Number(grupoInfo.porcentajeDebe || 0);
+  const avanceGrupo = Math.max(0, 100 - porcentajeGrupoDebe);
+
+  return Math.round(
+    Number(tipoInfo.gravedad || 1) * 1000 +
+    avanceGrupo * 10 -
+    porcentajeGrupoDebe
+  );
+}
+
+function calcularPrioridadGrupo(tipoInfo, grupo = {}) {
+  const saldo = Number(grupo.saldoPendiente || 0);
+
+  // En grupos importa más el que debe menos dentro de su categoría,
+  // porque está más cerca de concretar.
+  return Math.round(
+    Number(tipoInfo.gravedad || 1) * 1000 -
+    Math.min(saldo / 100, 999)
+  );
+}
+
+function getTextoSugeridoPago(alerta = {}) {
+  const responsable = alerta.responsable || "apoderado/a";
+  const participante = alerta.participante || "el/la participante";
+  const grupo = alerta.grupo || "su grupo";
+  const moneda = alerta.moneda || "";
+  const total = formatoMontoPago(alerta.totalDebe, moneda);
+  const pagado = formatoMontoPago(alerta.totalPagado, moneda);
+  const saldo = formatoMontoPago(alerta.saldoPendiente, moneda);
+
+  return `Estimado/a ${responsable}, junto con saludar, le escribimos respecto del viaje de estudios de ${participante}, correspondiente al grupo ${grupo}.
+
+Según nuestros registros, el total del programa es de ${total}, de los cuales actualmente se registra un pago de ${pagado}, quedando un saldo pendiente de ${saldo}.
+
+Le agradeceríamos regularizar esta situación o contactarnos para revisar el estado de pagos.`;
+}
+
+function getAlertasPagosForScope(scopedRows = []) {
+  const scopedIds = new Set(scopedRows.map(getRowId).filter(Boolean));
+  const scopedNumeros = new Set(scopedRows.map(getNumeroNegocio).filter(Boolean));
+
+  return (state.alertasPagosRows || [])
+    .filter((alerta) => {
+      if (alerta.activa === false) return false;
+
+      const idGrupo = String(alerta.idGrupo || "").trim();
+      const numeroNegocio = String(alerta.numeroNegocio || "").trim();
+
+      return scopedIds.has(idGrupo) || scopedNumeros.has(numeroNegocio);
+    })
+    .sort((a, b) => Number(b.prioridad || 0) - Number(a.prioridad || 0));
+}
+
+function buildAlertasPagosFiltrosHtml(rows = []) {
+  const anos = [...new Set(rows.map((r) => String(r.anoViaje || "").trim()).filter(Boolean))].sort();
+  const vendedores = [...new Map(
+    rows
+      .map((r) => [normalizeEmail(r.vendedoraCorreo || ""), r.vendedor || r.vendedoraCorreo || "Sin vendedor"])
+      .filter(([email]) => email)
+  ).entries()];
+
+  const tipos = [...new Set(rows.map((r) => String(r.tipo || "").trim()).filter(Boolean))].sort();
+  const monedas = [...new Set(rows.map((r) => String(r.moneda || "").trim()).filter(Boolean))].sort();
+
+  return `
+    <div style="display:flex; justify-content:space-between; gap:12px; align-items:center; flex-wrap:wrap; margin-bottom:14px;">
+      <div style="font-size:13px; color:#4b405a;">
+        <strong>Última actualización:</strong>
+        ${state.alertasPagosUltimaActualizacion ? escapeHtml(formatDate(state.alertasPagosUltimaActualizacion)) : "Sin actualización"}
+      </div>
+
+      <button type="button" id="btn-actualizar-alertas-pagos" class="home-btn">
+        Actualizar
+      </button>
+    </div>
+
+    <div style="display:grid; grid-template-columns:repeat(5, minmax(140px, 1fr)); gap:10px; margin-bottom:14px;">
+      <select id="filtro-alerta-pago-ano">
+        <option value="">Todos los años</option>
+        ${anos.map((a) => `<option value="${escapeHtml(a)}">${escapeHtml(a)}</option>`).join("")}
+      </select>
+
+      <select id="filtro-alerta-pago-vendedor">
+        <option value="">Todos los vendedores</option>
+        ${vendedores.map(([email, nombre]) => `
+          <option value="${escapeHtml(email)}">${escapeHtml(nombre)}</option>
+        `).join("")}
+      </select>
+
+      <select id="filtro-alerta-pago-tipo">
+        <option value="">Todos los tipos</option>
+        ${tipos.map((tipo) => `<option value="${escapeHtml(tipo)}">${escapeHtml(tipo)}</option>`).join("")}
+      </select>
+
+      <select id="filtro-alerta-pago-moneda">
+        <option value="">Todas las monedas</option>
+        ${monedas.map((m) => `<option value="${escapeHtml(m)}">${escapeHtml(m)}</option>`).join("")}
+      </select>
+
+      <input id="filtro-alerta-pago-buscar" type="search" placeholder="Buscar..." />
+    </div>
+
+    <div id="contenedor-alertas-pagos-listado"></div>
+  `;
+}
+
+function filtrarAlertasPagosModal(rows = []) {
+  const ano = $("filtro-alerta-pago-ano")?.value || "";
+  const vendedor = $("filtro-alerta-pago-vendedor")?.value || "";
+  const tipo = $("filtro-alerta-pago-tipo")?.value || "";
+  const moneda = $("filtro-alerta-pago-moneda")?.value || "";
+  const q = normalizeLoose($("filtro-alerta-pago-buscar")?.value || "");
+
+  return rows.filter((row) => {
+    if (ano && String(row.anoViaje || "") !== ano) return false;
+    if (vendedor && normalizeEmail(row.vendedoraCorreo || "") !== vendedor) return false;
+    if (tipo && String(row.tipo || "") !== tipo) return false;
+    if (moneda && String(row.moneda || "") !== moneda) return false;
+
+    if (q) {
+      const texto = buildSearchText(row);
+      if (!texto.includes(q)) return false;
+    }
+
+    return true;
+  });
+}
+
+function renderAlertasPagosListado(rows = []) {
+  const cont = $("contenedor-alertas-pagos-listado");
+  if (!cont) return;
+
+  if (!rows.length) {
+    cont.innerHTML = emptyHtml("No hay alertas de pagos para mostrar.");
+    return;
+  }
+
+  cont.innerHTML = rows.map(renderAlertaPagoCard).join("");
+}
+
+function renderAlertaPagoCard(alerta = {}) {
+  const esPersona = alerta.categoriaAlerta === "persona";
+  const idGrupo = String(alerta.idGrupo || "").trim();
+  const textoSugerido = esPersona ? getTextoSugeridoPago(alerta) : "";
+  const yaContactado = alerta.contactado === true;
+
+  return `
+    <div class="home-card-row">
+      <div style="min-width:0;">
+        <div class="home-card-row-title">
+          ${escapeHtml(alerta.label || alerta.tipo || "Alerta de pago")}
+        </div>
+
+        <div class="home-card-row-text">
+          Grupo: ${escapeHtml(alerta.grupo || "-")} · N° ${escapeHtml(alerta.numeroNegocio || "-")}<br>
+          Año: ${escapeHtml(alerta.anoViaje || "-")} · Vendedor(a): ${escapeHtml(alerta.vendedor || "Sin vendedor")}<br>
+          Moneda: ${escapeHtml(alerta.moneda || "-")} · Prioridad: ${escapeHtml(alerta.prioridad || 0)}
+        </div>
+
+        ${esPersona ? `
+          <div style="margin-top:10px; color:#3e3550; font-size:14px; line-height:1.5;">
+            <strong>Participante:</strong> ${escapeHtml(alerta.participante || "-")}<br>
+            <strong>Responsable:</strong> ${escapeHtml(alerta.responsable || "-")}<br>
+            <strong>Correo:</strong> ${escapeHtml(alerta.correoResponsable || "-")}<br>
+            <strong>Teléfono:</strong> ${escapeHtml(alerta.telefonoResponsable || "-")}<br>
+            <strong>Total:</strong> ${escapeHtml(formatoMontoPago(alerta.totalDebe, alerta.moneda))} ·
+            <strong>Pagado:</strong> ${escapeHtml(formatoMontoPago(alerta.totalPagado, alerta.moneda))} ·
+            <strong>Saldo:</strong> ${escapeHtml(formatoMontoPago(alerta.saldoPendiente, alerta.moneda))}<br>
+            <strong>Último pago:</strong> ${escapeHtml(alerta.ultimoPagoFecha || "Sin registro")}
+          </div>
+
+          ${yaContactado ? `
+            <div style="margin-top:10px; padding:10px 12px; border-radius:14px; background:#eef8ef; border:1px solid #b9dfc0; color:#1d6a2b; font-size:13px;">
+              ✅ Ya contactado por ${escapeHtml(alerta.contactadoPor || alerta.contactadoPorCorreo || "usuario")} el ${escapeHtml(formatDate(alerta.contactadoAt))}.<br>
+              ⚠ Recuerda que este contacto debe estar registrado también en el historial del Sistema de Pagos.
+            </div>
+          ` : ""}
+
+          <details style="margin-top:10px;">
+            <summary style="cursor:pointer; font-weight:800;">Texto sugerido para contactar</summary>
+            <div style="margin-top:8px; white-space:pre-wrap; padding:10px; border-radius:12px; background:#f7f3fb;">
+              ${escapeHtml(textoSugerido)}
+            </div>
+          </details>
+        ` : `
+          <div style="margin-top:10px; color:#3e3550; font-size:14px; line-height:1.5;">
+            <strong>Total viajan:</strong> ${escapeHtml(alerta.totalViajan || 0)}<br>
+            <strong>Con deuda:</strong> ${escapeHtml(alerta.totalConDeuda || 0)}<br>
+            <strong>% grupo debe:</strong> ${escapeHtml(Number(alerta.porcentajeGrupoDebe || 0).toFixed(1))}%<br>
+            <strong>Saldo pendiente grupo:</strong> ${escapeHtml(formatoMontoPago(alerta.saldoPendienteGrupo, alerta.moneda))}
+          </div>
+        `}
+      </div>
+
+      <div style="display:flex; flex-direction:column; gap:8px;">
+        ${esPersona ? `
+          <button
+            type="button"
+            class="home-btn"
+            data-copy-alerta-pago="${escapeHtml(alerta.id)}"
+          >
+            Copiar texto
+          </button>
+
+          <button
+            type="button"
+            class="home-btn"
+            data-contactar-alerta-pago="${escapeHtml(alerta.id)}"
+            style="background:${yaContactado ? "#6d4a92" : "#1f7a3b"};"
+          >
+            ${yaContactado ? "Registrar nuevo contacto" : "Marcar contactado"}
+          </button>
+        ` : ""}
+
+        <a
+          href="grupo.html?id=${encodeURIComponent(idGrupo)}"
+          target="_blank"
+          rel="noopener"
+          class="home-btn"
+        >
+          Abrir grupo
+        </a>
+      </div>
+    </div>
+  `;
+}
+
+async function copiarTextoAlertaPago(alertaId) {
+  const alerta = state.alertasPagosRows.find((row) => String(row.id) === String(alertaId));
+  if (!alerta) return;
+
+  const texto = getTextoSugeridoPago(alerta);
+
+  try {
+    await navigator.clipboard.writeText(texto);
+    alert("Texto copiado.");
+  } catch (error) {
+    console.error("No se pudo copiar:", error);
+    alert(texto);
+  }
+}
+
+async function marcarAlertaPagoContactada(alertaId) {
+  const alerta = state.alertasPagosRows.find((row) => String(row.id) === String(alertaId));
+  if (!alerta) return;
+
+  const ok = confirm(
+    "Antes de marcar como contactado:\n\n" +
+    "Recuerda registrar este contacto también en el historial del Sistema de Pagos.\n\n" +
+    "¿Confirmas que ya lo registraste o que lo registrarás ahora?"
+  );
+
+  if (!ok) return;
+
+  const nota = prompt("Nota del contacto realizado:", "") || "";
+
+  const user = getEffectiveUser() || {};
+  const realUser = getRealUser() || {};
+
+  const payload = {
+    ...alerta,
+    contactado: true,
+    contactadoAt: new Date().toISOString(),
+    contactadoPor: user.nombre || user.name || user.email || "",
+    contactadoPorCorreo: normalizeEmail(user.email || ""),
+    contactadoRealPorCorreo: normalizeEmail(realUser.email || ""),
+    notaContacto: nota,
+    requiereRegistroHistorialPagos: true,
+    mensajeAviso: "Debe registrar este contacto en historial del Sistema de Pagos",
+    actualizadoAt: new Date().toISOString()
+  };
+
+  await setDoc(doc(db, ALERTAS_PAGOS_COLLECTION, alerta.id), payload, { merge: true });
+
+  await addDoc(collection(db, ALERTAS_PAGOS_HISTORIAL_COLLECTION), {
+    tipo: "contacto_alerta_pago",
+    fecha: serverTimestamp(),
+    usuario: user.nombre || user.name || user.email || "",
+    usuarioCorreo: normalizeEmail(user.email || ""),
+    realUsuarioCorreo: normalizeEmail(realUser.email || ""),
+    alertaId: alerta.id,
+    numeroNegocio: alerta.numeroNegocio || "",
+    idGrupo: alerta.idGrupo || "",
+    rut: alerta.rut || "",
+    participante: alerta.participante || "",
+    responsable: alerta.responsable || "",
+    correoResponsable: alerta.correoResponsable || "",
+    telefonoResponsable: alerta.telefonoResponsable || "",
+    nota,
+    aviso: "Usuario fue advertido de registrar contacto en historial del Sistema de Pagos"
+  });
+
+  await loadHomeData();
+  renderHome();
+  abrirModalAlertasPagos();
+}
+
+async function actualizarAlertasPagos() {
+  const user = getEffectiveUser() || {};
+  const realUser = getRealUser() || {};
+
+  const ok = confirm(
+    "Esto consultará el Sistema de Pagos y recalculará las alertas.\n\n" +
+    "Puede demorar algunos minutos si hay muchos grupos.\n\n" +
+    "¿Deseas continuar?"
+  );
+
+  if (!ok) return;
+
+  const btn = $("btn-actualizar-alertas-pagos");
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = "Actualizando...";
+  }
+
+  try {
+    const dataGrupos = await fetchJsonPagos(`${API_PAGOS_URL}?modo=grupos`);
+    const gruposPagos = (dataGrupos?.grupos?.data || []).map(normalizarGrupoPagos);
+
+    const alertas = [];
+
+    for (let i = 0; i < gruposPagos.length; i++) {
+      const grupoPago = gruposPagos[i];
+      if (!grupoPago.numeroNegocio) continue;
+
+      const grupoRt = buscarGrupoRtPorNumeroNegocio(grupoPago.numeroNegocio);
+      if (!grupoRt) continue;
+
+      if (btn) {
+        btn.textContent = `Actualizando ${i + 1}/${gruposPagos.length}`;
+      }
+
+      const detalle = await fetchJsonPagos(
+        `${API_PAGOS_URL}?modo=detalle&numeroNegocio=${encodeURIComponent(grupoPago.numeroNegocio)}`
+      );
+
+      const pasajerosRaw =
+        detalle?.nominas?.data?.pasajeros ||
+        detalle?.saldos?.data?.detalle_pasajeros ||
+        [];
+
+      const pasajeros = pasajerosRaw.map(normalizarPasajeroPagos);
+
+      const grupoAlertaInfo = getTipoAlertaGrupoPago(grupoPago, pasajeros);
+
+      if (grupoAlertaInfo) {
+        const id = `grupo_${grupoPago.numeroNegocio}_${grupoAlertaInfo.tipo}`;
+
+        alertas.push({
+          id,
+          categoriaAlerta: "grupo",
+          tipo: grupoAlertaInfo.tipo,
+          label: grupoAlertaInfo.label,
+          nivel: grupoAlertaInfo.nivel,
+          activa: true,
+          prioridad: calcularPrioridadGrupo(grupoAlertaInfo, grupoPago),
+          numeroNegocio: grupoPago.numeroNegocio,
+          idGrupo: getRowId(grupoRt),
+          grupo: getRowAlias(grupoRt),
+          anoViaje: String(grupoPago.anoViaje || getAnoViajeNumber(grupoRt) || ""),
+          destino: grupoPago.destino || grupoRt.destino || grupoRt.destinoPrincipal || "",
+          moneda: grupoPago.monedaTexto,
+          vendedor: getRowVendorName(grupoRt) || grupoRt.vendedoraCorreo || "",
+          vendedoraCorreo: normalizeEmail(grupoRt.vendedoraCorreo || ""),
+          porcentajeGrupoDebe: grupoAlertaInfo.porcentajeDebe,
+          totalViajan: grupoAlertaInfo.totalViajan,
+          totalConDeuda: grupoAlertaInfo.totalConDeuda,
+          saldoPendienteGrupo: grupoPago.saldoPendiente,
+          actualizadoAt: new Date().toISOString()
+        });
+      }
+
+      const viajan = pasajeros.filter((p) => p.viaja);
+      const conDeuda = viajan.filter((p) => p.saldoPendiente > 0);
+      const porcentajeGrupoDebe = viajan.length > 0 ? (conDeuda.length / viajan.length) * 100 : 0;
+
+      pasajeros.forEach((p) => {
+        const tipoInfo = getTipoAlertaPersonaPago(p, grupoPago);
+        if (!tipoInfo) return;
+
+        const rutKey = String(p.rut || p.nombreCompleto || "")
+          .replace(/[^a-zA-Z0-9]/g, "_")
+          .slice(0, 80);
+
+        const id = `persona_${grupoPago.numeroNegocio}_${rutKey}_${tipoInfo.tipo}`;
+
+        alertas.push({
+          id,
+          categoriaAlerta: "persona",
+          tipo: tipoInfo.tipo,
+          label: tipoInfo.label,
+          nivel: tipoInfo.nivel,
+          activa: true,
+          prioridad: calcularPrioridadPersona(tipoInfo, { porcentajeDebe: porcentajeGrupoDebe }),
+          numeroNegocio: grupoPago.numeroNegocio,
+          idGrupo: getRowId(grupoRt),
+          grupo: getRowAlias(grupoRt),
+          anoViaje: String(grupoPago.anoViaje || getAnoViajeNumber(grupoRt) || ""),
+          destino: grupoPago.destino || grupoRt.destino || grupoRt.destinoPrincipal || "",
+          moneda: grupoPago.monedaTexto,
+          vendedor: getRowVendorName(grupoRt) || grupoRt.vendedoraCorreo || "",
+          vendedoraCorreo: normalizeEmail(grupoRt.vendedoraCorreo || ""),
+          rut: p.rut,
+          participante: p.nombreCompleto,
+          categoria: p.categoria,
+          responsable: p.responsable,
+          correoResponsable: p.correoResponsable,
+          telefonoResponsable: p.telefonoResponsable,
+          totalDebe: p.totalDebe,
+          totalPagado: p.totalPagado,
+          saldoPendiente: p.saldoPendiente,
+          ultimoPagoFecha: p.ultimoPagoFecha,
+          ultimoPagoMonto: p.ultimoPagoMonto,
+          porcentajeGrupoDebe,
+          actualizadoAt: new Date().toISOString()
+        });
+      });
+    }
+
+    for (const alerta of alertas) {
+      const anterior = state.alertasPagosRows.find((a) => String(a.id) === String(alerta.id));
+
+      await setDoc(doc(db, ALERTAS_PAGOS_COLLECTION, alerta.id), {
+        ...alerta,
+
+        // Conserva marca de contacto si la alerta sigue viva al día siguiente.
+        contactado: anterior?.contactado === true,
+        contactadoAt: anterior?.contactadoAt || null,
+        contactadoPor: anterior?.contactadoPor || "",
+        contactadoPorCorreo: anterior?.contactadoPorCorreo || "",
+        notaContacto: anterior?.notaContacto || "",
+
+        actualizadoPor: user.nombre || user.name || user.email || "",
+        actualizadoPorCorreo: normalizeEmail(user.email || ""),
+        actualizadoRealPorCorreo: normalizeEmail(realUser.email || "")
+      }, { merge: true });
+    }
+
+    await addDoc(collection(db, ALERTAS_PAGOS_HISTORIAL_COLLECTION), {
+      tipo: "actualizacion_alertas_pagos",
+      fecha: serverTimestamp(),
+      usuario: user.nombre || user.name || user.email || "",
+      usuarioCorreo: normalizeEmail(user.email || ""),
+      realUsuarioCorreo: normalizeEmail(realUser.email || ""),
+      totalAlertas: alertas.length,
+      totalPersonas: alertas.filter((a) => a.categoriaAlerta === "persona").length,
+      totalGrupos: alertas.filter((a) => a.categoriaAlerta === "grupo").length
+    });
+
+    await loadHomeData();
+    renderHome();
+    abrirModalAlertasPagos();
+
+  } catch (error) {
+    console.error("Error actualizando alertas de pagos:", error);
+    alert("No se pudieron actualizar las alertas de pagos: " + error.message);
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = "Actualizar";
+    }
+  }
+}
+
+function abrirModalAlertasPagos() {
+  openListadoModal({
+    titulo: "Alertas de pagos",
+    subtitulo: "Alertas generadas desde el Sistema de Pagos, ordenadas por prioridad.",
+    resumen: `Hay ${state.alertasPagosFiltradasRows.length} alerta(s) de pagos.`,
+    rows: state.alertasPagosFiltradasRows,
+    renderFn: (rows) => buildAlertasPagosFiltrosHtml(rows)
+  });
+
+  setTimeout(() => {
+    const rowsBase = state.alertasPagosFiltradasRows || [];
+
+    const refrescar = () => {
+      const filtradas = filtrarAlertasPagosModal(rowsBase);
+      renderAlertasPagosListado(filtradas);
+    };
+
+    ["filtro-alerta-pago-ano", "filtro-alerta-pago-vendedor", "filtro-alerta-pago-tipo", "filtro-alerta-pago-moneda", "filtro-alerta-pago-buscar"]
+      .forEach((id) => {
+        const el = $(id);
+        if (!el || el.dataset.bound) return;
+        el.dataset.bound = "1";
+        el.addEventListener("input", refrescar);
+        el.addEventListener("change", refrescar);
+      });
+
+    const btnActualizar = $("btn-actualizar-alertas-pagos");
+    if (btnActualizar && !btnActualizar.dataset.bound) {
+      btnActualizar.dataset.bound = "1";
+      btnActualizar.addEventListener("click", actualizarAlertasPagos);
+    }
+
+    refrescar();
+  }, 80);
 }
 
 /* =========================================================
@@ -1618,6 +2346,7 @@ function bindAlertButtons() {
   const linkHomeFichasAutorizadas = $("link-home-fichas-autorizadas");
   const linkCriticas = $("link-alertas-criticas");
   const linkWarning = $("link-alertas-warning");
+  const linkAlertasPagos = $("link-alertas-pagos");
   const linkReuniones = $("link-reunion-3dias");
   const selectAnoFichas = $("select-home-ano-fichas");
 
@@ -1636,6 +2365,25 @@ function bindAlertButtons() {
       const isHidden = box.hidden;
       box.hidden = !isHidden;
       btn.textContent = isHidden ? "Ocultar motivo" : "Ver motivo";
+    });
+  }
+
+  if (!document.body.dataset.boundAlertasPagosAcciones) {
+    document.body.dataset.boundAlertasPagosAcciones = "1";
+
+    document.addEventListener("click", async (e) => {
+      const btnCopy = e.target.closest("[data-copy-alerta-pago]");
+      if (btnCopy) {
+        e.preventDefault();
+        await copiarTextoAlertaPago(btnCopy.dataset.copyAlertaPago);
+        return;
+      }
+
+      const btnContactar = e.target.closest("[data-contactar-alerta-pago]");
+      if (btnContactar) {
+        e.preventDefault();
+        await marcarAlertaPagoContactada(btnContactar.dataset.contactarAlertaPago);
+      }
     });
   }
 
@@ -1758,6 +2506,14 @@ function bindAlertButtons() {
         rows: state.alertasWarningRows,
         renderFn: renderAlertCards
       });
+    });
+  }
+
+  if (linkAlertasPagos && !linkAlertasPagos.dataset.bound) {
+    linkAlertasPagos.dataset.bound = "1";
+    linkAlertasPagos.addEventListener("click", (e) => {
+      e.preventDefault();
+      abrirModalAlertasPagos();
     });
   }
 
