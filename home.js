@@ -1308,7 +1308,7 @@ function getTiposAlertaGrupoPago(grupo = {}, pasajeros = []) {
     alertas.push({
       tipo: "grupo_10_mas_deudores",
       nivel: "warning",
-      label: "10+ deudores",
+      label: "grupo c/10+ deudores",
       gravedad: 3,
       porcentajeSaldoPendiente,
       porcentajeGrupoSinPago60,
