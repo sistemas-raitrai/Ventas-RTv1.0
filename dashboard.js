@@ -603,7 +603,11 @@ window.buscarCorreosEnPagos = async function (correos = []) {
     ? gruposOriginales
     : (await fetchJson(`${API_PAGOS_URL}?modo=grupos`))?.grupos?.data?.map(normalizarGrupo) || [];
 
+  let revisados = 0;
+
   for (const grupo of grupos) {
+    revisados++;
+    console.log(`🔎 ${revisados}/${grupos.length} revisando N° ${grupo.numeroNegocio} · ${grupo.nombreGrupo || ""}`);
     try {
       const data = await fetchJson(
         `${API_PAGOS_URL}?modo=detalle&numeroNegocio=${encodeURIComponent(grupo.numeroNegocio)}`
