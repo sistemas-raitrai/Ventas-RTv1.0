@@ -1276,15 +1276,15 @@ function getTiposAlertaGrupoPago(grupo = {}, pasajeros = []) {
   const porcentajeSaldoPendiente =
     totalViaje > 0 ? (saldoPendienteGrupo / totalViaje) * 100 : 0;
 
-  const fechasPago = viajan
-    .map((p) => timestampLikeToDate(p.ultimoPagoFecha))
-    .filter(Boolean)
-    .sort((a, b) => b.getTime() - a.getTime());
+  const deudoresSinPago60 = conDeuda.filter((p) => {
+    const dias = diasDesdeFechaPago(p.ultimoPagoFecha);
+    return dias !== null && dias > 60;
+  });
 
-  const ultimaFechaPagoGrupo = fechasPago[0] || null;
-  const diasSinPagoGrupo = ultimaFechaPagoGrupo
-    ? diasDesdeFechaPago(ultimaFechaPagoGrupo)
-    : null;
+  const totalDeudoresSinPago60 = deudoresSinPago60.length;
+
+  const porcentajeGrupoSinPago60 =
+    totalViajan > 0 ? (totalDeudoresSinPago60 / totalViajan) * 100 : 0;
 
   const alertas = [];
 
@@ -1296,10 +1296,10 @@ function getTiposAlertaGrupoPago(grupo = {}, pasajeros = []) {
       label: "Grupo debe >50%",
       gravedad: 4,
       porcentajeSaldoPendiente,
+      porcentajeGrupoSinPago60,
       totalViajan,
       totalConDeuda,
-      ultimaFechaPagoGrupo: ultimaFechaPagoGrupo ? ultimaFechaPagoGrupo.toISOString() : "",
-      diasSinPagoGrupo
+      totalDeudoresSinPago60
     });
   }
 
@@ -1311,25 +1311,29 @@ function getTiposAlertaGrupoPago(grupo = {}, pasajeros = []) {
       label: "10+ deudores",
       gravedad: 3,
       porcentajeSaldoPendiente,
+      porcentajeGrupoSinPago60,
       totalViajan,
       totalConDeuda,
-      ultimaFechaPagoGrupo: ultimaFechaPagoGrupo ? ultimaFechaPagoGrupo.toISOString() : "",
-      diasSinPagoGrupo
+      totalDeudoresSinPago60
     });
   }
 
-  // 3) El grupo no registra pagos hace más de 90 días
-  if (saldoPendienteGrupo > 0 && diasSinPagoGrupo !== null && diasSinPagoGrupo > 90) {
+  // 3) 30% o más del grupo con deuda y sin pagar hace más de 60 días
+  if (
+    saldoPendienteGrupo > 0 &&
+    totalViajan > 0 &&
+    porcentajeGrupoSinPago60 >= 30
+  ) {
     alertas.push({
-      tipo: "grupo_sin_pagos_90",
+      tipo: "grupo_30_sin_pago_60",
       nivel: "warning",
-      label: "Sin pagos +90 días",
+      label: "30%+ sin pago +60 días",
       gravedad: 3,
       porcentajeSaldoPendiente,
+      porcentajeGrupoSinPago60,
       totalViajan,
       totalConDeuda,
-      ultimaFechaPagoGrupo: ultimaFechaPagoGrupo ? ultimaFechaPagoGrupo.toISOString() : "",
-      diasSinPagoGrupo
+      totalDeudoresSinPago60
     });
   }
 
@@ -1373,7 +1377,7 @@ function getPrioridadPagoKey(alerta = {}) {
   if (
     tipo === "persona_sin_pago_3_meses" ||
     tipo === "grupo_10_mas_deudores" ||
-    tipo === "grupo_sin_pagos_90" ||
+    tipo === "grupo_30_sin_pago_60" ||
     (tipo === "persona_pago_parcial_con_saldo" && saldo > 1000)
   ) {
     return "alta";
@@ -1547,7 +1551,7 @@ function getTiposAlertasPagosUI() {
 
     { tipo: "grupo_debe_mas_50", label: "Grupo debe >50%" },
     { tipo: "grupo_10_mas_deudores", label: "10+ deudores" },
-    { tipo: "grupo_sin_pagos_90", label: "Sin pagos +90 días" }
+    { tipo: "grupo_30_sin_pago_60", label: "30%+ sin pago +60 días" }
   ];
 }
 
@@ -1868,10 +1872,50 @@ function renderAlertaPagoCard(alerta = {}) {
             <strong>Total viajan:</strong> ${escapeHtml(alerta.totalViajan || 0)}<br>
             <strong>Con deuda:</strong> ${escapeHtml(alerta.totalConDeuda || 0)}<br>
             <strong>% saldo pendiente grupo:</strong> ${escapeHtml(Number(alerta.porcentajeGrupoDebe || 0).toFixed(1))}%<br>
-            <strong>Saldo pendiente grupo:</strong> ${escapeHtml(formatoMontoPago(alerta.saldoPendienteGrupo, alerta.moneda))}
-            <br>
-            <strong>Último pago grupo:</strong> ${escapeHtml(alerta.ultimaFechaPagoGrupo ? formatDate(alerta.ultimaFechaPagoGrupo) : "Sin registro")}<br>
-            <strong>Días sin pago grupo:</strong> ${escapeHtml(alerta.diasSinPagoGrupo ?? "-")}
+            <strong>Saldo pendiente grupo:</strong> ${escapeHtml(formatoMontoPago(alerta.saldoPendienteGrupo, alerta.moneda))}<br>
+            <strong>30%+ sin pago +60 días:</strong>
+            ${escapeHtml(alerta.totalDeudoresSinPago60 || 0)}
+            persona(s)
+            (${escapeHtml(Number(alerta.porcentajeGrupoSinPago60 || 0).toFixed(1))}%)
+          </div>
+        
+          <div style="margin-top:14px;">
+            <strong style="display:block; margin-bottom:8px;">Personas con deuda del grupo</strong>
+        
+            ${Array.isArray(alerta.pasajerosConDeudaGrupo) && alerta.pasajerosConDeudaGrupo.length ? `
+              <div style="overflow:auto; border:1px solid rgba(49,25,75,.10); border-radius:14px;">
+                <table style="width:100%; border-collapse:collapse; font-size:12px;">
+                  <thead style="background:#f7f3fb; color:#32184f;">
+                    <tr>
+                      <th style="padding:8px; text-align:left;">Participante</th>
+                      <th style="padding:8px; text-align:left;">Responsable</th>
+                      <th style="padding:8px; text-align:right;">Pagado</th>
+                      <th style="padding:8px; text-align:right;">Saldo</th>
+                      <th style="padding:8px; text-align:left;">Último pago</th>
+                      <th style="padding:8px; text-align:right;">Días</th>
+                    </tr>
+                  </thead>
+        
+                  <tbody>
+                    ${alerta.pasajerosConDeudaGrupo.map((p) => `
+                      <tr style="border-top:1px solid rgba(49,25,75,.08);">
+                        <td style="padding:8px;">
+                          <strong>${escapeHtml(p.participante || "-")}</strong><br>
+                          <span style="color:#766b84;">${escapeHtml(p.rut || "")}</span>
+                        </td>
+                        <td style="padding:8px;">${escapeHtml(p.responsable || "-")}</td>
+                        <td style="padding:8px; text-align:right;">${escapeHtml(formatoMontoPago(p.totalPagado || 0, alerta.moneda))}</td>
+                        <td style="padding:8px; text-align:right; font-weight:900;">${escapeHtml(formatoMontoPago(p.saldoPendiente || 0, alerta.moneda))}</td>
+                        <td style="padding:8px;">${escapeHtml(p.ultimoPagoFecha || "-")}</td>
+                        <td style="padding:8px; text-align:right;">${escapeHtml(p.diasUltimoPago ?? "-")}</td>
+                      </tr>
+                    `).join("")}
+                  </tbody>
+                </table>
+              </div>
+            ` : `
+              <div class="home-empty">No hay detalle de personas con deuda guardado para esta alerta.</div>
+            `}
           </div>
         `}
       </div>
@@ -2105,6 +2149,22 @@ async function actualizarAlertasPagos() {
 
       const pasajeros = pasajerosRaw.map(normalizarPasajeroPagos);
 
+      const pasajerosConDeudaGrupo = pasajeros
+      .filter((p) => p.viaja && p.saldoPendiente > 0)
+      .sort((a, b) => Number(b.saldoPendiente || 0) - Number(a.saldoPendiente || 0))
+      .map((p) => ({
+        rut: p.rut || "",
+        participante: p.nombreCompleto || "",
+        responsable: p.responsable || "",
+        correoResponsable: p.correoResponsable || "",
+        telefonoResponsable: p.telefonoResponsable || "",
+        totalDebe: p.totalDebe || 0,
+        totalPagado: p.totalPagado || 0,
+        saldoPendiente: p.saldoPendiente || 0,
+        ultimoPagoFecha: p.ultimoPagoFecha || "",
+        diasUltimoPago: diasDesdeFechaPago(p.ultimoPagoFecha)
+      }));
+
       const gruposAlertaInfo = getTiposAlertaGrupoPago(grupoPago, pasajeros);
       
       gruposAlertaInfo.forEach((grupoAlertaInfo) => {
@@ -2132,8 +2192,9 @@ async function actualizarAlertasPagos() {
           totalConDeuda: grupoAlertaInfo.totalConDeuda,
           saldoPendienteGrupo: grupoPago.saldoPendiente,
           totalViajeGrupo: grupoPago.totalViaje,
-          ultimaFechaPagoGrupo: grupoAlertaInfo.ultimaFechaPagoGrupo || "",
-          diasSinPagoGrupo: grupoAlertaInfo.diasSinPagoGrupo ?? null,
+          porcentajeGrupoSinPago60: grupoAlertaInfo.porcentajeGrupoSinPago60 || 0,
+          totalDeudoresSinPago60: grupoAlertaInfo.totalDeudoresSinPago60 || 0,
+          pasajerosConDeudaGrupo,
           actualizadoAt: new Date().toISOString()
         });
       });
