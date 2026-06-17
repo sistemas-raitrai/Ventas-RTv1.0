@@ -1222,9 +1222,18 @@ function getTipoAlertaGrupoPago(grupo = {}, pasajeros = []) {
 
   const totalViajan = viajan.length;
   const totalConDeuda = conDeuda.length;
-  const porcentajeDebe = totalViajan > 0 ? (totalConDeuda / totalViajan) * 100 : 0;
 
-  if (!totalViajan || !totalConDeuda) return null;
+  let porcentajeDebe = 0;
+
+  if (totalViajan > 0) {
+    porcentajeDebe = (totalConDeuda / totalViajan) * 100;
+  } else if (grupo.totalViaje > 0 && grupo.saldoPendiente > 0) {
+    porcentajeDebe = (grupo.saldoPendiente / grupo.totalViaje) * 100;
+  } else if (grupo.totalPagado <= 0 && grupo.totalViaje > 0) {
+    porcentajeDebe = 100;
+  }
+
+  if (porcentajeDebe <= 0) return null;
 
   if (porcentajeDebe > 50) {
     return {
@@ -1238,7 +1247,7 @@ function getTipoAlertaGrupoPago(grupo = {}, pasajeros = []) {
     };
   }
 
-  if (porcentajeDebe >= 20 && porcentajeDebe <= 49) {
+  if (porcentajeDebe >= 20) {
     return {
       tipo: "grupo_20_49_debe",
       nivel: "warning",
@@ -1250,19 +1259,15 @@ function getTipoAlertaGrupoPago(grupo = {}, pasajeros = []) {
     };
   }
 
-  if (porcentajeDebe > 0 && porcentajeDebe < 20) {
-    return {
-      tipo: "grupo_0_19_debe",
-      nivel: "info",
-      label: "Entre 0% y 19% del grupo debe",
-      gravedad: 1,
-      porcentajeDebe,
-      totalViajan,
-      totalConDeuda
-    };
-  }
-
-  return null;
+  return {
+    tipo: "grupo_0_19_debe",
+    nivel: "info",
+    label: "Entre 0% y 19% del grupo debe",
+    gravedad: 1,
+    porcentajeDebe,
+    totalViajan,
+    totalConDeuda
+  };
 }
 
 function calcularPrioridadPersona(tipoInfo, grupoInfo = {}) {
@@ -1591,8 +1596,17 @@ async function actualizarAlertasPagos() {
       const grupoPago = gruposPagos[i];
       if (!grupoPago.numeroNegocio) continue;
 
-      const grupoRt = buscarGrupoRtPorNumeroNegocio(grupoPago.numeroNegocio);
-      if (!grupoRt) continue;
+      const grupoRt = buscarGrupoRtPorNumeroNegocio(grupoPago.numeroNegocio) || {
+        idGrupo: "",
+        id: "",
+        numeroNegocio: grupoPago.numeroNegocio,
+        nombreGrupo: grupoPago.nombreGrupo,
+        colegio: grupoPago.nombreGrupo,
+        anoViaje: grupoPago.anoViaje,
+        destino: grupoPago.destino,
+        vendedora: "Sin vendedor",
+        vendedoraCorreo: ""
+      };
 
       if (btn) {
         btn.textContent = `Actualizando ${i + 1}/${gruposPagos.length}`;
@@ -1684,6 +1698,15 @@ async function actualizarAlertasPagos() {
         });
       });
     }
+
+    state.alertasPagosRows = alertas
+      .filter((row) => row.activa !== false)
+      .sort((a, b) => Number(b.prioridad || 0) - Number(a.prioridad || 0));
+    
+    state.alertasPagosUltimaActualizacion = new Date();
+    
+    renderHome();
+    abrirModalAlertasPagos();
 
     for (const alerta of alertas) {
       const anterior = state.alertasPagosRows.find((a) => String(a.id) === String(alerta.id));
