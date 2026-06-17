@@ -61,6 +61,9 @@ const state = {
   alertasPagosUltimaActualizacion: null,
   anoFichaFiltro: String(new Date().getFullYear()),
 
+  alertasPagosSortKey: "prioridad",
+  alertasPagosSortDir: "desc",
+
   scopedRows: [],
   sinAsignarRows: [],
   aContactarRows: [],
@@ -1547,20 +1550,71 @@ function renderResumenAlertasPagos(rows = []) {
 }
 
 function ordenarAlertasPagos(rows = []) {
+  const base = [...rows].map((row, index) => ({
+    ...row,
+    _numeroOrden: index + 1
+  }));
+
+  return ordenarAlertasPagosPorColumna(base);
+}
+
+function getValorOrdenAlertaPago(row = {}, key = "") {
+  if (key === "numero") return Number(row._numeroOrden || 0);
+  if (key === "participante") return normalizeLoose(row.participante || row.grupo || "");
+  if (key === "grupo") return normalizeLoose(row.grupo || "");
+  if (key === "ano") return Number(row.anoViaje || 0);
+  if (key === "vendedor") return normalizeLoose(row.vendedor || "");
+  if (key === "razon") return normalizeLoose(row.label || row.tipo || "");
+  if (key === "pagado") return Number(row.totalPagado || 0);
+  if (key === "saldo") return Number(row.saldoPendiente || row.saldoPendienteGrupo || 0);
+  if (key === "ultimoPago") {
+    const d = timestampLikeToDate(row.ultimoPagoFecha);
+    return d ? d.getTime() : 0;
+  }
+  if (key === "estado") return row.contactado === true ? 1 : 0;
+  if (key === "prioridad") return Number(row.prioridad || 0);
+
+  return "";
+}
+
+function ordenarAlertasPagosPorColumna(rows = []) {
+  const key = state.alertasPagosSortKey || "prioridad";
+  const dir = state.alertasPagosSortDir || "desc";
+  const factor = dir === "asc" ? 1 : -1;
+
   return [...rows].sort((a, b) => {
-    if (!!a.contactado !== !!b.contactado) {
-      return a.contactado ? 1 : -1;
+    const va = getValorOrdenAlertaPago(a, key);
+    const vb = getValorOrdenAlertaPago(b, key);
+
+    if (typeof va === "number" && typeof vb === "number") {
+      return (va - vb) * factor;
     }
 
-    const prioridad = Number(b.prioridad || 0) - Number(a.prioridad || 0);
-    if (prioridad !== 0) return prioridad;
-
-    return String(a.participante || a.grupo || "").localeCompare(
-      String(b.participante || b.grupo || ""),
-      "es",
-      { sensitivity: "base" }
-    );
+    return String(va).localeCompare(String(vb), "es", {
+      sensitivity: "base",
+      numeric: true
+    }) * factor;
   });
+}
+
+function getIconoOrdenAlertaPago(key = "") {
+  if (state.alertasPagosSortKey !== key) return "↕";
+  return state.alertasPagosSortDir === "asc" ? "▲" : "▼";
+}
+
+function thOrdenAlertaPago(label = "", key = "", align = "left") {
+  return `
+    <th
+      data-sort-alerta-pago="${escapeHtml(key)}"
+      style="padding:10px; text-align:${align}; cursor:pointer; user-select:none; white-space:nowrap;"
+      title="Ordenar"
+    >
+      ${escapeHtml(label)}
+      <span style="font-size:10px; opacity:.85; margin-left:4px;">
+        ${escapeHtml(getIconoOrdenAlertaPago(key))}
+      </span>
+    </th>
+  `;
 }
 
 function limpiarTelefonoWhatsapp(valor = "") {
@@ -1648,16 +1702,16 @@ function renderAlertasPagosListado(rows = []) {
       <table style="width:100%; border-collapse:collapse; font-size:12px;">
         <thead style="background:#32184f; color:white; position:sticky; top:0;">
           <tr>
-            <th style="padding:10px; text-align:left;">#</th>
-            <th style="padding:10px; text-align:left;">Participante / Grupo</th>
-            <th style="padding:10px; text-align:left;">Grupo</th>
-            <th style="padding:10px; text-align:left;">Año</th>
-            <th style="padding:10px; text-align:left;">Vendedor</th>
-            <th style="padding:10px; text-align:left;">Razón</th>
-            <th style="padding:10px; text-align:right;">Pagado</th>
-            <th style="padding:10px; text-align:right;">Saldo</th>
-            <th style="padding:10px; text-align:left;">Último pago</th>
-            <th style="padding:10px; text-align:left;">Estado</th>
+            ${thOrdenAlertaPago("#", "numero")}
+            ${thOrdenAlertaPago("Participante / Grupo", "participante")}
+            ${thOrdenAlertaPago("Grupo", "grupo")}
+            ${thOrdenAlertaPago("Año", "ano")}
+            ${thOrdenAlertaPago("Vendedor", "vendedor")}
+            ${thOrdenAlertaPago("Razón", "razon")}
+            ${thOrdenAlertaPago("Pagado", "pagado", "right")}
+            ${thOrdenAlertaPago("Saldo", "saldo", "right")}
+            ${thOrdenAlertaPago("Último pago", "ultimoPago")}
+            ${thOrdenAlertaPago("Estado", "estado")}
           </tr>
         </thead>
 
@@ -2141,7 +2195,30 @@ function abrirModalAlertasPagos() {
     const refrescar = () => {
       const filtradas = filtrarAlertasPagosModal(rowsBase);
       renderAlertasPagosListado(filtradas);
+
+      document.querySelectorAll("[data-sort-alerta-pago]").forEach((th) => {
+        if (th.dataset.boundSort) return;
+        th.dataset.boundSort = "1";
+
+        th.addEventListener("click", () => {
+          const key = th.dataset.sortAlertaPago;
+
+          if (state.alertasPagosSortKey === key) {
+            state.alertasPagosSortDir =
+              state.alertasPagosSortDir === "asc" ? "desc" : "asc";
+          } else {
+            state.alertasPagosSortKey = key;
+            state.alertasPagosSortDir =
+              ["pagado", "saldo", "ano", "ultimoPago", "estado", "numero"].includes(key)
+                ? "desc"
+                : "asc";
+          }
+
+          refrescar();
+        });
+      });
     };
+
 
     ["filtro-alerta-pago-ano", "filtro-alerta-pago-vendedor", "filtro-alerta-pago-moneda", "filtro-alerta-pago-prioridad", "filtro-alerta-pago-buscar"]
       .forEach((id) => {
