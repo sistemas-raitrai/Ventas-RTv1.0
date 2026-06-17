@@ -1272,62 +1272,64 @@ function getTiposAlertaGrupoPago(grupo = {}, pasajeros = []) {
 
   const totalViaje = Number(grupo.totalViaje || 0);
   const saldoPendienteGrupo = Number(grupo.saldoPendiente || 0);
+
   const porcentajeSaldoPendiente =
     totalViaje > 0 ? (saldoPendienteGrupo / totalViaje) * 100 : 0;
 
-  const moneda = String(grupo.monedaTexto || "").toUpperCase();
+  const fechasPago = viajan
+    .map((p) => timestampLikeToDate(p.ultimoPagoFecha))
+    .filter(Boolean)
+    .sort((a, b) => b.getTime() - a.getTime());
 
-  const limiteCercaCerrar =
-    moneda === "USD" || moneda === "EUR"
-      ? 5000
-      : moneda === "CLP"
-        ? 5000000
-        : null;
+  const ultimaFechaPagoGrupo = fechasPago[0] || null;
+  const diasSinPagoGrupo = ultimaFechaPagoGrupo
+    ? diasDesdeFechaPago(ultimaFechaPagoGrupo)
+    : null;
 
   const alertas = [];
 
-  // 1) Grupo crítico: debe más del 50% del valor total
-  if (porcentajeSaldoPendiente > 50) {
+  // 1) Grupo debe más del 50% del valor total del viaje
+  if (saldoPendienteGrupo > 0 && porcentajeSaldoPendiente > 50) {
     alertas.push({
-      tipo: "grupo_critico_saldo_50",
+      tipo: "grupo_debe_mas_50",
       nivel: "critica",
-      label: "Grupo crítico: saldo pendiente mayor al 50%",
+      label: "Grupo debe >50%",
       gravedad: 4,
       porcentajeSaldoPendiente,
       totalViajan,
-      totalConDeuda
+      totalConDeuda,
+      ultimaFechaPagoGrupo: ultimaFechaPagoGrupo ? ultimaFechaPagoGrupo.toISOString() : "",
+      diasSinPagoGrupo
     });
   }
 
-  // 2) Grupo cerca de cerrar: saldo bajo, pero todavía pendiente
-  if (
-    limiteCercaCerrar !== null &&
-    saldoPendienteGrupo > 0 &&
-    saldoPendienteGrupo <= limiteCercaCerrar
-  ) {
+  // 2) 10 o más pasajeros con saldo pendiente
+  if (totalConDeuda >= 10) {
     alertas.push({
-      tipo: "grupo_cerca_cerrar",
+      tipo: "grupo_10_mas_deudores",
       nivel: "warning",
-      label: moneda === "CLP"
-        ? "Grupo cerca de cerrar: saldo menor o igual a $5.000.000 CLP"
-        : `Grupo cerca de cerrar: saldo menor o igual a 5.000 ${moneda}`,
+      label: "10+ deudores",
       gravedad: 3,
       porcentajeSaldoPendiente,
       totalViajan,
-      totalConDeuda
+      totalConDeuda,
+      ultimaFechaPagoGrupo: ultimaFechaPagoGrupo ? ultimaFechaPagoGrupo.toISOString() : "",
+      diasSinPagoGrupo
     });
   }
 
-  // 3) Grupo con muchos morosos
-  if (totalConDeuda >= 10) {
+  // 3) El grupo no registra pagos hace más de 90 días
+  if (saldoPendienteGrupo > 0 && diasSinPagoGrupo !== null && diasSinPagoGrupo > 90) {
     alertas.push({
-      tipo: "grupo_muchos_morosos",
+      tipo: "grupo_sin_pagos_90",
       nivel: "warning",
-      label: "Grupo con 10 o más pasajeros con deuda",
-      gravedad: 2,
+      label: "Sin pagos +90 días",
+      gravedad: 3,
       porcentajeSaldoPendiente,
       totalViajan,
-      totalConDeuda
+      totalConDeuda,
+      ultimaFechaPagoGrupo: ultimaFechaPagoGrupo ? ultimaFechaPagoGrupo.toISOString() : "",
+      diasSinPagoGrupo
     });
   }
 
@@ -1363,23 +1365,21 @@ function getPrioridadPagoKey(alerta = {}) {
   if (
     tipo === "persona_sin_pagos" ||
     tipo === "persona_pago_bajo" ||
-    tipo === "grupo_critico_saldo_50"
+    tipo === "grupo_debe_mas_50"
   ) {
     return "critica";
   }
 
   if (
     tipo === "persona_sin_pago_3_meses" ||
-    tipo === "grupo_muchos_morosos" ||
+    tipo === "grupo_10_mas_deudores" ||
+    tipo === "grupo_sin_pagos_90" ||
     (tipo === "persona_pago_parcial_con_saldo" && saldo > 1000)
   ) {
     return "alta";
   }
 
-  if (
-    tipo === "persona_pago_parcial_con_saldo" ||
-    tipo === "grupo_cerca_cerrar"
-  ) {
+  if (tipo === "persona_pago_parcial_con_saldo") {
     return "media";
   }
 
@@ -1506,16 +1506,29 @@ function buildAlertasPagosFiltrosHtml(rows = []) {
     </div>
 
     <div id="chips-alertas-pagos" style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:14px;">
-      ${getTiposAlertasPagosUI().map((item) => `
-        <button
-          type="button"
-          class="chip-alerta-pago is-active"
-          data-tipo-alerta-pago="${escapeHtml(item.tipo)}"
-          style="border:1px solid rgba(49,25,75,.18); background:#f4eefb; color:#32184f; border-radius:999px; padding:8px 11px; font-weight:900; cursor:pointer; font-size:12px;"
-        >
-          ${escapeHtml(item.label)}
-        </button>
-      `).join("")}
+      ${getTiposAlertasPagosUI().map((item) => {
+        const activo = item.tipo === "__todos__";
+    
+        return `
+          <button
+            type="button"
+            class="chip-alerta-pago ${activo ? "is-active" : ""}"
+            data-tipo-alerta-pago="${escapeHtml(item.tipo)}"
+            style="
+              border:${activo ? "2px solid #32184f" : "1px solid rgba(49,25,75,.18)"};
+              background:${activo ? "#f4eefb" : "#fff"};
+              color:${activo ? "#32184f" : "#766b84"};
+              border-radius:999px;
+              padding:8px 11px;
+              font-weight:900;
+              cursor:pointer;
+              font-size:12px;
+            "
+          >
+            ${escapeHtml(item.label)}
+          </button>
+        `;
+      }).join("")}
     </div>
 
     <div id="resumen-alertas-pagos" style="margin-bottom:12px;"></div>
@@ -1525,14 +1538,16 @@ function buildAlertasPagosFiltrosHtml(rows = []) {
 
 function getTiposAlertasPagosUI() {
   return [
-    { tipo: "persona_sin_pagos", label: "Nunca pagó" },
-    { tipo: "persona_pago_bajo", label: "Personas: Pago bajo" },
-    { tipo: "persona_sin_pago_3_meses", label: "Sin pago +3 meses" },
-    { tipo: "persona_pago_parcial_con_saldo", label: "Pago parcial" },
+    { tipo: "__todos__", label: "Todos" },
 
-    { tipo: "grupo_critico_saldo_50", label: "Grupo crítico" },
-    { tipo: "grupo_cerca_cerrar", label: "Grupo cerca de cerrar" },
-    { tipo: "grupo_muchos_morosos", label: "Grupo muchos morosos" }
+    { tipo: "persona_sin_pagos", label: "Nunca pagó" },
+    { tipo: "persona_pago_bajo", label: "Pago ≤ USD 550" },
+    { tipo: "persona_sin_pago_3_meses", label: "Sin pago +90 días" },
+    { tipo: "persona_pago_parcial_con_saldo", label: "Saldo pendiente" },
+
+    { tipo: "grupo_debe_mas_50", label: "Grupo debe >50%" },
+    { tipo: "grupo_10_mas_deudores", label: "10+ deudores" },
+    { tipo: "grupo_sin_pagos_90", label: "Sin pagos +90 días" }
   ];
 }
 
@@ -1702,11 +1717,15 @@ function filtrarAlertasPagosModal(rows = []) {
     if (moneda && String(row.moneda || "") !== moneda) return false;
     if (prioridad && getPrioridadPagoKey(row) !== prioridad) return false;
 
-    // Si no hay ninguna pestaña activa, no mostrar nada.
     if (!tiposActivos.size) return false;
 
-    // Si hay pestañas activas, mostrar las alertas cuyo tipo esté activo.
-    if (!tiposActivos.has(String(row.tipo || ""))) return false;
+    // Pestaña "Todos"
+    if (
+      !tiposActivos.has("__todos__") &&
+      !tiposActivos.has(String(row.tipo || ""))
+    ) {
+      return false;
+    }
 
     if (q) {
       const texto = buildSearchText(row);
@@ -1850,6 +1869,9 @@ function renderAlertaPagoCard(alerta = {}) {
             <strong>Con deuda:</strong> ${escapeHtml(alerta.totalConDeuda || 0)}<br>
             <strong>% saldo pendiente grupo:</strong> ${escapeHtml(Number(alerta.porcentajeGrupoDebe || 0).toFixed(1))}%<br>
             <strong>Saldo pendiente grupo:</strong> ${escapeHtml(formatoMontoPago(alerta.saldoPendienteGrupo, alerta.moneda))}
+            <br>
+            <strong>Último pago grupo:</strong> ${escapeHtml(alerta.ultimaFechaPagoGrupo ? formatDate(alerta.ultimaFechaPagoGrupo) : "Sin registro")}<br>
+            <strong>Días sin pago grupo:</strong> ${escapeHtml(alerta.diasSinPagoGrupo ?? "-")}
           </div>
         `}
       </div>
@@ -2110,6 +2132,8 @@ async function actualizarAlertasPagos() {
           totalConDeuda: grupoAlertaInfo.totalConDeuda,
           saldoPendienteGrupo: grupoPago.saldoPendiente,
           totalViajeGrupo: grupoPago.totalViaje,
+          ultimaFechaPagoGrupo: grupoAlertaInfo.ultimaFechaPagoGrupo || "",
+          diasSinPagoGrupo: grupoAlertaInfo.diasSinPagoGrupo ?? null,
           actualizadoAt: new Date().toISOString()
         });
       });
@@ -2292,20 +2316,21 @@ function abrirModalAlertasPagos() {
       btn.dataset.bound = "1";
     
       btn.addEventListener("click", () => {
-        btn.classList.toggle("is-active");
+        document.querySelectorAll("[data-tipo-alerta-pago]").forEach((b) => {
+          b.classList.remove("is-active");
+          b.style.background = "#fff";
+          b.style.color = "#766b84";
+          b.style.border = "1px solid rgba(49,25,75,.18)";
+        });
     
-        if (btn.classList.contains("is-active")) {
-          btn.style.background = "#f4eefb";
-          btn.style.color = "#32184f";
-        } else {
-          btn.style.background = "#fff";
-          btn.style.color = "#766b84";
-        }
+        btn.classList.add("is-active");
+        btn.style.background = "#f4eefb";
+        btn.style.color = "#32184f";
+        btn.style.border = "2px solid #32184f";
     
         refrescar();
       });
     });
-
     refrescar();
   }, 80);
 }
