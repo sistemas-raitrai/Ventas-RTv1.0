@@ -1305,6 +1305,24 @@ function calcularPrioridadGrupo(tipoInfo, grupo = {}) {
   );
 }
 
+function getPrioridadPagoKey(valor = 0) {
+  const n = Number(valor || 0);
+
+  if (n >= 5000) return "critica";
+  if (n >= 4000) return "alta";
+  if (n >= 3000) return "media";
+  return "baja";
+}
+
+function getPrioridadPagoLabel(valor = 0) {
+  const key = getPrioridadPagoKey(valor);
+
+  if (key === "critica") return "Crítica";
+  if (key === "alta") return "Alta";
+  if (key === "media") return "Media";
+  return "Baja";
+}
+
 function getTextoSugeridoPago(alerta = {}) {
   const responsable = alerta.responsable || "apoderado/a";
   const participante = alerta.participante || "el/la participante";
@@ -1389,7 +1407,15 @@ function buildAlertasPagosFiltrosHtml(rows = []) {
         <option value="">Todas las monedas</option>
         ${monedas.map((m) => `<option value="${escapeHtml(m)}">${escapeHtml(m)}</option>`).join("")}
       </select>
-
+      
+      <select id="filtro-alerta-pago-prioridad">
+        <option value="">Todas las prioridades</option>
+        <option value="critica">Crítica</option>
+        <option value="alta">Alta</option>
+        <option value="media">Media</option>
+        <option value="baja">Baja</option>
+      </select>
+      
       <input id="filtro-alerta-pago-buscar" type="search" placeholder="Buscar participante, grupo, correo..." />
     </div>
 
@@ -1647,7 +1673,7 @@ function renderAlertaPagoCard(alerta = {}) {
           <strong>Razón:</strong> ${escapeHtml(alerta.label || alerta.tipo || "Alerta de pago")}<br>
           Grupo: ${escapeHtml(alerta.grupo || "-")} · N° ${escapeHtml(alerta.numeroNegocio || "-")}<br>
           Año: ${escapeHtml(alerta.anoViaje || "-")} · Vendedor(a): ${escapeHtml(alerta.vendedor || "Sin vendedor")}<br>
-          Moneda: ${escapeHtml(alerta.moneda || "-")} · Prioridad: ${escapeHtml(alerta.prioridad || 0)}
+          Moneda: ${escapeHtml(alerta.moneda || "-")} · Prioridad: ${escapeHtml(getPrioridadPagoLabel(alerta.prioridad))}
         </div>
 
         ${esPersona ? `
