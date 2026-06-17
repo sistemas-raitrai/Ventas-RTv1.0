@@ -9727,3 +9727,65 @@ async function sincronizarInscripcionPublicaPostEdicion(inscripcionOficial = {})
     await marcarInscripcionPublicaComoEliminada(inscripcionOficial);
   }
 }
+
+window.buscarCorreosEnInscripciones = async function (correos = []) {
+  const buscados = new Set(
+    (Array.isArray(correos) ? correos : String(correos).split(/[,\n;]/))
+      .map(c => normalizeEmail(c))
+      .filter(Boolean)
+  );
+
+  const resultados = [];
+
+  const gruposSnap = await getDocs(collection(db, "ventas_cotizaciones"));
+
+  for (const grupoDoc of gruposSnap.docs) {
+    const grupo = grupoDoc.data() || {};
+
+    const inscSnap = await getDocs(
+      collection(db, "ventas_cotizaciones", grupoDoc.id, "inscripciones")
+    );
+
+    for (const inscDoc of inscSnap.docs) {
+      const p = inscDoc.data() || {};
+
+      const correosPersona = [
+        p.contactoPrincipal?.correo,
+        p.contactoPrincipal?.email,
+        p.contactoSecundario?.correo,
+        p.contactoSecundario?.email,
+        p.identificacion?.correoViajante,
+        p.identificacion?.correoPersonaQueViaja,
+        p.correo,
+        p.email
+      ].map(normalizeEmail).filter(Boolean);
+
+      const match = correosPersona.find(c => buscados.has(c));
+      if (!match) continue;
+
+      resultados.push({
+        correoBuscado: match,
+        pasajero: p.identificacion?.nombreCompleto || [
+          p.identificacion?.nombres,
+          p.identificacion?.primerApellido,
+          p.identificacion?.segundoApellido
+        ].filter(Boolean).join(" "),
+        rut: p.identificacion?.rut || p.identificacion?.documento || inscDoc.id,
+        responsable1: p.contactoPrincipal?.nombre || "",
+        responsable2: p.contactoSecundario?.nombre || "",
+        tipoInscripcion: p.tipoInscripcion || "",
+        tipoViajante: p.tipoViajante || "",
+        numeroNegocio: grupo.numeroNegocio || grupo.ficha?.numeroNegocio || "",
+        grupo: grupo.nombreGrupo || grupo.aliasGrupo || grupo.colegio || "",
+        colegio: grupo.colegio || "",
+        curso: grupo.curso || "",
+        anoViaje: grupo.anoViaje || "",
+        grupoDocId: grupoDoc.id,
+        inscripcionDocId: inscDoc.id
+      });
+    }
+  }
+
+  console.table(resultados);
+  return resultados;
+};
