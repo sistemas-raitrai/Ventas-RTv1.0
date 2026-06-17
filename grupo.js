@@ -9856,17 +9856,12 @@ window.buscarCorreosEnInscripciones = async function (correos = []) {
 };
 
 window.repararYeliannaPichardo = async function () {
-  if (!canEditarNominaInscripcion()) {
-    alert("No tienes permisos para reparar nómina.");
-    return;
-  }
-
   const inscripcionId = "RUT_25656777-6";
 
   const ref = doc(
     db,
     "ventas_cotizaciones",
-    String(state.groupDocId),
+    "11157",
     "inscripciones",
     inscripcionId
   );
@@ -9874,13 +9869,17 @@ window.repararYeliannaPichardo = async function () {
   await updateDoc(ref, {
     "identificacion.fechaNacimiento": "2012-03-28",
 
+    // Restaurar lo que muestra el historial como valor anterior
     tipoInscripcion: "inscripcion_comercial",
 
-    "identificacion.nacionalidad": deleteField(),
-    "identificacion.nacionalidadBase": deleteField(),
-    "documentoIdentidad.sexoDocumento": deleteField(),
-    "contactoPrincipal.celular": deleteField(),
-    "identificacion.rutCompleto": deleteField(),
+    // Mantener datos reales, NO borrar
+    tipoParticipacion: "estudiante",
+    tipoViajante: "estudiante",
+    "identificacion.nacionalidad": "Venezolana",
+    "identificacion.nacionalidadBase": "Venezolana",
+    "documentoIdentidad.sexoDocumento": "femenino",
+    "contactoPrincipal.celular": "+56946968031",
+    "identificacion.rutCompleto": "25656777-6",
 
     actualizadoPor: getDisplayName(state.effectiveUser),
     actualizadoPorCorreo: state.effectiveEmail,
@@ -9891,17 +9890,15 @@ window.repararYeliannaPichardo = async function () {
     tipoMovimiento: "reparacion_nomina_inscripcion",
     modulo: "inscripcion",
     titulo: "Reparación de nómina",
-    mensaje: `${getDisplayName(state.effectiveUser)} reparó campos modificados accidentalmente de YELIANNA JOSÉ PICHARDO SÁNCHEZ.`,
+    mensaje: `${getDisplayName(state.effectiveUser)} reparó la inscripción de YELIANNA JOSÉ PICHARDO SÁNCHEZ, conservando datos reales y restaurando el tipoInscripcion anterior.`,
     metadata: {
       inscripcionId,
+      documento: "25656777-6",
       reparacion: true
     }
   });
 
-  await loadInscripciones();
-  renderInscripcionPasajerosPanel();
-  renderEditarNominaInscripcionModal();
-  syncButtons();
+  await loadAll();
 
   showSaveNotice("Yelianna reparada correctamente.");
 };
