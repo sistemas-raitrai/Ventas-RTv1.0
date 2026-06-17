@@ -1459,7 +1459,7 @@ function buildAlertasPagosFiltrosHtml(rows = []) {
     </div>
 
     <div style="display:grid; grid-template-columns:repeat(4, minmax(140px, 1fr)); gap:10px; margin-bottom:12px;">
-      <select id="filtro-alerta-pago-ano">
+      <select id="filtro-alerta-pago-ano" class="filtro-alerta-pago-control">
         <option value="">Todos los años</option>
         ${anos.map((a) => `
           <option value="${escapeHtml(a)}" ${String(a) === anoOperativo ? "selected" : ""}>
@@ -1468,19 +1468,19 @@ function buildAlertasPagosFiltrosHtml(rows = []) {
         `).join("")}
       </select>
 
-      <select id="filtro-alerta-pago-vendedor">
+      <select id="filtro-alerta-pago-vendedor" class="filtro-alerta-pago-control">
         <option value="">Todos los vendedores</option>
         ${vendedores.map(([email, nombre]) => `
           <option value="${escapeHtml(email)}">${escapeHtml(nombre)}</option>
         `).join("")}
       </select>
 
-      <select id="filtro-alerta-pago-moneda">
+      <select id="filtro-alerta-pago-moneda" class="filtro-alerta-pago-control">
         <option value="">Todas las monedas</option>
         ${monedas.map((m) => `<option value="${escapeHtml(m)}">${escapeHtml(m)}</option>`).join("")}
       </select>
       
-      <select id="filtro-alerta-pago-prioridad">
+      <select id="filtro-alerta-pago-prioridad" class="filtro-alerta-pago-control">
         <option value="">Todas las prioridades</option>
         <option value="critica">Crítica</option>
         <option value="alta">Alta</option>
@@ -1488,7 +1488,7 @@ function buildAlertasPagosFiltrosHtml(rows = []) {
         <option value="baja">Baja</option>
       </select>
       
-      <input id="filtro-alerta-pago-buscar" type="search" placeholder="Buscar participante, grupo, correo..." />
+      <input id="filtro-alerta-pago-buscar" class="filtro-alerta-pago-control" type="search" placeholder="Buscar participante, grupo, correo..." />
     </div>
 
     <div id="chips-alertas-pagos" style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:14px;">
