@@ -1199,11 +1199,20 @@ function getTipoAlertaPersonaPago(p = {}, grupo = {}) {
     };
   }
 
-  if ((moneda === "USD" || moneda === "EUR") && p.totalPagado <= 550) {
+  const limitePagoBajo =
+    moneda === "USD" || moneda === "EUR"
+      ? 550
+      : moneda === "CLP"
+        ? 500000
+        : null;
+  
+  if (limitePagoBajo !== null && p.totalPagado > 0 && p.totalPagado <= limitePagoBajo) {
     return {
-      tipo: "persona_pagado_550_o_menos",
+      tipo: "persona_pago_bajo",
       nivel: "critica",
-      label: `Pagado igual o menor a 550 ${moneda}`,
+      label: moneda === "CLP"
+        ? "Pagado menor o igual a $500.000 CLP"
+        : `Pagado menor o igual a 550 ${moneda}`,
       gravedad: 4
     };
   }
@@ -1440,7 +1449,7 @@ function buildAlertasPagosFiltrosHtml(rows = []) {
 function getTiposAlertasPagosUI() {
   return [
     { tipo: "persona_sin_pagos", label: "Nunca pagó" },
-    { tipo: "persona_pagado_550_o_menos", label: "≤ 550 USD/EUR" },
+    { tipo: "persona_pago_bajo", label: "Personas: Pago bajo" },
     { tipo: "persona_sin_pago_3_meses", label: "Sin pago +3 meses" },
     { tipo: "persona_pago_parcial_con_saldo", label: "Pago parcial" },
     { tipo: "grupo_mas_50_debe", label: "Grupo >50%" },
