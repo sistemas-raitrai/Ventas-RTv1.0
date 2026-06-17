@@ -9855,7 +9855,7 @@ window.buscarCorreosEnInscripciones = async function (correos = []) {
   return resultados;
 };
 
-window.repararYeliannaPichardo = async function () {
+window.repararYeliannaNombre = async function () {
   const inscripcionId = "RUT_25656777-6";
 
   const ref = doc(
@@ -9867,19 +9867,10 @@ window.repararYeliannaPichardo = async function () {
   );
 
   await updateDoc(ref, {
-    "identificacion.fechaNacimiento": "2012-03-28",
-
-    // Restaurar lo que muestra el historial como valor anterior
-    tipoInscripcion: "inscripcion_comercial",
-
-    // Mantener datos reales, NO borrar
-    tipoParticipacion: "estudiante",
-    tipoViajante: "estudiante",
-    "identificacion.nacionalidad": "Venezolana",
-    "identificacion.nacionalidadBase": "Venezolana",
-    "documentoIdentidad.sexoDocumento": "femenino",
-    "contactoPrincipal.celular": "+56946968031",
-    "identificacion.rutCompleto": "25656777-6",
+    "identificacion.nombres": "YELIANNA JOSÉ",
+    "identificacion.primerApellido": "PICHARDO",
+    "identificacion.segundoApellido": "SÁNCHEZ",
+    "identificacion.nombreCompleto": "YELIANNA JOSÉ PICHARDO SÁNCHEZ",
 
     actualizadoPor: getDisplayName(state.effectiveUser),
     actualizadoPorCorreo: state.effectiveEmail,
@@ -9889,8 +9880,8 @@ window.repararYeliannaPichardo = async function () {
   await createHistoryEntry({
     tipoMovimiento: "reparacion_nomina_inscripcion",
     modulo: "inscripcion",
-    titulo: "Reparación de nómina",
-    mensaje: `${getDisplayName(state.effectiveUser)} reparó la inscripción de YELIANNA JOSÉ PICHARDO SÁNCHEZ, conservando datos reales y restaurando el tipoInscripcion anterior.`,
+    titulo: "Reparación nombres inscripción",
+    mensaje: `${getDisplayName(state.effectiveUser)} restauró nombres y apellidos de YELIANNA JOSÉ PICHARDO SÁNCHEZ.`,
     metadata: {
       inscripcionId,
       documento: "25656777-6",
@@ -9899,6 +9890,5 @@ window.repararYeliannaPichardo = async function () {
   });
 
   await loadAll();
-
-  showSaveNotice("Yelianna reparada correctamente.");
+  showSaveNotice("Nombre de Yelianna restaurado.");
 };
