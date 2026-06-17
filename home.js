@@ -1473,7 +1473,7 @@ function buildAlertasPagosFiltrosHtml(rows = []) {
     </div>
 
     <div style="display:grid; grid-template-columns:repeat(4, minmax(140px, 1fr)); gap:10px; margin-bottom:12px;">
-      <select id="filtro-alerta-pago-ano" class="filtro-alerta-pago-control">
+      <select id="filtro-alerta-pago-ano" style="${filtroControlStyle}">
         <option value="">Todos los años</option>
         ${anos.map((a) => `
           <option value="${escapeHtml(a)}" ${String(a) === anoOperativo ? "selected" : ""}>
@@ -1482,19 +1482,19 @@ function buildAlertasPagosFiltrosHtml(rows = []) {
         `).join("")}
       </select>
 
-      <select id="filtro-alerta-pago-vendedor" class="filtro-alerta-pago-control">
+      <select id="filtro-alerta-pago-vendedor" style="${filtroControlStyle}">
         <option value="">Todos los vendedores</option>
         ${vendedores.map(([email, nombre]) => `
           <option value="${escapeHtml(email)}">${escapeHtml(nombre)}</option>
         `).join("")}
       </select>
 
-      <select id="filtro-alerta-pago-moneda" class="filtro-alerta-pago-control">
+      <select id="filtro-alerta-pago-moneda" style="${filtroControlStyle}">
         <option value="">Todas las monedas</option>
         ${monedas.map((m) => `<option value="${escapeHtml(m)}">${escapeHtml(m)}</option>`).join("")}
       </select>
       
-      <select id="filtro-alerta-pago-prioridad" class="filtro-alerta-pago-control">
+      <select id="filtro-alerta-pago-prioridad" style="${filtroControlStyle}">
         <option value="">Todas las prioridades</option>
         <option value="critica">Crítica</option>
         <option value="alta">Alta</option>
@@ -1502,7 +1502,7 @@ function buildAlertasPagosFiltrosHtml(rows = []) {
         <option value="baja">Baja</option>
       </select>
       
-      <input id="filtro-alerta-pago-buscar" class="filtro-alerta-pago-control" type="search" placeholder="Buscar participante, grupo, correo..." />
+      <input id="filtro-alerta-pago-buscar" style="${filtroControlStyle}" type="search" placeholder="Buscar participante, grupo, correo..." />
     </div>
 
     <div id="chips-alertas-pagos" style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:14px;">
@@ -2162,6 +2162,17 @@ async function actualizarAlertasPagos() {
       });
     }
 
+    const idsNuevasAlertas = new Set(alertas.map((a) => String(a.id)));
+    
+    for (const alertaAnterior of alertasAnterioresMap.values()) {
+      if (!idsNuevasAlertas.has(String(alertaAnterior.id))) {
+        await setDoc(doc(db, ALERTAS_PAGOS_COLLECTION, alertaAnterior.id), {
+          activa: false,
+          actualizadoAt: new Date().toISOString()
+        }, { merge: true });
+      }
+    }
+    
     state.alertasPagosRows = alertas
       .filter((row) => row.activa !== false)
       .sort((a, b) => Number(b.prioridad || 0) - Number(a.prioridad || 0));
@@ -2170,30 +2181,19 @@ async function actualizarAlertasPagos() {
     
     renderHome();
     abrirModalAlertasPagos();
-
+    
     for (const alerta of alertas) {
-      const idsNuevasAlertas = new Set(alertas.map((a) => String(a.id)));
-
-      for (const alertaAnterior of state.alertasPagosRows || []) {
-        if (!idsNuevasAlertas.has(String(alertaAnterior.id))) {
-          await setDoc(doc(db, ALERTAS_PAGOS_COLLECTION, alertaAnterior.id), {
-            activa: false,
-            actualizadoAt: new Date().toISOString()
-          }, { merge: true });
-        }
-      }
       const anterior = alertasAnterioresMap.get(String(alerta.id));
-
+    
       await setDoc(doc(db, ALERTAS_PAGOS_COLLECTION, alerta.id), {
         ...alerta,
-
-        // Conserva marca de contacto si la alerta sigue viva al día siguiente.
+    
         contactado: anterior?.contactado === true,
         contactadoAt: anterior?.contactadoAt || null,
         contactadoPor: anterior?.contactadoPor || "",
         contactadoPorCorreo: anterior?.contactadoPorCorreo || "",
         notaContacto: anterior?.notaContacto || "",
-
+    
         actualizadoPor: user.nombre || user.name || user.email || "",
         actualizadoPorCorreo: normalizeEmail(user.email || ""),
         actualizadoRealPorCorreo: normalizeEmail(realUser.email || "")
