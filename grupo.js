@@ -9736,11 +9736,18 @@ window.buscarCorreosEnInscripciones = async function (correos = []) {
   );
 
   const resultados = [];
-
   const gruposSnap = await getDocs(collection(db, "ventas_cotizaciones"));
 
+  let revisados = 0;
+
   for (const grupoDoc of gruposSnap.docs) {
+    revisados++;
+
     const grupo = grupoDoc.data() || {};
+    const numeroNegocio = grupo.numeroNegocio || grupo.ficha?.numeroNegocio || "";
+    const nombreGrupo = grupo.nombreGrupo || grupo.aliasGrupo || grupo.colegio || "";
+
+    console.log(`🔎 ${revisados}/${gruposSnap.size} revisando ${numeroNegocio || grupoDoc.id} · ${nombreGrupo}`);
 
     const inscSnap = await getDocs(
       collection(db, "ventas_cotizaciones", grupoDoc.id, "inscripciones")
@@ -9763,7 +9770,7 @@ window.buscarCorreosEnInscripciones = async function (correos = []) {
       const match = correosPersona.find(c => buscados.has(c));
       if (!match) continue;
 
-      resultados.push({
+      const item = {
         correoBuscado: match,
         pasajero: p.identificacion?.nombreCompleto || [
           p.identificacion?.nombres,
@@ -9775,17 +9782,21 @@ window.buscarCorreosEnInscripciones = async function (correos = []) {
         responsable2: p.contactoSecundario?.nombre || "",
         tipoInscripcion: p.tipoInscripcion || "",
         tipoViajante: p.tipoViajante || "",
-        numeroNegocio: grupo.numeroNegocio || grupo.ficha?.numeroNegocio || "",
-        grupo: grupo.nombreGrupo || grupo.aliasGrupo || grupo.colegio || "",
+        numeroNegocio,
+        grupo: nombreGrupo,
         colegio: grupo.colegio || "",
         curso: grupo.curso || "",
         anoViaje: grupo.anoViaje || "",
         grupoDocId: grupoDoc.id,
         inscripcionDocId: inscDoc.id
-      });
+      };
+
+      resultados.push(item);
+      console.log("✅ ENCONTRADO:", item);
     }
   }
 
+  console.log(`✅ Búsqueda terminada. Coincidencias: ${resultados.length}`);
   console.table(resultados);
   return resultados;
 };
