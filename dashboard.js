@@ -584,3 +584,62 @@ function escapeHtml(str) {
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#039;");
 }
+
+window.buscarCorreosEnPagos = async function (correos = []) {
+  const buscados = new Set(
+    (Array.isArray(correos) ? correos : String(correos).split(/[,\n;]/))
+      .map(c => normalizarTexto(c))
+      .filter(Boolean)
+  );
+
+  if (!buscados.size) {
+    console.warn("Debes ingresar uno o más correos.");
+    return [];
+  }
+
+  const resultados = [];
+
+  const grupos = gruposOriginales.length
+    ? gruposOriginales
+    : (await fetchJson(`${API_PAGOS_URL}?modo=grupos`))?.grupos?.data?.map(normalizarGrupo) || [];
+
+  for (const grupo of grupos) {
+    try {
+      const data = await fetchJson(
+        `${API_PAGOS_URL}?modo=detalle&numeroNegocio=${encodeURIComponent(grupo.numeroNegocio)}`
+      );
+
+      const pasajerosRaw =
+        data?.nominas?.data?.pasajeros ||
+        data?.saldos?.data?.detalle_pasajeros ||
+        [];
+
+      const pasajeros = pasajerosRaw.map(normalizarPasajero);
+
+      pasajeros.forEach((p) => {
+        const correo = normalizarTexto(p.correoApoderado || "");
+
+        if (!correo || !buscados.has(correo)) return;
+
+        resultados.push({
+          correo: p.correoApoderado,
+          pasajero: p.nombreCompleto,
+          rut: p.rut,
+          categoria: p.categoria,
+          viaja: p.viaja ? "Sí" : "No",
+          grupo: grupo.nombreGrupo,
+          numeroNegocio: grupo.numeroNegocio,
+          anoViaje: grupo.anoViaje,
+          destino: grupo.destino,
+          saldoPendiente: p.saldoPendiente
+        });
+      });
+
+    } catch (error) {
+      console.warn(`No pude revisar grupo ${grupo.numeroNegocio}`, error);
+    }
+  }
+
+  console.table(resultados);
+  return resultados;
+};
