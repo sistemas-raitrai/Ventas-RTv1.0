@@ -11,7 +11,8 @@ import {
   updateDoc,
   deleteDoc,
   serverTimestamp,
-  Timestamp
+  Timestamp,
+  deleteField
 } from "https://www.gstatic.com/firebasejs/11.7.3/firebase-firestore.js";
 
 import {
@@ -5786,29 +5787,82 @@ function buildNominaEditPatch(item = {}, values = {}) {
     cambios.push({ campo, anterior, nuevo });
   };
 
-  const apellidos = splitApellidosNomina(values.apellidos);
+  const changed = (anterior, nuevo) => !sameValue(anterior || "", nuevo || "");
 
-  addChange("identificacion.primerApellido", getByPath(item, "identificacion.primerApellido") || "", normalizeTextUpper(apellidos.primerApellido));
-  addChange("identificacion.segundoApellido", getByPath(item, "identificacion.segundoApellido") || "", normalizeTextUpper(apellidos.segundoApellido));
-  addChange("identificacion.nombres", getByPath(item, "identificacion.nombres") || "", normalizeTextUpper(values.nombres || ""));
-  addChange("identificacion.fechaNacimiento", getByPath(item, "identificacion.fechaNacimiento") || "", values.fechaNacimiento || "");
-  addChange("tipoViajante", item.tipoViajante || "", values.tipoViajante || "");
-  addChange("tipoParticipacion", item.tipoParticipacion || "", values.tipoViajante || "");
-  addChange("identificacion.nacionalidad", getByPath(item, "identificacion.nacionalidad") || "", normalizarTextoExport(values.nacionalidad || ""));
-  addChange("identificacion.nacionalidadBase", getByPath(item, "identificacion.nacionalidadBase") || "", normalizarTextoExport(values.nacionalidad || ""));
-  addChange("identificacion.genero", getByPath(item, "identificacion.genero") || "", values.genero || "");
-  addChange("documentoIdentidad.sexoDocumento", getByPath(item, "documentoIdentidad.sexoDocumento") || "", values.genero || "");
-  addChange("contactoPrincipal.nombre", getByPath(item, "contactoPrincipal.nombre") || "", normalizeTextUpper(values.responsable || ""));
-  addChange("contactoPrincipal.correo", getByPath(item, "contactoPrincipal.correo") || "", normalizeEmail(values.correoResponsable || ""));
-  addChange("contactoPrincipal.celular", getByPath(item, "contactoPrincipal.celular") || "", cleanText(values.celularResponsable || ""));
+  const apellidosActual = getInscripcionApellidos(item);
+  const nombresActual = getInscripcionNombres(item);
+  const fechaActual = getFechaNacimientoInputValue(item);
+  const tipoViajanteActual = item.tipoViajante || item.tipoParticipacion || "";
+  const nacionalidadActual = getInscripcionNacionalidad(item);
+  const generoActual =
+    getByPath(item, "identificacion.genero") ||
+    getByPath(item, "documentoIdentidad.sexoDocumento") ||
+    "";
+  const responsableActual = getResponsablePrincipalNombre(item);
+  const correoActual = getByPath(item, "contactoPrincipal.correo") || "";
+  const celularActual =
+    getByPath(item, "contactoPrincipal.celular") ||
+    getByPath(item, "contactoPrincipal.telefono") ||
+    getByPath(item, "contactoPrincipal.whatsapp") ||
+    "";
+
+  if (changed(apellidosActual, values.apellidos)) {
+    const apellidos = splitApellidosNomina(values.apellidos);
+    addChange("identificacion.primerApellido", getByPath(item, "identificacion.primerApellido") || "", normalizeTextUpper(apellidos.primerApellido));
+    addChange("identificacion.segundoApellido", getByPath(item, "identificacion.segundoApellido") || "", normalizeTextUpper(apellidos.segundoApellido));
+  }
+
+  if (changed(nombresActual, values.nombres)) {
+    addChange("identificacion.nombres", getByPath(item, "identificacion.nombres") || "", normalizeTextUpper(values.nombres || ""));
+  }
+
+  if (changed(fechaActual, values.fechaNacimiento)) {
+    addChange("identificacion.fechaNacimiento", getByPath(item, "identificacion.fechaNacimiento") || "", values.fechaNacimiento || "");
+  }
+
+  if (changed(tipoViajanteActual, values.tipoViajante)) {
+    addChange("tipoViajante", item.tipoViajante || "", values.tipoViajante || "");
+    addChange("tipoParticipacion", item.tipoParticipacion || "", values.tipoViajante || "");
+  }
+
+  if (changed(nacionalidadActual, values.nacionalidad)) {
+    addChange("identificacion.nacionalidad", getByPath(item, "identificacion.nacionalidad") || "", normalizarTextoExport(values.nacionalidad || ""));
+  }
+
+  if (changed(generoActual, values.genero)) {
+    addChange("identificacion.genero", getByPath(item, "identificacion.genero") || "", values.genero || "");
+    addChange("documentoIdentidad.sexoDocumento", getByPath(item, "documentoIdentidad.sexoDocumento") || "", values.genero || "");
+  }
+
+  if (changed(responsableActual, values.responsable)) {
+    addChange("contactoPrincipal.nombre", getByPath(item, "contactoPrincipal.nombre") || "", normalizeTextUpper(values.responsable || ""));
+  }
+
+  if (changed(correoActual, values.correoResponsable)) {
+    addChange("contactoPrincipal.correo", getByPath(item, "contactoPrincipal.correo") || "", normalizeEmail(values.correoResponsable || ""));
+  }
+
+  if (changed(celularActual, values.celularResponsable)) {
+    addChange("contactoPrincipal.celular", getByPath(item, "contactoPrincipal.celular") || "", cleanText(values.celularResponsable || ""));
+  }
 
   if (puedeEditarRutTipo) {
+    const documentoActual = getInscripcionDocumento(item);
     const documentoNuevo = cleanText(values.documento || "");
-    addChange("identificacion.documento", getByPath(item, "identificacion.documento") || "", documentoNuevo);
-    addChange("identificacion.rutCompleto", getByPath(item, "identificacion.rutCompleto") || "", documentoNuevo);
-    addChange("tipoInscripcion", item.tipoInscripcion || "", values.tipoInscripcion || "");
-    addChange("faseInscripcion", item.faseInscripcion || "", getFaseDesdeTipoInscripcionEditable(values.tipoInscripcion || ""));
-    addChange("estadoCupo", item.estadoCupo || "", getEstadoCupoDesdeTipoInscripcionEditable(values.tipoInscripcion || ""));
+
+    if (changed(documentoActual, documentoNuevo)) {
+      addChange("identificacion.documento", getByPath(item, "identificacion.documento") || "", documentoNuevo);
+      addChange("identificacion.rutCompleto", getByPath(item, "identificacion.rutCompleto") || "", documentoNuevo);
+    }
+
+    const tipoActualPantalla = getInscripcionTipoReal(item);
+    const tipoNuevo = values.tipoInscripcion || "";
+
+    if (changed(tipoActualPantalla, tipoNuevo)) {
+      addChange("tipoInscripcion", item.tipoInscripcion || "", tipoNuevo);
+      addChange("faseInscripcion", item.faseInscripcion || "", getFaseDesdeTipoInscripcionEditable(tipoNuevo));
+      addChange("estadoCupo", item.estadoCupo || "", getEstadoCupoDesdeTipoInscripcionEditable(tipoNuevo));
+    }
   }
 
   return { patch, cambios };
@@ -9799,4 +9853,55 @@ window.buscarCorreosEnInscripciones = async function (correos = []) {
   console.log(`✅ Búsqueda terminada. Coincidencias: ${resultados.length}`);
   console.table(resultados);
   return resultados;
+};
+
+window.repararYeliannaPichardo = async function () {
+  if (!canEditarNominaInscripcion()) {
+    alert("No tienes permisos para reparar nómina.");
+    return;
+  }
+
+  const inscripcionId = "RUT_25656777-6";
+
+  const ref = doc(
+    db,
+    "ventas_cotizaciones",
+    String(state.groupDocId),
+    "inscripciones",
+    inscripcionId
+  );
+
+  await updateDoc(ref, {
+    "identificacion.fechaNacimiento": "2012-03-28",
+
+    tipoInscripcion: "inscripcion_comercial",
+
+    "identificacion.nacionalidad": deleteField(),
+    "identificacion.nacionalidadBase": deleteField(),
+    "documentoIdentidad.sexoDocumento": deleteField(),
+    "contactoPrincipal.celular": deleteField(),
+    "identificacion.rutCompleto": deleteField(),
+
+    actualizadoPor: getDisplayName(state.effectiveUser),
+    actualizadoPorCorreo: state.effectiveEmail,
+    actualizadoAt: serverTimestamp()
+  });
+
+  await createHistoryEntry({
+    tipoMovimiento: "reparacion_nomina_inscripcion",
+    modulo: "inscripcion",
+    titulo: "Reparación de nómina",
+    mensaje: `${getDisplayName(state.effectiveUser)} reparó campos modificados accidentalmente de YELIANNA JOSÉ PICHARDO SÁNCHEZ.`,
+    metadata: {
+      inscripcionId,
+      reparacion: true
+    }
+  });
+
+  await loadInscripciones();
+  renderInscripcionPasajerosPanel();
+  renderEditarNominaInscripcionModal();
+  syncButtons();
+
+  showSaveNotice("Yelianna reparada correctamente.");
 };
