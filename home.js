@@ -1887,17 +1887,19 @@ function renderAlertaPagoCard(alerta = {}) {
                 <table style="width:100%; border-collapse:collapse; font-size:12px;">
                   <thead style="background:#f7f3fb; color:#32184f;">
                     <tr>
+                      <th style="padding:8px; text-align:right;">#</th>
                       <th style="padding:8px; text-align:left;">Participante</th>
-                      <th style="padding:8px; text-align:left;">Responsable</th>
+                      <th style="padding:8px; text-align:left;">Responsable / contacto</th>
                       <th style="padding:8px; text-align:right;">Pagado</th>
                       <th style="padding:8px; text-align:right;">Saldo</th>
                       <th style="padding:8px; text-align:left;">Último pago</th>
                       <th style="padding:8px; text-align:right;">Días</th>
+                      <th style="padding:8px; text-align:center;">Gestión</th>
                     </tr>
                   </thead>
         
                   <tbody>
-                    ${alerta.pasajerosConDeudaGrupo.map((p) => `
+                    ${alerta.pasajerosConDeudaGrupo.map((p, idx) => `
                       <tr style="border-top:1px solid rgba(49,25,75,.08);">
                         <td style="padding:8px;">
                           <strong>${escapeHtml(p.participante || "-")}</strong><br>
@@ -1973,6 +1975,64 @@ function openDetalleAlertaPago(alertaId) {
   }
 
   openDialog($("modal-detalle-home"));
+}
+
+function openDetallePersonaDesdeGrupo(alertaGrupoId, indexPersona) {
+  const alertaGrupo = state.alertasPagosRows.find((row) => String(row.id) === String(alertaGrupoId));
+  if (!alertaGrupo) return;
+
+  const p = alertaGrupo.pasajerosConDeudaGrupo?.[Number(indexPersona)];
+  if (!p) return;
+
+  const personaExistente = state.alertasPagosRows.find((row) =>
+    row.categoriaAlerta === "persona" &&
+    String(row.numeroNegocio || "") === String(alertaGrupo.numeroNegocio || "") &&
+    (
+      String(row.rut || "") === String(p.rut || "") ||
+      normalizeLoose(row.participante || "") === normalizeLoose(p.participante || "")
+    )
+  );
+
+  if (personaExistente) {
+    openDetalleAlertaPago(personaExistente.id);
+    return;
+  }
+
+  const rutKey = String(p.rut || p.participante || "")
+    .replace(/[^a-zA-Z0-9]/g, "_")
+    .slice(0, 80);
+
+  const alertaPersona = {
+    id: `persona_${alertaGrupo.numeroNegocio}_${rutKey}_desde_grupo`,
+    categoriaAlerta: "persona",
+    tipo: "persona_pago_parcial_con_saldo",
+    label: "Saldo pendiente",
+    nivel: "warning",
+    activa: true,
+    prioridad: 1,
+    numeroNegocio: alertaGrupo.numeroNegocio || "",
+    idGrupo: alertaGrupo.idGrupo || "",
+    grupo: alertaGrupo.grupo || "",
+    anoViaje: alertaGrupo.anoViaje || "",
+    destino: alertaGrupo.destino || "",
+    moneda: alertaGrupo.moneda || "",
+    vendedor: alertaGrupo.vendedor || "",
+    vendedoraCorreo: alertaGrupo.vendedoraCorreo || "",
+    rut: p.rut || "",
+    participante: p.participante || "",
+    responsable: p.responsable || "",
+    correoResponsable: p.correoResponsable || "",
+    telefonoResponsable: p.telefonoResponsable || "",
+    totalDebe: p.totalDebe || 0,
+    totalPagado: p.totalPagado || 0,
+    saldoPendiente: p.saldoPendiente || 0,
+    ultimoPagoFecha: p.ultimoPagoFecha || "",
+    ultimoPagoMonto: p.ultimoPagoMonto || 0,
+    contactado: false
+  };
+
+  state.alertasPagosRows.push(alertaPersona);
+  openDetalleAlertaPago(alertaPersona.id);
 }
 
 function exportarAlertasPagosXlsx() {
@@ -3008,6 +3068,19 @@ function bindAlertButtons() {
       if (filaDetalle) {
         e.preventDefault();
         openDetalleAlertaPago(filaDetalle.dataset.openDetalleAlertaPago);
+        return;
+      }
+
+      const btnPersonaGrupo = e.target.closest("[data-open-persona-grupo]");
+      if (btnPersonaGrupo) {
+        e.preventDefault();
+        e.stopPropagation();
+      
+        openDetallePersonaDesdeGrupo(
+          btnPersonaGrupo.dataset.openPersonaGrupo,
+          btnPersonaGrupo.dataset.personaIndex
+        );
+      
         return;
       }
       
