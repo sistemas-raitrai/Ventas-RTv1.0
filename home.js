@@ -1440,6 +1440,20 @@ function buildAlertasPagosFiltrosHtml(rows = []) {
 
   const monedas = [...new Set(rows.map((r) => String(r.moneda || "").trim()).filter(Boolean))].sort();
 
+  const filtroControlStyle = `
+    width:100%;
+    min-height:38px;
+    padding:9px 12px;
+    border:1px solid rgba(49,25,75,.22);
+    border-radius:14px;
+    background:#fff;
+    color:#32184f;
+    font-size:13px;
+    font-weight:700;
+    outline:none;
+    box-sizing:border-box;
+  `;
+
   return `
     <div style="display:flex; justify-content:space-between; gap:12px; align-items:center; flex-wrap:wrap; margin-bottom:14px;">
       <div style="font-size:13px; color:#4b405a;">
