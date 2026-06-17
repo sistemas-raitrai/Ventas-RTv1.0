@@ -1079,6 +1079,19 @@ function numeroPago(v) {
   return Number.isFinite(n) ? n : 0;
 }
 
+function obtenerAnoOperativoHome() {
+  const hoy = new Date();
+  const anoActual = hoy.getFullYear();
+  const mes = hoy.getMonth() + 1;
+  const dia = hoy.getDate();
+
+  if (mes < 3 || (mes === 3 && dia < 1)) {
+    return anoActual - 1;
+  }
+
+  return anoActual;
+}
+
 function formatoMontoPago(v, moneda = "") {
   const currency = String(moneda || "").toUpperCase();
 
@@ -1325,14 +1338,16 @@ function getAlertasPagosForScope(scopedRows = []) {
 }
 
 function buildAlertasPagosFiltrosHtml(rows = []) {
+  const anoOperativo = String(obtenerAnoOperativoHome());
+
   const anos = [...new Set(rows.map((r) => String(r.anoViaje || "").trim()).filter(Boolean))].sort();
+
   const vendedores = [...new Map(
     rows
       .map((r) => [normalizeEmail(r.vendedoraCorreo || ""), r.vendedor || r.vendedoraCorreo || "Sin vendedor"])
       .filter(([email]) => email)
   ).entries()];
 
-  const tipos = [...new Set(rows.map((r) => String(r.tipo || "").trim()).filter(Boolean))].sort();
   const monedas = [...new Set(rows.map((r) => String(r.moneda || "").trim()).filter(Boolean))].sort();
 
   return `
@@ -1342,15 +1357,25 @@ function buildAlertasPagosFiltrosHtml(rows = []) {
         ${state.alertasPagosUltimaActualizacion ? escapeHtml(formatDate(state.alertasPagosUltimaActualizacion)) : "Sin actualización"}
       </div>
 
-      <button type="button" id="btn-actualizar-alertas-pagos" class="home-btn">
-        Actualizar
-      </button>
+      <div style="display:flex; gap:8px; flex-wrap:wrap;">
+        <button type="button" id="btn-exportar-alertas-pagos" class="home-btn" style="background:#6d4a92;">
+          Exportar XLSX
+        </button>
+
+        <button type="button" id="btn-actualizar-alertas-pagos" class="home-btn">
+          Actualizar
+        </button>
+      </div>
     </div>
 
-    <div style="display:grid; grid-template-columns:repeat(5, minmax(140px, 1fr)); gap:10px; margin-bottom:14px;">
+    <div style="display:grid; grid-template-columns:repeat(4, minmax(140px, 1fr)); gap:10px; margin-bottom:12px;">
       <select id="filtro-alerta-pago-ano">
         <option value="">Todos los años</option>
-        ${anos.map((a) => `<option value="${escapeHtml(a)}">${escapeHtml(a)}</option>`).join("")}
+        ${anos.map((a) => `
+          <option value="${escapeHtml(a)}" ${String(a) === anoOperativo ? "selected" : ""}>
+            ${escapeHtml(a)}
+          </option>
+        `).join("")}
       </select>
 
       <select id="filtro-alerta-pago-vendedor">
@@ -1360,35 +1385,158 @@ function buildAlertasPagosFiltrosHtml(rows = []) {
         `).join("")}
       </select>
 
-      <select id="filtro-alerta-pago-tipo">
-        <option value="">Todos los tipos</option>
-        ${tipos.map((tipo) => `<option value="${escapeHtml(tipo)}">${escapeHtml(tipo)}</option>`).join("")}
-      </select>
-
       <select id="filtro-alerta-pago-moneda">
         <option value="">Todas las monedas</option>
         ${monedas.map((m) => `<option value="${escapeHtml(m)}">${escapeHtml(m)}</option>`).join("")}
       </select>
 
-      <input id="filtro-alerta-pago-buscar" type="search" placeholder="Buscar..." />
+      <input id="filtro-alerta-pago-buscar" type="search" placeholder="Buscar participante, grupo, correo..." />
     </div>
 
+    <div id="chips-alertas-pagos" style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:14px;">
+      ${getTiposAlertasPagosUI().map((item) => `
+        <button
+          type="button"
+          class="chip-alerta-pago is-active"
+          data-tipo-alerta-pago="${escapeHtml(item.tipo)}"
+          style="border:1px solid rgba(49,25,75,.18); background:#f4eefb; color:#32184f; border-radius:999px; padding:8px 11px; font-weight:900; cursor:pointer; font-size:12px;"
+        >
+          ${escapeHtml(item.label)}
+        </button>
+      `).join("")}
+    </div>
+
+    <div id="resumen-alertas-pagos" style="margin-bottom:12px;"></div>
     <div id="contenedor-alertas-pagos-listado"></div>
   `;
+}
+
+function getTiposAlertasPagosUI() {
+  return [
+    { tipo: "persona_sin_pagos", label: "Nunca pagó" },
+    { tipo: "persona_pagado_550_o_menos", label: "≤ 550 USD/EUR" },
+    { tipo: "persona_sin_pago_3_meses", label: "Sin pago +3 meses" },
+    { tipo: "persona_pago_parcial_con_saldo", label: "Pago parcial" },
+    { tipo: "grupo_mas_50_debe", label: "Grupo >50%" },
+    { tipo: "grupo_20_49_debe", label: "Grupo 20%-49%" },
+    { tipo: "grupo_0_19_debe", label: "Grupo 0%-19%" }
+  ];
+}
+
+function getTiposActivosAlertasPagos() {
+  const chips = [...document.querySelectorAll("[data-tipo-alerta-pago]")];
+
+  const activos = chips
+    .filter((btn) => btn.classList.contains("is-active"))
+    .map((btn) => btn.dataset.tipoAlertaPago)
+    .filter(Boolean);
+
+  return new Set(activos);
+}
+
+function renderResumenAlertasPagos(rows = []) {
+  const cont = $("resumen-alertas-pagos");
+  if (!cont) return;
+
+  const personas = rows.filter((r) => r.categoriaAlerta === "persona");
+  const grupos = rows.filter((r) => r.categoriaAlerta === "grupo");
+  const contactados = rows.filter((r) => r.contactado === true);
+
+  cont.innerHTML = `
+    <div style="display:grid; grid-template-columns:repeat(4, minmax(120px, 1fr)); gap:10px;">
+      <div style="padding:12px; border-radius:14px; background:#faf8fd; border:1px solid rgba(49,25,75,.10);">
+        <strong style="font-size:20px; color:#26133d;">${rows.length}</strong><br>
+        <span style="font-size:12px; color:#766b84;">Total alertas</span>
+      </div>
+
+      <div style="padding:12px; border-radius:14px; background:#faf8fd; border:1px solid rgba(49,25,75,.10);">
+        <strong style="font-size:20px; color:#26133d;">${personas.length}</strong><br>
+        <span style="font-size:12px; color:#766b84;">Personas</span>
+      </div>
+
+      <div style="padding:12px; border-radius:14px; background:#faf8fd; border:1px solid rgba(49,25,75,.10);">
+        <strong style="font-size:20px; color:#26133d;">${grupos.length}</strong><br>
+        <span style="font-size:12px; color:#766b84;">Grupos</span>
+      </div>
+
+      <div style="padding:12px; border-radius:14px; background:#eef8ef; border:1px solid #b9dfc0;">
+        <strong style="font-size:20px; color:#1d6a2b;">${contactados.length}</strong><br>
+        <span style="font-size:12px; color:#1d6a2b;">Contactados</span>
+      </div>
+    </div>
+  `;
+}
+
+function ordenarAlertasPagos(rows = []) {
+  return [...rows].sort((a, b) => {
+    if (!!a.contactado !== !!b.contactado) {
+      return a.contactado ? 1 : -1;
+    }
+
+    const prioridad = Number(b.prioridad || 0) - Number(a.prioridad || 0);
+    if (prioridad !== 0) return prioridad;
+
+    return String(a.participante || a.grupo || "").localeCompare(
+      String(b.participante || b.grupo || ""),
+      "es",
+      { sensitivity: "base" }
+    );
+  });
+}
+
+function limpiarTelefonoWhatsapp(valor = "") {
+  let fono = String(valor || "").replace(/\D/g, "");
+
+  if (!fono) return "";
+
+  if (fono.startsWith("56")) return fono;
+  if (fono.startsWith("9")) return `56${fono}`;
+  if (fono.length === 8) return `569${fono}`;
+
+  return fono;
+}
+
+function getTextoWhatsappPago(alerta = {}) {
+  const responsable = alerta.responsable || "";
+  const participante = alerta.participante || "el/la participante";
+  const grupo = alerta.grupo || "su grupo";
+  const moneda = alerta.moneda || "";
+  const pagado = formatoMontoPago(alerta.totalPagado, moneda);
+  const saldo = formatoMontoPago(alerta.saldoPendiente, moneda);
+
+  return `Hola ${responsable}, le escribimos de Turismo Rai Trai por el viaje de estudios de ${participante}, grupo ${grupo}. Según nuestros registros, se registra pagado ${pagado} y queda un saldo pendiente de ${saldo}. Le agradeceríamos regularizar o contactarnos para revisar el estado de pagos.`;
+}
+
+function getWhatsappUrlAlertaPago(alerta = {}) {
+  const fono = limpiarTelefonoWhatsapp(alerta.telefonoResponsable || "");
+  if (!fono) return "";
+
+  return `https://wa.me/${encodeURIComponent(fono)}?text=${encodeURIComponent(getTextoWhatsappPago(alerta))}`;
+}
+
+function getGmailUrlAlertaPago(alerta = {}) {
+  const to = String(alerta.correoResponsable || "").trim();
+  if (!to) return "";
+
+  const subject = `Estado de pagos viaje de estudios - ${alerta.participante || alerta.grupo || ""}`;
+  const body = getTextoSugeridoPago(alerta);
+
+  return `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(to)}&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
 }
 
 function filtrarAlertasPagosModal(rows = []) {
   const ano = $("filtro-alerta-pago-ano")?.value || "";
   const vendedor = $("filtro-alerta-pago-vendedor")?.value || "";
-  const tipo = $("filtro-alerta-pago-tipo")?.value || "";
   const moneda = $("filtro-alerta-pago-moneda")?.value || "";
   const q = normalizeLoose($("filtro-alerta-pago-buscar")?.value || "");
+  const tiposActivos = getTiposActivosAlertasPagos();
 
-  return rows.filter((row) => {
+  return ordenarAlertasPagos(rows.filter((row) => {
     if (ano && String(row.anoViaje || "") !== ano) return false;
     if (vendedor && normalizeEmail(row.vendedoraCorreo || "") !== vendedor) return false;
-    if (tipo && String(row.tipo || "") !== tipo) return false;
     if (moneda && String(row.moneda || "") !== moneda) return false;
+
+    if (tiposActivos.size && !tiposActivos.has(String(row.tipo || ""))) return false;
 
     if (q) {
       const texto = buildSearchText(row);
@@ -1396,19 +1544,88 @@ function filtrarAlertasPagosModal(rows = []) {
     }
 
     return true;
-  });
+  }));
 }
 
 function renderAlertasPagosListado(rows = []) {
   const cont = $("contenedor-alertas-pagos-listado");
   if (!cont) return;
 
+  renderResumenAlertasPagos(rows);
+
   if (!rows.length) {
     cont.innerHTML = emptyHtml("No hay alertas de pagos para mostrar.");
     return;
   }
 
-  cont.innerHTML = rows.map(renderAlertaPagoCard).join("");
+  cont.innerHTML = `
+    <div style="overflow:auto; border:1px solid rgba(49,25,75,.10); border-radius:16px;">
+      <table style="width:100%; border-collapse:collapse; font-size:12px;">
+        <thead style="background:#32184f; color:white; position:sticky; top:0;">
+          <tr>
+            <th style="padding:10px; text-align:left;">#</th>
+            <th style="padding:10px; text-align:left;">Participante / Grupo</th>
+            <th style="padding:10px; text-align:left;">Grupo</th>
+            <th style="padding:10px; text-align:left;">Año</th>
+            <th style="padding:10px; text-align:left;">Vendedor</th>
+            <th style="padding:10px; text-align:left;">Razón</th>
+            <th style="padding:10px; text-align:right;">Pagado</th>
+            <th style="padding:10px; text-align:right;">Saldo</th>
+            <th style="padding:10px; text-align:left;">Último pago</th>
+            <th style="padding:10px; text-align:left;">Estado</th>
+          </tr>
+        </thead>
+
+        <tbody>
+          ${rows.map((alerta, index) => {
+            const esPersona = alerta.categoriaAlerta === "persona";
+            const nombre = esPersona ? alerta.participante : alerta.grupo;
+            const contactado = alerta.contactado === true;
+
+            return `
+              <tr
+                data-open-detalle-alerta-pago="${escapeHtml(alerta.id)}"
+                style="cursor:pointer; border-bottom:1px solid rgba(49,25,75,.08); background:${contactado ? "#eef8ef" : "#fff"};"
+              >
+                <td style="padding:9px 10px; font-weight:900;">${index + 1}</td>
+
+                <td style="padding:9px 10px;">
+                  <strong style="color:#26133d;">${escapeHtml(nombre || "-")}</strong><br>
+                  <span style="color:#766b84;">${escapeHtml(esPersona ? (alerta.responsable || "Sin responsable") : "Alerta de grupo")}</span>
+                </td>
+
+                <td style="padding:9px 10px;">
+                  ${escapeHtml(alerta.grupo || "-")}<br>
+                  <span style="color:#766b84;">N° ${escapeHtml(alerta.numeroNegocio || "-")}</span>
+                </td>
+
+                <td style="padding:9px 10px;">${escapeHtml(alerta.anoViaje || "-")}</td>
+                <td style="padding:9px 10px;">${escapeHtml(alerta.vendedor || "Sin vendedor")}</td>
+                <td style="padding:9px 10px;">${escapeHtml(alerta.label || alerta.tipo || "-")}</td>
+
+                <td style="padding:9px 10px; text-align:right;">
+                  ${escapeHtml(formatoMontoPago(alerta.totalPagado || 0, alerta.moneda))}
+                </td>
+
+                <td style="padding:9px 10px; text-align:right; font-weight:900;">
+                  ${escapeHtml(formatoMontoPago(alerta.saldoPendiente || alerta.saldoPendienteGrupo || 0, alerta.moneda))}
+                </td>
+
+                <td style="padding:9px 10px;">${escapeHtml(alerta.ultimoPagoFecha || "-")}</td>
+
+                <td style="padding:9px 10px;">
+                  ${contactado
+                    ? `<span style="color:#1d6a2b; font-weight:900;">Contactado</span>`
+                    : `<span style="color:#9f1d1d; font-weight:900;">Pendiente</span>`
+                  }
+                </td>
+              </tr>
+            `;
+          }).join("")}
+        </tbody>
+      </table>
+    </div>
+  `;
 }
 
 function renderAlertaPagoCard(alerta = {}) {
@@ -1416,15 +1633,18 @@ function renderAlertaPagoCard(alerta = {}) {
   const idGrupo = String(alerta.idGrupo || "").trim();
   const textoSugerido = esPersona ? getTextoSugeridoPago(alerta) : "";
   const yaContactado = alerta.contactado === true;
+  const gmailUrl = esPersona ? getGmailUrlAlertaPago(alerta) : "";
+  const whatsappUrl = esPersona ? getWhatsappUrlAlertaPago(alerta) : "";
 
   return `
     <div class="home-card-row">
       <div style="min-width:0;">
         <div class="home-card-row-title">
-          ${escapeHtml(alerta.label || alerta.tipo || "Alerta de pago")}
+          ${escapeHtml(esPersona ? (alerta.participante || "Participante") : (alerta.grupo || "Grupo"))}
         </div>
 
         <div class="home-card-row-text">
+          <strong>Razón:</strong> ${escapeHtml(alerta.label || alerta.tipo || "Alerta de pago")}<br>
           Grupo: ${escapeHtml(alerta.grupo || "-")} · N° ${escapeHtml(alerta.numeroNegocio || "-")}<br>
           Año: ${escapeHtml(alerta.anoViaje || "-")} · Vendedor(a): ${escapeHtml(alerta.vendedor || "Sin vendedor")}<br>
           Moneda: ${escapeHtml(alerta.moneda || "-")} · Prioridad: ${escapeHtml(alerta.prioridad || 0)}
@@ -1432,7 +1652,6 @@ function renderAlertaPagoCard(alerta = {}) {
 
         ${esPersona ? `
           <div style="margin-top:10px; color:#3e3550; font-size:14px; line-height:1.5;">
-            <strong>Participante:</strong> ${escapeHtml(alerta.participante || "-")}<br>
             <strong>Responsable:</strong> ${escapeHtml(alerta.responsable || "-")}<br>
             <strong>Correo:</strong> ${escapeHtml(alerta.correoResponsable || "-")}<br>
             <strong>Teléfono:</strong> ${escapeHtml(alerta.telefonoResponsable || "-")}<br>
@@ -1449,7 +1668,7 @@ function renderAlertaPagoCard(alerta = {}) {
             </div>
           ` : ""}
 
-          <details style="margin-top:10px;">
+          <details open style="margin-top:10px;">
             <summary style="cursor:pointer; font-weight:800;">Texto sugerido para contactar</summary>
             <div style="margin-top:8px; white-space:pre-wrap; padding:10px; border-radius:12px; background:#f7f3fb;">
               ${escapeHtml(textoSugerido)}
@@ -1467,11 +1686,19 @@ function renderAlertaPagoCard(alerta = {}) {
 
       <div style="display:flex; flex-direction:column; gap:8px;">
         ${esPersona ? `
-          <button
-            type="button"
-            class="home-btn"
-            data-copy-alerta-pago="${escapeHtml(alerta.id)}"
-          >
+          ${gmailUrl ? `
+            <a href="${gmailUrl}" target="_blank" rel="noopener" class="home-btn" style="background:#b42318;">
+              Gmail
+            </a>
+          ` : ""}
+
+          ${whatsappUrl ? `
+            <a href="${whatsappUrl}" target="_blank" rel="noopener" class="home-btn" style="background:#16833a;">
+              WhatsApp
+            </a>
+          ` : ""}
+
+          <button type="button" class="home-btn" data-copy-alerta-pago="${escapeHtml(alerta.id)}">
             Copiar texto
           </button>
 
@@ -1485,17 +1712,76 @@ function renderAlertaPagoCard(alerta = {}) {
           </button>
         ` : ""}
 
-        <a
-          href="grupo.html?id=${encodeURIComponent(idGrupo)}"
-          target="_blank"
-          rel="noopener"
-          class="home-btn"
-        >
+        <a href="grupo.html?id=${encodeURIComponent(idGrupo)}" target="_blank" rel="noopener" class="home-btn">
           Abrir grupo
         </a>
       </div>
     </div>
   `;
+}
+
+function openDetalleAlertaPago(alertaId) {
+  const alerta = state.alertasPagosRows.find((row) => String(row.id) === String(alertaId));
+  if (!alerta) return;
+
+  setText("modal-detalle-titulo", alerta.categoriaAlerta === "persona"
+    ? (alerta.participante || "Detalle alerta")
+    : (alerta.grupo || "Detalle alerta")
+  );
+
+  setText("modal-detalle-subtitulo", alerta.label || alerta.tipo || "Alerta de pago");
+
+  const cont = $("modal-detalle-contenido");
+  if (cont) {
+    cont.innerHTML = renderAlertaPagoCard(alerta);
+  }
+
+  openDialog($("modal-detalle-home"));
+}
+
+function exportarAlertasPagosXlsx() {
+  const rows = filtrarAlertasPagosModal(state.alertasPagosFiltradasRows || []);
+
+  if (!rows.length) {
+    alert("No hay alertas para exportar con los filtros actuales.");
+    return;
+  }
+
+  const fecha = new Date();
+  const fechaTxt = fecha.toISOString().slice(0, 10);
+  const horaTxt = fecha.toTimeString().slice(0, 5).replace(":", "");
+
+  const data = rows.map((a, index) => ({
+    numero: index + 1,
+    exportadoEl: fecha.toLocaleString("es-CL"),
+    categoria: a.categoriaAlerta || "",
+    tipo: a.tipo || "",
+    razon: a.label || "",
+    participante: a.participante || "",
+    responsable: a.responsable || "",
+    correo: a.correoResponsable || "",
+    telefono: a.telefonoResponsable || "",
+    grupo: a.grupo || "",
+    numeroNegocio: a.numeroNegocio || "",
+    anoViaje: a.anoViaje || "",
+    vendedor: a.vendedor || "",
+    moneda: a.moneda || "",
+    total: a.totalDebe || "",
+    pagado: a.totalPagado || "",
+    saldo: a.saldoPendiente || a.saldoPendienteGrupo || "",
+    ultimoPagoFecha: a.ultimoPagoFecha || "",
+    contactado: a.contactado ? "Sí" : "No",
+    contactadoPor: a.contactadoPor || a.contactadoPorCorreo || "",
+    contactadoAt: a.contactadoAt || "",
+    prioridad: a.prioridad || ""
+  }));
+
+  const ws = XLSX.utils.json_to_sheet(data);
+  const wb = XLSX.utils.book_new();
+
+  XLSX.utils.book_append_sheet(wb, ws, "Alertas pagos");
+
+  XLSX.writeFile(wb, `alertas_pagos_${fechaTxt}_${horaTxt}.xlsx`);
 }
 
 async function copiarTextoAlertaPago(alertaId) {
@@ -1770,7 +2056,7 @@ function abrirModalAlertasPagos() {
       renderAlertasPagosListado(filtradas);
     };
 
-    ["filtro-alerta-pago-ano", "filtro-alerta-pago-vendedor", "filtro-alerta-pago-tipo", "filtro-alerta-pago-moneda", "filtro-alerta-pago-buscar"]
+    ["filtro-alerta-pago-ano", "filtro-alerta-pago-vendedor", "filtro-alerta-pago-moneda", "filtro-alerta-pago-buscar"]
       .forEach((id) => {
         const el = $(id);
         if (!el || el.dataset.bound) return;
@@ -1785,9 +2071,36 @@ function abrirModalAlertasPagos() {
       btnActualizar.addEventListener("click", actualizarAlertasPagos);
     }
 
+    const btnExportar = $("btn-exportar-alertas-pagos");
+    if (btnExportar && !btnExportar.dataset.bound) {
+      btnExportar.dataset.bound = "1";
+      btnExportar.addEventListener("click", exportarAlertasPagosXlsx);
+    }
+    
+    document.querySelectorAll("[data-tipo-alerta-pago]").forEach((btn) => {
+      if (btn.dataset.bound) return;
+      btn.dataset.bound = "1";
+    
+      btn.addEventListener("click", () => {
+        btn.classList.toggle("is-active");
+    
+        if (btn.classList.contains("is-active")) {
+          btn.style.background = "#f4eefb";
+          btn.style.color = "#32184f";
+        } else {
+          btn.style.background = "#fff";
+          btn.style.color = "#766b84";
+        }
+    
+        refrescar();
+      });
+    });
+
     refrescar();
   }, 80);
 }
+
+
 
 /* =========================================================
    MODALES LISTADO ALERTAS
@@ -2395,6 +2708,13 @@ function bindAlertButtons() {
     document.body.dataset.boundAlertasPagosAcciones = "1";
 
     document.addEventListener("click", async (e) => {
+      const filaDetalle = e.target.closest("[data-open-detalle-alerta-pago]");
+      if (filaDetalle) {
+        e.preventDefault();
+        openDetalleAlertaPago(filaDetalle.dataset.openDetalleAlertaPago);
+        return;
+      }
+      
       const btnCopy = e.target.closest("[data-copy-alerta-pago]");
       if (btnCopy) {
         e.preventDefault();
