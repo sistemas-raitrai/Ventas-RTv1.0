@@ -1108,6 +1108,16 @@ function formatoMontoPago(v, moneda = "") {
   });
 }
 
+function normalizarMonedaPago(valor = "") {
+  const m = normalizeLoose(valor);
+
+  if (m.includes("peso") || m === "clp") return "CLP";
+  if (m.includes("dolar") || m.includes("dólar") || m === "usd") return "USD";
+  if (m.includes("euro") || m === "eur") return "EUR";
+
+  return String(valor || "").trim().toUpperCase();
+}
+
 function normalizarGrupoPagos(g = {}) {
   return {
     numeroNegocio: String(g.negocio_id || "").trim(),
@@ -1115,7 +1125,7 @@ function normalizarGrupoPagos(g = {}) {
     anoViaje: String(g.ano_viaje || "").trim(),
     fechaSalida: String(g.fecha_salida || "").trim(),
     destino: String(g.destino || "").trim(),
-    monedaTexto: String(g.moneda_texto || "").trim().toUpperCase(),
+    monedaTexto: normalizarMonedaPago(g.moneda_texto),
     totalViaje: numeroPago(g.total_viaje),
     totalPagado: numeroPago(g.total_pagado),
     saldoPendiente: numeroPago(g.saldo_pendiente)
@@ -1592,6 +1602,7 @@ function filtrarAlertasPagosModal(rows = []) {
   return ordenarAlertasPagos(rows.filter((row) => {
     if (ano && String(row.anoViaje || "") !== ano) return false;
     if (vendedor && normalizeEmail(row.vendedoraCorreo || "") !== vendedor) return false;
+    if (moneda && String(row.moneda || "") !== moneda) return false;
     if (prioridad && getPrioridadPagoKey(row) !== prioridad) return false;
 
     if (tiposActivos.size && !tiposActivos.has(String(row.tipo || ""))) return false;
