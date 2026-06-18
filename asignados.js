@@ -1071,20 +1071,10 @@ async function analyzeVendorAssignmentRecommendation(sourceRow = {}, selectedVen
     vendors.map((vendor) => [normalizeEmail(vendor.email || ""), createVendorRecommendationBase(vendor)])
   );
   
-  const historialSnap = await getDocs(collection(db, "ventas_historial"));
+  // Optimización:
+  // Antes se leía TODA la colección ventas_historial cada vez que se asignaba.
+  // Eso hacía lento el flujo. Ahora la sugerencia usa datos ya cargados en state.rows.
   const historialPorGrupo = new Map();
-  
-  historialSnap.docs.forEach((docSnap) => {
-    const data = docSnap.data() || {};
-    const idGrupo = String(data.idGrupo || "").trim();
-    if (!idGrupo) return;
-  
-    if (!historialPorGrupo.has(idGrupo)) {
-      historialPorGrupo.set(idGrupo, []);
-    }
-  
-    historialPorGrupo.get(idGrupo).push(data);
-  });
   
   const currentId = getRowId(sourceRow);
   const sourceYear = getAnoViajeNumber(sourceRow);
@@ -1555,6 +1545,10 @@ function renderTable() {
         <td>
           <div class="table-actions">
             ${canEdit ? `
+              <button class="btn-mini open" data-action="view-recommendation" data-id="${escapeHtml(idGrupo)}">
+                Ver sugerencia
+              </button>
+            
               <button class="btn-mini edit" data-action="save-assignment" data-id="${escapeHtml(idGrupo)}">
                 ${state.tab === "sin_asignar" ? "Asignar" : "Guardar"}
               </button>
@@ -1898,48 +1892,23 @@ async function persistAssignment({
 
 async function continueAssignmentAfterAlertReview() {
   const pending = state.pendingAssignmentReview;
-  if (!pending) return;
-
-  const continueBtn = $("assignmentAlertContinueBtn");
-  if (continueBtn) continueBtn.disabled = true;
-
-  try {
-    const currentRow =
-      state.rows.find((item) => getRowId(item) === pending.idGrupo) ||
-      pending.row;
-
-    const currentVendor =
-      findVendorByEmail(pending.vendor.email || "") ||
-      pending.vendor;
-
-    closeAssignmentAlertModal();
-    
-    setProgressStatus({
-      text: "Confirmando asignación...",
-      meta: `Guardando selección para grupo ${pending.idGrupo}`,
-      progress: 82
-    });
-    
-    await persistAssignment({
-      row: currentRow,
-      vendor: currentVendor,
-      tipo: pending.tipo,
-      reviewAnalysis: pending.analysis,
-      confirmedAfterReview: true
-    });
-
-    state.pendingAssignmentReview = null;
-  } catch (error) {
-    console.error(error);
-    setProgressStatus({
-      text: "Error guardando la asignación.",
-      meta: error.message || "No se pudo completar la asignación luego de la revisión.",
-      progress: 100,
-      type: "error"
-    });
-  } finally {
-    if (continueBtn) continueBtn.disabled = false;
+  if (!pending?.analysis?.topRecommendation) {
+    clearAssignmentAlertReviewState();
+    return;
   }
+
+  const idGrupo = pending.idGrupo;
+  const top = pending.analysis.topRecommendation;
+
+  const select = document.querySelector(`[data-role="assign-select"][data-id="${CSS.escape(String(idGrupo))}"]`);
+
+  if (select && top.vendorEmail) {
+    select.value = top.vendorEmail;
+  }
+
+  clearAssignmentAlertReviewState();
+
+  alert(`Se seleccionó la sugerencia: ${top.vendorName}. Ahora debes presionar Asignar/Guardar para confirmar.`);
 }
 
 async function openHistory(idGrupo) {
@@ -2183,6 +2152,70 @@ async function archiveGroup(idGrupo) {
   }
 }
 
+async function openRecommendationForRow(idGrupo) {
+  if (!canEditAsignados(state.effectiveUser)) {
+    alert("No tienes permisos para ver sugerencias.");
+    return;
+  }
+
+  const row = state.rows.find((item) => getRowId(item) === String(idGrupo));
+  if (!row) {
+    alert("No se encontró el grupo en la vista actual.");
+    return;
+  }
+
+  const select = document.querySelector(`[data-role="assign-select"][data-id="${CSS.escape(String(idGrupo))}"]`);
+
+  let vendor = null;
+
+  if (select && normalizeEmail(select.value || "")) {
+    vendor = findVendorByEmail(select.value);
+  }
+
+  if (!vendor) {
+    vendor = getVendorOptions()[0] || null;
+  }
+
+  if (!vendor) {
+    alert("No hay vendedoras disponibles para analizar.");
+    return;
+  }
+
+  try {
+    setProgressStatus({
+      text: "Analizando sugerencia...",
+      meta: `Grupo ${idGrupo}`,
+      progress: 25
+    });
+
+    const analysis = await analyzeVendorAssignmentRecommendation(row, vendor);
+
+    clearProgressStatus();
+
+    state.pendingAssignmentReview = {
+      idGrupo: getRowId(row),
+      row,
+      vendor,
+      tipo: "Sugerencia",
+      analysis
+    };
+
+    openAssignmentAlertModal({
+      row,
+      vendor,
+      analysis
+    });
+  } catch (error) {
+    console.error(error);
+    setProgressStatus({
+      text: "Error generando sugerencia.",
+      meta: error.message || "No se pudo generar la recomendación.",
+      progress: 100,
+      type: "error"
+    });
+  }
+}
+
 async function saveAssignment(idGrupo) {
   if (!canEditAsignados(state.effectiveUser)) {
     alert("No tienes permisos para asignar vendedores.");
@@ -2209,12 +2242,10 @@ async function saveAssignment(idGrupo) {
 
   const anteriorVendedora = getRowVendorName(row) || "Sin asignar";
   const anteriorVendedoraCorreo = getRowVendorEmail(row) || "";
-  const nuevaVendedora = vendor.nombre;
-  const nuevaVendedoraCorreo = vendor.email;
 
   const noCambioReal =
-    normalizeEmail(anteriorVendedoraCorreo) === normalizeEmail(nuevaVendedoraCorreo) &&
-    normalizeSearch(anteriorVendedora) === normalizeSearch(nuevaVendedora) &&
+    normalizeEmail(anteriorVendedoraCorreo) === normalizeEmail(vendor.email) &&
+    normalizeSearch(anteriorVendedora) === normalizeSearch(vendor.nombre) &&
     !isSinAsignar(row);
 
   if (noCambioReal) {
@@ -2225,39 +2256,6 @@ async function saveAssignment(idGrupo) {
   const tipo = isSinAsignar(row) ? "Asignación" : "Reasignación";
 
   try {
-    setProgressStatus({
-      text: `Analizando ${tipo.toLowerCase()}...`,
-      meta: `Leyendo continuidad, territorio y desempeño para grupo ${idGrupo}`,
-      progress: 18
-    });
-
-    const analysis = await analyzeVendorAssignmentRecommendation(row, vendor);
-
-    setProgressStatus({
-      text: `Análisis listo`,
-      meta: `${analysis.totalRelatedGroups || 0} relacionado(s) detectado(s) para ${idGrupo}`,
-      progress: 72
-    });
-
-    if (analysis.shouldReview) {
-      clearProgressStatus();
-
-      state.pendingAssignmentReview = {
-        idGrupo: getRowId(row),
-        row,
-        vendor,
-        tipo,
-        analysis
-      };
-
-      openAssignmentAlertModal({
-        row,
-        vendor,
-        analysis
-      });
-      return;
-    }
-
     await persistAssignment({
       row,
       vendor,
@@ -2269,7 +2267,7 @@ async function saveAssignment(idGrupo) {
     console.error(error);
     setProgressStatus({
       text: `Error en ${tipo.toLowerCase()}.`,
-      meta: error.message || "No se pudo preparar la recomendación de asignación.",
+      meta: error.message || "No se pudo guardar la asignación.",
       progress: 100,
       type: "error"
     });
@@ -2431,6 +2429,15 @@ function bindPageEvents() {
       const action = btn.dataset.action || "";
       const id = btn.dataset.id || "";
       const canEdit = canEditAsignados(state.effectiveUser);
+
+      if (action === "view-recommendation") {
+        if (!canEdit) {
+          alert("Estás en modo solo lectura.");
+          return;
+        }
+        await openRecommendationForRow(id);
+        return;
+      }
 
       if (action === "save-assignment") {
         if (!canEdit) {
