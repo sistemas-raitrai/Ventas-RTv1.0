@@ -225,12 +225,19 @@ function buildTripKeyFromExistingDoc(data = {}) {
   return buildAliasTripKey({ colegio, comuna, cursoViaje, anoViaje });
 }
 
-async function findExistingAliasConflict(targetTripKey = "") {
+async function loadCotizacionesDocsForReview() {
+  const snap = await getDocs(collection(db, "ventas_cotizaciones"));
+  return snap.docs;
+}
+
+async function findExistingAliasConflict(targetTripKey = "", docs = null) {
   if (!targetTripKey) return null;
 
-  const snap = await getDocs(collection(db, "ventas_cotizaciones"));
+  const rows = Array.isArray(docs)
+    ? docs
+    : (await getDocs(collection(db, "ventas_cotizaciones"))).docs;
 
-  for (const row of snap.docs) {
+  for (const row of rows) {
     const data = row.data() || {};
     const rowTripKey = buildTripKeyFromExistingDoc(data);
 
@@ -508,24 +515,30 @@ function buildAlertReviewCardsHtml(matches = []) {
   `).join("");
 }
 
-async function findPotentialDuplicateAlerts(data = {}) {
-  const snap = await getDocs(collection(db, "ventas_cotizaciones"));
+async function findPotentialDuplicateAlerts(data = {}, docs = null) {
+  const rows = Array.isArray(docs)
+    ? docs
+    : (await getDocs(collection(db, "ventas_cotizaciones"))).docs;
+
   const currentYear = getCurrentYear();
   const inputYear = Number(data.anoViaje || "");
   const inputComuna = normalizeSearch(data.comunaCiudad || "");
+
   const inputNames = [data.nombreCliente, data.nombreCliente2]
     .map((value) => normalizeText(value))
     .filter(Boolean);
+
   const inputEmails = [data.correoCliente, data.correoCliente2]
     .map((value) => normalizeEmail(value))
     .filter(Boolean);
+
   const inputPhones = [data.celularCliente, data.celularCliente2]
     .map((value) => normalizePhoneLoose(value))
     .filter(Boolean);
 
   const results = [];
 
-  snap.docs.forEach((row) => {
+  rows.forEach((row) => {
     const rowData = row.data() || {};
     const rowId = normalizeText(rowData.idGrupo || row.id || "");
     const rowYear = Number(rowData.anoViaje || "");
@@ -545,22 +558,26 @@ async function findPotentialDuplicateAlerts(data = {}) {
     );
 
     if (schoolSimilarity >= 0.95) {
-      score += 28;
+      score += 40;
       pushUniqueReason(reasons, "Colegio muy parecido");
     } else if (schoolSimilarity >= 0.82) {
-      score += 18;
+      score += 24;
       pushUniqueReason(reasons, "Colegio parecido");
     }
 
     const rowComuna = normalizeSearch(rowData.comunaCiudad || rowData.comuna || "");
-    if (inputComuna && rowComuna && inputComuna === rowComuna) {
-      score += 10;
+    const sameComuna = inputComuna && rowComuna && inputComuna === rowComuna;
+
+    if (sameComuna) {
+      score += 14;
       pushUniqueReason(reasons, "Misma comuna/ciudad");
     }
 
+    const sameYear = inputYear && Number.isFinite(rowYear) && rowYear === inputYear;
+
     if (inputYear && Number.isFinite(rowYear) && rowYear) {
-      if (rowYear === inputYear) {
-        score += 18;
+      if (sameYear) {
+        score += 24;
         pushUniqueReason(reasons, `Mismo año de viaje (${rowYear})`);
       } else if (rowYear > inputYear) {
         score += 8;
@@ -610,6 +627,7 @@ async function findPotentialDuplicateAlerts(data = {}) {
       .filter(Boolean);
 
     const matchedEmail = inputEmails.find((email) => email && rowEmails.includes(email));
+
     if (matchedEmail) {
       score += 60;
       hardSignals += 1;
@@ -621,6 +639,7 @@ async function findPotentialDuplicateAlerts(data = {}) {
       .filter(Boolean);
 
     const matchedPhone = inputPhones.find((phone) => phone && rowPhones.includes(phone));
+
     if (matchedPhone) {
       score += 55;
       hardSignals += 1;
@@ -630,50 +649,42 @@ async function findPotentialDuplicateAlerts(data = {}) {
     const hasAssignedVendor =
       !!normalizeEmail(rowData.vendedoraCorreo || "") ||
       normalizeSearch(rowData.vendedora || "") !== "sin asignar";
-    
+
     const isFromCartera =
       normalizeSearch(rowData.origenColegio || "") === "cartera" ||
       !!normalizeText(rowData.carteraNumeroColegio || "") ||
       !!normalizeEmail(rowData.carteraCorreoVendedora || "");
-    
-    const sameComuna = inputComuna && rowComuna && inputComuna === rowComuna;
-    const sameYear = inputYear && Number.isFinite(rowYear) && rowYear === inputYear;
-    
-    const nearBusinessMatch =
-      schoolSimilarity >= 0.95 &&
-      sameComuna &&
-      (
-        courseSimilarity >= 0.88 ||
-        sameYear ||
-        hasAssignedVendor ||
-        isFromCartera
-      );
-    
-    if (nearBusinessMatch) {
+
+    // REGLA PRINCIPAL NUEVA:
+    // Colegio + comuna + mismo año = alerta comercial crítica,
+    // aunque sea otro curso, otro contacto, otro correo o teléfono.
+    if (schoolSimilarity >= 0.95 && sameComuna && sameYear) {
       businessCritical = true;
       pushUniqueReason(
         reasons,
-        "Posible conflicto comercial crítico: mismo colegio/comuna y grupo ya asignado o relacionado comercialmente"
+        "Conflicto comercial crítico: mismo colegio, misma comuna y mismo año de viaje"
       );
     }
-    
-    if (hasAssignedVendor && schoolSimilarity >= 0.95 && sameComuna) {
-      pushUniqueReason(reasons, "El grupo ya tiene vendedor/a asignado(a)");
+
+    if (schoolSimilarity >= 0.95 && sameComuna && hasAssignedVendor) {
+      businessCritical = true;
+      pushUniqueReason(reasons, "El colegio ya tiene vendedor/a asignado(a)");
     }
-    
-    if (isFromCartera && schoolSimilarity >= 0.95 && sameComuna) {
+
+    if (schoolSimilarity >= 0.95 && sameComuna && isFromCartera) {
+      businessCritical = true;
       pushUniqueReason(reasons, "El colegio ya existe en cartera");
     }
-    
+
     const shouldKeep =
       businessCritical ||
       hardSignals > 0 ||
       score >= 35 ||
-      (schoolSimilarity >= 0.82 && courseSimilarity >= 0.88 && rowYear === inputYear) ||
+      (schoolSimilarity >= 0.82 && courseSimilarity >= 0.88 && sameYear) ||
       (bestNameMatch.score >= 0.88 && schoolSimilarity >= 0.78);
-    
+
     if (!shouldKeep) return;
-    
+
     const level = getAlertLevel(score, hardSignals, businessCritical);
 
     results.push({
@@ -1458,13 +1469,14 @@ async function createRegistroHistorialEntry({
   });
 }
 
-async function getNextSequentialIdGrupo() {
-  const snap = await getDocs(collection(db, "ventas_cotizaciones"));
+async function getNextSequentialIdGrupo(docs = null) {
+  const rows = Array.isArray(docs)
+    ? docs
+    : (await getDocs(collection(db, "ventas_cotizaciones"))).docs;
 
-  // Piso inicial según tu base actual
   let maxId = 10935;
 
-  snap.docs.forEach((row) => {
+  rows.forEach((row) => {
     const data = row.data() || {};
 
     const candidates = [
@@ -1512,7 +1524,10 @@ async function saveRegistro(e) {
       progress: 35
     });
 
-    const conflict = await findExistingAliasConflict(data.aliasTripKey);
+    const cotizacionesDocs = await loadCotizacionesDocsForReview();
+    state.pendingCotizacionesDocs = cotizacionesDocs;
+
+    const conflict = await findExistingAliasConflict(data.aliasTripKey, cotizacionesDocs);
 
     if (conflict) {
       const conflictCode = normalizeText(conflict.data?.codigoRegistro || conflict.id || "");
@@ -1537,7 +1552,7 @@ async function saveRegistro(e) {
       progress: 62
     });
 
-    const alerts = await findPotentialDuplicateAlerts(data);
+    const alerts = await findPotentialDuplicateAlerts(data, cotizacionesDocs);
 
     if (alerts.length) {
       state.pendingAlertReview = { data, alerts };
@@ -1560,7 +1575,11 @@ async function saveRegistro(e) {
       type: "error"
     });
   } finally {
-    if (!state.pendingAlertReview && btn) {
+    if (!state.pendingAlertReview) {
+      state.pendingCotizacionesDocs = null;
+    }
+  
+    if (btn && !state.pendingAlertReview) {
       btn.disabled = false;
     }
   }
@@ -1582,7 +1601,7 @@ async function persistRegistro({
       progress: 78
     });
 
-    const idGrupo = await getNextSequentialIdGrupo();
+    const idGrupo = await getNextSequentialIdGrupo(state.pendingCotizacionesDocs || null);
     const newRef = doc(db, "ventas_cotizaciones", idGrupo);
     const codigoRegistro = buildCodigoRegistro(idGrupo);
 
@@ -1699,6 +1718,8 @@ async function persistRegistro({
       type: "error"
     });
   } finally {
+    state.pendingCotizacionesDocs = null;
+  
     if (btn) btn.disabled = false;
   }
 }
