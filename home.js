@@ -1797,7 +1797,10 @@ function renderAlertasPagosListado(rows = []) {
                 <td style="padding:9px 10px;">${escapeHtml(alerta.label || alerta.tipo || "-")}</td>
 
                 <td style="padding:9px 10px; text-align:right;">
-                  ${escapeHtml(formatoMontoPago(alerta.totalPagado || 0, alerta.moneda))}
+                  ${escapeHtml(formatoMontoPago(
+                    esPersona ? (alerta.totalPagado || 0) : (alerta.totalPagadoGrupo || 0),
+                    alerta.moneda
+                  ))}
                 </td>
 
                 <td style="padding:9px 10px; text-align:right; font-weight:900;">
@@ -1873,6 +1876,7 @@ function renderAlertaPagoCard(alerta = {}) {
             <strong>Con deuda:</strong> ${escapeHtml(alerta.totalConDeuda || 0)}<br>
             <strong>% saldo pendiente grupo:</strong> ${escapeHtml(Number(alerta.porcentajeGrupoDebe || 0).toFixed(1))}%<br>
             <strong>Saldo pendiente grupo:</strong> ${escapeHtml(formatoMontoPago(alerta.saldoPendienteGrupo, alerta.moneda))}<br>
+            <strong>Total pagado grupo:</strong> ${escapeHtml(formatoMontoPago(alerta.totalPagadoGrupo || 0, alerta.moneda))}<br>
             <strong>30%+ sin pago +60 días:</strong>
             ${escapeHtml(alerta.totalDeudoresSinPago60 || 0)}
             persona(s)
@@ -2250,6 +2254,7 @@ async function actualizarAlertasPagos() {
           porcentajeSaldoPendiente: grupoAlertaInfo.porcentajeSaldoPendiente,
           totalViajan: grupoAlertaInfo.totalViajan,
           totalConDeuda: grupoAlertaInfo.totalConDeuda,
+          totalPagadoGrupo: grupoPago.totalPagado,
           saldoPendienteGrupo: grupoPago.saldoPendiente,
           totalViajeGrupo: grupoPago.totalViaje,
           porcentajeGrupoSinPago60: grupoAlertaInfo.porcentajeGrupoSinPago60 || 0,
