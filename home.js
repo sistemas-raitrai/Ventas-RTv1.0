@@ -867,12 +867,29 @@ function getAlertsForScope(rows = [], predicate = () => false) {
 ========================================================= */
 
 async function loadHomeData() {
-  const [groupsSnap, alertsSnap, solicitudesSnap, alertasPagosSnap] = await Promise.all([
-    getDocs(collection(db, "ventas_cotizaciones")),
-    getDocs(collection(db, ALERTAS_COLLECTION)),
-    getDocs(collection(db, SOLICITUDES_COLLECTION)),
-    getDocs(collection(db, ALERTAS_PAGOS_COLLECTION))
-  ]);
+  console.time("HOME_TOTAL");
+
+  console.time("CARGA_FIRESTORE_TOTAL");
+
+  console.time("ventas_cotizaciones");
+  const groupsSnap = await getDocs(collection(db, "ventas_cotizaciones"));
+  console.timeEnd("ventas_cotizaciones");
+
+  console.time("ventas_alertas");
+  const alertsSnap = await getDocs(collection(db, ALERTAS_COLLECTION));
+  console.timeEnd("ventas_alertas");
+
+  console.time("ventas_solicitudes_actualizacion");
+  const solicitudesSnap = await getDocs(collection(db, SOLICITUDES_COLLECTION));
+  console.timeEnd("ventas_solicitudes_actualizacion");
+
+  console.time("ventas_alertas_pagos");
+  const alertasPagosSnap = await getDocs(collection(db, ALERTAS_PAGOS_COLLECTION));
+  console.timeEnd("ventas_alertas_pagos");
+
+  console.timeEnd("CARGA_FIRESTORE_TOTAL");
+
+  console.time("PROCESAR_DATOS_HOME");
 
   state.rows = groupsSnap.docs.map((docSnap) => {
     const data = docSnap.data() || {};
@@ -911,8 +928,10 @@ async function loadHomeData() {
       .map((row) => timestampLikeToDate(row.actualizadoAt))
       .filter(Boolean)
       .sort((a, b) => b.getTime() - a.getTime())[0] || null;
-}
 
+  console.timeEnd("PROCESAR_DATOS_HOME");
+  console.timeEnd("HOME_TOTAL");
+}
 /* =========================================================
    RENDER ALERTAS
 ========================================================= */
