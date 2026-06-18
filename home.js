@@ -9,6 +9,7 @@ import {
   addDoc,
   serverTimestamp,
   query,
+  where,
   orderBy,
   limit
 } from "https://www.gstatic.com/firebasejs/11.7.3/firebase-firestore.js";
@@ -876,7 +877,14 @@ async function loadHomeData() {
   console.time("CARGA_FIRESTORE_TOTAL");
 
   console.time("ventas_cotizaciones");
-  const groupsSnap = await getDocs(collection(db, "ventas_cotizaciones"));
+  const anoActual = new Date().getFullYear();
+  
+  const groupsSnap = await getDocs(
+    query(
+      collection(db, "ventas_cotizaciones"),
+      where("anoViaje", ">=", anoActual)
+    )
+  );
   console.timeEnd("ventas_cotizaciones");
 
   console.time("ventas_alertas");
