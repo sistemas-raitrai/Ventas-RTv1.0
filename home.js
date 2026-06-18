@@ -1271,7 +1271,9 @@ function getTiposAlertaGrupoPago(grupo = {}, pasajeros = []) {
   const totalConDeuda = conDeuda.length;
 
   const totalViaje = Number(grupo.totalViaje || 0);
-  const saldoPendienteGrupo = Number(grupo.saldoPendiente || 0);
+   const saldoPendienteGrupo = pasajeros
+    .filter((p) => p.viaja)
+    .reduce((acc, p) => acc + Number(p.saldoPendiente || 0), 0) || Number(grupo.saldoPendiente || 0);
 
   const porcentajeSaldoPendiente =
     totalViaje > 0 ? (saldoPendienteGrupo / totalViaje) * 100 : 0;
@@ -1905,15 +1907,48 @@ function renderAlertaPagoCard(alerta = {}) {
                   <tbody>
                     ${alerta.pasajerosConDeudaGrupo.map((p, idx) => `
                       <tr style="border-top:1px solid rgba(49,25,75,.08);">
+                        <td style="padding:8px; text-align:right; font-weight:900;">
+                          ${idx + 1}
+                        </td>
+                    
                         <td style="padding:8px;">
                           <strong>${escapeHtml(p.participante || "-")}</strong><br>
                           <span style="color:#766b84;">${escapeHtml(p.rut || "")}</span>
                         </td>
-                        <td style="padding:8px;">${escapeHtml(p.responsable || "-")}</td>
-                        <td style="padding:8px; text-align:right;">${escapeHtml(formatoMontoPago(p.totalPagado || 0, alerta.moneda))}</td>
-                        <td style="padding:8px; text-align:right; font-weight:900;">${escapeHtml(formatoMontoPago(p.saldoPendiente || 0, alerta.moneda))}</td>
-                        <td style="padding:8px;">${escapeHtml(p.ultimoPagoFecha || "-")}</td>
-                        <td style="padding:8px; text-align:right;">${escapeHtml(p.diasUltimoPago ?? "-")}</td>
+                    
+                        <td style="padding:8px;">
+                          <strong>${escapeHtml(p.responsable || "-")}</strong><br>
+                          <span style="color:#766b84;">${escapeHtml(p.correoResponsable || "-")}</span><br>
+                          <span style="color:#766b84;">${escapeHtml(p.telefonoResponsable || "-")}</span>
+                        </td>
+                    
+                        <td style="padding:8px; text-align:right;">
+                          ${escapeHtml(formatoMontoPago(p.totalPagado || 0, alerta.moneda))}
+                        </td>
+                    
+                        <td style="padding:8px; text-align:right; font-weight:900;">
+                          ${escapeHtml(formatoMontoPago(p.saldoPendiente || 0, alerta.moneda))}
+                        </td>
+                    
+                        <td style="padding:8px;">
+                          ${escapeHtml(p.ultimoPagoFecha || "-")}
+                        </td>
+                    
+                        <td style="padding:8px; text-align:right;">
+                          ${escapeHtml(p.diasUltimoPago ?? "-")}
+                        </td>
+                    
+                        <td style="padding:8px; text-align:center;">
+                          <button
+                            type="button"
+                            class="home-btn"
+                            data-open-persona-grupo="${escapeHtml(alerta.id)}"
+                            data-persona-index="${idx}"
+                            style="padding:6px 10px; font-size:11px;"
+                          >
+                            Ver gestión
+                          </button>
+                        </td>
                       </tr>
                     `).join("")}
                   </tbody>
