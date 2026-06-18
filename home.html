@@ -432,6 +432,30 @@
         </div>
       </div>
 
+      <section class="home-card" style="margin-bottom:22px;">
+        <div class="home-card-head">
+          <div>
+            <h2 class="home-card-title">Alertas de pagos</h2>
+            <p class="home-card-desc">
+              Información de pagos cargada solo al abrir el detalle.
+            </p>
+            <p class="home-card-desc" id="home-alertas-pagos-updated">
+              Última actualización: cargando...
+            </p>
+          </div>
+      
+          <div style="display:flex; gap:8px; flex-wrap:wrap;">
+            <a href="#" id="link-alertas-pagos" class="home-btn">
+              Ver alertas
+            </a>
+      
+            <button type="button" id="btn-home-actualizar-alertas-pagos" class="home-btn" style="background:#6d4a92;">
+              Actualizar
+            </button>
+          </div>
+        </div>
+      </section>
+
       <div class="home-content">
 
         <section class="home-card">
@@ -442,13 +466,7 @@
           </div>
 
           <div class="home-alert-list">
-            <div class="alert-row">
-              <span>Hay</span>
-              <strong id="count-alertas-pagos">0</strong>
-              <span>alertas de pagos</span>
-              <a href="#" id="link-alertas-pagos">Ver</a>
-            </div>
-            
+           
             <div class="alert-row">
               <span>Hay</span>
               <strong id="count-sin-asignar">0</strong>
