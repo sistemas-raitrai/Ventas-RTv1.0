@@ -3427,6 +3427,18 @@ async function renderPantalla() {
   }
 
   setHeaderState({
+    realUser,
+    effectiveUser,
+    title: "Inicio",
+    subtitle: "Panel principal"
+  });
+
+  renderActingUserSwitcher(VENTAS_USERS);
+
+  await loadHomeData();
+  renderHome();
+  initSearchers();
+}
 
 async function initPage() {
   await waitForLayoutReady();
