@@ -3401,27 +3401,13 @@ async function renderPantalla() {
     return;
   }
 
-  setHeaderState({
-    realUser,
-    effectiveUser,
-    isActing: normalizeEmail(realUser.email) !== normalizeEmail(effectiveUser.email)
-  });
-
-  renderActingUserSwitcher({
-    realUser,
-    effectiveUser,
-    users: VENTAS_USERS
-  });
-
-  try {
-    await loadHomeData();
-    renderHome();
-    initSearchers();
-  } catch (error) {
-    console.error("Error cargando home:", error);
-    alert("No se pudo cargar el home: " + error.message);
+  // BLOQUEAR HOME PARA ROL VENDEDOR
+  if (isVendedorRole(effectiveUser)) {
+    location.href = "index.html";
+    return;
   }
-}
+
+  setHeaderState({
 
 async function initPage() {
   await waitForLayoutReady();
