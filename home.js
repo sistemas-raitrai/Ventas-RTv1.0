@@ -7,7 +7,10 @@ import {
   doc,
   setDoc,
   addDoc,
-  serverTimestamp
+  serverTimestamp,
+  query,
+  orderBy,
+  limit
 } from "https://www.gstatic.com/firebasejs/11.7.3/firebase-firestore.js";
 
 import { auth, db, VENTAS_USERS } from "./firebase-init.js";
@@ -58,6 +61,7 @@ const state = {
   alertRows: [],
   solicitudesRows: [],
   alertasPagosRows: [],
+  alertasPagosCargadas: false,
   alertasPagosUltimaActualizacion: null,
   anoFichaFiltro: String(new Date().getFullYear()),
 
@@ -883,9 +887,15 @@ async function loadHomeData() {
   const solicitudesSnap = await getDocs(collection(db, SOLICITUDES_COLLECTION));
   console.timeEnd("ventas_solicitudes_actualizacion");
 
-  console.time("ventas_alertas_pagos");
-  const alertasPagosSnap = await getDocs(collection(db, ALERTAS_PAGOS_COLLECTION));
-  console.timeEnd("ventas_alertas_pagos");
+  console.time("ultima_alerta_pagos");
+  const ultimaAlertaPagosSnap = await getDocs(
+    query(
+      collection(db, ALERTAS_PAGOS_COLLECTION),
+      orderBy("actualizadoAt", "desc"),
+      limit(1)
+    )
+  );
+  console.timeEnd("ultima_alerta_pagos");
 
   console.timeEnd("CARGA_FIRESTORE_TOTAL");
 
@@ -915,7 +925,27 @@ async function loadHomeData() {
     ...docSnap.data()
   }));
 
-  state.alertasPagosRows = alertasPagosSnap.docs
+  const ultimaAlertaPagos = ultimaAlertaPagosSnap.docs[0]?.data() || null;
+
+  state.alertasPagosUltimaActualizacion =
+    timestampLikeToDate(ultimaAlertaPagos?.actualizadoAt) || null;
+
+  state.alertasPagosRows = [];
+  state.alertasPagosCargadas = false;
+  state.alertasPagosFiltradasRows = [];
+
+  console.timeEnd("PROCESAR_DATOS_HOME");
+  console.timeEnd("HOME_TOTAL");
+}
+
+async function cargarAlertasPagosDesdeFirestore({ forzar = false } = {}) {
+  if (state.alertasPagosCargadas && !forzar) return;
+
+  console.time("CARGA_ALERTAS_PAGOS_DETALLE");
+
+  const snap = await getDocs(collection(db, ALERTAS_PAGOS_COLLECTION));
+
+  state.alertasPagosRows = snap.docs
     .map((docSnap) => ({
       id: docSnap.id,
       ...docSnap.data()
@@ -929,9 +959,23 @@ async function loadHomeData() {
       .filter(Boolean)
       .sort((a, b) => b.getTime() - a.getTime())[0] || null;
 
-  console.timeEnd("PROCESAR_DATOS_HOME");
-  console.timeEnd("HOME_TOTAL");
+  state.alertasPagosCargadas = true;
+  state.alertasPagosFiltradasRows = getAlertasPagosForScope(state.scopedRows || []);
+
+  renderInfoAlertasPagosHome();
+
+  console.timeEnd("CARGA_ALERTAS_PAGOS_DETALLE");
 }
+
+function renderInfoAlertasPagosHome() {
+  const el = $("home-alertas-pagos-updated");
+  if (!el) return;
+
+  el.textContent = state.alertasPagosUltimaActualizacion
+    ? `Última actualización: ${formatDate(state.alertasPagosUltimaActualizacion)}`
+    : "Última actualización: sin registro";
+}
+
 /* =========================================================
    RENDER ALERTAS
 ========================================================= */
@@ -1071,7 +1115,9 @@ function renderHome() {
   state.alertasCriticasRows = getAlertsForScope(scopedRows, isCriticalIndexAlert);
   state.alertasWarningRows = getAlertsForScope(scopedRows, isWarningIndexAlert);
   
-  state.alertasPagosFiltradasRows = getAlertasPagosForScope(scopedRows);
+  state.alertasPagosFiltradasRows = state.alertasPagosCargadas
+    ? getAlertasPagosForScope(scopedRows)
+    : [];
   
   state.reuniones3DiasRows = sortRowsByAlias(scopedRows.filter(isReunionEnProximosTresDias));
 
@@ -1085,9 +1131,9 @@ function renderHome() {
   setText("count-solicitudes-actualizacion", state.solicitudesActualizacionRows.length);
   setText("count-alertas-criticas", state.alertasCriticasRows.length);
   setText("count-alertas-warning", state.alertasWarningRows.length);
-  setText("count-alertas-pagos", state.alertasPagosFiltradasRows.length);
   setText("count-reunion-3dias", state.reuniones3DiasRows.length);
-
+  
+  renderInfoAlertasPagosHome();
   syncAlertRowsByRole(effectiveUser);
 }
 
@@ -2219,6 +2265,7 @@ async function actualizarAlertasPagos() {
   );
 
   if (!ok) return;
+  await cargarAlertasPagosDesdeFirestore();
 
   const btn = $("btn-actualizar-alertas-pagos");
   if (btn) {
@@ -2438,7 +2485,9 @@ async function actualizarAlertasPagos() {
   }
 }
 
-function abrirModalAlertasPagos() {
+async function abrirModalAlertasPagos() {
+  await cargarAlertasPagosDesdeFirestore();
+
   openListadoModal({
     titulo: "Alertas de pagos",
     subtitulo: "Alertas generadas desde el Sistema de Pagos, ordenadas por prioridad.",
@@ -2477,7 +2526,6 @@ function abrirModalAlertasPagos() {
       });
     };
 
-
     ["filtro-alerta-pago-ano", "filtro-alerta-pago-vendedor", "filtro-alerta-pago-moneda", "filtro-alerta-pago-prioridad", "filtro-alerta-pago-buscar"]
       .forEach((id) => {
         const el = $(id);
@@ -2498,11 +2546,11 @@ function abrirModalAlertasPagos() {
       btnExportar.dataset.bound = "1";
       btnExportar.addEventListener("click", exportarAlertasPagosXlsx);
     }
-    
+
     document.querySelectorAll("[data-tipo-alerta-pago]").forEach((btn) => {
       if (btn.dataset.bound) return;
       btn.dataset.bound = "1";
-    
+
       btn.addEventListener("click", () => {
         document.querySelectorAll("[data-tipo-alerta-pago]").forEach((b) => {
           b.classList.remove("is-active");
@@ -2510,20 +2558,19 @@ function abrirModalAlertasPagos() {
           b.style.color = "#766b84";
           b.style.border = "1px solid rgba(49,25,75,.18)";
         });
-    
+
         btn.classList.add("is-active");
         btn.style.background = "#f4eefb";
         btn.style.color = "#32184f";
         btn.style.border = "2px solid #32184f";
-    
+
         refrescar();
       });
     });
+
     refrescar();
   }, 80);
 }
-
-
 
 /* =========================================================
    MODALES LISTADO ALERTAS
@@ -3106,6 +3153,7 @@ function bindAlertButtons() {
   const linkCriticas = $("link-alertas-criticas");
   const linkWarning = $("link-alertas-warning");
   const linkAlertasPagos = $("link-alertas-pagos");
+  const btnHomeActualizarAlertasPagos = $("btn-home-actualizar-alertas-pagos");
   const linkReuniones = $("link-reunion-3dias");
   const selectAnoFichas = $("select-home-ano-fichas");
 
@@ -3290,9 +3338,28 @@ function bindAlertButtons() {
 
   if (linkAlertasPagos && !linkAlertasPagos.dataset.bound) {
     linkAlertasPagos.dataset.bound = "1";
-    linkAlertasPagos.addEventListener("click", (e) => {
+    linkAlertasPagos.addEventListener("click", async (e) => {
       e.preventDefault();
-      abrirModalAlertasPagos();
+  
+      linkAlertasPagos.textContent = "Cargando...";
+      await abrirModalAlertasPagos();
+      linkAlertasPagos.textContent = "Ver alertas";
+    });
+  }
+
+  if (btnHomeActualizarAlertasPagos && !btnHomeActualizarAlertasPagos.dataset.bound) {
+    btnHomeActualizarAlertasPagos.dataset.bound = "1";
+  
+    btnHomeActualizarAlertasPagos.addEventListener("click", async (e) => {
+      e.preventDefault();
+  
+      btnHomeActualizarAlertasPagos.disabled = true;
+      btnHomeActualizarAlertasPagos.textContent = "Actualizando...";
+  
+      await actualizarAlertasPagos();
+  
+      btnHomeActualizarAlertasPagos.disabled = false;
+      btnHomeActualizarAlertasPagos.textContent = "Actualizar";
     });
   }
 
