@@ -2213,6 +2213,14 @@ async function actualizarAlertasPagos() {
 
       const pasajeros = pasajerosRaw.map(normalizarPasajeroPagos);
 
+      const totalPagadoGrupoCalculado = pasajeros
+        .filter((p) => p.viaja)
+        .reduce((acc, p) => acc + Number(p.totalPagado || 0), 0);
+      
+      const saldoPendienteGrupoCalculado = pasajeros
+        .filter((p) => p.viaja)
+        .reduce((acc, p) => acc + Number(p.saldoPendiente || 0), 0);
+
       const pasajerosConDeudaGrupo = pasajeros
       .filter((p) => p.viaja && p.saldoPendiente > 0)
       .sort((a, b) => Number(b.saldoPendiente || 0) - Number(a.saldoPendiente || 0))
@@ -2254,8 +2262,8 @@ async function actualizarAlertasPagos() {
           porcentajeSaldoPendiente: grupoAlertaInfo.porcentajeSaldoPendiente,
           totalViajan: grupoAlertaInfo.totalViajan,
           totalConDeuda: grupoAlertaInfo.totalConDeuda,
-          totalPagadoGrupo: grupoPago.totalPagado,
-          saldoPendienteGrupo: grupoPago.saldoPendiente,
+          totalPagadoGrupo: totalPagadoGrupoCalculado || grupoPago.totalPagado || 0,
+          saldoPendienteGrupo: saldoPendienteGrupoCalculado || grupoPago.saldoPendiente || 0,
           totalViajeGrupo: grupoPago.totalViaje,
           porcentajeGrupoSinPago60: grupoAlertaInfo.porcentajeGrupoSinPago60 || 0,
           totalDeudoresSinPago60: grupoAlertaInfo.totalDeudoresSinPago60 || 0,
