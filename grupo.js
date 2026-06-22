@@ -5616,6 +5616,298 @@ window.repararHistorialSolicitudesFicha = async function () {
   console.log(`Historial reconstruido. Entradas creadas: ${creadas}`);
 };
 
+/* =========================================================
+   CONSOLA · TRACKING FORMULARIO INSCRIPCIÓN
+========================================================= */
+
+async function cargarSesionesTrackingInscripcionGrupo(idGrupoManual = "") {
+  const idsBuscar = [
+    cleanText(idGrupoManual),
+    cleanText(state.groupId),
+    cleanText(state.groupDocId),
+    cleanText(state.requestedId)
+  ].filter(Boolean);
+
+  const idsUnicos = [...new Set(idsBuscar)];
+  const docsMap = new Map();
+
+  for (const id of idsUnicos) {
+    const snap = await getDocs(
+      query(
+        collection(db, "inscripciones_sesiones_publicas"),
+        where("idGrupo", "==", String(id))
+      )
+    );
+
+    snap.docs.forEach((d) => {
+      docsMap.set(d.id, {
+        id: d.id,
+        ...d.data()
+      });
+    });
+  }
+
+  return [...docsMap.values()];
+}
+
+function trackingToDate(value) {
+  if (!value) return null;
+
+  if (value?.toDate) return value.toDate();
+
+  const d = new Date(value);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+function trackingMinutosEntre(inicio, fin) {
+  const a = trackingToDate(inicio);
+  const b = trackingToDate(fin);
+
+  if (!a || !b) return null;
+
+  return Math.round(((b.getTime() - a.getTime()) / 60000) * 10) / 10;
+}
+
+function trackingFechaTexto(value) {
+  const d = trackingToDate(value);
+  if (!d) return "—";
+
+  return d.toLocaleString("es-CL", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit"
+  });
+}
+
+function trackingPersonaKey(item = {}) {
+  const persona = item.persona || {};
+
+  const doc = cleanText(persona.documentoNormalizado || "");
+  const correo = normalizeEmail(persona.correo || "");
+  const nombre = normalizeSearchLocal(persona.nombreCompleto || "");
+
+  if (doc) return `doc:${doc}`;
+  if (correo) return `correo:${correo}`;
+  if (nombre) return `nombre:${nombre}`;
+
+  return `sesion:${item.id}`;
+}
+
+function trackingPersonaLabel(item = {}) {
+  const persona = item.persona || {};
+
+  return (
+    cleanText(persona.nombreCompleto) ||
+    normalizeEmail(persona.correo || "") ||
+    cleanText(persona.documentoNormalizado) ||
+    "Sin identificar"
+  );
+}
+
+function trackingConstruirDetalle(sesiones = []) {
+  return sesiones
+    .map((item) => {
+      const persona = item.persona || {};
+
+      const abierto =
+        item.abiertoEnCliente ||
+        item.creadoEn ||
+        item.creadoAt ||
+        "";
+
+      const enviado =
+        item.enviadoEnCliente ||
+        item.enviadoEn ||
+        "";
+
+      const actualizado =
+        item.actualizadoEn ||
+        item.actualizadoAt ||
+        "";
+
+      const enviadoBool = item.enviado === true || cleanText(item.estado) === "enviada";
+
+      const minutosCompletar = enviadoBool
+        ? trackingMinutosEntre(abierto, enviado || actualizado)
+        : null;
+
+      const minutosDesdeApertura = !enviadoBool
+        ? trackingMinutosEntre(abierto, new Date())
+        : null;
+
+      return {
+        sesionId: item.id,
+        personaKey: trackingPersonaKey(item),
+        persona: trackingPersonaLabel(item),
+        documento: cleanText(persona.documentoNormalizado || ""),
+        correo: normalizeEmail(persona.correo || ""),
+        telefono: cleanText(persona.telefono || ""),
+        tipoViajante: cleanText(persona.tipoViajante || ""),
+
+        fase: cleanText(item.fase || ""),
+        tipoInscripcion: cleanText(item.tipoInscripcion || ""),
+        estado: cleanText(item.estado || ""),
+        enviado: enviadoBool ? "Sí" : "No",
+        avancePct: Number(item.avancePct || 0),
+        avanceTramo: cleanText(item.avanceTramo || "0"),
+        ultimoEvento: cleanText(item.ultimoEvento || ""),
+
+        abierto: trackingFechaTexto(abierto),
+        actualizado: trackingFechaTexto(actualizado),
+        enviadoEn: trackingFechaTexto(enviado),
+
+        minutosCompletar,
+        minutosDesdeApertura
+      };
+    })
+    .sort((a, b) => {
+      if (a.enviado !== b.enviado) return a.enviado === "Sí" ? -1 : 1;
+      return Number(b.avancePct || 0) - Number(a.avancePct || 0);
+    });
+}
+
+function trackingConstruirResumen(detalle = []) {
+  const totalSesiones = detalle.length;
+  const enviadas = detalle.filter((x) => x.enviado === "Sí");
+  const noEnviadas = detalle.filter((x) => x.enviado !== "Sí");
+
+  const comenzaron = detalle.filter((x) =>
+    Number(x.avancePct || 0) > 0 ||
+    ["formulario_comenzado", "avance_formulario", "formulario_enviado"].includes(x.ultimoEvento)
+  );
+
+  const quedaronEnProceso = noEnviadas.filter((x) => Number(x.avancePct || 0) > 0);
+  const abandonaronSinComenzar = noEnviadas.filter((x) => Number(x.avancePct || 0) === 0);
+
+  const demoras = enviadas
+    .map((x) => Number(x.minutosCompletar))
+    .filter((n) => Number.isFinite(n));
+
+  const promedioMinutos = demoras.length
+    ? Math.round((demoras.reduce((a, b) => a + b, 0) / demoras.length) * 10) / 10
+    : 0;
+
+  const porPersonaMap = new Map();
+
+  detalle.forEach((item) => {
+    const key = item.personaKey;
+
+    if (!porPersonaMap.has(key)) {
+      porPersonaMap.set(key, {
+        persona: item.persona,
+        documento: item.documento,
+        correo: item.correo,
+        sesiones: 0,
+        enviosCompletos: 0,
+        intentosPendientes: 0,
+        mejorAvancePendiente: 0,
+        demoraUltimoEnvioMin: "",
+        ultimoEstado: ""
+      });
+    }
+
+    const acc = porPersonaMap.get(key);
+
+    acc.sesiones += 1;
+
+    if (item.enviado === "Sí") {
+      acc.enviosCompletos += 1;
+      acc.demoraUltimoEnvioMin = item.minutosCompletar ?? "";
+    } else {
+      acc.intentosPendientes += 1;
+      acc.mejorAvancePendiente = Math.max(acc.mejorAvancePendiente, Number(item.avancePct || 0));
+    }
+
+    acc.ultimoEstado = item.enviado === "Sí"
+      ? "enviada"
+      : Number(item.avancePct || 0) > 0
+        ? "en proceso / abandonada"
+        : "abierta sin comenzar";
+  });
+
+  const porPersona = [...porPersonaMap.values()]
+    .sort((a, b) => b.intentosPendientes - a.intentosPendientes || b.sesiones - a.sesiones);
+
+  const resumen = {
+    grupo: String(state.groupId || state.requestedId || ""),
+    totalSesiones,
+    personasDetectadas: porPersona.length,
+    abrieron: totalSesiones,
+    comenzaron: comenzaron.length,
+    enviaron: enviadas.length,
+    quedaronEnProceso: quedaronEnProceso.length,
+    abandonaronSinComenzar: abandonaronSinComenzar.length,
+    promedioDemoraEnvioMin: promedioMinutos,
+    tasaEnvio: totalSesiones ? `${Math.round((enviadas.length / totalSesiones) * 100)}%` : "0%"
+  };
+
+  return {
+    resumen,
+    porPersona
+  };
+}
+
+window.resumenTrackingInscripcionGrupo = async function (idGrupoManual = "") {
+  const sesiones = await cargarSesionesTrackingInscripcionGrupo(idGrupoManual);
+  const detalle = trackingConstruirDetalle(sesiones);
+  const { resumen, porPersona } = trackingConstruirResumen(detalle);
+
+  console.log("RESUMEN TRACKING INSCRIPCIÓN");
+  console.table([resumen]);
+
+  console.log("RESUMEN POR PERSONA");
+  console.table(porPersona);
+
+  return {
+    resumen,
+    porPersona,
+    detalle
+  };
+};
+
+window.detalleTrackingInscripcionGrupo = async function (idGrupoManual = "") {
+  const sesiones = await cargarSesionesTrackingInscripcionGrupo(idGrupoManual);
+  const detalle = trackingConstruirDetalle(sesiones);
+
+  console.log("DETALLE TRACKING INSCRIPCIÓN");
+  console.table(detalle);
+
+  return detalle;
+};
+
+window.trackingPersonaInscripcionGrupo = async function (busqueda = "", idGrupoManual = "") {
+  const texto = normalizeSearchLocal(busqueda);
+
+  if (!texto) {
+    console.warn("Debes buscar por nombre, correo, documento o parte del teléfono.");
+    return [];
+  }
+
+  const sesiones = await cargarSesionesTrackingInscripcionGrupo(idGrupoManual);
+  const detalle = trackingConstruirDetalle(sesiones);
+
+  const filtrado = detalle.filter((item) => {
+    const universo = normalizeSearchLocal([
+      item.persona,
+      item.documento,
+      item.correo,
+      item.telefono,
+      item.tipoViajante,
+      item.estado,
+      item.ultimoEvento
+    ].join(" "));
+
+    return universo.includes(texto);
+  });
+
+  console.log(`TRACKING PERSONA: ${busqueda}`);
+  console.table(filtrado);
+
+  return filtrado;
+};
+
 function getTipoInscripcionEditableOptions() {
   return [
     { value: "sistema_pagos", label: "Sistema de Pagos" },
