@@ -614,39 +614,55 @@ function getDisplayName(user = {}) {
 function resolveNextFichaVersion() {
   const fichaActual = getByPath(state.group, "ficha") || {};
 
-  const tienePdfAnterior = !!cleanText(
+  /*
+    REGLA REAL:
+    Solo es actualización si YA EXISTIÓ un PDF real confirmado antes.
+
+    No sirven como criterio:
+    - fichaFlujoAbierto
+    - pdfPendienteGeneracion
+    - modo correccion / actualizacion
+    - versionNumero guardado en una ficha que aún no tiene PDF real
+
+    Porque una ficha nueva puede pasar por correcciones antes de generar su primer PDF.
+  */
+
+  const pdfRealAnterior = cleanText(
     fichaActual.pdfUrl ||
     state.group?.fichaPdfUrl ||
     ""
   );
 
-  const estabaReabierta =
-    state.group?.fichaFlujoAbierto === true ||
-    fichaActual.pdfPendienteGeneracion === true ||
-    normalizeSearchLocal(state.group?.flowFicha?.modo || "") === "actualizacion" ||
-    normalizeSearchLocal(state.group?.fichaFlujoModo || "") === "actualizacion";
+  const fueConfirmadaAntes =
+    fichaActual.confirmada === true ||
+    normalizeSearchLocal(fichaActual.estado || "") === "confirmada_pdf" ||
+    normalizeSearchLocal(state.group?.fichaEstado || "") === "confirmada_pdf" ||
+    normalizeSearchLocal(state.group?.fichaEstado || "") === "pdf_confirmado";
+
+  const tienePdfRealAnterior = !!pdfRealAnterior && fueConfirmadaAntes;
+
+  if (!tienePdfRealAnterior) {
+    return {
+      tipoVersion: "original",
+      version: "ORIGINAL",
+      versionNumero: 1
+    };
+  }
 
   const prevNumero = Number(
     pick(
       fichaActual.versionNumero,
       state.group?.versionFichaNumero,
-      0
+      1
     )
   );
 
-  // Si ya hubo PDF o está en flujo de actualización, nunca puede volver a ORIGINAL.
-  if (tienePdfAnterior || estabaReabierta || prevNumero >= 1) {
-    return {
-      tipoVersion: "actualizacion",
-      version: "ACTUALIZACIÓN",
-      versionNumero: Number.isFinite(prevNumero) && prevNumero > 0 ? prevNumero + 1 : 2
-    };
-  }
-
   return {
-    tipoVersion: "original",
-    version: "ORIGINAL",
-    versionNumero: 1
+    tipoVersion: "actualizacion",
+    version: "ACTUALIZACIÓN",
+    versionNumero: Number.isFinite(prevNumero) && prevNumero >= 1
+      ? prevNumero + 1
+      : 2
   };
 }
 
@@ -1669,9 +1685,9 @@ function hydrateFicha(group = {}) {
       pick(
         ficha.versionNumero,
         group.versionFichaNumero,
-        1
+        0
       )
-    ) || 1,
+    ) || 0,
 
     fechaActualizacionTexto: pick(
       ficha.fechaActualizacionTexto,
