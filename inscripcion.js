@@ -7,6 +7,7 @@ import {
   getDoc,
   collection,
   addDoc,
+  updateDoc,
   serverTimestamp
 } from "https://www.gstatic.com/firebasejs/11.7.3/firebase-firestore.js";
 
@@ -132,6 +133,7 @@ const CORREO_ADMIN = "administracion@raitrai.cl";
 const TELEFONO_ADMIN = "+56 (2) 2236 3232";
 const WHATSAPP_ADMIN = "(+569) 9818 3857";
 const COLECCION_INSCRIPCIONES_PENDIENTES = "inscripciones_pendientes_publicas";
+const COLECCION_SESIONES_PUBLICAS = "inscripciones_sesiones_publicas";
 
 
 // -----------------------------------------------------------------------------
@@ -146,6 +148,10 @@ let correoCambios = CORREO_ADMIN;
 let pasajeroSistemaPagosValidado = null;
 let pasajeroSistemaPagosDocId = "";
 let nominaFinalRutValidado = false;
+let sesionInscripcionRef = null;
+let sesionInscripcionId = "";
+let ultimoPctTracking = -1;
+let ultimoTrackingMs = 0;
 
 // -----------------------------------------------------------------------------
 // INICIO
@@ -168,6 +174,9 @@ async function init() {
   }
 
   await cargarGrupo();
+  
+  registrarSesionFormulario("formulario_abierto");
+  
   insertarBarraProgreso();
   conectarEventos();
   aplicarEstadoUI();
@@ -253,6 +262,7 @@ async function cargarGrupo() {
 // -----------------------------------------------------------------------------
 function conectarEventos() {
   btnComenzar?.addEventListener("click", () => {
+    registrarSesionFormulario("formulario_comenzado");
     pantallaBienvenida?.classList.add("hidden");
   
     if (faseUrl === "nomina_final") {
@@ -489,8 +499,9 @@ function actualizarProgreso() {
   } else {
     ayuda.textContent = "Formulario completo. Ya puede enviar la inscripción.";
   }
-}
 
+  registrarAvanceFormulario(pct);
+}
 function obtenerCamposRequeridosVisibles() {
   return Array.from(form.querySelectorAll("input, select, textarea"))
     .filter((el) => {
@@ -1005,8 +1016,9 @@ async function onSubmit(event) {
       btnEnviar.textContent = "Enviando formulario...";
       await enviarInscripcionPendiente(payloadBase);
       
+      registrarFormularioEnviado(payloadBase);
+      
       mostrarPantallaFinal(payloadBase);
-
   } catch (error) {
     console.error("ERROR INSCRIPCION:", {
       message: error?.message,
@@ -1158,6 +1170,178 @@ async function enviarInscripcionPendiente(payloadBase) {
   });
 
   return { ok: true };
+}
+
+// -----------------------------------------------------------------------------
+// TRACKING FORMULARIO PUBLICO
+// -----------------------------------------------------------------------------
+async function registrarSesionFormulario(evento = "formulario_abierto") {
+  try {
+    if (sesionInscripcionRef) {
+      await actualizarSesionFormulario({
+        ultimoEvento: evento
+      });
+      return;
+    }
+
+    const contexto = getContextoFormulario();
+
+    const ref = await addDoc(collection(db, COLECCION_SESIONES_PUBLICAS), {
+      idGrupo,
+      token: tokenUrl || "",
+      fase: faseUrl,
+      contextoFormulario: contexto.clave,
+      tipoInscripcion: contexto.tipoInscripcion,
+      estado: "abierta",
+
+      creadoEn: serverTimestamp(),
+      abiertoEnCliente: new Date().toISOString(),
+      actualizadoEn: serverTimestamp(),
+      ultimoEvento: evento,
+
+      avancePct: 0,
+      avanceTramo: "0",
+      enviado: false,
+      enviadoEnCliente: "",
+
+      navegador: {
+        userAgent: navigator.userAgent || "",
+        idioma: navigator.language || "",
+        plataforma: navigator.platform || ""
+      },
+
+      pagina: {
+        href: window.location.href,
+        pathname: window.location.pathname
+      },
+
+      grupo: {
+        colegio: limpiarTexto(grupoData?.colegio),
+        nombreGrupo: limpiarTexto(grupoData?.nombreGrupo),
+        aliasGrupo: limpiarTexto(grupoData?.aliasGrupo),
+        anoViaje: grupoData?.anoViaje || null,
+        destino: limpiarTexto(grupoData?.destinoPrincipal || grupoData?.destino)
+      },
+
+      persona: {
+        documentoNormalizado: "",
+        nombreCompleto: "",
+        correo: "",
+        telefono: "",
+        tipoViajante: ""
+      },
+
+      origen: "formulario_publico"
+    });
+
+    sesionInscripcionRef = ref;
+    sesionInscripcionId = ref.id;
+  } catch (error) {
+    console.warn("Tracking formulario no registrado:", error);
+  }
+}
+
+async function actualizarSesionFormulario(data = {}) {
+  try {
+    if (!sesionInscripcionRef) return;
+
+    await updateDoc(sesionInscripcionRef, {
+      ...limpiarPayloadFirestore(data),
+      actualizadoEn: serverTimestamp()
+    });
+  } catch (error) {
+    console.warn("Tracking formulario no actualizado:", error);
+  }
+}
+
+function registrarAvanceFormulario(pct = 0) {
+  try {
+    const ahora = Date.now();
+
+    // Evita escribir demasiado en Firestore.
+    // Solo guarda si cambia al menos 10% o si pasaron 15 segundos.
+    const cambioImportante = Math.abs(pct - ultimoPctTracking) >= 10;
+    const pasoTiempo = ahora - ultimoTrackingMs > 15000;
+
+    if (!cambioImportante && !pasoTiempo) return;
+
+    ultimoPctTracking = pct;
+    ultimoTrackingMs = ahora;
+
+    const persona = obtenerPersonaTrackingParcial();
+
+    actualizarSesionFormulario({
+      estado: "en_progreso",
+      ultimoEvento: "avance_formulario",
+      avancePct: pct,
+      avanceTramo: obtenerTramoAvance(pct),
+      persona
+    });
+  } catch (error) {
+    console.warn("Tracking avance no registrado:", error);
+  }
+}
+
+function registrarFormularioEnviado(payloadBase = {}) {
+  try {
+    const persona = {
+      documentoNormalizado: limpiarTexto(payloadBase?.identificacion?.documentoNormalizado),
+      nombreCompleto: limpiarTexto(payloadBase?.identificacion?.nombreCompleto),
+      correo: limpiarTexto(
+        payloadBase?.contactoPrincipal?.correo ||
+        payloadBase?.identificacion?.correoViajante
+      ),
+      telefono: limpiarTexto(
+        payloadBase?.contactoPrincipal?.telefono ||
+        payloadBase?.identificacion?.telefonoViajante
+      ),
+      tipoViajante: limpiarTexto(payloadBase?.tipoViajante)
+    };
+
+    actualizarSesionFormulario({
+      estado: "enviada",
+      ultimoEvento: "formulario_enviado",
+      avancePct: 100,
+      avanceTramo: "100",
+      enviado: true,
+      enviadoEnCliente: new Date().toISOString(),
+      persona
+    });
+  } catch (error) {
+    console.warn("Tracking envío no registrado:", error);
+  }
+}
+
+function obtenerPersonaTrackingParcial() {
+  const nombres = limpiarTexto($("nombres")?.value);
+  const primerApellido = limpiarTexto($("primerApellido")?.value);
+  const segundoApellido = limpiarTexto($("segundoApellido")?.value);
+  const nombreCompleto = [nombres, primerApellido, segundoApellido].filter(Boolean).join(" ");
+
+  const tipoIdentificacion = $("tipoIdentificacion")?.value || "";
+  const rutNumero = limpiarRutNumero($("rutNumero")?.value);
+  const rutDv = limpiarTexto($("rutDv")?.value).toUpperCase();
+
+  const documentoNormalizado =
+    tipoIdentificacion === "rut" && rutNumero && rutDv
+      ? normalizarRutDocumento(rutNumero, rutDv)
+      : "";
+
+  return {
+    documentoNormalizado,
+    nombreCompleto,
+    correo: limpiarTexto($("contactoPrincipalCorreo")?.value || $("correoViajante")?.value),
+    telefono: limpiarTexto($("contactoPrincipalTelefono")?.value || $("telefonoViajante")?.value),
+    tipoViajante: obtenerRadio("tipoViajante")
+  };
+}
+
+function obtenerTramoAvance(pct = 0) {
+  if (pct >= 100) return "100";
+  if (pct >= 75) return "75";
+  if (pct >= 50) return "50";
+  if (pct >= 25) return "25";
+  return "0";
 }
 
 // -----------------------------------------------------------------------------
