@@ -2038,9 +2038,20 @@ function getInscripcionesSistemaPagos() {
 }
 
 function fichaMedicaPendiente(item = {}) {
+  const tipo = normalizeSearchLocal(getInscripcionTipoReal(item));
+
+  // Regla de negocio:
+  // Solo las inscripciones importadas desde Sistema de Pagos
+  // quedan pendientes de completar Nómina Final / Ficha Médica.
+  if (tipo !== "sistema_pagos") {
+    return false;
+  }
+
   return !(
     item.fichaMedicaCompleta === true ||
     item.nominaFinalCompleta === true ||
+    item.fichaMedicaCompletada === true ||
+    item.nominaFinalCompletada === true ||
     item.fichaMedicaEstado === "completa" ||
     item.fichaMedicaEstado === "completada"
   );
