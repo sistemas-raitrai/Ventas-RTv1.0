@@ -734,25 +734,26 @@ function ensureEmailBulkUi() {
   if ($("email_bulk_wrap")) return;
 
   const emailTo = $("email_to");
-  const modal = $("modalCorreo");
-  if (!emailTo || !modal) return;
+  if (!emailTo) return;
 
   const wrap = document.createElement("div");
   wrap.id = "email_bulk_wrap";
-  wrap.className = "hidden";
-  wrap.style.margin = "12px 0";
+  wrap.className = "hidden email-bulk-wrap";
   wrap.innerHTML = `
-    <div style="font-weight:700;margin-bottom:8px;">Destinatarios BCC / CCO</div>
+    <div class="email-bulk-head">
+      <div>
+        <div class="email-bulk-title">Destinatarios BCC / CCO</div>
+        <div id="email_bulk_summary" class="email-bulk-summary"></div>
+      </div>
 
-    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;">
-      <button type="button" class="btn-pill" data-email-bulk-select="all">Seleccionar todos</button>
-      <button type="button" class="btn-pill" data-email-bulk-select="pending">Solo pendientes ficha médica</button>
-      <button type="button" class="btn-pill" data-email-bulk-select="none">Limpiar</button>
+      <div class="email-bulk-actions">
+        <button type="button" class="btn-pill" data-email-bulk-select="all">Seleccionar todos</button>
+        <button type="button" class="btn-pill" data-email-bulk-select="pending">Solo pendientes ficha médica</button>
+        <button type="button" class="btn-pill" data-email-bulk-select="none">Limpiar</button>
+      </div>
     </div>
 
-    <div id="email_bulk_summary" style="font-size:13px;margin-bottom:8px;color:#555;"></div>
-
-    <div id="email_bulk_list" style="max-height:260px;overflow:auto;border:1px solid #eee;border-radius:12px;padding:10px;"></div>
+    <div id="email_bulk_list" class="email-bulk-list"></div>
   `;
 
   emailTo.closest(".form-group, label, div")?.after(wrap);
