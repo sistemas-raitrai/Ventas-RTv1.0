@@ -1789,6 +1789,102 @@
     .email-variable-buttons button:hover{
       background:#e7dcf5;
     }
+
+    /* =========================================================
+   CORREOS MASIVOS INSCRIPCIÓN
+    ========================================================= */
+    
+    #modalCorreo .modal-card{
+      width:min(1100px,100%);
+    }
+    
+    #email_template{
+      width:100%;
+    }
+    
+    .email-bulk-wrap{
+      margin:14px 0 18px;
+    }
+    
+    .email-bulk-head{
+      display:grid;
+      grid-template-columns:1fr auto;
+      gap:16px;
+      align-items:end;
+    }
+    
+    .email-bulk-title{
+      font-weight:900;
+      color:#2b1940;
+    }
+    
+    .email-bulk-summary{
+      font-size:13px;
+      color:#6a6075;
+    }
+    
+    .email-bulk-actions{
+      display:flex;
+      gap:8px;
+      flex-wrap:wrap;
+      justify-content:flex-end;
+    }
+    
+    .email-bulk-list{
+      margin-top:10px;
+      max-height:280px;
+      overflow:auto;
+      border:1px solid rgba(58,42,82,.10);
+      border-radius:16px;
+      background:#fff;
+      padding:10px;
+    }
+    
+    .email-bulk-row{
+      display:grid;
+      grid-template-columns:24px 1fr;
+      gap:10px;
+      align-items:start;
+      padding:10px;
+      border-bottom:1px solid rgba(58,42,82,.08);
+    }
+    
+    .email-bulk-row:last-child{
+      border-bottom:none;
+    }
+    
+    .email-bulk-name{
+      font-weight:900;
+      color:#261d33;
+    }
+    
+    .email-bulk-detail{
+      font-size:13px;
+      color:#6a6075;
+    }
+    
+    .email-bulk-pending{
+      font-size:12px;
+      font-weight:800;
+      color:#b45309;
+    }
+    
+    .email-bulk-ok{
+      font-size:12px;
+      font-weight:800;
+      color:#15803d;
+    }
+    
+    @media (max-width:900px){
+    
+      .email-bulk-head{
+        grid-template-columns:1fr;
+      }
+    
+      .email-bulk-actions{
+        justify-content:flex-start;
+      }
+    }
     
     @media (max-width: 1100px){
       .hero-v2-cards{
