@@ -76,7 +76,9 @@ const state = {
   emailUi: {
     selectedTemplateId: "",
     editingTemplateId: "",
-    activeTargetEmail: ""
+    activeTargetEmail: "",
+    mode: "single",
+    bulkRecipients: []
   },
 
   historyUi: {
@@ -562,6 +564,39 @@ function canManageEmailTemplates() {
   return !!normalizeEmail(state.effectiveEmail || "");
 }
 
+function getGrupoCortoCorreo() {
+  const colegio = normalizeTextUpper(state.group?.colegio || "");
+  const curso = normalizeTextUpper(state.group?.curso || "");
+  const ano = cleanText(state.group?.anoViaje || "");
+
+  return `${colegio}${curso ? ` ${curso}` : ""}${ano ? ` (${ano})` : ""}`.trim();
+}
+
+function getBuiltinEmailTemplateById(id = "") {
+  if (id !== "__ficha_medica__") return null;
+
+  return {
+    id: "__ficha_medica__",
+    nombre: "Ficha médica",
+    categoria: "inscripcion",
+    asuntoTemplate: "Ficha médica habilitada · {{grupoCorto}}",
+    cuerpoTemplate:
+`Estimados/as apoderados/as:
+
+Junto con saludar, informamos que desde ahora se encuentra habilitado el ingreso de datos para completar la ficha médica del viaje de estudios del grupo {{grupoCorto}}.
+
+Les solicitamos ingresar al link enviado por Turismo Rai Trai y completar cuidadosamente la información solicitada, especialmente antecedentes médicos, alergias, medicamentos, contactos de emergencia y datos personales del/de la pasajero/a.
+
+Esta información es fundamental para la correcta organización del viaje y para que nuestro equipo pueda contar con los antecedentes necesarios antes de la salida.
+
+Agradecemos completar el formulario dentro de los próximos días.
+
+Saludos cordiales,
+{{firmaUsuario}}
+Turismo Rai Trai`
+  };
+}
+
 function getEmailVariableMap({ email = "", contactLabel = "" } = {}) {
   const nombre1 = normalizeTextUpper(state.group?.nombreCliente || "");
   const nombre2 = normalizeTextUpper(state.group?.nombreCliente2 || "");
@@ -585,6 +620,7 @@ function getEmailVariableMap({ email = "", contactLabel = "" } = {}) {
 
     idGrupo: String(state.groupId || ""),
     aliasGrupo: cleanText(state.group?.aliasGrupo || ""),
+    grupoCorto: getGrupoCortoCorreo(),
     nombreGrupo: cleanText(state.group?.nombreGrupo || ""),
     colegio: normalizeTextUpper(state.group?.colegio || ""),
     curso: normalizeTextUpper(state.group?.curso || ""),
@@ -610,7 +646,9 @@ function replaceTemplateVariables(text = "", variables = {}) {
 }
 
 function getSelectedEmailTemplate() {
-  return state.emailTemplates.find((item) => item.id === state.emailUi.selectedTemplateId) || null;
+  return getBuiltinEmailTemplateById(state.emailUi.selectedTemplateId) ||
+    state.emailTemplates.find((item) => item.id === state.emailUi.selectedTemplateId) ||
+    null;
 }
 
 function renderEmailTemplateOptions() {
@@ -621,6 +659,7 @@ function renderEmailTemplateOptions() {
 
   select.innerHTML = `
     <option value="">Sin plantilla</option>
+    <option value="__ficha_medica__">Ficha médica</option>
     ${state.emailTemplates.map((tpl) => `
       <option value="${escapeHtml(tpl.id)}">${escapeHtml(tpl.nombre || "Plantilla")}</option>
     `).join("")}
@@ -658,17 +697,13 @@ function applyEmailTemplateSelection() {
     return;
   }
 
-  const vars = getEmailVariableMap({ email: para, contactLabel });
+  const vars = getEmailVariableMap({
+    email: state.emailUi.mode === "bulk_inscripcion" ? "" : para,
+    contactLabel: state.emailUi.mode === "bulk_inscripcion" ? "" : contactLabel
+  });
 
-  setFormValue(
-    "email_subject",
-    replaceTemplateVariables(tpl.asuntoTemplate || "", vars)
-  );
-
-  setFormValue(
-    "email_body",
-    replaceTemplateVariables(tpl.cuerpoTemplate || "", vars)
-  );
+  setFormValue("email_subject", replaceTemplateVariables(tpl.asuntoTemplate || "", vars));
+  setFormValue("email_body", replaceTemplateVariables(tpl.cuerpoTemplate || "", vars));
 }
 
 function syncEmailTemplateButtons() {
@@ -695,6 +730,163 @@ function syncEmailTemplateButtons() {
   }
 }
 
+function ensureEmailBulkUi() {
+  if ($("email_bulk_wrap")) return;
+
+  const emailTo = $("email_to");
+  const modal = $("modalCorreo");
+  if (!emailTo || !modal) return;
+
+  const wrap = document.createElement("div");
+  wrap.id = "email_bulk_wrap";
+  wrap.className = "hidden";
+  wrap.style.margin = "12px 0";
+  wrap.innerHTML = `
+    <div style="font-weight:700;margin-bottom:8px;">Destinatarios BCC / CCO</div>
+
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;">
+      <button type="button" class="btn-pill" data-email-bulk-select="all">Seleccionar todos</button>
+      <button type="button" class="btn-pill" data-email-bulk-select="pending">Solo pendientes ficha médica</button>
+      <button type="button" class="btn-pill" data-email-bulk-select="none">Limpiar</button>
+    </div>
+
+    <div id="email_bulk_summary" style="font-size:13px;margin-bottom:8px;color:#555;"></div>
+
+    <div id="email_bulk_list" style="max-height:260px;overflow:auto;border:1px solid #eee;border-radius:12px;padding:10px;"></div>
+  `;
+
+  emailTo.closest(".form-group, label, div")?.after(wrap);
+}
+
+function buildDestinatariosApoderadosInscripcion() {
+  const vistos = new Set();
+
+  return state.inscripciones
+    .map((item) => {
+      const correo = normalizeEmail(getByPath(item, "contactoPrincipal.correo") || "");
+      const nombreResponsable = getResponsablePrincipalNombre(item);
+      const nombreParticipante = buildNombreCompletoInscripcion(item);
+      const documento = getInscripcionDocumento(item);
+      const pendienteFicha = fichaMedicaPendiente(item);
+
+      return {
+        id: item.id,
+        correo,
+        nombreResponsable,
+        nombreParticipante,
+        documento,
+        pendienteFicha
+      };
+    })
+    .filter((d) => {
+      if (!d.correo) return false;
+      if (vistos.has(d.correo)) return false;
+      vistos.add(d.correo);
+      return true;
+    })
+    .sort((a, b) => {
+      if (a.pendienteFicha !== b.pendienteFicha) return a.pendienteFicha ? -1 : 1;
+      return a.nombreParticipante.localeCompare(b.nombreParticipante, "es");
+    });
+}
+
+function renderEmailBulkRecipients() {
+  ensureEmailBulkUi();
+
+  const list = $("email_bulk_list");
+  const summary = $("email_bulk_summary");
+  if (!list || !summary) return;
+
+  const seleccionados = state.emailUi.bulkRecipients.filter((d) => d.selected);
+  const pendientes = state.emailUi.bulkRecipients.filter((d) => d.pendienteFicha);
+
+  summary.textContent =
+    `${seleccionados.length} seleccionado(s) · ${state.emailUi.bulkRecipients.length} correos disponibles · ${pendientes.length} pendiente(s) de ficha médica`;
+
+  list.innerHTML = state.emailUi.bulkRecipients.length
+    ? state.emailUi.bulkRecipients.map((d, index) => `
+      <label style="display:grid;grid-template-columns:24px 1fr;gap:8px;padding:8px;border-bottom:1px solid #f1f1f1;align-items:start;">
+        <input
+          type="checkbox"
+          data-email-bulk-index="${index}"
+          ${d.selected ? "checked" : ""}
+        />
+        <div>
+          <div><strong>${escapeHtml(d.nombreParticipante || "Participante")}</strong></div>
+          <div style="font-size:13px;color:#555;">
+            Apoderado/a: ${escapeHtml(d.nombreResponsable || "—")} · ${escapeHtml(d.correo)}
+          </div>
+          <div style="font-size:12px;color:${d.pendienteFicha ? "#b45309" : "#15803d"};">
+            ${d.pendienteFicha ? "Ficha médica pendiente" : "Ficha médica completa"}
+          </div>
+        </div>
+      </label>
+    `).join("")
+    : `<div class="empty-box">No hay correos de apoderados disponibles.</div>`;
+}
+
+function syncEmailBulkVisibility() {
+  ensureEmailBulkUi();
+
+  const bulkWrap = $("email_bulk_wrap");
+  const emailTo = $("email_to");
+
+  if (!bulkWrap || !emailTo) return;
+
+  const isBulk = state.emailUi.mode === "bulk_inscripcion";
+
+  bulkWrap.classList.toggle("hidden", !isBulk);
+  emailTo.disabled = isBulk;
+
+  if (isBulk) {
+    emailTo.value = "";
+  }
+}
+
+function openEmailModalInscripcion() {
+  const destinatarios = buildDestinatariosApoderadosInscripcion();
+
+  if (!destinatarios.length) {
+    alert("No hay correos de apoderados disponibles para este grupo.");
+    return;
+  }
+
+  state.emailUi.mode = "bulk_inscripcion";
+  state.emailUi.activeTargetEmail = "";
+  state.emailUi.selectedTemplateId = "__ficha_medica__";
+  state.emailUi.bulkRecipients = destinatarios.map((d) => ({
+    ...d,
+    selected: d.pendienteFicha
+  }));
+
+  const hayPendientes = state.emailUi.bulkRecipients.some((d) => d.selected);
+  if (!hayPendientes) {
+    state.emailUi.bulkRecipients = state.emailUi.bulkRecipients.map((d) => ({
+      ...d,
+      selected: true
+    }));
+  }
+
+  setFormValue("email_to", "");
+  setFormValue("email_contact_label", "");
+  setFormValue("email_subject", "");
+  setFormValue("email_body", "");
+
+  renderEmailTemplateOptions();
+  syncEmailTemplateButtons();
+  syncEmailBulkVisibility();
+  renderEmailBulkRecipients();
+  applyEmailTemplateSelection();
+
+  openModal("modalCorreo");
+}
+
+function getSelectedBulkEmails() {
+  return state.emailUi.bulkRecipients
+    .filter((d) => d.selected && d.correo)
+    .map((d) => d.correo);
+}
+
 async function openEmailModal({ email = "", contactLabel = "" } = {}) {
   const normalizedEmail = normalizeEmail(email || "");
   if (!normalizedEmail) {
@@ -702,6 +894,8 @@ async function openEmailModal({ email = "", contactLabel = "" } = {}) {
     return;
   }
 
+  state.emailUi.mode = "single";
+  state.emailUi.bulkRecipients = [];
   state.emailUi.activeTargetEmail = normalizedEmail;
   state.emailUi.selectedTemplateId = "";
 
@@ -712,6 +906,7 @@ async function openEmailModal({ email = "", contactLabel = "" } = {}) {
 
   renderEmailTemplateOptions();
   syncEmailTemplateButtons();
+  syncEmailBulkVisibility();
   applyEmailTemplateSelection();
 
   openModal("modalCorreo");
@@ -872,14 +1067,22 @@ async function deleteSelectedEmailTemplate() {
 }
 
 async function goToGmailWithDraft() {
+  const isBulk = state.emailUi.mode === "bulk_inscripcion";
+
   const para = normalizeEmail($("email_to")?.value || "");
+  const bccList = isBulk ? getSelectedBulkEmails() : [];
   const asunto = String($("email_subject")?.value || "").trim();
   const cuerpo = String($("email_body")?.value || "").trim();
   const contactLabel = cleanText($("email_contact_label")?.value || "");
   const tpl = getSelectedEmailTemplate();
 
-  if (!para) {
+  if (!isBulk && !para) {
     alert("Debes indicar un destinatario.");
+    return;
+  }
+
+  if (isBulk && !bccList.length) {
+    alert("Debes seleccionar al menos un apoderado.");
     return;
   }
 
@@ -894,30 +1097,42 @@ async function goToGmailWithDraft() {
   }
 
   const baseUrl = "https://mail.google.com/mail/u/0/?view=cm&fs=1";
-  const params = [
-    `to=${encodeURIComponent(para)}`,
-    `su=${encodeURIComponent(asunto)}`,
-    `body=${encodeURIComponent(cuerpo)}`
-  ].join("&");
 
-  window.open(`${baseUrl}&${params}`, "_blank", "noopener");
+  const paramsArray = [];
+
+  if (isBulk) {
+    paramsArray.push(`bcc=${encodeURIComponent(bccList.join(","))}`);
+  } else {
+    paramsArray.push(`to=${encodeURIComponent(para)}`);
+  }
+
+  paramsArray.push(`su=${encodeURIComponent(asunto)}`);
+  paramsArray.push(`body=${encodeURIComponent(cuerpo)}`);
+
+  window.open(`${baseUrl}&${paramsArray.join("&")}`, "_blank", "noopener");
 
   await createHistoryEntry({
     tipoMovimiento: "correo_preparado",
     modulo: "correo",
-    titulo: "Correo preparado",
+    titulo: isBulk ? "Correo masivo preparado" : "Correo preparado",
     asunto: asunto,
-    mensaje: `${getDisplayName(state.effectiveUser)} preparó un correo para ${contactLabel || para}${tpl ? ` usando la plantilla "${tpl.nombre}"` : ""}.`,
+    mensaje: isBulk
+      ? `${getDisplayName(state.effectiveUser)} preparó un correo masivo por Gmail para ${bccList.length} apoderado(s) del grupo ${getGrupoCortoCorreo()}${tpl ? ` usando la plantilla "${tpl.nombre}"` : ""}.`
+      : `${getDisplayName(state.effectiveUser)} preparó un correo para ${contactLabel || para}${tpl ? ` usando la plantilla "${tpl.nombre}"` : ""}.`,
     metadata: {
-      destinatario: para,
+      modo: isBulk ? "bulk_inscripcion" : "single",
+      destinatario: isBulk ? "" : para,
+      bcc: isBulk ? bccList : [],
+      totalBcc: isBulk ? bccList.length : 0,
       plantillaId: tpl?.id || "",
       plantillaNombre: tpl?.nombre || "",
-      asuntoCorreo: asunto
+      asuntoCorreo: asunto,
+      grupoCorto: getGrupoCortoCorreo()
     }
   });
 
   closeModal("modalCorreo");
-  showSaveNotice("Se abrió Gmail con el borrador listo.");
+  showSaveNotice(isBulk ? "Se abrió Gmail con los apoderados en BCC/CCO." : "Se abrió Gmail con el borrador listo.");
 }
 
 /* =========================================================
@@ -5218,7 +5433,23 @@ function renderHistory() {
   }
 }
 
+function ensureBotonCorreosInscripcion() {
+  if ($("btnCorreosInscripcion")) return;
+
+  const btnCerrar = $("btnCerrarInscripcion");
+  if (!btnCerrar || !btnCerrar.parentElement) return;
+
+  const btn = document.createElement("button");
+  btn.id = "btnCorreosInscripcion";
+  btn.type = "button";
+  btn.className = "btn-pill";
+  btn.textContent = "Correos";
+
+  btnCerrar.insertAdjacentElement("afterend", btn);
+}
+
 function syncButtons() {
+  ensureBotonCorreosInscripcion();
   const editable = canEditGroup();
   const isGanada = normalizeState(state.group.estado) === "ganada";
   const autorizada = !!state.group.autorizada;
@@ -5288,6 +5519,7 @@ function syncButtons() {
   const btnResetearCicloInscripcion = $("btnResetearCicloInscripcion");
   const btnEditarNominaInscripcion = $("btnEditarNominaInscripcion");
   const btnNominaInicialPagos = $("btnNominaInicialPagos");
+  const btnCorreosInscripcion = $("btnCorreosInscripcion");
 
   const puedeInicial = canGestionarInscripcionInicial();
   const puedeNominaFinal = canGestionarNominaFinal();
@@ -5330,6 +5562,12 @@ function syncButtons() {
     btnCerrarInscripcion.textContent = inscripcionYaHabilitada
       ? `Cerrar ${labelActivo}`
       : "Cerrar inscripción";
+  }
+
+  if (btnCorreosInscripcion) {
+    const puedeCorreo = canAccessGroup(state.group);
+    btnCorreosInscripcion.disabled = !puedeCorreo || !tieneInscripciones;
+    btnCorreosInscripcion.classList.toggle("hidden", !puedeCorreo);
   }
 
   if (btnAbrirNuevosInscritos) {
@@ -6496,6 +6734,54 @@ function bindEvents() {
   $("btnAbrirListaEspera")?.addEventListener("click", () => cambiarFaseInscripcion("lista_espera"));
   $("btnCrearLinkLiberados")?.addEventListener("click", crearLinkLiberados);
   $("btnCopiarLinkInscripcion")?.addEventListener("click", copyGroupInscripcionLink);
+    document.addEventListener("click", (event) => {
+    const btn = event.target.closest("#btnCorreosInscripcion");
+    if (!btn) return;
+
+    openEmailModalInscripcion();
+  });
+
+  document.addEventListener("click", (event) => {
+    const btn = event.target.closest("[data-email-bulk-select]");
+    if (!btn) return;
+
+    const mode = btn.dataset.emailBulkSelect;
+
+    if (mode === "all") {
+      state.emailUi.bulkRecipients = state.emailUi.bulkRecipients.map((d) => ({
+        ...d,
+        selected: true
+      }));
+    }
+
+    if (mode === "pending") {
+      state.emailUi.bulkRecipients = state.emailUi.bulkRecipients.map((d) => ({
+        ...d,
+        selected: d.pendienteFicha
+      }));
+    }
+
+    if (mode === "none") {
+      state.emailUi.bulkRecipients = state.emailUi.bulkRecipients.map((d) => ({
+        ...d,
+        selected: false
+      }));
+    }
+
+    renderEmailBulkRecipients();
+  });
+
+  document.addEventListener("change", (event) => {
+    const chk = event.target.closest("[data-email-bulk-index]");
+    if (!chk) return;
+
+    const index = Number(chk.dataset.emailBulkIndex);
+    if (!Number.isFinite(index)) return;
+    if (!state.emailUi.bulkRecipients[index]) return;
+
+    state.emailUi.bulkRecipients[index].selected = chk.checked;
+    renderEmailBulkRecipients();
+  });
   $("btnGenerarLinkNominaPublica")?.addEventListener("click", generarLinkNominaPublica);
   $("btnNominaInicialPagos")?.addEventListener("click", openNominaInicialPagosModal);
   $("btnEnviarNominaInicialPagos")?.addEventListener("click", enviarNominaInicialPagos);
