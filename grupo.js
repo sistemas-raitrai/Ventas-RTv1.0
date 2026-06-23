@@ -738,7 +738,7 @@ function ensureEmailBulkUi() {
 
   const wrap = document.createElement("div");
   wrap.id = "email_bulk_wrap";
-  wrap.className = "hidden email-bulk-wrap";
+  wrap.className = "hidden form-field span-3 email-bulk-wrap";
   wrap.innerHTML = `
     <div class="email-bulk-head">
       <div>
@@ -806,18 +806,19 @@ function renderEmailBulkRecipients() {
 
   list.innerHTML = state.emailUi.bulkRecipients.length
     ? state.emailUi.bulkRecipients.map((d, index) => `
-      <label style="display:grid;grid-template-columns:24px 1fr;gap:8px;padding:8px;border-bottom:1px solid #f1f1f1;align-items:start;">
+      <label class="email-bulk-row">
         <input
           type="checkbox"
           data-email-bulk-index="${index}"
           ${d.selected ? "checked" : ""}
         />
+
         <div>
-          <div><strong>${escapeHtml(d.nombreParticipante || "Participante")}</strong></div>
-          <div style="font-size:13px;color:#555;">
+          <div class="email-bulk-name">${escapeHtml(d.nombreParticipante || "Participante")}</div>
+          <div class="email-bulk-detail">
             Apoderado/a: ${escapeHtml(d.nombreResponsable || "—")} · ${escapeHtml(d.correo)}
           </div>
-          <div style="font-size:12px;color:${d.pendienteFicha ? "#b45309" : "#15803d"};">
+          <div class="${d.pendienteFicha ? "email-bulk-pending" : "email-bulk-ok"}">
             ${d.pendienteFicha ? "Ficha médica pendiente" : "Ficha médica completa"}
           </div>
         </div>
