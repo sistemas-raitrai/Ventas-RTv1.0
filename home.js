@@ -322,6 +322,10 @@ function isAdminDashboardRole(user = {}) {
   return getRoleKey(user) === "admin";
 }
 
+function isGeneralDashboardRole(user = {}) {
+  return isAdminDashboardRole(user) || isRegistroRole(user);
+}
+
 function isSupervisionDashboardRole(user = {}) {
   return getRoleKey(user) === "supervision";
 }
@@ -423,21 +427,21 @@ function isFichaCorregidaVisibleParaUsuario(row = {}, user = null) {
   const effectiveUser = user || getEffectiveUser();
   if (!effectiveUser) return false;
 
-  // Solo si hay corrección realmente pendiente
+  // Regla madre:
+  // Si no hay PDF real, sigue siendo ficha nueva,
+  // aunque esté en corrección interna.
+  if (!tienePdfRealFicha(row)) return false;
+
   if (!isCorreccionFichaPendiente(row)) return false;
 
   const estado = getCorreccionFichaEstado(row);
-  const rol = normalizeLoose(effectiveUser.rol || "");
 
-  // Admin real ve todas las correcciones activas
-  if (rol === "admin") return true;
+  if (isGeneralDashboardRole(effectiveUser)) return true;
 
-  // Jefa de ventas solo ve las que están pendientes para ella
   if (isCaroDashboardUser(effectiveUser)) {
     return estado === "pendiente_jefa";
   }
 
-  // Administración solo ve las que ya pasaron por jefa
   if (isAdministracionDashboardUser(effectiveUser)) {
     return estado === "pendiente_administracion";
   }
@@ -684,33 +688,9 @@ function isFichaPorFirmarSegunUsuario(row = {}, effectiveUser = null) {
   if (!ano || ano < 2026) return false;
   if (!isGanadaComercial(row)) return false;
 
-  const flow = row.flowFicha || {};
-  const flowMode = normalizeLoose(
-    row.fichaFlujoModo ||
-    row?.flowFicha?.modo ||
-    row?.ficha?.flujoModo ||
-    ""
-  );
-
-  if (
-    flowMode === "actualizacion" ||
-    flowMode === "correccion" ||
-    flow.correccionPendiente === true ||
-    flow.requiereActualizacion === true ||
-    row.fichaFlujoAbierto === true ||
-    isCorreccionFichaPendiente(row)
-  ) {
-    return false;
-  }
-
-  if (
-    tienePdfRealFicha(row) ||
-    tuvoPdfOficialAlgunaVez(row) ||
-    row.autorizada === true ||
-    Number(row.versionFichaNumero || row?.ficha?.versionNumero || 0) > 1
-  ) {
-    return false;
-  }
+  // Regla madre:
+  // si ya tiene PDF real, ya no es ficha nueva por firmar.
+  if (tienePdfRealFicha(row)) return false;
 
   const firmas = getFichaFirmas(row);
 
@@ -726,7 +706,12 @@ function isFichaPorFirmarSegunUsuario(row = {}, effectiveUser = null) {
     return firmas.vendedor && firmas.jefa && !firmas.admin;
   }
 
-  return !hasAllThreeFichaFirmas(row);
+  // Admin / Registro ven todo lo nuevo pendiente.
+  if (isGeneralDashboardRole(user)) {
+    return !hasAllThreeFichaFirmas(row);
+  }
+
+  return false;
 }
 
 function isSolicitudActualizacionAbierta(sol = {}) {
@@ -1072,6 +1057,15 @@ function renderHome() {
   
   state.fichasPorFirmarRows = sortRowsByAlias(
     scopedRows.filter((row) => {
+      /*
+        Regla madre:
+        Si NO tiene PDF real, sigue siendo ficha nueva.
+        No importa si en el camino hubo corrección o solicitud.
+      */
+      if (!tienePdfRealFicha(row)) {
+        return isFichaPorFirmarSegunUsuario(row, effectiveUser);
+      }
+  
       const posiblesIds = [
         String(row.idGrupo || "").trim(),
         String(row.id || "").trim(),
@@ -1083,14 +1077,11 @@ function renderHome() {
       );
   
       if (tieneSolicitudAbierta) return false;
-  
-      // Si está en corrección interna, NO es ficha nueva por firmar.
       if (isCorreccionFichaPendiente(row)) return false;
   
       return isFichaPorFirmarSegunUsuario(row, effectiveUser);
     })
   );
-
   const scopedIds = new Set(
     scopedRows.map((row) => getRowId(row)).filter(Boolean)
   );
