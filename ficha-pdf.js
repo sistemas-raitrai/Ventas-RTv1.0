@@ -632,7 +632,19 @@ function resolveNextFichaVersion() {
   const ultimaGestionFuePdf =
     normalizeSearchLocal(state.group?.ultimaGestionTipo || "") === "confirmacion_ficha_pdf";
 
-  const versionNumeroAnterior = Number(
+  const versionAnterior = cleanText(
+    fichaActual.version ||
+    state.group?.versionFicha ||
+    ""
+  ).toUpperCase();
+
+  const tipoAnterior = normalizeSearchLocal(
+    fichaActual.tipoVersion ||
+    state.group?.tipoVersionFicha ||
+    ""
+  );
+
+  const numeroAnterior = Number(
     pick(
       fichaActual.versionNumero,
       state.group?.versionFichaNumero,
@@ -645,7 +657,7 @@ function resolveNextFichaVersion() {
     !!storagePdfAnterior ||
     confirmadaElAnterior ||
     ultimaGestionFuePdf ||
-    versionNumeroAnterior >= 1;
+    numeroAnterior >= 1;
 
   if (!yaTuvoPdfReal) {
     return {
@@ -655,11 +667,15 @@ function resolveNextFichaVersion() {
     };
   }
 
+  const yaEraActualizacion =
+    tipoAnterior === "actualizacion" ||
+    versionAnterior === "ACTUALIZACIÓN";
+
   return {
     tipoVersion: "actualizacion",
     version: "ACTUALIZACIÓN",
-    versionNumero: versionNumeroAnterior >= 1
-      ? versionNumeroAnterior 
+    versionNumero: yaEraActualizacion && numeroAnterior >= 1
+      ? numeroAnterior + 1
       : 1
   };
 }
