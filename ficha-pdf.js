@@ -614,34 +614,27 @@ function getDisplayName(user = {}) {
 function resolveNextFichaVersion() {
   const fichaActual = getByPath(state.group, "ficha") || {};
 
-  /*
-    REGLA REAL:
-    Solo es actualización si YA EXISTIÓ un PDF real confirmado antes.
-
-    No sirven como criterio:
-    - fichaFlujoAbierto
-    - pdfPendienteGeneracion
-    - modo correccion / actualizacion
-    - versionNumero guardado en una ficha que aún no tiene PDF real
-
-    Porque una ficha nueva puede pasar por correcciones antes de generar su primer PDF.
-  */
-
-  const pdfRealAnterior = cleanText(
+  const pdfActivo = cleanText(
     fichaActual.pdfUrl ||
     state.group?.fichaPdfUrl ||
     ""
   );
 
-  const fueConfirmadaAntes =
-    fichaActual.confirmada === true ||
+  const pdfArchivado = Array.isArray(fichaActual.pdfHistorial)
+    ? fichaActual.pdfHistorial.some((item) => cleanText(item?.pdfUrl || item?.pdfNombre || ""))
+    : false;
+
+  const tuvoConfirmacionReal =
+    fichaActual.confirmadaEl ||
+    fichaActual.storagePathPdf ||
+    state.group?.versionFichaNumero >= 1 ||
     normalizeSearchLocal(fichaActual.estado || "") === "confirmada_pdf" ||
     normalizeSearchLocal(state.group?.fichaEstado || "") === "confirmada_pdf" ||
-    normalizeSearchLocal(state.group?.fichaEstado || "") === "pdf_confirmado";
+    pdfArchivado;
 
-  const tienePdfRealAnterior = !!pdfRealAnterior && fueConfirmadaAntes;
+  const yaTuvoPdfReal = !!pdfActivo || !!tuvoConfirmacionReal;
 
-  if (!tienePdfRealAnterior) {
+  if (!yaTuvoPdfReal) {
     return {
       tipoVersion: "original",
       version: "ORIGINAL",
