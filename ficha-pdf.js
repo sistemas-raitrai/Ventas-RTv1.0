@@ -307,7 +307,8 @@ function renderPage() {
   setText("pdfNumeroNegocio", valueOrDash(state.ficha?.numeroNegocio));
   setText("pdfUsuarioFicha", valueOrDash(state.ficha?.usuarioFicha));
   setText("pdfClaveAdministrativa", valueOrDash(state.ficha?.claveAdministrativa));
-  setText("pdfVersionFicha", getFichaVersionLabel(state.ficha));
+  const versionPreview = resolveNextFichaVersion();
+  setText("pdfVersionFicha", getFichaVersionLabel(versionPreview));
   setText("pdfFechaActualizacion", valueOrDash(state.ficha?.fechaActualizacionTexto));
 
   renderRichAsHtml("pdfInfoOperaciones", state.ficha?.infoOperacionesHtml);
