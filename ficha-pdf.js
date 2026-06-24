@@ -659,8 +659,8 @@ function resolveNextFichaVersion() {
     tipoVersion: "actualizacion",
     version: "ACTUALIZACIÓN",
     versionNumero: versionNumeroAnterior >= 1
-      ? versionNumeroAnterior + 1
-      : 2
+      ? versionNumeroAnterior 
+      : 1
   };
 }
 
@@ -670,7 +670,7 @@ function getFichaVersionLabel(ficha = {}) {
 
   if (version === "ORIGINAL") return "ORIGINAL";
   if (version === "ACTUALIZACIÓN" && numero > 1) return `ACTUALIZACIÓN ${numero}`;
-  if (version === "ACTUALIZACIÓN") return "ACTUALIZACIÓN";
+  if (version === "ACTUALIZACIÓN") return "ACTUALIZACIÓN 1";
 
   return version || "ORIGINAL";
 }
