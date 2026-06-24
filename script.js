@@ -619,6 +619,10 @@ function isAdminDashboardRole(user = {}) {
   return getRoleKey(user) === "admin";
 }
 
+function isGeneralDashboardRole(user = {}) {
+  return isAdminDashboardRole(user) || isRegistroRole(user);
+}
+
 function isSupervisionDashboardRole(user = {}) {
   return getRoleKey(user) === "supervision";
 }
@@ -866,21 +870,19 @@ function isFichaCorregidaVisibleParaUsuario(row = {}, user = null) {
   const effectiveUser = user || getEffectiveUser();
   if (!effectiveUser) return false;
 
-  // Solo si hay corrección realmente pendiente
+  // Si no hay PDF real, sigue siendo ficha nueva.
+  if (!tienePdfRealFicha(row)) return false;
+
   if (!isCorreccionFichaPendiente(row)) return false;
 
   const estado = getCorreccionFichaEstado(row);
-  const rol = normalizeLoose(effectiveUser.rol || "");
 
-  // Admin real ve todas las correcciones activas
-  if (rol === "admin") return true;
+  if (isGeneralDashboardRole(effectiveUser)) return true;
 
-  // Jefa de ventas solo ve las que están pendientes para ella
   if (isCaroDashboardUser(effectiveUser)) {
     return estado === "pendiente_jefa";
   }
 
-  // Administración solo ve las que ya pasaron por jefa
   if (isAdministracionDashboardUser(effectiveUser)) {
     return estado === "pendiente_administracion";
   }
@@ -985,36 +987,11 @@ function isFichaPorFirmarSegunUsuario(row = {}, effectiveUser = null) {
 
   const ano = getAnoViajeNumber(row);
 
-  // Fichas por firmar SOLO aplica al flujo inicial 2026+
   if (!ano || ano < 2026) return false;
-
-  // Solo grupos ganados
   if (!isGanadaComercial(row)) return false;
 
-  const flowMode = getFichaFlowModeRow(row);
-  const flow = row.flowFicha || {};
-
-  // Nunca entran acá actualización/corrección
-  if (
-    flowMode === "actualizacion" ||
-    flowMode === "correccion" ||
-    flow.correccionPendiente === true ||
-    flow.requiereActualizacion === true ||
-    row.fichaFlujoAbierto === true ||
-    isCorreccionFichaPendiente(row)
-  ) {
-    return false;
-  }
-
-  // Si ya tuvo PDF oficial, versión posterior o autorización, no es flujo inicial
-  if (
-    tienePdfRealFicha(row) ||
-    tuvoPdfOficialAlgunaVez(row) ||
-    row.autorizada === true ||
-    Number(row.versionFichaNumero || row?.ficha?.versionNumero || 0) > 1
-  ) {
-    return false;
-  }
+  // Si ya tiene PDF real, ya no es ficha nueva.
+  if (tienePdfRealFicha(row)) return false;
 
   const firmas = getFichaFirmas(row);
 
@@ -1030,21 +1007,17 @@ function isFichaPorFirmarSegunUsuario(row = {}, effectiveUser = null) {
     return firmas.vendedor && firmas.jefa && !firmas.admin;
   }
 
-  return !hasAllThreeFichaFirmas(row);
+  if (isGeneralDashboardRole(user)) {
+    return !hasAllThreeFichaFirmas(row);
+  }
+
+  return false;
 }
 
 function getFichasPorFirmarSegunUsuario(rows = [], effectiveUser = null) {
   const solicitudesAbiertasIds = new Set(
     (state.solicitudesRows || [])
-      .filter((sol) => {
-        const tipo = normalizeLoose(sol.tipoSolicitud || "");
-        const estado = normalizeLoose(sol.estadoSolicitud || "");
-
-        return tipo === "actualizacion_ficha" &&
-          sol.resuelta !== true &&
-          estado !== "completada" &&
-          estado !== "cerrada";
-      })
+      .filter(isSolicitudActualizacionAbierta)
       .flatMap((sol) => [
         String(sol.idGrupo || "").trim(),
         String(sol.codigoRegistro || "").trim()
@@ -1054,6 +1027,12 @@ function getFichasPorFirmarSegunUsuario(rows = [], effectiveUser = null) {
 
   return dedupeRowsByGroup(rows)
     .filter((row) => {
+      // Regla madre:
+      // Sin PDF real = ficha nueva, aunque tenga corrección o solicitud.
+      if (!tienePdfRealFicha(row)) {
+        return isFichaPorFirmarSegunUsuario(row, effectiveUser);
+      }
+
       const posiblesIdsGrupo = [
         String(row.idGrupo || "").trim(),
         String(row.id || "").trim(),
@@ -1065,10 +1044,8 @@ function getFichasPorFirmarSegunUsuario(rows = [], effectiveUser = null) {
       );
 
       if (tieneSolicitudAbierta) return false;
-      
-      // Si está en corrección interna, NO es ficha nueva por firmar.
       if (isCorreccionFichaPendiente(row)) return false;
-      
+
       return isFichaPorFirmarSegunUsuario(row, effectiveUser);
     })
     .sort((a, b) => {
