@@ -1857,33 +1857,29 @@ function getEstadoOperativoInscripcionLabel(item = {}) {
   const tipo = normalizeSearchLocal(getInscripcionTipoReal(item));
   const estadoCupo = normalizeSearchLocal(item.estadoCupo || "");
 
-  if (tipo === "nuevo_ingreso" && estadoCupo !== "confirmado") {
-    return "Nuevo ingreso pendiente";
-  }
-
-  if (
-    (tipo === "nuevo_ingreso" || tipo === "nuevo_ingreso_confirmado") &&
-    estadoCupo === "confirmado"
-  ) {
+  if (tipo === "nuevo_ingreso_confirmado") {
     return "Nuevo ingreso confirmado";
   }
 
-  if (tipo === "lista_espera" && estadoCupo === "pendiente_pago") {
-    return "Lista de espera pendiente";
+  if (tipo === "nuevo_ingreso") {
+    return estadoCupo === "confirmado"
+      ? "Nuevo ingreso confirmado"
+      : "Nuevo ingreso pendiente";
   }
 
-  if (
-    (tipo === "lista_espera" || tipo === "lista_espera_pagada") &&
-    estadoCupo === "pagado"
-  ) {
+  if (tipo === "lista_espera_confirmada") {
+    return "Lista de espera confirmada";
+  }
+
+  if (tipo === "lista_espera_pagada") {
     return "Lista de espera pagada";
   }
 
-  if (
-    tipo === "lista_espera_confirmada" ||
-    (tipo === "lista_espera" && estadoCupo === "confirmado")
-  ) {
-    return "Lista de espera confirmada";
+  if (tipo === "lista_espera") {
+    if (estadoCupo === "confirmado") return "Lista de espera confirmada";
+    if (estadoCupo === "pagado") return "Lista de espera pagada";
+
+    return "Lista de espera pendiente";
   }
 
   if (tipo === "sistema_pagos") {
@@ -1891,7 +1887,7 @@ function getEstadoOperativoInscripcionLabel(item = {}) {
       ? "Sistema de Pagos · Ficha pendiente"
       : "Sistema de Pagos · Ficha completa";
   }
-  
+
   return getTipoInscripcionLabel(tipo);
 }
 
