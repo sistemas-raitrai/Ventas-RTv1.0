@@ -620,19 +620,31 @@ function resolveNextFichaVersion() {
     ""
   );
 
-  const pdfArchivado = Array.isArray(fichaActual.pdfHistorial)
-    ? fichaActual.pdfHistorial.some((item) => cleanText(item?.pdfUrl || item?.pdfNombre || ""))
-    : false;
-
-  const tuvoConfirmacionReal =
-    fichaActual.confirmadaEl ||
+  const storagePdfAnterior = cleanText(
     fichaActual.storagePathPdf ||
-    state.group?.versionFichaNumero >= 1 ||
-    normalizeSearchLocal(fichaActual.estado || "") === "confirmada_pdf" ||
-    normalizeSearchLocal(state.group?.fichaEstado || "") === "confirmada_pdf" ||
-    pdfArchivado;
+    state.group?.storagePathPdf ||
+    ""
+  );
 
-  const yaTuvoPdfReal = !!pdfActivo || !!tuvoConfirmacionReal;
+  const confirmadaElAnterior = !!fichaActual.confirmadaEl;
+
+  const ultimaGestionFuePdf =
+    normalizeSearchLocal(state.group?.ultimaGestionTipo || "") === "confirmacion_ficha_pdf";
+
+  const versionNumeroAnterior = Number(
+    pick(
+      fichaActual.versionNumero,
+      state.group?.versionFichaNumero,
+      0
+    )
+  );
+
+  const yaTuvoPdfReal =
+    !!pdfActivo ||
+    !!storagePdfAnterior ||
+    confirmadaElAnterior ||
+    ultimaGestionFuePdf ||
+    versionNumeroAnterior >= 1;
 
   if (!yaTuvoPdfReal) {
     return {
@@ -642,19 +654,11 @@ function resolveNextFichaVersion() {
     };
   }
 
-  const prevNumero = Number(
-    pick(
-      fichaActual.versionNumero,
-      state.group?.versionFichaNumero,
-      1
-    )
-  );
-
   return {
     tipoVersion: "actualizacion",
     version: "ACTUALIZACIÓN",
-    versionNumero: Number.isFinite(prevNumero) && prevNumero >= 1
-      ? prevNumero + 1
+    versionNumero: versionNumeroAnterior >= 1
+      ? versionNumeroAnterior + 1
       : 2
   };
 }
