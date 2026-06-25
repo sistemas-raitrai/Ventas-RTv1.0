@@ -6155,6 +6155,76 @@ window.trackingPersonaInscripcionGrupo = async function (busqueda = "", idGrupoM
   return filtrado;
 };
 
+window.resumenTrackingInscripciones = async function () {
+  const snap = await getDocs(collection(db, "inscripciones_sesiones_publicas"));
+
+  const sesiones = snap.docs.map((d) => ({
+    id: d.id,
+    ...d.data()
+  }));
+
+  const gruposMap = new Map();
+
+  sesiones.forEach((s) => {
+    const idGrupo = cleanText(s.idGrupo || "sin_grupo");
+    if (!gruposMap.has(idGrupo)) gruposMap.set(idGrupo, []);
+    gruposMap.get(idGrupo).push(s);
+  });
+
+  const resumenGrupos = [];
+
+  for (const [idGrupo, sesionesGrupo] of gruposMap.entries()) {
+    const detalle = trackingConstruirDetalle(sesionesGrupo);
+    const { resumen } = trackingConstruirResumen(detalle);
+
+    resumenGrupos.push({
+      grupo: idGrupo,
+      totalSesiones: resumen.totalSesiones,
+      personasDetectadas: resumen.personasDetectadas,
+      abrieron: resumen.abrieron,
+      comenzaron: resumen.comenzaron,
+      enviaron: resumen.enviaron,
+      quedaronEnProceso: resumen.quedaronEnProceso,
+      abandonaronSinComenzar: resumen.abandonaronSinComenzar,
+      promedioDemoraEnvioMin: resumen.promedioDemoraEnvioMin,
+      tasaEnvio: resumen.tasaEnvio
+    });
+  }
+
+  resumenGrupos.sort((a, b) => {
+    const tasaA = Number(String(a.tasaEnvio).replace("%", ""));
+    const tasaB = Number(String(b.tasaEnvio).replace("%", ""));
+    return tasaA - tasaB;
+  });
+
+  const totalSesiones = resumenGrupos.reduce((acc, x) => acc + x.totalSesiones, 0);
+  const totalComenzaron = resumenGrupos.reduce((acc, x) => acc + x.comenzaron, 0);
+  const totalEnviaron = resumenGrupos.reduce((acc, x) => acc + x.enviaron, 0);
+  const totalProceso = resumenGrupos.reduce((acc, x) => acc + x.quedaronEnProceso, 0);
+  const totalSinComenzar = resumenGrupos.reduce((acc, x) => acc + x.abandonaronSinComenzar, 0);
+
+  const resumenGeneral = {
+    gruposAnalizados: resumenGrupos.length,
+    sesionesAbiertas: totalSesiones,
+    comenzaron: totalComenzaron,
+    enviaron: totalEnviaron,
+    quedaronEnProceso: totalProceso,
+    abandonaronSinComenzar: totalSinComenzar,
+    tasaEnvioGeneral: totalSesiones ? `${Math.round((totalEnviaron / totalSesiones) * 100)}%` : "0%"
+  };
+
+  console.log("RESUMEN GENERAL TRACKING INSCRIPCIONES");
+  console.table([resumenGeneral]);
+
+  console.log("RESUMEN POR GRUPO");
+  console.table(resumenGrupos);
+
+  return {
+    resumenGeneral,
+    resumenGrupos
+  };
+};
+
 function getTipoInscripcionEditableOptions() {
   return [
     { value: "sistema_pagos", label: "Sistema de Pagos" },
