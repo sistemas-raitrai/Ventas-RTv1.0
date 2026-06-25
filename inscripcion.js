@@ -1623,6 +1623,9 @@ function validarFormulario() {
       errores.push("Debe adjuntar el comprobante de transferencia.");
     }
 
+  if (faseUrl === "lista_espera" && !$("aceptaCondicionesListaEspera")?.checked) {
+      errores.push("Debe aceptar las condiciones de la Lista de Espera.");
+    }
   if (!$("aceptaVeracidad")?.checked) errores.push("Debe aceptar la declaración de veracidad.");
   if (!$("aceptaUsoInterno")?.checked) errores.push("Debe autorizar el uso interno de la información.");
   if (!$("aceptaCambiosCorreo")?.checked) errores.push("Debe aceptar la condición de modificación posterior.");
@@ -1967,6 +1970,9 @@ function construirPayloadBase() {
       aceptaVeracidad: !!$("aceptaVeracidad")?.checked,
       aceptaUsoInterno: !!$("aceptaUsoInterno")?.checked,
       aceptaCambiosCorreo: !!$("aceptaCambiosCorreo")?.checked,
+      aceptaCondicionesListaEspera: faseUrl === "lista_espera"
+        ? !!$("aceptaCondicionesListaEspera")?.checked
+        : false,
       correoCambios: CORREO_ADMIN,
       telefonoCambios: TELEFONO_ADMIN,
       whatsappCambios: WHATSAPP_ADMIN
@@ -2361,6 +2367,13 @@ function renderBannerFaseInscripcion() {
         <li>Comprobante de pago</li>
         <li>Información médica y personal del pasajero</li>
       </ul>
+
+      <label style="display:flex; gap:10px; align-items:flex-start; margin-top:16px; font-weight:700;">
+        <input type="checkbox" id="aceptaCondicionesListaEspera" style="margin-top:3px;">
+        <span>
+          Declaro que leí y acepto las condiciones de la Lista de Espera, incluyendo que el abono no garantiza automáticamente la asignación del cupo y que la confirmación queda sujeta a disponibilidad.
+        </span>
+      </label>
       
       El equipo de Administración revisará posteriormente la solicitud e informará si el cupo puede ser asignado definitivamente.
     `;
