@@ -2368,14 +2368,14 @@ function renderBannerFaseInscripcion() {
         <li>Información médica y personal del pasajero</li>
       </ul>
 
+      El equipo de Administración revisará posteriormente la solicitud e informará si el cupo puede ser asignado definitivamente.
+
       <label style="display:flex; gap:10px; align-items:flex-start; margin-top:16px; font-weight:700;">
         <input type="checkbox" id="aceptaCondicionesListaEspera" style="margin-top:3px;">
         <span>
           Declaro que leí y acepto las condiciones de la Lista de Espera, incluyendo que el abono no garantiza automáticamente la asignación del cupo y que la confirmación queda sujeta a disponibilidad.
         </span>
       </label>
-      
-      El equipo de Administración revisará posteriormente la solicitud e informará si el cupo puede ser asignado definitivamente.
     `;
   } else if (contexto.clave === "liberado") {
     box.className = "notice ok";
