@@ -2411,6 +2411,23 @@ function renderBannerFaseInscripcion() {
   }
 
   box.classList.remove("hidden");
+  if (contexto.clave === "lista_espera") {
+    const checkListaEspera = $("aceptaCondicionesListaEspera");
+  
+    if (btn) {
+      btn.disabled = true;
+      btn.textContent = "Acepta las condiciones para comenzar";
+    }
+  
+    checkListaEspera?.addEventListener("change", () => {
+      if (!btn) return;
+  
+      btn.disabled = !checkListaEspera.checked;
+      btn.textContent = checkListaEspera.checked
+        ? "Comenzar formulario"
+        : "Acepta las condiciones para comenzar";
+    });
+  }
 }
 
 // -----------------------------------------------------------------------------
