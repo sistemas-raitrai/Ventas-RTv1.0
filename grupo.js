@@ -10512,7 +10512,7 @@ window.buscarCorreosEnInscripciones = async function (correos = []) {
   return resultados;
 };
 
-async function repararIdentificacionInscripcion11190() {
+window.repararIdentificacionInscripcion11190 = async function repararIdentificacionInscripcion11190() {
   const idGrupo = "11190";
   const inscripcionId = "RUT_23739403-8";
 
