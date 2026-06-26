@@ -10512,4 +10512,40 @@ window.buscarCorreosEnInscripciones = async function (correos = []) {
   return resultados;
 };
 
+async function repararIdentificacionInscripcion11190() {
+  const idGrupo = "11190";
+  const inscripcionId = "RUT_23739403-8";
+
+  const ref = doc(
+    db,
+    "ventas_cotizaciones",
+    idGrupo,
+    "inscripciones",
+    inscripcionId
+  );
+
+  await updateDoc(ref, {
+    "identificacion.documento": "23739403-8",
+    "identificacion.documentoNormalizado": "RUT_23739403-8",
+    "identificacion.rut": "23739403-8",
+    "identificacion.rutNumero": "23739403",
+    "identificacion.rutDv": "8",
+
+    "identificacion.nombres": "Eleana Carolina",
+    "identificacion.primerApellido": "Fuentes",
+    "identificacion.segundoApellido": "Melgarejo",
+    "identificacion.nombreCompleto": "Eleana Carolina Fuentes Melgarejo",
+
+    "identificacion.fechaNacimiento": "2011-09-08",
+    "identificacion.nacionalidadBase": "chilena",
+    "identificacion.nacionalidadDetalle": "",
+    "identificacion.tipoIdentificacion": "rut",
+    "identificacion.tallaPolera": "M",
+
+    actualizadoPor: "Reparación consola",
+    actualizadoAt: new Date()
+  });
+
+  console.log("✅ Identificación reparada:", inscripcionId);
+}
 
