@@ -2472,11 +2472,12 @@ async function actualizarAlertasPagos() {
           porcentajeGrupoSinPago60: grupoAlertaInfo.porcentajeGrupoSinPago60 || 0,
           totalDeudoresSinPago60: grupoAlertaInfo.totalDeudoresSinPago60 || 0,
           pasajerosConDeudaGrupo,
-          cuotasAtrasadas: tipoInfo.cuotasAtrasadas || 0,
-          valorInscripcion: tipoInfo.valorInscripcion || 0,
-          porcentajeDeuda: tipoInfo.porcentajeDeuda || 0,
+          totalAtrasados: grupoAlertaInfo.totalAtrasados || 0,
+          totalAtrasados2Mas: grupoAlertaInfo.totalAtrasados2Mas || 0,
+          porcentajeGrupoAtrasado: grupoAlertaInfo.porcentajeGrupoAtrasado || 0,
           montoEsperadoHoy: calcularMontoEsperadoHoyGrupo(grupoPago),
           valorCuota: getInfoCuotaGrupo(grupoPago).valorCuota,
+          valorInscripcion: getValorInscripcionGrupo(grupoPago),
           actualizadoAt: new Date().toISOString()
         });
       });
@@ -2522,6 +2523,13 @@ async function actualizarAlertasPagos() {
             saldoPendiente: p.saldoPendiente,
             ultimoPagoFecha: p.ultimoPagoFecha,
             ultimoPagoMonto: p.ultimoPagoMonto,
+            
+            cuotasAtrasadas: tipoInfo.cuotasAtrasadas || 0,
+            valorInscripcion: tipoInfo.valorInscripcion || 0,
+            porcentajeDeuda: tipoInfo.porcentajeDeuda || 0,
+            montoEsperadoHoy: calcularMontoEsperadoHoyGrupo(grupoPago),
+            valorCuota: getInfoCuotaGrupo(grupoPago).valorCuota,
+            
             porcentajeGrupoDebe,
             actualizadoAt: new Date().toISOString()
           });
