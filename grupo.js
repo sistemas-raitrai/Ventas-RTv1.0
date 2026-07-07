@@ -2218,8 +2218,18 @@ function renderInscripcionPasajerosPanel() {
                           : esListaEsperaPendiente && normalizeSearchLocal(item.estadoCupo || "") === "pagado"
                             ? `<button class="inscripcion-action-btn" type="button" data-confirmar-cupo="${escapeHtml(item.id)}">Confirmar cupo</button>`
                             : "—"
-                    }
-                  </td>
+                                                }
+                            
+                                                <div style="margin-top:6px;">
+                                                  <button
+                                                    class="inscripcion-action-btn"
+                                                    type="button"
+                                                    data-reenviar-correo-inscripcion="${escapeHtml(item.id)}"
+                                                  >
+                                                    Reenviar correo
+                                                  </button>
+                                                </div>
+                                              </td>
                 </tr>
               `;
             }).join("")}
@@ -3776,6 +3786,261 @@ async function confirmarNuevoIngreso(inscripcionId = "") {
 
   showSaveNotice("Nuevo ingreso confirmado correctamente.");
 }
+
+function validarCorreoSimple(correo = "") {
+  const v = normalizeEmail(correo || "");
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
+}
+
+function getCorreoClienteInscripcion(item = {}) {
+  const tipo = normalizeSearchLocal(item.tipoViajante || item.tipoParticipacion || "");
+
+  if (tipo === "estudiante") {
+    return normalizeEmail(getByPath(item, "contactoPrincipal.correo") || "");
+  }
+
+  return normalizeEmail(
+    getByPath(item, "identificacion.correoViajante") ||
+    getByPath(item, "contactoPrincipal.correo") ||
+    ""
+  );
+}
+
+function getPayloadReenvioInscripcion(item = {}, nuevoCorreo = "") {
+  const tipo = normalizeSearchLocal(item.tipoViajante || item.tipoParticipacion || "");
+  const payload = JSON.parse(JSON.stringify(item || {}));
+
+  if (tipo === "estudiante") {
+    payload.contactoPrincipal = {
+      ...(payload.contactoPrincipal || {}),
+      correo: nuevoCorreo
+    };
+  } else {
+    payload.identificacion = {
+      ...(payload.identificacion || {}),
+      correoViajante: nuevoCorreo,
+      correoPersonaQueViaja: nuevoCorreo
+    };
+
+    payload.contactoPrincipal = {
+      ...(payload.contactoPrincipal || {}),
+      correo: nuevoCorreo
+    };
+  }
+
+  return payload;
+}
+
+function getPatchCorreoInscripcionCliente(item = {}, nuevoCorreo = "") {
+  const tipo = normalizeSearchLocal(item.tipoViajante || item.tipoParticipacion || "");
+
+  if (tipo === "estudiante") {
+    return {
+      "contactoPrincipal.correo": nuevoCorreo,
+      "reenvioCorreoInscripcion.ultimoCorreoCliente": nuevoCorreo,
+      "reenvioCorreoInscripcion.ultimoReenvioAt": serverTimestamp(),
+      "reenvioCorreoInscripcion.ultimoReenvioPor": getDisplayName(state.effectiveUser),
+      "reenvioCorreoInscripcion.ultimoReenvioPorCorreo": state.effectiveEmail
+    };
+  }
+
+  return {
+    "identificacion.correoViajante": nuevoCorreo,
+    "identificacion.correoPersonaQueViaja": nuevoCorreo,
+    "contactoPrincipal.correo": nuevoCorreo,
+    "reenvioCorreoInscripcion.ultimoCorreoCliente": nuevoCorreo,
+    "reenvioCorreoInscripcion.ultimoReenvioAt": serverTimestamp(),
+    "reenvioCorreoInscripcion.ultimoReenvioPor": getDisplayName(state.effectiveUser),
+    "reenvioCorreoInscripcion.ultimoReenvioPorCorreo": state.effectiveEmail
+  };
+}
+
+function openReenviarCorreoInscripcionModal(inscripcionId = "") {
+  const item = state.inscripciones.find((x) => x.id === inscripcionId);
+
+  if (!item) {
+    alert("No se encontró la inscripción seleccionada.");
+    return;
+  }
+
+  const actual = getCorreoClienteInscripcion(item);
+  const nombre = buildNombreCompletoInscripcion(item);
+  const tipo = getEstadoOperativoInscripcionLabel(item);
+
+  const nuevoCorreo = prompt(
+    [
+      `Reenviar correo oficial de inscripción`,
+      ``,
+      `Pasajero: ${nombre || "—"}`,
+      `Tipo: ${tipo}`,
+      `Correo actual: ${actual || "sin correo"}`,
+      ``,
+      `Ingresa el nuevo correo al que se reenviará el correo oficial:`
+    ].join("\n"),
+    actual || ""
+  );
+
+  if (nuevoCorreo === null) return;
+
+  reenviarCorreoInscripcionCliente(inscripcionId, nuevoCorreo);
+}
+
+async function reenviarCorreoInscripcionCliente(inscripcionId = "", nuevoCorreoRaw = "") {
+  if (!canEditarNominaInscripcion()) {
+    alert("No tienes permisos para modificar el correo de una inscripción.");
+    return;
+  }
+
+  const nuevoCorreo = normalizeEmail(nuevoCorreoRaw || "");
+
+  if (!validarCorreoSimple(nuevoCorreo)) {
+    alert("Debes ingresar un correo válido.");
+    return;
+  }
+
+  const item = state.inscripciones.find((x) => x.id === inscripcionId);
+
+  if (!item) {
+    alert("No se encontró la inscripción seleccionada.");
+    return;
+  }
+
+  const correoAnterior = getCorreoClienteInscripcion(item);
+  const nombre = buildNombreCompletoInscripcion(item);
+  const documento = getInscripcionDocumento(item);
+  const tipoLabel = getEstadoOperativoInscripcionLabel(item);
+
+  const ok = confirm(
+    [
+      `¿Confirmas reenviar el correo oficial de inscripción?`,
+      ``,
+      `Pasajero: ${nombre || "—"}`,
+      `Documento: ${documento || "—"}`,
+      `Tipo: ${tipoLabel}`,
+      ``,
+      `Correo anterior: ${correoAnterior || "—"}`,
+      `Nuevo correo: ${nuevoCorreo}`,
+      ``,
+      `Esto actualizará el correo de contacto en la inscripción y enviará nuevamente el correo oficial.`
+    ].join("\n")
+  );
+
+  if (!ok) return;
+
+  const ref = doc(
+    db,
+    "ventas_cotizaciones",
+    String(state.groupDocId),
+    "inscripciones",
+    String(inscripcionId)
+  );
+
+  const payloadReenvio = getPayloadReenvioInscripcion(item, nuevoCorreo);
+
+  await updateDoc(ref, getPatchCorreoInscripcionCliente(item, nuevoCorreo));
+
+  await addDoc(collection(db, "correos_inscripcion_pendientes"), {
+    tipoEnvio: "reenvio_cliente",
+    origen: "grupo_js_reenvio_manual",
+    estado: "pendiente",
+
+    destinatario: nuevoCorreo,
+    payload: payloadReenvio,
+
+    reenviarTransferencias: false,
+
+    idGrupo: String(state.groupId || ""),
+    groupDocId: String(state.groupDocId || ""),
+    inscripcionId: String(inscripcionId || ""),
+    documento,
+    nombreParticipante: nombre,
+    tipoInscripcion: getInscripcionTipoReal(item),
+
+    correoAnterior,
+    correoNuevo: nuevoCorreo,
+
+    creadoPor: getDisplayName(state.effectiveUser),
+    creadoPorCorreo: state.effectiveEmail,
+    creadoAt: serverTimestamp()
+  });
+
+  await createHistoryEntry({
+    tipoMovimiento: "reenvio_correo_inscripcion_cliente",
+    modulo: "inscripcion",
+    titulo: "Correo oficial de inscripción reenviado",
+    mensaje: `${getDisplayName(state.effectiveUser)} actualizó el correo de ${nombre || "una inscripción"} desde ${correoAnterior || "sin correo"} a ${nuevoCorreo} y reenvió el correo oficial de inscripción.`,
+    metadata: {
+      inscripcionId,
+      documento,
+      nombreCompleto: nombre,
+      tipoInscripcion: getInscripcionTipoReal(item),
+      correoAnterior,
+      correoNuevo: nuevoCorreo
+    }
+  });
+
+  await loadInscripciones();
+  renderInscripcionPasajerosPanel();
+  syncButtons();
+
+  showSaveNotice("Correo actualizado y reenvío generado correctamente.");
+}
+
+window.reenviarCorreoTransferenciaListaEspera = async function ({ rut = "", inscripcionId = "" } = {}) {
+  const textoRut = normalizeSearchLocal(rut || "");
+  const textoId = cleanText(inscripcionId || "");
+
+  const item = state.inscripciones.find((x) => {
+    if (textoId && x.id === textoId) return true;
+
+    const docu = normalizeSearchLocal(getInscripcionDocumento(x));
+    return textoRut && docu.includes(textoRut.replace(/\./g, "").replace(/-/g, ""));
+  });
+
+  if (!item) {
+    console.warn("No se encontró inscripción para reenviar a transferencias.");
+    return null;
+  }
+
+  if (normalizeSearchLocal(getInscripcionTipoReal(item)) !== "lista_espera") {
+    console.warn("Esta función solo aplica a inscripciones de lista de espera.");
+    return null;
+  }
+
+  const ref = await addDoc(collection(db, "correos_inscripcion_pendientes"), {
+    tipoEnvio: "solo_transferencias_lista_espera",
+    origen: "consola_grupo_js",
+    estado: "pendiente",
+
+    destinatario: "transferencia@raitrai.cl",
+    payload: item,
+
+    idGrupo: String(state.groupId || ""),
+    groupDocId: String(state.groupDocId || ""),
+    inscripcionId: String(item.id || ""),
+    documento: getInscripcionDocumento(item),
+    nombreParticipante: buildNombreCompletoInscripcion(item),
+
+    creadoPor: getDisplayName(state.effectiveUser),
+    creadoPorCorreo: state.effectiveEmail,
+    creadoAt: serverTimestamp()
+  });
+
+  await createHistoryEntry({
+    tipoMovimiento: "reenvio_transferencia_lista_espera",
+    modulo: "inscripcion",
+    titulo: "Reenvío interno lista de espera",
+    mensaje: `${getDisplayName(state.effectiveUser)} reenvió a transferencia@raitrai.cl el correo interno de lista de espera de ${buildNombreCompletoInscripcion(item) || "una inscripción"}.`,
+    metadata: {
+      inscripcionId: item.id,
+      documento: getInscripcionDocumento(item),
+      correoDestino: "transferencia@raitrai.cl"
+    }
+  });
+
+  console.log("Reenvío a transferencias generado:", ref.id);
+  return ref.id;
+};
 
 async function copyGroupInscripcionLink() {
   if (!state.group?.inscripcionHabilitada || !state.group?.tokenInscripcion) {
@@ -6664,10 +6929,10 @@ function bindEvents() {
   });
 
   document.addEventListener("click", (event) => {
-  const btn = event.target.closest("[data-marcar-lista-pagada]");
+    const btn = event.target.closest("[data-reenviar-correo-inscripcion]");
     if (!btn) return;
   
-    marcarListaEsperaPagada(btn.dataset.marcarListaPagada);
+    openReenviarCorreoInscripcionModal(btn.dataset.reenviarCorreoInscripcion);
   });
 
   document.addEventListener("click", (e) => {
