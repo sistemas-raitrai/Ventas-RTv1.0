@@ -1178,6 +1178,8 @@ function normalizarMonedaPago(valor = "") {
 }
 
 function normalizarGrupoPagos(g = {}) {
+  const detalleCuotas = Array.isArray(g.detalle_cuotas) ? g.detalle_cuotas : [];
+
   return {
     numeroNegocio: String(g.negocio_id || "").trim(),
     nombreGrupo: String(g.nombre_colegio || "").trim(),
@@ -1187,7 +1189,14 @@ function normalizarGrupoPagos(g = {}) {
     monedaTexto: normalizarMonedaPago(g.moneda_texto),
     totalViaje: numeroPago(g.total_viaje),
     totalPagado: numeroPago(g.total_pagado),
-    saldoPendiente: numeroPago(g.saldo_pendiente)
+    saldoPendiente: numeroPago(g.saldo_pendiente),
+
+    detalleCuotas,
+    totalCuotas: numeroPago(g.total_cuotas),
+    pagoOnlineActivo: Number(g.pago_online_activo || 0),
+    cerrado: Number(g.cerrado || 0),
+    bloqueado: Number(g.bloqueado || 0),
+    incluyePoleron: Number(g.incluye_poleron || 0)
   };
 }
 
@@ -1228,6 +1237,95 @@ function normalizarPasajeroPagos(item = {}) {
   };
 }
 
+function getDetalleCuotaPorTipo(grupo = {}, tipo = "") {
+  const tipoBuscado = normalizeLoose(tipo);
+
+  return (grupo.detalleCuotas || []).find((item) =>
+    normalizeLoose(item.tipo_cuota || "") === tipoBuscado
+  ) || null;
+}
+
+function getValorInscripcionGrupo(grupo = {}) {
+  const inscripcion = getDetalleCuotaPorTipo(grupo, "Inscripcion");
+  return numeroPago(inscripcion?.total);
+}
+
+function getInfoCuotaGrupo(grupo = {}) {
+  const cuota = getDetalleCuotaPorTipo(grupo, "Cuota");
+
+  const totalCuotas = numeroPago(cuota?.total);
+  const cantidadCuotas = Number(cuota?.cantidad || 0);
+  const valorCuota = cantidadCuotas > 0 ? totalCuotas / cantidadCuotas : 0;
+
+  return {
+    totalCuotas,
+    cantidadCuotas,
+    valorCuota,
+    inicioPago: cuota?.inicio_pago || "",
+    terminoPago: cuota?.termino_pago || ""
+  };
+}
+
+function calcularCuotasVencidasGrupo(grupo = {}) {
+  const info = getInfoCuotaGrupo(grupo);
+
+  if (!info.cantidadCuotas || !info.inicioPago) return 0;
+
+  const inicio = timestampLikeToDate(info.inicioPago);
+  if (!inicio) return 0;
+
+  const hoy = new Date();
+
+  if (hoy < inicio) return 0;
+
+  let vencidas =
+    (hoy.getFullYear() - inicio.getFullYear()) * 12 +
+    (hoy.getMonth() - inicio.getMonth()) +
+    1;
+
+  if (hoy.getDate() < inicio.getDate()) {
+    vencidas -= 1;
+  }
+
+  vencidas = Math.max(0, vencidas);
+  vencidas = Math.min(vencidas, info.cantidadCuotas);
+
+  return vencidas;
+}
+
+function calcularMontoEsperadoHoyGrupo(grupo = {}) {
+  const inscripcion = getValorInscripcionGrupo(grupo);
+  const info = getInfoCuotaGrupo(grupo);
+  const cuotasVencidas = calcularCuotasVencidasGrupo(grupo);
+
+  return inscripcion + (cuotasVencidas * info.valorCuota);
+}
+
+function calcularCuotasAtrasadasPersona(p = {}, grupo = {}) {
+  const info = getInfoCuotaGrupo(grupo);
+  if (!info.valorCuota) return 0;
+
+  const esperadoHoy = calcularMontoEsperadoHoyGrupo(grupo);
+  const diferencia = esperadoHoy - Number(p.totalPagado || 0);
+
+  if (diferencia <= 0) return 0;
+
+  return diferencia / info.valorCuota;
+}
+
+function enriquecerPasajeroConAtraso(p = {}, grupo = {}) {
+  const cuotasAtrasadas = calcularCuotasAtrasadasPersona(p, grupo);
+  const montoEsperadoHoy = calcularMontoEsperadoHoyGrupo(grupo);
+
+  return {
+    ...p,
+    cuotasAtrasadas,
+    montoEsperadoHoy,
+    valorInscripcion: getValorInscripcionGrupo(grupo),
+    valorCuota: getInfoCuotaGrupo(grupo).valorCuota
+  };
+}
+
 async function fetchJsonPagos(url) {
   const res = await fetch(url);
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -1257,141 +1355,153 @@ function getTiposAlertaPersonaPago(p = {}, grupo = {}) {
   if (p.saldoPendiente <= 0) return [];
 
   const moneda = String(grupo.monedaTexto || "").toUpperCase();
-  const diasUltimoPago = diasDesdeFechaPago(p.ultimoPagoFecha);
   const alertas = [];
+
+  const valorInscripcion = getValorInscripcionGrupo(grupo);
+  const cuotasAtrasadas = calcularCuotasAtrasadasPersona(p, grupo);
 
   const limitePagoBajo =
     moneda === "USD" || moneda === "EUR"
       ? 550
       : moneda === "CLP"
-        ? 500000
+        ? 550000
         : null;
 
-  // 1) Nunca pagó
-  if (p.totalPagado <= 0) {
+  if (p.totalPagado <= 0 || (valorInscripcion > 0 && p.totalPagado < valorInscripcion)) {
     alertas.push({
-      tipo: "persona_sin_pagos",
+      tipo: "persona_sin_pagos_o_sin_inscripcion",
       nivel: "critica",
-      label: "Nunca ha pagado",
-      gravedad: 5
+      label: p.totalPagado <= 0
+        ? "Nunca pagó"
+        : "Pagó menos que la inscripción",
+      gravedad: 5,
+      cuotasAtrasadas,
+      valorInscripcion
     });
-
-    return alertas;
   }
 
-  // 2) Pago bajo
-  if (limitePagoBajo !== null && p.totalPagado > 0 && p.totalPagado <= limitePagoBajo) {
+  if (limitePagoBajo !== null && p.totalPagado > 0 && p.totalPagado < limitePagoBajo) {
     alertas.push({
       tipo: "persona_pago_bajo",
       nivel: "critica",
       label: moneda === "CLP"
-        ? "Pagado menor o igual a $500.000 CLP"
-        : `Pagado menor o igual a 550 ${moneda}`,
-      gravedad: 4
+        ? "Pagó menos de $550.000 CLP"
+        : `Pagó menos de 550 ${moneda}`,
+      gravedad: 4,
+      cuotasAtrasadas,
+      valorInscripcion
     });
   }
 
-  // 3) Sin pago hace más de 3 meses
-  if (diasUltimoPago !== null && diasUltimoPago > 90) {
+  if (cuotasAtrasadas >= 1 && cuotasAtrasadas < 2) {
     alertas.push({
-      tipo: "persona_sin_pago_3_meses",
+      tipo: "persona_atrasada_1_cuota",
       nivel: "warning",
-      label: "No paga hace más de 3 meses",
-      gravedad: 3
+      label: "Atrasado 1 cuota",
+      gravedad: 3,
+      cuotasAtrasadas,
+      valorInscripcion
     });
   }
 
-  // 4) Pago parcial
-  // Para no duplicar "Pago bajo", solo entra aquí si pagó más que el límite bajo.
-  const superaPagoBajo =
-    limitePagoBajo === null
-      ? p.totalPagado > 50
-      : p.totalPagado > limitePagoBajo;
-
-  if (superaPagoBajo && p.saldoPendiente > 0) {
+  if (cuotasAtrasadas >= 2) {
     alertas.push({
-      tipo: "persona_pago_parcial_con_saldo",
-      nivel: "warning",
-      label: "Pago parcial con saldo pendiente",
-      gravedad: 2
+      tipo: "persona_atrasada_2_mas_cuotas",
+      nivel: "critica",
+      label: `Atrasado ${Math.floor(cuotasAtrasadas)} cuotas`,
+      gravedad: 5,
+      cuotasAtrasadas,
+      valorInscripcion
+    });
+  }
+
+  const totalDebe = Number(p.totalDebe || 0);
+  const saldo = Number(p.saldoPendiente || 0);
+  const porcentajeDeuda = totalDebe > 0 ? (saldo / totalDebe) * 100 : 0;
+
+  if (porcentajeDeuda > 50) {
+    alertas.push({
+      tipo: "persona_muy_atrasada_50",
+      nivel: "critica",
+      label: "Muy atrasado: deuda mayor al 50%",
+      gravedad: 5,
+      cuotasAtrasadas,
+      porcentajeDeuda,
+      valorInscripcion
     });
   }
 
   return alertas;
 }
+
 function getTiposAlertaGrupoPago(grupo = {}, pasajeros = []) {
   const viajan = pasajeros.filter((p) => p.viaja);
-  const conDeuda = viajan.filter((p) => p.saldoPendiente > 0);
+  const viajanConAtraso = viajan.map((p) => enriquecerPasajeroConAtraso(p, grupo));
 
-  const totalViajan = viajan.length;
+  const conDeuda = viajanConAtraso.filter((p) => p.saldoPendiente > 0);
+  const atrasados = viajanConAtraso.filter((p) => p.cuotasAtrasadas >= 1);
+  const atrasados2Mas = viajanConAtraso.filter((p) => p.cuotasAtrasadas >= 2);
+
+  const totalViajan = viajanConAtraso.length;
   const totalConDeuda = conDeuda.length;
+  const totalAtrasados = atrasados.length;
+  const totalAtrasados2Mas = atrasados2Mas.length;
 
   const totalViaje = Number(grupo.totalViaje || 0);
-   const saldoPendienteGrupo = pasajeros
-    .filter((p) => p.viaja)
+
+  const saldoPendienteGrupo = viajanConAtraso
     .reduce((acc, p) => acc + Number(p.saldoPendiente || 0), 0) || Number(grupo.saldoPendiente || 0);
 
   const porcentajeSaldoPendiente =
     totalViaje > 0 ? (saldoPendienteGrupo / totalViaje) * 100 : 0;
 
-  const deudoresSinPago60 = conDeuda.filter((p) => {
-    const dias = diasDesdeFechaPago(p.ultimoPagoFecha);
-    return dias !== null && dias > 60;
-  });
-
-  const totalDeudoresSinPago60 = deudoresSinPago60.length;
-
-  const porcentajeGrupoSinPago60 =
-    totalViajan > 0 ? (totalDeudoresSinPago60 / totalViajan) * 100 : 0;
+  const porcentajeGrupoAtrasado =
+    totalViajan > 0 ? (totalAtrasados / totalViajan) * 100 : 0;
 
   const alertas = [];
 
-  // 1) Grupo debe más del 50% del valor total del viaje
   if (saldoPendienteGrupo > 0 && porcentajeSaldoPendiente > 50) {
     alertas.push({
       tipo: "grupo_debe_mas_50",
       nivel: "critica",
-      label: "Grupo debe >50%",
-      gravedad: 4,
+      label: "Grupo debe más del 50% del total",
+      gravedad: 5,
       porcentajeSaldoPendiente,
-      porcentajeGrupoSinPago60,
+      porcentajeGrupoAtrasado,
       totalViajan,
       totalConDeuda,
-      totalDeudoresSinPago60
+      totalAtrasados,
+      totalAtrasados2Mas
     });
   }
 
-  // 2) 10 o más pasajeros con saldo pendiente
-  if (totalConDeuda >= 10) {
+  if (totalAtrasados2Mas >= 10) {
     alertas.push({
-      tipo: "grupo_10_mas_deudores",
-      nivel: "warning",
-      label: "grupo c/10+ deudores",
-      gravedad: 3,
+      tipo: "grupo_10_mas_atrasados_2_cuotas",
+      nivel: "critica",
+      label: "10+ personas con 2+ cuotas atrasadas",
+      gravedad: 5,
       porcentajeSaldoPendiente,
-      porcentajeGrupoSinPago60,
+      porcentajeGrupoAtrasado,
       totalViajan,
       totalConDeuda,
-      totalDeudoresSinPago60
+      totalAtrasados,
+      totalAtrasados2Mas
     });
   }
 
-  // 3) 30% o más del grupo con deuda y sin pagar hace más de 60 días
-  if (
-    saldoPendienteGrupo > 0 &&
-    totalViajan > 0 &&
-    porcentajeGrupoSinPago60 >= 30
-  ) {
+  if (totalAtrasados > 0) {
     alertas.push({
-      tipo: "grupo_30_sin_pago_60",
+      tipo: "grupo_no_va_al_dia",
       nivel: "warning",
-      label: "30%+ sin pago +60 días",
+      label: "Grupo no va al día",
       gravedad: 3,
       porcentajeSaldoPendiente,
-      porcentajeGrupoSinPago60,
+      porcentajeGrupoAtrasado,
       totalViajan,
       totalConDeuda,
-      totalDeudoresSinPago60
+      totalAtrasados,
+      totalAtrasados2Mas
     });
   }
 
@@ -1422,30 +1532,26 @@ function calcularPrioridadGrupo(tipoInfo, grupo = {}) {
 
 function getPrioridadPagoKey(alerta = {}) {
   const tipo = String(alerta.tipo || "");
-  const saldo = Number(alerta.saldoPendiente || alerta.saldoPendienteGrupo || 0);
 
   if (
-    tipo === "persona_sin_pagos" ||
-    tipo === "persona_pago_bajo" ||
-    tipo === "grupo_debe_mas_50"
+    tipo === "persona_sin_pagos_o_sin_inscripcion" ||
+    tipo === "persona_atrasada_2_mas_cuotas" ||
+    tipo === "persona_muy_atrasada_50" ||
+    tipo === "grupo_debe_mas_50" ||
+    tipo === "grupo_10_mas_atrasados_2_cuotas"
   ) {
     return "critica";
   }
 
   if (
-    tipo === "persona_sin_pago_3_meses" ||
-    tipo === "grupo_10_mas_deudores" ||
-    tipo === "grupo_30_sin_pago_60" ||
-    (tipo === "persona_pago_parcial_con_saldo" && saldo > 1000)
+    tipo === "persona_pago_bajo" ||
+    tipo === "persona_atrasada_1_cuota" ||
+    tipo === "grupo_no_va_al_dia"
   ) {
     return "alta";
   }
 
-  if (tipo === "persona_pago_parcial_con_saldo") {
-    return "media";
-  }
-
-  return "baja";
+  return "media";
 }
 
 function getPrioridadPagoLabel(alerta = {}) {
@@ -1602,14 +1708,15 @@ function getTiposAlertasPagosUI() {
   return [
     { tipo: "__todos__", label: "Todos" },
 
-    { tipo: "persona_sin_pagos", label: "Nunca pagó" },
-    { tipo: "persona_pago_bajo", label: "Pago ≤ USD 550" },
-    { tipo: "persona_sin_pago_3_meses", label: "Sin pago +90 días" },
-    { tipo: "persona_pago_parcial_con_saldo", label: "Saldo pendiente" },
+    { tipo: "persona_sin_pagos_o_sin_inscripcion", label: "Nunca pagó / inscripción" },
+    { tipo: "persona_pago_bajo", label: "Pago <550" },
+    { tipo: "persona_atrasada_1_cuota", label: "1 cuota atrasada" },
+    { tipo: "persona_atrasada_2_mas_cuotas", label: "2+ cuotas atrasadas" },
+    { tipo: "persona_muy_atrasada_50", label: "Muy atrasado +50%" },
 
     { tipo: "grupo_debe_mas_50", label: "Grupo debe >50%" },
-    { tipo: "grupo_10_mas_deudores", label: "10+ deudores" },
-    { tipo: "grupo_30_sin_pago_60", label: "30%+ sin pago +60 días" }
+    { tipo: "grupo_10_mas_atrasados_2_cuotas", label: "10+ con 2 cuotas" },
+    { tipo: "grupo_no_va_al_dia", label: "Grupo no va al día" }
   ];
 }
 
@@ -2314,20 +2421,25 @@ async function actualizarAlertasPagos() {
         .reduce((acc, p) => acc + Number(p.saldoPendiente || 0), 0);
 
       const pasajerosConDeudaGrupo = pasajeros
-      .filter((p) => p.viaja && p.saldoPendiente > 0)
-      .sort((a, b) => Number(b.saldoPendiente || 0) - Number(a.saldoPendiente || 0))
-      .map((p) => ({
-        rut: p.rut || "",
-        participante: p.nombreCompleto || "",
-        responsable: p.responsable || "",
-        correoResponsable: p.correoResponsable || "",
-        telefonoResponsable: p.telefonoResponsable || "",
-        totalDebe: p.totalDebe || 0,
-        totalPagado: p.totalPagado || 0,
-        saldoPendiente: p.saldoPendiente || 0,
-        ultimoPagoFecha: p.ultimoPagoFecha || "",
-        diasUltimoPago: diasDesdeFechaPago(p.ultimoPagoFecha)
-      }));
+        .filter((p) => p.viaja && p.saldoPendiente > 0)
+        .map((p) => enriquecerPasajeroConAtraso(p, grupoPago))
+        .sort((a, b) => Number(b.cuotasAtrasadas || 0) - Number(a.cuotasAtrasadas || 0))
+        .map((p) => ({
+          rut: p.rut || "",
+          participante: p.nombreCompleto || "",
+          responsable: p.responsable || "",
+          correoResponsable: p.correoResponsable || "",
+          telefonoResponsable: p.telefonoResponsable || "",
+          totalDebe: p.totalDebe || 0,
+          totalPagado: p.totalPagado || 0,
+          saldoPendiente: p.saldoPendiente || 0,
+          ultimoPagoFecha: p.ultimoPagoFecha || "",
+          diasUltimoPago: diasDesdeFechaPago(p.ultimoPagoFecha),
+          cuotasAtrasadas: p.cuotasAtrasadas || 0,
+          montoEsperadoHoy: p.montoEsperadoHoy || 0,
+          valorInscripcion: p.valorInscripcion || 0,
+          valorCuota: p.valorCuota || 0
+        }));
 
       const gruposAlertaInfo = getTiposAlertaGrupoPago(grupoPago, pasajeros);
       
@@ -2360,6 +2472,11 @@ async function actualizarAlertasPagos() {
           porcentajeGrupoSinPago60: grupoAlertaInfo.porcentajeGrupoSinPago60 || 0,
           totalDeudoresSinPago60: grupoAlertaInfo.totalDeudoresSinPago60 || 0,
           pasajerosConDeudaGrupo,
+          cuotasAtrasadas: tipoInfo.cuotasAtrasadas || 0,
+          valorInscripcion: tipoInfo.valorInscripcion || 0,
+          porcentajeDeuda: tipoInfo.porcentajeDeuda || 0,
+          montoEsperadoHoy: calcularMontoEsperadoHoyGrupo(grupoPago),
+          valorCuota: getInfoCuotaGrupo(grupoPago).valorCuota,
           actualizadoAt: new Date().toISOString()
         });
       });
