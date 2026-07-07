@@ -96,40 +96,31 @@ async function cargarGruposPagos() {
 async function cargarDetalleGrupo(numeroNegocio) {
   els.detalleGrupoBox.classList.remove("hidden");
 
-  // Evita que se mueva la página de fondo mientras el modal está abierto.
   document.documentElement.style.overflow = "hidden";
   document.body.style.overflow = "hidden";
 
   els.detalleTitulo.textContent = `Cargando detalle N° ${numeroNegocio}...`;
   els.tbodyDetallePasajeros.innerHTML =
-    `<tr><td colspan="10" class="seg-empty">Cargando pasajeros...</td></tr>`;
+    `<tr><td colspan="15" class="seg-empty">Cargando pasajeros...</td></tr>`;
 
   try {
-    const data = await fetchJson(
-      `${API_PAGOS_URL}?modo=detalle&numeroNegocio=${encodeURIComponent(numeroNegocio)}`
-    );
+    const [data, dataGrupo] = await Promise.all([
+      fetchJson(`${API_PAGOS_URL}?modo=detalle&numeroNegocio=${encodeURIComponent(numeroNegocio)}`),
+      fetchJson(`${API_PAGOS_URL}?modo=grupos&numeroNegocio=${encodeURIComponent(numeroNegocio)}`)
+    ]);
 
-    detalleActual = data;
+    const infoGrupoPagos = normalizarGrupo(dataGrupo?.grupos?.data || {});
 
-    console.log("NOMINAS COMPLETO:", JSON.stringify(data?.nominas, null, 2));
-    console.log("SALDOS COMPLETO:", JSON.stringify(data?.saldos, null, 2));
-    
-    const primerPasajeroNomina = data?.nominas?.data?.pasajeros?.[0]?.pasajero;
-    const primerPasajeroSaldo = data?.saldos?.data?.detalle_pasajeros?.[0];
-    
-    console.log("CAMPOS NOMINA:", Object.keys(primerPasajeroNomina || {}));
-    console.log("CAMPOS SALDOS:", Object.keys(primerPasajeroSaldo || {}));
-    
-    console.log("PRIMER PASAJERO NOMINA:", JSON.stringify(primerPasajeroNomina, null, 2));
-    console.log("PRIMER PASAJERO SALDOS:", JSON.stringify(primerPasajeroSaldo, null, 2));
+    detalleActual = {
+      ...data,
+      infoGrupoPagos
+    };
 
     const resumen = data?.saldos?.data?.resumen_grupo || {};
     const pasajeros =
       data?.nominas?.data?.pasajeros ||
       data?.saldos?.data?.detalle_pasajeros ||
       [];
-
-    console.log("DATA COMPLETA PAGOS:", JSON.stringify(data, null, 2));
 
     const grupo = gruposOriginales.find(
       (g) => String(g.numeroNegocio) === String(numeroNegocio)
@@ -138,13 +129,13 @@ async function cargarDetalleGrupo(numeroNegocio) {
     els.detalleTitulo.textContent =
       `Detalle N° ${numeroNegocio}${grupo?.nombreGrupo ? " · " + grupo.nombreGrupo : ""}`;
 
-    renderResumenDetalle(resumen);
-    renderTablaDetalle(pasajeros);
+    renderResumenDetalle(resumen, infoGrupoPagos);
+    renderTablaDetalle(pasajeros, infoGrupoPagos);
 
   } catch (error) {
     console.error("Error cargando detalle:", error);
     els.tbodyDetallePasajeros.innerHTML =
-      `<tr><td colspan="10" class="seg-empty">Error cargando detalle.</td></tr>`;
+      `<tr><td colspan="15" class="seg-empty">Error cargando detalle.</td></tr>`;
   }
 }
 
@@ -262,11 +253,6 @@ function renderTablaGrupos() {
         <td>${formatoMoneda(g.totalPagado, g.monedaTexto)}</td>
         <td>${formatoMoneda(g.saldoPendiente, g.monedaTexto)}</td>
         <td>
-          <strong>Inscripción:</strong> ${formatoMoneda(g.valorInscripcion, g.monedaTexto)}<br>
-          <strong>Cuota:</strong> ${formatoMoneda(g.valorCuota, g.monedaTexto)}<br>
-          <small>${escapeHtml(g.cantidadCuotas || 0)} cuotas · ${formatearFecha(g.inicioPagoCuotas)} a ${formatearFecha(g.terminoPagoCuotas)}</small>
-        </td>
-        <td>
           <div class="progress-pay" title="${porcentaje.toFixed(1)}%">
             <span style="width:${Math.min(100, porcentaje).toFixed(1)}%"></span>
           </div>
@@ -287,24 +273,65 @@ function renderTablaGrupos() {
   });
 }
 
-function renderResumenDetalle(resumen) {
+function renderResumenDetalle(resumen, infoGrupoPagos = {}) {
   els.detPasajeros.textContent = resumen.total_pasajeros ?? 0;
   els.detViajan.textContent = resumen.total_viajan ?? 0;
   els.detNoViajan.textContent = resumen.total_no_viajan ?? 0;
   els.detCredencial.textContent = resumen.con_credencial ?? 0;
   els.detSinCredencial.textContent = resumen.sin_credencial ?? 0;
-  els.detPagado.textContent = formatoCLP(resumen.monto_total_pagado || 0);
-  els.detSaldo.textContent = formatoCLP(resumen.saldo_pendiente || 0);
+  els.detPagado.textContent = formatoMoneda(resumen.monto_total_pagado || 0, infoGrupoPagos.monedaTexto);
+  els.detSaldo.textContent = formatoMoneda(resumen.saldo_pendiente || 0, infoGrupoPagos.monedaTexto);
+
+  let boxCuotas = document.getElementById("detalleCuotasBox");
+
+  if (!boxCuotas) {
+    boxCuotas = document.createElement("div");
+    boxCuotas.id = "detalleCuotasBox";
+    boxCuotas.className = "seg-card";
+    boxCuotas.style.margin = "12px 0";
+
+    const referencia = els.detalleGrupoBox.querySelector(".seg-table-wrap") || els.tbodyDetallePasajeros.closest("table");
+    els.detalleGrupoBox.insertBefore(boxCuotas, referencia);
+  }
+
+  boxCuotas.innerHTML = `
+    <div style="display:grid; grid-template-columns:repeat(4, minmax(150px, 1fr)); gap:10px;">
+      <div><strong>Inscripción</strong><br>${formatoMoneda(infoGrupoPagos.valorInscripcion || 0, infoGrupoPagos.monedaTexto)}</div>
+      <div><strong>Valor cuota</strong><br>${formatoMoneda(infoGrupoPagos.valorCuota || 0, infoGrupoPagos.monedaTexto)}</div>
+      <div><strong>Cantidad cuotas</strong><br>${escapeHtml(infoGrupoPagos.cantidadCuotas || 0)}</div>
+      <div><strong>Total cuotas</strong><br>${formatoMoneda(infoGrupoPagos.totalCuotas || 0, infoGrupoPagos.monedaTexto)}</div>
+      <div><strong>Inicio cuotas</strong><br>${formatearFecha(infoGrupoPagos.inicioPagoCuotas)}</div>
+      <div><strong>Término cuotas</strong><br>${formatearFecha(infoGrupoPagos.terminoPagoCuotas)}</div>
+      <div><strong>Total API</strong><br>${formatoMoneda(infoGrupoPagos.totalCuotasApi || 0, infoGrupoPagos.monedaTexto)}</div>
+      <div><strong>Estado grupo</strong><br>
+        ${infoGrupoPagos.bloqueado ? "Bloqueado" : "No bloqueado"} ·
+        ${infoGrupoPagos.cerrado ? "Cerrado" : "Abierto"}
+      </div>
+    </div>
+  `;
 }
 
-function renderTablaDetalle(items) {
+function renderTablaDetalle(items, infoGrupoPagos = {}) {
   if (!items.length) {
     els.tbodyDetallePasajeros.innerHTML =
-      `<tr><td colspan="13" class="seg-empty">No hay pasajeros para mostrar.</td></tr>`;
+      `<tr><td colspan="15" class="seg-empty">No hay pasajeros para mostrar.</td></tr>`;
     return;
   }
 
-  const pasajeros = items.map(normalizarPasajero);
+  const pasajeros = items.map((item) => {
+    const p = normalizarPasajero(item);
+    const esperadoHoy = calcularEsperadoHoy(infoGrupoPagos);
+    const atrasoMonto = Math.max(0, esperadoHoy - p.totalPagado);
+    const cuotasAtrasadas = infoGrupoPagos.valorCuota > 0
+      ? atrasoMonto / infoGrupoPagos.valorCuota
+      : 0;
+
+    return {
+      ...p,
+      esperadoHoy,
+      cuotasAtrasadas
+    };
+  });
 
   els.tbodyDetallePasajeros.innerHTML = pasajeros.map((p) => {
     const estadoViaje = p.viaja
@@ -330,11 +357,13 @@ function renderTablaDetalle(items) {
         <td>${escapeHtml(p.nombreApoderado || "-")}</td>
         <td>${escapeHtml(p.correoApoderado || "-")}</td>
         <td>${escapeHtml(p.celularApoderado || "-")}</td>
-        <td>${formatoCLP(p.totalDebe)}</td>
-        <td>${formatoCLP(p.totalPagado)}</td>
-        <td>${formatoCLP(p.saldoPendiente)}</td>
+        <td>${formatoMoneda(p.totalDebe, infoGrupoPagos.monedaTexto)}</td>
+        <td>${formatoMoneda(p.totalPagado, infoGrupoPagos.monedaTexto)}</td>
+        <td>${formatoMoneda(p.saldoPendiente, infoGrupoPagos.monedaTexto)}</td>
+        <td>${formatoMoneda(p.esperadoHoy, infoGrupoPagos.monedaTexto)}</td>
+        <td>${Number(p.cuotasAtrasadas || 0).toFixed(1)}</td>
         <td>${estadoPago}</td>
-        <td>${p.ultimoPagoFecha ? `${formatearFecha(p.ultimoPagoFecha)} · ${formatoCLP(p.ultimoPagoMonto)}` : "-"}</td>
+        <td>${p.ultimoPagoFecha ? `${formatearFecha(p.ultimoPagoFecha)} · ${formatoMoneda(p.ultimoPagoMonto, infoGrupoPagos.monedaTexto)}` : "-"}</td>
         <td>${credencial}</td>
       </tr>
     `;
@@ -483,6 +512,35 @@ function normalizarGrupo(g) {
     bloqueado: Number(g.bloqueado || 0),
     incluyePoleron: Number(g.incluye_poleron || 0)
   };
+}
+
+function calcularCuotasVencidas(infoGrupoPagos = {}) {
+  if (!infoGrupoPagos.cantidadCuotas || !infoGrupoPagos.inicioPagoCuotas) return 0;
+
+  const inicio = new Date(`${infoGrupoPagos.inicioPagoCuotas}T00:00:00`);
+  if (Number.isNaN(inicio.getTime())) return 0;
+
+  const hoy = new Date();
+  if (hoy < inicio) return 0;
+
+  let vencidas =
+    (hoy.getFullYear() - inicio.getFullYear()) * 12 +
+    (hoy.getMonth() - inicio.getMonth()) +
+    1;
+
+  if (hoy.getDate() < inicio.getDate()) {
+    vencidas -= 1;
+  }
+
+  return Math.max(0, Math.min(vencidas, Number(infoGrupoPagos.cantidadCuotas || 0)));
+}
+
+function calcularEsperadoHoy(infoGrupoPagos = {}) {
+  const inscripcion = Number(infoGrupoPagos.valorInscripcion || 0);
+  const valorCuota = Number(infoGrupoPagos.valorCuota || 0);
+  const cuotasVencidas = calcularCuotasVencidas(infoGrupoPagos);
+
+  return inscripcion + (valorCuota * cuotasVencidas);
 }
 
 function normalizarPasajero(item) {
