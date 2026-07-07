@@ -274,6 +274,8 @@ function renderTablaGrupos() {
 }
 
 function renderResumenDetalle(resumen, infoGrupoPagos = {}) {
+  const resumenCuotas = calcularResumenCuotasGrupo(infoGrupoPagos);
+
   els.detPasajeros.textContent = resumen.total_pasajeros ?? 0;
   els.detViajan.textContent = resumen.total_viajan ?? 0;
   els.detNoViajan.textContent = resumen.total_no_viajan ?? 0;
@@ -303,17 +305,66 @@ function renderResumenDetalle(resumen, infoGrupoPagos = {}) {
   if (!boxCuotas) return;
 
   boxCuotas.innerHTML = `
-    <div style="display:grid; grid-template-columns:repeat(4, minmax(150px, 1fr)); gap:10px;">
-      <div><strong>Inscripción</strong><br>${formatoMoneda(infoGrupoPagos.valorInscripcion || 0, infoGrupoPagos.monedaTexto)}</div>
-      <div><strong>Valor cuota</strong><br>${formatoMoneda(infoGrupoPagos.valorCuota || 0, infoGrupoPagos.monedaTexto)}</div>
-      <div><strong>Cantidad cuotas</strong><br>${escapeHtml(infoGrupoPagos.cantidadCuotas || 0)}</div>
-      <div><strong>Total cuotas</strong><br>${formatoMoneda(infoGrupoPagos.totalCuotas || 0, infoGrupoPagos.monedaTexto)}</div>
-      <div><strong>Inicio cuotas</strong><br>${formatearFecha(infoGrupoPagos.inicioPagoCuotas)}</div>
-      <div><strong>Término cuotas</strong><br>${formatearFecha(infoGrupoPagos.terminoPagoCuotas)}</div>
-      <div><strong>Total API</strong><br>${formatoMoneda(infoGrupoPagos.totalCuotasApi || 0, infoGrupoPagos.monedaTexto)}</div>
-      <div><strong>Estado grupo</strong><br>
+    <div style="display:grid; grid-template-columns:repeat(4, minmax(150px, 1fr)); gap:12px;">
+      <div>
+        <strong>Inscripción total</strong><br>
+        ${formatoMoneda(infoGrupoPagos.totalInscripcion || 0, infoGrupoPagos.monedaTexto)}
+      </div>
+
+      <div>
+        <strong>Inscripciones vencidas</strong><br>
+        ${escapeHtml(resumenCuotas.inscripcionesVencidas)} de ${escapeHtml(infoGrupoPagos.cantidadInscripcion || 0)}
+      </div>
+
+      <div>
+        <strong>Esperado inscripción</strong><br>
+        ${formatoMoneda(resumenCuotas.esperadoInscripcionHoy || 0, infoGrupoPagos.monedaTexto)}
+      </div>
+
+      <div>
+        <strong>Valor cuota</strong><br>
+        ${formatoMoneda(infoGrupoPagos.valorCuota || 0, infoGrupoPagos.monedaTexto)}
+      </div>
+
+      <div>
+        <strong>Cuotas vencidas</strong><br>
+        ${escapeHtml(resumenCuotas.cuotasVencidas)} de ${escapeHtml(infoGrupoPagos.cantidadCuotas || 0)}
+      </div>
+
+      <div>
+        <strong>Esperado cuotas</strong><br>
+        ${formatoMoneda(resumenCuotas.esperadoCuotasHoy || 0, infoGrupoPagos.monedaTexto)}
+      </div>
+
+      <div>
+        <strong>Esperado hoy</strong><br>
+        ${formatoMoneda(resumenCuotas.esperadoHoy || 0, infoGrupoPagos.monedaTexto)}
+      </div>
+
+      <div>
+        <strong>Estado grupo</strong><br>
         ${infoGrupoPagos.bloqueado ? "Bloqueado" : "No bloqueado"} ·
         ${infoGrupoPagos.cerrado ? "Cerrado" : "Abierto"}
+      </div>
+
+      <div>
+        <strong>Inicio inscripción</strong><br>
+        ${formatearFecha(infoGrupoPagos.inicioPagoInscripcion)}
+      </div>
+
+      <div>
+        <strong>Término inscripción</strong><br>
+        ${formatearFecha(infoGrupoPagos.terminoPagoInscripcion)}
+      </div>
+
+      <div>
+        <strong>Inicio cuotas</strong><br>
+        ${formatearFecha(infoGrupoPagos.inicioPagoCuotas)}
+      </div>
+
+      <div>
+        <strong>Término cuotas</strong><br>
+        ${formatearFecha(infoGrupoPagos.terminoPagoCuotas)}
       </div>
     </div>
   `;
@@ -328,16 +379,11 @@ function renderTablaDetalle(items, infoGrupoPagos = {}) {
 
   const pasajeros = items.map((item) => {
     const p = normalizarPasajero(item);
-    const esperadoHoy = calcularEsperadoHoy(infoGrupoPagos);
-    const atrasoMonto = Math.max(0, esperadoHoy - p.totalPagado);
-    const cuotasAtrasadas = infoGrupoPagos.valorCuota > 0
-      ? atrasoMonto / infoGrupoPagos.valorCuota
-      : 0;
+    const estadoCuotas = calcularEstadoCuotasPasajero(p, infoGrupoPagos);
 
     return {
       ...p,
-      esperadoHoy,
-      cuotasAtrasadas
+      ...estadoCuotas
     };
   });
 
@@ -398,18 +444,28 @@ function exportarDetalleNomina() {
     (g) => String(g.numeroNegocio) === String(numeroNegocio)
   );
 
+  const infoGrupoPagos = detalleActual.infoGrupoPagos || {};
+  const resumenCuotas = calcularResumenCuotasGrupo(infoGrupoPagos);
+
   const pasajerosRaw =
     detalleActual?.nominas?.data?.pasajeros ||
     detalleActual?.saldos?.data?.detalle_pasajeros ||
     [];
 
-  const pasajeros = pasajerosRaw.map(normalizarPasajero);
+  const pasajeros = pasajerosRaw.map((item) => {
+    const p = normalizarPasajero(item);
+    return {
+      ...p,
+      ...calcularEstadoCuotasPasajero(p, infoGrupoPagos)
+    };
+  });
 
   const rows = pasajeros.map((p) => ({
     numeroNegocio,
     grupo: grupo?.nombreGrupo || "",
     anoViaje: grupo?.anoViaje || "",
     destino: grupo?.destino || "",
+    moneda: infoGrupoPagos.monedaTexto || grupo?.monedaTexto || "",
     rut: p.rut || "",
     nombreCompleto: p.nombreCompleto || "",
     nombreApoderado: p.nombreApoderado || "",
@@ -417,9 +473,26 @@ function exportarDetalleNomina() {
     celularApoderado: p.celularApoderado || "",
     categoria: p.categoria || "",
     viaja: p.viaja ? "Sí" : "No",
+
     total: p.totalDebe,
     pagado: p.totalPagado,
     saldo: p.saldoPendiente,
+
+    totalInscripcion: infoGrupoPagos.totalInscripcion || 0,
+    cantidadInscripcion: infoGrupoPagos.cantidadInscripcion || 0,
+    valorInscripcionUnitario: infoGrupoPagos.valorInscripcionUnitario || 0,
+    inscripcionesVencidas: resumenCuotas.inscripcionesVencidas || 0,
+    esperadoInscripcionHoy: p.esperadoInscripcionHoy || 0,
+
+    valorCuota: infoGrupoPagos.valorCuota || 0,
+    cantidadCuotas: infoGrupoPagos.cantidadCuotas || 0,
+    cuotasVencidas: p.cuotasVencidas || 0,
+    esperadoCuotasHoy: p.esperadoCuotasHoy || 0,
+
+    esperadoHoy: p.esperadoHoy || 0,
+    cuotasPagadasEstimadas: p.cuotasPagadasEstimadas || 0,
+    cuotasAtrasadas: p.cuotasAtrasadas || 0,
+
     estadoPago:
       p.saldoPendiente <= 0
         ? "Pagado"
@@ -482,17 +555,28 @@ async function fetchJson(url) {
 function normalizarGrupo(g) {
   const detalleCuotas = Array.isArray(g.detalle_cuotas) ? g.detalle_cuotas : [];
 
-  const inscripcion = detalleCuotas.find(c =>
+  const inscripciones = detalleCuotas.filter(c =>
     normalizarTexto(c.tipo_cuota || "") === "inscripcion"
-  ) || null;
+  );
 
-  const cuota = detalleCuotas.find(c =>
+  const cuotas = detalleCuotas.filter(c =>
     normalizarTexto(c.tipo_cuota || "") === "cuota"
-  ) || null;
+  );
 
-  const totalCuotas = numero(cuota?.total);
-  const cantidadCuotas = Number(cuota?.cantidad || 0);
+  const totalInscripcion = inscripciones.reduce((acc, c) => acc + numero(c.total), 0);
+  const cantidadInscripcion = inscripciones.reduce((acc, c) => acc + Number(c.cantidad || 0), 0);
+  const valorInscripcionUnitario =
+    cantidadInscripcion > 0 ? totalInscripcion / cantidadInscripcion : 0;
+
+  const totalCuotas = cuotas.reduce((acc, c) => acc + numero(c.total), 0);
+  const cantidadCuotas = cuotas.reduce((acc, c) => acc + Number(c.cantidad || 0), 0);
   const valorCuota = cantidadCuotas > 0 ? totalCuotas / cantidadCuotas : 0;
+
+  const primeraInscripcion = inscripciones[0] || null;
+  const ultimaInscripcion = inscripciones[inscripciones.length - 1] || primeraInscripcion;
+
+  const primeraCuota = cuotas[0] || null;
+  const ultimaCuota = cuotas[cuotas.length - 1] || primeraCuota;
 
   return {
     numeroNegocio: g.negocio_id,
@@ -507,13 +591,21 @@ function normalizarGrupo(g) {
     saldoPendiente: numero(g.saldo_pendiente),
 
     detalleCuotas,
-    valorInscripcion: numero(inscripcion?.total),
-    cantidadInscripcion: Number(inscripcion?.cantidad || 0),
+
+    totalInscripcion,
+    cantidadInscripcion,
+    valorInscripcionUnitario,
+    inicioPagoInscripcion: primeraInscripcion?.inicio_pago || "",
+    terminoPagoInscripcion: ultimaInscripcion?.termino_pago || primeraInscripcion?.termino_pago || "",
+
+    valorInscripcion: totalInscripcion,
+
     totalCuotas,
     cantidadCuotas,
     valorCuota,
-    inicioPagoCuotas: cuota?.inicio_pago || "",
-    terminoPagoCuotas: cuota?.termino_pago || "",
+    inicioPagoCuotas: primeraCuota?.inicio_pago || "",
+    terminoPagoCuotas: ultimaCuota?.termino_pago || primeraCuota?.termino_pago || "",
+
     totalCuotasApi: numero(g.total_cuotas),
     pagoOnlineActivo: Number(g.pago_online_activo || 0),
     cerrado: Number(g.cerrado || 0),
@@ -522,14 +614,37 @@ function normalizarGrupo(g) {
   };
 }
 
-function calcularCuotasVencidas(infoGrupoPagos = {}) {
-  if (!infoGrupoPagos.cantidadCuotas || !infoGrupoPagos.inicioPagoCuotas) return 0;
+function fechaLocal(fecha) {
+  if (!fecha) return null;
 
-  const inicio = new Date(`${infoGrupoPagos.inicioPagoCuotas}T00:00:00`);
-  if (Number.isNaN(inicio.getTime())) return 0;
+  const d = new Date(`${fecha}T00:00:00`);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+function contarVencimientosPorMes(cantidad = 0, inicioPago = "", terminoPago = "") {
+  const cantidadNum = Number(cantidad || 0);
+  const inicio = fechaLocal(inicioPago);
+  const termino = fechaLocal(terminoPago);
+
+  if (!cantidadNum || !inicio) return 0;
 
   const hoy = new Date();
+
   if (hoy < inicio) return 0;
+
+  if (cantidadNum === 1) {
+    return 1;
+  }
+
+  // Caso típico doble inscripción:
+  // cantidad 2, inicio 23-12, término 30-01.
+  // Se consideran vencidas según esas dos fechas reales.
+  if (cantidadNum === 2 && termino) {
+    let vencidas = 0;
+    if (hoy >= inicio) vencidas++;
+    if (hoy >= termino) vencidas++;
+    return Math.min(vencidas, cantidadNum);
+  }
 
   let vencidas =
     (hoy.getFullYear() - inicio.getFullYear()) * 12 +
@@ -540,15 +655,68 @@ function calcularCuotasVencidas(infoGrupoPagos = {}) {
     vencidas -= 1;
   }
 
-  return Math.max(0, Math.min(vencidas, Number(infoGrupoPagos.cantidadCuotas || 0)));
+  return Math.max(0, Math.min(vencidas, cantidadNum));
+}
+
+function calcularResumenCuotasGrupo(infoGrupoPagos = {}) {
+  const inscripcionesVencidas = contarVencimientosPorMes(
+    infoGrupoPagos.cantidadInscripcion,
+    infoGrupoPagos.inicioPagoInscripcion,
+    infoGrupoPagos.terminoPagoInscripcion
+  );
+
+  const cuotasVencidas = contarVencimientosPorMes(
+    infoGrupoPagos.cantidadCuotas,
+    infoGrupoPagos.inicioPagoCuotas,
+    infoGrupoPagos.terminoPagoCuotas
+  );
+
+  const esperadoInscripcionHoy =
+    inscripcionesVencidas * Number(infoGrupoPagos.valorInscripcionUnitario || 0);
+
+  const esperadoCuotasHoy =
+    cuotasVencidas * Number(infoGrupoPagos.valorCuota || 0);
+
+  const esperadoHoy = esperadoInscripcionHoy + esperadoCuotasHoy;
+
+  return {
+    inscripcionesVencidas,
+    cuotasVencidas,
+    esperadoInscripcionHoy,
+    esperadoCuotasHoy,
+    esperadoHoy
+  };
+}
+
+function calcularEstadoCuotasPasajero(p = {}, infoGrupoPagos = {}) {
+  const resumen = calcularResumenCuotasGrupo(infoGrupoPagos);
+
+  const totalPagado = Number(p.totalPagado || 0);
+  const valorCuota = Number(infoGrupoPagos.valorCuota || 0);
+
+  const pagoAplicadoACuotas = Math.max(
+    0,
+    totalPagado - resumen.esperadoInscripcionHoy
+  );
+
+  const cuotasPagadasEstimadas =
+    valorCuota > 0 ? pagoAplicadoACuotas / valorCuota : 0;
+
+  const cuotasAtrasadas = Math.max(
+    0,
+    resumen.cuotasVencidas - cuotasPagadasEstimadas
+  );
+
+  return {
+    ...resumen,
+    pagoAplicadoACuotas,
+    cuotasPagadasEstimadas,
+    cuotasAtrasadas
+  };
 }
 
 function calcularEsperadoHoy(infoGrupoPagos = {}) {
-  const inscripcion = Number(infoGrupoPagos.valorInscripcion || 0);
-  const valorCuota = Number(infoGrupoPagos.valorCuota || 0);
-  const cuotasVencidas = calcularCuotasVencidas(infoGrupoPagos);
-
-  return inscripcion + (valorCuota * cuotasVencidas);
+  return calcularResumenCuotasGrupo(infoGrupoPagos).esperadoHoy;
 }
 
 function normalizarPasajero(item) {
