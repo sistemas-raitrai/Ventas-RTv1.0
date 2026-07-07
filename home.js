@@ -2396,7 +2396,7 @@ async function actualizarAlertasPagos() {
     if (anoViaje) params.set("anoViaje", anoViaje);
     if (destino) params.set("destino", destino);
 
-    const res = await fetch(`/api/actualizar-alertas-pagos?${params.toString()}`);
+    const res = await fetch(`https://southamerica-west1-sist-op-rt.cloudfunctions.net/actualizarAlertasPagos?${params.toString()}`);
     const data = await res.json();
 
     if (!res.ok || data.ok === false) {
