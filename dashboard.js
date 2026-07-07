@@ -415,7 +415,7 @@ function renderTablaDetalle(items, infoGrupoPagos = {}) {
         <td>${formatoMoneda(p.totalPagado, infoGrupoPagos.monedaTexto)}</td>
         <td>${formatoMoneda(p.saldoPendiente, infoGrupoPagos.monedaTexto)}</td>
         <td>${formatoMoneda(p.esperadoHoy, infoGrupoPagos.monedaTexto)}</td>
-        <td>${Number(p.cuotasAtrasadas || 0).toFixed(1)}</td>
+        <td>${Number(p.cuotasAtrasadas || 0)}</td>
         <td>${estadoPago}</td>
         <td>${p.ultimoPagoFecha ? `${formatearFecha(p.ultimoPagoFecha)} · ${formatoMoneda(p.ultimoPagoMonto, infoGrupoPagos.monedaTexto)}` : "-"}</td>
         <td>${credencial}</td>
@@ -702,15 +702,18 @@ function calcularEstadoCuotasPasajero(p = {}, infoGrupoPagos = {}) {
   const cuotasPagadasEstimadas =
     valorCuota > 0 ? pagoAplicadoACuotas / valorCuota : 0;
 
+  const cuotasCubiertas = Math.floor(cuotasPagadasEstimadas);
+
   const cuotasAtrasadas = Math.max(
     0,
-    resumen.cuotasVencidas - cuotasPagadasEstimadas
+    resumen.cuotasVencidas - cuotasCubiertas
   );
 
   return {
     ...resumen,
     pagoAplicadoACuotas,
     cuotasPagadasEstimadas,
+    cuotasCubiertas,
     cuotasAtrasadas
   };
 }
