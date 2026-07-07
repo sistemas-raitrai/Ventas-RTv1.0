@@ -282,17 +282,25 @@ function renderResumenDetalle(resumen, infoGrupoPagos = {}) {
   els.detPagado.textContent = formatoMoneda(resumen.monto_total_pagado || 0, infoGrupoPagos.monedaTexto);
   els.detSaldo.textContent = formatoMoneda(resumen.saldo_pendiente || 0, infoGrupoPagos.monedaTexto);
 
+  const modalCard = els.detalleGrupoBox.querySelector(".detalle-modal-card");
+  const tablaWrap = modalCard?.querySelector(".pagos-table-wrap");
+
   let boxCuotas = document.getElementById("detalleCuotasBox");
 
-  if (!boxCuotas) {
+  if (!boxCuotas && modalCard && tablaWrap) {
     boxCuotas = document.createElement("div");
     boxCuotas.id = "detalleCuotasBox";
     boxCuotas.className = "seg-card";
-    boxCuotas.style.margin = "12px 0";
+    boxCuotas.style.margin = "12px 16px";
+    boxCuotas.style.padding = "14px 16px";
+    boxCuotas.style.border = "2px solid #d7dde6";
+    boxCuotas.style.borderRadius = "12px";
+    boxCuotas.style.background = "#fff";
 
-    const referencia = els.detalleGrupoBox.querySelector(".seg-table-wrap") || els.tbodyDetallePasajeros.closest("table");
-    els.detalleGrupoBox.insertBefore(boxCuotas, referencia);
+    modalCard.insertBefore(boxCuotas, tablaWrap);
   }
+
+  if (!boxCuotas) return;
 
   boxCuotas.innerHTML = `
     <div style="display:grid; grid-template-columns:repeat(4, minmax(150px, 1fr)); gap:10px;">
