@@ -262,6 +262,11 @@ function renderTablaGrupos() {
         <td>${formatoMoneda(g.totalPagado, g.monedaTexto)}</td>
         <td>${formatoMoneda(g.saldoPendiente, g.monedaTexto)}</td>
         <td>
+          <strong>Inscripción:</strong> ${formatoMoneda(g.valorInscripcion, g.monedaTexto)}<br>
+          <strong>Cuota:</strong> ${formatoMoneda(g.valorCuota, g.monedaTexto)}<br>
+          <small>${escapeHtml(g.cantidadCuotas || 0)} cuotas · ${formatearFecha(g.inicioPagoCuotas)} a ${formatearFecha(g.terminoPagoCuotas)}</small>
+        </td>
+        <td>
           <div class="progress-pay" title="${porcentaje.toFixed(1)}%">
             <span style="width:${Math.min(100, porcentaje).toFixed(1)}%"></span>
           </div>
@@ -411,6 +416,17 @@ function exportarGruposPagos() {
     totalViaje: g.totalViaje,
     totalPagado: g.totalPagado,
     saldoPendiente: g.saldoPendiente,
+    valorInscripcion: g.valorInscripcion,
+    valorCuota: g.valorCuota,
+    cantidadCuotas: g.cantidadCuotas,
+    totalCuotas: g.totalCuotas,
+    inicioPagoCuotas: g.inicioPagoCuotas,
+    terminoPagoCuotas: g.terminoPagoCuotas,
+    totalCuotasApi: g.totalCuotasApi,
+    pagoOnlineActivo: g.pagoOnlineActivo,
+    cerrado: g.cerrado,
+    bloqueado: g.bloqueado,
+    incluyePoleron: g.incluyePoleron,
     porcentajePagado: g.totalViaje > 0 ? (g.totalPagado / g.totalViaje) : 0
   }));
 
@@ -427,6 +443,20 @@ async function fetchJson(url) {
 }
 
 function normalizarGrupo(g) {
+  const detalleCuotas = Array.isArray(g.detalle_cuotas) ? g.detalle_cuotas : [];
+
+  const inscripcion = detalleCuotas.find(c =>
+    normalizarTexto(c.tipo_cuota || "") === "inscripcion"
+  ) || null;
+
+  const cuota = detalleCuotas.find(c =>
+    normalizarTexto(c.tipo_cuota || "") === "cuota"
+  ) || null;
+
+  const totalCuotas = numero(cuota?.total);
+  const cantidadCuotas = Number(cuota?.cantidad || 0);
+  const valorCuota = cantidadCuotas > 0 ? totalCuotas / cantidadCuotas : 0;
+
   return {
     numeroNegocio: g.negocio_id,
     nombreGrupo: g.nombre_colegio || "",
@@ -437,7 +467,21 @@ function normalizarGrupo(g) {
     monedaTexto: g.moneda_texto || "",
     totalViaje: numero(g.total_viaje),
     totalPagado: numero(g.total_pagado),
-    saldoPendiente: numero(g.saldo_pendiente)
+    saldoPendiente: numero(g.saldo_pendiente),
+
+    detalleCuotas,
+    valorInscripcion: numero(inscripcion?.total),
+    cantidadInscripcion: Number(inscripcion?.cantidad || 0),
+    totalCuotas,
+    cantidadCuotas,
+    valorCuota,
+    inicioPagoCuotas: cuota?.inicio_pago || "",
+    terminoPagoCuotas: cuota?.termino_pago || "",
+    totalCuotasApi: numero(g.total_cuotas),
+    pagoOnlineActivo: Number(g.pago_online_activo || 0),
+    cerrado: Number(g.cerrado || 0),
+    bloqueado: Number(g.bloqueado || 0),
+    incluyePoleron: Number(g.incluye_poleron || 0)
   };
 }
 
