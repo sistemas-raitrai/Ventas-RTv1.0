@@ -20,7 +20,12 @@ export default async function handler(req, res) {
     }
 
     if (modo === "grupos") {
-      const grupos = await pedirJson(`${BASE_API_PAGOS}/api_colegios.php`);
+      const url = numeroNegocio
+        ? `${BASE_API_PAGOS}/api_colegios.php?negocio_id=${encodeURIComponent(numeroNegocio)}&t=${Date.now()}`
+        : `${BASE_API_PAGOS}/api_colegios.php?t=${Date.now()}`;
+    
+      const grupos = await pedirJson(url);
+    
       return res.status(200).json({ ok: true, modo, grupos });
     }
 
