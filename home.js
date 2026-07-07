@@ -2365,7 +2365,9 @@ async function actualizarAlertasPagos() {
   if (!ok) return;
   await cargarAlertasPagosDesdeFirestore();
 
-  const btn = $("btn-actualizar-alertas-pagos");
+  const btn =
+    $("btn-actualizar-alertas-pagos") ||
+    $("btn-home-actualizar-alertas-pagos");
   if (btn) {
     btn.disabled = true;
     btn.textContent = "Actualizando...";
