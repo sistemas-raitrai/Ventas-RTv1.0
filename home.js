@@ -2000,6 +2000,106 @@ function renderAlertasPagosListado(rows = []) {
   `;
 }
 
+function renderTablaCasosEspecialesPago(alerta = {}) {
+  let titulo = "";
+  let rows = [];
+
+  if (alerta.tipo === "grupo_liberados_parciales") {
+    titulo = "Liberados parciales del grupo";
+    rows = Array.isArray(alerta.pasajerosLiberacionParcial)
+      ? alerta.pasajerosLiberacionParcial
+      : [];
+  }
+
+  if (alerta.tipo === "grupo_saldo_a_favor") {
+    titulo = "Personas con posible saldo a favor";
+    rows = Array.isArray(alerta.pasajerosSaldoFavor)
+      ? alerta.pasajerosSaldoFavor
+      : [];
+  }
+
+  if (!titulo) return "";
+
+  if (!rows.length) {
+    return `
+      <div class="home-empty">
+        No hay detalle de personas guardado para esta alerta.
+      </div>
+    `;
+  }
+
+  return `
+    <div style="margin-top:14px;">
+      <strong style="display:block; margin-bottom:8px;">
+        ${escapeHtml(titulo)}
+      </strong>
+
+      <div style="overflow:auto; border:1px solid rgba(49,25,75,.10); border-radius:14px;">
+        <table style="width:100%; border-collapse:collapse; font-size:12px;">
+          <thead style="background:#f7f3fb; color:#32184f;">
+            <tr>
+              <th style="padding:8px; text-align:right;">#</th>
+              <th style="padding:8px; text-align:left;">Participante</th>
+              <th style="padding:8px; text-align:left;">Responsable / contacto</th>
+              <th style="padding:8px; text-align:right;">Total persona</th>
+              <th style="padding:8px; text-align:right;">Total grupo</th>
+              <th style="padding:8px; text-align:right;">Pagado</th>
+              <th style="padding:8px; text-align:right;">Saldo</th>
+              <th style="padding:8px; text-align:right;">Diferencia</th>
+              <th style="padding:8px; text-align:right;">Saldo favor</th>
+            </tr>
+          </thead>
+
+          <tbody>
+            ${rows.map((p, idx) => `
+              <tr style="border-top:1px solid rgba(49,25,75,.08);">
+                <td style="padding:8px; text-align:right; font-weight:900;">
+                  ${idx + 1}
+                </td>
+
+                <td style="padding:8px;">
+                  <strong>${escapeHtml(p.participante || "-")}</strong><br>
+                  <span style="color:#766b84;">${escapeHtml(p.rut || "")}</span>
+                </td>
+
+                <td style="padding:8px;">
+                  <strong>${escapeHtml(p.responsable || "-")}</strong><br>
+                  <span style="color:#766b84;">${escapeHtml(p.correoResponsable || "-")}</span><br>
+                  <span style="color:#766b84;">${escapeHtml(p.telefonoResponsable || "-")}</span>
+                </td>
+
+                <td style="padding:8px; text-align:right;">
+                  ${escapeHtml(formatoMontoPago(p.totalDebe || 0, alerta.moneda))}
+                </td>
+
+                <td style="padding:8px; text-align:right;">
+                  ${escapeHtml(formatoMontoPago(p.totalReferenciaGrupo || 0, alerta.moneda))}
+                </td>
+
+                <td style="padding:8px; text-align:right;">
+                  ${escapeHtml(formatoMontoPago(p.totalPagado || 0, alerta.moneda))}
+                </td>
+
+                <td style="padding:8px; text-align:right; font-weight:900;">
+                  ${escapeHtml(formatoMontoPago(p.saldoPendiente || 0, alerta.moneda))}
+                </td>
+
+                <td style="padding:8px; text-align:right;">
+                  ${escapeHtml(formatoMontoPago(p.diferenciaValorPrograma || 0, alerta.moneda))}
+                </td>
+
+                <td style="padding:8px; text-align:right; font-weight:900;">
+                  ${escapeHtml(formatoMontoPago(p.saldoFavorEstimado || 0, alerta.moneda))}
+                </td>
+              </tr>
+            `).join("")}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
+}
+
 function renderAlertaPagoCard(alerta = {}) {
   const esPersona = alerta.categoriaAlerta === "persona";
   const idGrupo = String(alerta.idGrupo || "").trim();
@@ -2059,80 +2159,82 @@ function renderAlertaPagoCard(alerta = {}) {
             (${escapeHtml(Number(alerta.porcentajeGrupoSinPago60 || 0).toFixed(1))}%)
           </div>
         
-          <div style="margin-top:14px;">
-            <strong style="display:block; margin-bottom:8px;">Personas con deuda del grupo</strong>
-        
-            ${Array.isArray(alerta.pasajerosConDeudaGrupo) && alerta.pasajerosConDeudaGrupo.length ? `
-              <div style="overflow:auto; border:1px solid rgba(49,25,75,.10); border-radius:14px;">
-                <table style="width:100%; border-collapse:collapse; font-size:12px;">
-                  <thead style="background:#f7f3fb; color:#32184f;">
-                    <tr>
-                      <th style="padding:8px; text-align:right;">#</th>
-                      <th style="padding:8px; text-align:left;">Participante</th>
-                      <th style="padding:8px; text-align:left;">Responsable / contacto</th>
-                      <th style="padding:8px; text-align:right;">Pagado</th>
-                      <th style="padding:8px; text-align:right;">Saldo</th>
-                      <th style="padding:8px; text-align:left;">Último pago</th>
-                      <th style="padding:8px; text-align:right;">Días</th>
-                      <th style="padding:8px; text-align:center;">Gestión</th>
-                    </tr>
-                  </thead>
-        
-                  <tbody>
-                    ${alerta.pasajerosConDeudaGrupo.map((p, idx) => `
-                      <tr style="border-top:1px solid rgba(49,25,75,.08);">
-                        <td style="padding:8px; text-align:right; font-weight:900;">
-                          ${idx + 1}
-                        </td>
-                    
-                        <td style="padding:8px;">
-                          <strong>${escapeHtml(p.participante || "-")}</strong><br>
-                          <span style="color:#766b84;">${escapeHtml(p.rut || "")}</span>
-                        </td>
-                    
-                        <td style="padding:8px;">
-                          <strong>${escapeHtml(p.responsable || "-")}</strong><br>
-                          <span style="color:#766b84;">${escapeHtml(p.correoResponsable || "-")}</span><br>
-                          <span style="color:#766b84;">${escapeHtml(p.telefonoResponsable || "-")}</span>
-                        </td>
-                    
-                        <td style="padding:8px; text-align:right;">
-                          ${escapeHtml(formatoMontoPago(p.totalPagado || 0, alerta.moneda))}
-                        </td>
-                    
-                        <td style="padding:8px; text-align:right; font-weight:900;">
-                          ${escapeHtml(formatoMontoPago(p.saldoPendiente || 0, alerta.moneda))}
-                        </td>
-                    
-                        <td style="padding:8px;">
-                          ${escapeHtml(p.ultimoPagoFecha || "-")}
-                        </td>
-                    
-                        <td style="padding:8px; text-align:right;">
-                          ${escapeHtml(p.diasUltimoPago ?? "-")}
-                        </td>
-                    
-                        <td style="padding:8px; text-align:center;">
-                          <button
-                            type="button"
-                            class="home-btn"
-                            data-open-persona-grupo="${escapeHtml(alerta.id)}"
-                            data-persona-index="${idx}"
-                            style="padding:6px 10px; font-size:11px;"
-                          >
-                            Ver gestión
-                          </button>
-                        </td>
-                      </tr>
-                    `).join("")}
-                  </tbody>
-                </table>
+          ${["grupo_liberados_parciales", "grupo_saldo_a_favor"].includes(alerta.tipo)
+            ? renderTablaCasosEspecialesPago(alerta)
+            : `
+              <div style="margin-top:14px;">
+                <strong style="display:block; margin-bottom:8px;">Personas con deuda del grupo</strong>
+          
+                ${Array.isArray(alerta.pasajerosConDeudaGrupo) && alerta.pasajerosConDeudaGrupo.length ? `
+                  <div style="overflow:auto; border:1px solid rgba(49,25,75,.10); border-radius:14px;">
+                    <table style="width:100%; border-collapse:collapse; font-size:12px;">
+                      <thead style="background:#f7f3fb; color:#32184f;">
+                        <tr>
+                          <th style="padding:8px; text-align:right;">#</th>
+                          <th style="padding:8px; text-align:left;">Participante</th>
+                          <th style="padding:8px; text-align:left;">Responsable / contacto</th>
+                          <th style="padding:8px; text-align:right;">Pagado</th>
+                          <th style="padding:8px; text-align:right;">Saldo</th>
+                          <th style="padding:8px; text-align:left;">Último pago</th>
+                          <th style="padding:8px; text-align:right;">Días</th>
+                          <th style="padding:8px; text-align:center;">Gestión</th>
+                        </tr>
+                      </thead>
+          
+                      <tbody>
+                        ${alerta.pasajerosConDeudaGrupo.map((p, idx) => `
+                          <tr style="border-top:1px solid rgba(49,25,75,.08);">
+                            <td style="padding:8px; text-align:right; font-weight:900;">${idx + 1}</td>
+          
+                            <td style="padding:8px;">
+                              <strong>${escapeHtml(p.participante || "-")}</strong><br>
+                              <span style="color:#766b84;">${escapeHtml(p.rut || "")}</span>
+                            </td>
+          
+                            <td style="padding:8px;">
+                              <strong>${escapeHtml(p.responsable || "-")}</strong><br>
+                              <span style="color:#766b84;">${escapeHtml(p.correoResponsable || "-")}</span><br>
+                              <span style="color:#766b84;">${escapeHtml(p.telefonoResponsable || "-")}</span>
+                            </td>
+          
+                            <td style="padding:8px; text-align:right;">
+                              ${escapeHtml(formatoMontoPago(p.totalPagado || 0, alerta.moneda))}
+                            </td>
+          
+                            <td style="padding:8px; text-align:right; font-weight:900;">
+                              ${escapeHtml(formatoMontoPago(p.saldoPendiente || 0, alerta.moneda))}
+                            </td>
+          
+                            <td style="padding:8px;">
+                              ${escapeHtml(p.ultimoPagoFecha || "-")}
+                            </td>
+          
+                            <td style="padding:8px; text-align:right;">
+                              ${escapeHtml(p.diasUltimoPago ?? "-")}
+                            </td>
+          
+                            <td style="padding:8px; text-align:center;">
+                              <button
+                                type="button"
+                                class="home-btn"
+                                data-open-persona-grupo="${escapeHtml(alerta.id)}"
+                                data-persona-index="${idx}"
+                                style="padding:6px 10px; font-size:11px;"
+                              >
+                                Ver gestión
+                              </button>
+                            </td>
+                          </tr>
+                        `).join("")}
+                      </tbody>
+                    </table>
+                  </div>
+                ` : `
+                  <div class="home-empty">No hay detalle de personas con deuda guardado para esta alerta.</div>
+                `}
               </div>
-            ` : `
-              <div class="home-empty">No hay detalle de personas con deuda guardado para esta alerta.</div>
-            `}
-          </div>
-        `}
+            `
+          }
       </div>
 
       <div style="display:flex; flex-direction:column; gap:8px;">
