@@ -1722,7 +1722,10 @@ function getTiposAlertasPagosUI() {
 
     { tipo: "grupo_debe_mas_50", label: "Grupo debe >50%" },
     { tipo: "grupo_10_mas_atrasados_2_cuotas", label: "10+ con 2 cuotas" },
-    { tipo: "grupo_no_va_al_dia", label: "Grupo no va al día" }
+    { tipo: "grupo_no_va_al_dia", label: "Grupo no va al día" },
+
+    { tipo: "grupo_liberados_parciales", label: "Liberados parciales" },
+    { tipo: "grupo_saldo_a_favor", label: "Saldo a favor" }
   ];
 }
 
