@@ -4384,11 +4384,20 @@ async function marcarListaEsperaPagada(inscripcionId = "") {
 
     console.log("[INSCRIPCIONES] updateDoc lista espera pagada OK");
 
-    await sincronizarAlertaInscripcion({
-      ...item,
-      tipoInscripcion: "lista_espera_pagada",
-      estadoCupo: "pagado"
-    });
+    const alertaRef = doc(
+      db,
+      ALERTAS_INSCRIPCIONES_COLLECTION,
+      getDocIdAlertaInscripcion(item.id)
+    );
+    
+    await setDoc(alertaRef, {
+      activa: false,
+      resuelta: true,
+      resueltaAt: serverTimestamp(),
+      resueltaPor: getDisplayName(state.effectiveUser),
+      resueltaPorCorreo: state.effectiveEmail,
+      actualizadoAt: serverTimestamp()
+    }, { merge: true });
 
     await createHistoryEntry({
       tipoMovimiento: "inscripcion_lista_espera_pagada",
@@ -4455,11 +4464,20 @@ async function confirmarCupoListaEspera(inscripcionId = "") {
     confirmadoCupoAt: serverTimestamp()
   });
 
-  await sincronizarAlertaInscripcion({
-    ...item,
-    tipoInscripcion: "lista_espera_confirmada",
-    estadoCupo: "confirmado"
-  });
+  const alertaRef = doc(
+    db,
+    ALERTAS_INSCRIPCIONES_COLLECTION,
+    getDocIdAlertaInscripcion(item.id)
+  );
+  
+  await setDoc(alertaRef, {
+    activa: false,
+    resuelta: true,
+    resueltaAt: serverTimestamp(),
+    resueltaPor: getDisplayName(state.effectiveUser),
+    resueltaPorCorreo: state.effectiveEmail,
+    actualizadoAt: serverTimestamp()
+  }, { merge: true });
 
   await createHistoryEntry({
     tipoMovimiento: "inscripcion_lista_espera_confirmada",
