@@ -2576,7 +2576,7 @@ function descargarFichaInscripcionPdf(inscripcionId = "") {
     </html>
   `;
 
-  const win = window.open("", "_blank", "noopener,noreferrer");
+  const win = window.open("", "_blank");
 
   if (!win) {
     alert("El navegador bloqueó la ventana emergente. Permite pop-ups para generar el PDF.");
