@@ -61,6 +61,10 @@ const state = {
   rowsById: new Map(),
   alertRows: [],
   solicitudesRows: [],
+  inscripcionesRows: [],
+  inscripcionNuevoIngresoRows: [],
+  inscripcionListaEsperaRows: [],
+  listaEsperaPagadaRows: [],
   alertasPagosRows: [],
   alertasPagosCargadas: false,
   alertasPagosUltimaActualizacion: null,
@@ -552,6 +556,9 @@ function syncAlertRowsByRole(effectiveUser = null) {
   setAlertRowVisibleByChild("link-alertas-warning", !!user);
   setAlertRowVisibleByChild("link-alertas-pagos", !!user);
   setAlertRowVisibleByChild("link-reunion-3dias", !!user);
+  setAlertRowVisibleByChild("link-inscripcion-nuevo-ingreso", !!user);
+  setAlertRowVisibleByChild("link-inscripcion-lista-espera", !!user);
+  setAlertRowVisibleByChild("link-lista-espera-pagada", !!user);
 }
 
 function setAlertRowVisibleByChild(childId, visible = true) {
@@ -905,6 +912,8 @@ async function loadHomeData() {
   state.rowsById = new Map(
     state.rows.map((row) => [getRowId(row), row])
   );
+  
+  state.inscripcionesRows = await cargarInscripcionesHome(state.rows);
 
   state.alertRows = alertsSnap.docs.map((docSnap) => ({
     id: docSnap.id,
@@ -979,6 +988,223 @@ function renderInfoAlertasPagosHome() {
   el.textContent = state.alertasPagosUltimaActualizacion
     ? `Última actualización: ${formatDate(state.alertasPagosUltimaActualizacion)}`
     : "Última actualización: sin registro";
+}
+
+async function cargarInscripcionesHome(rows = []) {
+  const resultados = [];
+
+  for (const row of rows) {
+    const idGrupo = getRowId(row);
+    if (!idGrupo) continue;
+
+    try {
+      const snap = await getDocs(
+        collection(db, "ventas_cotizaciones", String(idGrupo), "inscripciones")
+      );
+
+      snap.docs.forEach((docSnap) => {
+        const data = docSnap.data() || {};
+        const privacidadEstado = normalizeLoose(data?.privacidad?.estado || "");
+
+        if (privacidadEstado === "eliminada_logica" || privacidadEstado === "archivada") {
+          return;
+        }
+
+        resultados.push({
+          id: docSnap.id,
+          inscripcionId: docSnap.id,
+          idGrupo,
+          _groupRow: row,
+          ...data
+        });
+      });
+    } catch (error) {
+      console.warn("[home] No se pudieron cargar inscripciones del grupo", idGrupo, error);
+    }
+  }
+
+  return resultados;
+}
+
+function getInscripcionTipoHome(item = {}) {
+  const raw = String(
+    item.tipoInscripcion ||
+    item.estadoInscripcion ||
+    item.faseInscripcion ||
+    ""
+  ).trim();
+
+  const key = normalizeLoose(raw).replace(/\s+/g, "_");
+
+  if (key === "inscripcion_inicial") return "nomina_inicial";
+  if (key === "nomina_inicial") return "nomina_inicial";
+  if (key === "nomina_final") return "nomina_final";
+  if (key === "sistema_de_pagos") return "sistema_pagos";
+  if (key === "sistema_pagos") return "sistema_pagos";
+  if (key === "nuevo_ingreso") return "nuevo_ingreso";
+  if (key === "nuevo_ingreso_confirmado") return "nuevo_ingreso_confirmado";
+  if (key === "lista_espera") return "lista_espera";
+  if (key === "lista_espera_pagada") return "lista_espera_pagada";
+  if (key === "lista_espera_confirmada") return "lista_espera_confirmada";
+  if (key === "liberado" || key === "cupo_liberado") return "liberado";
+
+  return key;
+}
+
+function getInscripcionEstadoCupoHome(item = {}) {
+  return normalizeLoose(item.estadoCupo || "");
+}
+
+function esInscripcionNuevoIngresoPendiente(item = {}) {
+  const tipo = getInscripcionTipoHome(item);
+  const estadoCupo = getInscripcionEstadoCupoHome(item);
+
+  return tipo === "nuevo_ingreso" && estadoCupo !== "confirmado";
+}
+
+function esInscripcionListaEsperaPendiente(item = {}) {
+  const tipo = getInscripcionTipoHome(item);
+  const estadoCupo = getInscripcionEstadoCupoHome(item);
+
+  return (
+    tipo === "lista_espera" &&
+    estadoCupo !== "pagado" &&
+    estadoCupo !== "confirmado"
+  );
+}
+
+function esListaEsperaPagadaPendienteConfirmar(item = {}) {
+  const tipo = getInscripcionTipoHome(item);
+  const estadoCupo = getInscripcionEstadoCupoHome(item);
+
+  return (
+    tipo === "lista_espera_pagada" ||
+    (tipo === "lista_espera" && estadoCupo === "pagado")
+  );
+}
+
+function getByPathHome(obj = {}, path = "") {
+  return String(path || "")
+    .split(".")
+    .reduce((acc, key) => acc?.[key], obj);
+}
+
+function getInscripcionNombreHome(item = {}) {
+  const nombres =
+    getByPathHome(item, "identificacion.nombres") ||
+    getByPathHome(item, "identificacion.nombre") ||
+    "";
+
+  const apellido1 =
+    getByPathHome(item, "identificacion.primerApellido") ||
+    "";
+
+  const apellido2 =
+    getByPathHome(item, "identificacion.segundoApellido") ||
+    "";
+
+  return [nombres, apellido1, apellido2].filter(Boolean).join(" ").trim() || "Sin nombre";
+}
+
+function getInscripcionResponsableHome(item = {}) {
+  const directo =
+    getByPathHome(item, "contactoPrincipal.nombre") ||
+    getByPathHome(item, "contactoPrincipal.nombreCompleto") ||
+    "";
+
+  if (directo) return directo;
+
+  const nombres = getByPathHome(item, "contactoPrincipal.nombres") || "";
+  const apellido1 = getByPathHome(item, "contactoPrincipal.primerApellido") || "";
+  const apellido2 = getByPathHome(item, "contactoPrincipal.segundoApellido") || "";
+
+  return [nombres, apellido1, apellido2].filter(Boolean).join(" ").trim() || "Sin responsable";
+}
+
+function getInscripcionCorreoHome(item = {}) {
+  return String(
+    getByPathHome(item, "contactoPrincipal.correo") ||
+    getByPathHome(item, "identificacion.correoViajante") ||
+    ""
+  ).trim();
+}
+
+function getInscripcionTelefonoHome(item = {}) {
+  return String(
+    getByPathHome(item, "contactoPrincipal.celular") ||
+    getByPathHome(item, "contactoPrincipal.telefono") ||
+    getByPathHome(item, "contactoPrincipal.whatsapp") ||
+    ""
+  ).trim();
+}
+
+function getInscripcionFechaHome(item = {}) {
+  return (
+    item?.meta?.fechaInscripcion ||
+    item?.meta?.fechaFormularioCliente ||
+    item?.fechaInscripcion ||
+    item?.fechaFormularioCliente ||
+    item?.creadoEn ||
+    item?.createdAt ||
+    item?.fechaCreacion ||
+    ""
+  );
+}
+
+function sortInscripcionesHome(rows = []) {
+  return [...rows].sort((a, b) => {
+    const grupoA = getAliasColegioSortKey(getRowAlias(a._groupRow || {}));
+    const grupoB = getAliasColegioSortKey(getRowAlias(b._groupRow || {}));
+
+    const byGrupo = grupoA.localeCompare(grupoB, "es", {
+      sensitivity: "base",
+      numeric: true
+    });
+
+    if (byGrupo !== 0) return byGrupo;
+
+    const fechaA = timestampLikeToDate(getInscripcionFechaHome(a))?.getTime() || 0;
+    const fechaB = timestampLikeToDate(getInscripcionFechaHome(b))?.getTime() || 0;
+
+    return fechaB - fechaA;
+  });
+}
+
+function renderInscripcionesHomeCards(rows = []) {
+  if (!rows.length) return emptyHtml("No hay inscripciones para mostrar.");
+
+  return rows.map((item) => {
+    const groupRow = item._groupRow || {};
+    const idGrupo = String(item.idGrupo || getRowId(groupRow) || "").trim();
+
+    return `
+      <div class="home-card-row">
+        <div style="min-width:0;">
+          <div class="home-card-row-title">${escapeHtml(getInscripcionNombreHome(item))}</div>
+
+          <div class="home-card-row-text">
+            Grupo: ${escapeHtml(getRowAlias(groupRow))}<br>
+            Año: ${escapeHtml(groupRow.anoViaje || "Sin año")} · Curso: ${escapeHtml(groupRow.curso || "Sin curso")}<br>
+            Vendedor(a): ${escapeHtml(getRowVendorName(groupRow) || groupRow.vendedoraCorreo || "Sin vendedor")}<br>
+            Responsable: ${escapeHtml(getInscripcionResponsableHome(item))}<br>
+            Correo: ${escapeHtml(getInscripcionCorreoHome(item) || "Sin correo")}<br>
+            Teléfono: ${escapeHtml(getInscripcionTelefonoHome(item) || "Sin teléfono")}<br>
+            Fecha formulario: ${escapeHtml(formatDate(getInscripcionFechaHome(item)))}<br>
+            Estado cupo: ${escapeHtml(item.estadoCupo || "Sin estado")}
+          </div>
+        </div>
+
+        <a
+          href="grupo.html?id=${encodeURIComponent(idGrupo)}"
+          target="_blank"
+          rel="noopener"
+          class="home-btn"
+        >
+          Abrir grupo
+        </a>
+      </div>
+    `;
+  }).join("");
 }
 
 /* =========================================================
@@ -1132,6 +1358,25 @@ function renderHome() {
   
   state.reuniones3DiasRows = sortRowsByAlias(scopedRows.filter(isReunionEnProximosTresDias));
 
+  const scopedIdsInscripciones = new Set(
+    scopedRows.map((row) => getRowId(row)).filter(Boolean)
+  );
+
+  const inscripcionesScope = (state.inscripcionesRows || [])
+    .filter((item) => scopedIdsInscripciones.has(String(item.idGrupo || "").trim()));
+
+  state.inscripcionNuevoIngresoRows = sortInscripcionesHome(
+    inscripcionesScope.filter(esInscripcionNuevoIngresoPendiente)
+  );
+
+  state.inscripcionListaEsperaRows = sortInscripcionesHome(
+    inscripcionesScope.filter(esInscripcionListaEsperaPendiente)
+  );
+
+  state.listaEsperaPagadaRows = sortInscripcionesHome(
+    inscripcionesScope.filter(esListaEsperaPagadaPendienteConfirmar)
+  );
+
   setText("count-sin-asignar", state.sinAsignarRows.length);
   setText("count-a-contactar", state.aContactarRows.length);
   setText("count-fichas-firmar", state.fichasPorFirmarRows.length);
@@ -1143,6 +1388,9 @@ function renderHome() {
   setText("count-alertas-criticas", state.alertasCriticasRows.length);
   setText("count-alertas-warning", state.alertasWarningRows.length);
   setText("count-reunion-3dias", state.reuniones3DiasRows.length);
+  setText("count-inscripcion-nuevo-ingreso", state.inscripcionNuevoIngresoRows.length);
+  setText("count-inscripcion-lista-espera", state.inscripcionListaEsperaRows.length);
+  setText("count-lista-espera-pagada", state.listaEsperaPagadaRows.length);
   
   renderInfoAlertasPagosHome();
   syncAlertRowsByRole(effectiveUser);
@@ -3293,6 +3541,9 @@ function bindAlertButtons() {
   const linkAlertasPagos = $("link-alertas-pagos");
   const btnHomeActualizarAlertasPagos = $("btn-home-actualizar-alertas-pagos");
   const linkReuniones = $("link-reunion-3dias");
+  const linkInscripcionNuevoIngreso = $("link-inscripcion-nuevo-ingreso");
+  const linkInscripcionListaEspera = $("link-inscripcion-lista-espera");
+  const linkListaEsperaPagada = $("link-lista-espera-pagada");
   const selectAnoFichas = $("select-home-ano-fichas");
 
   // AGREGAR: permite abrir/cerrar el motivo completo de corrección
@@ -3498,6 +3749,54 @@ function bindAlertButtons() {
   
       btnHomeActualizarAlertasPagos.disabled = false;
       btnHomeActualizarAlertasPagos.textContent = "Actualizar";
+    });
+  }
+
+  if (linkInscripcionNuevoIngreso && !linkInscripcionNuevoIngreso.dataset.bound) {
+    linkInscripcionNuevoIngreso.dataset.bound = "1";
+
+    linkInscripcionNuevoIngreso.addEventListener("click", (e) => {
+      e.preventDefault();
+
+      openListadoModal({
+        titulo: "Inscripción Nuevo Ingreso",
+        subtitulo: "Formularios de nuevo ingreso pendientes de confirmación.",
+        resumen: `Hay ${state.inscripcionNuevoIngresoRows.length} nuevo(s) ingreso(s) pendiente(s).`,
+        rows: state.inscripcionNuevoIngresoRows,
+        renderFn: renderInscripcionesHomeCards
+      });
+    });
+  }
+
+  if (linkInscripcionListaEspera && !linkInscripcionListaEspera.dataset.bound) {
+    linkInscripcionListaEspera.dataset.bound = "1";
+
+    linkInscripcionListaEspera.addEventListener("click", (e) => {
+      e.preventDefault();
+
+      openListadoModal({
+        titulo: "Inscripción Lista de Espera",
+        subtitulo: "Formularios de lista de espera pendientes de pago.",
+        resumen: `Hay ${state.inscripcionListaEsperaRows.length} lista(s) de espera pendiente(s).`,
+        rows: state.inscripcionListaEsperaRows,
+        renderFn: renderInscripcionesHomeCards
+      });
+    });
+  }
+
+  if (linkListaEsperaPagada && !linkListaEsperaPagada.dataset.bound) {
+    linkListaEsperaPagada.dataset.bound = "1";
+
+    linkListaEsperaPagada.addEventListener("click", (e) => {
+      e.preventDefault();
+
+      openListadoModal({
+        titulo: "Lista de Espera pendiente por confirmar",
+        subtitulo: "Listas de espera pagadas, pendientes de confirmar cupo.",
+        resumen: `Hay ${state.listaEsperaPagadaRows.length} lista(s) de espera pagada(s) pendiente(s) de confirmar.`,
+        rows: state.listaEsperaPagadaRows,
+        renderFn: renderInscripcionesHomeCards
+      });
     });
   }
 
