@@ -4741,6 +4741,101 @@ async function reenviarCorreoInscripcionCliente(inscripcionId = "", nuevoCorreoR
   showSaveNotice("Correo actualizado y reenvío generado correctamente.");
 }
 
+window.borrarInscripcionesGrupo = async function ({ rut = "", confirmar = false } = {}) {
+  if (!canEditarNominaInscripcion()) {
+    console.error("No tienes permisos para borrar inscripciones.");
+    return;
+  }
+
+  if (!confirmar) {
+    console.warn("Debes ejecutar con confirmar:true");
+    console.warn("Ejemplo borrar por RUT:");
+    console.warn(`await borrarInscripcionesGrupo({ rut: "10121006-5", confirmar: true })`);
+    console.warn("Ejemplo borrar TODOS:");
+    console.warn(`await borrarInscripcionesGrupo({ confirmar: true })`);
+    return;
+  }
+
+  const rutBuscado = normalizeSearchLocal(rut || "").replace(/\./g, "").replace(/-/g, "");
+
+  const candidatos = state.inscripciones.filter((item) => {
+    if (!rutBuscado) return true;
+
+    const docu = normalizeSearchLocal(getInscripcionDocumento(item))
+      .replace(/\./g, "")
+      .replace(/-/g, "");
+
+    return docu.includes(rutBuscado);
+  });
+
+  if (!candidatos.length) {
+    console.warn("No encontré inscripciones para borrar.", { rut });
+    return;
+  }
+
+  console.table(candidatos.map((item) => ({
+    id: item.id,
+    documento: getInscripcionDocumento(item),
+    nombre: buildNombreCompletoInscripcion(item),
+    tipo: getEstadoOperativoInscripcionLabel(item)
+  })));
+
+  const ok = confirm(
+    rutBuscado
+      ? `¿Borrar ${candidatos.length} inscripción(es) asociadas al RUT ${rut}?`
+      : `¿Borrar TODAS las inscripciones visibles de este grupo? Total: ${candidatos.length}`
+  );
+
+  if (!ok) return;
+
+  for (const item of candidatos) {
+    const ref = doc(
+      db,
+      "ventas_cotizaciones",
+      String(state.groupDocId),
+      "inscripciones",
+      String(item.id)
+    );
+
+    console.log("Borrando inscripción:", {
+      id: item.id,
+      documento: getInscripcionDocumento(item),
+      nombre: buildNombreCompletoInscripcion(item)
+    });
+
+    await deleteDoc(ref);
+
+    await sincronizarAlertaInscripcion({
+      ...item,
+      tipoInscripcion: "borrada",
+      estadoCupo: "borrada"
+    });
+  }
+
+  await createHistoryEntry({
+    tipoMovimiento: rutBuscado ? "inscripcion_borrada_por_rut" : "inscripciones_borradas_masivo",
+    modulo: "inscripcion",
+    titulo: rutBuscado ? "Inscripción borrada por RUT" : "Inscripciones borradas masivamente",
+    mensaje: `${getDisplayName(state.effectiveUser)} borró ${candidatos.length} inscripción(es) del grupo.`,
+    metadata: {
+      rutBuscado: rut || "",
+      totalBorradas: candidatos.length,
+      inscripciones: candidatos.map((item) => ({
+        id: item.id,
+        documento: getInscripcionDocumento(item),
+        nombre: buildNombreCompletoInscripcion(item),
+        tipo: getEstadoOperativoInscripcionLabel(item)
+      }))
+    }
+  });
+
+  await loadInscripciones();
+  renderInscripcionPasajerosPanel();
+  syncButtons();
+
+  console.log(`Listo. Borradas ${candidatos.length} inscripción(es).`);
+};
+
 window.reenviarCorreoTransferenciaListaEspera = async function ({ rut = "", inscripcionId = "" } = {}) {
   const textoRut = normalizeSearchLocal(rut || "");
   const textoId = cleanText(inscripcionId || "");
