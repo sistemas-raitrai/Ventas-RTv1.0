@@ -2440,6 +2440,20 @@ function getNombreGrupoPdf() {
   );
 }
 
+function getTituloGrupoPdf() {
+  const colegio = normalizeTextUpper(state.group?.colegio || "");
+  const cursoViaje =
+    normalizeCursoInput(state.group?.cursoViaje || "") ||
+    normalizeCursoInput(state.group?.curso || "");
+
+  const anoViaje = cleanText(state.group?.anoViaje || "");
+
+  return [
+    cursoViaje,
+    colegio
+  ].filter(Boolean).join(" ") + (anoViaje ? ` - AÑO ${anoViaje}` : "");
+}
+
 function getEncargadosGrupoPdf() {
   const contactos = [];
 
@@ -2600,6 +2614,7 @@ async function generarFichaInscripcionPdfFinal(inscripcionId = "", recortes = {}
   win.document.close();
 
   const grupo = getNombreGrupoPdf();
+  const grupoTitulo = getTituloGrupoPdf() || grupo;
   const encargados = getEncargadosGrupoPdf();
 
   const tipoInscripcionTitulo = getEstadoOperativoInscripcionLabel(item);
@@ -2612,8 +2627,9 @@ async function generarFichaInscripcionPdfFinal(inscripcionId = "", recortes = {}
   const comprobantePagoUrl = recortes.comprobantePago || await resolveArchivoEspecialUrl(item, "comprobantePago");
 
   const filasGrupo = [
-    ["Grupo", grupo],
-    ["ID grupo / Nº negocio", `${String(state.groupId || "—")} / ${numeroNegocio}`],
+    ["Grupo", grupoTitulo],
+    ["N° negocio", numeroNegocio],
+    ["ID grupo", String(state.groupId || "—")],
     ["Colegio", normalizeTextUpper(state.group?.colegio || "—")],
     ["Curso", normalizeTextUpper(state.group?.curso || "—")],
     ["Año viaje", cleanText(state.group?.anoViaje || "—")],
@@ -2809,7 +2825,7 @@ async function generarFichaInscripcionPdfFinal(inscripcionId = "", recortes = {}
 
           <div class="group-name-box">
             <div class="group-label">Grupo</div>
-            <div class="group-name">${escapeHtml(grupo)}</div>
+            <div class="group-name">${escapeHtml(grupoTitulo)}</div>
           </div>
         </div>
 
