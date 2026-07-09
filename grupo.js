@@ -4741,6 +4741,146 @@ async function reenviarCorreoInscripcionCliente(inscripcionId = "", nuevoCorreoR
   showSaveNotice("Correo actualizado y reenvío generado correctamente.");
 }
 
+window.archivarInscripcionesGrupo = async function ({ rut = "", confirmar = false, motivo = "" } = {}) {
+  if (!canEditarNominaInscripcion()) {
+    console.error("No tienes permisos para archivar inscripciones.");
+    return;
+  }
+
+  if (!confirmar) {
+    console.warn("Debes ejecutar con confirmar:true");
+    console.warn("Ejemplo archivar por RUT:");
+    console.warn(`await archivarInscripcionesGrupo({ rut: "10121006-5", motivo: "prueba", confirmar: true })`);
+    console.warn("Ejemplo archivar TODOS:");
+    console.warn(`await archivarInscripcionesGrupo({ motivo: "limpieza nómina", confirmar: true })`);
+    return;
+  }
+
+  const rutBuscado = normalizeSearchLocal(rut || "").replace(/\./g, "").replace(/-/g, "");
+
+  const candidatos = state.inscripciones.filter((item) => {
+    if (!rutBuscado) return true;
+
+    const docu = normalizeSearchLocal(getInscripcionDocumento(item))
+      .replace(/\./g, "")
+      .replace(/-/g, "");
+
+    return docu.includes(rutBuscado);
+  });
+
+  if (!candidatos.length) {
+    console.warn("No encontré inscripciones para archivar.", { rut });
+    return;
+  }
+
+  console.table(candidatos.map((item) => ({
+    id: item.id,
+    documento: getInscripcionDocumento(item),
+    nombre: buildNombreCompletoInscripcion(item),
+    tipo: getEstadoOperativoInscripcionLabel(item)
+  })));
+
+  const ok = confirm(
+    rutBuscado
+      ? `¿Archivar ${candidatos.length} inscripción(es) asociadas al RUT ${rut}?`
+      : `¿Archivar TODAS las inscripciones visibles de este grupo? Total: ${candidatos.length}`
+  );
+
+  if (!ok) return;
+
+  const archivoId = `archivo_manual_${state.groupId}_${Date.now()}`;
+
+  const archivoRef = doc(
+    db,
+    "ventas_cotizaciones",
+    String(state.groupDocId),
+    "inscripciones_archivadas",
+    archivoId
+  );
+
+  await setDoc(archivoRef, {
+    archivoId,
+    tipoArchivo: rutBuscado ? "archivo_manual_por_rut" : "archivo_manual_masivo",
+    idGrupo: String(state.groupId || ""),
+    groupDocId: String(state.groupDocId || ""),
+    rutBuscado: rut || "",
+    motivo: motivo || "Archivo manual desde consola",
+
+    totalInscritos: candidatos.length,
+
+    creadoPor: getDisplayName(state.effectiveUser),
+    creadoPorCorreo: state.effectiveEmail,
+    creadoAt: serverTimestamp(),
+
+    inscripciones: candidatos.map((item) => ({
+      id: item.id,
+      documento: getInscripcionDocumento(item),
+      nombre: buildNombreCompletoInscripcion(item),
+      tipo: getEstadoOperativoInscripcionLabel(item),
+      data: item
+    }))
+  });
+
+  for (const item of candidatos) {
+    const inscRef = doc(
+      db,
+      "ventas_cotizaciones",
+      String(state.groupDocId),
+      "inscripciones",
+      String(item.id)
+    );
+
+    console.log("Archivando inscripción:", {
+      id: item.id,
+      documento: getInscripcionDocumento(item),
+      nombre: buildNombreCompletoInscripcion(item)
+    });
+
+    await updateDoc(inscRef, {
+      privacidad: {
+        ...(item.privacidad || {}),
+        estado: "archivada",
+        archivoId,
+        archivadaAt: serverTimestamp(),
+        archivadaPor: getDisplayName(state.effectiveUser),
+        archivadaPorCorreo: state.effectiveEmail,
+        motivoArchivo: motivo || "Archivo manual desde consola"
+      }
+    });
+
+    await sincronizarAlertaInscripcion({
+      ...item,
+      tipoInscripcion: "archivada",
+      estadoCupo: "archivada"
+    });
+  }
+
+  await createHistoryEntry({
+    tipoMovimiento: rutBuscado ? "inscripcion_archivada_por_rut" : "inscripciones_archivadas_masivo",
+    modulo: "inscripcion",
+    titulo: rutBuscado ? "Inscripción archivada por RUT" : "Inscripciones archivadas masivamente",
+    mensaje: `${getDisplayName(state.effectiveUser)} archivó ${candidatos.length} inscripción(es) del grupo.`,
+    metadata: {
+      archivoId,
+      rutBuscado: rut || "",
+      motivo: motivo || "Archivo manual desde consola",
+      totalArchivadas: candidatos.length,
+      inscripciones: candidatos.map((item) => ({
+        id: item.id,
+        documento: getInscripcionDocumento(item),
+        nombre: buildNombreCompletoInscripcion(item),
+        tipo: getEstadoOperativoInscripcionLabel(item)
+      }))
+    }
+  });
+
+  await loadInscripciones();
+  renderInscripcionPasajerosPanel();
+  syncButtons();
+
+  console.log(`Listo. Archivadas ${candidatos.length} inscripción(es). Archivo: ${archivoId}`);
+};
+
 window.borrarInscripcionesGrupo = async function ({ rut = "", confirmar = false } = {}) {
   if (!canEditarNominaInscripcion()) {
     console.error("No tienes permisos para borrar inscripciones.");
