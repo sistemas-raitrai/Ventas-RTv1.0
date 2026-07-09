@@ -1616,6 +1616,18 @@ function getFechaViajeOrdenAlertaPago(alerta = {}) {
   return fecha ? fecha.getTime() : Number.MAX_SAFE_INTEGER;
 }
 
+function formatFechaViajeAlertaPago(alerta = {}) {
+  const fecha = getFechaViajeConfirmadaOperacion(alerta.numeroNegocio);
+
+  if (!fecha) return "-";
+
+  return fecha.toLocaleDateString("es-CL", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric"
+  });
+}
+
 function getAlertasPagosForScope(scopedRows = []) {
   const scopedIds = new Set(scopedRows.map(getRowId).filter(Boolean));
   const scopedNumeros = new Set(scopedRows.map(getNumeroNegocio).filter(Boolean));
@@ -1644,7 +1656,12 @@ function buildAlertasPagosFiltrosHtml(rows = []) {
   ).entries()];
 
   const monedas = [...new Set(rows.map((r) => String(r.moneda || "").trim()).filter(Boolean))].sort();
-  const destinos = [...new Set(rows.map((r) => String(r.destino || "").trim()).filter(Boolean))].sort();
+  const destinos = [
+    "Chile",
+    "Argentina",
+    "Brasil",
+    "Otros"
+  ];
 
   const filtroControlStyle = `
     width:100%;
@@ -1828,6 +1845,7 @@ function getValorOrdenAlertaPago(row = {}, key = "") {
   if (key === "vendedor") return normalizeLoose(row.vendedor || "");
   if (key === "razon") return normalizeLoose(row.label || row.tipo || "");
   if (key === "pagado") return Number(row.totalPagado || 0);
+  if (key === "total") return Number(row.totalDebe || row.totalViajeGrupo || row.totalDebeGrupo || 0);
   if (key === "saldo") return Number(row.saldoPendiente || row.saldoPendienteGrupo || 0);
   if (key === "ultimoPago") {
     const d = timestampLikeToDate(row.ultimoPagoFecha);
@@ -1919,6 +1937,28 @@ function getGmailUrlAlertaPago(alerta = {}) {
   return `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(to)}&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
 }
 
+function getZonaDestinoPago(destino = "") {
+  const d = normalizeLoose(destino);
+
+  if (
+    d.includes("sur de chile y bariloche") ||
+    d.includes("norte de chile") ||
+    d.includes("sur de chile")
+  ) {
+    return "Chile";
+  }
+
+  if (d.includes("bariloche")) {
+    return "Argentina";
+  }
+
+  if (d.includes("camboriu") || d.includes("brasil")) {
+    return "Brasil";
+  }
+
+  return "Otros";
+}
+
 function filtrarAlertasPagosModal(rows = []) {
   const ano = $("filtro-alerta-pago-ano")?.value || "";
   const vendedor = $("filtro-alerta-pago-vendedor")?.value || "";
@@ -1932,16 +1972,15 @@ function filtrarAlertasPagosModal(rows = []) {
     if (ano && String(row.anoViaje || "") !== ano) return false;
     if (vendedor && normalizeEmail(row.vendedoraCorreo || "") !== vendedor) return false;
     if (moneda && String(row.moneda || "") !== moneda) return false;
-    if (destino && String(row.destino || "") !== destino) return false;
+    if (destino && getZonaDestinoPago(row.destino) !== destino) return false;
     if (prioridad && getPrioridadPagoKey(row) !== prioridad) return false;
 
     if (!tiposActivos.size) return false;
 
     // Pestaña "Todos"
-    if (
-      !tiposActivos.has("__todos__") &&
-      !tiposActivos.has(String(row.tipo || ""))
-    ) {
+    if (tiposActivos.has("__todos__")) {
+      if (row.categoriaAlerta !== "persona") return false;
+    } else if (!tiposActivos.has(String(row.tipo || ""))) {
       return false;
     }
 
@@ -1974,8 +2013,10 @@ function renderAlertasPagosListado(rows = []) {
             ${thOrdenAlertaPago("Participante / Grupo", "participante")}
             ${thOrdenAlertaPago("Grupo", "grupo")}
             ${thOrdenAlertaPago("Año", "ano")}
+            ${thOrdenAlertaPago("Fecha viaje", "fechaViaje")}
             ${thOrdenAlertaPago("Vendedor", "vendedor")}
             ${thOrdenAlertaPago("Razón", "razon")}
+            ${thOrdenAlertaPago("Total programa", "total", "right")}
             ${thOrdenAlertaPago("Pagado", "pagado", "right")}
             ${thOrdenAlertaPago("Saldo", "saldo", "right")}
             ${thOrdenAlertaPago("Último pago", "ultimoPago")}
@@ -2007,8 +2048,20 @@ function renderAlertasPagosListado(rows = []) {
                 </td>
 
                 <td style="padding:9px 10px;">${escapeHtml(alerta.anoViaje || "-")}</td>
+                
+                <td style="padding:9px 10px;">
+                  ${escapeHtml(formatFechaViajeAlertaPago(alerta))}
+                </td>
+                
                 <td style="padding:9px 10px;">${escapeHtml(alerta.vendedor || "Sin vendedor")}</td>
                 <td style="padding:9px 10px;">${escapeHtml(alerta.label || alerta.tipo || "-")}</td>
+                
+                <td style="padding:9px 10px; text-align:right;">
+                  ${escapeHtml(formatoMontoPago(
+                    esPersona ? (alerta.totalDebe || 0) : (alerta.totalViajeGrupo || alerta.totalDebeGrupo || alerta.totalDebe || 0),
+                    alerta.moneda
+                  ))}
+                </td>
 
                 <td style="padding:9px 10px; text-align:right;">
                   ${escapeHtml(formatoMontoPago(
@@ -2575,7 +2628,7 @@ async function abrirModalAlertasPagos() {
 
   openListadoModal({
     titulo: "Alertas de pagos",
-    subtitulo: "Alertas generadas desde el Sistema de Pagos, ordenadas por prioridad.",
+    subtitulo: "Alertas generadas desde el Sistema de Pagos, ordenadas por fecha de viaje confirmada.",
     resumen: `Hay ${state.alertasPagosFiltradasRows.length} alerta(s) de pagos.`,
     rows: state.alertasPagosFiltradasRows,
     renderFn: (rows) => buildAlertasPagosFiltrosHtml(rows)
