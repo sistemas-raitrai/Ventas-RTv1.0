@@ -2763,8 +2763,7 @@ async function descargarFichaInscripcionPdf(inscripcionId = "") {
 
       <body>
         <div class="top">
-          <div class="brand">Turismo Rai Trai</div>
-          <h1 class="doc-title">Ficha individual de inscripción</h1>
+          <div class="brand">Ficha de Inscripción</div>
 
           <div class="group-name-box">
             <div class="group-label">Grupo</div>
