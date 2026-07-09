@@ -2556,6 +2556,24 @@ async function descargarFichaInscripcionPdf(inscripcionId = "") {
   await generarFichaInscripcionPdfFinal(inscripcionId, {});
 }
 
+function getFechaCambioEstadoInscripcionPdf(item = {}) {
+  const tipo = normalizeSearchLocal(getInscripcionTipoReal(item));
+
+  if (tipo === "nuevo_ingreso_confirmado") {
+    return item.nuevoIngresoConfirmadoAt || item.confirmadoAt || "";
+  }
+
+  if (tipo === "lista_espera_pagada") {
+    return item.listaEsperaPagadaAt || "";
+  }
+
+  if (tipo === "lista_espera_confirmada") {
+    return item.confirmadoCupoAt || item.confirmadoAt || "";
+  }
+
+  return "";
+}
+
 async function generarFichaInscripcionPdfFinal(inscripcionId = "", recortes = {}) {
   const item = state.inscripciones.find((x) => String(x.id) === String(inscripcionId));
 
@@ -2584,13 +2602,18 @@ async function generarFichaInscripcionPdfFinal(inscripcionId = "", recortes = {}
   const grupo = getNombreGrupoPdf();
   const encargados = getEncargadosGrupoPdf();
 
+  const tipoInscripcionTitulo = getEstadoOperativoInscripcionLabel(item);
+  const fechaCreacionFormulario = formatFechaFormularioTabla(getFechaFormularioInscripcion(item));
+  const fechaCambioEstado = getFechaCambioEstadoInscripcionPdf(item);
+  const numeroNegocio = cleanText(state.group?.numeroNegocio || state.group?.ficha?.numeroNegocio || "—");
+
   const carnetFrenteUrl = recortes.carnetFrente || await resolveArchivoEspecialUrl(item, "carnetFrente");
   const carnetReversoUrl = recortes.carnetReverso || await resolveArchivoEspecialUrl(item, "carnetReverso");
   const comprobantePagoUrl = recortes.comprobantePago || await resolveArchivoEspecialUrl(item, "comprobantePago");
 
   const filasGrupo = [
     ["Grupo", grupo],
-    ["ID grupo", String(state.groupId || "—")],
+    ["ID grupo / Nº negocio", `${String(state.groupId || "—")} / ${numeroNegocio}`],
     ["Colegio", normalizeTextUpper(state.group?.colegio || "—")],
     ["Curso", normalizeTextUpper(state.group?.curso || "—")],
     ["Año viaje", cleanText(state.group?.anoViaje || "—")],
@@ -2605,8 +2628,9 @@ async function generarFichaInscripcionPdfFinal(inscripcionId = "", recortes = {}
     ["Tipo pasajero(a)", formatInscripcionValue(item.tipoViajante || item.tipoParticipacion || "")],
     ["Nacionalidad", getInscripcionNacionalidad(item)],
     ["Género", getInscripcionGenero(item)],
-    ["Tipo inscripción", getEstadoOperativoInscripcionLabel(item)],
-    ["Fecha formulario", formatFechaFormularioTabla(getFechaFormularioInscripcion(item))],
+    ["Tipo inscripción", tipoInscripcionTitulo],
+    ["Fecha creación formulario", fechaCreacionFormulario],
+    ...(fechaCambioEstado ? [["Fecha cambio de estado", formatFechaFormularioTabla(fechaCambioEstado)]] : []),
     ["Apoderado(a)", getResponsablePrincipalNombre(item)],
     ["Correo apoderado(a)", getByPath(item, "contactoPrincipal.correo") || "—"],
     [
@@ -2780,8 +2804,8 @@ async function generarFichaInscripcionPdfFinal(inscripcionId = "", recortes = {}
 
       <body>
         <div class="top">
-          <div class="brand">Turismo Rai Trai</div>
-          <h1 class="doc-title">Ficha individual de inscripción</h1>
+          <div class="brand">Formulario de inscripción</div>
+          <h1 class="doc-title">${escapeHtml(tipoInscripcionTitulo)}</h1>
 
           <div class="group-name-box">
             <div class="group-label">Grupo</div>
