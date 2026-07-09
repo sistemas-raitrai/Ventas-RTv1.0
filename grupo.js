@@ -2000,6 +2000,10 @@ function getTipoInscripcionClass(item = {}) {
   if (tipo === "liberado") return "insc-liberado";
   if (tipo === "lista_espera" && estadoCupo === "confirmado") return "insc-lista-espera-confirmada";
   if (tipo === "lista_espera_confirmada") return "insc-lista-espera-confirmada";
+  
+  if (tipo === "lista_espera_pagada") return "insc-lista-espera-pagada";
+  if (tipo === "lista_espera" && estadoCupo === "pagado") return "insc-lista-espera-pagada";
+  
   if (tipo === "lista_espera") return "insc-lista-espera";
   if (tipo === "nuevo_ingreso" || tipo === "nuevos") return "insc-nuevo-ingreso";
 
@@ -2214,9 +2218,17 @@ function renderInscripcionPasajerosPanel() {
           <tbody>
             ${state.inscripciones.map((item, index) => {
               const tipoReal = getInscripcionTipoReal(item);
+              const tipoRealKey = normalizeSearchLocal(tipoReal);
+              const estadoCupoKey = normalizeSearchLocal(item.estadoCupo || "");
+              
               const esListaEsperaPendiente =
-                normalizeSearchLocal(tipoReal) === "lista_espera" &&
-                normalizeSearchLocal(item.estadoCupo || "") !== "confirmado";
+                tipoRealKey === "lista_espera" &&
+                estadoCupoKey !== "pagado" &&
+                estadoCupoKey !== "confirmado";
+              
+              const esListaEsperaPagada =
+                tipoRealKey === "lista_espera_pagada" ||
+                (tipoRealKey === "lista_espera" && estadoCupoKey === "pagado");
 
               return `
                 <tr class="${escapeHtml(getTipoInscripcionClass(item))}">
@@ -2247,9 +2259,9 @@ function renderInscripcionPasajerosPanel() {
                       normalizeSearchLocal(tipoReal) === "nuevo_ingreso" &&
                       normalizeSearchLocal(item.estadoCupo || "") !== "confirmado"
                         ? `<button class="inscripcion-action-btn" type="button" data-confirmar-nuevo-ingreso="${escapeHtml(item.id)}">Confirmar nuevo ingreso</button>`
-                        : esListaEsperaPendiente && normalizeSearchLocal(item.estadoCupo || "") !== "pagado"
+                        : esListaEsperaPendiente
                           ? `<button class="inscripcion-action-btn" type="button" data-marcar-lista-pagada="${escapeHtml(item.id)}">Marcar pagado</button>`
-                          : esListaEsperaPendiente && normalizeSearchLocal(item.estadoCupo || "") === "pagado"
+                          : esListaEsperaPagada
                             ? `<button class="inscripcion-action-btn" type="button" data-confirmar-cupo="${escapeHtml(item.id)}">Confirmar cupo</button>`
                             : "—"
                                                 }
