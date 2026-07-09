@@ -2589,29 +2589,28 @@ async function generarFichaInscripcionPdfFinal(inscripcionId = "", recortes = {}
   const comprobantePagoUrl = recortes.comprobantePago || await resolveArchivoEspecialUrl(item, "comprobantePago");
 
   const filasGrupo = [
-    ["Nombre grupo", grupo],
+    ["Grupo", grupo],
     ["ID grupo", String(state.groupId || "—")],
     ["Colegio", normalizeTextUpper(state.group?.colegio || "—")],
     ["Curso", normalizeTextUpper(state.group?.curso || "—")],
     ["Año viaje", cleanText(state.group?.anoViaje || "—")],
-    ["Vendedora", cleanText(state.group?.vendedora || state.group?.vendedoraCorreo || "—")]
+    ["Vendedor(a)", cleanText(state.group?.vendedora || state.group?.vendedoraCorreo || "—")]
   ];
 
   const filasPersona = [
-    ["Nombre grupo", grupo],
+    ["Nombres", getInscripcionNombres(item)],
+    ["Apellidos", getInscripcionApellidos(item)],
+    ["RUT / Documento", getInscripcionDocumento(item)],
+    ["Fecha nacimiento", formatDateOnlyForTable(getByPath(item, "identificacion.fechaNacimiento"))],
+    ["Tipo pasajero(a)", formatInscripcionValue(item.tipoViajante || item.tipoParticipacion || "")],
+    ["Nacionalidad", getInscripcionNacionalidad(item)],
+    ["Género", getInscripcionGenero(item)],
     ["Tipo inscripción", getEstadoOperativoInscripcionLabel(item)],
     ["Fecha formulario", formatFechaFormularioTabla(getFechaFormularioInscripcion(item))],
-    ["RUT / Documento", getInscripcionDocumento(item)],
-    ["Apellidos", getInscripcionApellidos(item)],
-    ["Nombres", getInscripcionNombres(item)],
-    ["Fecha nacimiento", formatDateOnlyForTable(getByPath(item, "identificacion.fechaNacimiento"))],
-    ["Tipo pasajero", formatInscripcionValue(item.tipoViajante || item.tipoParticipacion || "")],
-    ["Nacionalidad", getInscripcionNacionalidad(item)],
-    ["Sexo / género", getInscripcionGenero(item)],
-    ["Responsable", getResponsablePrincipalNombre(item)],
-    ["Correo responsable", getByPath(item, "contactoPrincipal.correo") || "—"],
+    ["Apoderado(a)", getResponsablePrincipalNombre(item)],
+    ["Correo apoderado(a)", getByPath(item, "contactoPrincipal.correo") || "—"],
     [
-      "Celular responsable",
+      "Celular apoderado(a)",
       getByPath(item, "contactoPrincipal.celular") ||
       getByPath(item, "contactoPrincipal.telefono") ||
       getByPath(item, "contactoPrincipal.whatsapp") ||
@@ -2619,12 +2618,16 @@ async function generarFichaInscripcionPdfFinal(inscripcionId = "", recortes = {}
     ]
   ];
 
-  const filasEncargados = encargados.flatMap((c) => [
-    [`${c.label} · Nombre`, c.nombre],
-    [`${c.label} · Rol`, c.rol],
-    [`${c.label} · Correo`, c.correo],
-    [`${c.label} · Teléfono`, c.celular]
-  ]);
+  const filasEncargados = encargados.flatMap((c, index) => {
+    const suffix = index === 0 ? "" : " 2°";
+  
+    return [
+      [`Nombre${suffix}`, c.nombre],
+      [`Rol${suffix}`, c.rol],
+      [`Correo${suffix}`, c.correo],
+      [`Teléfono${suffix}`, c.celular]
+    ];
+  });
 
   const nombreArchivo = `ficha_${normalizarRutExport(getInscripcionDocumento(item)) || inscripcionId}.pdf`;
 
