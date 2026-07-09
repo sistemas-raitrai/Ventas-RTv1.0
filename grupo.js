@@ -11005,3 +11005,82 @@ window.repararAlertasInscripcionesGrupo = async function () {
     alertasSync
   };
 };
+
+window.marcarNuevoIngresoPendiente = async function ({ rut = "", inscripcionId = "" } = {}) {
+  if (!canEditarNominaInscripcion()) {
+    alert("No tienes permisos para modificar esta inscripción.");
+    return null;
+  }
+
+  const rutBuscado = normalizeSearchLocal(rut || "")
+    .replace(/\./g, "")
+    .replace(/-/g, "");
+
+  const item = state.inscripciones.find((x) => {
+    if (inscripcionId && String(x.id) === String(inscripcionId)) return true;
+
+    const docu = normalizeSearchLocal(getInscripcionDocumento(x))
+      .replace(/\./g, "")
+      .replace(/-/g, "");
+
+    return rutBuscado && docu === rutBuscado;
+  });
+
+  if (!item) {
+    console.warn("No encontré la inscripción.");
+    return null;
+  }
+
+  const ref = doc(
+    db,
+    "ventas_cotizaciones",
+    String(state.groupDocId),
+    "inscripciones",
+    String(item.id)
+  );
+
+  await updateDoc(ref, {
+    tipoInscripcion: "nuevo_ingreso",
+    estadoCupo: "pendiente_confirmacion",
+
+    nuevoIngresoConfirmado: false,
+    nuevoIngresoConfirmadoPor: deleteField(),
+    nuevoIngresoConfirmadoPorCorreo: deleteField(),
+    nuevoIngresoConfirmadoAt: deleteField(),
+
+    corregidoComoNuevoIngresoPendiente: true,
+    corregidoComoNuevoIngresoPendienteAt: serverTimestamp(),
+    corregidoComoNuevoIngresoPendientePor: getDisplayName(state.effectiveUser),
+    corregidoComoNuevoIngresoPendientePorCorreo: state.effectiveEmail
+  });
+
+  await sincronizarAlertaInscripcion({
+    ...item,
+    tipoInscripcion: "nuevo_ingreso",
+    estadoCupo: "pendiente_confirmacion"
+  });
+
+  await createHistoryEntry({
+    tipoMovimiento: "correccion_nuevo_ingreso_pendiente",
+    modulo: "inscripcion",
+    titulo: "Nuevo ingreso corregido a pendiente",
+    mensaje: `${getDisplayName(state.effectiveUser)} corrigió a ${buildNombreCompletoInscripcion(item) || "una inscripción"} como Nuevo ingreso pendiente.`,
+    metadata: {
+      inscripcionId: item.id,
+      documento: getInscripcionDocumento(item),
+      nombreCompleto: buildNombreCompletoInscripcion(item)
+    }
+  });
+
+  await loadInscripciones();
+  renderInscripcionPasajerosPanel();
+  syncButtons();
+
+  console.log("Nuevo ingreso corregido a pendiente:", {
+    grupo: state.groupId,
+    inscripcionId: item.id,
+    documento: getInscripcionDocumento(item)
+  });
+
+  return item.id;
+};
