@@ -231,7 +231,7 @@ export function puedeVerGeneral(email = "") {
 }
 
 export function puedeModificarVentas(email = "") {
-  return esAdmin(email) || esSupervisor(email) || esVendedor(email) || esRegistro(email);
+  return esAdmin(email) || esSupervisor(email) || esVendedor(email);
 }
 
 export function puedeCrearCotizaciones(email = "") {
