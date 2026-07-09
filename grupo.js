@@ -75,6 +75,14 @@ const state = {
   alertsManual: [],
   requests: [],
   inscripciones: [],
+  reencuadrePdf: {
+    inscripcionId: "",
+    imagenes: [],
+    activaKey: "",
+    dragging: false,
+    dragStartX: 0,
+    dragStartY: 0
+  },
   editingMeetingId: "",
 
   autoAlerts: [],
@@ -2538,6 +2546,24 @@ async function descargarFichaInscripcionPdf(inscripcionId = "") {
     return;
   }
 
+  const imagenes = await prepararImagenesReencuadreInscripcion(item);
+
+  if (imagenes.length) {
+    abrirModalReencuadreFicha(inscripcionId, imagenes);
+    return;
+  }
+
+  await generarFichaInscripcionPdfFinal(inscripcionId, {});
+}
+
+async function generarFichaInscripcionPdfFinal(inscripcionId = "", recortes = {}) {
+  const item = state.inscripciones.find((x) => String(x.id) === String(inscripcionId));
+
+  if (!item) {
+    alert("No se encontró la inscripción seleccionada.");
+    return;
+  }
+
   const win = window.open("", "_blank");
 
   if (!win) {
@@ -2549,13 +2575,8 @@ async function descargarFichaInscripcionPdf(inscripcionId = "") {
   win.document.write(`
     <!doctype html>
     <html>
-      <head>
-        <meta charset="UTF-8" />
-        <title>Generando ficha...</title>
-      </head>
-      <body style="font-family: Arial, sans-serif; padding: 30px;">
-        Generando ficha individual...
-      </body>
+      <head><meta charset="UTF-8" /></head>
+      <body style="font-family:Arial;padding:30px;">Generando ficha...</body>
     </html>
   `);
   win.document.close();
@@ -2563,9 +2584,9 @@ async function descargarFichaInscripcionPdf(inscripcionId = "") {
   const grupo = getNombreGrupoPdf();
   const encargados = getEncargadosGrupoPdf();
 
-  const carnetFrenteUrl = await resolveArchivoEspecialUrl(item, "carnetFrente");
-  const carnetReversoUrl = await resolveArchivoEspecialUrl(item, "carnetReverso");
-  const comprobantePagoUrl = await resolveArchivoEspecialUrl(item, "comprobantePago");
+  const carnetFrenteUrl = recortes.carnetFrente || await resolveArchivoEspecialUrl(item, "carnetFrente");
+  const carnetReversoUrl = recortes.carnetReverso || await resolveArchivoEspecialUrl(item, "carnetReverso");
+  const comprobantePagoUrl = recortes.comprobantePago || await resolveArchivoEspecialUrl(item, "comprobantePago");
 
   const filasGrupo = [
     ["Nombre grupo", grupo],
@@ -2577,6 +2598,7 @@ async function descargarFichaInscripcionPdf(inscripcionId = "") {
   ];
 
   const filasPersona = [
+    ["Nombre grupo", grupo],
     ["Tipo inscripción", getEstadoOperativoInscripcionLabel(item)],
     ["Fecha formulario", formatFechaFormularioTabla(getFechaFormularioInscripcion(item))],
     ["RUT / Documento", getInscripcionDocumento(item)],
@@ -2618,12 +2640,8 @@ async function descargarFichaInscripcionPdf(inscripcionId = "") {
       <head>
         <meta charset="UTF-8" />
         <title>${escapeHtml(nombreArchivo)}</title>
-
         <style>
-          @page {
-            size: A4;
-            margin: 14mm;
-          }
+          @page { size: A4; margin: 14mm; }
 
           body {
             font-family: Arial, sans-serif;
@@ -2699,9 +2717,7 @@ async function descargarFichaInscripcionPdf(inscripcionId = "") {
             border-bottom: 1px solid #eee8f5;
           }
 
-          .row:last-child {
-            border-bottom: 0;
-          }
+          .row:last-child { border-bottom: 0; }
 
           .label {
             background: #f4eff9;
@@ -2752,18 +2768,13 @@ async function descargarFichaInscripcionPdf(inscripcionId = "") {
             font-size: 9px;
             color: #786883;
           }
-
-          @media print {
-            .no-print {
-              display: none;
-            }
-          }
         </style>
       </head>
 
       <body>
         <div class="top">
-          <div class="brand">Ficha de Inscripción</div>
+          <div class="brand">Turismo Rai Trai</div>
+          <h1 class="doc-title">Ficha individual de inscripción</h1>
 
           <div class="group-name-box">
             <div class="group-label">Grupo</div>
@@ -2772,33 +2783,25 @@ async function descargarFichaInscripcionPdf(inscripcionId = "") {
         </div>
 
         <div class="section-title">Datos del grupo</div>
-        <div class="form-grid">
-          ${renderPdfRows(filasGrupo)}
-        </div>
+        <div class="form-grid">${renderPdfRows(filasGrupo)}</div>
 
         ${
           filasEncargados.length
             ? `
               <div class="section-title">Encargado(s) del grupo</div>
-              <div class="form-grid">
-                ${renderPdfRows(filasEncargados)}
-              </div>
+              <div class="form-grid">${renderPdfRows(filasEncargados)}</div>
             `
             : ""
         }
 
         <div class="section-title">Datos de la persona inscrita</div>
-        <div class="form-grid">
-          ${renderPdfRows(filasPersona)}
-        </div>
+        <div class="form-grid">${renderPdfRows(filasPersona)}</div>
 
         ${
           documentosHtml
             ? `
               <div class="section-title">Documentos adjuntos</div>
-              <div class="docs-grid">
-                ${documentosHtml}
-              </div>
+              <div class="docs-grid">${documentosHtml}</div>
             `
             : ""
         }
@@ -2822,6 +2825,232 @@ async function descargarFichaInscripcionPdf(inscripcionId = "") {
   win.document.open();
   win.document.write(html);
   win.document.close();
+}
+
+async function prepararImagenesReencuadreInscripcion(item = {}) {
+  const defs = [
+    { key: "carnetFrente", label: "Carnet frente" },
+    { key: "carnetReverso", label: "Carnet reverso" },
+    { key: "comprobantePago", label: "Comprobante pago" }
+  ];
+
+  const out = [];
+
+  for (const def of defs) {
+    const url = await resolveArchivoEspecialUrl(item, def.key);
+    if (!url) continue;
+
+    const img = await cargarImagenParaCanvas(url);
+
+    out.push({
+      ...def,
+      url,
+      img,
+      scale: 1,
+      offsetX: 0,
+      offsetY: 0,
+      rotation: 0,
+      recorteDataUrl: ""
+    });
+  }
+
+  return out;
+}
+
+function cargarImagenParaCanvas(url = "") {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+
+    img.onload = () => resolve(img);
+    img.onerror = () => reject(new Error("No se pudo cargar imagen para reencuadre."));
+
+    img.src = url;
+  });
+}
+
+function abrirModalReencuadreFicha(inscripcionId = "", imagenes = []) {
+  state.reencuadrePdf = {
+    inscripcionId,
+    imagenes,
+    activaKey: imagenes[0]?.key || "",
+    dragging: false,
+    dragStartX: 0,
+    dragStartY: 0
+  };
+
+  renderListaReencuadre();
+  centrarReencuadreActivo();
+  openModal("modalReencuadreFicha");
+}
+
+function getImagenReencuadreActiva() {
+  return state.reencuadrePdf.imagenes.find((x) => x.key === state.reencuadrePdf.activaKey) || null;
+}
+
+function renderListaReencuadre() {
+  const box = $("reencuadreListaImagenes");
+  if (!box) return;
+
+  box.innerHTML = state.reencuadrePdf.imagenes.map((img) => `
+    <button
+      class="reencuadre-item ${img.key === state.reencuadrePdf.activaKey ? "active" : ""}"
+      type="button"
+      data-reencuadre-key="${escapeHtml(img.key)}"
+    >
+      ${escapeHtml(img.label)}
+    </button>
+  `).join("");
+
+  box.querySelectorAll("[data-reencuadre-key]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      state.reencuadrePdf.activaKey = btn.dataset.reencuadreKey || "";
+      renderListaReencuadre();
+      dibujarReencuadreActivo();
+    });
+  });
+}
+
+function centrarReencuadreActivo() {
+  const item = getImagenReencuadreActiva();
+  const canvas = $("reencuadreCanvas");
+  if (!item || !canvas) return;
+
+  const baseScale = Math.max(
+    canvas.width / item.img.width,
+    canvas.height / item.img.height
+  );
+
+  item.scale = baseScale;
+  item.offsetX = 0;
+  item.offsetY = 0;
+  item.rotation = item.rotation || 0;
+
+  dibujarReencuadreActivo();
+}
+
+function dibujarReencuadreActivo() {
+  const canvas = $("reencuadreCanvas");
+  const ctx = canvas?.getContext("2d");
+  const item = getImagenReencuadreActiva();
+
+  if (!canvas || !ctx || !item) return;
+
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.fillStyle = "#251b32";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  ctx.save();
+
+  ctx.translate(canvas.width / 2 + item.offsetX, canvas.height / 2 + item.offsetY);
+  ctx.rotate((item.rotation || 0) * Math.PI / 180);
+  ctx.scale(item.scale, item.scale);
+
+  ctx.drawImage(
+    item.img,
+    -item.img.width / 2,
+    -item.img.height / 2
+  );
+
+  ctx.restore();
+
+  ctx.strokeStyle = "rgba(255,255,255,.95)";
+  ctx.lineWidth = 4;
+  ctx.strokeRect(10, 10, canvas.width - 20, canvas.height - 20);
+
+  setText(
+    "reencuadreEstado",
+    `${item.label} · Zoom ${Math.round(item.scale * 100)}% · Rotación ${item.rotation || 0}°`
+  );
+}
+
+function ajustarReencuadreZoom(delta = 0) {
+  const item = getImagenReencuadreActiva();
+  if (!item) return;
+
+  item.scale = Math.max(0.05, item.scale + delta);
+  dibujarReencuadreActivo();
+}
+
+function rotarReencuadre(grados = 0) {
+  const item = getImagenReencuadreActiva();
+  if (!item) return;
+
+  item.rotation = ((item.rotation || 0) + grados) % 360;
+  dibujarReencuadreActivo();
+}
+
+function iniciarDragReencuadre(event) {
+  const item = getImagenReencuadreActiva();
+  if (!item) return;
+
+  state.reencuadrePdf.dragging = true;
+  state.reencuadrePdf.dragStartX = event.clientX;
+  state.reencuadrePdf.dragStartY = event.clientY;
+}
+
+function moverDragReencuadre(event) {
+  if (!state.reencuadrePdf.dragging) return;
+
+  const item = getImagenReencuadreActiva();
+  if (!item) return;
+
+  const dx = event.clientX - state.reencuadrePdf.dragStartX;
+  const dy = event.clientY - state.reencuadrePdf.dragStartY;
+
+  item.offsetX += dx;
+  item.offsetY += dy;
+
+  state.reencuadrePdf.dragStartX = event.clientX;
+  state.reencuadrePdf.dragStartY = event.clientY;
+
+  dibujarReencuadreActivo();
+}
+
+function terminarDragReencuadre() {
+  state.reencuadrePdf.dragging = false;
+}
+
+function capturarReencuadreDataUrl(item = {}) {
+  const canvas = document.createElement("canvas");
+  canvas.width = 900;
+  canvas.height = 540;
+
+  const ctx = canvas.getContext("2d");
+
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  ctx.save();
+
+  ctx.translate(canvas.width / 2 + item.offsetX, canvas.height / 2 + item.offsetY);
+  ctx.rotate((item.rotation || 0) * Math.PI / 180);
+  ctx.scale(item.scale, item.scale);
+
+  ctx.drawImage(
+    item.img,
+    -item.img.width / 2,
+    -item.img.height / 2
+  );
+
+  ctx.restore();
+
+  return canvas.toDataURL("image/jpeg", 0.92);
+}
+
+async function generarPdfDesdeModalReencuadre() {
+  const recortes = {};
+
+  state.reencuadrePdf.imagenes.forEach((img) => {
+    recortes[img.key] = capturarReencuadreDataUrl(img);
+  });
+
+  closeModal("modalReencuadreFicha");
+
+  await generarFichaInscripcionPdfFinal(
+    state.reencuadrePdf.inscripcionId,
+    recortes
+  );
 }
 
 function renderFichaPanel() {
@@ -7758,6 +7987,17 @@ function bindEvents() {
       await toggleHistoryHidden(id);
     }
   });
+
+  $("btnReencuadreZoomMenos")?.addEventListener("click", () => ajustarReencuadreZoom(-0.08));
+  $("btnReencuadreZoomMas")?.addEventListener("click", () => ajustarReencuadreZoom(0.08));
+  $("btnReencuadreRotarIzq")?.addEventListener("click", () => rotarReencuadre(-90));
+  $("btnReencuadreRotarDer")?.addEventListener("click", () => rotarReencuadre(90));
+  $("btnReencuadreCentrar")?.addEventListener("click", centrarReencuadreActivo);
+  $("btnReencuadreGenerarPdf")?.addEventListener("click", generarPdfDesdeModalReencuadre);
+
+  $("reencuadreCanvas")?.addEventListener("mousedown", iniciarDragReencuadre);
+  $("reencuadreCanvas")?.addEventListener("mousemove", moverDragReencuadre);
+  document.addEventListener("mouseup", terminarDragReencuadre);
 }
 
 function openModal(id) {
