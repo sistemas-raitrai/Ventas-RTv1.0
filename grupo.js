@@ -1276,6 +1276,7 @@ function puedeOperarListaEsperaAdministrativa() {
   return (
     rol === "admin" ||
     rol === "registro" ||
+    isGirasConPermisoAdministracion() ||
     email === "administracion@raitrai.cl" ||
     email === "yenny@raitrai.cl" ||
     email === "raitrai@raitrai.cl"
@@ -1592,11 +1593,16 @@ function isJefaVentas() {
   return normalizeEmail(state.effectiveEmail) === "chernandez@raitrai.cl" || state.effectiveUser?.rol === "admin";
 }
 
+function isGirasConPermisoAdministracion() {
+  return normalizeEmail(state.effectiveEmail || "") === "giras@raitrai.cl";
+}
+
 function isAdministracion() {
   const email = normalizeEmail(state.effectiveEmail || "");
   const rol = String(state.effectiveUser?.rol || "").toLowerCase();
 
   if (rol === "admin") return true;
+  if (isGirasConPermisoAdministracion()) return true;
 
   return (
     email === "yenny@raitrai.cl" ||
@@ -1609,6 +1615,7 @@ function isStrictAdministracionUser() {
   const email = normalizeEmail(state.effectiveEmail || "");
 
   return (
+    isGirasConPermisoAdministracion() ||
     email === "yenny@raitrai.cl" ||
     email === "administracion@raitrai.cl" ||
     email === "raitrai@raitrai.cl"
@@ -4795,6 +4802,7 @@ function canEditarNominaInscripcion() {
 
   if (rol === "admin") return true;
   if (rol === "registro") return true;
+  if (isGirasConPermisoAdministracion()) return true;
 
   if (
     email === "administracion@raitrai.cl" ||
