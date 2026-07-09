@@ -47,6 +47,7 @@ import {
 const GITHUB_HOME_URL = "https://sistemas-raitrai.github.io/Ventas-RT/home.html";
 const ALERTAS_COLLECTION = "ventas_alertas";
 const SOLICITUDES_COLLECTION = "ventas_solicitudes_actualizacion";
+const ALERTAS_INSCRIPCIONES_COLLECTION = "ventas_alertas_inscripciones";
 
 const API_PAGOS_URL = "/api/pagos";
 const ALERTAS_PAGOS_COLLECTION = "ventas_alertas_pagos";
@@ -915,9 +916,17 @@ async function loadHomeData() {
   
   state.inscripcionesRows = [];
 
-  setTimeout(() => {
-    cargarInscripcionesHomeEnSegundoPlano();
-  }, 100);
+  const alertasInscripcionesSnap = await getDocs(
+    query(
+      collection(db, ALERTAS_INSCRIPCIONES_COLLECTION),
+      where("activa", "==", true)
+    )
+  );
+
+  state.inscripcionesRows = alertasInscripcionesSnap.docs.map((docSnap) => ({
+    id: docSnap.id,
+    ...docSnap.data()
+  }));
 
   state.alertRows = alertsSnap.docs.map((docSnap) => ({
     id: docSnap.id,
@@ -995,68 +1004,6 @@ function renderInfoAlertasPagosHome() {
     : "Última actualización: sin registro";
 }
 
-async function cargarInscripcionesHomeEnSegundoPlano() {
-  try {
-    console.time("CARGA_INSCRIPCIONES_HOME_SEGUNDO_PLANO");
-
-    const rowsCandidatas = state.rows.filter((row) => {
-      const ano = getAnoViajeNumber(row);
-      if (!ano || ano < 2026) return false;
-
-      return (
-        normalizeLoose(row.estado).includes("ganad") ||
-        row.inscripcionHabilitada === true ||
-        row.inscripcion ||
-        row.tokenInscripcion
-      );
-    });
-
-    state.inscripcionesRows = await cargarInscripcionesHome(rowsCandidatas);
-
-    console.timeEnd("CARGA_INSCRIPCIONES_HOME_SEGUNDO_PLANO");
-
-    renderHome();
-  } catch (error) {
-    console.error("[home] Error cargando inscripciones en segundo plano", error);
-  }
-}
-
-async function cargarInscripcionesHome(rows = []) {
-  const resultados = [];
-
-  for (const row of rows) {
-    const idGrupo = getRowId(row);
-    if (!idGrupo) continue;
-
-    try {
-      const snap = await getDocs(
-        collection(db, "ventas_cotizaciones", String(idGrupo), "inscripciones")
-      );
-
-      snap.docs.forEach((docSnap) => {
-        const data = docSnap.data() || {};
-        const privacidadEstado = normalizeLoose(data?.privacidad?.estado || "");
-
-        if (privacidadEstado === "eliminada_logica" || privacidadEstado === "archivada") {
-          return;
-        }
-
-        resultados.push({
-          id: docSnap.id,
-          inscripcionId: docSnap.id,
-          idGrupo,
-          _groupRow: row,
-          ...data
-        });
-      });
-    } catch (error) {
-      console.warn("[home] No se pudieron cargar inscripciones del grupo", idGrupo, error);
-    }
-  }
-
-  return resultados;
-}
-
 function getInscripcionTipoHome(item = {}) {
   const raw = String(
     item.tipoInscripcion ||
@@ -1087,30 +1034,26 @@ function getInscripcionEstadoCupoHome(item = {}) {
 }
 
 function esInscripcionNuevoIngresoPendiente(item = {}) {
-  const tipo = getInscripcionTipoHome(item);
-  const estadoCupo = getInscripcionEstadoCupoHome(item);
-
-  return tipo === "nuevo_ingreso" && estadoCupo !== "confirmado";
+  return (
+    item.activa !== false &&
+    item.resuelta !== true &&
+    item.tipoAlerta === "nuevo_ingreso_pendiente"
+  );
 }
 
 function esInscripcionListaEsperaPendiente(item = {}) {
-  const tipo = getInscripcionTipoHome(item);
-  const estadoCupo = getInscripcionEstadoCupoHome(item);
-
   return (
-    tipo === "lista_espera" &&
-    estadoCupo !== "pagado" &&
-    estadoCupo !== "confirmado"
+    item.activa !== false &&
+    item.resuelta !== true &&
+    item.tipoAlerta === "lista_espera_pendiente"
   );
 }
 
 function esListaEsperaPagadaPendienteConfirmar(item = {}) {
-  const tipo = getInscripcionTipoHome(item);
-  const estadoCupo = getInscripcionEstadoCupoHome(item);
-
   return (
-    tipo === "lista_espera_pagada" ||
-    (tipo === "lista_espera" && estadoCupo === "pagado")
+    item.activa !== false &&
+    item.resuelta !== true &&
+    item.tipoAlerta === "lista_espera_pagada_pendiente_confirmar"
   );
 }
 
@@ -1121,71 +1064,29 @@ function getByPathHome(obj = {}, path = "") {
 }
 
 function getInscripcionNombreHome(item = {}) {
-  const nombres =
-    getByPathHome(item, "identificacion.nombres") ||
-    getByPathHome(item, "identificacion.nombre") ||
-    "";
-
-  const apellido1 =
-    getByPathHome(item, "identificacion.primerApellido") ||
-    "";
-
-  const apellido2 =
-    getByPathHome(item, "identificacion.segundoApellido") ||
-    "";
-
-  return [nombres, apellido1, apellido2].filter(Boolean).join(" ").trim() || "Sin nombre";
+  return String(item.nombreParticipante || "Sin nombre").trim();
 }
 
 function getInscripcionResponsableHome(item = {}) {
-  const directo =
-    getByPathHome(item, "contactoPrincipal.nombre") ||
-    getByPathHome(item, "contactoPrincipal.nombreCompleto") ||
-    "";
-
-  if (directo) return directo;
-
-  const nombres = getByPathHome(item, "contactoPrincipal.nombres") || "";
-  const apellido1 = getByPathHome(item, "contactoPrincipal.primerApellido") || "";
-  const apellido2 = getByPathHome(item, "contactoPrincipal.segundoApellido") || "";
-
-  return [nombres, apellido1, apellido2].filter(Boolean).join(" ").trim() || "Sin responsable";
+  return String(item.nombreResponsable || "Sin responsable").trim();
 }
 
 function getInscripcionCorreoHome(item = {}) {
-  return String(
-    getByPathHome(item, "contactoPrincipal.correo") ||
-    getByPathHome(item, "identificacion.correoViajante") ||
-    ""
-  ).trim();
+  return String(item.correoResponsable || "").trim();
 }
 
 function getInscripcionTelefonoHome(item = {}) {
-  return String(
-    getByPathHome(item, "contactoPrincipal.celular") ||
-    getByPathHome(item, "contactoPrincipal.telefono") ||
-    getByPathHome(item, "contactoPrincipal.whatsapp") ||
-    ""
-  ).trim();
+  return String(item.telefonoResponsable || "").trim();
 }
 
 function getInscripcionFechaHome(item = {}) {
-  return (
-    item?.meta?.fechaInscripcion ||
-    item?.meta?.fechaFormularioCliente ||
-    item?.fechaInscripcion ||
-    item?.fechaFormularioCliente ||
-    item?.creadoEn ||
-    item?.createdAt ||
-    item?.fechaCreacion ||
-    ""
-  );
+  return item.fechaFormulario || item.creadaAt || item.actualizadoAt || "";
 }
 
 function sortInscripcionesHome(rows = []) {
   return [...rows].sort((a, b) => {
-    const grupoA = getAliasColegioSortKey(getRowAlias(a._groupRow || {}));
-    const grupoB = getAliasColegioSortKey(getRowAlias(b._groupRow || {}));
+    const grupoA = getAliasColegioSortKey(a.aliasGrupo || a.colegio || "");
+    const grupoB = getAliasColegioSortKey(b.aliasGrupo || b.colegio || "");
 
     const byGrupo = grupoA.localeCompare(grupoB, "es", {
       sensitivity: "base",
@@ -1205,8 +1106,7 @@ function renderInscripcionesHomeCards(rows = []) {
   if (!rows.length) return emptyHtml("No hay inscripciones para mostrar.");
 
   return rows.map((item) => {
-    const groupRow = item._groupRow || {};
-    const idGrupo = String(item.idGrupo || getRowId(groupRow) || "").trim();
+    const idGrupo = String(item.idGrupo || item.groupDocId || "").trim();
 
     return `
       <div class="home-card-row">
@@ -1214,9 +1114,9 @@ function renderInscripcionesHomeCards(rows = []) {
           <div class="home-card-row-title">${escapeHtml(getInscripcionNombreHome(item))}</div>
 
           <div class="home-card-row-text">
-            Grupo: ${escapeHtml(getRowAlias(groupRow))}<br>
-            Año: ${escapeHtml(groupRow.anoViaje || "Sin año")} · Curso: ${escapeHtml(groupRow.curso || "Sin curso")}<br>
-            Vendedor(a): ${escapeHtml(getRowVendorName(groupRow) || groupRow.vendedoraCorreo || "Sin vendedor")}<br>
+            Grupo: ${escapeHtml(item.aliasGrupo || item.colegio || idGrupo || "Sin grupo")}<br>
+            Año: ${escapeHtml(item.anoViaje || "Sin año")} · Curso: ${escapeHtml(item.curso || "Sin curso")}<br>
+            Vendedor(a): ${escapeHtml(item.vendedora || item.vendedoraCorreo || "Sin vendedor")}<br>
             Responsable: ${escapeHtml(getInscripcionResponsableHome(item))}<br>
             Correo: ${escapeHtml(getInscripcionCorreoHome(item) || "Sin correo")}<br>
             Teléfono: ${escapeHtml(getInscripcionTelefonoHome(item) || "Sin teléfono")}<br>
@@ -1393,8 +1293,20 @@ function renderHome() {
     scopedRows.map((row) => getRowId(row)).filter(Boolean)
   );
 
+  const scopedDocIdsInscripciones = new Set(
+    scopedRows.map((row) => String(row.id || "").trim()).filter(Boolean)
+  );
+
   const inscripcionesScope = (state.inscripcionesRows || [])
-    .filter((item) => scopedIdsInscripciones.has(String(item.idGrupo || "").trim()));
+    .filter((item) => {
+      const idGrupo = String(item.idGrupo || "").trim();
+      const groupDocId = String(item.groupDocId || "").trim();
+
+      return (
+        scopedIdsInscripciones.has(idGrupo) ||
+        scopedDocIdsInscripciones.has(groupDocId)
+      );
+    });
 
   state.inscripcionNuevoIngresoRows = sortInscripcionesHome(
     inscripcionesScope.filter(esInscripcionNuevoIngresoPendiente)
