@@ -45,6 +45,7 @@ const HISTORIAL_COLLECTION = "ventas_historial";
 const ALERTAS_COLLECTION = "ventas_alertas";
 const SOLICITUDES_COLLECTION = "ventas_solicitudes_actualizacion";
 const EMAIL_TEMPLATES_COLLECTION = "ventas_email_templates";
+const ALERTAS_INSCRIPCIONES_COLLECTION = "ventas_alertas_inscripciones";
 
 const DEFAULT_CORREO_CAMBIOS_INSCRIPCION = "operaciones@raitrai.cl";
 
@@ -555,6 +556,9 @@ async function loadInscripciones() {
       
         return fechaB - fechaA;
       });
+    
+    await sincronizarAlertasInscripcionesGrupo();
+
   } catch (error) {
     console.error("[grupo] loadInscripciones", error);
   }
@@ -3651,6 +3655,12 @@ async function marcarListaEsperaPagada(inscripcionId = "") {
     listaEsperaPagadaAt: serverTimestamp()
   });
 
+  await sincronizarAlertaInscripcion({
+    ...item,
+    tipoInscripcion: "lista_espera_pagada",
+    estadoCupo: "pagado"
+  });
+
   await createHistoryEntry({
     tipoMovimiento: "inscripcion_lista_espera_pagada",
     modulo: "inscripcion",
@@ -3712,6 +3722,12 @@ async function confirmarCupoListaEspera(inscripcionId = "") {
     confirmadoCupoAt: serverTimestamp()
   });
 
+  await sincronizarAlertaInscripcion({
+    ...item,
+    tipoInscripcion: "lista_espera_confirmada",
+    estadoCupo: "confirmado"
+  });
+
   await createHistoryEntry({
     tipoMovimiento: "inscripcion_lista_espera_confirmada",
     modulo: "inscripcion",
@@ -3766,6 +3782,12 @@ async function confirmarNuevoIngreso(inscripcionId = "") {
     nuevoIngresoConfirmadoPor: getDisplayName(state.effectiveUser),
     nuevoIngresoConfirmadoPorCorreo: state.effectiveEmail,
     nuevoIngresoConfirmadoAt: serverTimestamp()
+  });
+
+  await sincronizarAlertaInscripcion({
+    ...item,
+    tipoInscripcion: "nuevo_ingreso_confirmado",
+    estadoCupo: "confirmado"
   });
 
   await createHistoryEntry({
@@ -4636,6 +4658,115 @@ function buildNombreCompletoInscripcion(item = {}) {
     .filter((x) => x && x !== "—")
     .join(" ")
     .trim();
+}
+
+function getTipoAlertaInscripcionHome(item = {}) {
+  const tipo = normalizeSearchLocal(getInscripcionTipoReal(item));
+  const estadoCupo = normalizeSearchLocal(item.estadoCupo || "");
+
+  if (tipo === "nuevo_ingreso" && estadoCupo !== "confirmado") {
+    return "nuevo_ingreso_pendiente";
+  }
+
+  if (
+    tipo === "lista_espera" &&
+    estadoCupo !== "pagado" &&
+    estadoCupo !== "confirmado"
+  ) {
+    return "lista_espera_pendiente";
+  }
+
+  if (
+    tipo === "lista_espera_pagada" ||
+    (tipo === "lista_espera" && estadoCupo === "pagado")
+  ) {
+    return "lista_espera_pagada_pendiente_confirmar";
+  }
+
+  return "";
+}
+
+function getDocIdAlertaInscripcion(inscripcionId = "") {
+  return `${String(state.groupDocId || state.groupId || "").trim()}_${String(inscripcionId || "").trim()}`;
+}
+
+function buildPayloadAlertaInscripcion(item = {}, tipoAlerta = "") {
+  const nombreParticipante = buildNombreCompletoInscripcion(item);
+  const nombreResponsable = getResponsablePrincipalNombre(item);
+  const correoResponsable = normalizeEmail(getByPath(item, "contactoPrincipal.correo") || "");
+  const telefonoResponsable =
+    getByPath(item, "contactoPrincipal.celular") ||
+    getByPath(item, "contactoPrincipal.telefono") ||
+    getByPath(item, "contactoPrincipal.whatsapp") ||
+    "";
+
+  return {
+    activa: true,
+    resuelta: false,
+
+    tipoAlerta,
+    tipoInscripcion: getInscripcionTipoReal(item),
+    estadoCupo: item.estadoCupo || "",
+
+    idGrupo: String(state.groupId || ""),
+    groupDocId: String(state.groupDocId || ""),
+    inscripcionId: String(item.id || ""),
+
+    anoViaje: cleanText(state.group?.anoViaje || ""),
+    colegio: cleanText(state.group?.colegio || ""),
+    curso: cleanText(state.group?.curso || ""),
+    aliasGrupo:
+      cleanText(state.group?.aliasGrupo) ||
+      cleanText(state.group?.nombreGrupo) ||
+      cleanText(state.group?.colegio) ||
+      String(state.groupId || ""),
+
+    vendedora: cleanText(state.group?.vendedora || state.group?.vendedoraCorreo || ""),
+    vendedoraCorreo: normalizeEmail(state.group?.vendedoraCorreo || ""),
+
+    documento: getInscripcionDocumento(item),
+    nombreParticipante,
+    nombreResponsable,
+    correoResponsable,
+    telefonoResponsable,
+
+    fechaFormulario: getFechaFormularioInscripcion(item) || null,
+    actualizadoAt: serverTimestamp(),
+    actualizadoPor: getDisplayName(state.effectiveUser),
+    actualizadoPorCorreo: state.effectiveEmail
+  };
+}
+
+async function sincronizarAlertaInscripcion(item = {}) {
+  if (!item?.id) return;
+
+  const tipoAlerta = getTipoAlertaInscripcionHome(item);
+  const alertaId = getDocIdAlertaInscripcion(item.id);
+  const ref = doc(db, ALERTAS_INSCRIPCIONES_COLLECTION, alertaId);
+
+  if (!tipoAlerta) {
+    await setDoc(ref, {
+      activa: false,
+      resuelta: true,
+      resueltaAt: serverTimestamp(),
+      resueltaPor: getDisplayName(state.effectiveUser),
+      resueltaPorCorreo: state.effectiveEmail,
+      actualizadoAt: serverTimestamp()
+    }, { merge: true });
+
+    return;
+  }
+
+  await setDoc(ref, {
+    ...buildPayloadAlertaInscripcion(item, tipoAlerta),
+    creadaAt: item.alertaCreadaAt || serverTimestamp()
+  }, { merge: true });
+}
+
+async function sincronizarAlertasInscripcionesGrupo() {
+  for (const item of state.inscripciones) {
+    await sincronizarAlertaInscripcion(item);
+  }
 }
 
 function getCorreoViajanteAdulto(item = {}) {
@@ -10814,3 +10945,63 @@ window.repararIdentificacionInscripcion11190 = async function repararIdentificac
   console.log("✅ Identificación reparada:", inscripcionId);
 }
 
+window.repararAlertasInscripcionesGrupo = async function () {
+  if (!state.canSeeAll) {
+    alert("Solo Admin/Supervisión puede reparar alertas de inscripciones.");
+    return;
+  }
+
+  let corregidas = 0;
+  let alertasSync = 0;
+
+  for (const item of state.inscripciones) {
+    const tipo = normalizeSearchLocal(getInscripcionTipoReal(item));
+    const estadoCupo = normalizeSearchLocal(item.estadoCupo || "");
+
+    const patch = {};
+
+    if (tipo === "nuevo_ingreso" && !estadoCupo) {
+      patch.estadoCupo = "pendiente_confirmacion";
+    }
+
+    if (tipo === "lista_espera" && !estadoCupo) {
+      patch.estadoCupo = "pendiente_pago";
+    }
+
+    if (Object.keys(patch).length) {
+      const ref = doc(
+        db,
+        "ventas_cotizaciones",
+        String(state.groupDocId),
+        "inscripciones",
+        String(item.id)
+      );
+
+      await updateDoc(ref, patch);
+      corregidas++;
+    }
+
+    await sincronizarAlertaInscripcion({
+      ...item,
+      ...patch
+    });
+
+    alertasSync++;
+  }
+
+  await loadInscripciones();
+  renderInscripcionPasajerosPanel();
+  syncButtons();
+
+  console.log("Reparación alertas inscripciones finalizada", {
+    grupo: state.groupId,
+    corregidas,
+    alertasSync
+  });
+
+  return {
+    grupo: state.groupId,
+    corregidas,
+    alertasSync
+  };
+};
