@@ -5,6 +5,7 @@ import {
   collection,
   getDocs,
   doc,
+  where,
   setDoc,
   addDoc,
   serverTimestamp,
@@ -65,8 +66,8 @@ const state = {
   alertasPagosUltimaActualizacion: null,
   anoFichaFiltro: String(new Date().getFullYear()),
 
-  alertasPagosSortKey: "prioridad",
-  alertasPagosSortDir: "desc",
+  alertasPagosSortKey: "fechaViaje",
+  alertasPagosSortDir: "asc",
 
   scopedRows: [],
   sinAsignarRows: [],
@@ -80,6 +81,7 @@ const state = {
   alertasCriticasRows: [],
   alertasWarningRows: [],
   alertasPagosFiltradasRows: [],
+  gruposOperacionByNumero: new Map(),
   reuniones3DiasRows: []
 };
 
@@ -872,6 +874,10 @@ async function loadHomeData() {
   const solicitudesSnap = await getDocs(collection(db, SOLICITUDES_COLLECTION));
   console.timeEnd("ventas_solicitudes_actualizacion");
 
+  console.time("grupos_operacion");
+  const gruposOperacionSnap = await getDocs(collection(db, "grupos"));
+  console.timeEnd("grupos_operacion");
+
   console.time("ultima_alerta_pagos");
   const ultimaAlertaPagosSnap = await getDocs(
     query(
@@ -910,6 +916,20 @@ async function loadHomeData() {
     ...docSnap.data()
   }));
 
+  state.gruposOperacionByNumero = new Map();
+
+  gruposOperacionSnap.docs.forEach((docSnap) => {
+    const data = docSnap.data() || {};
+    const numero = String(data.numeroNegocio || "").trim();
+  
+    if (!numero) return;
+  
+    state.gruposOperacionByNumero.set(numero, {
+      id: docSnap.id,
+      ...data
+    });
+  });
+
   const ultimaAlertaPagos = ultimaAlertaPagosSnap.docs[0]?.data() || null;
 
   state.alertasPagosUltimaActualizacion =
@@ -936,7 +956,7 @@ async function cargarAlertasPagosDesdeFirestore({ forzar = false } = {}) {
       ...docSnap.data()
     }))
     .filter((row) => row.activa !== false)
-    .sort((a, b) => Number(b.prioridad || 0) - Number(a.prioridad || 0));
+    .sort((a, b) => getFechaViajeOrdenAlertaPago(a) - getFechaViajeOrdenAlertaPago(b));
 
   state.alertasPagosUltimaActualizacion =
     state.alertasPagosRows
@@ -1579,6 +1599,23 @@ Según nuestros registros, el total del programa es de ${total}, de los cuales a
 Le agradeceríamos regularizar esta situación o contactarnos para revisar el estado de pagos.`;
 }
 
+function getFechaViajeConfirmadaOperacion(numeroNegocio = "") {
+  const numero = String(numeroNegocio || "").trim();
+  if (!numero) return null;
+
+  const grupoOp = state.gruposOperacionByNumero?.get(numero);
+  if (!grupoOp) return null;
+
+  if (grupoOp.fechasConfirmadasDesdeHoteles !== true) return null;
+
+  return timestampLikeToDate(grupoOp.fechaInicio);
+}
+
+function getFechaViajeOrdenAlertaPago(alerta = {}) {
+  const fecha = getFechaViajeConfirmadaOperacion(alerta.numeroNegocio);
+  return fecha ? fecha.getTime() : Number.MAX_SAFE_INTEGER;
+}
+
 function getAlertasPagosForScope(scopedRows = []) {
   const scopedIds = new Set(scopedRows.map(getRowId).filter(Boolean));
   const scopedNumeros = new Set(scopedRows.map(getNumeroNegocio).filter(Boolean));
@@ -1592,7 +1629,7 @@ function getAlertasPagosForScope(scopedRows = []) {
 
       return scopedIds.has(idGrupo) || scopedNumeros.has(numeroNegocio);
     })
-    .sort((a, b) => Number(b.prioridad || 0) - Number(a.prioridad || 0));
+    .sort((a, b) => getFechaViajeOrdenAlertaPago(a) - getFechaViajeOrdenAlertaPago(b));
 }
 
 function buildAlertasPagosFiltrosHtml(rows = []) {
@@ -1783,6 +1820,7 @@ function ordenarAlertasPagos(rows = []) {
 }
 
 function getValorOrdenAlertaPago(row = {}, key = "") {
+  if (key === "fechaViaje") return getFechaViajeOrdenAlertaPago(row);
   if (key === "numero") return Number(row._numeroOrden || 0);
   if (key === "participante") return normalizeLoose(row.participante || row.grupo || "");
   if (key === "grupo") return normalizeLoose(row.grupo || "");
