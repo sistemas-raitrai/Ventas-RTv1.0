@@ -2623,7 +2623,6 @@ async function generarFichaInscripcionPdfFinal(inscripcionId = "", recortes = {}
   
     return [
       [`Nombre${suffix}`, c.nombre],
-      [`Rol${suffix}`, c.rol],
       [`Correo${suffix}`, c.correo],
       [`Teléfono${suffix}`, c.celular]
     ];
