@@ -16,6 +16,12 @@ import {
 } from "https://www.gstatic.com/firebasejs/11.7.3/firebase-firestore.js";
 
 import {
+  getStorage,
+  ref as storageRef,
+  getDownloadURL
+} from "https://www.gstatic.com/firebasejs/11.7.3/firebase-storage.js";
+
+import {
   auth,
   db,
   VENTAS_USERS,
@@ -2417,7 +2423,114 @@ function formatInscripcionValue(value = "") {
   return map[key] || raw.replaceAll("_", " ");
 }
 
-function descargarFichaInscripcionPdf(inscripcionId = "") {
+function getNombreGrupoPdf() {
+  return (
+    cleanText(state.group?.aliasGrupo) ||
+    cleanText(state.group?.nombreGrupo) ||
+    cleanText(state.group?.colegio) ||
+    String(state.groupId || "")
+  );
+}
+
+function getEncargadosGrupoPdf() {
+  const contactos = [];
+
+  const nombre1 = cleanText(state.group?.nombreCliente || "");
+  const correo1 = normalizeEmail(state.group?.correoCliente || "");
+  const celular1 = cleanText(state.group?.celularCliente || "");
+  const rol1 = cleanText(state.group?.rolCliente || "");
+
+  if (nombre1 || correo1 || celular1) {
+    contactos.push({
+      label: "Encargado/a grupo 1",
+      nombre: nombre1 || "—",
+      rol: rol1 || "—",
+      correo: correo1 || "—",
+      celular: celular1 || "—"
+    });
+  }
+
+  const nombre2 = cleanText(state.group?.nombreCliente2 || "");
+  const correo2 = normalizeEmail(state.group?.correoCliente2 || "");
+  const celular2 = cleanText(state.group?.celularCliente2 || "");
+  const rol2 = cleanText(state.group?.rolCliente2 || "");
+
+  if (nombre2 || correo2 || celular2) {
+    contactos.push({
+      label: "Encargado/a grupo 2",
+      nombre: nombre2 || "—",
+      rol: rol2 || "—",
+      correo: correo2 || "—",
+      celular: celular2 || "—"
+    });
+  }
+
+  return contactos;
+}
+
+function getArchivoEspecialInscripcion(item = {}, clave = "") {
+  return (
+    getByPath(item, `archivosEspeciales.${clave}`) ||
+    getByPath(item, `archivos.${clave}`) ||
+    getByPath(item, `documentos.${clave}`) ||
+    null
+  );
+}
+
+function getRutaArchivoEspecialInscripcion(item = {}, clave = "") {
+  const archivo = getArchivoEspecialInscripcion(item, clave);
+
+  if (!archivo) return "";
+
+  return cleanText(
+    archivo.url ||
+    archivo.downloadURL ||
+    archivo.publicUrl ||
+    archivo.ruta ||
+    archivo.path ||
+    ""
+  );
+}
+
+async function resolveArchivoEspecialUrl(item = {}, clave = "") {
+  const ruta = getRutaArchivoEspecialInscripcion(item, clave);
+
+  if (!ruta) return "";
+
+  if (/^https?:\/\//i.test(ruta)) {
+    return ruta;
+  }
+
+  try {
+    const storage = getStorage();
+    return await getDownloadURL(storageRef(storage, ruta));
+  } catch (error) {
+    console.warn(`[grupo] No se pudo obtener URL Storage para ${clave}:`, error);
+    return "";
+  }
+}
+
+function renderPdfRows(filas = []) {
+  return filas.map(([label, value]) => `
+    <div class="row">
+      <div class="label">${escapeHtml(label)}</div>
+      <div class="value">${escapeHtml(value || "—")}</div>
+    </div>
+  `).join("");
+}
+
+function renderPdfDocumentoImagen(label = "", url = "") {
+  if (!url) return "";
+
+  return `
+    <div class="doc-card">
+      <div class="doc-title">${escapeHtml(label)}</div>
+      <img src="${escapeHtml(url)}" alt="${escapeHtml(label)}" />
+    </div>
+  `;
+}
+
+async function descargarFichaInscripcionPdf(inscripcionId = "") {
   const item = state.inscripciones.find((x) => String(x.id) === String(inscripcionId));
 
   if (!item) {
@@ -2425,13 +2538,45 @@ function descargarFichaInscripcionPdf(inscripcionId = "") {
     return;
   }
 
-  const grupo =
-    cleanText(state.group?.aliasGrupo) ||
-    cleanText(state.group?.nombreGrupo) ||
-    cleanText(state.group?.colegio) ||
-    String(state.groupId || "");
+  const win = window.open("", "_blank");
 
-  const filas = [
+  if (!win) {
+    alert("El navegador bloqueó la ventana emergente. Permite pop-ups para generar el PDF.");
+    return;
+  }
+
+  win.document.open();
+  win.document.write(`
+    <!doctype html>
+    <html>
+      <head>
+        <meta charset="UTF-8" />
+        <title>Generando ficha...</title>
+      </head>
+      <body style="font-family: Arial, sans-serif; padding: 30px;">
+        Generando ficha individual...
+      </body>
+    </html>
+  `);
+  win.document.close();
+
+  const grupo = getNombreGrupoPdf();
+  const encargados = getEncargadosGrupoPdf();
+
+  const carnetFrenteUrl = await resolveArchivoEspecialUrl(item, "carnetFrente");
+  const carnetReversoUrl = await resolveArchivoEspecialUrl(item, "carnetReverso");
+  const comprobantePagoUrl = await resolveArchivoEspecialUrl(item, "comprobantePago");
+
+  const filasGrupo = [
+    ["Nombre grupo", grupo],
+    ["ID grupo", String(state.groupId || "—")],
+    ["Colegio", normalizeTextUpper(state.group?.colegio || "—")],
+    ["Curso", normalizeTextUpper(state.group?.curso || "—")],
+    ["Año viaje", cleanText(state.group?.anoViaje || "—")],
+    ["Vendedora", cleanText(state.group?.vendedora || state.group?.vendedoraCorreo || "—")]
+  ];
+
+  const filasPersona = [
     ["Tipo inscripción", getEstadoOperativoInscripcionLabel(item)],
     ["Fecha formulario", formatFechaFormularioTabla(getFechaFormularioInscripcion(item))],
     ["RUT / Documento", getInscripcionDocumento(item)],
@@ -2452,7 +2597,20 @@ function descargarFichaInscripcionPdf(inscripcionId = "") {
     ]
   ];
 
+  const filasEncargados = encargados.flatMap((c) => [
+    [`${c.label} · Nombre`, c.nombre],
+    [`${c.label} · Rol`, c.rol],
+    [`${c.label} · Correo`, c.correo],
+    [`${c.label} · Teléfono`, c.celular]
+  ]);
+
   const nombreArchivo = `ficha_${normalizarRutExport(getInscripcionDocumento(item)) || inscripcionId}.pdf`;
+
+  const documentosHtml = `
+    ${renderPdfDocumentoImagen("Carnet de identidad · Frente", carnetFrenteUrl)}
+    ${renderPdfDocumentoImagen("Carnet de identidad · Reverso", carnetReversoUrl)}
+    ${renderPdfDocumentoImagen("Comprobante de pago", comprobantePagoUrl)}
+  `.trim();
 
   const html = `
     <!doctype html>
@@ -2460,53 +2618,84 @@ function descargarFichaInscripcionPdf(inscripcionId = "") {
       <head>
         <meta charset="UTF-8" />
         <title>${escapeHtml(nombreArchivo)}</title>
+
         <style>
           @page {
             size: A4;
-            margin: 18mm;
+            margin: 14mm;
           }
 
           body {
             font-family: Arial, sans-serif;
             color: #241238;
             margin: 0;
-            font-size: 12px;
+            font-size: 11px;
           }
 
-          .header {
+          .top {
             border-bottom: 3px solid #4b1979;
-            padding-bottom: 12px;
-            margin-bottom: 18px;
+            padding-bottom: 10px;
+            margin-bottom: 12px;
           }
 
-          .title {
-            font-size: 22px;
-            font-weight: 800;
-            margin: 0 0 6px;
+          .brand {
+            font-size: 11px;
+            font-weight: 900;
+            color: #4b1979;
+            letter-spacing: .08em;
+            text-transform: uppercase;
+            margin-bottom: 5px;
           }
 
-          .subtitle {
-            font-size: 13px;
-            color: #5f4a72;
-            margin: 0;
+          .doc-title {
+            font-size: 18px;
+            font-weight: 900;
+            margin: 0 0 10px;
+            text-transform: uppercase;
+          }
+
+          .group-name-box {
+            background: #f4eff9;
+            border: 1px solid #ddd6e8;
+            border-radius: 12px;
+            padding: 12px;
+            margin-top: 8px;
+          }
+
+          .group-label {
+            font-size: 9px;
+            font-weight: 900;
+            color: #6b5a78;
+            text-transform: uppercase;
+            letter-spacing: .06em;
+            margin-bottom: 4px;
+          }
+
+          .group-name {
+            font-size: 20px;
+            line-height: 1.15;
+            font-weight: 900;
+            color: #241238;
           }
 
           .section-title {
-            font-size: 14px;
-            font-weight: 800;
-            margin: 18px 0 10px;
+            font-size: 12px;
+            font-weight: 900;
+            margin: 14px 0 7px;
             color: #4b1979;
+            text-transform: uppercase;
           }
 
           .form-grid {
             border: 1px solid #ddd6e8;
             border-radius: 10px;
             overflow: hidden;
+            margin-bottom: 8px;
           }
 
           .row {
             display: grid;
-            grid-template-columns: 190px 1fr;
+            grid-template-columns: 170px 1fr;
             border-bottom: 1px solid #eee8f5;
           }
 
@@ -2516,22 +2705,51 @@ function descargarFichaInscripcionPdf(inscripcionId = "") {
 
           .label {
             background: #f4eff9;
-            padding: 10px 12px;
-            font-weight: 800;
+            padding: 7px 9px;
+            font-weight: 900;
             text-transform: uppercase;
-            font-size: 10px;
+            font-size: 8.5px;
             letter-spacing: .04em;
             color: #6b5a78;
           }
 
           .value {
-            padding: 10px 12px;
-            font-weight: 600;
+            padding: 7px 9px;
+            font-weight: 700;
+          }
+
+          .docs-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-top: 8px;
+          }
+
+          .doc-card {
+            border: 1px solid #ddd6e8;
+            border-radius: 10px;
+            padding: 8px;
+            break-inside: avoid;
+          }
+
+          .doc-card .doc-title {
+            font-size: 10px;
+            margin: 0 0 6px;
+            color: #4b1979;
+          }
+
+          .doc-card img {
+            width: 100%;
+            max-height: 230px;
+            object-fit: contain;
+            display: block;
+            border-radius: 6px;
+            background: #f7f3fb;
           }
 
           .footer {
-            margin-top: 18px;
-            font-size: 10px;
+            margin-top: 12px;
+            font-size: 9px;
             color: #786883;
           }
 
@@ -2544,23 +2762,47 @@ function descargarFichaInscripcionPdf(inscripcionId = "") {
       </head>
 
       <body>
-        <div class="header">
-          <h1 class="title">Ficha individual de inscripción</h1>
-          <p class="subtitle">
-            Grupo: ${escapeHtml(grupo)} · ID grupo: ${escapeHtml(String(state.groupId || ""))}
-          </p>
+        <div class="top">
+          <div class="brand">Turismo Rai Trai</div>
+          <h1 class="doc-title">Ficha individual de inscripción</h1>
+
+          <div class="group-name-box">
+            <div class="group-label">Grupo</div>
+            <div class="group-name">${escapeHtml(grupo)}</div>
+          </div>
         </div>
+
+        <div class="section-title">Datos del grupo</div>
+        <div class="form-grid">
+          ${renderPdfRows(filasGrupo)}
+        </div>
+
+        ${
+          filasEncargados.length
+            ? `
+              <div class="section-title">Encargado(s) del grupo</div>
+              <div class="form-grid">
+                ${renderPdfRows(filasEncargados)}
+              </div>
+            `
+            : ""
+        }
 
         <div class="section-title">Datos de la persona inscrita</div>
-
         <div class="form-grid">
-          ${filas.map(([label, value]) => `
-            <div class="row">
-              <div class="label">${escapeHtml(label)}</div>
-              <div class="value">${escapeHtml(value || "—")}</div>
-            </div>
-          `).join("")}
+          ${renderPdfRows(filasPersona)}
         </div>
+
+        ${
+          documentosHtml
+            ? `
+              <div class="section-title">Documentos adjuntos</div>
+              <div class="docs-grid">
+                ${documentosHtml}
+              </div>
+            `
+            : ""
+        }
 
         <div class="footer">
           Documento generado desde el portafolio del grupo el ${escapeHtml(new Date().toLocaleString("es-CL"))}.
@@ -2569,19 +2811,14 @@ function descargarFichaInscripcionPdf(inscripcionId = "") {
         <script>
           window.onload = function () {
             document.title = ${JSON.stringify(nombreArchivo)};
-            window.print();
+            setTimeout(function () {
+              window.print();
+            }, 600);
           };
         </script>
       </body>
     </html>
   `;
-
-  const win = window.open("", "_blank");
-
-  if (!win) {
-    alert("El navegador bloqueó la ventana emergente. Permite pop-ups para generar el PDF.");
-    return;
-  }
 
   win.document.open();
   win.document.write(html);
