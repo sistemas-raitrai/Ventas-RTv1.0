@@ -913,7 +913,11 @@ async function loadHomeData() {
     state.rows.map((row) => [getRowId(row), row])
   );
   
-  state.inscripcionesRows = await cargarInscripcionesHome(state.rows);
+  state.inscripcionesRows = [];
+
+  setTimeout(() => {
+    cargarInscripcionesHomeEnSegundoPlano();
+  }, 100);
 
   state.alertRows = alertsSnap.docs.map((docSnap) => ({
     id: docSnap.id,
@@ -947,6 +951,7 @@ async function loadHomeData() {
   state.alertasPagosRows = [];
   state.alertasPagosCargadas = false;
   state.alertasPagosFiltradasRows = [];
+  renderInfoAlertasPagosHome();
 
   console.timeEnd("PROCESAR_DATOS_HOME");
   console.timeEnd("HOME_TOTAL");
@@ -988,6 +993,32 @@ function renderInfoAlertasPagosHome() {
   el.textContent = state.alertasPagosUltimaActualizacion
     ? `Última actualización: ${formatDate(state.alertasPagosUltimaActualizacion)}`
     : "Última actualización: sin registro";
+}
+
+async function cargarInscripcionesHomeEnSegundoPlano() {
+  try {
+    console.time("CARGA_INSCRIPCIONES_HOME_SEGUNDO_PLANO");
+
+    const rowsCandidatas = state.rows.filter((row) => {
+      const ano = getAnoViajeNumber(row);
+      if (!ano || ano < 2026) return false;
+
+      return (
+        normalizeLoose(row.estado).includes("ganad") ||
+        row.inscripcionHabilitada === true ||
+        row.inscripcion ||
+        row.tokenInscripcion
+      );
+    });
+
+    state.inscripcionesRows = await cargarInscripcionesHome(rowsCandidatas);
+
+    console.timeEnd("CARGA_INSCRIPCIONES_HOME_SEGUNDO_PLANO");
+
+    renderHome();
+  } catch (error) {
+    console.error("[home] Error cargando inscripciones en segundo plano", error);
+  }
 }
 
 async function cargarInscripcionesHome(rows = []) {
