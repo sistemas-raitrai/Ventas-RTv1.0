@@ -2202,7 +2202,16 @@ function renderInscripcionPasajerosPanel() {
                   <td>${index + 1}</td>
                   <td>${escapeHtml(getEstadoOperativoInscripcionLabel(item))}</td>
                   <td>${escapeHtml(formatFechaFormularioTabla(getFechaFormularioInscripcion(item)))}</td>
-                  <td>${escapeHtml(getInscripcionDocumento(item))}</td>
+                  <td>
+                    <button
+                      class="inscripcion-doc-link"
+                      type="button"
+                      title="Descargar ficha individual"
+                      data-descargar-ficha-inscripcion="${escapeHtml(item.id)}"
+                    >
+                      ${escapeHtml(getInscripcionDocumento(item))}
+                    </button>
+                  </td>
                   <td>${escapeHtml(getInscripcionApellidos(item))}</td>
                   <td>${escapeHtml(getInscripcionNombres(item))}</td>
                   <td>${escapeHtml(formatDateOnlyForTable(getByPath(item, "identificacion.fechaNacimiento")))}</td>
@@ -2406,6 +2415,177 @@ function formatInscripcionValue(value = "") {
 
   const key = normalizeSearchLocal(raw).replace(/\s+/g, "_");
   return map[key] || raw.replaceAll("_", " ");
+}
+
+function descargarFichaInscripcionPdf(inscripcionId = "") {
+  const item = state.inscripciones.find((x) => String(x.id) === String(inscripcionId));
+
+  if (!item) {
+    alert("No se encontró la inscripción seleccionada.");
+    return;
+  }
+
+  const grupo =
+    cleanText(state.group?.aliasGrupo) ||
+    cleanText(state.group?.nombreGrupo) ||
+    cleanText(state.group?.colegio) ||
+    String(state.groupId || "");
+
+  const filas = [
+    ["Tipo inscripción", getEstadoOperativoInscripcionLabel(item)],
+    ["Fecha formulario", formatFechaFormularioTabla(getFechaFormularioInscripcion(item))],
+    ["RUT / Documento", getInscripcionDocumento(item)],
+    ["Apellidos", getInscripcionApellidos(item)],
+    ["Nombres", getInscripcionNombres(item)],
+    ["Fecha nacimiento", formatDateOnlyForTable(getByPath(item, "identificacion.fechaNacimiento"))],
+    ["Tipo pasajero", formatInscripcionValue(item.tipoViajante || item.tipoParticipacion || "")],
+    ["Nacionalidad", getInscripcionNacionalidad(item)],
+    ["Sexo / género", getInscripcionGenero(item)],
+    ["Responsable", getResponsablePrincipalNombre(item)],
+    ["Correo responsable", getByPath(item, "contactoPrincipal.correo") || "—"],
+    [
+      "Celular responsable",
+      getByPath(item, "contactoPrincipal.celular") ||
+      getByPath(item, "contactoPrincipal.telefono") ||
+      getByPath(item, "contactoPrincipal.whatsapp") ||
+      "—"
+    ]
+  ];
+
+  const nombreArchivo = `ficha_${normalizarRutExport(getInscripcionDocumento(item)) || inscripcionId}.pdf`;
+
+  const html = `
+    <!doctype html>
+    <html>
+      <head>
+        <meta charset="UTF-8" />
+        <title>${escapeHtml(nombreArchivo)}</title>
+        <style>
+          @page {
+            size: A4;
+            margin: 18mm;
+          }
+
+          body {
+            font-family: Arial, sans-serif;
+            color: #241238;
+            margin: 0;
+            font-size: 12px;
+          }
+
+          .header {
+            border-bottom: 3px solid #4b1979;
+            padding-bottom: 12px;
+            margin-bottom: 18px;
+          }
+
+          .title {
+            font-size: 22px;
+            font-weight: 800;
+            margin: 0 0 6px;
+          }
+
+          .subtitle {
+            font-size: 13px;
+            color: #5f4a72;
+            margin: 0;
+          }
+
+          .section-title {
+            font-size: 14px;
+            font-weight: 800;
+            margin: 18px 0 10px;
+            color: #4b1979;
+          }
+
+          .form-grid {
+            border: 1px solid #ddd6e8;
+            border-radius: 10px;
+            overflow: hidden;
+          }
+
+          .row {
+            display: grid;
+            grid-template-columns: 190px 1fr;
+            border-bottom: 1px solid #eee8f5;
+          }
+
+          .row:last-child {
+            border-bottom: 0;
+          }
+
+          .label {
+            background: #f4eff9;
+            padding: 10px 12px;
+            font-weight: 800;
+            text-transform: uppercase;
+            font-size: 10px;
+            letter-spacing: .04em;
+            color: #6b5a78;
+          }
+
+          .value {
+            padding: 10px 12px;
+            font-weight: 600;
+          }
+
+          .footer {
+            margin-top: 18px;
+            font-size: 10px;
+            color: #786883;
+          }
+
+          @media print {
+            .no-print {
+              display: none;
+            }
+          }
+        </style>
+      </head>
+
+      <body>
+        <div class="header">
+          <h1 class="title">Ficha individual de inscripción</h1>
+          <p class="subtitle">
+            Grupo: ${escapeHtml(grupo)} · ID grupo: ${escapeHtml(String(state.groupId || ""))}
+          </p>
+        </div>
+
+        <div class="section-title">Datos de la persona inscrita</div>
+
+        <div class="form-grid">
+          ${filas.map(([label, value]) => `
+            <div class="row">
+              <div class="label">${escapeHtml(label)}</div>
+              <div class="value">${escapeHtml(value || "—")}</div>
+            </div>
+          `).join("")}
+        </div>
+
+        <div class="footer">
+          Documento generado desde el portafolio del grupo el ${escapeHtml(new Date().toLocaleString("es-CL"))}.
+        </div>
+
+        <script>
+          window.onload = function () {
+            document.title = ${JSON.stringify(nombreArchivo)};
+            window.print();
+          };
+        </script>
+      </body>
+    </html>
+  `;
+
+  const win = window.open("", "_blank", "noopener,noreferrer");
+
+  if (!win) {
+    alert("El navegador bloqueó la ventana emergente. Permite pop-ups para generar el PDF.");
+    return;
+  }
+
+  win.document.open();
+  win.document.write(html);
+  win.document.close();
 }
 
 function renderFichaPanel() {
@@ -7064,6 +7244,13 @@ function bindEvents() {
     if (!btn) return;
   
     openReenviarCorreoInscripcionModal(btn.dataset.reenviarCorreoInscripcion);
+  });
+
+  document.addEventListener("click", (event) => {
+    const btn = event.target.closest("[data-descargar-ficha-inscripcion]");
+    if (!btn) return;
+  
+    descargarFichaInscripcionPdf(btn.dataset.descargarFichaInscripcion);
   });
 
   document.addEventListener("click", (e) => {
