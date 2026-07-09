@@ -4320,65 +4320,85 @@ async function cerrarInscripcion() {
 }
 
 async function marcarListaEsperaPagada(inscripcionId = "") {
-  if (!puedeMarcarListaEsperaPagada()) {
-    alert("Solo Administración o Admin pueden marcar lista de espera como pagada.");
-    return;
-  }
-
-  const item = state.inscripciones.find((x) => x.id === inscripcionId);
-  if (!item) {
-    alert("No se encontró la inscripción seleccionada.");
-    return;
-  }
-
-  const nombre = [
-    getInscripcionNombres(item),
-    getInscripcionApellidos(item)
-  ].filter(Boolean).join(" ");
-
-  const ok = confirm(`¿Confirmar que ${nombre || "esta persona"} pagó los $100.000 de lista de espera?`);
-  if (!ok) return;
-
-  const ref = doc(
-    db,
-    "ventas_cotizaciones",
-    String(state.groupDocId),
-    "inscripciones",
-    String(inscripcionId)
-  );
-
-  await updateDoc(ref, {
-    tipoInscripcion: "lista_espera_pagada",
-    estadoCupo: "pagado",
-    listaEsperaPagada: true,
-    listaEsperaPagadaPor: getDisplayName(state.effectiveUser),
-    listaEsperaPagadaPorCorreo: state.effectiveEmail,
-    listaEsperaPagadaAt: serverTimestamp()
+  console.log("[INSCRIPCIONES] Entró a marcarListaEsperaPagada", {
+    inscripcionId,
+    email: state.effectiveEmail,
+    rol: state.effectiveUser?.rol,
+    estadoGrupo: state.group?.estado,
+    puedeOperarListaEsperaAdministrativa: puedeOperarListaEsperaAdministrativa(),
+    puedeMarcarListaEsperaPagada: puedeMarcarListaEsperaPagada()
   });
 
-  await sincronizarAlertaInscripcion({
-    ...item,
-    tipoInscripcion: "lista_espera_pagada",
-    estadoCupo: "pagado"
-  });
-
-  await createHistoryEntry({
-    tipoMovimiento: "inscripcion_lista_espera_pagada",
-    modulo: "inscripcion",
-    titulo: "Lista de espera pagada",
-    mensaje: `${getDisplayName(state.effectiveUser)} marcó como pagada la lista de espera de ${nombre || "una persona"}.`,
-    metadata: {
-      inscripcionId,
-      documento: getInscripcionDocumento(item),
-      nombreCompleto: nombre
+  try {
+    if (!puedeMarcarListaEsperaPagada()) {
+      alert("Solo Administración o Admin pueden marcar lista de espera como pagada.");
+      return;
     }
-  });
 
-  await loadInscripciones();
-  renderInscripcionPasajerosPanel();
-  syncButtons();
+    const item = state.inscripciones.find((x) => x.id === inscripcionId);
+    if (!item) {
+      alert("No se encontró la inscripción seleccionada.");
+      return;
+    }
 
-  showSaveNotice("Lista de espera marcada como pagada.");
+    const nombre = [
+      getInscripcionNombres(item),
+      getInscripcionApellidos(item)
+    ].filter(Boolean).join(" ");
+
+    const ok = confirm(`¿Confirmar que ${nombre || "esta persona"} pagó los $100.000 de lista de espera?`);
+    if (!ok) return;
+
+    const ref = doc(
+      db,
+      "ventas_cotizaciones",
+      String(state.groupDocId),
+      "inscripciones",
+      String(inscripcionId)
+    );
+
+    console.log("[INSCRIPCIONES] Intentando updateDoc lista espera pagada", {
+      path: `ventas_cotizaciones/${state.groupDocId}/inscripciones/${inscripcionId}`
+    });
+
+    await updateDoc(ref, {
+      tipoInscripcion: "lista_espera_pagada",
+      estadoCupo: "pagado",
+      listaEsperaPagada: true,
+      listaEsperaPagadaPor: getDisplayName(state.effectiveUser),
+      listaEsperaPagadaPorCorreo: state.effectiveEmail,
+      listaEsperaPagadaAt: serverTimestamp()
+    });
+
+    console.log("[INSCRIPCIONES] updateDoc lista espera pagada OK");
+
+    await sincronizarAlertaInscripcion({
+      ...item,
+      tipoInscripcion: "lista_espera_pagada",
+      estadoCupo: "pagado"
+    });
+
+    await createHistoryEntry({
+      tipoMovimiento: "inscripcion_lista_espera_pagada",
+      modulo: "inscripcion",
+      titulo: "Lista de espera pagada",
+      mensaje: `${getDisplayName(state.effectiveUser)} marcó como pagada la lista de espera de ${nombre || "una persona"}.`,
+      metadata: {
+        inscripcionId,
+        documento: getInscripcionDocumento(item),
+        nombreCompleto: nombre
+      }
+    });
+
+    await loadInscripciones();
+    renderInscripcionPasajerosPanel();
+    syncButtons();
+
+    showSaveNotice("Lista de espera marcada como pagada.");
+  } catch (error) {
+    console.error("[INSCRIPCIONES] Error al marcar lista de espera pagada", error);
+    alert("Error al marcar lista de espera como pagada: " + error.message);
+  }
 }
 
 async function confirmarCupoListaEspera(inscripcionId = "") {
@@ -7752,6 +7772,21 @@ function bindEvents() {
     if (!btn) return;
   
     confirmarCupoListaEspera(btn.dataset.confirmarCupo);
+  });
+
+  document.addEventListener("click", (event) => {
+    const btn = event.target.closest("[data-marcar-lista-pagada]");
+    if (!btn) return;
+  
+    console.log("[INSCRIPCIONES] Click Marcar pagado detectado", {
+      inscripcionId: btn.dataset.marcarListaPagada,
+      email: state.effectiveEmail,
+      rol: state.effectiveUser?.rol,
+      estadoGrupo: state.group?.estado,
+      puedeMarcarListaEsperaPagada: puedeMarcarListaEsperaPagada()
+    });
+  
+    marcarListaEsperaPagada(btn.dataset.marcarListaPagada);
   });
 
   document.addEventListener("click", (event) => {
