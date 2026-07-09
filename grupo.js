@@ -2763,6 +2763,11 @@ async function generarFichaInscripcionPdfFinal(inscripcionId = "", recortes = {}
             background: #f7f3fb;
           }
 
+          .docs-page {
+            page-break-before: always;
+            break-before: page;
+          }
+
           .footer {
             margin-top: 12px;
             font-size: 9px;
@@ -2782,9 +2787,12 @@ async function generarFichaInscripcionPdfFinal(inscripcionId = "", recortes = {}
           </div>
         </div>
 
+        <div class="section-title">Datos de la persona inscrita</div>
+        <div class="form-grid">${renderPdfRows(filasPersona)}</div>
+        
         <div class="section-title">Datos del grupo</div>
         <div class="form-grid">${renderPdfRows(filasGrupo)}</div>
-
+        
         ${
           filasEncargados.length
             ? `
@@ -2794,14 +2802,13 @@ async function generarFichaInscripcionPdfFinal(inscripcionId = "", recortes = {}
             : ""
         }
 
-        <div class="section-title">Datos de la persona inscrita</div>
-        <div class="form-grid">${renderPdfRows(filasPersona)}</div>
-
         ${
           documentosHtml
             ? `
-              <div class="section-title">Documentos adjuntos</div>
-              <div class="docs-grid">${documentosHtml}</div>
+              <div class="docs-page">
+                <div class="section-title">Documentos adjuntos</div>
+                <div class="docs-grid">${documentosHtml}</div>
+              </div>
             `
             : ""
         }
