@@ -9,7 +9,9 @@ import {
   getDoc,
   setDoc,
   deleteDoc,
-  serverTimestamp
+  serverTimestamp,
+  query,
+  where
 } from "https://www.gstatic.com/firebasejs/11.7.3/firebase-firestore.js";
 
 import { auth, db, VENTAS_USERS } from "./firebase-init.js";
@@ -55,6 +57,7 @@ const ALERTAS_COLLECTION = "ventas_alertas";
 const SOLICITUDES_COLLECTION = "ventas_solicitudes_actualizacion";
 const PRIVATE_NOTES_COLLECTION = "ventas_notas_privadas";
 const PRIVATE_NOTE_PAGE = "index";
+const ALERTAS_INSCRIPCIONES_COLLECTION = "ventas_alertas_inscripciones";
 
 const searchableInstances = {};
 
@@ -117,6 +120,10 @@ const state = {
   alertasWarningRows: [],
   solicitudesRows: [],
   solicitudesActualizacionRows: [],
+  inscripcionesRows: [],
+  inscripcionNuevoIngresoRows: [],
+  inscripcionListaEsperaRows: [],
+  listaEsperaPagadaRows: [],
   aContactarRows: []
 };
 
@@ -1161,6 +1168,9 @@ function syncAlertRowsByRole(effectiveUser = null) {
   setAlertRowVisibleByChild("link-solicitudes-actualizacion", canSeeSolicitudes);
   setAlertRowVisibleByChild("link-alertas-criticas", canSeeAlertasCriticas);
   setAlertRowVisibleByChild("link-alertas-warning", canSeeAlertasWarning);
+  setAlertRowVisibleByChild("link-inscripcion-nuevo-ingreso", !!user);
+  setAlertRowVisibleByChild("link-inscripcion-lista-espera", !!user);
+  setAlertRowVisibleByChild("link-lista-espera-pagada", !!user);
   setAlertRowVisibleByChild("count-pendientes", false);
 }
 
@@ -1993,20 +2003,422 @@ function closeAlertasWarningModal() {
   dialog.removeAttribute("open");
 }
 
+/* =========================================================
+   ALERTAS DE INSCRIPCIONES
+========================================================= */
 
+function esInscripcionNuevoIngresoPendiente(item = {}) {
+  return (
+    item.activa !== false &&
+    item.resuelta !== true &&
+    String(item.tipoAlerta || "").trim() === "nuevo_ingreso_pendiente"
+  );
+}
+
+function esInscripcionListaEsperaPendiente(item = {}) {
+  return (
+    item.activa !== false &&
+    item.resuelta !== true &&
+    String(item.tipoAlerta || "").trim() === "lista_espera_pendiente"
+  );
+}
+
+function esListaEsperaPagadaPendienteConfirmar(item = {}) {
+  return (
+    item.activa !== false &&
+    item.resuelta !== true &&
+    String(item.tipoAlerta || "").trim() ===
+      "lista_espera_pagada_pendiente_confirmar"
+  );
+}
+
+function getInscripcionFechaDashboard(item = {}) {
+  return (
+    item.fechaFormulario ||
+    item.creadaAt ||
+    item.creadoAt ||
+    item.actualizadoAt ||
+    ""
+  );
+}
+
+function getInscripcionNombreDashboard(item = {}) {
+  return String(
+    item.nombreParticipante ||
+    item.nombreCompleto ||
+    "Sin nombre"
+  ).trim();
+}
+
+function getInscripcionResponsableDashboard(item = {}) {
+  return String(
+    item.nombreResponsable ||
+    item.responsable ||
+    "Sin responsable"
+  ).trim();
+}
+
+function getInscripcionCorreoDashboard(item = {}) {
+  return String(
+    item.correoResponsable ||
+    item.emailResponsable ||
+    ""
+  ).trim();
+}
+
+function getInscripcionTelefonoDashboard(item = {}) {
+  return String(
+    item.telefonoResponsable ||
+    item.celularResponsable ||
+    ""
+  ).trim();
+}
+
+function getGrupoIdAlertaInscripcion(item = {}) {
+  return String(
+    item.idGrupo ||
+    item.groupDocId ||
+    ""
+  ).trim();
+}
+
+function getGrupoAlertaInscripcion(item = {}) {
+  const idGrupo = String(item.idGrupo || "").trim();
+  const groupDocId = String(item.groupDocId || "").trim();
+
+  return (
+    state.rows.find((row) => {
+      const rowId = String(getRowId(row) || "").trim();
+      const rowDocId = String(row.id || "").trim();
+
+      return (
+        (idGrupo && rowId === idGrupo) ||
+        (groupDocId && rowDocId === groupDocId) ||
+        (groupDocId && rowId === groupDocId)
+      );
+    }) || null
+  );
+}
+
+function sortInscripcionesDashboard(rows = []) {
+  return [...rows].sort((a, b) => {
+    const grupoA = normalizeLoose(
+      a.aliasGrupo ||
+      a.colegio ||
+      getGrupoAlertaInscripcion(a)?.aliasGrupo ||
+      ""
+    );
+
+    const grupoB = normalizeLoose(
+      b.aliasGrupo ||
+      b.colegio ||
+      getGrupoAlertaInscripcion(b)?.aliasGrupo ||
+      ""
+    );
+
+    const porGrupo = grupoA.localeCompare(grupoB, "es", {
+      sensitivity: "base",
+      numeric: true
+    });
+
+    if (porGrupo !== 0) return porGrupo;
+
+    const fechaA =
+      timestampLikeToDate(getInscripcionFechaDashboard(a))?.getTime() || 0;
+
+    const fechaB =
+      timestampLikeToDate(getInscripcionFechaDashboard(b))?.getTime() || 0;
+
+    return fechaB - fechaA;
+  });
+}
+
+function formatFechaInscripcionDashboard(value) {
+  const fecha = timestampLikeToDate(value);
+
+  if (!fecha) return "Sin fecha";
+
+  return fecha.toLocaleString("es-CL", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false
+  });
+}
+
+function renderInscripcionesDashboardCards(rows = []) {
+  if (!rows.length) {
+    return `
+      <div
+        style="
+          padding:16px 18px;
+          border:1px solid rgba(60,40,90,.10);
+          border-radius:16px;
+          background:#faf8fd;
+          color:#5d546d;
+        "
+      >
+        No hay inscripciones para mostrar.
+      </div>
+    `;
+  }
+
+  return rows.map((item) => {
+    const grupoRow = getGrupoAlertaInscripcion(item) || {};
+
+    const idGrupo =
+      String(grupoRow.idGrupo || grupoRow.id || "").trim() ||
+      getGrupoIdAlertaInscripcion(item);
+
+    const aliasGrupo =
+      item.aliasGrupo ||
+      grupoRow.aliasGrupo ||
+      grupoRow.nombreGrupo ||
+      grupoRow.colegio ||
+      idGrupo ||
+      "Sin grupo";
+
+    const vendedor =
+      item.vendedora ||
+      grupoRow.vendedora ||
+      item.vendedoraCorreo ||
+      grupoRow.vendedoraCorreo ||
+      "Sin vendedor";
+
+    return `
+      <div
+        data-inscripcion-alerta-card
+        data-search-text="${escapeHtml(
+          normalizeLoose([
+            getInscripcionNombreDashboard(item),
+            aliasGrupo,
+            vendedor,
+            getInscripcionResponsableDashboard(item),
+            getInscripcionCorreoDashboard(item),
+            getInscripcionTelefonoDashboard(item),
+            item.documento || "",
+            item.estadoCupo || ""
+          ].join(" "))
+        )}"
+        style="
+          padding:14px 16px;
+          border:1px solid rgba(60,40,90,.12);
+          border-radius:16px;
+          background:#fff;
+          display:flex;
+          justify-content:space-between;
+          gap:14px;
+          align-items:flex-start;
+        "
+      >
+        <div style="min-width:0;">
+          <div
+            style="
+              font-weight:800;
+              color:#31194b;
+              font-size:16px;
+              line-height:1.2;
+            "
+          >
+            ${escapeHtml(getInscripcionNombreDashboard(item))}
+          </div>
+
+          <div
+            style="
+              margin-top:6px;
+              color:#6a6078;
+              font-size:13px;
+              line-height:1.45;
+            "
+          >
+            Grupo: ${escapeHtml(aliasGrupo)}<br>
+            Año: ${escapeHtml(item.anoViaje || grupoRow.anoViaje || "Sin año")} ·
+            Curso: ${escapeHtml(item.curso || grupoRow.curso || "Sin curso")}<br>
+            Vendedor(a): ${escapeHtml(vendedor)}<br>
+            Responsable: ${escapeHtml(getInscripcionResponsableDashboard(item))}<br>
+            Correo: ${escapeHtml(getInscripcionCorreoDashboard(item) || "Sin correo")}<br>
+            Teléfono: ${escapeHtml(getInscripcionTelefonoDashboard(item) || "Sin teléfono")}<br>
+            Fecha formulario:
+            ${escapeHtml(
+              formatFechaInscripcionDashboard(
+                getInscripcionFechaDashboard(item)
+              )
+            )}<br>
+            Estado cupo: ${escapeHtml(item.estadoCupo || "Sin estado")}
+          </div>
+        </div>
+
+        <a
+          href="grupo.html?id=${encodeURIComponent(idGrupo)}"
+          target="_blank"
+          rel="noopener"
+          style="
+            flex:0 0 auto;
+            text-decoration:none;
+            background:#3b2357;
+            color:#fff;
+            border-radius:999px;
+            padding:10px 14px;
+            font-weight:700;
+            white-space:nowrap;
+          "
+        >
+          Abrir grupo
+        </a>
+      </div>
+    `;
+  }).join("");
+}
+
+function getConfiguracionModalInscripcion(tipo = "") {
+  if (tipo === "nuevo_ingreso") {
+    return {
+      titulo: "Inscripción Nuevo Ingreso",
+      subtitulo: "Formularios de nuevo ingreso pendientes de confirmación.",
+      rows: state.inscripcionNuevoIngresoRows
+    };
+  }
+
+  if (tipo === "lista_espera") {
+    return {
+      titulo: "Inscripción Lista de Espera",
+      subtitulo: "Formularios de lista de espera pendientes de pago.",
+      rows: state.inscripcionListaEsperaRows
+    };
+  }
+
+  if (tipo === "lista_espera_pagada") {
+    return {
+      titulo: "Lista de Espera pendiente por confirmar",
+      subtitulo: "Listas de espera pagadas que todavía deben confirmarse.",
+      rows: state.listaEsperaPagadaRows
+    };
+  }
+
+  return {
+    titulo: "Inscripciones",
+    subtitulo: "Alertas de inscripción.",
+    rows: []
+  };
+}
+
+function pintarListadoAlertasInscripciones(rows = []) {
+  const lista = $("alertas-inscripciones-lista");
+  const resumen = $("alertas-inscripciones-resumen");
+
+  if (!lista || !resumen) return;
+
+  resumen.textContent = rows.length
+    ? `Hay ${rows.length} inscripción(es) en este listado.`
+    : "No hay inscripciones pendientes en este listado.";
+
+  lista.innerHTML = renderInscripcionesDashboardCards(rows);
+}
+
+function openAlertasInscripcionesModal(tipo = "") {
+  const dialog = $("modal-alertas-inscripciones");
+  if (!dialog) return;
+
+  const config = getConfiguracionModalInscripcion(tipo);
+
+  dialog.dataset.tipoInscripcion = tipo;
+
+  const titulo = $("alertas-inscripciones-titulo");
+  const subtitulo = $("alertas-inscripciones-subtitulo");
+  const buscador = $("alertas-inscripciones-buscador");
+
+  if (titulo) titulo.textContent = config.titulo;
+  if (subtitulo) subtitulo.textContent = config.subtitulo;
+  if (buscador) buscador.value = "";
+
+  pintarListadoAlertasInscripciones(config.rows || []);
+
+  if (typeof dialog.showModal === "function") {
+    if (!dialog.open) dialog.showModal();
+  } else {
+    dialog.setAttribute("open", "open");
+  }
+}
+
+function closeAlertasInscripcionesModal() {
+  const dialog = $("modal-alertas-inscripciones");
+  if (!dialog) return;
+
+  if (typeof dialog.close === "function") {
+    dialog.close();
+  } else {
+    dialog.removeAttribute("open");
+  }
+}
+
+function filtrarModalAlertasInscripciones() {
+  const dialog = $("modal-alertas-inscripciones");
+  const buscador = $("alertas-inscripciones-buscador");
+
+  if (!dialog || !buscador) return;
+
+  const tipo = dialog.dataset.tipoInscripcion || "";
+  const config = getConfiguracionModalInscripcion(tipo);
+  const q = normalizeLoose(buscador.value || "");
+
+  const rows = q
+    ? (config.rows || []).filter((item) => {
+        const grupoRow = getGrupoAlertaInscripcion(item) || {};
+
+        const texto = normalizeLoose([
+          getInscripcionNombreDashboard(item),
+          item.aliasGrupo,
+          item.colegio,
+          grupoRow.aliasGrupo,
+          grupoRow.nombreGrupo,
+          grupoRow.colegio,
+          item.vendedora,
+          item.vendedoraCorreo,
+          grupoRow.vendedora,
+          grupoRow.vendedoraCorreo,
+          getInscripcionResponsableDashboard(item),
+          getInscripcionCorreoDashboard(item),
+          getInscripcionTelefonoDashboard(item),
+          item.documento,
+          item.estadoCupo
+        ].join(" "));
+
+        return texto.includes(q);
+      })
+    : config.rows || [];
+
+  pintarListadoAlertasInscripciones(rows);
+}
 
 /* =========================================================
    CARGA DE DATOS
 ========================================================= */
 async function loadDashboardData() {
-  const [groupsSnap, alertsSnap, solicitudesSnap] = await Promise.all([
+  const [
+    groupsSnap,
+    alertsSnap,
+    solicitudesSnap,
+    alertasInscripcionesSnap
+  ] = await Promise.all([
     getDocs(collection(db, "ventas_cotizaciones")),
+
     getDocs(collection(db, ALERTAS_COLLECTION)),
-    getDocs(collection(db, SOLICITUDES_COLLECTION))
+
+    getDocs(collection(db, SOLICITUDES_COLLECTION)),
+
+    getDocs(
+      query(
+        collection(db, ALERTAS_INSCRIPCIONES_COLLECTION),
+        where("activa", "==", true)
+      )
+    )
   ]);
 
   state.rows = groupsSnap.docs.map((docSnap) => {
     const data = docSnap.data() || {};
+
     return {
       id: docSnap.id,
       idGrupo: data.idGrupo || docSnap.id,
@@ -2027,6 +2439,15 @@ async function loadDashboardData() {
     id: docSnap.id,
     ...docSnap.data()
   }));
+
+  state.inscripcionesRows = alertasInscripcionesSnap.docs.map((docSnap) => ({
+    id: docSnap.id,
+    ...docSnap.data()
+  }));
+
+  console.log("[DASHBOARD] Alertas de inscripción cargadas", {
+    total: state.inscripcionesRows.length
+  });
 }
 
 /* =========================================================
@@ -2160,29 +2581,39 @@ function renderSingleTotalLink(targetId, bucket, count = 0) {
 
 function inicializarDashboardEnCeros() {
   state.scopedRows = [];
+
   state.fichasPorFirmarRows = [];
   state.fichasCorregidasRows = [];
   state.alertasCriticasRows = [];
   state.alertasWarningRows = [];
   state.solicitudesActualizacionRows = [];
-  
+
+  state.inscripcionesRows = [];
+  state.inscripcionNuevoIngresoRows = [];
+  state.inscripcionListaEsperaRows = [];
+  state.listaEsperaPagadaRows = [];
+
   const setText = (id, value) => {
     const el = $(id);
     if (el) el.textContent = value;
   };
 
-  const effectiveUser = getEffectiveUser();
-  
   setText("count-sin-asignar", "0");
   setSinAsignarManagementHref();
+
   setText("count-a-contactar", "0");
   setText("count-fichas-firmar", "0");
   setText("count-fichas-corregidas", "0");
   setText("count-solicitudes-actualizacion", "0");
+
+  setText("count-inscripcion-nuevo-ingreso", "0");
+  setText("count-inscripcion-lista-espera", "0");
+  setText("count-lista-espera-pagada", "0");
+
   setText("count-alertas-criticas", "0");
   setText("count-alertas-warning", "0");
   setText("count-reunion-3dias", "0");
-  
+
   syncAlertRowsByRole(getEffectiveUser());
 
   renderBucketLinks("contactados-top", "contactados", []);
@@ -2191,6 +2622,7 @@ function inicializarDashboardEnCeros() {
   renderBucketLinks("perdidas-top", "perdidas", []);
   renderBucketLinks("recotizando-top", "recotizando", []);
   renderBucketLinks("ganadas-top", "ganadas", []);
+
   renderFichaAdminBucketLinks("abiertas-top", "abiertas", []);
   renderFichaAdminBucketLinks("cerradas-top", "cerradas", []);
   renderFichaAdminBucketLinks("autorizadas-top", "autorizadas", []);
@@ -2280,6 +2712,51 @@ function renderDashboard(rows = []) {
   state.aContactarRows = aContactarRows;
   const reuniones3DiasRows = scopedRows.filter(isReunionEnProximosTresDias);
 
+    /* =======================================================
+     ALERTAS DE INSCRIPCIÓN SEGÚN VISTA / VENDEDOR
+  ======================================================= */
+
+  const scopedIdsInscripciones = new Set(
+    scopedRows
+      .map((row) => String(getRowId(row) || "").trim())
+      .filter(Boolean)
+  );
+
+  const scopedDocIdsInscripciones = new Set(
+    scopedRows
+      .map((row) => String(row.id || "").trim())
+      .filter(Boolean)
+  );
+
+  const inscripcionesScope = (state.inscripcionesRows || [])
+    .filter((item) => {
+      if (item.activa === false || item.resuelta === true) {
+        return false;
+      }
+
+      const idGrupo = String(item.idGrupo || "").trim();
+      const groupDocId = String(item.groupDocId || "").trim();
+
+      return (
+        scopedIdsInscripciones.has(idGrupo) ||
+        scopedIdsInscripciones.has(groupDocId) ||
+        scopedDocIdsInscripciones.has(idGrupo) ||
+        scopedDocIdsInscripciones.has(groupDocId)
+      );
+    });
+
+  state.inscripcionNuevoIngresoRows = sortInscripcionesDashboard(
+    inscripcionesScope.filter(esInscripcionNuevoIngresoPendiente)
+  );
+
+  state.inscripcionListaEsperaRows = sortInscripcionesDashboard(
+    inscripcionesScope.filter(esInscripcionListaEsperaPendiente)
+  );
+
+  state.listaEsperaPagadaRows = sortInscripcionesDashboard(
+    inscripcionesScope.filter(esListaEsperaPagadaPendienteConfirmar)
+  );
+
   // ALERTAS
   setText("count-sin-asignar", sinAsignarRows.length);
   setSinAsignarManagementHref();
@@ -2289,6 +2766,22 @@ function renderDashboard(rows = []) {
   setText("count-fichas-firmar", fichasPorFirmar.length);
   setText("count-fichas-corregidas", fichasCorregidas.length);
   setText("count-solicitudes-actualizacion", solicitudesActualizacion.length);
+
+  setText(
+    "count-inscripcion-nuevo-ingreso",
+    state.inscripcionNuevoIngresoRows.length
+  );
+
+  setText(
+    "count-inscripcion-lista-espera",
+    state.inscripcionListaEsperaRows.length
+  );
+
+  setText(
+    "count-lista-espera-pagada",
+    state.listaEsperaPagadaRows.length
+  );
+
   setText("count-alertas-criticas", alertasCriticas.length);
   setText("count-alertas-warning", alertasWarning.length);
   setText("count-reunion-3dias", reuniones3DiasRows.length);
