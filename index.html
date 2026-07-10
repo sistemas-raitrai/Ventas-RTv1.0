@@ -442,6 +442,108 @@
         <div id="fichas-admin-lista" style="display:grid; gap:12px;"></div>
       </div>
     </dialog>
+
+    <dialog
+      id="modal-alertas-inscripciones"
+      style="
+        width:min(940px, calc(100vw - 32px));
+        max-height:calc(100vh - 40px);
+        border:none;
+        border-radius:22px;
+        padding:0;
+        box-shadow:0 24px 64px rgba(24,16,36,.28);
+      "
+    >
+      <div
+        style="
+          padding:20px 22px 16px;
+          border-bottom:1px solid rgba(60,40,90,.12);
+          display:flex;
+          justify-content:space-between;
+          align-items:flex-start;
+          gap:16px;
+          position:sticky;
+          top:0;
+          background:#fff;
+          z-index:2;
+        "
+      >
+        <div>
+          <h3
+            id="alertas-inscripciones-titulo"
+            style="
+              margin:0;
+              font-size:24px;
+              color:#31194b;
+            "
+          >
+            Inscripciones
+          </h3>
+    
+          <p
+            id="alertas-inscripciones-subtitulo"
+            style="
+              margin:6px 0 0;
+              color:#6a6078;
+              font-size:14px;
+            "
+          >
+            Alertas de inscripción.
+          </p>
+        </div>
+    
+        <button
+          id="btn-cerrar-alertas-inscripciones"
+          type="button"
+          style="
+            border:none;
+            background:#ece8f4;
+            color:#31194b;
+            border-radius:999px;
+            padding:10px 14px;
+            cursor:pointer;
+            font-weight:700;
+          "
+        >
+          Cerrar
+        </button>
+      </div>
+    
+      <div style="padding:18px 22px 22px;">
+        <div
+          id="alertas-inscripciones-resumen"
+          style="
+            margin-bottom:14px;
+            color:#4b405a;
+            font-size:14px;
+          "
+        ></div>
+    
+        <input
+          id="alertas-inscripciones-buscador"
+          type="search"
+          placeholder="Buscar participante, grupo, vendedor, correo..."
+          style="
+            width:100%;
+            min-height:44px;
+            margin-bottom:14px;
+            border-radius:999px;
+            border:1px solid rgba(60,40,90,.18);
+            padding:0 15px;
+            font:inherit;
+            outline:none;
+          "
+        />
+    
+        <div
+          id="alertas-inscripciones-lista"
+          style="
+            display:grid;
+            gap:12px;
+          "
+        ></div>
+      </div>
+    </dialog>
   </main>
 
   <script type="module" src="layout.js"></script>
