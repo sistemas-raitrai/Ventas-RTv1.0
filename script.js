@@ -3226,6 +3226,24 @@ async function initPage() {
   const linkAlertasWarning = $("link-alertas-warning");
   const btnCerrarAlertasWarning = $("btn-cerrar-alertas-warning");
   const modalAlertasWarning = $("modal-alertas-warning");
+
+  const linkInscripcionNuevoIngreso =
+    $("link-inscripcion-nuevo-ingreso");
+
+  const linkInscripcionListaEspera =
+    $("link-inscripcion-lista-espera");
+
+  const linkListaEsperaPagada =
+    $("link-lista-espera-pagada");
+
+  const btnCerrarAlertasInscripciones =
+    $("btn-cerrar-alertas-inscripciones");
+
+  const modalAlertasInscripciones =
+    $("modal-alertas-inscripciones");
+
+  const buscadorAlertasInscripciones =
+    $("alertas-inscripciones-buscador");
   
   const selectGrupo = $("select-grupo");
   const selectApoderado = $("select-apoderado");
@@ -3498,6 +3516,78 @@ async function initPage() {
         closeAlertasWarningModal();
       }
     });
+  }
+
+  if (
+    linkInscripcionNuevoIngreso &&
+    !linkInscripcionNuevoIngreso.dataset.bound
+  ) {
+    linkInscripcionNuevoIngreso.dataset.bound = "1";
+
+    linkInscripcionNuevoIngreso.addEventListener("click", (e) => {
+      e.preventDefault();
+      openAlertasInscripcionesModal("nuevo_ingreso");
+    });
+  }
+
+  if (
+    linkInscripcionListaEspera &&
+    !linkInscripcionListaEspera.dataset.bound
+  ) {
+    linkInscripcionListaEspera.dataset.bound = "1";
+
+    linkInscripcionListaEspera.addEventListener("click", (e) => {
+      e.preventDefault();
+      openAlertasInscripcionesModal("lista_espera");
+    });
+  }
+
+  if (
+    linkListaEsperaPagada &&
+    !linkListaEsperaPagada.dataset.bound
+  ) {
+    linkListaEsperaPagada.dataset.bound = "1";
+
+    linkListaEsperaPagada.addEventListener("click", (e) => {
+      e.preventDefault();
+      openAlertasInscripcionesModal("lista_espera_pagada");
+    });
+  }
+
+  if (
+    btnCerrarAlertasInscripciones &&
+    !btnCerrarAlertasInscripciones.dataset.bound
+  ) {
+    btnCerrarAlertasInscripciones.dataset.bound = "1";
+
+    btnCerrarAlertasInscripciones.addEventListener("click", () => {
+      closeAlertasInscripcionesModal();
+    });
+  }
+
+  if (
+    modalAlertasInscripciones &&
+    !modalAlertasInscripciones.dataset.bound
+  ) {
+    modalAlertasInscripciones.dataset.bound = "1";
+
+    modalAlertasInscripciones.addEventListener("click", (e) => {
+      if (e.target === modalAlertasInscripciones) {
+        closeAlertasInscripcionesModal();
+      }
+    });
+  }
+
+  if (
+    buscadorAlertasInscripciones &&
+    !buscadorAlertasInscripciones.dataset.bound
+  ) {
+    buscadorAlertasInscripciones.dataset.bound = "1";
+
+    buscadorAlertasInscripciones.addEventListener(
+      "input",
+      filtrarModalAlertasInscripciones
+    );
   }
 
   onAuthStateChanged(auth, (user) => {
