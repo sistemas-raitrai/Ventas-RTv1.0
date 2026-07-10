@@ -218,9 +218,12 @@
 
     body[data-page="home"] .home-modal{
       width:min(1500px, calc(100vw - 16px));
+      max-width:none;
+      max-height:94vh;
       border:none;
       border-radius:24px;
       padding:0;
+      overflow:hidden;
       box-shadow:0 24px 64px rgba(24,16,36,.28);
     }
 
@@ -262,6 +265,9 @@
 
     body[data-page="home"] .home-modal-body{
       padding:18px 22px 22px;
+      max-height:calc(94vh - 92px);
+      overflow:auto;
+      box-sizing:border-box;
     }
 
     body[data-page="home"] .home-modal-list{
