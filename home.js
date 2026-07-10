@@ -2029,15 +2029,27 @@ function getAlertasPagosForScope(scopedRows = []) {
 function buildAlertasPagosFiltrosHtml(rows = []) {
   const anoOperativo = String(obtenerAnoOperativoHome());
 
-  const anos = [...new Set(rows.map((r) => String(r.anoViaje || "").trim()).filter(Boolean))].sort();
+  const anos = [...new Set(
+    rows
+      .map((r) => String(r.anoViaje || "").trim())
+      .filter(Boolean)
+  )].sort();
 
   const vendedores = [...new Map(
     rows
-      .map((r) => [normalizeEmail(r.vendedoraCorreo || ""), r.vendedor || r.vendedoraCorreo || "Sin vendedor"])
+      .map((r) => [
+        normalizeEmail(r.vendedoraCorreo || ""),
+        r.vendedor || r.vendedoraCorreo || "Sin vendedor"
+      ])
       .filter(([email]) => email)
   ).entries()];
 
-  const monedas = [...new Set(rows.map((r) => String(r.moneda || "").trim()).filter(Boolean))].sort();
+  const monedas = [...new Set(
+    rows
+      .map((r) => String(r.moneda || "").trim())
+      .filter(Boolean)
+  )].sort();
+
   const destinos = [
     "Chile",
     "Argentina",
@@ -2045,8 +2057,11 @@ function buildAlertasPagosFiltrosHtml(rows = []) {
     "Otros"
   ];
 
+  const tiposAlertas = getTiposAlertasPagosUI();
+
   const filtroControlStyle = `
     width:100%;
+    min-width:0;
     min-height:38px;
     padding:9px 12px;
     border:1px solid rgba(49,25,75,.22);
@@ -2059,110 +2074,327 @@ function buildAlertasPagosFiltrosHtml(rows = []) {
     box-sizing:border-box;
   `;
 
+  const renderChip = (item, activo = false) => {
+    const esGrupal = item.categoria === "grupo";
+
+    const backgroundNormal = esGrupal ? "#f6f0fb" : "#fff";
+    const colorNormal = esGrupal ? "#694583" : "#654d78";
+    const borderNormal = esGrupal
+      ? "1px solid rgba(109,74,146,.28)"
+      : "1px solid rgba(49,25,75,.18)";
+
+    const backgroundActivo = esGrupal ? "#e4d3f1" : "#eadff7";
+    const colorActivo = esGrupal ? "#4d216e" : "#32184f";
+    const borderActivo = esGrupal
+      ? "2px solid #6d4a92"
+      : "2px solid #32184f";
+
+    return `
+      <button
+        type="button"
+        class="chip-alerta-pago ${activo ? "is-active" : ""}"
+        data-tipo-alerta-pago="${escapeHtml(item.tipo)}"
+        data-chip-categoria="${escapeHtml(item.categoria)}"
+        data-bg-normal="${escapeHtml(backgroundNormal)}"
+        data-color-normal="${escapeHtml(colorNormal)}"
+        data-border-normal="${escapeHtml(borderNormal)}"
+        data-bg-activo="${escapeHtml(backgroundActivo)}"
+        data-color-activo="${escapeHtml(colorActivo)}"
+        data-border-activo="${escapeHtml(borderActivo)}"
+        style="
+          border:${activo ? borderActivo : borderNormal};
+          background:${activo ? backgroundActivo : backgroundNormal};
+          color:${activo ? colorActivo : colorNormal};
+          border-radius:999px;
+          padding:8px 12px;
+          font-weight:900;
+          cursor:pointer;
+          font-size:12px;
+          white-space:nowrap;
+        "
+      >
+        ${escapeHtml(item.label)}
+      </button>
+    `;
+  };
+
   return `
-    <div style="display:flex; justify-content:space-between; gap:12px; align-items:center; flex-wrap:wrap; margin-bottom:14px;">
+    <div
+      style="
+        display:flex;
+        justify-content:space-between;
+        gap:12px;
+        align-items:center;
+        flex-wrap:wrap;
+        margin-bottom:14px;
+      "
+    >
       <div style="font-size:13px; color:#4b405a;">
         <strong>Última actualización:</strong>
-        ${state.alertasPagosUltimaActualizacion ? escapeHtml(formatDate(state.alertasPagosUltimaActualizacion)) : "Sin actualización"}
+        ${
+          state.alertasPagosUltimaActualizacion
+            ? escapeHtml(formatDate(state.alertasPagosUltimaActualizacion))
+            : "Sin actualización"
+        }
       </div>
 
       <div style="display:flex; gap:8px; flex-wrap:wrap;">
-        <button type="button" id="btn-exportar-alertas-pagos" class="home-btn" style="background:#6d4a92;">
+        <button
+          type="button"
+          id="btn-exportar-alertas-pagos"
+          class="home-btn"
+          style="background:#6d4a92;"
+        >
           Exportar XLSX
         </button>
 
-        <!-- <button type="button" id="btn-actualizar-alertas-pagos" class="home-btn">
+        <!--
+        <button
+          type="button"
+          id="btn-actualizar-alertas-pagos"
+          class="home-btn"
+        >
           Actualizar
-        </button> -->
+        </button>
+        -->
       </div>
     </div>
 
-    <div style="display:grid; grid-template-columns:repeat(4, minmax(140px, 1fr)); gap:10px; margin-bottom:12px;">
-      <select id="filtro-alerta-pago-ano" style="${filtroControlStyle}">
+    <div
+      style="
+        display:grid;
+        grid-template-columns:
+          minmax(90px, 120px)
+          minmax(180px, 1.3fr)
+          minmax(130px, .85fr)
+          minmax(140px, .95fr)
+          minmax(150px, .95fr);
+        gap:10px;
+        margin-bottom:10px;
+        align-items:center;
+      "
+    >
+      <select
+        id="filtro-alerta-pago-ano"
+        style="${filtroControlStyle}"
+      >
         <option value="">Todos los años</option>
+
         ${anos.map((a) => `
-          <option value="${escapeHtml(a)}" ${String(a) === anoOperativo ? "selected" : ""}>
+          <option
+            value="${escapeHtml(a)}"
+            ${String(a) === anoOperativo ? "selected" : ""}
+          >
             ${escapeHtml(a)}
           </option>
         `).join("")}
       </select>
 
-      <select id="filtro-alerta-pago-vendedor" style="${filtroControlStyle}">
+      <select
+        id="filtro-alerta-pago-vendedor"
+        style="${filtroControlStyle}"
+      >
         <option value="">Todos los vendedores</option>
+
         ${vendedores.map(([email, nombre]) => `
-          <option value="${escapeHtml(email)}">${escapeHtml(nombre)}</option>
+          <option value="${escapeHtml(email)}">
+            ${escapeHtml(nombre)}
+          </option>
         `).join("")}
       </select>
 
-      <select id="filtro-alerta-pago-moneda" style="${filtroControlStyle}">
+      <select
+        id="filtro-alerta-pago-moneda"
+        style="${filtroControlStyle}"
+      >
         <option value="">Todas las monedas</option>
-        ${monedas.map((m) => `<option value="${escapeHtml(m)}">${escapeHtml(m)}</option>`).join("")}
+
+        ${monedas.map((m) => `
+          <option value="${escapeHtml(m)}">
+            ${escapeHtml(m)}
+          </option>
+        `).join("")}
       </select>
-      
-      <select id="filtro-alerta-pago-destino" style="${filtroControlStyle}">
+
+      <select
+        id="filtro-alerta-pago-destino"
+        style="${filtroControlStyle}"
+      >
         <option value="">Todos los destinos</option>
-        ${destinos.map((d) => `<option value="${escapeHtml(d)}">${escapeHtml(d)}</option>`).join("")}
+
+        ${destinos.map((d) => `
+          <option value="${escapeHtml(d)}">
+            ${escapeHtml(d)}
+          </option>
+        `).join("")}
       </select>
-      
-      <select id="filtro-alerta-pago-prioridad" style="${filtroControlStyle}">
+
+      <select
+        id="filtro-alerta-pago-prioridad"
+        style="${filtroControlStyle}"
+      >
         <option value="">Todas las prioridades</option>
         <option value="critica">Crítica</option>
         <option value="alta">Alta</option>
         <option value="media">Media</option>
         <option value="baja">Baja</option>
       </select>
-      
-      <input id="filtro-alerta-pago-buscar" style="${filtroControlStyle}" type="search" placeholder="Buscar participante, grupo, correo..." />
     </div>
 
-    <div id="chips-alertas-pagos" style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:14px;">
-      ${getTiposAlertasPagosUI().map((item) => {
-        const activo = item.tipo === "__todos__";
-    
-        return `
-          <button
-            type="button"
-            class="chip-alerta-pago ${activo ? "is-active" : ""}"
-            data-tipo-alerta-pago="${escapeHtml(item.tipo)}"
-            style="
-              border:${activo ? "2px solid #32184f" : "1px solid rgba(49,25,75,.18)"};
-              background:${activo ? "#f4eefb" : "#fff"};
-              color:${activo ? "#32184f" : "#766b84"};
-              border-radius:999px;
-              padding:8px 11px;
-              font-weight:900;
-              cursor:pointer;
-              font-size:12px;
-            "
-          >
-            ${escapeHtml(item.label)}
-          </button>
-        `;
-      }).join("")}
+    <div style="margin-bottom:14px;">
+      <input
+        id="filtro-alerta-pago-buscar"
+        style="${filtroControlStyle}"
+        type="search"
+        placeholder="Buscar participante, responsable, grupo, correo, RUT, vendedor..."
+      />
     </div>
 
-    <div id="resumen-alertas-pagos" style="margin-bottom:12px;"></div>
+    <div
+      id="chips-alertas-pagos"
+      style="
+        display:grid;
+        gap:12px;
+        margin-bottom:16px;
+      "
+    >
+      <div
+        style="
+          padding:12px 14px;
+          border-radius:16px;
+          background:#fbf9fd;
+          border:1px solid rgba(49,25,75,.10);
+        "
+      >
+        <div
+          style="
+            margin-bottom:9px;
+            color:#32184f;
+            font-size:12px;
+            font-weight:900;
+            text-transform:uppercase;
+            letter-spacing:.35px;
+          "
+        >
+          Alertas individuales
+        </div>
+
+        <div style="display:flex; flex-wrap:wrap; gap:8px;">
+          ${tiposAlertas.individuales.map((item) =>
+            renderChip(
+              item,
+              item.tipo === "__todas_individuales__"
+            )
+          ).join("")}
+        </div>
+      </div>
+
+      <div
+        style="
+          padding:12px 14px;
+          border-radius:16px;
+          background:#f7f1fb;
+          border:1px solid rgba(109,74,146,.18);
+        "
+      >
+        <div
+          style="
+            margin-bottom:9px;
+            color:#5c3279;
+            font-size:12px;
+            font-weight:900;
+            text-transform:uppercase;
+            letter-spacing:.35px;
+          "
+        >
+          Alertas grupales
+        </div>
+
+        <div style="display:flex; flex-wrap:wrap; gap:8px;">
+          ${tiposAlertas.grupales.map((item) =>
+            renderChip(item, false)
+          ).join("")}
+        </div>
+      </div>
+    </div>
+
+    <div
+      id="resumen-alertas-pagos"
+      style="margin-bottom:12px;"
+    ></div>
+
     <div id="contenedor-alertas-pagos-listado"></div>
   `;
 }
 
 function getTiposAlertasPagosUI() {
-  return [
-    { tipo: "__todos__", label: "Todos" },
+  return {
+    individuales: [
+      {
+        tipo: "__todas_individuales__",
+        label: "Todas las individuales",
+        categoria: "persona"
+      },
+      {
+        tipo: "persona_sin_pagos_o_sin_inscripcion",
+        label: "Nunca pagó / inscripción",
+        categoria: "persona"
+      },
+      {
+        tipo: "persona_pago_bajo",
+        label: "Pago <550",
+        categoria: "persona"
+      },
+      {
+        tipo: "persona_atrasada_1_cuota",
+        label: "1 cuota atrasada",
+        categoria: "persona"
+      },
+      {
+        tipo: "persona_atrasada_2_mas_cuotas",
+        label: "2+ cuotas atrasadas",
+        categoria: "persona"
+      },
+      {
+        tipo: "persona_muy_atrasada_50",
+        label: "Muy atrasado +50%",
+        categoria: "persona"
+      }
+    ],
 
-    { tipo: "persona_sin_pagos_o_sin_inscripcion", label: "Nunca pagó / inscripción" },
-    { tipo: "persona_pago_bajo", label: "Pago <550" },
-    { tipo: "persona_atrasada_1_cuota", label: "1 cuota atrasada" },
-    { tipo: "persona_atrasada_2_mas_cuotas", label: "2+ cuotas atrasadas" },
-    { tipo: "persona_muy_atrasada_50", label: "Muy atrasado +50%" },
-
-    { tipo: "grupo_debe_mas_50", label: "Grupo debe >50%" },
-    { tipo: "grupo_10_mas_atrasados_2_cuotas", label: "10+ con 2 cuotas" },
-    { tipo: "grupo_no_va_al_dia", label: "Grupo no va al día" },
-
-    { tipo: "grupo_liberados_parciales", label: "Liberados parciales" },
-    { tipo: "grupo_saldo_a_favor", label: "Saldo a favor" }
-  ];
+    grupales: [
+      {
+        tipo: "__todas_grupales__",
+        label: "Todas las grupales",
+        categoria: "grupo"
+      },
+      {
+        tipo: "grupo_debe_mas_50",
+        label: "Grupo debe >50%",
+        categoria: "grupo"
+      },
+      {
+        tipo: "grupo_10_mas_atrasados_2_cuotas",
+        label: "10+ con 2 cuotas",
+        categoria: "grupo"
+      },
+      {
+        tipo: "grupo_no_va_al_dia",
+        label: "Grupo no va al día",
+        categoria: "grupo"
+      },
+      {
+        tipo: "grupo_liberados_parciales",
+        label: "Liberados parciales",
+        categoria: "grupo"
+      },
+      {
+        tipo: "grupo_saldo_a_favor",
+        label: "Saldo a favor",
+        categoria: "grupo"
+      }
+    ]
+  };
 }
 
 function getTiposActivosAlertasPagos() {
@@ -2353,32 +2585,77 @@ function filtrarAlertasPagosModal(rows = []) {
   const moneda = $("filtro-alerta-pago-moneda")?.value || "";
   const destino = $("filtro-alerta-pago-destino")?.value || "";
   const prioridad = $("filtro-alerta-pago-prioridad")?.value || "";
-  const q = normalizeLoose($("filtro-alerta-pago-buscar")?.value || "");
+
+  const q = normalizeLoose(
+    $("filtro-alerta-pago-buscar")?.value || ""
+  );
+
   const tiposActivos = getTiposActivosAlertasPagos();
 
-  return ordenarAlertasPagos(rows.filter((row) => {
-    if (ano && String(row.anoViaje || "") !== ano) return false;
-    if (vendedor && normalizeEmail(row.vendedoraCorreo || "") !== vendedor) return false;
-    if (moneda && String(row.moneda || "") !== moneda) return false;
-    if (destino && getZonaDestinoPago(row.destino) !== destino) return false;
-    if (prioridad && getPrioridadPagoKey(row) !== prioridad) return false;
+  return ordenarAlertasPagos(
+    rows.filter((row) => {
+      if (
+        ano &&
+        String(row.anoViaje || "") !== ano
+      ) {
+        return false;
+      }
 
-    if (!tiposActivos.size) return false;
+      if (
+        vendedor &&
+        normalizeEmail(row.vendedoraCorreo || "") !== vendedor
+      ) {
+        return false;
+      }
 
-    // Pestaña "Todos"
-    if (tiposActivos.has("__todos__")) {
-      if (row.categoriaAlerta !== "persona") return false;
-    } else if (!tiposActivos.has(String(row.tipo || ""))) {
-      return false;
-    }
+      if (
+        moneda &&
+        String(row.moneda || "") !== moneda
+      ) {
+        return false;
+      }
 
-    if (q) {
-      const texto = buildSearchText(row);
-      if (!texto.includes(q)) return false;
-    }
+      if (
+        destino &&
+        getZonaDestinoPago(row.destino) !== destino
+      ) {
+        return false;
+      }
 
-    return true;
-  }));
+      if (
+        prioridad &&
+        getPrioridadPagoKey(row) !== prioridad
+      ) {
+        return false;
+      }
+
+      if (!tiposActivos.size) {
+        return false;
+      }
+
+      if (tiposActivos.has("__todas_individuales__")) {
+        if (row.categoriaAlerta !== "persona") {
+          return false;
+        }
+      } else if (tiposActivos.has("__todas_grupales__")) {
+        if (row.categoriaAlerta !== "grupo") {
+          return false;
+        }
+      } else if (!tiposActivos.has(String(row.tipo || ""))) {
+        return false;
+      }
+
+      if (q) {
+        const texto = buildSearchText(row);
+
+        if (!texto.includes(q)) {
+          return false;
+        }
+      }
+
+      return true;
+    })
+  );
 }
 
 function renderAlertasPagosListado(rows = []) {
@@ -3111,21 +3388,37 @@ async function abrirModalAlertasPagos() {
 
     document.querySelectorAll("[data-tipo-alerta-pago]").forEach((btn) => {
       if (btn.dataset.bound) return;
+    
       btn.dataset.bound = "1";
-
+    
       btn.addEventListener("click", () => {
-        document.querySelectorAll("[data-tipo-alerta-pago]").forEach((b) => {
-          b.classList.remove("is-active");
-          b.style.background = "#fff";
-          b.style.color = "#766b84";
-          b.style.border = "1px solid rgba(49,25,75,.18)";
-        });
-
+        document
+          .querySelectorAll("[data-tipo-alerta-pago]")
+          .forEach((otroBtn) => {
+            otroBtn.classList.remove("is-active");
+    
+            otroBtn.style.background =
+              otroBtn.dataset.bgNormal || "#fff";
+    
+            otroBtn.style.color =
+              otroBtn.dataset.colorNormal || "#766b84";
+    
+            otroBtn.style.border =
+              otroBtn.dataset.borderNormal ||
+              "1px solid rgba(49,25,75,.18)";
+          });
+    
         btn.classList.add("is-active");
-        btn.style.background = "#f4eefb";
-        btn.style.color = "#32184f";
-        btn.style.border = "2px solid #32184f";
-
+    
+        btn.style.background =
+          btn.dataset.bgActivo || "#eadff7";
+    
+        btn.style.color =
+          btn.dataset.colorActivo || "#32184f";
+    
+        btn.style.border =
+          btn.dataset.borderActivo || "2px solid #32184f";
+    
         refrescar();
       });
     });
