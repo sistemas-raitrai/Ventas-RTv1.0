@@ -5012,6 +5012,227 @@ window.borrarInscripcionesGrupo = async function ({ rut = "", confirmar = false 
   console.log(`Listo. Borradas ${candidatos.length} inscripción(es).`);
 };
 
+window.limpiarAlertasInscripcionesEliminadas = async function ({
+  tipo = "todas",
+  confirmar = false
+} = {}) {
+  if (!canEditarNominaInscripcion()) {
+    console.error("No tienes permisos para limpiar alertas de inscripción.");
+    return;
+  }
+
+  const tipoNormalizado = normalizeSearchLocal(tipo || "todas");
+
+  const tiposPermitidos = {
+    todas: [
+      "nuevo_ingreso_pendiente",
+      "lista_espera_pendiente",
+      "lista_espera_pagada_pendiente_confirmar"
+    ],
+
+    nuevos: [
+      "nuevo_ingreso_pendiente"
+    ],
+
+    lista_espera: [
+      "lista_espera_pendiente",
+      "lista_espera_pagada_pendiente_confirmar"
+    ]
+  };
+
+  const tiposAlertaObjetivo =
+    tiposPermitidos[tipoNormalizado] ||
+    tiposPermitidos.todas;
+
+  if (!confirmar) {
+    console.warn("Esta función apagará alertas que ya no tienen una inscripción visible.");
+
+    console.warn("Limpiar NUEVOS INGRESOS y LISTAS DE ESPERA:");
+    console.warn(`
+await limpiarAlertasInscripcionesEliminadas({
+  tipo: "todas",
+  confirmar: true
+})
+    `);
+
+    console.warn("Limpiar solo NUEVOS INGRESOS:");
+    console.warn(`
+await limpiarAlertasInscripcionesEliminadas({
+  tipo: "nuevos",
+  confirmar: true
+})
+    `);
+
+    console.warn("Limpiar solo LISTAS DE ESPERA:");
+    console.warn(`
+await limpiarAlertasInscripcionesEliminadas({
+  tipo: "lista_espera",
+  confirmar: true
+})
+    `);
+
+    return;
+  }
+
+  console.log("[ALERTAS INSCRIPCIONES] Iniciando limpieza", {
+    groupDocId: state.groupDocId,
+    idGrupo: state.groupId,
+    tipo,
+    tiposAlertaObjetivo
+  });
+
+  /*
+    state.inscripciones solo contiene inscripciones visibles.
+    Las borradas ya no existen.
+    Las archivadas quedan fuera por el filtro de loadInscripciones().
+  */
+  const idsInscripcionesActivas = new Set(
+    state.inscripciones
+      .map((item) => String(item.id || "").trim())
+      .filter(Boolean)
+  );
+
+  const snap = await getDocs(
+    collection(db, ALERTAS_INSCRIPCIONES_COLLECTION)
+  );
+
+  const alertasGrupo = snap.docs
+    .map((docSnap) => ({
+      id: docSnap.id,
+      ...docSnap.data()
+    }))
+    .filter((alerta) => {
+      const mismoGroupDocId =
+        String(alerta.groupDocId || "").trim() ===
+        String(state.groupDocId || "").trim();
+
+      const mismoIdGrupo =
+        String(alerta.idGrupo || "").trim() ===
+        String(state.groupId || "").trim();
+
+      return mismoGroupDocId || mismoIdGrupo;
+    })
+    .filter((alerta) => {
+      if (alerta.activa === false) return false;
+      if (alerta.resuelta === true) return false;
+
+      return tiposAlertaObjetivo.includes(
+        String(alerta.tipoAlerta || "").trim()
+      );
+    });
+
+  const alertasHuerfanas = alertasGrupo.filter((alerta) => {
+    const inscripcionId = String(alerta.inscripcionId || "").trim();
+
+    // Alertas antiguas sin inscripcionId también se limpian.
+    if (!inscripcionId) return true;
+
+    return !idsInscripcionesActivas.has(inscripcionId);
+  });
+
+  console.log("[ALERTAS INSCRIPCIONES] Resultado revisión", {
+    alertasActivasEncontradas: alertasGrupo.length,
+    alertasHuerfanas: alertasHuerfanas.length,
+    inscripcionesVisibles: idsInscripcionesActivas.size
+  });
+
+  if (!alertasHuerfanas.length) {
+    console.log("No se encontraron alertas huérfanas para limpiar.");
+
+    alert(
+      `No se encontraron alertas huérfanas.\n\n` +
+      `Alertas revisadas: ${alertasGrupo.length}`
+    );
+
+    return {
+      revisadas: alertasGrupo.length,
+      limpiadas: 0
+    };
+  }
+
+  console.table(
+    alertasHuerfanas.map((alerta) => ({
+      alertaId: alerta.id,
+      inscripcionId: alerta.inscripcionId || "SIN ID",
+      tipoAlerta: alerta.tipoAlerta || "",
+      participante: alerta.nombreParticipante || "Sin nombre",
+      documento: alerta.documento || "",
+      estadoCupo: alerta.estadoCupo || "",
+      activa: alerta.activa,
+      resuelta: alerta.resuelta
+    }))
+  );
+
+  const ok = confirm(
+    `Se encontraron ${alertasHuerfanas.length} alerta(s) ` +
+    `sin una inscripción visible.\n\n` +
+    `¿Quieres marcarlas como resueltas?`
+  );
+
+  if (!ok) {
+    console.warn("Limpieza cancelada.");
+    return;
+  }
+
+  let limpiadas = 0;
+  let errores = 0;
+
+  for (const alerta of alertasHuerfanas) {
+    try {
+      await setDoc(
+        doc(db, ALERTAS_INSCRIPCIONES_COLLECTION, alerta.id),
+        {
+          activa: false,
+          resuelta: true,
+
+          motivoResolucion: "inscripcion_eliminada_o_archivada",
+          resueltaAt: serverTimestamp(),
+          resueltaPor: getDisplayName(state.effectiveUser),
+          resueltaPorCorreo: state.effectiveEmail,
+
+          actualizadoAt: serverTimestamp()
+        },
+        { merge: true }
+      );
+
+      limpiadas += 1;
+
+      console.log("[ALERTA LIMPIADA]", {
+        alertaId: alerta.id,
+        inscripcionId: alerta.inscripcionId || "",
+        tipoAlerta: alerta.tipoAlerta || "",
+        participante: alerta.nombreParticipante || ""
+      });
+    } catch (error) {
+      errores += 1;
+
+      console.error("[ERROR LIMPIANDO ALERTA]", {
+        alertaId: alerta.id,
+        error
+      });
+    }
+  }
+
+  console.log("[ALERTAS INSCRIPCIONES] Limpieza finalizada", {
+    alertasRevisadas: alertasGrupo.length,
+    alertasLimpiadas: limpiadas,
+    errores
+  });
+
+  alert(
+    `Limpieza finalizada.\n\n` +
+    `Alertas revisadas: ${alertasGrupo.length}\n` +
+    `Alertas limpiadas: ${limpiadas}\n` +
+    `Errores: ${errores}`
+  );
+
+  return {
+    revisadas: alertasGrupo.length,
+    limpiadas,
+    errores
+  };
+};
+
 window.reenviarCorreoTransferenciaListaEspera = async function ({ rut = "", inscripcionId = "" } = {}) {
   const textoRut = normalizeSearchLocal(rut || "");
   const textoId = cleanText(inscripcionId || "");
