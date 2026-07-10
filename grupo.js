@@ -2649,8 +2649,8 @@ async function generarFichaInscripcionPdfFinal(inscripcionId = "", recortes = {}
     ["Grupo", grupoTitulo],
     ["N° negocio", numeroNegocio],
     ["ID grupo", String(state.groupId || "—")],
-    ["Colegio", normalizeTextUpper(state.group?.colegio || "—")],
-    ["Curso", normalizeTextUpper(state.group?.curso || "—")],
+    ["Nombre Colegio", normalizeTextUpper(state.group?.colegio || "—")],
+    ["Curso al momento de inscribirse", normalizeTextUpper(state.group?.curso || "—")],
     ["Año viaje", cleanText(state.group?.anoViaje || "—")],
     ["Vendedor(a)", cleanText(state.group?.vendedora || state.group?.vendedoraCorreo || "—")]
   ];
