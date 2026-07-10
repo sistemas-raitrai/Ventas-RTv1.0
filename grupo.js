@@ -4535,11 +4535,20 @@ async function confirmarNuevoIngreso(inscripcionId = "") {
     nuevoIngresoConfirmadoAt: serverTimestamp()
   });
 
-  await sincronizarAlertaInscripcion({
-    ...item,
-    tipoInscripcion: "nuevo_ingreso_confirmado",
-    estadoCupo: "confirmado"
-  });
+  const alertaRef = doc(
+    db,
+    ALERTAS_INSCRIPCIONES_COLLECTION,
+    getDocIdAlertaInscripcion(item.id)
+  );
+  
+  await setDoc(alertaRef, {
+    activa: false,
+    resuelta: true,
+    resueltaAt: serverTimestamp(),
+    resueltaPor: getDisplayName(state.effectiveUser),
+    resueltaPorCorreo: state.effectiveEmail,
+    actualizadoAt: serverTimestamp()
+  }, { merge: true });
 
   await createHistoryEntry({
     tipoMovimiento: "inscripcion_nuevo_ingreso_confirmado",
@@ -4866,11 +4875,20 @@ window.archivarInscripcionesGrupo = async function ({ rut = "", confirmar = fals
       }
     });
 
-    await sincronizarAlertaInscripcion({
-      ...item,
-      tipoInscripcion: "archivada",
-      estadoCupo: "archivada"
-    });
+    const alertaRef = doc(
+      db,
+      ALERTAS_INSCRIPCIONES_COLLECTION,
+      getDocIdAlertaInscripcion(item.id)
+    );
+    
+    await setDoc(alertaRef, {
+      activa: false,
+      resuelta: true,
+      resueltaAt: serverTimestamp(),
+      resueltaPor: getDisplayName(state.effectiveUser),
+      resueltaPorCorreo: state.effectiveEmail,
+      actualizadoAt: serverTimestamp()
+    }, { merge: true });
   }
 
   await createHistoryEntry({
