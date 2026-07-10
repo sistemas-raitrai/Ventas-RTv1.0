@@ -1774,20 +1774,211 @@ function getPrioridadPagoLabel(alerta = {}) {
   return "Baja";
 }
 
+function redondearNumeroCuotas(valor = 0) {
+  const numero = Number(valor || 0);
+
+  if (!Number.isFinite(numero) || numero <= 0) {
+    return 0;
+  }
+
+  return Math.round(numero * 10) / 10;
+}
+
+function formatearNumeroCuotas(valor = 0) {
+  const numero = redondearNumeroCuotas(valor);
+
+  if (Number.isInteger(numero)) {
+    return String(numero);
+  }
+
+  return numero.toLocaleString("es-CL", {
+    minimumFractionDigits: 1,
+    maximumFractionDigits: 1
+  });
+}
+
+function getInfoCuotasAlertaPago(alerta = {}) {
+  const cantidadCuotas = Math.max(
+    0,
+    Number(alerta.cantidadCuotas || 0)
+  );
+
+  const cuotasVencidas = Math.max(
+    0,
+    Number(alerta.cuotasVencidas || 0)
+  );
+
+  const cuotasPagadasEstimadas = Math.max(
+    0,
+    Number(
+      alerta.cuotasPagadasEstimadas ??
+      alerta.cuotasCubiertas ??
+      0
+    )
+  );
+
+  const cuotasAtrasadasReales = Math.max(
+    0,
+    Number(alerta.cuotasAtrasadas || 0)
+  );
+
+  /*
+    Regla operativa:
+    si debe 2,3 cuotas, se considera que registra
+    3 cuotas atrasadas.
+  */
+  const cuotasAtrasadasOperativas =
+    cuotasAtrasadasReales > 0
+      ? Math.ceil(cuotasAtrasadasReales)
+      : 0;
+
+  const valorCuota = Math.max(
+    0,
+    Number(alerta.valorCuota || 0)
+  );
+
+  return {
+    cantidadCuotas,
+    cuotasVencidas,
+    cuotasPagadasEstimadas,
+    cuotasAtrasadasReales,
+    cuotasAtrasadasOperativas,
+    valorCuota
+  };
+}
+
+function getTextoAvanceCuotasPago(alerta = {}) {
+  const info = getInfoCuotasAlertaPago(alerta);
+
+  if (!info.cantidadCuotas) {
+    return "";
+  }
+
+  const partes = [];
+
+  if (info.cuotasPagadasEstimadas > 0) {
+    partes.push(
+      `Registra pagos equivalentes a ${formatearNumeroCuotas(info.cuotasPagadasEstimadas)} ` +
+      `${info.cuotasPagadasEstimadas === 1 ? "cuota" : "cuotas"} de ${info.cantidadCuotas}.`
+    );
+  } else {
+    partes.push(
+      `No registra pagos equivalentes a cuotas del plan de ${info.cantidadCuotas} cuotas.`
+    );
+  }
+
+  if (info.cuotasVencidas > 0) {
+    partes.push(
+      `A esta fecha debería ir en la cuota ${info.cuotasVencidas} de ${info.cantidadCuotas}.`
+    );
+  }
+
+  if (info.cuotasAtrasadasOperativas > 0) {
+    partes.push(
+      `Registra ${info.cuotasAtrasadasOperativas} ` +
+      `${info.cuotasAtrasadasOperativas === 1 ? "cuota atrasada" : "cuotas atrasadas"}.`
+    );
+  } else if (info.cuotasVencidas > 0) {
+    partes.push("De acuerdo con este cálculo, no registra cuotas atrasadas.");
+  }
+
+  return partes.join(" ");
+}
+
+function getResumenCuotasTablaPago(alerta = {}) {
+  const info = getInfoCuotasAlertaPago(alerta);
+
+  if (!info.cantidadCuotas) {
+    return "";
+  }
+
+  const pagadas = formatearNumeroCuotas(info.cuotasPagadasEstimadas);
+
+  if (info.cuotasAtrasadasOperativas > 0) {
+    return (
+      `Pagos equivalentes a ${pagadas} de ${info.cantidadCuotas} · ` +
+      `Debería ir en ${info.cuotasVencidas} · ` +
+      `${info.cuotasAtrasadasOperativas} atrasada${info.cuotasAtrasadasOperativas === 1 ? "" : "s"}`
+    );
+  }
+
+  return (
+    `Pagos equivalentes a ${pagadas} de ${info.cantidadCuotas} · ` +
+    `Debería ir en ${info.cuotasVencidas}`
+  );
+}
+
+function renderDetalleCuotasAlertaPago(alerta = {}) {
+  const info = getInfoCuotasAlertaPago(alerta);
+
+  if (!info.cantidadCuotas) {
+    return `
+      <div style="margin-top:12px; padding:12px; border-radius:14px; background:#faf8fd; border:1px solid rgba(49,25,75,.10);">
+        <strong>Plan de cuotas:</strong> Sin información disponible.
+      </div>
+    `;
+  }
+
+  const cuotasPagadasTexto = formatearNumeroCuotas(
+    info.cuotasPagadasEstimadas
+  );
+
+  return `
+    <div style="
+      margin-top:12px;
+      padding:12px 14px;
+      border-radius:14px;
+      background:#f7f3fb;
+      border:1px solid rgba(49,25,75,.12);
+      color:#3e3550;
+      font-size:14px;
+      line-height:1.6;
+    ">
+      <strong>Plan de pagos</strong><br>
+
+      <strong>Cantidad total:</strong>
+      ${escapeHtml(info.cantidadCuotas)} cuotas<br>
+
+      <strong>Pagos equivalentes:</strong>
+      ${escapeHtml(cuotasPagadasTexto)} de
+      ${escapeHtml(info.cantidadCuotas)} cuotas<br>
+
+      <strong>Cuota esperada a esta fecha:</strong>
+      ${escapeHtml(info.cuotasVencidas)} de
+      ${escapeHtml(info.cantidadCuotas)}<br>
+
+      <strong>Atraso estimado:</strong>
+      ${escapeHtml(info.cuotasAtrasadasOperativas)}
+      ${info.cuotasAtrasadasOperativas === 1 ? "cuota" : "cuotas"}<br>
+
+      <strong>Valor referencial de cada cuota:</strong>
+      ${escapeHtml(formatoMontoPago(info.valorCuota, alerta.moneda))}
+    </div>
+  `;
+}
+
 function getTextoSugeridoPago(alerta = {}) {
   const responsable = alerta.responsable || "apoderado/a";
   const participante = alerta.participante || "el/la participante";
   const grupo = alerta.grupo || "su grupo";
   const moneda = alerta.moneda || "";
+
   const total = formatoMontoPago(alerta.totalDebe, moneda);
   const pagado = formatoMontoPago(alerta.totalPagado, moneda);
   const saldo = formatoMontoPago(alerta.saldoPendiente, moneda);
 
-  return `Estimado/a ${responsable}, junto con saludar, le escribimos respecto del viaje de estudios de ${participante}, correspondiente al grupo ${grupo}.
+  const textoCuotas = getTextoAvanceCuotasPago(alerta);
 
-Según nuestros registros, el total del programa es de ${total}, de los cuales actualmente se registra un pago de ${pagado}, quedando un saldo pendiente de ${saldo}.
+  return `Estimado/a ${responsable}:
 
-Le agradeceríamos regularizar esta situación o contactarnos para revisar el estado de pagos.`;
+Junto con saludar, le escribimos respecto del viaje de estudios de ${participante}, correspondiente al grupo ${grupo}.
+
+Según nuestros registros, el valor total del programa es de ${total}. Actualmente registra pagos por ${pagado}, manteniendo un saldo pendiente de ${saldo}.
+
+${textoCuotas ? `${textoCuotas}\n\n` : ""}Le agradeceríamos revisar esta información y regularizar las cuotas pendientes. Si existe algún pago que aún no se encuentre reflejado o requiere revisar su situación, puede contactarnos para verificarlo.
+
+Saludos cordiales,
+Turismo Rai Trai`;
 }
 
 function getFechaViajeConfirmadaOperacion(numeroNegocio = "") {
@@ -2105,10 +2296,16 @@ function getTextoWhatsappPago(alerta = {}) {
   const participante = alerta.participante || "el/la participante";
   const grupo = alerta.grupo || "su grupo";
   const moneda = alerta.moneda || "";
+
   const pagado = formatoMontoPago(alerta.totalPagado, moneda);
   const saldo = formatoMontoPago(alerta.saldoPendiente, moneda);
+  const textoCuotas = getTextoAvanceCuotasPago(alerta);
 
-  return `Hola ${responsable}, le escribimos de Turismo Rai Trai por el viaje de estudios de ${participante}, grupo ${grupo}. Según nuestros registros, se registra pagado ${pagado} y queda un saldo pendiente de ${saldo}. Le agradeceríamos regularizar o contactarnos para revisar el estado de pagos.`;
+  return `Hola ${responsable}, le escribimos de Turismo Rai Trai por el viaje de estudios de ${participante}, grupo ${grupo}.
+
+Actualmente registra pagos por ${pagado} y un saldo pendiente de ${saldo}.
+
+${textoCuotas ? `${textoCuotas}\n\n` : ""}Le agradeceríamos revisar esta información y regularizar las cuotas pendientes. Si existe algún pago que aún no se encuentre reflejado, puede contactarnos para verificarlo.`;
 }
 
 function getWhatsappUrlAlertaPago(alerta = {}) {
@@ -2245,7 +2442,16 @@ function renderAlertasPagosListado(rows = []) {
                 </td>
                 
                 <td style="padding:9px 10px;">${escapeHtml(alerta.vendedor || "Sin vendedor")}</td>
-                <td style="padding:9px 10px;">${escapeHtml(alerta.label || alerta.tipo || "-")}</td>
+                <td style="padding:9px 10px; min-width:210px;">
+                  <strong>${escapeHtml(alerta.label || alerta.tipo || "-")}</strong>
+                
+                  ${esPersona && getResumenCuotasTablaPago(alerta) ? `
+                    <br>
+                    <span style="display:inline-block; margin-top:4px; color:#766b84; line-height:1.4;">
+                      ${escapeHtml(getResumenCuotasTablaPago(alerta))}
+                    </span>
+                  ` : ""}
+                </td>
                 
                 <td style="padding:9px 10px; text-align:right;">
                   ${escapeHtml(formatoMontoPago(
@@ -2406,14 +2612,24 @@ function renderAlertaPagoCard(alerta = {}) {
 
         ${esPersona ? `
           <div style="margin-top:10px; color:#3e3550; font-size:14px; line-height:1.5;">
-            <strong>Responsable:</strong> ${escapeHtml(alerta.responsable || "-")}<br>
+            <strong>Apoderado(a):</strong> ${escapeHtml(alerta.responsable || "-")}<br>
             <strong>Correo:</strong> ${escapeHtml(alerta.correoResponsable || "-")}<br>
             <strong>Teléfono:</strong> ${escapeHtml(alerta.telefonoResponsable || "-")}<br>
-            <strong>Total:</strong> ${escapeHtml(formatoMontoPago(alerta.totalDebe, alerta.moneda))} ·
-            <strong>Pagado:</strong> ${escapeHtml(formatoMontoPago(alerta.totalPagado, alerta.moneda))} ·
-            <strong>Saldo:</strong> ${escapeHtml(formatoMontoPago(alerta.saldoPendiente, alerta.moneda))}<br>
-            <strong>Último pago:</strong> ${escapeHtml(alerta.ultimoPagoFecha || "Sin registro")}
+          
+            <strong>Total programa:</strong>
+            ${escapeHtml(formatoMontoPago(alerta.totalDebe, alerta.moneda))}<br>
+          
+            <strong>Total pagado:</strong>
+            ${escapeHtml(formatoMontoPago(alerta.totalPagado, alerta.moneda))}<br>
+          
+            <strong>Saldo pendiente:</strong>
+            ${escapeHtml(formatoMontoPago(alerta.saldoPendiente, alerta.moneda))}<br>
+          
+            <strong>Último pago:</strong>
+            ${escapeHtml(alerta.ultimoPagoFecha || "Sin registro")}
           </div>
+          
+          ${renderDetalleCuotasAlertaPago(alerta)}
 
           ${yaContactado ? `
             <div style="margin-top:10px; padding:10px 12px; border-radius:14px; background:#eef8ef; border:1px solid #b9dfc0; color:#1d6a2b; font-size:13px;">
@@ -2663,6 +2879,23 @@ function exportarAlertasPagosXlsx() {
     total: a.totalDebe || "",
     pagado: a.totalPagado || "",
     saldo: a.saldoPendiente || a.saldoPendienteGrupo || "",
+    
+    cantidadCuotas: a.cantidadCuotas || "",
+    cuotasVencidas: a.cuotasVencidas || "",
+    cuotasPagadasEstimadas:
+      a.cuotasPagadasEstimadas ??
+      a.cuotasCubiertas ??
+      "",
+    
+    cuotasAtrasadasReales: a.cuotasAtrasadas || "",
+    cuotasAtrasadasOperativas:
+      Number(a.cuotasAtrasadas || 0) > 0
+        ? Math.ceil(Number(a.cuotasAtrasadas || 0))
+        : 0,
+    
+    valorCuota: a.valorCuota || "",
+    estadoCuotas: getResumenCuotasTablaPago(a),
+    
     ultimoPagoFecha: a.ultimoPagoFecha || "",
     contactado: a.contactado ? "Sí" : "No",
     contactadoPor: a.contactadoPor || a.contactadoPorCorreo || "",
