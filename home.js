@@ -2357,7 +2357,7 @@ function getTiposAlertasPagosUI() {
       },
       {
         tipo: "persona_muy_atrasada_50",
-        label: "Muy atrasado +50%",
+        label: "Muy atrasado 50%+",
         categoria: "persona"
       }
     ],
@@ -2370,7 +2370,7 @@ function getTiposAlertasPagosUI() {
       },
       {
         tipo: "grupo_debe_mas_50",
-        label: "Grupo debe >50%",
+        label: "Grupo debe 50%+",
         categoria: "grupo"
       },
       {
