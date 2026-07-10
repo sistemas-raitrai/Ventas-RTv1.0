@@ -3053,7 +3053,7 @@ async function abrirModalAlertasPagos() {
   openListadoModal({
     titulo: "Alertas de pagos",
     subtitulo: "Alertas generadas desde el Sistema de Pagos, ordenadas por fecha de viaje confirmada.",
-    resumen: `Hay ${state.alertasPagosFiltradasRows.length} alerta(s) de pagos.`,
+    resumen: `Hay ${state.alertasPagosFiltradasRows.length} alerta(s)`,
     rows: state.alertasPagosFiltradasRows,
     renderFn: (rows) => buildAlertasPagosFiltrosHtml(rows)
   });
