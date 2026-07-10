@@ -2071,9 +2071,9 @@ function buildAlertasPagosFiltrosHtml(rows = []) {
           Exportar XLSX
         </button>
 
-        <button type="button" id="btn-actualizar-alertas-pagos" class="home-btn">
+        <!-- <button type="button" id="btn-actualizar-alertas-pagos" class="home-btn">
           Actualizar
-        </button>
+        </button> -->
       </div>
     </div>
 
