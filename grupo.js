@@ -11828,8 +11828,7 @@ window.importarNominaPagosPorNumeroNegocio = async function (numeroNegocio, opti
 
 window.importarTodasNominasPagos = async function (options = {}) {
   const {
-    dryRun = true,
-    soloSiNoTieneNomina = true
+    dryRun = true
   } = options;
 
   const gruposSnap = await getDocs(collection(db, "ventas_cotizaciones"));
@@ -11837,7 +11836,7 @@ window.importarTodasNominasPagos = async function (options = {}) {
   let procesados = 0;
   let importados = 0;
   let omitidosSinNumeroNegocio = 0;
-  let omitidosConNomina = 0;
+  let omitidosConInscripcionInicial = 0;
   let errores = 0;
 
   for (const grupoDoc of gruposSnap.docs) {
@@ -11858,48 +11857,84 @@ window.importarTodasNominasPagos = async function (options = {}) {
     procesados++;
 
     try {
-      if (soloSiNoTieneNomina) {
-        const inscSnap = await getDocs(
-          collection(db, "ventas_cotizaciones", grupoDoc.id, "inscripciones")
+      const inscSnap = await getDocs(
+        collection(
+          db,
+          "ventas_cotizaciones",
+          grupoDoc.id,
+          "inscripciones"
+        )
+      );
+
+      const tieneInscripcionInicial = inscSnap.docs.some((d) => {
+        const data = d.data() || {};
+
+        const estadoPrivacidad = normalizeSearchLocal(
+          data?.privacidad?.estado || ""
         );
 
-        const tieneNominaVisible = inscSnap.docs.some((d) => {
-          const data = d.data() || {};
-          const estadoPrivacidad = normalizeSearchLocal(data?.privacidad?.estado || "");
-
-          return estadoPrivacidad !== "archivada" &&
-                 estadoPrivacidad !== "eliminada_logica";
-        });
-
-        if (tieneNominaVisible) {
-          omitidosConNomina++;
-          console.log(`⏭️ ${numeroNegocio}: ya tiene nómina.`);
-          continue;
+        if (
+          estadoPrivacidad === "archivada" ||
+          estadoPrivacidad === "eliminada_logica"
+        ) {
+          return false;
         }
+
+        const tipo = normalizeSearchLocal(
+          getInscripcionTipoReal({
+            id: d.id,
+            ...data
+          })
+        );
+
+        return (
+          tipo === "nomina_inicial" ||
+          tipo === "inscripcion_comercial"
+        );
+      });
+
+      if (tieneInscripcionInicial) {
+        omitidosConInscripcionInicial++;
+
+        console.log(
+          `⏭️ ${numeroNegocio}: tiene inscripción inicial; no se importa desde Sistema de Pagos.`
+        );
+
+        continue;
       }
 
-      console.log(`▶️ Importando numeroNegocio ${numeroNegocio} · doc ${grupoDoc.id}`);
+      console.log(
+        `▶️ Importando numeroNegocio ${numeroNegocio} · doc ${grupoDoc.id}`
+      );
 
-      await window.importarNominaPagosPorNumeroNegocio(numeroNegocio, { dryRun });
+      await window.importarNominaPagosPorNumeroNegocio(
+        numeroNegocio,
+        { dryRun }
+      );
 
       importados++;
+
     } catch (error) {
       errores++;
-      console.error(`❌ Error importando ${numeroNegocio}:`, error);
+
+      console.error(
+        `❌ Error importando ${numeroNegocio}:`,
+        error
+      );
     }
   }
 
   const resumen = {
     dryRun,
-    soloSiNoTieneNomina,
     procesados,
     importados,
     omitidosSinNumeroNegocio,
-    omitidosConNomina,
+    omitidosConInscripcionInicial,
     errores
   };
 
   console.table([resumen]);
+
   return resumen;
 };
 
