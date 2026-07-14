@@ -11938,6 +11938,157 @@ window.importarTodasNominasPagos = async function (options = {}) {
   return resumen;
 };
 
+window.importarNominasPagosAno = async function ({
+  anoViaje = 2026,
+  dryRun = false,
+  soloSiNoTieneNomina = true
+} = {}) {
+  const gruposSnap = await getDocs(
+    collection(db, "ventas_cotizaciones")
+  );
+
+  const gruposDelAno = gruposSnap.docs
+    .map((grupoDoc) => ({
+      id: grupoDoc.id,
+      data: grupoDoc.data() || {}
+    }))
+    .filter(({ data }) => {
+      const ano = Number(
+        data.anoViaje ??
+        data.ficha?.anoViaje ??
+        0
+      );
+
+      return ano === Number(anoViaje);
+    })
+    .sort((a, b) => {
+      const numeroA = Number(
+        a.data.numeroNegocio ||
+        a.data.ficha?.numeroNegocio ||
+        a.id ||
+        0
+      );
+
+      const numeroB = Number(
+        b.data.numeroNegocio ||
+        b.data.ficha?.numeroNegocio ||
+        b.id ||
+        0
+      );
+
+      return numeroA - numeroB;
+    });
+
+  console.log(
+    `📋 Grupos encontrados para ${anoViaje}:`,
+    gruposDelAno.length
+  );
+
+  let procesados = 0;
+  let importados = 0;
+  let omitidosConNomina = 0;
+  let omitidosSinNumeroNegocio = 0;
+  let errores = 0;
+
+  for (let i = 0; i < gruposDelAno.length; i++) {
+    const { id: grupoDocId, data: grupo } = gruposDelAno[i];
+
+    const numeroNegocio = String(
+      grupo.numeroNegocio ||
+      grupo.ficha?.numeroNegocio ||
+      ""
+    ).trim();
+
+    console.log(
+      `⏳ ${i + 1}/${gruposDelAno.length} · Grupo ${grupoDocId} · Negocio ${numeroNegocio || "sin número"}`
+    );
+
+    if (!numeroNegocio) {
+      omitidosSinNumeroNegocio++;
+      console.warn(`⏭️ ${grupoDocId}: sin numeroNegocio.`);
+      continue;
+    }
+
+    procesados++;
+
+    try {
+      if (soloSiNoTieneNomina) {
+        const inscripcionesSnap = await getDocs(
+          collection(
+            db,
+            "ventas_cotizaciones",
+            grupoDocId,
+            "inscripciones"
+          )
+        );
+
+        const tieneNominaVisible = inscripcionesSnap.docs.some((docSnap) => {
+          const data = docSnap.data() || {};
+
+          const estadoPrivacidad = String(
+            data?.privacidad?.estado || ""
+          )
+            .normalize("NFD")
+            .replace(/[\u0300-\u036f]/g, "")
+            .toLowerCase()
+            .trim();
+
+          return (
+            estadoPrivacidad !== "archivada" &&
+            estadoPrivacidad !== "eliminada_logica"
+          );
+        });
+
+        if (tieneNominaVisible) {
+          omitidosConNomina++;
+          console.log(`⏭️ ${numeroNegocio}: ya tiene nómina.`);
+          continue;
+        }
+      }
+
+      console.log(
+        `▶️ Importando ${numeroNegocio} · año ${anoViaje}`
+      );
+
+      const resultado =
+        await window.importarNominaPagosPorNumeroNegocio(
+          numeroNegocio,
+          { dryRun }
+        );
+
+      importados++;
+
+      console.log(
+        `✅ ${numeroNegocio} terminado`,
+        resultado
+      );
+    } catch (error) {
+      errores++;
+
+      console.error(
+        `❌ Error importando ${numeroNegocio}:`,
+        error
+      );
+    }
+  }
+
+  const resumen = {
+    anoViaje,
+    dryRun,
+    soloSiNoTieneNomina,
+    gruposEncontrados: gruposDelAno.length,
+    procesados,
+    importados,
+    omitidosConNomina,
+    omitidosSinNumeroNegocio,
+    errores
+  };
+
+  console.table([resumen]);
+
+  return resumen;
+};
+
 window.sincronizarNominaPublicaConOficial = async function (groupDocIdParam = "") {
   const groupDocId = String(groupDocIdParam || state.groupDocId || "").trim();
 
