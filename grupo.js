@@ -11940,8 +11940,7 @@ window.importarTodasNominasPagos = async function (options = {}) {
 
 window.importarNominasPagosAno = async function ({
   anoViaje = 2026,
-  dryRun = false,
-  soloSiNoTieneNomina = true
+  dryRun = true
 } = {}) {
   const gruposSnap = await getDocs(
     collection(db, "ventas_cotizaciones")
@@ -11980,14 +11979,14 @@ window.importarNominasPagosAno = async function ({
     });
 
   console.log(
-    `📋 Grupos encontrados para ${anoViaje}:`,
+    `📋 Grupos encontrados para el año ${anoViaje}:`,
     gruposDelAno.length
   );
 
   let procesados = 0;
   let importados = 0;
-  let omitidosConNomina = 0;
   let omitidosSinNumeroNegocio = 0;
+  let omitidosConInscripcionInicial = 0;
   let errores = 0;
 
   for (let i = 0; i < gruposDelAno.length; i++) {
@@ -12005,49 +12004,71 @@ window.importarNominasPagosAno = async function ({
 
     if (!numeroNegocio) {
       omitidosSinNumeroNegocio++;
-      console.warn(`⏭️ ${grupoDocId}: sin numeroNegocio.`);
+
+      console.warn(
+        `⏭️ ${grupoDocId}: no tiene numeroNegocio.`
+      );
+
       continue;
     }
 
     procesados++;
 
     try {
-      if (soloSiNoTieneNomina) {
-        const inscripcionesSnap = await getDocs(
-          collection(
-            db,
-            "ventas_cotizaciones",
-            grupoDocId,
-            "inscripciones"
-          )
+      /*
+       * Solo se omite si el grupo ya tiene una Inscripción Inicial.
+       *
+       * Una lista de espera, un nuevo ingreso o un liberado
+       * NO deben impedir traer la nómina desde Sistema de Pagos.
+       */
+      const inscripcionesSnap = await getDocs(
+        collection(
+          db,
+          "ventas_cotizaciones",
+          grupoDocId,
+          "inscripciones"
+        )
+      );
+
+      const tieneInscripcionInicial = inscripcionesSnap.docs.some((docSnap) => {
+        const data = docSnap.data() || {};
+
+        const estadoPrivacidad = normalizeSearchLocal(
+          data?.privacidad?.estado || ""
         );
 
-        const tieneNominaVisible = inscripcionesSnap.docs.some((docSnap) => {
-          const data = docSnap.data() || {};
-
-          const estadoPrivacidad = String(
-            data?.privacidad?.estado || ""
-          )
-            .normalize("NFD")
-            .replace(/[\u0300-\u036f]/g, "")
-            .toLowerCase()
-            .trim();
-
-          return (
-            estadoPrivacidad !== "archivada" &&
-            estadoPrivacidad !== "eliminada_logica"
-          );
-        });
-
-        if (tieneNominaVisible) {
-          omitidosConNomina++;
-          console.log(`⏭️ ${numeroNegocio}: ya tiene nómina.`);
-          continue;
+        if (
+          estadoPrivacidad === "archivada" ||
+          estadoPrivacidad === "eliminada_logica"
+        ) {
+          return false;
         }
+
+        const tipo = normalizeSearchLocal(
+          getInscripcionTipoReal({
+            id: docSnap.id,
+            ...data
+          })
+        );
+
+        return (
+          tipo === "nomina_inicial" ||
+          tipo === "inscripcion_comercial"
+        );
+      });
+
+      if (tieneInscripcionInicial) {
+        omitidosConInscripcionInicial++;
+
+        console.log(
+          `⏭️ ${numeroNegocio}: tiene Inscripción Inicial; no se importa desde Sistema de Pagos.`
+        );
+
+        continue;
       }
 
       console.log(
-        `▶️ Importando ${numeroNegocio} · año ${anoViaje}`
+        `▶️ Importando negocio ${numeroNegocio} · año ${anoViaje}`
       );
 
       const resultado =
@@ -12062,6 +12083,7 @@ window.importarNominasPagosAno = async function ({
         `✅ ${numeroNegocio} terminado`,
         resultado
       );
+
     } catch (error) {
       errores++;
 
@@ -12075,14 +12097,17 @@ window.importarNominasPagosAno = async function ({
   const resumen = {
     anoViaje,
     dryRun,
-    soloSiNoTieneNomina,
     gruposEncontrados: gruposDelAno.length,
     procesados,
     importados,
-    omitidosConNomina,
     omitidosSinNumeroNegocio,
+    omitidosConInscripcionInicial,
     errores
   };
+
+  console.log(
+    `🏁 Importación del año ${anoViaje} terminada`
+  );
 
   console.table([resumen]);
 
