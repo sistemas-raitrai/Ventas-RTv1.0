@@ -3,6 +3,7 @@ import {
   collection,
   query,
   where,
+  limit,
   getDocs,
   getDoc,
   addDoc,
@@ -79,6 +80,10 @@ const state = {
   inscripcionesCargadas: false,
   inscripcionesCargando: false,
   nominaVisible: false,
+  
+  // Permite reconocer grupos importados desde Sistema de Pagos
+  // sin descargar la nómina completa.
+  grupoTieneNominaSistemaPagos: false,
   
   reencuadrePdf: {
     inscripcionId: "",
@@ -420,7 +425,8 @@ async function loadAll() {
     loadHistory(),
     loadManualAlerts(),
     loadRequests(),
-    loadEmailTemplates()
+    loadEmailTemplates(),
+    detectarNominaSistemaPagosGrupo()
   ]);
 
   state.autoAlerts = buildAutomaticAlerts();
@@ -562,6 +568,82 @@ async function loadEmailTemplates() {
   }
 }
 
+async function detectarNominaSistemaPagosGrupo() {
+  state.grupoTieneNominaSistemaPagos = false;
+
+  /*
+    Primero revisamos marcas que puedan existir directamente
+    en el documento principal del grupo.
+  */
+  const origenGuardado = normalizeSearchLocal(
+    state.group?.origenNomina ||
+    state.group?.nominaOrigen ||
+    state.group?.inscripcion?.origenNomina ||
+    state.group?.sistemaPagos?.origenNomina ||
+    ""
+  ).replace(/\s+/g, "_");
+
+  const tieneMarcaDirecta =
+    origenGuardado === "sistema_pagos" ||
+    origenGuardado === "sistema_de_pagos" ||
+    state.group?.sistemaPagos?.nominaImportada === true ||
+    state.group?.sistemaPagos?.importada === true ||
+    state.group?.nominaImportadaPagos === true ||
+    state.group?.nominaImportadaSistemaPagos === true ||
+    state.group?.inscripcion?.nominaImportada === true;
+
+  if (tieneMarcaDirecta) {
+    state.grupoTieneNominaSistemaPagos = true;
+    return true;
+  }
+
+  /*
+    Si el grupo no tiene una marca directa, hacemos una consulta
+    muy pequeña a la subcolección: solo buscamos un documento.
+  */
+  try {
+    const inscripcionesRef = collection(
+      db,
+      "ventas_cotizaciones",
+      String(state.groupDocId),
+      "inscripciones"
+    );
+
+    const snap = await getDocs(
+      query(
+        inscripcionesRef,
+        where(
+          "tipoInscripcion",
+          "in",
+          [
+            "sistema_pagos",
+            "sistema_de_pagos",
+            "Sistema de Pagos"
+          ]
+        ),
+        limit(1)
+      )
+    );
+
+    state.grupoTieneNominaSistemaPagos = !snap.empty;
+
+    return state.grupoTieneNominaSistemaPagos;
+  } catch (error) {
+    console.error(
+      "[grupo] detectarNominaSistemaPagosGrupo",
+      error
+    );
+
+    /*
+      Si la consulta falla, no bloqueamos la carga de la página.
+      Simplemente dejamos la marca como false.
+    */
+    state.grupoTieneNominaSistemaPagos = false;
+
+    return false;
+  }
+}
+
 async function loadInscripciones() {
   state.inscripciones = [];
   state.inscripcionesCargando = true;
@@ -604,7 +686,15 @@ async function loadInscripciones() {
       });
 
     state.inscripcionesCargadas = true;
-
+    
+    /*
+      Si al cargar la nómina completa aparecen pasajeros importados,
+      mantenemos actualizada la detección del grupo.
+    */
+    if (getInscripcionesSistemaPagos().length > 0) {
+      state.grupoTieneNominaSistemaPagos = true;
+    }
+    
     await sincronizarAlertasInscripcionesGrupo();
   } catch (error) {
     console.error("[grupo] loadInscripciones", error);
@@ -1412,6 +1502,14 @@ function puedeExportarCsvInscripciones() {
 }
 
 function getOrigenNominaGrupo() {
+  /*
+    Primero usamos la detección liviana realizada al cargar
+    el portafolio del grupo.
+  */
+  if (state.grupoTieneNominaSistemaPagos === true) {
+    return "sistema_pagos";
+  }
+
   const origenGuardado = normalizeSearchLocal(
     state.group?.origenNomina ||
     state.group?.nominaOrigen ||
@@ -1434,7 +1532,6 @@ function getOrigenNominaGrupo() {
     return "inscripcion_inicial";
   }
 
-  // Señales guardadas directamente en el documento del grupo.
   const tieneNominaPagosGuardada =
     state.group?.sistemaPagos?.nominaImportada === true ||
     state.group?.sistemaPagos?.importada === true ||
@@ -1446,7 +1543,10 @@ function getOrigenNominaGrupo() {
     return "sistema_pagos";
   }
 
-  // Solo usa los pasajeros cuando la nómina ya fue consultada.
+  /*
+    Si la nómina completa ya fue cargada, dejamos también
+    este respaldo de detección.
+  */
   if (
     state.inscripcionesCargadas &&
     getInscripcionesSistemaPagos().length > 0
@@ -1675,6 +1775,14 @@ function canEditSituacionGrupo() {
 }
 
 function grupoTieneNominaImportadaSistemaPagos() {
+  /*
+    Esta es ahora la señal principal.
+    Se obtiene con una consulta liviana al abrir el grupo.
+  */
+  if (state.grupoTieneNominaSistemaPagos === true) {
+    return true;
+  }
+
   const origen = normalizeSearchLocal(
     state.group?.origenNomina ||
     state.group?.nominaOrigen ||
@@ -1690,13 +1798,30 @@ function grupoTieneNominaImportadaSistemaPagos() {
     return true;
   }
 
-  return !!(
+  const tieneMarcaDirecta = !!(
     state.group?.sistemaPagos?.nominaImportada === true ||
     state.group?.sistemaPagos?.importada === true ||
     state.group?.nominaImportadaPagos === true ||
     state.group?.nominaImportadaSistemaPagos === true ||
     state.group?.inscripcion?.nominaImportada === true
   );
+
+  if (tieneMarcaDirecta) {
+    return true;
+  }
+
+  /*
+    Respaldo adicional para cuando la nómina completa
+    ya fue cargada manualmente.
+  */
+  if (
+    state.inscripcionesCargadas &&
+    getInscripcionesSistemaPagos().length > 0
+  ) {
+    return true;
+  }
+
+  return false;
 }
 
 function canEditElementosIncluidosGrupo() {
