@@ -2163,7 +2163,17 @@ function resetDefaults() {
 // HELPERS UI
 // -----------------------------------------------------------------------------
 function grupoIncluyePolera() {
-  return grupoData?.elementosIncluidos?.polera === true;
+  /*
+    Regla:
+
+    - Grupo sin configuración: se considera que sí incluye polera.
+    - Grupo con polera true: incluye polera.
+    - Grupo con polera false: no incluye polera.
+
+    Por tanto, solamente deja de pedir talla cuando
+    polera está guardado explícitamente como false.
+  */
+  return grupoData?.elementosIncluidos?.polera !== false;
 }
 
 function aplicarConfiguracionPolera() {
