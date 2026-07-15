@@ -1020,35 +1020,64 @@ async function fetchPdfBytesFromUrl(url = "", storagePath = "") {
 async function mergeFichaAndProgramaPdf(fichaBlob, programaPdfUrl) {
   const mergedPdf = await PDFDocument.create();
 
-  // ===== FICHA =====
+  /* =====================================================
+     1. AGREGAR LA FICHA
+  ===================================================== */
   const fichaBytes = new Uint8Array(await fichaBlob.arrayBuffer());
   const fichaPdf = await PDFDocument.load(fichaBytes);
 
-  const fichaPages = await mergedPdf.copyPages(fichaPdf, [0]);
-  fichaPages.forEach((page) => mergedPdf.addPage(page));
+  const fichaIndices = fichaPdf.getPageIndices();
 
-  // ===== PROGRAMA =====
-  // IMPORTANTE:
-  // Usamos directamente la URL resuelta del programa actual.
-  // No pasamos storagePath porque podría apuntar a un programa anterior.
-  const programaBytes = await fetchPdfBytesFromUrl(programaPdfUrl, "");
+  console.log("[ficha-pdf] Páginas de la ficha:", fichaIndices.length);
+
+  const fichaPages = await mergedPdf.copyPages(
+    fichaPdf,
+    fichaIndices
+  );
+
+  fichaPages.forEach((page) => {
+    mergedPdf.addPage(page);
+  });
+
+  /* =====================================================
+     2. AGREGAR EL PROGRAMA COMPLETO
+  ===================================================== */
+  const programaBytes = await fetchPdfBytesFromUrl(
+    programaPdfUrl,
+    ""
+  );
+
   const programaPdf = await PDFDocument.load(programaBytes);
 
-  let programaIndices = programaPdf.getPageIndices();
+  const programaIndices = programaPdf.getPageIndices();
 
-  // IMPORTANTE:
-  // Esto elimina SIEMPRE la última página del programa.
-  // Déjalo solo si tus programas siempre terminan con una hoja vacía.
-  if (programaIndices.length > 1) {
-    programaIndices = programaIndices.slice(0, -1);
-  }
+  console.log("[ficha-pdf] Páginas del programa:", programaIndices.length);
 
-  const programaPages = await mergedPdf.copyPages(programaPdf, programaIndices);
-  programaPages.forEach((page) => mergedPdf.addPage(page));
+  // Se copian TODAS las páginas del programa.
+  // No se elimina automáticamente la última página.
+  const programaPages = await mergedPdf.copyPages(
+    programaPdf,
+    programaIndices
+  );
+
+  programaPages.forEach((page) => {
+    mergedPdf.addPage(page);
+  });
+
+  /* =====================================================
+     3. GUARDAR PDF COMBINADO
+  ===================================================== */
+  console.log(
+    "[ficha-pdf] Total páginas PDF combinado:",
+    mergedPdf.getPageCount()
+  );
 
   const mergedBytes = await mergedPdf.save();
 
-  return new Blob([mergedBytes], { type: "application/pdf" });
+  return new Blob(
+    [mergedBytes],
+    { type: "application/pdf" }
+  );
 }
 
 function getCurrentVersionData() {
