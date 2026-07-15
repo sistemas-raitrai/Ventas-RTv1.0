@@ -749,16 +749,20 @@
         </div>
       </section>
 
-      <section class="card">
+      <section id="tallaPoleraWrap" class="card hidden">
         <h2>• Talla de polera</h2>
+      
         <div class="sub">
           Para preparar algunos elementos del viaje, indíquenos la talla de polera que utiliza normalmente.
         </div>
-
+      
         <div class="form-grid">
           <div class="field col-6">
-            <label for="tallaPolera">Talla de polera <span class="req">*</span></label>
-            <select id="tallaPolera" name="tallaPolera" required>
+            <label for="tallaPolera">
+              Talla de polera <span class="req">*</span>
+            </label>
+      
+            <select id="tallaPolera" name="tallaPolera">
               <option value="">Seleccione...</option>
               <option value="S">S</option>
               <option value="M">M</option>
@@ -767,20 +771,27 @@
               <option value="2XL">2XL</option>
             </select>
           </div>
-
+      
           <div class="field col-6">
             <label>Referencia de medidas</label>
-            <button type="button" id="btnAbrirTallas" class="btn-secondary" style="padding:0; border-radius:16px; overflow:hidden;">
+      
+            <button
+              type="button"
+              id="btnAbrirTallas"
+              class="btn-secondary"
+              style="padding:0; border-radius:16px; overflow:hidden;"
+            >
               <img
                 src="IMG/tallas-polera-raitrai.png"
                 alt="Tabla de tallas de polera Rai Trai"
                 style="display:block; width:100%; max-width:100%; background:#fff;"
               />
             </button>
-            
+      
             <div class="hint">
               Haz clic en la imagen para verla en grande.
             </div>
+      
             <div class="hint">
               Medidas referenciales: S 48x69 cm, M 51x71 cm, L 54x72 cm, XL 57x73 cm, 2XL 60x74 cm.
             </div>
