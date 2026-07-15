@@ -2027,17 +2027,30 @@ async function guardarElementosIncluidos() {
 }
 
 function getElementosIncluidosGrupo() {
-  const data = state.group?.elementosIncluidos || {};
+  const data = state.group?.elementosIncluidos;
 
+  /*
+    Regla de compatibilidad:
+
+    - Si el grupo todavía no tiene elementosIncluidos,
+      los elementos habituales se consideran incluidos.
+    - Un elemento solamente queda desmarcado cuando está
+      guardado explícitamente como false.
+    - "Otros" se mantiene desmarcado por defecto.
+  */
   return {
-    poleron: data.poleron === true,
-    polera: data.polera === true,
-    soporteCelular: data.soporteCelular === true,
-    portapasaporte: data.portapasaporte === true,
-    toalla: data.toalla === true,
-    cortesias: data.cortesias === true,
-    otros: data.otros === true,
-    otrosDetalle: cleanText(data.otrosDetalle || "")
+    poleron: data?.poleron !== false,
+    polera: data?.polera !== false,
+    soporteCelular: data?.soporteCelular !== false,
+    portapasaporte: data?.portapasaporte !== false,
+    toalla: data?.toalla !== false,
+    cortesias: data?.cortesias !== false,
+
+    otros: data?.otros === true,
+
+    otrosDetalle: cleanText(
+      data?.otrosDetalle || ""
+    )
   };
 }
 
