@@ -372,6 +372,125 @@
         page-break-inside:avoid;
       }
     }
+
+        /* =========================================================
+       VISTA PREVIA VERTICAL DEL PROGRAMA
+    ========================================================= */
+
+    .hidden{
+      display:none !important;
+    }
+
+    .programa-preview-section{
+      width:210mm;
+      max-width:100%;
+      margin:24px auto 44px;
+    }
+
+    .programa-preview-pages{
+      display:flex;
+      flex-direction:column;
+      align-items:center;
+      gap:24px;
+    }
+
+    .programa-preview-page{
+      position:relative;
+      width:210mm;
+      max-width:100%;
+      margin:0 auto;
+      background:#fff;
+      border:1px solid rgba(59,35,87,.14);
+      box-shadow:0 18px 40px rgba(25,15,40,.12);
+      overflow:hidden;
+    }
+
+    .programa-preview-page canvas{
+      display:block;
+      width:100%;
+      height:auto;
+      background:#fff;
+    }
+
+    .programa-preview-page-number{
+      position:absolute;
+      right:12px;
+      bottom:10px;
+      min-width:30px;
+      height:30px;
+      padding:0 9px;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      border-radius:999px;
+      background:rgba(43,17,69,.84);
+      color:#fff;
+      font-size:12px;
+      font-weight:900;
+      box-shadow:0 4px 12px rgba(0,0,0,.14);
+    }
+
+    .programa-conversion-box{
+      width:210mm;
+      max-width:100%;
+      margin:0 auto;
+      padding:28px 24px;
+      border:2px dashed rgba(74,37,112,.28);
+      border-radius:20px;
+      background:#f7f2fb;
+      text-align:center;
+      box-shadow:0 10px 24px rgba(43,17,69,.08);
+    }
+
+    .programa-conversion-message{
+      max-width:610px;
+      margin:0 auto 18px;
+      color:#4b385e;
+      font-size:15px;
+      font-weight:700;
+      line-height:1.5;
+    }
+
+    .programa-preview-status{
+      width:210mm;
+      max-width:100%;
+      margin:0 auto 18px;
+      padding:15px 18px;
+      border:1px solid rgba(74,37,112,.16);
+      border-radius:16px;
+      background:#f2ecf8;
+      color:#3c2851;
+      font-size:14px;
+      font-weight:800;
+      line-height:1.45;
+      text-align:center;
+    }
+
+    .programa-preview-status.error{
+      border-color:#e0b2b2;
+      background:#fff0f0;
+      color:#812b2b;
+    }
+
+    @media (max-width:1180px){
+      .programa-preview-section,
+      .programa-preview-page,
+      .programa-conversion-box,
+      .programa-preview-status{
+        width:210mm;
+        max-width:100%;
+      }
+    }
+
+    @media print{
+      /*
+        Esta vista es solo para revisión en pantalla.
+        El PDF definitivo agrega el programa mediante pdf-lib.
+      */
+      .programa-preview-section{
+        display:none !important;
+      }
+    }
   </style>
 </head>
 
@@ -501,8 +620,51 @@
         <div class="pdf-row row-1">
           <div class="pdf-label">Observaciones Ficha:</div>
           <div class="pdf-box obs" id="pdfObservaciones">—</div>
-        </div>
       </div>
+    </section>
+
+    <!-- =====================================================
+         CONTINUACIÓN VISUAL:
+         PÁGINAS DEL PROGRAMA QUE SE UNIRÁN A LA FICHA
+    ====================================================== -->
+    <section
+      id="programaPreviewSection"
+      class="programa-preview-section"
+    >
+      <!--
+        Este bloque aparece solamente cuando el programa
+        vigente es Word y todavía no existe un PDF convertido
+        correspondiente a ese mismo archivo.
+      -->
+      <div
+        id="programaConversionBox"
+        class="programa-conversion-box hidden"
+      >
+        <div class="programa-conversion-message">
+          El programa vigente está en formato Word.
+          Conviértelo para ver las páginas que se agregarán después de la ficha.
+        </div>
+
+        <button
+          id="btnConvertirProgramaPreview"
+          class="btn-dark"
+          type="button"
+        >
+          Convertir programa y mostrar páginas
+        </button>
+      </div>
+
+      <!-- Mensaje temporal de carga, conversión o error -->
+      <div
+        id="programaPreviewStatus"
+        class="programa-preview-status hidden"
+      ></div>
+
+      <!-- Aquí se renderizarán todas las páginas verticalmente -->
+      <div
+        id="programaPreviewPages"
+        class="programa-preview-pages"
+      ></div>
     </section>
   </main>
 
