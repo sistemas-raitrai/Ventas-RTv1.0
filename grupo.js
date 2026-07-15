@@ -9202,7 +9202,16 @@ function bindEvents() {
 
   $("btnNuevoComentario")?.addEventListener("click", openCommentModal);
 
-  $("btnGuardarDatos")?.addEventListener("click", saveDatos);
+  $("btnGuardarDatos")?.addEventListener(
+    "click",
+    saveDatos
+  );
+  
+  $("btnGuardarSituacion")?.addEventListener(
+    "click",
+    saveSituacion
+  );
+  
   $("btnGuardarElementosIncluidos")?.addEventListener(
     "click",
     guardarElementosIncluidos
@@ -9212,7 +9221,11 @@ function bindEvents() {
     "change",
     syncElementosOtrosVisibility
   );
-  $("btnGuardarDocumentos")?.addEventListener("click", saveDocumentos);
+  
+  $("btnGuardarDocumentos")?.addEventListener(
+    "click",
+    saveDocumentos
+  );
   $("s_estado")?.addEventListener("change", syncSituacionStateUI);
   $("s_estado")?.addEventListener("input", syncSituacionStateUI);
   $("btnGuardarReunion")?.addEventListener("click", saveMeeting);
