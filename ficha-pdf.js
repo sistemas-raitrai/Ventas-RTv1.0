@@ -42,6 +42,11 @@ import {
 
 import { PDFDocument } from "https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/+esm";
 
+import * as pdfjsLib from "https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.min.mjs";
+
+pdfjsLib.GlobalWorkerOptions.workerSrc =
+  "https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.worker.min.mjs";
+
 const $ = (id) => document.getElementById(id);
 const GITHUB_HOME_URL = "https://sistemas-raitrai.github.io/Ventas-RT/";
 const HISTORIAL_COLLECTION = "ventas_historial";
@@ -58,7 +63,13 @@ const state = {
   groupId: "",
   group: null,
   ficha: null,
-  isClosingPdf: false
+  isClosingPdf: false,
+
+  // Vista previa del programa vigente
+  programaPreviewPdfUrl: "",
+  programaPreviewOriginalPath: "",
+  programaPreviewPageCount: 0,
+  programaPreviewLoading: false
 };
 
 initPage();
@@ -207,7 +218,12 @@ async function loadAll() {
   }
 
   state.ficha = hydrateFicha(state.group);
+
   renderPage();
+
+  // Después de mostrar la hoja de la ficha,
+  // prepara las hojas del programa vigente debajo.
+  await prepareProgramaPreview();
 }
 
 async function resolveGroupByParam(id) {
@@ -320,19 +336,451 @@ function renderPage() {
 }
 
 /* =========================================================
+   VISTA PREVIA DEL PROGRAMA
+========================================================= */
+
+function resetProgramaPreview() {
+  state.programaPreviewPdfUrl = "";
+  state.programaPreviewOriginalPath = "";
+  state.programaPreviewPageCount = 0;
+  state.programaPreviewLoading = false;
+
+  const pages = $("programaPreviewPages");
+  const status = $("programaPreviewStatus");
+  const conversionBox = $("programaConversionBox");
+  const btn = $("btnConvertirProgramaPreview");
+
+  if (pages) {
+    pages.innerHTML = "";
+  }
+
+  if (status) {
+    status.textContent = "";
+    status.classList.remove("error");
+    status.classList.add("hidden");
+  }
+
+  conversionBox?.classList.add("hidden");
+
+  if (btn) {
+    btn.disabled = false;
+    btn.textContent = "Convertir programa y mostrar páginas";
+  }
+}
+
+function showProgramaPreviewStatus(message = "", isError = false) {
+  const status = $("programaPreviewStatus");
+  if (!status) return;
+
+  status.textContent = String(message || "");
+  status.classList.remove("hidden");
+  status.classList.toggle("error", isError);
+}
+
+function hideProgramaPreviewStatus() {
+  const status = $("programaPreviewStatus");
+  if (!status) return;
+
+  status.textContent = "";
+  status.classList.remove("error");
+  status.classList.add("hidden");
+}
+
+function showProgramaConversionButton() {
+  $("programaConversionBox")?.classList.remove("hidden");
+}
+
+function hideProgramaConversionButton() {
+  $("programaConversionBox")?.classList.add("hidden");
+}
+
+function getProgramaActualInfo() {
+  const programa = state.group?.programaGrupo || {};
+
+  const archivoUrl = cleanText(programa.archivoUrl || "");
+  const archivoNombre = cleanText(programa.archivoNombre || "");
+  const archivoTipo = normalizeSearchLocal(
+    programa.archivoTipo || ""
+  );
+  const archivoStoragePath = cleanText(
+    programa.archivoStoragePath || ""
+  );
+
+  const nombreNormalizado = archivoNombre.toLowerCase();
+
+  const esPdf =
+    archivoTipo === "pdf" ||
+    nombreNormalizado.endsWith(".pdf");
+
+  const esWord =
+    archivoTipo === "doc" ||
+    archivoTipo === "docx" ||
+    nombreNormalizado.endsWith(".doc") ||
+    nombreNormalizado.endsWith(".docx");
+
+  return {
+    programa,
+    archivoUrl,
+    archivoNombre,
+    archivoTipo,
+    archivoStoragePath,
+    esPdf,
+    esWord
+  };
+}
+
+/**
+ * Obtiene el PDF convertido solamente cuando está comprobado
+ * que corresponde al archivo Word actualmente vigente.
+ */
+function getConvertedPdfForCurrentPrograma() {
+  const programa = state.group?.programaGrupo || {};
+  const originalPath = getProgramaOriginalStoragePath();
+
+  if (!originalPath) return "";
+
+  const expectedPdfPath = originalPath
+    .replace("programas-originales", "programas-pdf")
+    .replace(/\.(docx|doc)$/i, ".pdf");
+
+  const pdfUrl = cleanText(programa.pdfUrl || "");
+
+  const pdfStoragePath = cleanText(
+    programa.storagePath ||
+    programa.pdfStoragePath ||
+    ""
+  );
+
+  const pdfOriginalPath = cleanText(
+    programa.pdfOriginalPath || ""
+  );
+
+  const correspondeAlProgramaVigente =
+    pdfOriginalPath === originalPath ||
+    pdfStoragePath === expectedPdfPath;
+
+  return pdfUrl && correspondeAlProgramaVigente
+    ? pdfUrl
+    : "";
+}
+
+async function prepareProgramaPreview() {
+  resetProgramaPreview();
+
+  const info = getProgramaActualInfo();
+
+  /*
+   * No existe un programa cargado.
+   */
+  if (!info.archivoUrl && !info.archivoStoragePath) {
+    showProgramaPreviewStatus(
+      "No hay un programa cargado para mostrar después de la ficha.",
+      true
+    );
+    return;
+  }
+
+  /*
+   * El programa vigente ya es PDF.
+   * Se muestran sus páginas directamente.
+   */
+  if (info.esPdf && info.archivoUrl) {
+    hideProgramaConversionButton();
+
+    try {
+      await renderProgramaPdfPreview(
+        info.archivoUrl,
+        info.archivoStoragePath
+      );
+    } catch (error) {
+      // renderProgramaPdfPreview ya muestra el mensaje.
+    }
+
+    return;
+  }
+
+  /*
+   * El programa vigente es Word.
+   */
+  if (info.esWord) {
+    const convertedPdfUrl =
+      getConvertedPdfForCurrentPrograma();
+
+    /*
+     * Si ya existe una conversión válida para exactamente
+     * este Word, se muestra directamente.
+     */
+    if (convertedPdfUrl) {
+      hideProgramaConversionButton();
+
+      try {
+        await renderProgramaPdfPreview(
+          convertedPdfUrl,
+          info.archivoStoragePath
+        );
+      } catch (error) {
+        showProgramaConversionButton();
+      }
+
+      return;
+    }
+
+    /*
+     * Existe Word, pero todavía no hay conversión válida.
+     * No se convierte automáticamente: aparece el botón.
+     */
+    hideProgramaPreviewStatus();
+    showProgramaConversionButton();
+    return;
+  }
+
+  showProgramaPreviewStatus(
+    "El programa vigente tiene un formato que no permite mostrar sus páginas.",
+    true
+  );
+}
+
+async function handleConvertProgramaPreview() {
+  if (state.programaPreviewLoading) return;
+
+  const info = getProgramaActualInfo();
+
+  if (!info.esWord) {
+    await prepareProgramaPreview();
+    return;
+  }
+
+  const btn = $("btnConvertirProgramaPreview");
+
+  state.programaPreviewLoading = true;
+
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = "Convirtiendo programa...";
+  }
+
+  showProgramaPreviewStatus(
+    "Convirtiendo el programa Word y preparando sus páginas..."
+  );
+
+  try {
+    const groupRef = doc(
+      db,
+      "ventas_cotizaciones",
+      state.groupDocId
+    );
+
+    /*
+     * ensureProgramaPdfReady:
+     * - verifica el archivo Word vigente;
+     * - busca/espera su PDF convertido;
+     * - guarda la relación con el original actual.
+     */
+    const programaReady =
+      await ensureProgramaPdfReady(groupRef);
+
+    if (!programaReady?.pdfUrl) {
+      throw new Error(
+        "La conversión no devolvió una URL PDF válida."
+      );
+    }
+
+    state.programaPreviewPdfUrl =
+      programaReady.pdfUrl;
+
+    state.programaPreviewOriginalPath =
+      info.archivoStoragePath;
+
+    hideProgramaConversionButton();
+
+    await renderProgramaPdfPreview(
+      programaReady.pdfUrl,
+      info.archivoStoragePath
+    );
+  } catch (error) {
+    console.error(
+      "[ficha-pdf] handleConvertProgramaPreview",
+      error
+    );
+
+    showProgramaPreviewStatus(
+      "No fue posible convertir el programa: " +
+        (error?.message || error),
+      true
+    );
+
+    showProgramaConversionButton();
+  } finally {
+    state.programaPreviewLoading = false;
+
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent =
+        "Convertir programa y mostrar páginas";
+    }
+  }
+}
+
+async function renderProgramaPdfPreview(
+  pdfUrl = "",
+  originalPath = ""
+) {
+  const container = $("programaPreviewPages");
+
+  if (!container) {
+    throw new Error(
+      "No encontré el contenedor programaPreviewPages."
+    );
+  }
+
+  const cleanUrl = cleanText(pdfUrl);
+
+  if (!cleanUrl) {
+    throw new Error(
+      "No existe una URL PDF válida para mostrar el programa."
+    );
+  }
+
+  container.innerHTML = "";
+
+  showProgramaPreviewStatus(
+    "Cargando las páginas del programa..."
+  );
+
+  try {
+    const pdfBytes = await fetchPdfBytesFromUrl(
+      cleanUrl,
+      ""
+    );
+
+    const loadingTask = pdfjsLib.getDocument({
+      data: pdfBytes
+    });
+
+    const pdf = await loadingTask.promise;
+
+    state.programaPreviewPdfUrl = cleanUrl;
+    state.programaPreviewOriginalPath =
+      cleanText(originalPath);
+    state.programaPreviewPageCount = pdf.numPages;
+
+    /*
+     * Se renderiza una página a la vez para no sobrecargar
+     * el navegador cuando el programa tiene muchas páginas.
+     */
+    for (
+      let pageNumber = 1;
+      pageNumber <= pdf.numPages;
+      pageNumber += 1
+    ) {
+      const page = await pdf.getPage(pageNumber);
+
+      const baseViewport = page.getViewport({
+        scale: 1
+      });
+
+      const viewport = page.getViewport({
+        scale: 1.55
+      });
+
+      const pageWrap =
+        document.createElement("article");
+
+      pageWrap.className =
+        "programa-preview-page";
+
+      pageWrap.dataset.pageNumber =
+        String(pageNumber);
+
+      pageWrap.style.aspectRatio =
+        `${baseViewport.width} / ${baseViewport.height}`;
+
+      const canvas =
+        document.createElement("canvas");
+
+      const context = canvas.getContext(
+        "2d",
+        { alpha: false }
+      );
+
+      canvas.width = Math.ceil(viewport.width);
+      canvas.height = Math.ceil(viewport.height);
+
+      /*
+       * La ficha es la hoja 1.
+       * La primera página del programa es la hoja 2.
+       */
+      const pageBadge =
+        document.createElement("div");
+
+      pageBadge.className =
+        "programa-preview-page-number";
+
+      pageBadge.textContent =
+        String(pageNumber + 1);
+
+      pageWrap.appendChild(canvas);
+      pageWrap.appendChild(pageBadge);
+      container.appendChild(pageWrap);
+
+      await page.render({
+        canvasContext: context,
+        viewport,
+        background: "#ffffff"
+      }).promise;
+    }
+
+    hideProgramaPreviewStatus();
+    hideProgramaConversionButton();
+
+    console.log(
+      "[ficha-pdf] Vista previa preparada",
+      {
+        programaPdfUrl: cleanUrl,
+        paginasPrograma: pdf.numPages,
+        totalHojasFinales: pdf.numPages + 1
+      }
+    );
+  } catch (error) {
+    container.innerHTML = "";
+
+    console.error(
+      "[ficha-pdf] renderProgramaPdfPreview",
+      error
+    );
+
+    showProgramaPreviewStatus(
+      "No fue posible mostrar las páginas del programa: " +
+        (error?.message || error),
+      true
+    );
+
+    throw error;
+  }
+}
+
+/* =========================================================
    EVENTS
 ========================================================= */
 function bindEvents() {
   $("btnVolverFichaEditable")?.addEventListener("click", () => {
-    location.href = `fichas.html?id=${encodeURIComponent(state.groupId || state.requestedId || "")}`;
+    location.href = `fichas.html?id=${encodeURIComponent(
+      state.groupId || state.requestedId || ""
+    )}`;
   });
 
   $("btnVolverGrupo")?.addEventListener("click", () => {
-    location.href = `grupo.html?id=${encodeURIComponent(state.groupId || state.requestedId || "")}`;
+    location.href = `grupo.html?id=${encodeURIComponent(
+      state.groupId || state.requestedId || ""
+    )}`;
   });
 
   $("btnImprimirFichaPdf")?.addEventListener("click", async () => {
     await handlePrintButtonClick();
+  });
+
+  $("btnConvertirProgramaPreview")?.addEventListener("click", async () => {
+    await handleConvertProgramaPreview();
   });
 }
 
@@ -613,36 +1061,41 @@ function getDisplayName(user = {}) {
 }
 
 function resolveNextFichaVersion() {
-  const fichaActual = getByPath(state.group, "ficha") || {};
+  const fichaActual =
+    getByPath(state.group, "ficha") || {};
 
-  const pdfActivo = cleanText(
+  /*
+   * La existencia de una versión final anterior se define
+   * exclusivamente por la URL del PDF final unido.
+   */
+  const pdfFinalAnterior = cleanText(
     fichaActual.pdfUrl ||
     state.group?.fichaPdfUrl ||
     ""
   );
 
-  const storagePdfAnterior = cleanText(
-    fichaActual.storagePathPdf ||
-    state.group?.storagePathPdf ||
-    ""
-  );
-
-  const confirmadaElAnterior = !!fichaActual.confirmadaEl;
-
-  const ultimaGestionFuePdf =
-    normalizeSearchLocal(state.group?.ultimaGestionTipo || "") === "confirmacion_ficha_pdf";
-
-  const versionAnterior = cleanText(
-    fichaActual.version ||
-    state.group?.versionFicha ||
-    ""
-  ).toUpperCase();
+  /*
+   * Nunca se ha generado una unión final.
+   */
+  if (!pdfFinalAnterior) {
+    return {
+      tipoVersion: "original",
+      version: "ORIGINAL",
+      versionNumero: 1
+    };
+  }
 
   const tipoAnterior = normalizeSearchLocal(
     fichaActual.tipoVersion ||
     state.group?.tipoVersionFicha ||
     ""
   );
+
+  const versionAnterior = cleanText(
+    fichaActual.version ||
+    state.group?.versionFicha ||
+    ""
+  ).toUpperCase();
 
   const numeroAnterior = Number(
     pick(
@@ -652,31 +1105,25 @@ function resolveNextFichaVersion() {
     )
   );
 
-  const yaTuvoPdfReal =
-    !!pdfActivo ||
-    !!storagePdfAnterior ||
-    confirmadaElAnterior ||
-    ultimaGestionFuePdf ||
-    numeroAnterior >= 1;
-
-  if (!yaTuvoPdfReal) {
-    return {
-      tipoVersion: "original",
-      version: "ORIGINAL",
-      versionNumero: 1
-    };
-  }
-
-  const yaEraActualizacion =
+  const anteriorYaEraActualizacion =
     tipoAnterior === "actualizacion" ||
     versionAnterior === "ACTUALIZACIÓN";
 
+  /*
+   * Si el PDF anterior era ORIGINAL:
+   * la nueva versión será ACTUALIZACIÓN 1.
+   *
+   * Si ya era una actualización:
+   * aumenta el número.
+   */
   return {
     tipoVersion: "actualizacion",
     version: "ACTUALIZACIÓN",
-    versionNumero: yaEraActualizacion && numeroAnterior >= 1
-      ? numeroAnterior + 1
-      : 1
+    versionNumero:
+      anteriorYaEraActualizacion &&
+      numeroAnterior >= 1
+        ? numeroAnterior + 1
+        : 1
   };
 }
 
@@ -1351,6 +1798,61 @@ async function queueFichaConfirmationEmail({ versionLabel, nombre }) {
   return { subject };
 }
 
+function getProgramaPdfReadyForFinalGeneration() {
+  const info = getProgramaActualInfo();
+
+  /*
+   * Si el archivo vigente ya es PDF,
+   * se usa directamente.
+   */
+  if (info.esPdf && info.archivoUrl) {
+    return {
+      pdfUrl: info.archivoUrl,
+      pdfNombre:
+        info.archivoNombre ||
+        "programa.pdf"
+    };
+  }
+
+  /*
+   * Si el archivo vigente es Word, debe existir una
+   * conversión válida correspondiente a ese mismo archivo.
+   */
+  if (info.esWord) {
+    const convertedFromFirestore =
+      getConvertedPdfForCurrentPrograma();
+
+    const convertedFromCurrentPreview =
+      state.programaPreviewOriginalPath ===
+        info.archivoStoragePath
+        ? state.programaPreviewPdfUrl
+        : "";
+
+    const convertedPdfUrl =
+      convertedFromFirestore ||
+      convertedFromCurrentPreview;
+
+    if (!convertedPdfUrl) {
+      throw new Error(
+        "El programa vigente está en formato Word. " +
+        "Primero presiona “Convertir programa y mostrar páginas” " +
+        "debajo de la ficha."
+      );
+    }
+
+    return {
+      pdfUrl: convertedPdfUrl,
+      pdfNombre: String(
+        info.archivoNombre || "programa.docx"
+      ).replace(/\.(docx|doc)$/i, ".pdf")
+    };
+  }
+
+  throw new Error(
+    "No existe un programa vigente en PDF listo para unir."
+  );
+}
+
 async function confirmOfficialPdfClosure({ preserveCurrentVersion = false } = {}) {
   const nombre = getDisplayName(state.effectiveUser);
   const fichaActual = getByPath(state.group, "ficha") || {};
@@ -1371,12 +1873,25 @@ async function confirmOfficialPdfClosure({ preserveCurrentVersion = false } = {}
   
   setText("pdfVersionFicha", versionLabel);
   
-  const programaReady = await ensureProgramaPdfReady(groupRef);
-  const programaPdfUrl = programaReady.pdfUrl;
-  const programaPdfNombre = programaReady.pdfNombre;
+  /*
+   * El botón final utiliza el programa vigente ya preparado.
+   *
+   * Si es Word y todavía no fue convertido para vista previa,
+   * se detiene y pide utilizar primero el botón inferior.
+   */
+  const programaReady =
+    getProgramaPdfReadyForFinalGeneration();
+
+  const programaPdfUrl =
+    programaReady.pdfUrl;
+
+  const programaPdfNombre =
+    programaReady.pdfNombre;
   
   if (!programaPdfUrl) {
-    throw new Error("No se pudo obtener el PDF del programa para unirlo con la ficha.");
+    throw new Error(
+      "No se pudo obtener el PDF vigente del programa para unirlo con la ficha."
+    );
   }
   
   // 1) generar PDF base de la ficha
