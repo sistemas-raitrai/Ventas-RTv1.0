@@ -705,14 +705,43 @@ function nominaInicialEstaCargadaEnPagos() {
 
 async function obtenerResumenNominaParaFirmaAdmin() {
   const snap = await getDocs(
-    collection(db, "ventas_cotizaciones", state.groupDocId, "inscripciones")
+    collection(
+      db,
+      "ventas_cotizaciones",
+      state.groupDocId,
+      "inscripciones"
+    )
   );
 
-  const existeNomina = !snap.empty;
-
-  const tieneSistemaPagos = snap.docs.some((d) => {
+  const inscripcionesActivas = snap.docs.filter((d) => {
     const data = d.data() || {};
-    return normalizeSearchLocal(data.tipoInscripcion || "") === "sistema de pagos";
+
+    const estadoPrivacidad = normalizeSearchLocal(
+      data?.privacidad?.estado || ""
+    );
+
+    return (
+      estadoPrivacidad !== "archivada" &&
+      estadoPrivacidad !== "eliminada_logica"
+    );
+  });
+
+  const existeNomina = inscripcionesActivas.length > 0;
+
+  const tieneSistemaPagos = inscripcionesActivas.some((d) => {
+    const data = d.data() || {};
+
+    const tipo = normalizeSearchLocal(
+      data.tipoInscripcion ||
+      data.estadoInscripcion ||
+      data.contextoFormulario?.tipoInscripcion ||
+      ""
+    );
+
+    return (
+      tipo === "sistema_pagos" ||
+      tipo === "sistema de pagos"
+    );
   });
 
   return {
@@ -2201,11 +2230,21 @@ async function signFlowFromFicha(step) {
       return;
     }
     
-    if (!isRealAdminRole() && !inscripcionInicialEstaCerradaParaFirma()) {
+    const resumenNominaFirmaVendedor =
+      await obtenerResumenNominaParaFirmaAdmin();
+    
+    const puedeFirmarPorOrigenNomina =
+      inscripcionInicialEstaCerradaParaFirma() ||
+      resumenNominaFirmaVendedor.tieneSistemaPagos;
+    
+    if (!isRealAdminRole() && !puedeFirmarPorOrigenNomina) {
       alert(
-        "Antes de firmar la ficha debes cerrar la Inscripción Inicial del grupo.\n\n" +
-        "Ve a la ficha del grupo, sección Inscripciones, cierra la Inscripción Inicial y luego vuelve a firmar."
+        "Antes de firmar la ficha debes cumplir una de estas condiciones:\n\n" +
+        "• Cerrar la Inscripción Inicial del grupo.\n" +
+        "• Tener cargada la nómina base desde Sistema de Pagos.\n\n" +
+        "Revisa la sección Inscripciones del grupo y luego vuelve a firmar."
       );
+    
       return;
     }
 
