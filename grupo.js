@@ -74,7 +74,12 @@ const state = {
   history: [],
   alertsManual: [],
   requests: [],
+  
   inscripciones: [],
+  inscripcionesCargadas: false,
+  inscripcionesCargando: false,
+  nominaVisible: false,
+  
   reencuadrePdf: {
     inscripcionId: "",
     imagenes: [],
@@ -275,7 +280,16 @@ const SITUACION_FIELDS = [
   "situacion.observacionVentas",
   "situacion.observacionJefaVentas",
   "situacion.observacionAdministracion",
-  "situacion.observacionOperaciones"
+  "situacion.observacionOperaciones",
+
+  "elementosIncluidos.poleron",
+  "elementosIncluidos.polera",
+  "elementosIncluidos.soporteCelular",
+  "elementosIncluidos.portapasaporte",
+  "elementosIncluidos.toalla",
+  "elementosIncluidos.cortesias",
+  "elementosIncluidos.otros",
+  "elementosIncluidos.otrosDetalle"
 ];
 
 const DOC_FIELDS = [
@@ -394,13 +408,19 @@ async function loadAll() {
     return;
   }
 
+  // La nómina ya no se carga automáticamente.
+  // Se descargará solamente cuando el usuario presione "Ver nómina".
+  state.inscripciones = [];
+  state.inscripcionesCargadas = false;
+  state.inscripcionesCargando = false;
+  state.nominaVisible = false;
+  
   await Promise.all([
     loadMeetings(),
     loadHistory(),
     loadManualAlerts(),
     loadRequests(),
-    loadEmailTemplates(),
-    loadInscripciones()
+    loadEmailTemplates()
   ]);
 
   state.autoAlerts = buildAutomaticAlerts();
@@ -544,10 +564,16 @@ async function loadEmailTemplates() {
 
 async function loadInscripciones() {
   state.inscripciones = [];
+  state.inscripcionesCargando = true;
 
   try {
     const snap = await getDocs(
-      collection(db, "ventas_cotizaciones", String(state.groupDocId), "inscripciones")
+      collection(
+        db,
+        "ventas_cotizaciones",
+        String(state.groupDocId),
+        "inscripciones"
+      )
     );
 
     state.inscripciones = snap.docs
@@ -556,26 +582,124 @@ async function loadInscripciones() {
         ...d.data()
       }))
       .filter((item) => {
-        const estadoPrivacidad = normalizeSearchLocal(item?.privacidad?.estado || "");
-        return estadoPrivacidad !== "eliminada_logica" && estadoPrivacidad !== "archivada";
+        const estadoPrivacidad = normalizeSearchLocal(
+          item?.privacidad?.estado || ""
+        );
+
+        return (
+          estadoPrivacidad !== "eliminada_logica" &&
+          estadoPrivacidad !== "archivada"
+        );
       })
       .sort((a, b) => {
         const ordenA = getOrdenOperativoInscripcion(a);
         const ordenB = getOrdenOperativoInscripcion(b);
-      
+
         if (ordenA !== ordenB) return ordenA - ordenB;
-      
+
         const fechaA = dateValue(getFechaFormularioInscripcion(a));
         const fechaB = dateValue(getFechaFormularioInscripcion(b));
-      
+
         return fechaB - fechaA;
       });
-    
-    await sincronizarAlertasInscripcionesGrupo();
 
+    state.inscripcionesCargadas = true;
+
+    await sincronizarAlertasInscripcionesGrupo();
   } catch (error) {
     console.error("[grupo] loadInscripciones", error);
+
+    state.inscripciones = [];
+    state.inscripcionesCargadas = false;
+
+    throw error;
+  } finally {
+    state.inscripcionesCargando = false;
   }
+}
+
+async function asegurarNominaCargada({
+  mostrar = true,
+  renderizar = true
+} = {}) {
+  if (state.inscripcionesCargando) return false;
+
+  if (state.inscripcionesCargadas) {
+    if (mostrar) state.nominaVisible = true;
+
+    if (renderizar) {
+      renderInscripcionPasajerosPanel();
+      syncButtons();
+    }
+
+    return true;
+  }
+
+  state.inscripcionesCargando = true;
+
+  if (mostrar) {
+    state.nominaVisible = true;
+  }
+
+  renderInscripcionPasajerosPanel();
+  syncButtons();
+
+  try {
+    await loadInscripciones();
+
+    if (mostrar) {
+      state.nominaVisible = true;
+    }
+
+    if (renderizar) {
+      renderInscripcionPasajerosPanel();
+      syncButtons();
+    }
+
+    return true;
+  } catch (error) {
+    console.error("[grupo] asegurarNominaCargada", error);
+
+    alert(
+      "No se pudo cargar la nómina del grupo: " +
+      (error?.message || "Error desconocido")
+    );
+
+    renderInscripcionPasajerosPanel();
+    syncButtons();
+
+    return false;
+  }
+}
+
+async function toggleNominaPasajeros() {
+  if (state.inscripcionesCargando) return;
+
+  if (!state.inscripcionesCargadas) {
+    await asegurarNominaCargada({
+      mostrar: true,
+      renderizar: true
+    });
+
+    return;
+  }
+
+  state.nominaVisible = !state.nominaVisible;
+
+  renderInscripcionPasajerosPanel();
+  syncButtons();
+}
+
+async function recargarNominaPasajeros() {
+  if (state.inscripcionesCargando) return;
+
+  state.inscripcionesCargadas = false;
+  state.nominaVisible = true;
+
+  await asegurarNominaCargada({
+    mostrar: true,
+    renderizar: true
+  });
 }
 
 function canManageEmailTemplates() {
@@ -1292,13 +1416,43 @@ function getOrigenNominaGrupo() {
     state.group?.origenNomina ||
     state.group?.nominaOrigen ||
     state.group?.inscripcion?.origenNomina ||
+    state.group?.sistemaPagos?.origenNomina ||
     ""
-  );
+  ).replace(/\s+/g, "_");
 
-  if (origenGuardado === "sistema_pagos") return "sistema_pagos";
-  if (origenGuardado === "inscripcion_inicial") return "inscripcion_inicial";
+  if (
+    origenGuardado === "sistema_pagos" ||
+    origenGuardado === "sistema_de_pagos"
+  ) {
+    return "sistema_pagos";
+  }
 
-  if (getInscripcionesSistemaPagos().length > 0) return "sistema_pagos";
+  if (
+    origenGuardado === "inscripcion_inicial" ||
+    origenGuardado === "nomina_inicial"
+  ) {
+    return "inscripcion_inicial";
+  }
+
+  // Señales guardadas directamente en el documento del grupo.
+  const tieneNominaPagosGuardada =
+    state.group?.sistemaPagos?.nominaImportada === true ||
+    state.group?.sistemaPagos?.importada === true ||
+    state.group?.nominaImportadaPagos === true ||
+    state.group?.nominaImportadaSistemaPagos === true ||
+    state.group?.inscripcion?.nominaImportada === true;
+
+  if (tieneNominaPagosGuardada) {
+    return "sistema_pagos";
+  }
+
+  // Solo usa los pasajeros cuando la nómina ya fue consultada.
+  if (
+    state.inscripcionesCargadas &&
+    getInscripcionesSistemaPagos().length > 0
+  ) {
+    return "sistema_pagos";
+  }
 
   return "inscripcion_inicial";
 }
@@ -1518,6 +1672,370 @@ function canEditSituacionGrupo() {
   // Ganada NO bloquea por sí sola.
   // No metemos aquí regla de autorizada.
   return canEditGroup();
+}
+
+function grupoTieneNominaImportadaSistemaPagos() {
+  const origen = normalizeSearchLocal(
+    state.group?.origenNomina ||
+    state.group?.nominaOrigen ||
+    state.group?.inscripcion?.origenNomina ||
+    state.group?.sistemaPagos?.origenNomina ||
+    ""
+  ).replace(/\s+/g, "_");
+
+  if (
+    origen === "sistema_pagos" ||
+    origen === "sistema_de_pagos"
+  ) {
+    return true;
+  }
+
+  return !!(
+    state.group?.sistemaPagos?.nominaImportada === true ||
+    state.group?.sistemaPagos?.importada === true ||
+    state.group?.nominaImportadaPagos === true ||
+    state.group?.nominaImportadaSistemaPagos === true ||
+    state.group?.inscripcion?.nominaImportada === true
+  );
+}
+
+function canEditElementosIncluidosGrupo() {
+  if (!canAccessGroup(state.group)) return false;
+
+  const rol = String(
+    state.effectiveUser?.rol || ""
+  ).toLowerCase();
+
+  const email = normalizeEmail(
+    state.effectiveEmail || ""
+  );
+
+  // Admin y supervisión.
+  if (rol === "admin" || rol === "supervision") {
+    return true;
+  }
+
+  // Administración y Registro.
+  if (
+    rol === "registro" ||
+    isGirasConPermisoAdministracion() ||
+    email === "yenny@raitrai.cl" ||
+    email === "administracion@raitrai.cl" ||
+    email === "raitrai@raitrai.cl"
+  ) {
+    return true;
+  }
+
+  if (rol !== "vendedor") {
+    return canEditGroup();
+  }
+
+  // Excepción solicitada:
+  // el vendedor puede editar estos checkbox en grupos con
+  // nómina importada desde Sistema de Pagos, aunque ya haya firmado.
+  if (grupoTieneNominaImportadaSistemaPagos()) {
+    return true;
+  }
+
+  // Grupos normales:
+  // vendedor solamente antes de firmar.
+  return (
+    state.canModify &&
+    !isVendorLockedByFlow(state.group)
+  );
+}
+
+function canOpenSituacionModal() {
+  return (
+    canEditSituacionGrupo() ||
+    canEditElementosIncluidosGrupo()
+  );
+}
+
+async function guardarElementosIncluidos() {
+  if (!canEditElementosIncluidosGrupo()) {
+    alert(
+      "No tienes permisos para editar los elementos incluidos."
+    );
+
+    return;
+  }
+
+  const otros = $("s_elementoOtros")?.checked === true;
+
+  const otrosDetalle = cleanText(
+    $("s_elementoOtrosDetalle")?.value || ""
+  );
+
+  if (otros && !otrosDetalle) {
+    alert(
+      "Debes explicar qué otros elementos tiene el grupo."
+    );
+
+    $("s_elementoOtrosDetalle")?.focus();
+    return;
+  }
+
+  const anterior = getElementosIncluidosGrupo();
+
+  const nuevo = {
+    poleron:
+      $("s_elementoPoleron")?.checked === true,
+
+    polera:
+      $("s_elementoPolera")?.checked === true,
+
+    soporteCelular:
+      $("s_elementoSoporteCelular")?.checked === true,
+
+    portapasaporte:
+      $("s_elementoPortapasaporte")?.checked === true,
+
+    toalla:
+      $("s_elementoToalla")?.checked === true,
+
+    cortesias:
+      $("s_elementoCortesias")?.checked === true,
+
+    otros,
+
+    otrosDetalle:
+      otros ? otrosDetalle : "",
+
+    actualizadoPor:
+      getDisplayName(state.effectiveUser),
+
+    actualizadoPorCorreo:
+      state.effectiveEmail,
+
+    actualizadoAt:
+      serverTimestamp()
+  };
+
+  const camposComparables = [
+    "poleron",
+    "polera",
+    "soporteCelular",
+    "portapasaporte",
+    "toalla",
+    "cortesias",
+    "otros",
+    "otrosDetalle"
+  ];
+
+  const cambios = camposComparables
+    .filter((campo) => {
+      return anterior[campo] !== nuevo[campo];
+    })
+    .map((campo) => ({
+      campo: `elementosIncluidos.${campo}`,
+      anterior: anterior[campo],
+      nuevo: nuevo[campo]
+    }));
+
+  if (!cambios.length) {
+    showSaveNotice(
+      "No hay cambios en los elementos incluidos."
+    );
+
+    return;
+  }
+
+  const btn = $("btnGuardarElementosIncluidos");
+
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = "Guardando...";
+  }
+
+  try {
+    await saveGroupPatch(
+      {
+        elementosIncluidos: nuevo
+      },
+      {
+        tipoMovimiento:
+          "elementos_incluidos_actualizados",
+
+        modulo:
+          "grupo",
+
+        titulo:
+          "Elementos incluidos actualizados",
+
+        mensaje:
+          `${getDisplayName(state.effectiveUser)} actualizó los elementos incluidos del grupo.`,
+
+        cambios,
+
+        metadata: {
+          origenNomina:
+            getOrigenNominaGrupo(),
+
+          permisoEspecialSistemaPagos:
+            grupoTieneNominaImportadaSistemaPagos()
+        }
+      }
+    );
+
+    closeModal("modalSituacion");
+
+    showSaveNotice(
+      "Elementos incluidos guardados correctamente."
+    );
+  } catch (error) {
+    console.error(
+      "[grupo] guardarElementosIncluidos",
+      error
+    );
+
+    alert(
+      "Error al guardar los elementos incluidos: " +
+      (error?.message || "Error desconocido")
+    );
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = "Guardar elementos";
+    }
+  }
+}
+
+function getElementosIncluidosGrupo() {
+  const data = state.group?.elementosIncluidos || {};
+
+  return {
+    poleron: data.poleron === true,
+    polera: data.polera === true,
+    soporteCelular: data.soporteCelular === true,
+    portapasaporte: data.portapasaporte === true,
+    toalla: data.toalla === true,
+    cortesias: data.cortesias === true,
+    otros: data.otros === true,
+    otrosDetalle: cleanText(data.otrosDetalle || "")
+  };
+}
+
+function setCheckboxValue(id, checked) {
+  const input = $(id);
+  if (!input) return;
+
+  input.checked = checked === true;
+}
+
+function syncElementosOtrosVisibility() {
+  const tieneOtros = $("s_elementoOtros")?.checked === true;
+  const wrap = $("wrapElementoOtrosDetalle");
+
+  wrap?.classList.toggle("hidden", !tieneOtros);
+
+  if (!tieneOtros) {
+    setFormValue("s_elementoOtrosDetalle", "");
+  }
+}
+
+function fillElementosIncluidosModal() {
+  const elementos = getElementosIncluidosGrupo();
+
+  setCheckboxValue("s_elementoPoleron", elementos.poleron);
+  setCheckboxValue("s_elementoPolera", elementos.polera);
+  setCheckboxValue(
+    "s_elementoSoporteCelular",
+    elementos.soporteCelular
+  );
+  setCheckboxValue(
+    "s_elementoPortapasaporte",
+    elementos.portapasaporte
+  );
+  setCheckboxValue("s_elementoToalla", elementos.toalla);
+  setCheckboxValue("s_elementoCortesias", elementos.cortesias);
+  setCheckboxValue("s_elementoOtros", elementos.otros);
+
+  setFormValue(
+    "s_elementoOtrosDetalle",
+    elementos.otrosDetalle
+  );
+
+  syncElementosOtrosVisibility();
+}
+
+function syncSituacionModalPermissions() {
+  const puedeSituacion = canEditSituacionGrupo();
+  const puedeElementos = canEditElementosIncluidosGrupo();
+
+  const camposSituacion = [
+    "s_estado",
+    "s_mensajeHistorial",
+    "s_fechaReunion"
+  ];
+
+  camposSituacion.forEach((id) => {
+    const el = $(id);
+    if (el) el.disabled = !puedeSituacion;
+  });
+
+  ["s_obsAdmin", "s_obsOperaciones"].forEach((id) => {
+    const editor = $(id);
+    if (!editor) return;
+
+    editor.contentEditable = puedeSituacion
+      ? "true"
+      : "false";
+
+    editor.classList.toggle(
+      "is-readonly",
+      !puedeSituacion
+    );
+  });
+
+  const camposElementos = [
+    "s_elementoPoleron",
+    "s_elementoPolera",
+    "s_elementoSoporteCelular",
+    "s_elementoPortapasaporte",
+    "s_elementoToalla",
+    "s_elementoCortesias",
+    "s_elementoOtros",
+    "s_elementoOtrosDetalle"
+  ];
+
+  camposElementos.forEach((id) => {
+    const el = $(id);
+    if (el) el.disabled = !puedeElementos;
+  });
+
+  const btnSituacion = $("btnGuardarSituacion");
+
+  if (btnSituacion) {
+    btnSituacion.disabled = !puedeSituacion;
+    btnSituacion.classList.toggle(
+      "hidden",
+      !puedeSituacion
+    );
+  }
+
+  const btnElementos = $("btnGuardarElementosIncluidos");
+
+  if (btnElementos) {
+    btnElementos.disabled = !puedeElementos;
+    btnElementos.classList.toggle(
+      "hidden",
+      !puedeElementos
+    );
+  }
+
+  const aviso = $("situacionPermisosEspeciales");
+
+  if (aviso) {
+    const soloElementos =
+      !puedeSituacion &&
+      puedeElementos;
+
+    aviso.classList.toggle(
+      "hidden",
+      !soloElementos
+    );
+  }
 }
 
 function shouldAutoMarkVendorGroupAsContacted(groupData = {}) {
@@ -2147,6 +2665,88 @@ function renderInscripcionPasajerosPanel() {
 
   if (!visible) return;
 
+  if (state.inscripcionesCargando) {
+    box.innerHTML = `
+      <div class="nomina-carga-box">
+        <div class="nomina-carga-icon">⏳</div>
+  
+        <div>
+          <div class="nomina-carga-title">Cargando nómina</div>
+          <div class="nomina-carga-text">
+            Se están consultando los pasajeros inscritos para este grupo.
+          </div>
+        </div>
+      </div>
+    `;
+  
+    return;
+  }
+  
+  if (!state.inscripcionesCargadas) {
+    box.innerHTML = `
+      <div class="nomina-carga-box">
+        <div class="nomina-carga-icon">👥</div>
+  
+        <div class="nomina-carga-content">
+          <div class="nomina-carga-title">Nómina no cargada</div>
+  
+          <div class="nomina-carga-text">
+            Para que el portafolio abra más rápido, los pasajeros se consultan
+            solamente cuando necesitas ver la nómina.
+          </div>
+  
+          <button
+            id="btnVerNominaPasajeros"
+            class="btn-dark"
+            type="button"
+          >
+            Ver nómina
+          </button>
+        </div>
+      </div>
+    `;
+  
+    return;
+  }
+  
+  if (!state.nominaVisible) {
+    box.innerHTML = `
+      <div class="nomina-carga-box">
+        <div class="nomina-carga-icon">👥</div>
+  
+        <div class="nomina-carga-content">
+          <div class="nomina-carga-title">
+            Nómina cargada
+          </div>
+  
+          <div class="nomina-carga-text">
+            Se cargaron ${state.inscripciones.length} inscripción(es).
+          </div>
+  
+          <div class="nomina-carga-actions">
+            <button
+              id="btnVerNominaPasajeros"
+              class="btn-dark"
+              type="button"
+            >
+              Mostrar nómina
+            </button>
+  
+            <button
+              id="btnRecargarNominaPasajeros"
+              class="btn-pill"
+              type="button"
+            >
+              Recargar
+            </button>
+          </div>
+        </div>
+      </div>
+    `;
+  
+    return;
+  }
+
   const totalBruto = state.inscripciones.length;
   const capacidad = Number(state.group?.cantidadGrupo || 0);
   
@@ -2337,6 +2937,23 @@ function renderInscripcionPasajerosPanel() {
       <div><strong>Fecha generación:</strong> ${escapeHtml(formatDateTime(linkInfo.actualizadoAt || linkInfo.linkGeneradoAt || state.group?.fechaAperturaInscripcion))}</div>
       <div><strong>Link liberados:</strong> ${state.group?.linkLiberadosActivo ? "Habilitado" : "No habilitado"}</div>
       <div><strong>Liberados generado por:</strong> ${escapeHtml(liberadosInfo.actualizadoPor || liberadosInfo.linkGeneradoPor || "—")}</div>
+    </div>
+    <div class="nomina-loaded-footer">
+      <button
+        id="btnVerNominaPasajeros"
+        class="btn-pill"
+        type="button"
+      >
+        Ocultar nómina
+      </button>
+    
+      <button
+        id="btnRecargarNominaPasajeros"
+        class="btn-pill"
+        type="button"
+      >
+        Recargar nómina
+      </button>
     </div>
   `;
 }
@@ -6544,6 +7161,55 @@ function renderSituacion() {
   setText("situacionProximoPaso", getByPath(state.group, "situacion.proximoPaso") || "—");
   setText("situacionUltimoCambioEstado", fechaCambioEstadoTxt);
 
+  const elementos = getElementosIncluidosGrupo();
+
+  const elementosSeleccionados = [
+    elementos.poleron ? "Polerón" : "",
+    elementos.polera ? "Polera" : "",
+    elementos.soporteCelular
+      ? "Soporte para celular"
+      : "",
+    elementos.portapasaporte
+      ? "Portapasaporte"
+      : "",
+    elementos.toalla ? "Toalla" : "",
+    elementos.cortesias ? "Cortesías" : "",
+    elementos.otros && elementos.otrosDetalle
+      ? `Otros: ${elementos.otrosDetalle}`
+      : ""
+  ].filter(Boolean);
+  
+  const elementosWrap = $(
+    "situacionElementosIncluidosWrap"
+  );
+  
+  const elementosBox = $(
+    "situacionElementosIncluidos"
+  );
+  
+  if (elementosWrap) {
+    elementosWrap.classList.remove("hidden");
+  }
+  
+  if (elementosBox) {
+    elementosBox.innerHTML =
+      elementosSeleccionados.length
+        ? elementosSeleccionados
+            .map(
+              (item) => `
+                <span class="elemento-incluido-chip">
+                  ${escapeHtml(item)}
+                </span>
+              `
+            )
+            .join("")
+        : `
+            <span class="muted">
+              No se han registrado elementos incluidos.
+            </span>
+          `;
+  }
+
   const obsAdmin = sanitizeRichHtml(getSharedObsAdministracion(state.group)) || "—";
   const obsOps = sanitizeRichHtml(getSharedObsOperaciones(state.group)) || "—";
 
@@ -7110,7 +7776,10 @@ function syncButtons() {
     "btnEditarSituacion"
   ].forEach((id) => {
     const el = $(id);
-    if (el) el.disabled = !canEditSituacionGrupo();
+  
+    if (el) {
+      el.disabled = !canOpenSituacionModal();
+    }
   });
 
   [
@@ -8396,7 +9065,15 @@ function bindEvents() {
   $("btnNuevoComentario")?.addEventListener("click", openCommentModal);
 
   $("btnGuardarDatos")?.addEventListener("click", saveDatos);
-  $("btnGuardarSituacion")?.addEventListener("click", saveSituacion);
+  $("btnGuardarElementosIncluidos")?.addEventListener(
+    "click",
+    guardarElementosIncluidos
+  );
+  
+  $("s_elementoOtros")?.addEventListener(
+    "change",
+    syncElementosOtrosVisibility
+  );
   $("btnGuardarDocumentos")?.addEventListener("click", saveDocumentos);
   $("s_estado")?.addEventListener("change", syncSituacionStateUI);
   $("s_estado")?.addEventListener("input", syncSituacionStateUI);
@@ -8457,10 +9134,35 @@ function bindEvents() {
   $("btnAbrirListaEspera")?.addEventListener("click", () => cambiarFaseInscripcion("lista_espera"));
   $("btnCrearLinkLiberados")?.addEventListener("click", crearLinkLiberados);
   $("btnCopiarLinkInscripcion")?.addEventListener("click", copyGroupInscripcionLink);
-    document.addEventListener("click", (event) => {
+
+  document.addEventListener("click", async (event) => {
+    const btnVer = event.target.closest("#btnVerNominaPasajeros");
+  
+    if (btnVer) {
+      await toggleNominaPasajeros();
+      return;
+    }
+  
+    const btnRecargar = event.target.closest(
+      "#btnRecargarNominaPasajeros"
+    );
+  
+    if (btnRecargar) {
+      await recargarNominaPasajeros();
+    }
+  });
+  
+  document.addEventListener("click", async (event) => {
     const btn = event.target.closest("#btnCorreosInscripcion");
     if (!btn) return;
-
+  
+    const cargada = await asegurarNominaCargada({
+      mostrar: false,
+      renderizar: false
+    });
+  
+    if (!cargada) return;
+  
     openEmailModalInscripcion();
   });
 
@@ -8506,12 +9208,61 @@ function bindEvents() {
     renderEmailBulkRecipients();
   });
   $("btnGenerarLinkNominaPublica")?.addEventListener("click", generarLinkNominaPublica);
-  $("btnNominaInicialPagos")?.addEventListener("click", openNominaInicialPagosModal);
+  $("btnNominaInicialPagos")?.addEventListener(
+    "click",
+    async () => {
+      const cargada = await asegurarNominaCargada({
+        mostrar: false,
+        renderizar: false
+      });
+  
+      if (!cargada) return;
+  
+      openNominaInicialPagosModal();
+    }
+  );
   $("btnEnviarNominaInicialPagos")?.addEventListener("click", enviarNominaInicialPagos);
-  $("btnExportarInscripcionesExcel")?.addEventListener("click", exportarInscripcionesExcel);
-  $("btnExportarInscripcionesCsv")?.addEventListener("click", exportarInscripcionesCsv);
+  $("btnExportarInscripcionesExcel")?.addEventListener(
+    "click",
+    async () => {
+      const cargada = await asegurarNominaCargada({
+        mostrar: false,
+        renderizar: false
+      });
+  
+      if (!cargada) return;
+  
+      exportarInscripcionesExcel();
+    }
+  );
+  
+  $("btnExportarInscripcionesCsv")?.addEventListener(
+    "click",
+    async () => {
+      const cargada = await asegurarNominaCargada({
+        mostrar: false,
+        renderizar: false
+      });
+  
+      if (!cargada) return;
+  
+      exportarInscripcionesCsv();
+    }
+  );
   $("btnResetearCicloInscripcion")?.addEventListener("click", openResetCicloInscripcionModal);
-  $("btnEditarNominaInscripcion")?.addEventListener("click", openEditarNominaInscripcionModal);
+  $("btnEditarNominaInscripcion")?.addEventListener(
+    "click",
+    async () => {
+      const cargada = await asegurarNominaCargada({
+        mostrar: true,
+        renderizar: true
+      });
+  
+      if (!cargada) return;
+  
+      openEditarNominaInscripcionModal();
+    }
+  );
   $("btnConfirmarResetCicloInscripcion")?.addEventListener("click", resetearCicloInscripcion);
 
   $("btnCrearContrato")?.addEventListener("click", () => {
@@ -8845,16 +9596,19 @@ function getSharedObsOperaciones(groupData = state.group || {}) {
 }
 
 function openSituacionModal() {
-  if (!canEditSituacionGrupo()) {
+  if (!canOpenSituacionModal()) {
     alert(getBlockedEditMessage());
     return;
   }
 
-  const estadoActual = normalizeState(state.group.estado);
+  const estadoActual = normalizeState(
+    state.group.estado
+  );
 
   setFormValue("s_mensajeHistorial", "");
 
   const selectEstado = $("s_estado");
+
   if (selectEstado) {
     selectEstado.innerHTML = `
       <option value="contactado">Contactado</option>
@@ -8867,20 +9621,45 @@ function openSituacionModal() {
 
     setFormValue(
       "s_estado",
-      estadoActual === "a_contactar" ? "contactado" : estadoActual
+      estadoActual === "a_contactar"
+        ? "contactado"
+        : estadoActual
     );
   }
 
-  const meetingBaseDate = getSituacionMeetingBaseDate();
-  setFormValue("s_fechaReunion", meetingBaseDate ? toDatetimeLocal(meetingBaseDate) : "");
+  const meetingBaseDate =
+    getSituacionMeetingBaseDate();
 
-  setRichEditorHtml("s_obsAdmin", getSharedObsAdministracion(state.group));
-  setRichEditorHtml("s_obsOperaciones", getSharedObsOperaciones(state.group));
+  setFormValue(
+    "s_fechaReunion",
+    meetingBaseDate
+      ? toDatetimeLocal(meetingBaseDate)
+      : ""
+  );
+
+  setRichEditorHtml(
+    "s_obsAdmin",
+    getSharedObsAdministracion(state.group)
+  );
+
+  setRichEditorHtml(
+    "s_obsOperaciones",
+    getSharedObsOperaciones(state.group)
+  );
+
+  fillElementosIncluidosModal();
 
   openModal("modalSituacion");
 
-  requestAnimationFrame(syncSituacionStateUI);
-  setTimeout(syncSituacionStateUI, 0);
+  requestAnimationFrame(() => {
+    syncSituacionStateUI();
+    syncSituacionModalPermissions();
+  });
+
+  setTimeout(() => {
+    syncSituacionStateUI();
+    syncSituacionModalPermissions();
+  }, 0);
 }
 
 function openDocsModal() {
