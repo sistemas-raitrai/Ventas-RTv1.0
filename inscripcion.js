@@ -41,6 +41,7 @@ const chipDestino = $("chipDestino");
 const chipAno = $("chipAno");
 
 const generoOtroWrap = $("generoOtroWrap");
+const tallaPoleraWrap = $("tallaPoleraWrap");
 
 const rutCompletoWrap = $("rutCompletoWrap");
 const rutWrap = $("rutWrap");
@@ -253,8 +254,9 @@ async function cargarGrupo() {
   }
 
   if (chipAno) chipAno.textContent = String(grupoData.anoViaje || "-");
-
+  
   renderBannerFaseInscripcion();
+  aplicarConfiguracionPolera();
 }
 
 // -----------------------------------------------------------------------------
@@ -302,6 +304,8 @@ function conectarEventos() {
   });
 
   $("btnAbrirTallas")?.addEventListener("click", () => {
+    if (!grupoIncluyePolera()) return;
+  
     $("modalTallasPolera")?.classList.remove("hidden");
   });
   
@@ -527,6 +531,8 @@ function campoEstaCompleto(el) {
 // UI
 // -----------------------------------------------------------------------------
 function aplicarEstadoUI() {
+  aplicarConfiguracionPolera();
+
   const tipoViajante = obtenerRadio("tipoViajante");
   const esEstudiante = tipoViajante === "estudiante";
   const esProfesor = tipoViajante === "profesor";
@@ -1423,7 +1429,10 @@ function validarFormulario() {
     errores.push("Debe especificar la nacionalidad o nacionalidades.");
   }
 
-  if (!$("tallaPolera")?.value) {
+  if (
+    grupoIncluyePolera() &&
+    !$("tallaPolera")?.value
+  ) {
     errores.push("Debe indicar la talla de polera.");
   }
   
@@ -1746,8 +1755,16 @@ function construirPayloadBase() {
       cursoActualInscripcion: obtenerCursoActualInscripcion(grupoData),
       cantidadGrupo: grupoData?.cantidadGrupo ?? grupoData?.cantidadgrupo ?? null,
       anoViaje: grupoData?.anoViaje ?? null,
-      destinoPrincipal: limpiarTexto(grupoData?.destinoPrincipal || grupoData?.destino),
-      internacional: esInternacional
+      destinoPrincipal: limpiarTexto(
+        grupoData?.destinoPrincipal ||
+        grupoData?.destino
+      ),
+      
+      internacional: esInternacional,
+      
+      elementosIncluidos: {
+        polera: grupoIncluyePolera()
+      }
     },
 
     identificacion: {
@@ -1778,7 +1795,9 @@ function construirPayloadBase() {
       correoViajante: limpiarTexto($("correoViajante")?.value),
       telefonoViajante: esAdultoOperativo ? limpiarTexto($("telefonoViajante")?.value) : "",
       telefonoViajanteEsWhatsapp: esAdultoOperativo,
-      tallaPolera: $("tallaPolera")?.value || "",
+      tallaPolera: grupoIncluyePolera()
+        ? ($("tallaPolera")?.value || "")
+        : "",
 
       correoPersonaQueViaja: limpiarTexto($("correoViajante")?.value),
       autorizaCorreosPreviosPersonaQueViaja: esEstudiante
@@ -2143,6 +2162,37 @@ function resetDefaults() {
 // -----------------------------------------------------------------------------
 // HELPERS UI
 // -----------------------------------------------------------------------------
+function grupoIncluyePolera() {
+  return grupoData?.elementosIncluidos?.polera === true;
+}
+
+function aplicarConfiguracionPolera() {
+  const incluyePolera = grupoIncluyePolera();
+  const tallaPolera = $("tallaPolera");
+
+  // Muestra u oculta la sección completa.
+  mostrar(tallaPoleraWrap, incluyePolera);
+
+  // La talla solo es obligatoria si el grupo tiene polera.
+  setRequired("tallaPolera", incluyePolera);
+
+  if (tallaPolera) {
+    tallaPolera.disabled = !incluyePolera;
+
+    if (!incluyePolera) {
+      // Elimina cualquier talla anterior o precargada.
+      tallaPolera.value = "";
+    }
+  }
+
+  // Si el grupo no tiene polera, el modal de tallas
+  // tampoco debe permanecer abierto.
+  if (!incluyePolera) {
+    $("modalTallasPolera")?.classList.add("hidden");
+  }
+}
+
+
 function enlazarFlagDetalle(nombreRadio, wrap, valoresActivos) {
   const radios = document.querySelectorAll(`input[name="${nombreRadio}"]`);
 
