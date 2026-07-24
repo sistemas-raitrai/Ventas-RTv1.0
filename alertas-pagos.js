@@ -60,17 +60,13 @@ const ALERTAS_PAGOS_HISTORIAL_COLLECTION =
 ========================================================= */
 
 const state = {
-  rows: [],
   alertasPagosRows: [],
   alertasPagosFiltradasRows: [],
   alertasPagosCargadas: false,
   alertasPagosUltimaActualizacion: null,
 
   alertasPagosSortKey: "fechaViaje",
-  alertasPagosSortDir: "asc",
-
-  gruposOperacionByNumero: new Map(),
-  scopedRows: []
+  alertasPagosSortDir: "asc"
 };
 
 /* =========================================================
@@ -174,52 +170,6 @@ function formatDate(value) {
     minute: "2-digit",
     hour12: false
   });
-}
-
-function getRowId(row = {}) {
-  return String(
-    row.idGrupo ||
-    row.id ||
-    ""
-  ).trim();
-}
-
-function getNumeroNegocio(row = {}) {
-  return String(
-    row.numeroNegocio ||
-    row?.ficha?.numeroNegocio ||
-    ""
-  ).trim();
-}
-
-function getNumerosNegocio(row = {}) {
-  const valorOriginal =
-    getNumeroNegocio(row);
-
-  if (!valorOriginal) {
-    return [];
-  }
-
-  const encontrados =
-    valorOriginal.match(/\d+/g) || [];
-
-  return [
-    ...new Set(
-      encontrados
-        .map((numero) =>
-          String(numero).trim()
-        )
-        .filter(Boolean)
-    )
-  ];
-}
-
-function getRowVendorEmail(row = {}) {
-  return normalizeEmail(
-    row.vendedoraCorreo ||
-    row.creadoPorCorreo ||
-    ""
-  );
 }
 
 function getAlertasPagosForScope() {
@@ -452,13 +402,6 @@ async function cargarDatosAlertasPagos() {
   );
 
   try {
-    /*
-      CARGA PRINCIPAL:
-
-      Solamente traemos alertas.
-      No esperamos ventas_cotizaciones
-      ni grupos.
-    */
     const alertasPagosSnap =
       await medirConsultaPagos(
         "ventas_alertas_pagos",
@@ -470,10 +413,10 @@ async function cargarDatosAlertasPagos() {
             )
           )
       );
-
+  
     const inicioProcesamiento =
       performance.now();
-
+  
     state.alertasPagosRows =
       alertasPagosSnap.docs
         .map((docSnap) => ({
@@ -484,13 +427,13 @@ async function cargarDatosAlertasPagos() {
           (row) =>
             row.activa !== false
         );
-
+  
     logCargaPagos(
       "Alertas activas procesadas",
       {
         documentosFirestore:
           alertasPagosSnap.size,
-
+  
         alertasActivas:
           state.alertasPagosRows.length
       }
@@ -561,13 +504,6 @@ async function cargarDatosAlertasPagos() {
     logCargaPagos(
       `Alertas listas para mostrar · ${duracionTotal} ms`
     );
-
-    /*
-      La fecha confirmada de viaje
-      se completa después, sin bloquear
-      la pantalla.
-    */
-    cargarFechasOperacionEnSegundoPlano();
 
   } catch (error) {
     console.error(
@@ -658,122 +594,9 @@ async function cargarAlertasPagosDesdeFirestore({
     getAlertasPagosForScope();
 }
 
-async function cargarFechasOperacionEnSegundoPlano() {
-  logCargaPagos(
-    "La tabla ya puede mostrarse. Iniciando fechas de operación en segundo plano."
-  );
-
-  try {
-    const gruposOperacionSnap =
-      await medirConsultaPagos(
-        "grupos para fechas confirmadas",
-        () =>
-          getDocs(
-            collection(
-              db,
-              "grupos"
-            )
-          )
-      );
-
-    const inicioMapa =
-      performance.now();
-
-    state.gruposOperacionByNumero =
-      new Map();
-
-    gruposOperacionSnap.docs.forEach(
-      (docSnap) => {
-        const data =
-          docSnap.data() || {};
-
-        const numero =
-          String(
-            data.numeroNegocio || ""
-          ).trim();
-
-        if (!numero) {
-          return;
-        }
-
-        state
-          .gruposOperacionByNumero
-          .set(
-            numero,
-            {
-              id: docSnap.id,
-              ...data
-            }
-          );
-      }
-    );
-
-    logCargaPagos(
-      `Mapa de fechas creado · ${Math.round(
-        performance.now() -
-        inicioMapa
-      )} ms`,
-      {
-        gruposConNumero:
-          state
-            .gruposOperacionByNumero
-            .size
-      }
-    );
-
-    /*
-      Volvemos a ordenar ahora que
-      conocemos las fechas de viaje.
-    */
-    state.alertasPagosFiltradasRows =
-      getAlertasPagosForScope();
-
-    /*
-      Si los filtros ya están dibujados,
-      solo repintamos la tabla.
-      No ocultamos la pantalla ni
-      reiniciamos toda la página.
-    */
-    if (
-      $("contenedor-alertas-pagos-listado")
-    ) {
-      const filtradas =
-        filtrarAlertasPagosModal(
-          state
-            .alertasPagosFiltradasRows
-        );
-
-      renderAlertasPagosListado(
-        filtradas
-      );
-    }
-
-    logCargaPagos(
-      "Fechas de viaje incorporadas a la tabla"
-    );
-
-  } catch (error) {
-    /*
-      La página sigue funcionando aunque
-      falle la colección grupos.
-      Solo quedará '-' en fecha viaje.
-    */
-    console.warn(
-      "No se pudieron cargar las fechas de viaje. Las alertas seguirán disponibles.",
-      error
-    );
-  }
-}
-
 /* =========================================================
    ALERTAS DE PAGOS
 ========================================================= */
-
-function numeroPago(v) {
-  if (v === null || v === undefined || v === "") return 0;
-  const n = Number(String(v).replace(/\./g, "").replace(",", "."));
-  return Number.isFinite(n) ? n : 0;
-}
 
 function obtenerAnoOperativoHome() {
   const hoy = new Date();
@@ -804,405 +627,47 @@ function formatoMontoPago(v, moneda = "") {
   });
 }
 
-function normalizarMonedaPago(valor = "") {
-  const m = normalizeLoose(valor);
-
-  if (m.includes("peso") || m === "clp") return "CLP";
-  if (m.includes("dolar") || m.includes("dólar") || m === "usd") return "USD";
-  if (m.includes("euro") || m === "eur") return "EUR";
-
-  return String(valor || "").trim().toUpperCase();
-}
-
-function normalizarGrupoPagos(g = {}) {
-  const detalleCuotas = Array.isArray(g.detalle_cuotas) ? g.detalle_cuotas : [];
-
-  return {
-    numeroNegocio: String(g.negocio_id || "").trim(),
-    nombreGrupo: String(g.nombre_colegio || "").trim(),
-    anoViaje: String(g.ano_viaje || "").trim(),
-    fechaSalida: String(g.fecha_salida || "").trim(),
-    destino: String(g.destino || "").trim(),
-    monedaTexto: normalizarMonedaPago(g.moneda_texto),
-    totalViaje: numeroPago(g.total_viaje),
-    totalPagado: numeroPago(g.total_pagado),
-    saldoPendiente: numeroPago(g.saldo_pendiente),
-
-    detalleCuotas,
-    totalCuotas: numeroPago(g.total_cuotas),
-    pagoOnlineActivo: Number(g.pago_online_activo || 0),
-    cerrado: Number(g.cerrado || 0),
-    bloqueado: Number(g.bloqueado || 0),
-    incluyePoleron: Number(g.incluye_poleron || 0)
-  };
-}
-
-function normalizarPasajeroPagos(item = {}) {
-  if (item.pasajero) {
-    const p = item.pasajero || {};
-    const s = item.situacion_pagos || {};
-
-    return {
-      rut: String(p.rut || "").trim(),
-      nombreCompleto: `${p.nombres || ""} ${p.apellidos || ""}`.trim(),
-      categoria: String(p.ocupacion_categoria || "").trim(),
-      responsable: String(p.nombre_apoderado || p.apoderado || "").trim(),
-      correoResponsable: String(p.email || "").trim(),
-      telefonoResponsable: String(p.telefono || "").trim(),
-      viaja: Number(p.viaja) === 1,
-      totalDebe: numeroPago(s.monto_total),
-      totalPagado: numeroPago(s.monto_total_pagado),
-      saldoPendiente: numeroPago(s.saldo_pendiente),
-      ultimoPagoFecha: s.ultimo_pago?.fecha || "",
-      ultimoPagoMonto: numeroPago(s.ultimo_pago?.monto)
-    };
-  }
-
-  return {
-    rut: String(item.rut || "").trim(),
-    nombreCompleto: String(item.nombre_completo || "").trim(),
-    categoria: "",
-    responsable: String(item.nombre_apoderado || item.apoderado || "").trim(),
-    correoResponsable: String(item.email || item.correo || "").trim(),
-    telefonoResponsable: String(item.telefono || item.celular || "").trim(),
-    viaja: String(item.viaja || "").toLowerCase() !== "no",
-    totalDebe: numeroPago(item.total_debe),
-    totalPagado: numeroPago(item.total_pagado),
-    saldoPendiente: numeroPago(item.saldo_pendiente),
-    ultimoPagoFecha: item.ultimo_pago_fecha || "",
-    ultimoPagoMonto: numeroPago(item.ultimo_pago_monto)
-  };
-}
-
-function getDetalleCuotaPorTipo(grupo = {}, tipo = "") {
-  const tipoBuscado = normalizeLoose(tipo);
-
-  return (grupo.detalleCuotas || []).find((item) =>
-    normalizeLoose(item.tipo_cuota || "") === tipoBuscado
-  ) || null;
-}
-
-function getValorInscripcionGrupo(grupo = {}) {
-  const inscripcion = getDetalleCuotaPorTipo(grupo, "Inscripcion");
-  return numeroPago(inscripcion?.total);
-}
-
-function getInfoCuotaGrupo(grupo = {}) {
-  const cuota = getDetalleCuotaPorTipo(grupo, "Cuota");
-
-  const totalCuotas = numeroPago(cuota?.total);
-  const cantidadCuotas = Number(cuota?.cantidad || 0);
-  const valorCuota = cantidadCuotas > 0 ? totalCuotas / cantidadCuotas : 0;
-
-  return {
-    totalCuotas,
-    cantidadCuotas,
-    valorCuota,
-    inicioPago: cuota?.inicio_pago || "",
-    terminoPago: cuota?.termino_pago || ""
-  };
-}
-
-function calcularCuotasVencidasGrupo(grupo = {}) {
-  const info = getInfoCuotaGrupo(grupo);
-
-  if (!info.cantidadCuotas || !info.inicioPago) return 0;
-
-  const inicio = timestampLikeToDate(info.inicioPago);
-  if (!inicio) return 0;
-
-  const hoy = new Date();
-
-  if (hoy < inicio) return 0;
-
-  let vencidas =
-    (hoy.getFullYear() - inicio.getFullYear()) * 12 +
-    (hoy.getMonth() - inicio.getMonth()) +
-    1;
-
-  if (hoy.getDate() < inicio.getDate()) {
-    vencidas -= 1;
-  }
-
-  vencidas = Math.max(0, vencidas);
-  vencidas = Math.min(vencidas, info.cantidadCuotas);
-
-  return vencidas;
-}
-
-function calcularMontoEsperadoHoyGrupo(grupo = {}) {
-  const inscripcion = getValorInscripcionGrupo(grupo);
-  const info = getInfoCuotaGrupo(grupo);
-  const cuotasVencidas = calcularCuotasVencidasGrupo(grupo);
-
-  return inscripcion + (cuotasVencidas * info.valorCuota);
-}
-
-function calcularCuotasAtrasadasPersona(p = {}, grupo = {}) {
-  const info = getInfoCuotaGrupo(grupo);
-  if (!info.valorCuota) return 0;
-
-  const esperadoHoy = calcularMontoEsperadoHoyGrupo(grupo);
-  const diferencia = esperadoHoy - Number(p.totalPagado || 0);
-
-  if (diferencia <= 0) return 0;
-
-  return diferencia / info.valorCuota;
-}
-
-function enriquecerPasajeroConAtraso(p = {}, grupo = {}) {
-  const cuotasAtrasadas = calcularCuotasAtrasadasPersona(p, grupo);
-  const montoEsperadoHoy = calcularMontoEsperadoHoyGrupo(grupo);
-
-  return {
-    ...p,
-    cuotasAtrasadas,
-    montoEsperadoHoy,
-    valorInscripcion: getValorInscripcionGrupo(grupo),
-    valorCuota: getInfoCuotaGrupo(grupo).valorCuota
-  };
-}
-
-async function fetchJsonPagos(url) {
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  return await res.json();
-}
-
-function buscarGrupoRtPorNumeroNegocio(
-  numeroNegocio
-) {
-  const numeroBuscado =
-    String(
-      numeroNegocio || ""
-    ).trim();
-
-  if (!numeroBuscado) {
-    return null;
-  }
-
-  return state.rows.find((row) => {
-    const numerosGrupo =
-      getNumerosNegocio(row);
-
-    return numerosGrupo.includes(
-      numeroBuscado
-    );
-  }) || null;
-}
-
-function diasDesdeFechaPago(fecha) {
-  const d = timestampLikeToDate(fecha);
-  if (!d) return null;
-
-  const now = new Date();
-  const diff = now.getTime() - d.getTime();
-
-  return Math.floor(diff / (1000 * 60 * 60 * 24));
-}
-
-function getTiposAlertaPersonaPago(p = {}, grupo = {}) {
-  if (!p.viaja) return [];
-  if (p.saldoPendiente <= 0) return [];
-
-  const moneda = String(grupo.monedaTexto || "").toUpperCase();
-  const alertas = [];
-
-  const valorInscripcion = getValorInscripcionGrupo(grupo);
-  const cuotasAtrasadas = calcularCuotasAtrasadasPersona(p, grupo);
-
-  const limitePagoBajo =
-    moneda === "USD" || moneda === "EUR"
-      ? 550
-      : moneda === "CLP"
-        ? 550000
-        : null;
-
-  if (p.totalPagado <= 0 || (valorInscripcion > 0 && p.totalPagado < valorInscripcion)) {
-    alertas.push({
-      tipo: "persona_sin_pagos_o_sin_inscripcion",
-      nivel: "critica",
-      label: p.totalPagado <= 0
-        ? "Nunca pagó"
-        : "Pagó menos que la inscripción",
-      gravedad: 5,
-      cuotasAtrasadas,
-      valorInscripcion
-    });
-  }
-
-  if (limitePagoBajo !== null && p.totalPagado > 0 && p.totalPagado < limitePagoBajo) {
-    alertas.push({
-      tipo: "persona_pago_bajo",
-      nivel: "critica",
-      label: moneda === "CLP"
-        ? "Pagó menos de $550.000 CLP"
-        : `Pagó menos de 550 ${moneda}`,
-      gravedad: 4,
-      cuotasAtrasadas,
-      valorInscripcion
-    });
-  }
-
-  if (cuotasAtrasadas >= 1 && cuotasAtrasadas < 2) {
-    alertas.push({
-      tipo: "persona_atrasada_1_cuota",
-      nivel: "warning",
-      label: "Atrasado 1 cuota",
-      gravedad: 3,
-      cuotasAtrasadas,
-      valorInscripcion
-    });
-  }
-
-  if (cuotasAtrasadas >= 2) {
-    alertas.push({
-      tipo: "persona_atrasada_2_mas_cuotas",
-      nivel: "critica",
-      label: `Atrasado ${Math.floor(cuotasAtrasadas)} cuotas`,
-      gravedad: 5,
-      cuotasAtrasadas,
-      valorInscripcion
-    });
-  }
-
-  const totalDebe = Number(p.totalDebe || 0);
-  const saldo = Number(p.saldoPendiente || 0);
-  const porcentajeDeuda = totalDebe > 0 ? (saldo / totalDebe) * 100 : 0;
-
-  if (porcentajeDeuda > 50) {
-    alertas.push({
-      tipo: "persona_muy_atrasada_50",
-      nivel: "critica",
-      label: "Muy atrasado: deuda mayor al 50%",
-      gravedad: 5,
-      cuotasAtrasadas,
-      porcentajeDeuda,
-      valorInscripcion
-    });
-  }
-
-  return alertas;
-}
-
-function getTiposAlertaGrupoPago(grupo = {}, pasajeros = []) {
-  const viajan = pasajeros.filter((p) => p.viaja);
-  const viajanConAtraso = viajan.map((p) => enriquecerPasajeroConAtraso(p, grupo));
-
-  const conDeuda = viajanConAtraso.filter((p) => p.saldoPendiente > 0);
-  const atrasados = viajanConAtraso.filter((p) => p.cuotasAtrasadas >= 1);
-  const atrasados2Mas = viajanConAtraso.filter((p) => p.cuotasAtrasadas >= 2);
-
-  const totalViajan = viajanConAtraso.length;
-  const totalConDeuda = conDeuda.length;
-  const totalAtrasados = atrasados.length;
-  const totalAtrasados2Mas = atrasados2Mas.length;
-
-  const totalViaje = Number(grupo.totalViaje || 0);
-
-  const saldoPendienteGrupo = viajanConAtraso
-    .reduce((acc, p) => acc + Number(p.saldoPendiente || 0), 0) || Number(grupo.saldoPendiente || 0);
-
-  const porcentajeSaldoPendiente =
-    totalViaje > 0 ? (saldoPendienteGrupo / totalViaje) * 100 : 0;
-
-  const porcentajeGrupoAtrasado =
-    totalViajan > 0 ? (totalAtrasados / totalViajan) * 100 : 0;
-
-  const alertas = [];
-
-  if (saldoPendienteGrupo > 0 && porcentajeSaldoPendiente > 50) {
-    alertas.push({
-      tipo: "grupo_debe_mas_50",
-      nivel: "critica",
-      label: "Grupo debe más del 50% del total",
-      gravedad: 5,
-      porcentajeSaldoPendiente,
-      porcentajeGrupoAtrasado,
-      totalViajan,
-      totalConDeuda,
-      totalAtrasados,
-      totalAtrasados2Mas
-    });
-  }
-
-  if (totalAtrasados2Mas >= 10) {
-    alertas.push({
-      tipo: "grupo_10_mas_atrasados_2_cuotas",
-      nivel: "critica",
-      label: "10+ personas con 2+ cuotas atrasadas",
-      gravedad: 5,
-      porcentajeSaldoPendiente,
-      porcentajeGrupoAtrasado,
-      totalViajan,
-      totalConDeuda,
-      totalAtrasados,
-      totalAtrasados2Mas
-    });
-  }
-
-  if (totalAtrasados > 0) {
-    alertas.push({
-      tipo: "grupo_no_va_al_dia",
-      nivel: "warning",
-      label: "Grupo no va al día",
-      gravedad: 3,
-      porcentajeSaldoPendiente,
-      porcentajeGrupoAtrasado,
-      totalViajan,
-      totalConDeuda,
-      totalAtrasados,
-      totalAtrasados2Mas
-    });
-  }
-
-  return alertas;
-}
-
-function calcularPrioridadPersona(tipoInfo, grupoInfo = {}) {
-  const porcentajeGrupoDebe = Number(grupoInfo.porcentajeDebe || 0);
-  const avanceGrupo = Math.max(0, 100 - porcentajeGrupoDebe);
-
-  return Math.round(
-    Number(tipoInfo.gravedad || 1) * 1000 +
-    avanceGrupo * 10 -
-    porcentajeGrupoDebe
-  );
-}
-
-function calcularPrioridadGrupo(tipoInfo, grupo = {}) {
-  const saldo = Number(grupo.saldoPendiente || 0);
-
-  // En grupos importa más el que debe menos dentro de su categoría,
-  // porque está más cerca de concretar.
-  return Math.round(
-    Number(tipoInfo.gravedad || 1) * 1000 -
-    Math.min(saldo / 100, 999)
-  );
-}
-
 function getPrioridadPagoKey(alerta = {}) {
-  const tipo = String(alerta.tipo || "");
+  const tipo = String(
+    alerta.tipo || ""
+  );
 
   if (
-    tipo === "persona_sin_pagos_o_sin_inscripcion" ||
-    tipo === "persona_atrasada_2_mas_cuotas" ||
-    tipo === "persona_muy_atrasada_50" ||
-    tipo === "grupo_debe_mas_50" ||
-    tipo === "grupo_10_mas_atrasados_2_cuotas"
+    tipo ===
+      "persona_sin_pagos_o_sin_inscripcion" ||
+    tipo ===
+      "persona_atrasada_2_mas_cuotas" ||
+    tipo ===
+      "persona_muy_atrasada_50" ||
+    tipo ===
+      "grupo_debe_mas_50" ||
+    tipo ===
+      "grupo_10_mas_atrasados_2_cuotas"
   ) {
     return "critica";
   }
 
   if (
-    tipo === "persona_pago_bajo" ||
-    tipo === "persona_atrasada_1_cuota" ||
-    tipo === "grupo_no_va_al_dia"
+    tipo ===
+      "persona_pago_bajo" ||
+    tipo ===
+      "persona_atrasada_1_cuota" ||
+    tipo ===
+      "grupo_no_va_al_dia"
   ) {
     return "alta";
   }
 
-  return "media";
+  if (
+    tipo ===
+      "grupo_liberados_parciales" ||
+    tipo ===
+      "grupo_saldo_a_favor"
+  ) {
+    return "media";
+  }
+
+  return "baja";
 }
 
 function getPrioridadPagoLabel(alerta = {}) {
@@ -1421,84 +886,32 @@ Saludos cordiales,
 Turismo Rai Trai`;
 }
 
-function getFechaViajeConfirmadaOperacion(numeroNegocio = "") {
-  const numero = String(numeroNegocio || "").trim();
-  if (!numero) return null;
-
-  const grupoOp = state.gruposOperacionByNumero?.get(numero);
-  if (!grupoOp) return null;
-
-  if (grupoOp.fechasConfirmadasDesdeHoteles !== true) return null;
-
-  return timestampLikeToDate(grupoOp.fechaInicio);
-}
-
 function getFechaViajeOrdenAlertaPago(alerta = {}) {
-  const fecha = getFechaViajeConfirmadaOperacion(alerta.numeroNegocio);
-  return fecha ? fecha.getTime() : Number.MAX_SAFE_INTEGER;
+  const fecha = timestampLikeToDate(
+    alerta.fechaViajeTimestamp ||
+    alerta.fechaViajeConfirmada
+  );
+
+  return fecha
+    ? fecha.getTime()
+    : Number.MAX_SAFE_INTEGER;
 }
 
 function formatFechaViajeAlertaPago(alerta = {}) {
-  const fecha = getFechaViajeConfirmadaOperacion(alerta.numeroNegocio);
+  const fecha = timestampLikeToDate(
+    alerta.fechaViajeTimestamp ||
+    alerta.fechaViajeConfirmada
+  );
 
-  if (!fecha) return "-";
+  if (!fecha) {
+    return "-";
+  }
 
   return fecha.toLocaleDateString("es-CL", {
     day: "2-digit",
     month: "2-digit",
     year: "numeric"
   });
-}
-
-function getAlertasPagosForScope(
-  scopedRows = []
-) {
-  const scopedIds = new Set(
-    scopedRows
-      .map(getRowId)
-      .filter(Boolean)
-  );
-
-  const scopedNumeros = new Set(
-    scopedRows
-      .flatMap((row) =>
-        getNumerosNegocio(row)
-      )
-      .filter(Boolean)
-  );
-
-  return (
-    state.alertasPagosRows || []
-  )
-    .filter((alerta) => {
-      if (
-        alerta.activa === false
-      ) {
-        return false;
-      }
-
-      const idGrupo =
-        String(
-          alerta.idGrupo || ""
-        ).trim();
-
-      const numeroNegocio =
-        String(
-          alerta.numeroNegocio || ""
-        ).trim();
-
-      return (
-        scopedIds.has(idGrupo) ||
-        scopedNumeros.has(
-          numeroNegocio
-        )
-      );
-    })
-    .sort(
-      (a, b) =>
-        getFechaViajeOrdenAlertaPago(a) -
-        getFechaViajeOrdenAlertaPago(b)
-    );
 }
 
 function buildAlertasPagosFiltrosHtml(rows = []) {
@@ -2653,6 +2066,7 @@ function exportarAlertasPagosXlsx() {
     grupo: a.grupo || "",
     numeroNegocio: a.numeroNegocio || "",
     anoViaje: a.anoViaje || "",
+    fechaViaje: formatFechaViajeAlertaPago(a),
     vendedor: a.vendedor || "",
     moneda: a.moneda || "",
     total: a.totalDebe || "",
