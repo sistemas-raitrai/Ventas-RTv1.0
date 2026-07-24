@@ -1361,26 +1361,37 @@ function buildAlertasPagosFiltrosHtml(rows = []) {
           ${escapeHtml(etiquetaTodos)}
         </option>
       
-        ${anos.map((a) => `
-          <option
-            value="${escapeHtml(a)}"
-            ${
-              state.anoFiltro ===
-              String(a)
-                ? "selected"
-                : ""
-            }
-          >
-            ${escapeHtml(a)}
-            ${
-              state.anosCargados.has(
-                String(a)
-              )
-                ? ""
-                : " · cargar"
-            }
-          </option>
-        `).join("")}
+        ${anos.map((a) => {
+          const anoTexto =
+            String(a);
+        
+          const estaCargado =
+            state.anosGruposCargados.has(
+              anoTexto
+            ) ||
+            state.anosPersonasCargados.has(
+              anoTexto
+            );
+        
+          return `
+            <option
+              value="${escapeHtml(anoTexto)}"
+              ${
+                state.anoFiltro ===
+                anoTexto
+                  ? "selected"
+                  : ""
+              }
+            >
+              ${escapeHtml(anoTexto)}
+              ${
+                estaCargado
+                  ? ""
+                  : " · cargar"
+              }
+            </option>
+          `;
+        }).join("")}
       </select>
 
       <select
@@ -1526,11 +1537,14 @@ function buildAlertasPagosFiltrosHtml(rows = []) {
           ).join("")}
         </div>
       </div>
+
     </div>
+    
+    <div
       id="resumen-alertas-pagos"
       style="margin-bottom:12px;"
     ></div>
-
+    
     <div id="contenedor-alertas-pagos-listado"></div>
   `;
 }
@@ -1539,157 +1553,77 @@ function getTiposAlertasPagosUI() {
   return {
     grupales: [
       {
-        tipo:
-          "grupo_muy_atrasado",
-
-        label:
-          "Grupo muy atrasado",
-
-        categoria:
-          "grupo",
-
-        campo:
-          "grupoMuyAtrasado"
+        tipo: "__todas_grupales__",
+        label: "Todas las grupales",
+        categoria: "grupo"
       },
       {
-        tipo:
-          "grupo_atrasos_2_mas",
-
-        label:
-          "Integrantes con 2+ cuotas",
-
-        categoria:
-          "grupo",
-
-        campo:
-          "grupoConAtrasos2Mas"
+        tipo: "grupo_muy_atrasado",
+        label: "Grupo muy atrasado",
+        categoria: "grupo",
+        campo: "grupoMuyAtrasado"
       },
       {
-        tipo:
-          "grupo_no_va_al_dia",
-
-        label:
-          "Grupo no va al día",
-
-        categoria:
-          "grupo",
-
-        campo:
-          "grupoNoVaAlDia"
+        tipo: "grupo_atrasos_2_mas",
+        label: "Integrantes con 2+ cuotas",
+        categoria: "grupo",
+        campo: "grupoConAtrasos2Mas"
       },
       {
-        tipo:
-          "grupo_liberados_parciales",
-
-        label:
-          "Liberados parciales",
-
-        categoria:
-          "grupo",
-
-        campo:
-          "grupoConLiberadosParciales"
+        tipo: "grupo_no_va_al_dia",
+        label: "Grupo no va al día",
+        categoria: "grupo",
+        campo: "grupoNoVaAlDia"
       },
       {
-        tipo:
-          "grupo_saldo_a_favor",
-
-        label:
-          "Saldo a favor",
-
-        categoria:
-          "grupo",
-
-        campo:
-          "grupoConSaldoFavor"
+        tipo: "grupo_liberados_parciales",
+        label: "Liberados parciales",
+        categoria: "grupo",
+        campo: "grupoConLiberadosParciales"
       },
       {
-        tipo:
-          "__todas_grupales__",
-
-        label:
-          "Todas las grupales",
-
-        categoria:
-          "grupo"
+        tipo: "grupo_saldo_a_favor",
+        label: "Saldo a favor",
+        categoria: "grupo",
+        campo: "grupoConSaldoFavor"
       }
     ],
 
     individuales: [
       {
-        tipo:
-          "persona_muy_atrasada",
-
-        label:
-          "Muy atrasado",
-
-        categoria:
-          "persona",
-
-        campo:
-          "personaMuyAtrasada"
+        tipo: "__todas_individuales__",
+        label: "Todas las individuales",
+        categoria: "persona"
       },
       {
-        tipo:
-          "persona_sin_pagos_o_inscripcion",
-
-        label:
-          "Nunca pagó / inscripción",
-
-        categoria:
-          "persona",
-
-        campo:
-          "personaSinPagosOInscripcion"
+        tipo: "persona_muy_atrasada",
+        label: "Muy atrasado",
+        categoria: "persona",
+        campo: "personaMuyAtrasada"
       },
       {
-        tipo:
-          "persona_atrasada_2_mas_cuotas",
-
-        label:
-          "2+ cuotas atrasadas",
-
-        categoria:
-          "persona",
-
-        campo:
-          "personaAtraso2MasCuotas"
+        tipo: "persona_atrasada_2_mas_cuotas",
+        label: "2+ cuotas atrasadas",
+        categoria: "persona",
+        campo: "personaAtraso2MasCuotas"
       },
       {
-        tipo:
-          "persona_atrasada_1_cuota",
-
-        label:
-          "1 cuota atrasada",
-
-        categoria:
-          "persona",
-
-        campo:
-          "personaAtraso1Cuota"
+        tipo: "persona_atrasada_1_cuota",
+        label: "1 cuota atrasada",
+        categoria: "persona",
+        campo: "personaAtraso1Cuota"
       },
       {
-        tipo:
-          "persona_pago_bajo",
-
-        label:
-          "Pago bajo",
-
-        categoria:
-          "persona",
-
-        campo:
-          "personaPagoBajo"
+        tipo: "persona_sin_pagos_o_inscripcion",
+        label: "Nunca pagó / inscripción",
+        categoria: "persona",
+        campo: "personaSinPagosOInscripcion"
       },
       {
-        tipo:
-          "__todas_individuales__",
-
-        label:
-          "Todas las individuales",
-
-        categoria:
-          "persona"
+        tipo: "persona_pago_bajo",
+        label: "Pago bajo",
+        categoria: "persona",
+        campo: "personaPagoBajo"
       }
     ]
   };
@@ -2851,8 +2785,6 @@ async function actualizarAlertasPagos() {
           })
         : Promise.resolve()
     ]);
-    
-    await abrirPaginaAlertasPagos();
     
     await abrirPaginaAlertasPagos();
 
