@@ -8,6 +8,7 @@ import {
 import {
   collection,
   getDocs,
+  getDoc,
   doc,
   setDoc,
   addDoc,
@@ -51,8 +52,14 @@ import {
 
 const HOME_URL = "home.html";
 
-const ALERTAS_PAGOS_COLLECTION =
-  "ventas_alertas_pagos";
+const ALERTAS_PAGOS_PERSONAS_COLLECTION =
+  "ventas_alertas_pagos_personas";
+
+const ALERTAS_PAGOS_GRUPOS_COLLECTION =
+  "ventas_alertas_pagos_grupos";
+
+const ALERTAS_PAGOS_DETALLE_COLLECTION =
+  "ventas_alertas_pagos_detalle";
 
 const ALERTAS_PAGOS_HISTORIAL_COLLECTION =
   "ventas_alertas_pagos_historial";
@@ -64,31 +71,53 @@ const ALERTAS_PAGOS_HISTORIAL_COLLECTION =
 const state = {
   alertasPagosRows: [],
   alertasPagosFiltradasRows: [],
-  alertasPagosCargadas: false,
   alertasPagosUltimaActualizacion: null,
 
-  alertasPagosSortKey: "fechaViaje",
-  alertasPagosSortDir: "asc",
+  alertasPagosSortKey:
+    "fechaViaje",
+
+  alertasPagosSortDir:
+    "asc",
 
   /*
-    Caché separada por año.
-
-    Ejemplo:
-    "2026" → alertas 2026
-    "2027" → alertas 2027
+    Resúmenes grupales.
   */
-  alertasPorAno: new Map(),
-
-  anosIniciales: [],
-  anosCargados: new Set(),
+  gruposPorAno:
+    new Map(),
 
   /*
-    "__iniciales__" significa:
-    mostrar juntos los dos años iniciales.
+    Personas cargadas solamente cuando
+    se abre una categoría individual.
   */
-  anoFiltro: "__iniciales__",
+  personasPorAno:
+    new Map(),
 
-  cargaEnCurso: false
+  anosIniciales:
+    [],
+
+  anosGruposCargados:
+    new Set(),
+
+  anosPersonasCargados:
+    new Set(),
+
+  anoFiltro:
+    "__iniciales__",
+
+  /*
+    La pantalla comienza en grupos muy atrasados.
+  */
+  tipoActivo:
+    "grupo_muy_atrasado",
+
+  modoActivo:
+    "grupo",
+
+  detalleGrupoCache:
+    new Map(),
+
+  cargaEnCurso:
+    false
 };
 
 /* =========================================================
@@ -437,13 +466,18 @@ function getAnosDisponiblesSelectorPagos() {
   const anoBase =
     Number(anosIniciales[0]);
 
+  const anosCargados = [
+    ...state.anosGruposCargados,
+    ...state.anosPersonasCargados
+  ];
+
   const anos = [
     String(anoBase - 1),
     String(anoBase),
     String(anoBase + 1),
     String(anoBase + 2),
     String(anoBase + 3),
-    ...state.anosCargados
+    ...anosCargados
   ];
 
   return [
@@ -454,26 +488,34 @@ function getAnosDisponiblesSelectorPagos() {
   );
 }
 
-async function consultarAlertasActivasAno(
-  anoViaje
-) {
+async function consultarAlertasActivasAno({
+  anoViaje,
+  categoria
+}) {
   const ano =
-    String(anoViaje || "").trim();
+    String(
+      anoViaje || ""
+    ).trim();
 
   if (!ano) {
     throw new Error(
-      "No se indicó el año de las alertas."
+      "No se indicó el año."
     );
   }
 
+  const coleccion =
+    categoria === "persona"
+      ? ALERTAS_PAGOS_PERSONAS_COLLECTION
+      : ALERTAS_PAGOS_GRUPOS_COLLECTION;
+
   return medirConsultaPagos(
-    `alertas activas ${ano}`,
+    `${categoria} activas ${ano}`,
     () =>
       getDocs(
         query(
           collection(
             db,
-            ALERTAS_PAGOS_COLLECTION
+            coleccion
           ),
 
           where(
@@ -492,76 +534,123 @@ async function consultarAlertasActivasAno(
   );
 }
 
-async function cargarAnoAlertasPagos(
+async function cargarAnoGruposPagos(
   anoViaje,
   {
     forzar = false
   } = {}
 ) {
   const ano =
-    String(anoViaje || "").trim();
-
-  if (!ano) {
-    return [];
-  }
+    String(
+      anoViaje || ""
+    ).trim();
 
   if (
-    state.alertasPorAno.has(ano) &&
+    state.gruposPorAno.has(ano) &&
     !forzar
   ) {
-    logCargaPagos(
-      `Año ${ano} recuperado desde memoria.`,
-      {
-        alertas:
-          state.alertasPorAno
-            .get(ano)
-            ?.length || 0
-      }
-    );
-
     return (
-      state.alertasPorAno.get(ano) ||
+      state.gruposPorAno.get(ano) ||
       []
     );
   }
 
   const snap =
-    await consultarAlertasActivasAno(
-      ano
-    );
+    await consultarAlertasActivasAno({
+      anoViaje:
+        ano,
 
-  const alertas =
+      categoria:
+        "grupo"
+    });
+
+  const rows =
     snap.docs.map(
       (docSnap) => ({
-        id: docSnap.id,
+        id:
+          docSnap.id,
+
         ...docSnap.data()
       })
     );
 
-  state.alertasPorAno.set(
+  state.gruposPorAno.set(
     ano,
-    alertas
+    rows
   );
 
-  state.anosCargados.add(
+  state.anosGruposCargados.add(
     ano
   );
 
-  logCargaPagos(
-    `Año ${ano} guardado en memoria.`,
-    {
-      documentos:
-        alertas.length
-    }
+  return rows;
+}
+
+async function cargarAnoPersonasPagos(
+  anoViaje,
+  {
+    forzar = false
+  } = {}
+) {
+  const ano =
+    String(
+      anoViaje || ""
+    ).trim();
+
+  if (
+    state.personasPorAno.has(ano) &&
+    !forzar
+  ) {
+    return (
+      state.personasPorAno.get(ano) ||
+      []
+    );
+  }
+
+  const snap =
+    await consultarAlertasActivasAno({
+      anoViaje:
+        ano,
+
+      categoria:
+        "persona"
+    });
+
+  const rows =
+    snap.docs.map(
+      (docSnap) => ({
+        id:
+          docSnap.id,
+
+        ...docSnap.data()
+      })
+    );
+
+  state.personasPorAno.set(
+    ano,
+    rows
   );
 
-  return alertas;
+  state.anosPersonasCargados.add(
+    ano
+  );
+
+  return rows;
 }
 
 function reconstruirAlertasPagosDesdeCache() {
-  state.alertasPagosRows =
-    [...state.alertasPorAno.values()]
+  const grupos =
+    [...state.gruposPorAno.values()]
       .flat();
+
+  const personas =
+    [...state.personasPorAno.values()]
+      .flat();
+
+  state.alertasPagosRows = [
+    ...grupos,
+    ...personas
+  ];
 
   state
     .alertasPagosUltimaActualizacion =
@@ -577,9 +666,6 @@ function reconstruirAlertasPagosDesdeCache() {
           b.getTime() -
           a.getTime()
       )[0] || null;
-
-  state.alertasPagosCargadas =
-    state.anosCargados.size > 0;
 
   state.alertasPagosFiltradasRows =
     getAlertasPagosForScope();
@@ -641,12 +727,12 @@ async function cargarDatosAlertasPagos({
 
   try {
     /*
-      Los dos años se consultan al mismo tiempo.
+      La carga inicial contiene solamente resúmenes grupales.
     */
     await Promise.all(
       state.anosIniciales.map(
         (ano) =>
-          cargarAnoAlertasPagos(
+          cargarAnoGruposPagos(
             ano,
             {
               forzar
@@ -666,8 +752,11 @@ async function cargarDatosAlertasPagos({
         inicioProcesamiento
       )} ms`,
       {
-        anosCargados:
-          [...state.anosCargados],
+        anosGruposCargados:
+          [...state.anosGruposCargados],
+        
+        anosPersonasCargados:
+          [...state.anosPersonasCargados],
 
         alertasEnMemoria:
           state.alertasPagosRows.length,
@@ -739,7 +828,8 @@ async function cargarDatosAlertasPagos({
 
 async function cargarAlertasPagosDesdeFirestore({
   forzar = false,
-  anos = null
+  anos = null,
+  categoria = ""
 } = {}) {
   if (!state.anosIniciales.length) {
     state.anosIniciales =
@@ -750,47 +840,38 @@ async function cargarAlertasPagosDesdeFirestore({
     Array.isArray(anos) &&
     anos.length
       ? anos.map(String)
-      : (
-          state.anosCargados.size
-            ? [...state.anosCargados]
-            : state.anosIniciales
-        );
+      : state.anosIniciales;
 
-  const faltanAnos =
-    anosObjetivo.some(
-      (ano) =>
-        !state.anosCargados.has(
-          String(ano)
-        )
+  const categoriaObjetivo =
+    categoria ||
+    state.modoActivo ||
+    "grupo";
+
+  if (categoriaObjetivo === "persona") {
+    await Promise.all(
+      anosObjetivo.map(
+        (ano) =>
+          cargarAnoPersonasPagos(
+            ano,
+            {
+              forzar
+            }
+          )
+      )
     );
-
-  if (
-    state.alertasPagosCargadas &&
-    !forzar &&
-    !faltanAnos
-  ) {
-    logCargaPagos(
-      "Las alertas requeridas ya están en memoria.",
-      {
-        anos:
-          anosObjetivo
-      }
+  } else {
+    await Promise.all(
+      anosObjetivo.map(
+        (ano) =>
+          cargarAnoGruposPagos(
+            ano,
+            {
+              forzar
+            }
+          )
+      )
     );
-
-    return;
   }
-
-  await Promise.all(
-    anosObjetivo.map(
-      (ano) =>
-        cargarAnoAlertasPagos(
-          ano,
-          {
-            forzar
-          }
-        )
-    )
-  );
 
   reconstruirAlertasPagosDesdeCache();
 }
@@ -829,42 +910,40 @@ function formatoMontoPago(v, moneda = "") {
 }
 
 function getPrioridadPagoKey(alerta = {}) {
-  const tipo = String(
-    alerta.tipo || ""
-  );
+  const nivel =
+    normalizeLoose(
+      alerta.nivel || ""
+    );
 
-  if (
-    tipo ===
-      "persona_sin_pagos_o_sin_inscripcion" ||
-    tipo ===
-      "persona_atrasada_2_mas_cuotas" ||
-    tipo ===
-      "persona_muy_atrasada_50" ||
-    tipo ===
-      "grupo_debe_mas_50" ||
-    tipo ===
-      "grupo_10_mas_atrasados_2_cuotas"
-  ) {
+  if (nivel === "critica") {
     return "critica";
   }
 
   if (
-    tipo ===
-      "persona_pago_bajo" ||
-    tipo ===
-      "persona_atrasada_1_cuota" ||
-    tipo ===
-      "grupo_no_va_al_dia"
+    nivel === "warning" ||
+    nivel === "advertencia"
   ) {
     return "alta";
   }
 
-  if (
-    tipo ===
-      "grupo_liberados_parciales" ||
-    tipo ===
-      "grupo_saldo_a_favor"
-  ) {
+  if (nivel === "info") {
+    return "media";
+  }
+
+  const gravedad =
+    Number(
+      alerta.gravedad || 0
+    );
+
+  if (gravedad >= 5) {
+    return "critica";
+  }
+
+  if (gravedad >= 3) {
+    return "alta";
+  }
+
+  if (gravedad >= 2) {
     return "media";
   }
 
@@ -1372,37 +1451,7 @@ function buildAlertasPagosFiltrosHtml(rows = []) {
         margin-bottom:16px;
       "
     >
-      <div
-        style="
-          padding:12px 14px;
-          border-radius:16px;
-          background:#fbf9fd;
-          border:1px solid rgba(49,25,75,.10);
-        "
-      >
-        <div
-          style="
-            margin-bottom:9px;
-            color:#32184f;
-            font-size:12px;
-            font-weight:900;
-            text-transform:uppercase;
-            letter-spacing:.35px;
-          "
-        >
-          Alertas individuales
-        </div>
-
-        <div style="display:flex; flex-wrap:wrap; gap:8px;">
-          ${tiposAlertas.individuales.map((item) =>
-            renderChip(
-              item,
-              item.tipo === "__todas_individuales__"
-            )
-          ).join("")}
-        </div>
-      </div>
-
+      <!-- ALERTAS GRUPALES PRIMERO -->
       <div
         style="
           padding:12px 14px;
@@ -1423,16 +1472,61 @@ function buildAlertasPagosFiltrosHtml(rows = []) {
         >
           Alertas grupales
         </div>
-
-        <div style="display:flex; flex-wrap:wrap; gap:8px;">
+    
+        <div
+          style="
+            display:flex;
+            flex-wrap:wrap;
+            gap:8px;
+          "
+        >
           ${tiposAlertas.grupales.map((item) =>
-            renderChip(item, false)
+            renderChip(
+              item,
+              item.tipo === state.tipoActivo
+            )
+          ).join("")}
+        </div>
+      </div>
+    
+      <!-- ALERTAS INDIVIDUALES DESPUÉS -->
+      <div
+        style="
+          padding:12px 14px;
+          border-radius:16px;
+          background:#fbf9fd;
+          border:1px solid rgba(49,25,75,.10);
+        "
+      >
+        <div
+          style="
+            margin-bottom:9px;
+            color:#32184f;
+            font-size:12px;
+            font-weight:900;
+            text-transform:uppercase;
+            letter-spacing:.35px;
+          "
+        >
+          Alertas individuales
+        </div>
+    
+        <div
+          style="
+            display:flex;
+            flex-wrap:wrap;
+            gap:8px;
+          "
+        >
+          ${tiposAlertas.individuales.map((item) =>
+            renderChip(
+              item,
+              item.tipo === state.tipoActivo
+            )
           ).join("")}
         </div>
       </div>
     </div>
-
-    <div
       id="resumen-alertas-pagos"
       style="margin-bottom:12px;"
     ></div>
@@ -1443,69 +1537,159 @@ function buildAlertasPagosFiltrosHtml(rows = []) {
 
 function getTiposAlertasPagosUI() {
   return {
-    individuales: [
+    grupales: [
       {
-        tipo: "__todas_individuales__",
-        label: "Todas las individuales",
-        categoria: "persona"
+        tipo:
+          "grupo_muy_atrasado",
+
+        label:
+          "Grupo muy atrasado",
+
+        categoria:
+          "grupo",
+
+        campo:
+          "grupoMuyAtrasado"
       },
       {
-        tipo: "persona_sin_pagos_o_sin_inscripcion",
-        label: "Nunca pagó / inscripción",
-        categoria: "persona"
+        tipo:
+          "grupo_atrasos_2_mas",
+
+        label:
+          "Integrantes con 2+ cuotas",
+
+        categoria:
+          "grupo",
+
+        campo:
+          "grupoConAtrasos2Mas"
       },
       {
-        tipo: "persona_pago_bajo",
-        label: "Pago <550",
-        categoria: "persona"
+        tipo:
+          "grupo_no_va_al_dia",
+
+        label:
+          "Grupo no va al día",
+
+        categoria:
+          "grupo",
+
+        campo:
+          "grupoNoVaAlDia"
       },
       {
-        tipo: "persona_atrasada_1_cuota",
-        label: "1 cuota atrasada",
-        categoria: "persona"
+        tipo:
+          "grupo_liberados_parciales",
+
+        label:
+          "Liberados parciales",
+
+        categoria:
+          "grupo",
+
+        campo:
+          "grupoConLiberadosParciales"
       },
       {
-        tipo: "persona_atrasada_2_mas_cuotas",
-        label: "2+ cuotas atrasadas",
-        categoria: "persona"
+        tipo:
+          "grupo_saldo_a_favor",
+
+        label:
+          "Saldo a favor",
+
+        categoria:
+          "grupo",
+
+        campo:
+          "grupoConSaldoFavor"
       },
       {
-        tipo: "persona_muy_atrasada_50",
-        label: "Muy atrasado 50%+",
-        categoria: "persona"
+        tipo:
+          "__todas_grupales__",
+
+        label:
+          "Todas las grupales",
+
+        categoria:
+          "grupo"
       }
     ],
 
-    grupales: [
+    individuales: [
       {
-        tipo: "__todas_grupales__",
-        label: "Todas las grupales",
-        categoria: "grupo"
+        tipo:
+          "persona_muy_atrasada",
+
+        label:
+          "Muy atrasado",
+
+        categoria:
+          "persona",
+
+        campo:
+          "personaMuyAtrasada"
       },
       {
-        tipo: "grupo_debe_mas_50",
-        label: "Grupo debe 50%+",
-        categoria: "grupo"
+        tipo:
+          "persona_sin_pagos_o_inscripcion",
+
+        label:
+          "Nunca pagó / inscripción",
+
+        categoria:
+          "persona",
+
+        campo:
+          "personaSinPagosOInscripcion"
       },
       {
-        tipo: "grupo_10_mas_atrasados_2_cuotas",
-        label: "10+ con 2 cuotas",
-        categoria: "grupo"
+        tipo:
+          "persona_atrasada_2_mas_cuotas",
+
+        label:
+          "2+ cuotas atrasadas",
+
+        categoria:
+          "persona",
+
+        campo:
+          "personaAtraso2MasCuotas"
       },
       {
-        tipo: "grupo_no_va_al_dia",
-        label: "Grupo no va al día",
-        categoria: "grupo"
+        tipo:
+          "persona_atrasada_1_cuota",
+
+        label:
+          "1 cuota atrasada",
+
+        categoria:
+          "persona",
+
+        campo:
+          "personaAtraso1Cuota"
       },
       {
-        tipo: "grupo_liberados_parciales",
-        label: "Liberados parciales",
-        categoria: "grupo"
+        tipo:
+          "persona_pago_bajo",
+
+        label:
+          "Pago bajo",
+
+        categoria:
+          "persona",
+
+        campo:
+          "personaPagoBajo"
       },
       {
-        tipo: "grupo_saldo_a_favor",
-        label: "Saldo a favor",
-        categoria: "grupo"
+        tipo:
+          "__todas_individuales__",
+
+        label:
+          "Todas las individuales",
+
+        categoria:
+          "persona"
       }
     ]
   };
@@ -1760,17 +1944,67 @@ function filtrarAlertasPagosModal(rows = []) {
       if (!tiposActivos.size) {
         return false;
       }
-
-      if (tiposActivos.has("__todas_individuales__")) {
-        if (row.categoriaAlerta !== "persona") {
+      
+      const tipoActivo =
+        [...tiposActivos][0];
+      
+      if (
+        tipoActivo ===
+        "__todas_individuales__"
+      ) {
+        if (
+          row.categoriaAlerta !==
+          "persona"
+        ) {
           return false;
         }
-      } else if (tiposActivos.has("__todas_grupales__")) {
-        if (row.categoriaAlerta !== "grupo") {
+      } else if (
+        tipoActivo ===
+        "__todas_grupales__"
+      ) {
+        if (
+          row.categoriaAlerta !==
+          "grupo"
+        ) {
           return false;
         }
-      } else if (!tiposActivos.has(String(row.tipo || ""))) {
-        return false;
+      } else {
+        const configuracion =
+          [
+            ...getTiposAlertasPagosUI()
+              .grupales,
+      
+            ...getTiposAlertasPagosUI()
+              .individuales
+          ].find(
+            (item) =>
+              item.tipo ===
+              tipoActivo
+          );
+      
+        if (!configuracion) {
+          return false;
+        }
+      
+        if (
+          row.categoriaAlerta !==
+          configuracion.categoria
+        ) {
+          return false;
+        }
+      
+        /*
+          El filtro usa indicadores superpuestos,
+          no solamente la categoría principal.
+        */
+        if (
+          configuracion.campo &&
+          row[
+            configuracion.campo
+          ] !== true
+        ) {
+          return false;
+        }
       }
 
       if (q) {
@@ -2177,7 +2411,7 @@ function renderAlertaPagoCard(alerta = {}) {
   `;
 }
 
-function openDetalleAlertaPago(
+async function openDetalleAlertaPago(
   alertaId
 ) {
   const alerta =
@@ -2187,26 +2421,121 @@ function openDetalleAlertaPago(
         String(alertaId)
     );
 
-  if (!alerta) return;
+  if (!alerta) {
+    return;
+  }
+
+  let alertaCompleta =
+    alerta;
+
+  if (
+    alerta.categoriaAlerta ===
+    "grupo"
+  ) {
+    const detalleId =
+      String(
+        alerta.detalleId ||
+        alerta.id ||
+        ""
+      );
+
+    let detalle =
+      state.detalleGrupoCache.get(
+        detalleId
+      );
+
+    if (!detalle) {
+      const cont =
+        $(
+          "modal-alerta-pago-contenido"
+        );
+
+      setText(
+        "modal-alerta-pago-titulo",
+        alerta.grupo ||
+        "Detalle grupo"
+      );
+
+      setText(
+        "modal-alerta-pago-subtitulo",
+        "Cargando detalle..."
+      );
+
+      if (cont) {
+        cont.innerHTML = `
+          <div class="home-empty">
+            Cargando participantes del grupo...
+          </div>
+        `;
+      }
+
+      openDialog(
+        $(
+          "modal-detalle-alerta-pago"
+        )
+      );
+
+      const snapDetalle =
+        await getDoc(
+          doc(
+            db,
+            ALERTAS_PAGOS_DETALLE_COLLECTION,
+            detalleId
+          )
+        );
+
+      detalle =
+        snapDetalle.exists()
+          ? {
+              id:
+                snapDetalle.id,
+
+              ...snapDetalle.data()
+            }
+          : {};
+
+      state.detalleGrupoCache.set(
+        detalleId,
+        detalle
+      );
+    }
+
+    alertaCompleta = {
+      ...alerta,
+      ...detalle
+    };
+    /*
+      Guardamos también el detalle en el objeto
+      que está dentro del estado de la página.
+      Así funciona "Ver gestión".
+    */
+    Object.assign(
+      alerta,
+      detalle
+    );
+  }
 
   setText(
     "modal-alerta-pago-titulo",
-    alerta.categoriaAlerta ===
-      "persona"
+    alertaCompleta
+      .categoriaAlerta ===
+    "persona"
       ? (
-          alerta.participante ||
+          alertaCompleta
+            .participante ||
           "Detalle alerta"
         )
       : (
-          alerta.grupo ||
-          "Detalle alerta"
+          alertaCompleta.grupo ||
+          "Detalle grupo"
         )
   );
 
   setText(
     "modal-alerta-pago-subtitulo",
-    alerta.label ||
-    alerta.tipo ||
+    alertaCompleta.label ||
+    alertaCompleta
+      .categoriaPrincipal ||
     "Alerta de pago"
   );
 
@@ -2215,7 +2544,9 @@ function openDetalleAlertaPago(
 
   if (cont) {
     cont.innerHTML =
-      renderAlertaPagoCard(alerta);
+      renderAlertaPagoCard(
+        alertaCompleta
+      );
   }
 
   openDialog(
@@ -2389,7 +2720,17 @@ async function marcarAlertaPagoContactada(alertaId) {
     actualizadoAt: new Date().toISOString()
   };
 
-  await setDoc(doc(db, ALERTAS_PAGOS_COLLECTION, alerta.id), payload, { merge: true });
+  await setDoc(
+    doc(
+      db,
+      ALERTAS_PAGOS_PERSONAS_COLLECTION,
+      alerta.id
+    ),
+    payload,
+    {
+      merge: true
+    }
+  );
 
   await addDoc(collection(db, ALERTAS_PAGOS_HISTORIAL_COLLECTION), {
     tipo: "contacto_alerta_pago",
@@ -2412,20 +2753,21 @@ async function marcarAlertaPagoContactada(alertaId) {
   closeDialog(
      $("modal-detalle-alerta-pago")
   );
-   
-  const anoAlerta =
-    String(
-      alerta.anoViaje || ""
-    ).trim();
+
+  alerta.contactado =
+    true;
   
-  if (anoAlerta) {
-    await cargarAlertasPagosDesdeFirestore({
-      forzar: true,
-      anos: [
-        anoAlerta
-      ]
-    });
-  }
+  alerta.contactadoAt =
+    payload.contactadoAt;
+  
+  alerta.contactadoPor =
+    payload.contactadoPor;
+  
+  alerta.contactadoPorCorreo =
+    payload.contactadoPorCorreo;
+  
+  alerta.notaContacto =
+    payload.notaContacto;
   
   await abrirPaginaAlertasPagos();
 }
@@ -2482,18 +2824,35 @@ async function actualizarAlertasPagos() {
     );
 
     const anosARecargar =
-      anoViaje
+      anoViaje &&
+      anoViaje !== "__iniciales__"
         ? [
             String(anoViaje)
           ]
         : [
-            ...state.anosCargados
+            ...new Set([
+              ...state.anosGruposCargados,
+              ...state.anosPersonasCargados
+            ])
           ];
     
-    await cargarAlertasPagosDesdeFirestore({
-      forzar: true,
-      anos: anosARecargar
-    });
+    await Promise.all([
+      cargarAlertasPagosDesdeFirestore({
+        forzar: true,
+        anos: anosARecargar,
+        categoria: "grupo"
+      }),
+    
+      state.anosPersonasCargados.size
+        ? cargarAlertasPagosDesdeFirestore({
+            forzar: true,
+            anos: anosARecargar,
+            categoria: "persona"
+          })
+        : Promise.resolve()
+    ]);
+    
+    await abrirPaginaAlertasPagos();
     
     await abrirPaginaAlertasPagos();
 
@@ -2638,8 +2997,13 @@ async function abrirPaginaAlertasPagos() {
           Si el año ya se descargó antes,
           solo aplicamos el filtro local.
         */
+        const anosCargadosModo =
+          state.modoActivo === "persona"
+            ? state.anosPersonasCargados
+            : state.anosGruposCargados;
+        
         if (
-          state.anosCargados.has(
+          anosCargadosModo.has(
             nuevoValor
           )
         ) {
@@ -2671,7 +3035,10 @@ async function abrirPaginaAlertasPagos() {
           await cargarAlertasPagosDesdeFirestore({
             anos: [
               nuevoValor
-            ]
+            ],
+          
+            categoria:
+              state.modoActivo
           });
   
           /*
@@ -2764,7 +3131,82 @@ async function abrirPaginaAlertasPagos() {
 
       btn.addEventListener(
         "click",
-        () => {
+        async () => {
+          const tipo =
+            btn.dataset
+              .tipoAlertaPago;
+      
+          const categoria =
+            btn.dataset
+              .chipCategoria;
+      
+          state.tipoActivo =
+            tipo;
+      
+          state.modoActivo =
+            categoria;
+      
+          /*
+            Las personas no se cargan al abrir la página.
+            Se descargan la primera vez que el usuario
+            selecciona una categoría individual.
+          */
+          if (
+            categoria === "persona"
+          ) {
+            const anosObjetivo =
+              state.anoFiltro ===
+              "__iniciales__"
+                ? state.anosIniciales
+                : [
+                    state.anoFiltro
+                  ];
+      
+            const faltanPersonas =
+              anosObjetivo.some(
+                (ano) =>
+                  !state
+                    .anosPersonasCargados
+                    .has(
+                      String(ano)
+                    )
+              );
+      
+            if (faltanPersonas) {
+              const loading =
+                $("alertas-pagos-loading");
+      
+              if (loading) {
+                loading.hidden = false;
+      
+                loading.textContent =
+                  "Cargando alertas individuales...";
+              }
+      
+              await Promise.all(
+                anosObjetivo.map(
+                  (ano) =>
+                    cargarAnoPersonasPagos(
+                      ano
+                    )
+                )
+              );
+      
+              reconstruirAlertasPagosDesdeCache();
+      
+              if (loading) {
+                loading.hidden = true;
+              }
+      
+              /*
+                Se reconstruye para incorporar
+                vendedores y datos individuales.
+              */
+              await abrirPaginaAlertasPagos();
+              return;
+            }
+          }
+      
           document
             .querySelectorAll(
               "[data-tipo-alerta-pago]"
@@ -2774,40 +3216,40 @@ async function abrirPaginaAlertasPagos() {
                 otroBtn.classList.remove(
                   "is-active"
                 );
-
+      
                 otroBtn.style.background =
                   otroBtn.dataset
                     .bgNormal ||
                   "#fff";
-
+      
                 otroBtn.style.color =
                   otroBtn.dataset
                     .colorNormal ||
                   "#766b84";
-
+      
                 otroBtn.style.border =
                   otroBtn.dataset
                     .borderNormal ||
                   "1px solid rgba(49,25,75,.18)";
               }
             );
-
+      
           btn.classList.add(
             "is-active"
           );
-
+      
           btn.style.background =
             btn.dataset.bgActivo ||
             "#eadff7";
-
+      
           btn.style.color =
             btn.dataset.colorActivo ||
             "#32184f";
-
+      
           btn.style.border =
             btn.dataset.borderActivo ||
             "2px solid #32184f";
-
+      
           refrescar();
         }
       );
@@ -2840,11 +3282,10 @@ function bindAlertasPagosPage() {
         if (fila) {
           event.preventDefault();
 
-          openDetalleAlertaPago(
+          await openDetalleAlertaPago(
             fila.dataset
               .openDetalleAlertaPago
           );
-
           return;
         }
 
