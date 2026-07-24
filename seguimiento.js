@@ -12,8 +12,7 @@ import {
   collection,
   getDocs,
   query,
-  where,
-  orderBy
+  where
 } from "https://www.gstatic.com/firebasejs/11.7.3/firebase-firestore.js";
 
 import {
@@ -44,6 +43,55 @@ const CURRENT_YEAR =
 const GRUPOS_RESUMEN_COLLECTION =
   "ventas_grupos_resumen";
 
+const SEGUIMIENTO_CACHE_PREFIX =
+  "seguimiento_resumen_ano_";
+
+const SEGUIMIENTO_CACHE_TTL_MS =
+  10 * 60 * 1000;
+
+function getAnoComercialActual() {
+  const hoy =
+    new Date();
+
+  const ano =
+    hoy.getFullYear();
+
+  const mes =
+    hoy.getMonth();
+
+  /*
+    Enero = 0
+    Febrero = 1
+    Marzo = 2
+
+    El año comercial cambia el 1 de marzo.
+  */
+  return mes >= 2
+    ? ano
+    : ano - 1;
+}
+
+function getAnoViajePrincipal() {
+  return (
+    getAnoComercialActual() + 1
+  );
+}
+
+function getAnosSeguimientoDisponibles() {
+  const anoComercial =
+    getAnoComercialActual();
+
+  const anoPrincipal =
+    getAnoViajePrincipal();
+
+  return [
+    anoComercial,
+    anoPrincipal,
+    anoPrincipal + 1,
+    anoPrincipal + 2
+  ];
+}
+
 const state = {
   allRows: [],
   filteredRows: [],
@@ -67,7 +115,27 @@ const state = {
 
   // Orden default: por grupo/colegio A → Z
   sortKey: "grupo",
-  sortDir: "asc"
+  sortDir: "asc",
+  
+  /*
+    Caché en memoria, separada por año.
+  */
+  rowsPorAno:
+    new Map(),
+  
+  anosCargados:
+    new Set(),
+  
+  /*
+    Hoy en 2026 comenzará en 2027.
+  */
+  anoSeleccionado:
+    String(
+      getAnoViajePrincipal()
+    ),
+  
+  cargaEnCurso:
+    false
 };
 
 const STAGE_META = {
@@ -240,7 +308,23 @@ function renderActingUserSwitcherSimple() {
    EVENTOS
 ========================================================= */
 function bindEvents() {
-  $("filtroAno")?.addEventListener("change", applyFiltersAndRender);
+  $("filtroAno")?.addEventListener(
+    "change",
+    async (event) => {
+      const nuevoAno =
+        String(
+          event.target.value ||
+          getAnoViajePrincipal()
+        );
+  
+      state.anoSeleccionado =
+        nuevoAno;
+  
+      await cargarSeleccionAnoSeguimiento(
+        nuevoAno
+      );
+    }
+  );
   $("filtroEstado")?.addEventListener("change", applyFiltersAndRender);
   $("filtroVendedora")?.addEventListener("change", applyFiltersAndRender);
 
@@ -248,10 +332,18 @@ function bindEvents() {
     applyFiltersAndRender();
   }, 180));
 
-  $("btnRecargarSeguimiento")?.addEventListener("click", async () => {
-    await loadSeguimiento();
-  });
-
+  $("btnRecargarSeguimiento")?.addEventListener(
+    "click",
+    async () => {
+      await cargarSeleccionAnoSeguimiento(
+        state.anoSeleccionado,
+        {
+          forzar: true
+        }
+      );
+    }
+  );
+  
   $("btnExportarSeguimiento")?.addEventListener("click", exportVisibleRowsToXlsx);
 
   document.querySelectorAll(".summary-filter").forEach((btn) => {
@@ -329,27 +421,170 @@ function updateSortHeaderUI() {
   });
 }
 
-/* =========================================================
-   CARGA PRINCIPAL
-========================================================= */
-async function loadSeguimiento() {
-  renderEmpty(
-    `Cargando grupos ${CURRENT_YEAR} en adelante...`
+function getCacheKeySeguimientoAno(
+  ano
+) {
+  return (
+    SEGUIMIENTO_CACHE_PREFIX +
+    String(ano)
   );
+}
+
+function guardarCacheSeguimientoAno(
+  ano,
+  rows = []
+) {
+  try {
+    sessionStorage.setItem(
+      getCacheKeySeguimientoAno(
+        ano
+      ),
+      JSON.stringify({
+        guardadoAt:
+          Date.now(),
+
+        rows
+      })
+    );
+  } catch (error) {
+    console.warn(
+      "[seguimiento] no se pudo guardar caché",
+      error
+    );
+  }
+}
+
+function leerCacheSeguimientoAno(
+  ano
+) {
+  try {
+    const raw =
+      sessionStorage.getItem(
+        getCacheKeySeguimientoAno(
+          ano
+        )
+      );
+
+    if (!raw) {
+      return null;
+    }
+
+    const parsed =
+      JSON.parse(raw);
+
+    const guardadoAt =
+      Number(
+        parsed?.guardadoAt || 0
+      );
+
+    if (
+      !guardadoAt ||
+      Date.now() - guardadoAt >
+        SEGUIMIENTO_CACHE_TTL_MS
+    ) {
+      sessionStorage.removeItem(
+        getCacheKeySeguimientoAno(
+          ano
+        )
+      );
+
+      return null;
+    }
+
+    const rows =
+      Array.isArray(parsed?.rows)
+        ? parsed.rows
+        : [];
+
+    return rows.map(
+      (row) => ({
+        ...row,
+
+        ultimaGestionAt:
+          toDate(
+            row.ultimaGestionAt
+          ),
+
+        fechaUltimaReunion:
+          toDate(
+            row.fechaUltimaReunion
+          )
+      })
+    );
+  } catch (error) {
+    console.warn(
+      "[seguimiento] caché inválida",
+      error
+    );
+
+    return null;
+  }
+}
+
+function reconstruirRowsSeguimiento() {
+  if (
+    state.anoSeleccionado ===
+    "todos"
+  ) {
+    state.allRows =
+      getAnosSeguimientoDisponibles()
+        .flatMap(
+          (ano) =>
+            state.rowsPorAno.get(
+              String(ano)
+            ) || []
+        );
+  } else {
+    state.allRows =
+      state.rowsPorAno.get(
+        String(
+          state.anoSeleccionado
+        )
+      ) || [];
+  }
+}
+
+function renderizarSeguimientoCargado() {
+  reconstruirRowsSeguimiento();
+
+  state.sortKey =
+    "grupo";
+
+  state.sortDir =
+    "asc";
+
+  updateSortHeaderUI();
+
+  fillYearFilter();
+
+  fillVendorFilter(
+    state.allRows
+  );
+
+  applyDashboardPreset();
+
+  updateSummaryButtonsUI();
+
+  applyFiltersAndRender();
+}
+
+async function consultarSeguimientoAno(
+  ano
+) {
+  const anoNumero =
+    Number(ano);
+
+  if (!anoNumero) {
+    throw new Error(
+      "Año de seguimiento inválido."
+    );
+  }
 
   const inicio =
     performance.now();
 
-  try {
-    /*
-      Solo cargamos los grupos activos:
-
-      - año actual;
-      - años siguientes.
-
-      Los años anteriores no se descargan.
-    */
-    const gruposQuery =
+  const snap =
+    await getDocs(
       query(
         collection(
           db,
@@ -358,88 +593,291 @@ async function loadSeguimiento() {
 
         where(
           "anoViaje",
-          ">=",
-          CURRENT_YEAR
-        ),
-
-        orderBy(
-          "anoViaje",
-          "asc"
+          "==",
+          anoNumero
         )
+      )
+    );
+
+  const rows =
+    snap.docs.map(
+      (docSnap) =>
+        mapClienteDoc(
+          docSnap.id,
+          docSnap.data() || {}
+        )
+    );
+
+  console.log(
+    "[seguimiento] año consultado",
+    {
+      ano:
+        anoNumero,
+
+      documentos:
+        snap.size,
+
+      firestoreMs:
+        Math.round(
+          performance.now() -
+          inicio
+        )
+    }
+  );
+
+  return rows;
+}
+
+async function cargarAnoSeguimiento(
+  ano,
+  {
+    forzar = false,
+    permitirCache = true
+  } = {}
+) {
+  const anoTexto =
+    String(ano);
+
+  if (
+    !forzar &&
+    state.rowsPorAno.has(
+      anoTexto
+    )
+  ) {
+    return {
+      rows:
+        state.rowsPorAno.get(
+          anoTexto
+        ) || [],
+
+      origen:
+        "memoria"
+    };
+  }
+
+  if (
+    !forzar &&
+    permitirCache
+  ) {
+    const rowsCache =
+      leerCacheSeguimientoAno(
+        anoTexto
       );
 
-    const snap =
-      await getDocs(
-        gruposQuery
+    if (rowsCache) {
+      state.rowsPorAno.set(
+        anoTexto,
+        rowsCache
       );
 
-    const rows =
-      snap.docs.map(
-        (docSnap) =>
-          mapClienteDoc(
-            docSnap.id,
-            docSnap.data() || {}
-          )
+      state.anosCargados.add(
+        anoTexto
       );
 
-    state.allRows =
-      rows;
+      return {
+        rows:
+          rowsCache,
 
-    console.log(
-      "[seguimiento] resúmenes cargados",
+        origen:
+          "sessionStorage"
+      };
+    }
+  }
+
+  const rows =
+    await consultarSeguimientoAno(
+      anoTexto
+    );
+
+  state.rowsPorAno.set(
+    anoTexto,
+    rows
+  );
+
+  state.anosCargados.add(
+    anoTexto
+  );
+
+  guardarCacheSeguimientoAno(
+    anoTexto,
+    rows
+  );
+
+  return {
+    rows,
+    origen:
+      "firestore"
+  };
+}
+
+async function actualizarAnoEnSegundoPlano(
+  ano
+) {
+  try {
+    await cargarAnoSeguimiento(
+      ano,
       {
-        coleccion:
-          GRUPOS_RESUMEN_COLLECTION,
-
-        anoDesde:
-          CURRENT_YEAR,
-
-        documentos:
-          snap.size,
-
-        duracionMs:
-          Math.round(
-            performance.now() -
-            inicio
-          )
+        forzar: true,
+        permitirCache: false
       }
     );
 
     /*
-      Orden inicial:
-      grupo/colegio A → Z.
+      Solo redibujamos si el usuario
+      sigue viendo ese mismo año.
     */
-    state.sortKey =
-      "grupo";
+    if (
+      state.anoSeleccionado ===
+      String(ano)
+    ) {
+      renderizarSeguimientoCargado();
+    }
+  } catch (error) {
+    console.warn(
+      "[seguimiento] no se pudo refrescar en segundo plano",
+      error
+    );
+  }
+}
 
-    state.sortDir =
-      "asc";
+async function cargarSeleccionAnoSeguimiento(
+  valor,
+  {
+    forzar = false
+  } = {}
+) {
+  if (state.cargaEnCurso) {
+    return;
+  }
 
-    updateSortHeaderUI();
+  state.cargaEnCurso =
+    true;
 
-    fillYearFilter(
-      rows
+  state.anoSeleccionado =
+    String(
+      valor ||
+      getAnoViajePrincipal()
     );
 
-    fillVendorFilter(
-      rows
+  const anosObjetivo =
+    state.anoSeleccionado ===
+    "todos"
+      ? getAnosSeguimientoDisponibles()
+      : [
+          Number(
+            state.anoSeleccionado
+          )
+        ];
+
+  const hayTodoEnMemoria =
+    anosObjetivo.every(
+      (ano) =>
+        state.rowsPorAno.has(
+          String(ano)
+        )
     );
 
-    applyDashboardPreset();
+  if (!hayTodoEnMemoria) {
+    renderEmpty(
+      state.anoSeleccionado ===
+        "todos"
+        ? "Cargando todos los años activos..."
+        : `Cargando grupos ${state.anoSeleccionado}...`
+    );
+  }
 
-    updateSummaryButtonsUI();
+  try {
+    const resultados =
+      await Promise.all(
+        anosObjetivo.map(
+          (ano) =>
+            cargarAnoSeguimiento(
+              ano,
+              {
+                forzar,
+                permitirCache: true
+              }
+            )
+        )
+      );
 
-    applyFiltersAndRender();
+    renderizarSeguimientoCargado();
+
+    /*
+      Si se mostró una copia de sessionStorage,
+      actualizamos ese año sin bloquear la pantalla.
+    */
+    resultados.forEach(
+      (resultado, index) => {
+        if (
+          resultado.origen ===
+          "sessionStorage" &&
+          !forzar
+        ) {
+          actualizarAnoEnSegundoPlano(
+            anosObjetivo[index]
+          );
+        }
+      }
+    );
   } catch (error) {
     console.error(
-      "[seguimiento] error cargando resúmenes:",
+      "[seguimiento] error cargando selección:",
       error
     );
 
     renderEmpty(
       "No se pudieron cargar los grupos."
     );
+  } finally {
+    state.cargaEnCurso =
+      false;
   }
+}
+
+/* =========================================================
+   CARGA PRINCIPAL
+========================================================= */
+async function loadSeguimiento() {
+  const preset =
+    getDashboardQueryPreset();
+
+  state.dashboardPreset =
+    preset;
+
+  const anosDisponibles =
+    getAnosSeguimientoDisponibles();
+
+  const anoPreset =
+    Number(
+      preset.ano || 0
+    );
+
+  const anoInicial =
+    anosDisponibles.includes(
+      anoPreset
+    )
+      ? String(anoPreset)
+      : String(
+          getAnoViajePrincipal()
+        );
+
+  state.anoSeleccionado =
+    anoInicial;
+
+  fillYearFilter();
+
+  const filtroAno =
+    $("filtroAno");
+
+  if (filtroAno) {
+    filtroAno.value =
+      anoInicial;
+  }
+
+  await cargarSeleccionAnoSeguimiento(
+    anoInicial
+  );
 }
 
 /* =========================================================
@@ -662,30 +1100,24 @@ function applyFiltersAndRender() {
           row.anoViaje || 0
         );
   
-      /*
-        Blindaje adicional.
-  
-        La consulta de Firestore ya excluye
-        años anteriores, pero no permitimos
-        que pase ningún resumen antiguo.
-      */
       if (
         !anoViaje ||
-        anoViaje < CURRENT_YEAR
+        anoViaje <
+          getAnoComercialActual()
       ) {
         return false;
       }
   
       if (
-        filtroAno !== "todos"
+        filtroAno === "todos"
       ) {
-        return (
-          String(anoViaje) ===
-          String(filtroAno)
-        );
+        return true;
       }
   
-      return true;
+      return (
+        String(anoViaje) ===
+        String(filtroAno)
+      );
     }
   );
 
@@ -1015,82 +1447,112 @@ function getDashboardQueryPreset() {
 }
 
 function applyDashboardPreset() {
-  const preset = getDashboardQueryPreset();
-  state.dashboardPreset = preset;
+  const preset =
+    state.dashboardPreset ||
+    getDashboardQueryPreset();
 
-  const toggleAnteriores = $("toggleAnteriores");
-  const filtroAno = $("filtroAno");
-  const filtroEstado = $("filtroEstado");
-  const filtroVendedora = $("filtroVendedora");
+  const filtroAno =
+    $("filtroAno");
+
+  const filtroEstado =
+    $("filtroEstado");
+
+  const filtroVendedora =
+    $("filtroVendedora");
+
+  const anosDisponibles =
+    getAnosSeguimientoDisponibles();
+
+  const anoPreset =
+    Number(
+      preset.ano || 0
+    );
 
   /*
-    Seguimiento solo trabaja con el año actual
-    y los siguientes.
-  
-    Si llega una URL antigua con 2025 o anterior,
-    no se activa ni se consulta el archivo.
+    Solo aceptamos años activos.
+    Los anteriores quedan archivados.
   */
-  if (toggleAnteriores) {
-    toggleAnteriores.checked =
-      false;
-  
-    toggleAnteriores.disabled =
-      true;
-  }
-  
   if (
-    preset.ano &&
-    Number(preset.ano) < CURRENT_YEAR
-  ) {
-    preset.ano = "";
-    preset.archivados = false;
-  }
-  
-  fillYearFilter(
-    state.allRows
-  );
-
-  // Aplicar año
-  if (
-    preset.ano &&
     filtroAno &&
-    [...filtroAno.options].some((opt) => opt.value === preset.ano)
+    anosDisponibles.includes(
+      anoPreset
+    )
   ) {
-    filtroAno.value = preset.ano;
+    filtroAno.value =
+      String(anoPreset);
+
+    state.anoSeleccionado =
+      String(anoPreset);
   }
 
-  // Aplicar estado
   const bucketToEstado = {
-    a_contactar: "a_contactar",
-    contactados: "contactado",
-    cotizando: "cotizando",
-    recotizando: "recotizando",
-    reunion: "reunion_confirmada",
-    reunion_confirmada: "reunion_confirmada",
-    ganadas: "ganada",
-    ganada: "ganada",
-    perdidas: "perdida",
-    perdida: "perdida"
+    a_contactar:
+      "a_contactar",
+
+    contactados:
+      "contactado",
+
+    cotizando:
+      "cotizando",
+
+    recotizando:
+      "recotizando",
+
+    reunion:
+      "reunion_confirmada",
+
+    reunion_confirmada:
+      "reunion_confirmada",
+
+    ganadas:
+      "ganada",
+
+    ganada:
+      "ganada",
+
+    perdidas:
+      "perdida",
+
+    perdida:
+      "perdida"
   };
 
   if (filtroEstado) {
-    filtroEstado.value = bucketToEstado[preset.bucket] || "todos";
+    filtroEstado.value =
+      bucketToEstado[
+        preset.bucket
+      ] || "todos";
   }
 
-  // Aplicar vendedor en el selector visual
-  if (preset.vendor && filtroVendedora) {
-    const matchingOption = [...filtroVendedora.options].find(
-      (opt) => normalizeEmail(opt.value) === preset.vendor
-    );
+  if (
+    preset.vendor &&
+    filtroVendedora
+  ) {
+    const matchingOption =
+      [...filtroVendedora.options]
+        .find(
+          (option) =>
+            normalizeEmail(
+              option.value
+            ) ===
+            preset.vendor
+        );
 
     if (matchingOption) {
-      filtroVendedora.value = matchingOption.value;
+      filtroVendedora.value =
+        matchingOption.value;
     }
   }
 
-  // Si vienen desde pérdidas, dejarla visible
-  if (preset.bucket === "perdidas" || preset.bucket === "perdida") {
-    state.hiddenSummaryStates.delete("perdida");
+  if (
+    preset.bucket ===
+      "perdidas" ||
+    preset.bucket ===
+      "perdida"
+  ) {
+    state.hiddenSummaryStates.delete(
+      "perdida"
+    );
   }
 }
 
@@ -1175,9 +1637,7 @@ function getDocsSortText(row) {
 /* =========================================================
    OPCIONES DE FILTROS
 ========================================================= */
-function fillYearFilter(
-  rows = []
-) {
+function fillYearFilter() {
   const select =
     $("filtroAno");
 
@@ -1186,31 +1646,17 @@ function fillYearFilter(
   }
 
   const previous =
-    select.value ||
-    "todos";
+    state.anoSeleccionado ||
+    String(
+      getAnoViajePrincipal()
+    );
 
-  const years = [
-    ...new Set(
-      rows
-        .map(
-          (row) =>
-            Number(
-              row.anoViaje || 0
-            )
-        )
-        .filter(
-          (year) =>
-            year >= CURRENT_YEAR
-        )
-    )
-  ].sort(
-    (a, b) =>
-      a - b
-  );
+  const years =
+    getAnosSeguimientoDisponibles();
 
   select.innerHTML = `
     <option value="todos">
-      Todos ${CURRENT_YEAR} en adelante
+      Todos
     </option>
 
     ${years.map(
@@ -1232,7 +1678,9 @@ function fillYearFilter(
       previous;
   } else {
     select.value =
-      "todos";
+      String(
+        getAnoViajePrincipal()
+      );
   }
 }
 
