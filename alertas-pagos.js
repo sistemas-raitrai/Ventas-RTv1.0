@@ -1,3 +1,581 @@
+// alertas-pagos.js — Página independiente de alertas de pagos
+
+import {
+  onAuthStateChanged,
+  signOut
+} from "https://www.gstatic.com/firebasejs/11.7.3/firebase-auth.js";
+
+import {
+  collection,
+  getDocs,
+  doc,
+  setDoc,
+  addDoc,
+  serverTimestamp
+} from "https://www.gstatic.com/firebasejs/11.7.3/firebase-firestore.js";
+
+import {
+  auth,
+  db,
+  VENTAS_USERS
+} from "./firebase-init.js";
+
+import {
+  $,
+  normalizeEmail,
+  escapeHtml
+} from "./utils.js";
+
+import {
+  ACTING_USER_KEY,
+  getRealUser,
+  getEffectiveUser,
+  clearVendorFilter,
+  clearGroupFilter,
+  isVendedorRole
+} from "./roles.js";
+
+import {
+  updateClockDataset,
+  setHeaderState,
+  renderActingUserSwitcher,
+  bindLayoutButtons,
+  waitForLayoutReady
+} from "./ui.js";
+
+/* =========================================================
+   CONFIGURACIÓN
+========================================================= */
+
+const HOME_URL = "home.html";
+
+const ALERTAS_PAGOS_COLLECTION =
+  "ventas_alertas_pagos";
+
+const ALERTAS_PAGOS_HISTORIAL_COLLECTION =
+  "ventas_alertas_pagos_historial";
+
+/* =========================================================
+   ESTADO
+========================================================= */
+
+const state = {
+  rows: [],
+  alertasPagosRows: [],
+  alertasPagosFiltradasRows: [],
+  alertasPagosCargadas: false,
+  alertasPagosUltimaActualizacion: null,
+
+  alertasPagosSortKey: "fechaViaje",
+  alertasPagosSortDir: "asc",
+
+  gruposOperacionByNumero: new Map(),
+  scopedRows: []
+};
+
+/* =========================================================
+   HELPERS GENERALES
+========================================================= */
+
+function normalizeLoose(value = "") {
+  return String(value ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
+}
+
+function timestampLikeToDate(value) {
+  if (!value) return null;
+
+  if (value instanceof Date) {
+    return Number.isNaN(value.getTime())
+      ? null
+      : value;
+  }
+
+  if (typeof value?.toDate === "function") {
+    const date = value.toDate();
+
+    return Number.isNaN(date?.getTime?.())
+      ? null
+      : date;
+  }
+
+  if (
+    typeof value === "object" &&
+    typeof value.seconds === "number"
+  ) {
+    const date = new Date(
+      value.seconds * 1000
+    );
+
+    return Number.isNaN(date.getTime())
+      ? null
+      : date;
+  }
+
+  if (typeof value === "number") {
+    const date = new Date(value);
+
+    return Number.isNaN(date.getTime())
+      ? null
+      : date;
+  }
+
+  if (typeof value === "string") {
+    const date = new Date(value);
+
+    if (!Number.isNaN(date.getTime())) {
+      return date;
+    }
+
+    const match = value.match(
+      /^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})(?:\s+(\d{1,2}):(\d{2}))?$/
+    );
+
+    if (match) {
+      let year = Number(match[3]);
+
+      if (year < 100) {
+        year += 2000;
+      }
+
+      const parsed = new Date(
+        year,
+        Number(match[2]) - 1,
+        Number(match[1]),
+        Number(match[4] || 0),
+        Number(match[5] || 0),
+        0
+      );
+
+      return Number.isNaN(parsed.getTime())
+        ? null
+        : parsed;
+    }
+  }
+
+  return null;
+}
+
+function formatDate(value) {
+  const date = timestampLikeToDate(value);
+
+  if (!date) {
+    return "Sin fecha";
+  }
+
+  return date.toLocaleString("es-CL", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false
+  });
+}
+
+function getRowId(row = {}) {
+  return String(
+    row.idGrupo ||
+    row.id ||
+    ""
+  ).trim();
+}
+
+function getNumeroNegocio(row = {}) {
+  return String(
+    row.numeroNegocio ||
+    row?.ficha?.numeroNegocio ||
+    ""
+  ).trim();
+}
+
+function getNumerosNegocio(row = {}) {
+  const valorOriginal =
+    getNumeroNegocio(row);
+
+  if (!valorOriginal) {
+    return [];
+  }
+
+  const encontrados =
+    valorOriginal.match(/\d+/g) || [];
+
+  return [
+    ...new Set(
+      encontrados
+        .map((numero) =>
+          String(numero).trim()
+        )
+        .filter(Boolean)
+    )
+  ];
+}
+
+function getRowVendorEmail(row = {}) {
+  return normalizeEmail(
+    row.vendedoraCorreo ||
+    row.creadoPorCorreo ||
+    ""
+  );
+}
+
+function getRowsForCurrentScope(
+  effectiveUser
+) {
+  if (!effectiveUser) {
+    return [];
+  }
+
+  if (isVendedorRole(effectiveUser)) {
+    const email = normalizeEmail(
+      effectiveUser.email || ""
+    );
+
+    return state.rows.filter(
+      (row) =>
+        getRowVendorEmail(row) === email
+    );
+  }
+
+  return state.rows;
+}
+
+function setText(id, value) {
+  const element = $(id);
+
+  if (element) {
+    element.textContent =
+      String(value ?? "");
+  }
+}
+
+function buildSearchText(obj = {}) {
+  let text = "";
+
+  function extract(value) {
+    if (
+      value === null ||
+      value === undefined
+    ) {
+      return;
+    }
+
+    if (value instanceof Date) {
+      text += ` ${value.toISOString()}`;
+      return;
+    }
+
+    if (
+      typeof value?.toDate ===
+      "function"
+    ) {
+      text +=
+        ` ${value.toDate().toISOString()}`;
+
+      return;
+    }
+
+    if (Array.isArray(value)) {
+      value.forEach(extract);
+      return;
+    }
+
+    if (typeof value === "object") {
+      Object.values(value)
+        .forEach(extract);
+
+      return;
+    }
+
+    text += ` ${String(value)}`;
+  }
+
+  extract(obj);
+
+  return normalizeLoose(text);
+}
+
+function emptyHtml(
+  text = "Sin resultados."
+) {
+  return `
+    <div class="home-empty">
+      ${escapeHtml(text)}
+    </div>
+  `;
+}
+
+function openDialog(dialog) {
+  if (!dialog) return;
+
+  if (
+    typeof dialog.showModal ===
+    "function"
+  ) {
+    if (!dialog.open) {
+      dialog.showModal();
+    }
+
+    return;
+  }
+
+  dialog.setAttribute(
+    "open",
+    "open"
+  );
+}
+
+function closeDialog(dialog) {
+  if (!dialog) return;
+
+  if (
+    typeof dialog.close ===
+    "function"
+  ) {
+    dialog.close();
+    return;
+  }
+
+  dialog.removeAttribute("open");
+}
+
+/* =========================================================
+   CARGA DE DATOS
+========================================================= */
+
+async function cargarDatosAlertasPagos() {
+  const loading =
+    $("alertas-pagos-loading");
+
+  const app =
+    $("alertas-pagos-app");
+
+  if (loading) {
+    loading.hidden = false;
+    loading.textContent =
+      "Cargando alertas de pagos...";
+  }
+
+  if (app) {
+    app.hidden = true;
+  }
+
+  console.time(
+    "ALERTAS_PAGOS_TOTAL"
+  );
+
+  try {
+    const [
+      gruposVentasSnap,
+      gruposOperacionSnap,
+      alertasPagosSnap
+    ] = await Promise.all([
+      getDocs(
+        collection(
+          db,
+          "ventas_cotizaciones"
+        )
+      ),
+
+      getDocs(
+        collection(
+          db,
+          "grupos"
+        )
+      ),
+
+      getDocs(
+        collection(
+          db,
+          ALERTAS_PAGOS_COLLECTION
+        )
+      )
+    ]);
+
+    state.rows =
+      gruposVentasSnap.docs.map(
+        (docSnap) => {
+          const data =
+            docSnap.data() || {};
+
+          return {
+            id: docSnap.id,
+            idGrupo:
+              data.idGrupo ||
+              docSnap.id,
+            ...data
+          };
+        }
+      );
+
+    state.gruposOperacionByNumero =
+      new Map();
+
+    gruposOperacionSnap.docs.forEach(
+      (docSnap) => {
+        const data =
+          docSnap.data() || {};
+
+        const numero =
+          String(
+            data.numeroNegocio || ""
+          ).trim();
+
+        if (!numero) return;
+
+        state.gruposOperacionByNumero.set(
+          numero,
+          {
+            id: docSnap.id,
+            ...data
+          }
+        );
+      }
+    );
+
+    state.alertasPagosRows =
+      alertasPagosSnap.docs
+        .map((docSnap) => ({
+          id: docSnap.id,
+          ...docSnap.data()
+        }))
+        .filter(
+          (row) =>
+            row.activa !== false
+        );
+
+    state.alertasPagosUltimaActualizacion =
+      state.alertasPagosRows
+        .map((row) =>
+          timestampLikeToDate(
+            row.actualizadoAt
+          )
+        )
+        .filter(Boolean)
+        .sort(
+          (a, b) =>
+            b.getTime() -
+            a.getTime()
+        )[0] || null;
+
+    const effectiveUser =
+      getEffectiveUser();
+
+    state.scopedRows =
+      getRowsForCurrentScope(
+        effectiveUser
+      );
+
+    state.alertasPagosCargadas =
+      true;
+
+    state.alertasPagosFiltradasRows =
+      getAlertasPagosForScope(
+        state.scopedRows
+      );
+
+    const actualizado =
+      $("alertas-pagos-actualizado");
+
+    if (actualizado) {
+      actualizado.textContent =
+        state
+          .alertasPagosUltimaActualizacion
+          ? `Última actualización: ${formatDate(
+              state
+                .alertasPagosUltimaActualizacion
+            )}`
+          : "Última actualización: sin registro";
+    }
+
+    if (loading) {
+      loading.hidden = true;
+    }
+
+    if (app) {
+      app.hidden = false;
+    }
+
+    console.timeEnd(
+      "ALERTAS_PAGOS_TOTAL"
+    );
+  } catch (error) {
+    console.error(
+      "Error cargando alertas de pagos:",
+      error
+    );
+
+    if (loading) {
+      loading.hidden = false;
+
+      loading.innerHTML = `
+        <strong>
+          No se pudieron cargar las alertas.
+        </strong>
+        <br>
+        ${escapeHtml(
+          error.message ||
+          "Error desconocido"
+        )}
+      `;
+    }
+  }
+}
+
+async function cargarAlertasPagosDesdeFirestore({
+  forzar = false
+} = {}) {
+  if (
+    state.alertasPagosCargadas &&
+    !forzar
+  ) {
+    return;
+  }
+
+  const snap = await getDocs(
+    collection(
+      db,
+      ALERTAS_PAGOS_COLLECTION
+    )
+  );
+
+  state.alertasPagosRows =
+    snap.docs
+      .map((docSnap) => ({
+        id: docSnap.id,
+        ...docSnap.data()
+      }))
+      .filter(
+        (row) =>
+          row.activa !== false
+      );
+
+  state.alertasPagosUltimaActualizacion =
+    state.alertasPagosRows
+      .map((row) =>
+        timestampLikeToDate(
+          row.actualizadoAt
+        )
+      )
+      .filter(Boolean)
+      .sort(
+        (a, b) =>
+          b.getTime() -
+          a.getTime()
+      )[0] || null;
+
+  state.alertasPagosCargadas =
+    true;
+
+  state.alertasPagosFiltradasRows =
+    getAlertasPagosForScope(
+      state.scopedRows
+    );
+}
+
 /* =========================================================
    ALERTAS DE PAGOS
 ========================================================= */
@@ -202,12 +780,26 @@ async function fetchJsonPagos(url) {
   return await res.json();
 }
 
-function buscarGrupoRtPorNumeroNegocio(numeroNegocio) {
-  const numero = String(numeroNegocio || "").trim();
+function buscarGrupoRtPorNumeroNegocio(
+  numeroNegocio
+) {
+  const numeroBuscado =
+    String(
+      numeroNegocio || ""
+    ).trim();
 
-  return state.rows.find((row) =>
-    String(getNumeroNegocio(row) || "").trim() === numero
-  ) || null;
+  if (!numeroBuscado) {
+    return null;
+  }
+
+  return state.rows.find((row) => {
+    const numerosGrupo =
+      getNumerosNegocio(row);
+
+    return numerosGrupo.includes(
+      numeroBuscado
+    );
+  }) || null;
 }
 
 function diasDesdeFechaPago(fecha) {
@@ -669,20 +1261,55 @@ function formatFechaViajeAlertaPago(alerta = {}) {
   });
 }
 
-function getAlertasPagosForScope(scopedRows = []) {
-  const scopedIds = new Set(scopedRows.map(getRowId).filter(Boolean));
-  const scopedNumeros = new Set(scopedRows.map(getNumeroNegocio).filter(Boolean));
+function getAlertasPagosForScope(
+  scopedRows = []
+) {
+  const scopedIds = new Set(
+    scopedRows
+      .map(getRowId)
+      .filter(Boolean)
+  );
 
-  return (state.alertasPagosRows || [])
+  const scopedNumeros = new Set(
+    scopedRows
+      .flatMap((row) =>
+        getNumerosNegocio(row)
+      )
+      .filter(Boolean)
+  );
+
+  return (
+    state.alertasPagosRows || []
+  )
     .filter((alerta) => {
-      if (alerta.activa === false) return false;
+      if (
+        alerta.activa === false
+      ) {
+        return false;
+      }
 
-      const idGrupo = String(alerta.idGrupo || "").trim();
-      const numeroNegocio = String(alerta.numeroNegocio || "").trim();
+      const idGrupo =
+        String(
+          alerta.idGrupo || ""
+        ).trim();
 
-      return scopedIds.has(idGrupo) || scopedNumeros.has(numeroNegocio);
+      const numeroNegocio =
+        String(
+          alerta.numeroNegocio || ""
+        ).trim();
+
+      return (
+        scopedIds.has(idGrupo) ||
+        scopedNumeros.has(
+          numeroNegocio
+        )
+      );
     })
-    .sort((a, b) => getFechaViajeOrdenAlertaPago(a) - getFechaViajeOrdenAlertaPago(b));
+    .sort(
+      (a, b) =>
+        getFechaViajeOrdenAlertaPago(a) -
+        getFechaViajeOrdenAlertaPago(b)
+    );
 }
 
 function buildAlertasPagosFiltrosHtml(rows = []) {
@@ -1708,23 +2335,50 @@ function renderAlertaPagoCard(alerta = {}) {
   `;
 }
 
-function openDetalleAlertaPago(alertaId) {
-  const alerta = state.alertasPagosRows.find((row) => String(row.id) === String(alertaId));
+function openDetalleAlertaPago(
+  alertaId
+) {
+  const alerta =
+    state.alertasPagosRows.find(
+      (row) =>
+        String(row.id) ===
+        String(alertaId)
+    );
+
   if (!alerta) return;
 
-  setText("modal-detalle-titulo", alerta.categoriaAlerta === "persona"
-    ? (alerta.participante || "Detalle alerta")
-    : (alerta.grupo || "Detalle alerta")
+  setText(
+    "modal-alerta-pago-titulo",
+    alerta.categoriaAlerta ===
+      "persona"
+      ? (
+          alerta.participante ||
+          "Detalle alerta"
+        )
+      : (
+          alerta.grupo ||
+          "Detalle alerta"
+        )
   );
 
-  setText("modal-detalle-subtitulo", alerta.label || alerta.tipo || "Alerta de pago");
+  setText(
+    "modal-alerta-pago-subtitulo",
+    alerta.label ||
+    alerta.tipo ||
+    "Alerta de pago"
+  );
 
-  const cont = $("modal-detalle-contenido");
+  const cont =
+    $("modal-alerta-pago-contenido");
+
   if (cont) {
-    cont.innerHTML = renderAlertaPagoCard(alerta);
+    cont.innerHTML =
+      renderAlertaPagoCard(alerta);
   }
 
-  openDialog($("modal-detalle-home"));
+  openDialog(
+    $("modal-detalle-alerta-pago")
+  );
 }
 
 function openDetallePersonaDesdeGrupo(alertaGrupoId, indexPersona) {
@@ -1912,9 +2566,17 @@ async function marcarAlertaPagoContactada(alertaId) {
     aviso: "Usuario fue advertido de registrar contacto en historial del Sistema de Pagos"
   });
 
-  await loadHomeData();
-  renderHome();
-  abrirModalAlertasPagos();
+  closeDialog(
+     $("modal-detalle-alerta-pago")
+  );
+   
+  state.alertasPagosCargadas = false;
+   
+  await cargarAlertasPagosDesdeFirestore({
+     forzar: true
+  });
+   
+  await abrirPaginaAlertasPagos();
 }
 
 async function actualizarAlertasPagos() {
@@ -1968,9 +2630,11 @@ async function actualizarAlertasPagos() {
       `Grupos: ${data.totalGrupos}`
     );
 
-    await cargarAlertasPagosDesdeFirestore({ forzar: true });
-    renderHome();
-    abrirModalAlertasPagos();
+    await cargarAlertasPagosDesdeFirestore({
+      forzar: true
+    });
+   
+    await abrirPaginaAlertasPagos();
 
   } catch (error) {
     console.error("Error actualizando alertas de pagos:", error);
@@ -1983,105 +2647,461 @@ async function actualizarAlertasPagos() {
   }
 }
 
-async function abrirModalAlertasPagos() {
+async function abrirPaginaAlertasPagos() {
   await cargarAlertasPagosDesdeFirestore();
 
-  openListadoModal({
-    titulo: "Alertas de pagos",
-    subtitulo: "Alertas generadas desde el Sistema de Pagos, ordenadas por fecha de viaje confirmada.",
-    resumen: `Hay ${state.alertasPagosFiltradasRows.length} alerta(s)`,
-    rows: state.alertasPagosFiltradasRows,
-    renderFn: (rows) => buildAlertasPagosFiltrosHtml(rows)
-  });
+  const app =
+    $("alertas-pagos-app");
 
-  setTimeout(() => {
-    const rowsBase = state.alertasPagosFiltradasRows || [];
+  if (!app) {
+    console.error(
+      "No existe #alertas-pagos-app en alertas-pagos.html"
+    );
 
-    const refrescar = () => {
-      const filtradas = filtrarAlertasPagosModal(rowsBase);
-      renderAlertasPagosListado(filtradas);
+    return;
+  }
 
-      document.querySelectorAll("[data-sort-alerta-pago]").forEach((th) => {
-        if (th.dataset.boundSort) return;
+  state.alertasPagosFiltradasRows =
+    getAlertasPagosForScope(
+      state.scopedRows || []
+    );
+
+  app.innerHTML =
+    buildAlertasPagosFiltrosHtml(
+      state.alertasPagosFiltradasRows
+    );
+
+  app.hidden = false;
+
+  const rowsBase =
+    state.alertasPagosFiltradasRows ||
+    [];
+
+  const refrescar = () => {
+    const filtradas =
+      filtrarAlertasPagosModal(
+        rowsBase
+      );
+
+    renderAlertasPagosListado(
+      filtradas
+    );
+
+    document
+      .querySelectorAll(
+        "[data-sort-alerta-pago]"
+      )
+      .forEach((th) => {
+        if (
+          th.dataset.boundSort
+        ) {
+          return;
+        }
+
         th.dataset.boundSort = "1";
 
-        th.addEventListener("click", () => {
-          const key = th.dataset.sortAlertaPago;
+        th.addEventListener(
+          "click",
+          () => {
+            const key =
+              th.dataset
+                .sortAlertaPago;
 
-          if (state.alertasPagosSortKey === key) {
-            state.alertasPagosSortDir =
-              state.alertasPagosSortDir === "asc" ? "desc" : "asc";
-          } else {
-            state.alertasPagosSortKey = key;
-            state.alertasPagosSortDir =
-              ["pagado", "saldo", "ano", "ultimoPago", "estado", "numero"].includes(key)
-                ? "desc"
-                : "asc";
+            if (
+              state
+                .alertasPagosSortKey ===
+              key
+            ) {
+              state
+                .alertasPagosSortDir =
+                state
+                  .alertasPagosSortDir ===
+                "asc"
+                  ? "desc"
+                  : "asc";
+            } else {
+              state
+                .alertasPagosSortKey =
+                key;
+
+              state
+                .alertasPagosSortDir =
+                [
+                  "pagado",
+                  "saldo",
+                  "ano",
+                  "ultimoPago",
+                  "estado",
+                  "numero"
+                ].includes(key)
+                  ? "desc"
+                  : "asc";
+            }
+
+            refrescar();
           }
+        );
+      });
+  };
+
+  [
+    "filtro-alerta-pago-ano",
+    "filtro-alerta-pago-vendedor",
+    "filtro-alerta-pago-moneda",
+    "filtro-alerta-pago-destino",
+    "filtro-alerta-pago-prioridad",
+    "filtro-alerta-pago-buscar"
+  ].forEach((id) => {
+    const element = $(id);
+
+    if (
+      !element ||
+      element.dataset.bound
+    ) {
+      return;
+    }
+
+    element.dataset.bound = "1";
+
+    element.addEventListener(
+      "input",
+      refrescar
+    );
+
+    element.addEventListener(
+      "change",
+      refrescar
+    );
+  });
+
+  const btnExportar =
+    $("btn-exportar-alertas-pagos") ||
+    $("btn-exportar-alertas");
+
+  if (
+    btnExportar &&
+    !btnExportar.dataset.bound
+  ) {
+    btnExportar.dataset.bound = "1";
+
+    btnExportar.addEventListener(
+      "click",
+      exportarAlertasPagosXlsx
+    );
+  }
+
+  document
+    .querySelectorAll(
+      "[data-tipo-alerta-pago]"
+    )
+    .forEach((btn) => {
+      if (btn.dataset.bound) {
+        return;
+      }
+
+      btn.dataset.bound = "1";
+
+      btn.addEventListener(
+        "click",
+        () => {
+          document
+            .querySelectorAll(
+              "[data-tipo-alerta-pago]"
+            )
+            .forEach(
+              (otroBtn) => {
+                otroBtn.classList.remove(
+                  "is-active"
+                );
+
+                otroBtn.style.background =
+                  otroBtn.dataset
+                    .bgNormal ||
+                  "#fff";
+
+                otroBtn.style.color =
+                  otroBtn.dataset
+                    .colorNormal ||
+                  "#766b84";
+
+                otroBtn.style.border =
+                  otroBtn.dataset
+                    .borderNormal ||
+                  "1px solid rgba(49,25,75,.18)";
+              }
+            );
+
+          btn.classList.add(
+            "is-active"
+          );
+
+          btn.style.background =
+            btn.dataset.bgActivo ||
+            "#eadff7";
+
+          btn.style.color =
+            btn.dataset.colorActivo ||
+            "#32184f";
+
+          btn.style.border =
+            btn.dataset.borderActivo ||
+            "2px solid #32184f";
 
           refrescar();
-        });
-      });
-    };
-
-    ["filtro-alerta-pago-ano", "filtro-alerta-pago-vendedor", "filtro-alerta-pago-moneda", "filtro-alerta-pago-destino", "filtro-alerta-pago-prioridad", "filtro-alerta-pago-buscar"]
-      .forEach((id) => {
-        const el = $(id);
-        if (!el || el.dataset.bound) return;
-        el.dataset.bound = "1";
-        el.addEventListener("input", refrescar);
-        el.addEventListener("change", refrescar);
-      });
-
-    const btnActualizar = $("btn-actualizar-alertas-pagos");
-    if (btnActualizar && !btnActualizar.dataset.bound) {
-      btnActualizar.dataset.bound = "1";
-      btnActualizar.addEventListener("click", actualizarAlertasPagos);
-    }
-
-    const btnExportar = $("btn-exportar-alertas-pagos");
-    if (btnExportar && !btnExportar.dataset.bound) {
-      btnExportar.dataset.bound = "1";
-      btnExportar.addEventListener("click", exportarAlertasPagosXlsx);
-    }
-
-    document.querySelectorAll("[data-tipo-alerta-pago]").forEach((btn) => {
-      if (btn.dataset.bound) return;
-    
-      btn.dataset.bound = "1";
-    
-      btn.addEventListener("click", () => {
-        document
-          .querySelectorAll("[data-tipo-alerta-pago]")
-          .forEach((otroBtn) => {
-            otroBtn.classList.remove("is-active");
-    
-            otroBtn.style.background =
-              otroBtn.dataset.bgNormal || "#fff";
-    
-            otroBtn.style.color =
-              otroBtn.dataset.colorNormal || "#766b84";
-    
-            otroBtn.style.border =
-              otroBtn.dataset.borderNormal ||
-              "1px solid rgba(49,25,75,.18)";
-          });
-    
-        btn.classList.add("is-active");
-    
-        btn.style.background =
-          btn.dataset.bgActivo || "#eadff7";
-    
-        btn.style.color =
-          btn.dataset.colorActivo || "#32184f";
-    
-        btn.style.border =
-          btn.dataset.borderActivo || "2px solid #32184f";
-    
-        refrescar();
-      });
+        }
+      );
     });
 
-    refrescar();
-  }, 80);
+  refrescar();
 }
+
+/* =========================================================
+   EVENTOS DE LA PÁGINA
+========================================================= */
+
+function bindAlertasPagosPage() {
+  if (
+    !document.body.dataset
+      .boundAlertasPagosPage
+  ) {
+    document.body.dataset
+      .boundAlertasPagosPage =
+      "1";
+
+    document.addEventListener(
+      "click",
+      async (event) => {
+        const fila =
+          event.target.closest(
+            "[data-open-detalle-alerta-pago]"
+          );
+
+        if (fila) {
+          event.preventDefault();
+
+          openDetalleAlertaPago(
+            fila.dataset
+              .openDetalleAlertaPago
+          );
+
+          return;
+        }
+
+        const personaGrupo =
+          event.target.closest(
+            "[data-open-persona-grupo]"
+          );
+
+        if (personaGrupo) {
+          event.preventDefault();
+          event.stopPropagation();
+
+          openDetallePersonaDesdeGrupo(
+            personaGrupo.dataset
+              .openPersonaGrupo,
+            personaGrupo.dataset
+              .personaIndex
+          );
+
+          return;
+        }
+
+        const copiar =
+          event.target.closest(
+            "[data-copy-alerta-pago]"
+          );
+
+        if (copiar) {
+          event.preventDefault();
+
+          await copiarTextoAlertaPago(
+            copiar.dataset
+              .copyAlertaPago
+          );
+
+          return;
+        }
+
+        const contactar =
+          event.target.closest(
+            "[data-contactar-alerta-pago]"
+          );
+
+        if (contactar) {
+          event.preventDefault();
+
+          await marcarAlertaPagoContactada(
+            contactar.dataset
+              .contactarAlertaPago
+          );
+        }
+      }
+    );
+  }
+
+  const btnCerrar =
+    $("btn-cerrar-alerta-pago");
+
+  const dialog =
+    $("modal-detalle-alerta-pago");
+
+  if (
+    btnCerrar &&
+    !btnCerrar.dataset.bound
+  ) {
+    btnCerrar.dataset.bound = "1";
+
+    btnCerrar.addEventListener(
+      "click",
+      () => {
+        closeDialog(dialog);
+      }
+    );
+  }
+
+  if (
+    dialog &&
+    !dialog.dataset.bound
+  ) {
+    dialog.dataset.bound = "1";
+
+    dialog.addEventListener(
+      "click",
+      (event) => {
+        if (event.target === dialog) {
+          closeDialog(dialog);
+        }
+      }
+    );
+  }
+}
+
+/* =========================================================
+   INIT
+========================================================= */
+
+async function renderPantallaAlertasPagos() {
+  const realUser =
+    getRealUser();
+
+  const effectiveUser =
+    getEffectiveUser();
+
+  if (
+    !realUser ||
+    !effectiveUser
+  ) {
+    location.href =
+      "login.html";
+
+    return;
+  }
+
+  setHeaderState({
+    realUser,
+    effectiveUser,
+    title: "Alertas de pagos",
+    subtitle:
+      "Gestión de alertas de pagos"
+  });
+
+  renderActingUserSwitcher(
+    VENTAS_USERS
+  );
+
+  await cargarDatosAlertasPagos();
+  await abrirPaginaAlertasPagos();
+}
+
+async function initAlertasPagosPage() {
+  await waitForLayoutReady();
+
+  bindLayoutButtons({
+    homeUrl: HOME_URL,
+
+    onLogout: async () => {
+      try {
+        sessionStorage.removeItem(
+          ACTING_USER_KEY
+        );
+
+        clearVendorFilter();
+        clearGroupFilter();
+
+        await signOut(auth);
+
+        location.href =
+          "login.html";
+      } catch (error) {
+        alert(
+          "Error al cerrar sesión: " +
+          error.message
+        );
+      }
+    },
+
+    onActAs: async (
+      selectedEmail
+    ) => {
+      const realUser =
+        getRealUser();
+
+      if (
+        !realUser ||
+        realUser.rol !== "admin"
+      ) {
+        return;
+      }
+
+      if (!selectedEmail) {
+        return;
+      }
+
+      sessionStorage.setItem(
+        ACTING_USER_KEY,
+        selectedEmail
+      );
+
+      clearVendorFilter();
+      clearGroupFilter();
+
+      await renderPantallaAlertasPagos();
+    },
+
+    onResetActAs: async () => {
+      sessionStorage.removeItem(
+        ACTING_USER_KEY
+      );
+
+      clearVendorFilter();
+      clearGroupFilter();
+
+      await renderPantallaAlertasPagos();
+    }
+  });
+
+  bindAlertasPagosPage();
+
+  onAuthStateChanged(
+    auth,
+    async (user) => {
+      if (!user) {
+        location.href =
+          "login.html";
+
+        return;
+      }
+
+      await renderPantallaAlertasPagos();
+    }
+  );
+
+  updateClockDataset();
+
+  setInterval(
+    updateClockDataset,
+    1000
+  );
+}
+
+initAlertasPagosPage();
