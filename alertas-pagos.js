@@ -2327,20 +2327,87 @@ function renderAlertaPagoCard(alerta = {}) {
             </div>
           </details>
         ` : `
-          <div style="margin-top:10px; color:#3e3550; font-size:14px; line-height:1.5;">
-            <strong>Total viajan:</strong> ${escapeHtml(alerta.totalViajan || 0)}<br>
-            <strong>Con deuda:</strong> ${escapeHtml(alerta.totalConDeuda || 0)}<br>
-            <strong>% saldo pendiente grupo:</strong> ${escapeHtml(Number(alerta.porcentajeGrupoDebe || 0).toFixed(1))}%<br>
-            <strong>Saldo pendiente grupo:</strong> ${escapeHtml(formatoMontoPago(alerta.saldoPendienteGrupo, alerta.moneda))}<br>
-            <strong>Total pagado grupo:</strong> ${escapeHtml(formatoMontoPago(alerta.totalPagadoGrupo || 0, alerta.moneda))}<br>
-            <strong>30%+ sin pago +60 días:</strong>
-            ${escapeHtml(alerta.totalDeudoresSinPago60 || 0)}
-            persona(s)
-            (${escapeHtml(Number(alerta.porcentajeGrupoSinPago60 || 0).toFixed(1))}%)
+          <div style="
+            margin-top:10px;
+            color:#3e3550;
+            font-size:14px;
+            line-height:1.6;
+          ">
+            <strong>Total que viajan:</strong>
+            ${escapeHtml(alerta.totalViajan || 0)}
+            <br>
+          
+            <strong>Integrantes considerados para atrasos:</strong>
+            ${escapeHtml(
+              alerta.totalIntegrantesConsiderados || 0
+            )}
+            <br>
+          
+            <strong>Con deuda:</strong>
+            ${escapeHtml(alerta.totalConDeuda || 0)}
+            <br>
+          
+            <strong>Con 1 o más cuotas atrasadas:</strong>
+            ${escapeHtml(alerta.totalAtrasados || 0)}
+            <br>
+          
+            <strong>Con 2 o más cuotas atrasadas:</strong>
+            ${escapeHtml(alerta.totalAtrasados2Mas || 0)}
+            <br>
+          
+            <strong>Porcentaje con atrasos:</strong>
+            ${escapeHtml(
+              Number(
+                alerta.porcentajeGrupoAtrasado || 0
+              ).toFixed(1)
+            )}%
+            <br>
+          
+            <strong>Porcentaje con 2+ cuotas atrasadas:</strong>
+            ${escapeHtml(
+              Number(
+                alerta.porcentajeGrupoAtrasados2Mas || 0
+              ).toFixed(1)
+            )}%
+            <br>
+          
+            <strong>Saldo pendiente del grupo:</strong>
+            ${escapeHtml(
+              formatoMontoPago(
+                alerta.saldoPendienteGrupo || 0,
+                alerta.moneda
+              )
+            )}
+            <br>
+          
+            <strong>Total pagado por el grupo:</strong>
+            ${escapeHtml(
+              formatoMontoPago(
+                alerta.totalPagadoGrupo || 0,
+                alerta.moneda
+              )
+            )}
           </div>
         
-          ${["grupo_liberados_parciales", "grupo_saldo_a_favor"].includes(alerta.tipo)
-            ? renderTablaCasosEspecialesPago(alerta)
+          ${
+            [
+              "grupo_liberados_parciales",
+              "grupo_saldo_a_favor"
+            ].includes(state.tipoActivo) ||
+            (
+              state.tipoActivo ===
+                "__todas_grupales__" &&
+              [
+                "grupo_liberados_parciales",
+                "grupo_saldo_a_favor"
+              ].includes(
+                alerta.categoriaPrincipal ||
+                alerta.tipo
+              )
+            )
+              ? renderTablaCasosEspecialesPago(
+                  alerta
+                )
             : `
               <div style="margin-top:14px;">
                 <strong style="display:block; margin-bottom:8px;">Personas con deuda del grupo</strong>
