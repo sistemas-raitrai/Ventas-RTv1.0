@@ -222,25 +222,48 @@ function getRowVendorEmail(row = {}) {
   );
 }
 
-function getRowsForCurrentScope(
-  effectiveUser
-) {
+function getAlertasPagosForScope() {
+  const effectiveUser =
+    getEffectiveUser();
+
   if (!effectiveUser) {
     return [];
   }
 
-  if (isVendedorRole(effectiveUser)) {
-    const email = normalizeEmail(
-      effectiveUser.email || ""
-    );
+  let alertas = (
+    state.alertasPagosRows || []
+  ).filter(
+    (alerta) =>
+      alerta.activa !== false
+  );
 
-    return state.rows.filter(
-      (row) =>
-        getRowVendorEmail(row) === email
+  /*
+    Los vendedores ven solamente
+    las alertas de sus grupos.
+  */
+  if (isVendedorRole(effectiveUser)) {
+    const correoUsuario =
+      normalizeEmail(
+        effectiveUser.email || ""
+      );
+
+    alertas = alertas.filter(
+      (alerta) =>
+        normalizeEmail(
+          alerta.vendedoraCorreo || ""
+        ) === correoUsuario
     );
   }
 
-  return state.rows;
+  /*
+    Admin, Registro, Administración
+    y otros roles autorizados ven todas.
+  */
+  return alertas.sort(
+    (a, b) =>
+      getFechaViajeOrdenAlertaPago(a) -
+      getFechaViajeOrdenAlertaPago(b)
+  );
 }
 
 function setText(id, value) {
@@ -346,12 +369,65 @@ function closeDialog(dialog) {
    CARGA DE DATOS
 ========================================================= */
 
+function logCargaPagos(mensaje, datos = null) {
+  const hora = new Date().toLocaleTimeString("es-CL", {
+    hour12: false
+  });
+
+  if (datos !== null) {
+    console.log(
+      `%c[Alertas pagos ${hora}] ${mensaje}`,
+      "color:#5a2d82;font-weight:900;",
+      datos
+    );
+  } else {
+    console.log(
+      `%c[Alertas pagos ${hora}] ${mensaje}`,
+      "color:#5a2d82;font-weight:900;"
+    );
+  }
+}
+
+async function medirConsultaPagos(nombre, callback) {
+  const inicio = performance.now();
+
+  logCargaPagos(`Iniciando: ${nombre}`);
+
+  try {
+    const resultado = await callback();
+
+    const duracion = Math.round(
+      performance.now() - inicio
+    );
+
+    logCargaPagos(
+      `Finalizó: ${nombre} · ${duracion} ms · ${resultado?.size ?? 0} documentos`
+    );
+
+    return resultado;
+  } catch (error) {
+    const duracion = Math.round(
+      performance.now() - inicio
+    );
+
+    console.error(
+      `[Alertas pagos] Error en ${nombre} después de ${duracion} ms`,
+      error
+    );
+
+    throw error;
+  }
+}
+
 async function cargarDatosAlertasPagos() {
   const loading =
     $("alertas-pagos-loading");
 
   const app =
     $("alertas-pagos-app");
+
+  const actualizado =
+    $("alertas-pagos-actualizado");
 
   if (loading) {
     loading.hidden = false;
@@ -363,78 +439,40 @@ async function cargarDatosAlertasPagos() {
     app.hidden = true;
   }
 
-  console.time(
-    "ALERTAS_PAGOS_TOTAL"
+  if (actualizado) {
+    actualizado.textContent =
+      "Última actualización: consultando alertas...";
+  }
+
+  const inicioTotal =
+    performance.now();
+
+  logCargaPagos(
+    "Comenzó la carga de la página"
   );
 
   try {
-    const [
-      gruposVentasSnap,
-      gruposOperacionSnap,
-      alertasPagosSnap
-    ] = await Promise.all([
-      getDocs(
-        collection(
-          db,
-          "ventas_cotizaciones"
-        )
-      ),
+    /*
+      CARGA PRINCIPAL:
 
-      getDocs(
-        collection(
-          db,
-          "grupos"
-        )
-      ),
-
-      getDocs(
-        collection(
-          db,
-          ALERTAS_PAGOS_COLLECTION
-        )
-      )
-    ]);
-
-    state.rows =
-      gruposVentasSnap.docs.map(
-        (docSnap) => {
-          const data =
-            docSnap.data() || {};
-
-          return {
-            id: docSnap.id,
-            idGrupo:
-              data.idGrupo ||
-              docSnap.id,
-            ...data
-          };
-        }
+      Solamente traemos alertas.
+      No esperamos ventas_cotizaciones
+      ni grupos.
+    */
+    const alertasPagosSnap =
+      await medirConsultaPagos(
+        "ventas_alertas_pagos",
+        () =>
+          getDocs(
+            collection(
+              db,
+              ALERTAS_PAGOS_COLLECTION
+            )
+          )
       );
 
-    state.gruposOperacionByNumero =
-      new Map();
-
-    gruposOperacionSnap.docs.forEach(
-      (docSnap) => {
-        const data =
-          docSnap.data() || {};
-
-        const numero =
-          String(
-            data.numeroNegocio || ""
-          ).trim();
-
-        if (!numero) return;
-
-        state.gruposOperacionByNumero.set(
-          numero,
-          {
-            id: docSnap.id,
-            ...data
-          }
-        );
-      }
-    );
+    const inicioProcesamiento =
+      performance.now();
 
     state.alertasPagosRows =
       alertasPagosSnap.docs
@@ -447,7 +485,19 @@ async function cargarDatosAlertasPagos() {
             row.activa !== false
         );
 
-    state.alertasPagosUltimaActualizacion =
+    logCargaPagos(
+      "Alertas activas procesadas",
+      {
+        documentosFirestore:
+          alertasPagosSnap.size,
+
+        alertasActivas:
+          state.alertasPagosRows.length
+      }
+    );
+
+    state
+      .alertasPagosUltimaActualizacion =
       state.alertasPagosRows
         .map((row) =>
           timestampLikeToDate(
@@ -461,24 +511,27 @@ async function cargarDatosAlertasPagos() {
             a.getTime()
         )[0] || null;
 
-    const effectiveUser =
-      getEffectiveUser();
-
-    state.scopedRows =
-      getRowsForCurrentScope(
-        effectiveUser
-      );
-
     state.alertasPagosCargadas =
       true;
 
     state.alertasPagosFiltradasRows =
-      getAlertasPagosForScope(
-        state.scopedRows
+      getAlertasPagosForScope();
+
+    const duracionProcesamiento =
+      Math.round(
+        performance.now() -
+        inicioProcesamiento
       );
 
-    const actualizado =
-      $("alertas-pagos-actualizado");
+    logCargaPagos(
+      `Procesamiento local finalizado · ${duracionProcesamiento} ms`,
+      {
+        alertasVisibles:
+          state
+            .alertasPagosFiltradasRows
+            .length
+      }
+    );
 
     if (actualizado) {
       actualizado.textContent =
@@ -499,9 +552,23 @@ async function cargarDatosAlertasPagos() {
       app.hidden = false;
     }
 
-    console.timeEnd(
-      "ALERTAS_PAGOS_TOTAL"
+    const duracionTotal =
+      Math.round(
+        performance.now() -
+        inicioTotal
+      );
+
+    logCargaPagos(
+      `Alertas listas para mostrar · ${duracionTotal} ms`
     );
+
+    /*
+      La fecha confirmada de viaje
+      se completa después, sin bloquear
+      la pantalla.
+    */
+    cargarFechasOperacionEnSegundoPlano();
+
   } catch (error) {
     console.error(
       "Error cargando alertas de pagos:",
@@ -522,6 +589,11 @@ async function cargarDatosAlertasPagos() {
         )}
       `;
     }
+
+    if (actualizado) {
+      actualizado.textContent =
+        "Última actualización: error de carga";
+    }
   }
 }
 
@@ -532,15 +604,26 @@ async function cargarAlertasPagosDesdeFirestore({
     state.alertasPagosCargadas &&
     !forzar
   ) {
+    logCargaPagos(
+      "Las alertas ya están en memoria. No se consulta Firestore nuevamente."
+    );
+
     return;
   }
 
-  const snap = await getDocs(
-    collection(
-      db,
-      ALERTAS_PAGOS_COLLECTION
-    )
-  );
+  const snap =
+    await medirConsultaPagos(
+      forzar
+        ? "recarga forzada ventas_alertas_pagos"
+        : "ventas_alertas_pagos",
+      () =>
+        getDocs(
+          collection(
+            db,
+            ALERTAS_PAGOS_COLLECTION
+          )
+        )
+    );
 
   state.alertasPagosRows =
     snap.docs
@@ -553,7 +636,8 @@ async function cargarAlertasPagosDesdeFirestore({
           row.activa !== false
       );
 
-  state.alertasPagosUltimaActualizacion =
+  state
+    .alertasPagosUltimaActualizacion =
     state.alertasPagosRows
       .map((row) =>
         timestampLikeToDate(
@@ -571,9 +655,114 @@ async function cargarAlertasPagosDesdeFirestore({
     true;
 
   state.alertasPagosFiltradasRows =
-    getAlertasPagosForScope(
-      state.scopedRows
+    getAlertasPagosForScope();
+}
+
+async function cargarFechasOperacionEnSegundoPlano() {
+  logCargaPagos(
+    "La tabla ya puede mostrarse. Iniciando fechas de operación en segundo plano."
+  );
+
+  try {
+    const gruposOperacionSnap =
+      await medirConsultaPagos(
+        "grupos para fechas confirmadas",
+        () =>
+          getDocs(
+            collection(
+              db,
+              "grupos"
+            )
+          )
+      );
+
+    const inicioMapa =
+      performance.now();
+
+    state.gruposOperacionByNumero =
+      new Map();
+
+    gruposOperacionSnap.docs.forEach(
+      (docSnap) => {
+        const data =
+          docSnap.data() || {};
+
+        const numero =
+          String(
+            data.numeroNegocio || ""
+          ).trim();
+
+        if (!numero) {
+          return;
+        }
+
+        state
+          .gruposOperacionByNumero
+          .set(
+            numero,
+            {
+              id: docSnap.id,
+              ...data
+            }
+          );
+      }
     );
+
+    logCargaPagos(
+      `Mapa de fechas creado · ${Math.round(
+        performance.now() -
+        inicioMapa
+      )} ms`,
+      {
+        gruposConNumero:
+          state
+            .gruposOperacionByNumero
+            .size
+      }
+    );
+
+    /*
+      Volvemos a ordenar ahora que
+      conocemos las fechas de viaje.
+    */
+    state.alertasPagosFiltradasRows =
+      getAlertasPagosForScope();
+
+    /*
+      Si los filtros ya están dibujados,
+      solo repintamos la tabla.
+      No ocultamos la pantalla ni
+      reiniciamos toda la página.
+    */
+    if (
+      $("contenedor-alertas-pagos-listado")
+    ) {
+      const filtradas =
+        filtrarAlertasPagosModal(
+          state
+            .alertasPagosFiltradasRows
+        );
+
+      renderAlertasPagosListado(
+        filtradas
+      );
+    }
+
+    logCargaPagos(
+      "Fechas de viaje incorporadas a la tabla"
+    );
+
+  } catch (error) {
+    /*
+      La página sigue funcionando aunque
+      falle la colección grupos.
+      Solo quedará '-' en fecha viaje.
+    */
+    console.warn(
+      "No se pudieron cargar las fechas de viaje. Las alertas seguirán disponibles.",
+      error
+    );
+  }
 }
 
 /* =========================================================
@@ -2662,9 +2851,7 @@ async function abrirPaginaAlertasPagos() {
   }
 
   state.alertasPagosFiltradasRows =
-    getAlertasPagosForScope(
-      state.scopedRows || []
-    );
+    getAlertasPagosForScope();
 
   app.innerHTML =
     buildAlertasPagosFiltrosHtml(
@@ -3014,7 +3201,25 @@ async function renderPantallaAlertasPagos() {
 }
 
 async function initAlertasPagosPage() {
+  const inicioInit =
+    performance.now();
+
+  logCargaPagos(
+    "Iniciando alertas-pagos.js"
+  );
+
+  logCargaPagos(
+    "Esperando layout..."
+  );
+
   await waitForLayoutReady();
+
+  logCargaPagos(
+    `Layout disponible · ${Math.round(
+      performance.now() -
+      inicioInit
+    )} ms`
+  );
 
   bindLayoutButtons({
     homeUrl: HOME_URL,
@@ -3085,14 +3290,32 @@ async function initAlertasPagosPage() {
   onAuthStateChanged(
     auth,
     async (user) => {
+      logCargaPagos(
+        "Firebase Auth respondió",
+        {
+          conectado: !!user,
+          correo: user?.email || ""
+        }
+      );
+  
       if (!user) {
         location.href =
           "login.html";
-
+  
         return;
       }
-
+  
+      const inicioRender =
+        performance.now();
+  
       await renderPantallaAlertasPagos();
+  
+      logCargaPagos(
+        `Render general terminado · ${Math.round(
+          performance.now() -
+          inicioRender
+        )} ms`
+      );
     }
   );
 
