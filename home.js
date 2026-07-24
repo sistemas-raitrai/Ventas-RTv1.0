@@ -193,6 +193,31 @@ function getNumeroNegocio(row = {}) {
   ).trim();
 }
 
+function getNumerosNegocio(row = {}) {
+  const valorOriginal = getNumeroNegocio(row);
+
+  if (!valorOriginal) {
+    return [];
+  }
+
+  /*
+    Ejemplos:
+
+    "1581"        -> ["1581"]
+    "1581 / 1582" -> ["1581", "1582"]
+    "1581-1582"   -> ["1581", "1582"]
+    "1581, 1582"  -> ["1581", "1582"]
+  */
+  const numerosEncontrados =
+    valorOriginal.match(/\d+/g) || [];
+
+  return [...new Set(
+    numerosEncontrados
+      .map((numero) => String(numero).trim())
+      .filter(Boolean)
+  )];
+}
+
 function getIdNegocioLabel(row = {}) {
   const id = getRowId(row);
   const numero = getNumeroNegocio(row);
@@ -1544,11 +1569,19 @@ async function fetchJsonPagos(url) {
 }
 
 function buscarGrupoRtPorNumeroNegocio(numeroNegocio) {
-  const numero = String(numeroNegocio || "").trim();
+  const numeroBuscado = String(
+    numeroNegocio || ""
+  ).trim();
 
-  return state.rows.find((row) =>
-    String(getNumeroNegocio(row) || "").trim() === numero
-  ) || null;
+  if (!numeroBuscado) {
+    return null;
+  }
+
+  return state.rows.find((row) => {
+    const numerosGrupo = getNumerosNegocio(row);
+
+    return numerosGrupo.includes(numeroBuscado);
+  }) || null;
 }
 
 function diasDesdeFechaPago(fecha) {
@@ -2011,19 +2044,52 @@ function formatFechaViajeAlertaPago(alerta = {}) {
 }
 
 function getAlertasPagosForScope(scopedRows = []) {
-  const scopedIds = new Set(scopedRows.map(getRowId).filter(Boolean));
-  const scopedNumeros = new Set(scopedRows.map(getNumeroNegocio).filter(Boolean));
+  const scopedIds = new Set(
+    scopedRows
+      .map(getRowId)
+      .filter(Boolean)
+  );
+
+  /*
+    Antes:
+
+    "1581 / 1582" se guardaba como una sola llave.
+
+    Ahora:
+
+    "1581 / 1582" se convierte en:
+    ["1581", "1582"]
+  */
+  const scopedNumeros = new Set(
+    scopedRows
+      .flatMap((row) => getNumerosNegocio(row))
+      .filter(Boolean)
+  );
 
   return (state.alertasPagosRows || [])
     .filter((alerta) => {
-      if (alerta.activa === false) return false;
+      if (alerta.activa === false) {
+        return false;
+      }
 
-      const idGrupo = String(alerta.idGrupo || "").trim();
-      const numeroNegocio = String(alerta.numeroNegocio || "").trim();
+      const idGrupo = String(
+        alerta.idGrupo || ""
+      ).trim();
 
-      return scopedIds.has(idGrupo) || scopedNumeros.has(numeroNegocio);
+      const numeroNegocio = String(
+        alerta.numeroNegocio || ""
+      ).trim();
+
+      return (
+        scopedIds.has(idGrupo) ||
+        scopedNumeros.has(numeroNegocio)
+      );
     })
-    .sort((a, b) => getFechaViajeOrdenAlertaPago(a) - getFechaViajeOrdenAlertaPago(b));
+    .sort(
+      (a, b) =>
+        getFechaViajeOrdenAlertaPago(a) -
+        getFechaViajeOrdenAlertaPago(b)
+    );
 }
 
 function buildAlertasPagosFiltrosHtml(rows = []) {
