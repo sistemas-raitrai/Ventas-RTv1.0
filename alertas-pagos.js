@@ -2065,21 +2065,58 @@ function renderTablaCasosEspecialesPago(alerta = {}) {
   let titulo = "";
   let rows = [];
 
-  if (alerta.tipo === "grupo_liberados_parciales") {
-    titulo = "Liberados parciales del grupo";
-    rows = Array.isArray(alerta.pasajerosLiberacionParcial)
-      ? alerta.pasajerosLiberacionParcial
-      : [];
+  /*
+    Si estamos viendo un filtro especial,
+    prevalece el chip seleccionado.
+
+    Si estamos viendo "Todas las grupales",
+    usamos la categoría principal del grupo.
+  */
+  const tipoDetalle =
+    [
+      "grupo_liberados_parciales",
+      "grupo_saldo_a_favor"
+    ].includes(state.tipoActivo)
+      ? state.tipoActivo
+      : String(
+          alerta.categoriaPrincipal ||
+          alerta.tipo ||
+          ""
+        );
+
+  if (
+    tipoDetalle ===
+    "grupo_liberados_parciales"
+  ) {
+    titulo =
+      "Liberados parciales del grupo";
+
+    rows =
+      Array.isArray(
+        alerta.pasajerosLiberacionParcial
+      )
+        ? alerta.pasajerosLiberacionParcial
+        : [];
   }
 
-  if (alerta.tipo === "grupo_saldo_a_favor") {
-    titulo = "Personas con posible saldo a favor";
-    rows = Array.isArray(alerta.pasajerosSaldoFavor)
-      ? alerta.pasajerosSaldoFavor
-      : [];
+  if (
+    tipoDetalle ===
+    "grupo_saldo_a_favor"
+  ) {
+    titulo =
+      "Personas con posible saldo a favor";
+
+    rows =
+      Array.isArray(
+        alerta.pasajerosSaldoFavor
+      )
+        ? alerta.pasajerosSaldoFavor
+        : [];
   }
 
-  if (!titulo) return "";
+  if (!titulo) {
+    return "";
+  }
 
   if (!rows.length) {
     return `
@@ -2095,9 +2132,20 @@ function renderTablaCasosEspecialesPago(alerta = {}) {
         ${escapeHtml(titulo)}
       </strong>
 
-      <div style="overflow:auto; border:1px solid rgba(49,25,75,.10); border-radius:14px;">
-        <table style="width:100%; border-collapse:collapse; font-size:12px;">
-          <thead style="background:#f7f3fb; color:#32184f;">
+      <div style="
+        overflow:auto;
+        border:1px solid rgba(49,25,75,.10);
+        border-radius:14px;
+      ">
+        <table style="
+          width:100%;
+          border-collapse:collapse;
+          font-size:12px;
+        ">
+          <thead style="
+            background:#f7f3fb;
+            color:#32184f;
+          ">
             <tr>
               <th style="padding:8px; text-align:right;">#</th>
               <th style="padding:8px; text-align:left;">Participante</th>
@@ -2113,44 +2161,105 @@ function renderTablaCasosEspecialesPago(alerta = {}) {
 
           <tbody>
             ${rows.map((p, idx) => `
-              <tr style="border-top:1px solid rgba(49,25,75,.08);">
-                <td style="padding:8px; text-align:right; font-weight:900;">
+              <tr style="
+                border-top:1px solid rgba(49,25,75,.08);
+              ">
+                <td style="
+                  padding:8px;
+                  text-align:right;
+                  font-weight:900;
+                ">
                   ${idx + 1}
                 </td>
 
                 <td style="padding:8px;">
-                  <strong>${escapeHtml(p.participante || "-")}</strong><br>
-                  <span style="color:#766b84;">${escapeHtml(p.rut || "")}</span>
+                  <strong>
+                    ${escapeHtml(p.participante || "-")}
+                  </strong><br>
+
+                  <span style="color:#766b84;">
+                    ${escapeHtml(p.rut || "")}
+                  </span>
                 </td>
 
                 <td style="padding:8px;">
-                  <strong>${escapeHtml(p.responsable || "-")}</strong><br>
-                  <span style="color:#766b84;">${escapeHtml(p.correoResponsable || "-")}</span><br>
-                  <span style="color:#766b84;">${escapeHtml(p.telefonoResponsable || "-")}</span>
+                  <strong>
+                    ${escapeHtml(p.responsable || "-")}
+                  </strong><br>
+
+                  <span style="color:#766b84;">
+                    ${escapeHtml(
+                      p.correoResponsable || "-"
+                    )}
+                  </span><br>
+
+                  <span style="color:#766b84;">
+                    ${escapeHtml(
+                      p.telefonoResponsable || "-"
+                    )}
+                  </span>
                 </td>
 
                 <td style="padding:8px; text-align:right;">
-                  ${escapeHtml(formatoMontoPago(p.totalDebe || 0, alerta.moneda))}
+                  ${escapeHtml(
+                    formatoMontoPago(
+                      p.totalDebe || 0,
+                      alerta.moneda
+                    )
+                  )}
                 </td>
 
                 <td style="padding:8px; text-align:right;">
-                  ${escapeHtml(formatoMontoPago(p.totalReferenciaGrupo || 0, alerta.moneda))}
+                  ${escapeHtml(
+                    formatoMontoPago(
+                      p.totalReferenciaGrupo || 0,
+                      alerta.moneda
+                    )
+                  )}
                 </td>
 
                 <td style="padding:8px; text-align:right;">
-                  ${escapeHtml(formatoMontoPago(p.totalPagado || 0, alerta.moneda))}
+                  ${escapeHtml(
+                    formatoMontoPago(
+                      p.totalPagado || 0,
+                      alerta.moneda
+                    )
+                  )}
                 </td>
 
-                <td style="padding:8px; text-align:right; font-weight:900;">
-                  ${escapeHtml(formatoMontoPago(p.saldoPendiente || 0, alerta.moneda))}
+                <td style="
+                  padding:8px;
+                  text-align:right;
+                  font-weight:900;
+                ">
+                  ${escapeHtml(
+                    formatoMontoPago(
+                      p.saldoPendiente || 0,
+                      alerta.moneda
+                    )
+                  )}
                 </td>
 
                 <td style="padding:8px; text-align:right;">
-                  ${escapeHtml(formatoMontoPago(p.diferenciaValorPrograma || 0, alerta.moneda))}
+                  ${escapeHtml(
+                    formatoMontoPago(
+                      p.diferenciaValorPrograma || 0,
+                      alerta.moneda
+                    )
+                  )}
                 </td>
 
-                <td style="padding:8px; text-align:right; font-weight:900;">
-                  ${escapeHtml(formatoMontoPago(p.saldoFavorEstimado || 0, alerta.moneda))}
+                <td style="
+                  padding:8px;
+                  text-align:right;
+                  font-weight:900;
+                ">
+                  ${escapeHtml(
+                    formatoMontoPago(
+                      p.saldoFavorEstimado || 0,
+                      alerta.moneda
+                    )
+                  )}
                 </td>
               </tr>
             `).join("")}
