@@ -10,7 +10,10 @@ import {
 
 import {
   collection,
-  getDocs
+  getDocs,
+  query,
+  where,
+  orderBy
 } from "https://www.gstatic.com/firebasejs/11.7.3/firebase-firestore.js";
 
 import {
@@ -32,8 +35,14 @@ import {
 /* =========================================================
    CONFIG
 ========================================================= */
-const $ = (id) => document.getElementById(id);
-const CURRENT_YEAR = new Date().getFullYear();
+const $ = (id) =>
+  document.getElementById(id);
+
+const CURRENT_YEAR =
+  new Date().getFullYear();
+
+const GRUPOS_RESUMEN_COLLECTION =
+  "ventas_grupos_resumen";
 
 const state = {
   allRows: [],
@@ -86,7 +95,11 @@ initPage();
 
 async function initPage() {
   bindEvents();
+  
   await waitForLayoutReady();
+  
+  ocultarControlAnosAnteriores();
+  
   bindHeaderActions();
 
   onAuthStateChanged(auth, async (user) => {
@@ -100,6 +113,31 @@ async function initPage() {
     updateSortHeaderUI();
     await loadSeguimiento();
   });
+}
+
+function ocultarControlAnosAnteriores() {
+  const toggle =
+    $("toggleAnteriores");
+
+  if (!toggle) {
+    return;
+  }
+
+  toggle.checked = false;
+  toggle.disabled = true;
+
+  const contenedor =
+    toggle.closest(
+      "label, .form-check, .seg-toggle, .filter-check"
+    );
+
+  if (contenedor) {
+    contenedor.style.display =
+      "none";
+  } else {
+    toggle.style.display =
+      "none";
+  }
 }
 
 async function bootstrapFromSession() {
@@ -206,11 +244,6 @@ function bindEvents() {
   $("filtroEstado")?.addEventListener("change", applyFiltersAndRender);
   $("filtroVendedora")?.addEventListener("change", applyFiltersAndRender);
 
-  $("toggleAnteriores")?.addEventListener("change", () => {
-    fillYearFilter(state.allRows);
-    applyFiltersAndRender();
-  });
-
   $("buscadorSeguimiento")?.addEventListener("input", debounce(() => {
     applyFiltersAndRender();
   }, 180));
@@ -300,30 +333,112 @@ function updateSortHeaderUI() {
    CARGA PRINCIPAL
 ========================================================= */
 async function loadSeguimiento() {
-  renderEmpty("Cargando grupos...");
+  renderEmpty(
+    `Cargando grupos ${CURRENT_YEAR} en adelante...`
+  );
+
+  const inicio =
+    performance.now();
 
   try {
-    const snap = await getDocs(collection(db, "ventas_cotizaciones"));
-    const rows = [];
+    /*
+      Solo cargamos los grupos activos:
 
-    snap.forEach((docSnap) => {
-      rows.push(mapClienteDoc(docSnap.id, docSnap.data() || {}));
-    });
+      - año actual;
+      - años siguientes.
 
-    state.allRows = rows;
+      Los años anteriores no se descargan.
+    */
+    const gruposQuery =
+      query(
+        collection(
+          db,
+          GRUPOS_RESUMEN_COLLECTION
+        ),
 
-    // Blindaje: cada vez que carga la página, el orden default vuelve a GRUPO A → Z
-    state.sortKey = "grupo";
-    state.sortDir = "asc";
+        where(
+          "anoViaje",
+          ">=",
+          CURRENT_YEAR
+        ),
+
+        orderBy(
+          "anoViaje",
+          "asc"
+        )
+      );
+
+    const snap =
+      await getDocs(
+        gruposQuery
+      );
+
+    const rows =
+      snap.docs.map(
+        (docSnap) =>
+          mapClienteDoc(
+            docSnap.id,
+            docSnap.data() || {}
+          )
+      );
+
+    state.allRows =
+      rows;
+
+    console.log(
+      "[seguimiento] resúmenes cargados",
+      {
+        coleccion:
+          GRUPOS_RESUMEN_COLLECTION,
+
+        anoDesde:
+          CURRENT_YEAR,
+
+        documentos:
+          snap.size,
+
+        duracionMs:
+          Math.round(
+            performance.now() -
+            inicio
+          )
+      }
+    );
+
+    /*
+      Orden inicial:
+      grupo/colegio A → Z.
+    */
+    state.sortKey =
+      "grupo";
+
+    state.sortDir =
+      "asc";
+
     updateSortHeaderUI();
-    
-    fillVendorFilter(rows);
+
+    fillYearFilter(
+      rows
+    );
+
+    fillVendorFilter(
+      rows
+    );
+
     applyDashboardPreset();
+
     updateSummaryButtonsUI();
+
     applyFiltersAndRender();
-  } catch (err) {
-    console.error("[seguimiento] error cargando clientes:", err);
-    renderEmpty("No se pudieron cargar los grupos.");
+  } catch (error) {
+    console.error(
+      "[seguimiento] error cargando resúmenes:",
+      error
+    );
+
+    renderEmpty(
+      "No se pudieron cargar los grupos."
+    );
   }
 }
 
@@ -455,22 +570,42 @@ function mapClienteDoc(id, data) {
     subtitleParts,
     hasAlias: !!aliasGrupo,
     avatarBaseText: colegio || nombreGrupo || nombreApoderado || displayTitle,
-    searchIndex: buildSearchIndex([
-      id,
-      data.idGrupo || "",
-      data.numeroNegocio || "",
-      data.numero_negocio || "",
-      data.codigo || "",
-      aliasGrupo,
-      nombreApoderado,
-      nombreGrupo,
-      colegio,
-      curso,
-      destino,
-      vendedora,
-      vendedoraCorreo,
-      anoViaje
-    ])
+    searchIndex:
+      buildSearchIndex([
+        data.busquedaTexto || "",
+    
+        id,
+        data.idGrupo || "",
+        data.groupDocId || "",
+    
+        data.numeroNegocio || "",
+        data.numero_negocio || "",
+        data.codigo || "",
+    
+        aliasGrupo,
+        nombreApoderado,
+        nombreGrupo,
+        colegio,
+        curso,
+    
+        destino,
+        data.programa || "",
+        data.comunaCiudad || "",
+    
+        data.nombreCliente || "",
+        data.nombreCliente2 || "",
+    
+        data.correoCliente || "",
+        data.correoCliente2 || "",
+    
+        data.celularCliente || "",
+        data.celularCliente2 || "",
+    
+        vendedora,
+        vendedoraCorreo,
+    
+        anoViaje
+      ])
   };
 }
 
@@ -481,7 +616,6 @@ function applyFiltersAndRender() {
   const filtroAno = $("filtroAno")?.value || "todos";
   const filtroEstado = $("filtroEstado")?.value || "todos";
   const filtroVendedora = $("filtroVendedora")?.value || "todos";
-  const verAnteriores = !!$("toggleAnteriores")?.checked;
   const search = normalizeText($("buscadorSeguimiento")?.value || "");
 
   const currentVendorFullName = normalizeText([
@@ -521,14 +655,39 @@ function applyFiltersAndRender() {
   });
 
   // Filtro año
-  rows = rows.filter((row) => {
-    if (filtroAno !== "todos") {
-      return String(row.anoViaje || "") === String(filtroAno);
+  rows = rows.filter(
+    (row) => {
+      const anoViaje =
+        Number(
+          row.anoViaje || 0
+        );
+  
+      /*
+        Blindaje adicional.
+  
+        La consulta de Firestore ya excluye
+        años anteriores, pero no permitimos
+        que pase ningún resumen antiguo.
+      */
+      if (
+        !anoViaje ||
+        anoViaje < CURRENT_YEAR
+      ) {
+        return false;
+      }
+  
+      if (
+        filtroAno !== "todos"
+      ) {
+        return (
+          String(anoViaje) ===
+          String(filtroAno)
+        );
+      }
+  
+      return true;
     }
-
-    if (verAnteriores) return true;
-    return !row.anoViaje || row.anoViaje >= CURRENT_YEAR;
-  });
+  );
 
   // Filtro estado selector
   rows = rows.filter((row) => {
@@ -864,17 +1023,32 @@ function applyDashboardPreset() {
   const filtroEstado = $("filtroEstado");
   const filtroVendedora = $("filtroVendedora");
 
-  // Si viene archivados=1 o viene un año menor al actual,
-  // activamos archivados para que ese año se pueda mostrar.
-  if (
-    toggleAnteriores &&
-    (preset.archivados || (preset.ano && Number(preset.ano) < CURRENT_YEAR))
-  ) {
-    toggleAnteriores.checked = true;
+  /*
+    Seguimiento solo trabaja con el año actual
+    y los siguientes.
+  
+    Si llega una URL antigua con 2025 o anterior,
+    no se activa ni se consulta el archivo.
+  */
+  if (toggleAnteriores) {
+    toggleAnteriores.checked =
+      false;
+  
+    toggleAnteriores.disabled =
+      true;
   }
-
-  // Rehacer selector de años después de aplicar archivados
-  fillYearFilter(state.allRows);
+  
+  if (
+    preset.ano &&
+    Number(preset.ano) < CURRENT_YEAR
+  ) {
+    preset.ano = "";
+    preset.archivados = false;
+  }
+  
+  fillYearFilter(
+    state.allRows
+  );
 
   // Aplicar año
   if (
@@ -1001,32 +1175,64 @@ function getDocsSortText(row) {
 /* =========================================================
    OPCIONES DE FILTROS
 ========================================================= */
-function fillYearFilter(rows) {
-  const select = $("filtroAno");
-  if (!select) return;
+function fillYearFilter(
+  rows = []
+) {
+  const select =
+    $("filtroAno");
 
-  const previous = select.value || "todos";
-  const showOld = !!$("toggleAnteriores")?.checked;
-
-  let years = [...new Set(
-    rows
-      .map((r) => Number(r.anoViaje || 0))
-      .filter(Boolean)
-  )].sort((a, b) => a - b);
-
-  if (!showOld) {
-    years = years.filter((year) => year >= CURRENT_YEAR);
+  if (!select) {
+    return;
   }
 
+  const previous =
+    select.value ||
+    "todos";
+
+  const years = [
+    ...new Set(
+      rows
+        .map(
+          (row) =>
+            Number(
+              row.anoViaje || 0
+            )
+        )
+        .filter(
+          (year) =>
+            year >= CURRENT_YEAR
+        )
+    )
+  ].sort(
+    (a, b) =>
+      a - b
+  );
+
   select.innerHTML = `
-    <option value="todos">Todos</option>
-    ${years.map((year) => `<option value="${year}">${year}</option>`).join("")}
+    <option value="todos">
+      Todos ${CURRENT_YEAR} en adelante
+    </option>
+
+    ${years.map(
+      (year) => `
+        <option value="${year}">
+          ${year}
+        </option>
+      `
+    ).join("")}
   `;
 
-  if ([...select.options].some((opt) => opt.value === previous)) {
-    select.value = previous;
+  if (
+    [...select.options].some(
+      (option) =>
+        option.value === previous
+    )
+  ) {
+    select.value =
+      previous;
   } else {
-    select.value = "todos";
+    select.value =
+      "todos";
   }
 }
 
