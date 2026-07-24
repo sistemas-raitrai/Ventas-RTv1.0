@@ -11,7 +11,9 @@ import {
   doc,
   setDoc,
   addDoc,
-  serverTimestamp
+  serverTimestamp,
+  query,
+  where
 } from "https://www.gstatic.com/firebasejs/11.7.3/firebase-firestore.js";
 
 import {
@@ -66,7 +68,27 @@ const state = {
   alertasPagosUltimaActualizacion: null,
 
   alertasPagosSortKey: "fechaViaje",
-  alertasPagosSortDir: "asc"
+  alertasPagosSortDir: "asc",
+
+  /*
+    Caché separada por año.
+
+    Ejemplo:
+    "2026" → alertas 2026
+    "2027" → alertas 2027
+  */
+  alertasPorAno: new Map(),
+
+  anosIniciales: [],
+  anosCargados: new Set(),
+
+  /*
+    "__iniciales__" significa:
+    mostrar juntos los dos años iniciales.
+  */
+  anoFiltro: "__iniciales__",
+
+  cargaEnCurso: false
 };
 
 /* =========================================================
@@ -369,7 +391,203 @@ async function medirConsultaPagos(nombre, callback) {
   }
 }
 
-async function cargarDatosAlertasPagos() {
+function getAnosInicialesAlertasPagos() {
+  const hoy = new Date();
+
+  const anoActual =
+    hoy.getFullYear();
+
+  const mes =
+    hoy.getMonth();
+
+  const dia =
+    hoy.getDate();
+
+  /*
+    getMonth() comienza en 0:
+
+    Enero = 0
+    Noviembre = 10
+    Diciembre = 11
+  */
+  const desde30Noviembre =
+    mes > 10 ||
+    (
+      mes === 10 &&
+      dia >= 30
+    );
+
+  const anoBase =
+    desde30Noviembre
+      ? anoActual + 1
+      : anoActual;
+
+  return [
+    String(anoBase),
+    String(anoBase + 1)
+  ];
+}
+
+function getAnosDisponiblesSelectorPagos() {
+  const anosIniciales =
+    state.anosIniciales.length
+      ? state.anosIniciales
+      : getAnosInicialesAlertasPagos();
+
+  const anoBase =
+    Number(anosIniciales[0]);
+
+  const anos = [
+    String(anoBase - 1),
+    String(anoBase),
+    String(anoBase + 1),
+    String(anoBase + 2),
+    String(anoBase + 3),
+    ...state.anosCargados
+  ];
+
+  return [
+    ...new Set(anos)
+  ].sort(
+    (a, b) =>
+      Number(a) - Number(b)
+  );
+}
+
+async function consultarAlertasActivasAno(
+  anoViaje
+) {
+  const ano =
+    String(anoViaje || "").trim();
+
+  if (!ano) {
+    throw new Error(
+      "No se indicó el año de las alertas."
+    );
+  }
+
+  return medirConsultaPagos(
+    `alertas activas ${ano}`,
+    () =>
+      getDocs(
+        query(
+          collection(
+            db,
+            ALERTAS_PAGOS_COLLECTION
+          ),
+
+          where(
+            "activa",
+            "==",
+            true
+          ),
+
+          where(
+            "anoViaje",
+            "==",
+            ano
+          )
+        )
+      )
+  );
+}
+
+async function cargarAnoAlertasPagos(
+  anoViaje,
+  {
+    forzar = false
+  } = {}
+) {
+  const ano =
+    String(anoViaje || "").trim();
+
+  if (!ano) {
+    return [];
+  }
+
+  if (
+    state.alertasPorAno.has(ano) &&
+    !forzar
+  ) {
+    logCargaPagos(
+      `Año ${ano} recuperado desde memoria.`,
+      {
+        alertas:
+          state.alertasPorAno
+            .get(ano)
+            ?.length || 0
+      }
+    );
+
+    return (
+      state.alertasPorAno.get(ano) ||
+      []
+    );
+  }
+
+  const snap =
+    await consultarAlertasActivasAno(
+      ano
+    );
+
+  const alertas =
+    snap.docs.map(
+      (docSnap) => ({
+        id: docSnap.id,
+        ...docSnap.data()
+      })
+    );
+
+  state.alertasPorAno.set(
+    ano,
+    alertas
+  );
+
+  state.anosCargados.add(
+    ano
+  );
+
+  logCargaPagos(
+    `Año ${ano} guardado en memoria.`,
+    {
+      documentos:
+        alertas.length
+    }
+  );
+
+  return alertas;
+}
+
+function reconstruirAlertasPagosDesdeCache() {
+  state.alertasPagosRows =
+    [...state.alertasPorAno.values()]
+      .flat();
+
+  state
+    .alertasPagosUltimaActualizacion =
+    state.alertasPagosRows
+      .map((row) =>
+        timestampLikeToDate(
+          row.actualizadoAt
+        )
+      )
+      .filter(Boolean)
+      .sort(
+        (a, b) =>
+          b.getTime() -
+          a.getTime()
+      )[0] || null;
+
+  state.alertasPagosCargadas =
+    state.anosCargados.size > 0;
+
+  state.alertasPagosFiltradasRows =
+    getAlertasPagosForScope();
+}
+
+async function cargarDatosAlertasPagos({
+  forzar = false
+} = {}) {
   const loading =
     $("alertas-pagos-loading");
 
@@ -379,10 +597,26 @@ async function cargarDatosAlertasPagos() {
   const actualizado =
     $("alertas-pagos-actualizado");
 
+  if (state.cargaEnCurso) {
+    logCargaPagos(
+      "Ya existe una carga en curso."
+    );
+
+    return;
+  }
+
+  state.cargaEnCurso = true;
+
+  if (!state.anosIniciales.length) {
+    state.anosIniciales =
+      getAnosInicialesAlertasPagos();
+  }
+
   if (loading) {
     loading.hidden = false;
+
     loading.textContent =
-      "Cargando alertas de pagos...";
+      `Cargando alertas activas ${state.anosIniciales.join(" y ")}...`;
   }
 
   if (app) {
@@ -391,84 +625,53 @@ async function cargarDatosAlertasPagos() {
 
   if (actualizado) {
     actualizado.textContent =
-      "Última actualización: consultando alertas...";
+      `Consultando alertas ${state.anosIniciales.join("–")}...`;
   }
 
   const inicioTotal =
     performance.now();
 
   logCargaPagos(
-    "Comenzó la carga de la página"
+    "Comenzó la carga inicial",
+    {
+      anos:
+        state.anosIniciales
+    }
   );
 
   try {
-    const alertasPagosSnap =
-      await medirConsultaPagos(
-        "ventas_alertas_pagos",
-        () =>
-          getDocs(
-            collection(
-              db,
-              ALERTAS_PAGOS_COLLECTION
-            )
+    /*
+      Los dos años se consultan al mismo tiempo.
+    */
+    await Promise.all(
+      state.anosIniciales.map(
+        (ano) =>
+          cargarAnoAlertasPagos(
+            ano,
+            {
+              forzar
+            }
           )
-      );
-  
-    const inicioProcesamiento =
-      performance.now();
-  
-    state.alertasPagosRows =
-      alertasPagosSnap.docs
-        .map((docSnap) => ({
-          id: docSnap.id,
-          ...docSnap.data()
-        }))
-        .filter(
-          (row) =>
-            row.activa !== false
-        );
-  
-    logCargaPagos(
-      "Alertas activas procesadas",
-      {
-        documentosFirestore:
-          alertasPagosSnap.size,
-  
-        alertasActivas:
-          state.alertasPagosRows.length
-      }
+      )
     );
 
-    state
-      .alertasPagosUltimaActualizacion =
-      state.alertasPagosRows
-        .map((row) =>
-          timestampLikeToDate(
-            row.actualizadoAt
-          )
-        )
-        .filter(Boolean)
-        .sort(
-          (a, b) =>
-            b.getTime() -
-            a.getTime()
-        )[0] || null;
+    const inicioProcesamiento =
+      performance.now();
 
-    state.alertasPagosCargadas =
-      true;
-
-    state.alertasPagosFiltradasRows =
-      getAlertasPagosForScope();
-
-    const duracionProcesamiento =
-      Math.round(
-        performance.now() -
-        inicioProcesamiento
-      );
+    reconstruirAlertasPagosDesdeCache();
 
     logCargaPagos(
-      `Procesamiento local finalizado · ${duracionProcesamiento} ms`,
+      `Procesamiento local finalizado · ${Math.round(
+        performance.now() -
+        inicioProcesamiento
+      )} ms`,
       {
+        anosCargados:
+          [...state.anosCargados],
+
+        alertasEnMemoria:
+          state.alertasPagosRows.length,
+
         alertasVisibles:
           state
             .alertasPagosFiltradasRows
@@ -495,21 +698,20 @@ async function cargarDatosAlertasPagos() {
       app.hidden = false;
     }
 
-    const duracionTotal =
-      Math.round(
+    logCargaPagos(
+      `Alertas iniciales listas · ${Math.round(
         performance.now() -
         inicioTotal
-      );
-
-    logCargaPagos(
-      `Alertas listas para mostrar · ${duracionTotal} ms`
+      )} ms`
     );
-
   } catch (error) {
     console.error(
       "Error cargando alertas de pagos:",
       error
     );
+
+    state.alertasPagosCargadas =
+      false;
 
     if (loading) {
       loading.hidden = false;
@@ -530,68 +732,67 @@ async function cargarDatosAlertasPagos() {
       actualizado.textContent =
         "Última actualización: error de carga";
     }
+  } finally {
+    state.cargaEnCurso = false;
   }
 }
 
 async function cargarAlertasPagosDesdeFirestore({
-  forzar = false
+  forzar = false,
+  anos = null
 } = {}) {
+  if (!state.anosIniciales.length) {
+    state.anosIniciales =
+      getAnosInicialesAlertasPagos();
+  }
+
+  const anosObjetivo =
+    Array.isArray(anos) &&
+    anos.length
+      ? anos.map(String)
+      : (
+          state.anosCargados.size
+            ? [...state.anosCargados]
+            : state.anosIniciales
+        );
+
+  const faltanAnos =
+    anosObjetivo.some(
+      (ano) =>
+        !state.anosCargados.has(
+          String(ano)
+        )
+    );
+
   if (
     state.alertasPagosCargadas &&
-    !forzar
+    !forzar &&
+    !faltanAnos
   ) {
     logCargaPagos(
-      "Las alertas ya están en memoria. No se consulta Firestore nuevamente."
+      "Las alertas requeridas ya están en memoria.",
+      {
+        anos:
+          anosObjetivo
+      }
     );
 
     return;
   }
 
-  const snap =
-    await medirConsultaPagos(
-      forzar
-        ? "recarga forzada ventas_alertas_pagos"
-        : "ventas_alertas_pagos",
-      () =>
-        getDocs(
-          collection(
-            db,
-            ALERTAS_PAGOS_COLLECTION
-          )
+  await Promise.all(
+    anosObjetivo.map(
+      (ano) =>
+        cargarAnoAlertasPagos(
+          ano,
+          {
+            forzar
+          }
         )
-    );
+    )
+  );
 
-  state.alertasPagosRows =
-    snap.docs
-      .map((docSnap) => ({
-        id: docSnap.id,
-        ...docSnap.data()
-      }))
-      .filter(
-        (row) =>
-          row.activa !== false
-      );
-
-  state
-    .alertasPagosUltimaActualizacion =
-    state.alertasPagosRows
-      .map((row) =>
-        timestampLikeToDate(
-          row.actualizadoAt
-        )
-      )
-      .filter(Boolean)
-      .sort(
-        (a, b) =>
-          b.getTime() -
-          a.getTime()
-      )[0] || null;
-
-  state.alertasPagosCargadas =
-    true;
-
-  state.alertasPagosFiltradasRows =
-    getAlertasPagosForScope();
+  reconstruirAlertasPagosDesdeCache();
 }
 
 /* =========================================================
@@ -915,13 +1116,16 @@ function formatFechaViajeAlertaPago(alerta = {}) {
 }
 
 function buildAlertasPagosFiltrosHtml(rows = []) {
-  const anoOperativo = String(obtenerAnoOperativoHome());
-
-  const anos = [...new Set(
-    rows
-      .map((r) => String(r.anoViaje || "").trim())
-      .filter(Boolean)
-  )].sort();
+  const anosIniciales =
+    state.anosIniciales.length
+      ? state.anosIniciales
+      : getAnosInicialesAlertasPagos();
+  
+  const anos =
+    getAnosDisponiblesSelectorPagos();
+  
+  const etiquetaTodos =
+    `Todos ${anosIniciales[0]}–${anosIniciales[1]}`;
 
   const vendedores = [...new Map(
     rows
@@ -1066,14 +1270,36 @@ function buildAlertasPagosFiltrosHtml(rows = []) {
         id="filtro-alerta-pago-ano"
         style="${filtroControlStyle}"
       >
-        <option value="">Todos los años</option>
-
+        <option
+          value="__iniciales__"
+          ${
+            state.anoFiltro ===
+            "__iniciales__"
+              ? "selected"
+              : ""
+          }
+        >
+          ${escapeHtml(etiquetaTodos)}
+        </option>
+      
         ${anos.map((a) => `
           <option
             value="${escapeHtml(a)}"
-            ${String(a) === anoOperativo ? "selected" : ""}
+            ${
+              state.anoFiltro ===
+              String(a)
+                ? "selected"
+                : ""
+            }
           >
             ${escapeHtml(a)}
+            ${
+              state.anosCargados.has(
+                String(a)
+              )
+                ? ""
+                : " · cargar"
+            }
           </option>
         `).join("")}
       </select>
@@ -1468,7 +1694,11 @@ function getZonaDestinoPago(destino = "") {
 }
 
 function filtrarAlertasPagosModal(rows = []) {
-  const ano = $("filtro-alerta-pago-ano")?.value || "";
+  const ano =
+    $("filtro-alerta-pago-ano")
+      ?.value ||
+    state.anoFiltro ||
+    "__iniciales__";
   const vendedor = $("filtro-alerta-pago-vendedor")?.value || "";
   const moneda = $("filtro-alerta-pago-moneda")?.value || "";
   const destino = $("filtro-alerta-pago-destino")?.value || "";
@@ -1483,8 +1713,18 @@ function filtrarAlertasPagosModal(rows = []) {
   return ordenarAlertasPagos(
     rows.filter((row) => {
       if (
-        ano &&
-        String(row.anoViaje || "") !== ano
+        ano === "__iniciales__" &&
+        !state.anosIniciales.includes(
+          String(row.anoViaje || "")
+        )
+      ) {
+        return false;
+      }
+      
+      if (
+        ano !== "__iniciales__" &&
+        String(row.anoViaje || "") !==
+          String(ano)
       ) {
         return false;
       }
@@ -2173,12 +2413,20 @@ async function marcarAlertaPagoContactada(alertaId) {
      $("modal-detalle-alerta-pago")
   );
    
-  state.alertasPagosCargadas = false;
-   
-  await cargarAlertasPagosDesdeFirestore({
-     forzar: true
-  });
-   
+  const anoAlerta =
+    String(
+      alerta.anoViaje || ""
+    ).trim();
+  
+  if (anoAlerta) {
+    await cargarAlertasPagosDesdeFirestore({
+      forzar: true,
+      anos: [
+        anoAlerta
+      ]
+    });
+  }
+  
   await abrirPaginaAlertasPagos();
 }
 
@@ -2233,10 +2481,20 @@ async function actualizarAlertasPagos() {
       `Grupos: ${data.totalGrupos}`
     );
 
+    const anosARecargar =
+      anoViaje
+        ? [
+            String(anoViaje)
+          ]
+        : [
+            ...state.anosCargados
+          ];
+    
     await cargarAlertasPagosDesdeFirestore({
-      forzar: true
+      forzar: true,
+      anos: anosARecargar
     });
-   
+    
     await abrirPaginaAlertasPagos();
 
   } catch (error) {
@@ -2345,8 +2603,110 @@ async function abrirPaginaAlertasPagos() {
       });
   };
 
+  const filtroAno =
+    $("filtro-alerta-pago-ano");
+  
+  if (
+    filtroAno &&
+    !filtroAno.dataset.bound
+  ) {
+    filtroAno.dataset.bound = "1";
+  
+    filtroAno.addEventListener(
+      "change",
+      async () => {
+        const nuevoValor =
+          filtroAno.value ||
+          "__iniciales__";
+  
+        state.anoFiltro =
+          nuevoValor;
+  
+        /*
+          "Todos 2026–2027" ya está
+          disponible en memoria.
+        */
+        if (
+          nuevoValor ===
+          "__iniciales__"
+        ) {
+          refrescar();
+          return;
+        }
+  
+        /*
+          Si el año ya se descargó antes,
+          solo aplicamos el filtro local.
+        */
+        if (
+          state.anosCargados.has(
+            nuevoValor
+          )
+        ) {
+          refrescar();
+          return;
+        }
+  
+        const loading =
+          $("alertas-pagos-loading");
+  
+        const app =
+          $("alertas-pagos-app");
+  
+        if (loading) {
+          loading.hidden = false;
+          loading.textContent =
+            `Cargando alertas activas ${nuevoValor}...`;
+        }
+  
+        if (app) {
+          app.hidden = true;
+        }
+  
+        try {
+          logCargaPagos(
+            `El usuario solicitó el año ${nuevoValor}`
+          );
+  
+          await cargarAlertasPagosDesdeFirestore({
+            anos: [
+              nuevoValor
+            ]
+          });
+  
+          /*
+            Volvemos a construir la interfaz
+            para incorporar el año nuevo.
+          */
+          await abrirPaginaAlertasPagos();
+        } catch (error) {
+          console.error(
+            `Error cargando año ${nuevoValor}:`,
+            error
+          );
+  
+          alert(
+            `No se pudieron cargar las alertas ${nuevoValor}: ${error.message}`
+          );
+  
+          state.anoFiltro =
+            "__iniciales__";
+  
+          await abrirPaginaAlertasPagos();
+        } finally {
+          if (loading) {
+            loading.hidden = true;
+          }
+  
+          if (app) {
+            app.hidden = false;
+          }
+        }
+      }
+    );
+  }
+  
   [
-    "filtro-alerta-pago-ano",
     "filtro-alerta-pago-vendedor",
     "filtro-alerta-pago-moneda",
     "filtro-alerta-pago-destino",
@@ -2354,21 +2714,21 @@ async function abrirPaginaAlertasPagos() {
     "filtro-alerta-pago-buscar"
   ].forEach((id) => {
     const element = $(id);
-
+  
     if (
       !element ||
       element.dataset.bound
     ) {
       return;
     }
-
+  
     element.dataset.bound = "1";
-
+  
     element.addEventListener(
       "input",
       refrescar
     );
-
+  
     element.addEventListener(
       "change",
       refrescar
