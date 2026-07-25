@@ -3878,70 +3878,174 @@ function construirSortKeyGrupoSelector(
 /* =========================================================
    SELECTOR DE GRUPOS
 ========================================================= */
-function poblarSelectorGrupos(effectiveUser, rows = []) {
-  const select = $("select-grupo");
-  const btn = $("btn-ir-grupo");
+function poblarSelectorGrupos(
+  effectiveUser,
+  rows = []
+) {
+  const select =
+    $("select-grupo");
 
-  if (!select || !btn || !effectiveUser) return;
+  const btn =
+    $("btn-ir-grupo");
 
-  const vendorFilter = getVendorFilter(effectiveUser);
-  const savedGroup = getGroupFilter();
-
-  select.innerHTML = "";
-
-  const defaultOption = document.createElement("option");
-  defaultOption.value = "";
-
-  if (isVendedorRole(effectiveUser)) {
-    defaultOption.textContent = "Seleccionar Grupo";
-  } else if (vendorFilter) {
-    const vendedores = getVendorUsers();
-    const vendedor = vendedores.find(
-      (v) => normalizeEmail(v.email) === normalizeEmail(vendorFilter)
-    );
-    defaultOption.textContent = vendedor
-      ? `Seleccionar Grupo (${`${vendedor.nombre} ${vendedor.apellido}`.trim()})`
-      : "Seleccionar Grupo";
-  } else {
-    defaultOption.textContent = "Seleccionar Grupo";
+  if (
+    !select ||
+    !btn ||
+    !effectiveUser
+  ) {
+    return;
   }
 
-  select.appendChild(defaultOption);
-
-  const items = rows
-    .map((row) => ({
-      value: getRowId(row),
-      label: construirLabelGrupoSelector(row),
-      sortKey: construirSortKeyGrupoSelector(row)
-    }))
-    .filter((item) => item.value)
-    .sort((a, b) =>
-      a.sortKey.localeCompare(b.sortKey, "es", {
-        sensitivity: "base",
-        numeric: true
-      })
+  const vendorFilter =
+    getVendorFilter(
+      effectiveUser
     );
 
-  items.forEach((item) => {
-    const option = document.createElement("option");
-    option.value = item.value;
-    option.textContent = item.label;
-    select.appendChild(option);
-  });
+  const savedGroup =
+    getGroupFilter();
 
-  const existsSaved = items.some((item) => item.value === savedGroup);
+  select.innerHTML =
+    "";
 
-  if (existsSaved) {
-    select.value = savedGroup;
+  const defaultOption =
+    document.createElement(
+      "option"
+    );
+
+  defaultOption.value =
+    "";
+
+  /*
+    El texto inicial debe comportarse como buscador,
+    no como selector tradicional.
+  */
+  if (
+    isVendedorRole(
+      effectiveUser
+    )
+  ) {
+    defaultOption.textContent =
+      "Buscar grupo...";
+  } else if (
+    vendorFilter
+  ) {
+    const vendedores =
+      getVendorUsers();
+
+    const vendedor =
+      vendedores.find(
+        (v) =>
+          normalizeEmail(
+            v.email
+          ) ===
+          normalizeEmail(
+            vendorFilter
+          )
+      );
+
+    const nombreVendedor =
+      vendedor
+        ? `${vendedor.nombre || ""} ${vendedor.apellido || ""}`.trim()
+        : "";
+
+    defaultOption.textContent =
+      nombreVendedor
+        ? `Buscar grupo de ${nombreVendedor}...`
+        : "Buscar grupo...";
   } else {
-    select.value = "";
+    defaultOption.textContent =
+      "Buscar grupo...";
+  }
+
+  select.appendChild(
+    defaultOption
+  );
+
+  const items =
+    rows
+      .map(
+        (row) => ({
+          value:
+            getRowId(row),
+
+          label:
+            construirLabelGrupoSelector(
+              row
+            ),
+
+          sortKey:
+            construirSortKeyGrupoSelector(
+              row
+            )
+        })
+      )
+      .filter(
+        (item) =>
+          item.value
+      )
+      .sort(
+        (a, b) =>
+          a.sortKey.localeCompare(
+            b.sortKey,
+            "es",
+            {
+              sensitivity:
+                "base",
+
+              numeric:
+                true
+            }
+          )
+      );
+
+  items.forEach(
+    (item) => {
+      const option =
+        document.createElement(
+          "option"
+        );
+
+      option.value =
+        item.value;
+
+      option.textContent =
+        item.label;
+
+      select.appendChild(
+        option
+      );
+    }
+  );
+
+  const existsSaved =
+    items.some(
+      (item) =>
+        item.value ===
+        savedGroup
+    );
+
+  if (
+    existsSaved
+  ) {
+    select.value =
+      savedGroup;
+  } else {
+    select.value =
+      "";
+
     clearGroupFilter();
   }
 
-  select.disabled = !items.length;
-  btn.disabled = !items.length;
+  select.disabled =
+    !items.length;
 
-  initSearchableSelect("select-grupo", "Buscar por colegio, curso, año o apoderado...");
+  btn.disabled =
+    !items.length;
+
+  initSearchableSelect(
+    "select-grupo",
+    "Buscar por colegio, curso, año o apoderado..."
+  );
 }
 
 /* =========================================================
@@ -3966,63 +4070,83 @@ function poblarSelectorApoderados(
   const savedApoderado =
     getApoderadoFilter();
 
+  /*
+    El texto inicial ahora dice Buscar apoderado.
+  */
   select.innerHTML =
-    `<option value="">Seleccionar Apoderado</option>`;
+    `<option value="">Buscar apoderado...</option>`;
 
   const anoActual =
     getAnoPrioritarioIndex();
 
   const items =
     rows
-      .map((row) => {
-        const ano =
-          getAnoViajeNumber(row) ||
-          9999;
+      .map(
+        (row) => {
+          const ano =
+            getAnoViajeNumber(
+              row
+            ) ||
+            9999;
 
-        const prioridadAno =
-          ano === anoActual
-            ? 0
-            : Math.max(
-                1,
-                ano - anoActual
-              );
+          const prioridadAno =
+            ano === anoActual
+              ? 0
+              : Math.max(
+                  1,
+                  ano - anoActual
+                );
 
-        const prioridadEstado =
-          isGanadaComercial(row)
-            ? 0
-            : 1;
+          const prioridadEstado =
+            isGanadaComercial(
+              row
+            )
+              ? 0
+              : 1;
 
-        return {
-          value:
-            getRowId(row),
+          return {
+            value:
+              getRowId(row),
 
-          label:
-            [
-              ano,
-              getRowApoderado(row),
-              getRowAlias(row)
-            ].join(" · "),
+            label:
+              [
+                ano,
+                getRowApoderado(
+                  row
+                ),
+                getRowAlias(
+                  row
+                )
+              ].join(" · "),
 
-          sortKey:
-            [
-              String(
-                prioridadAno
-              ).padStart(3, "0"),
+            sortKey:
+              [
+                String(
+                  prioridadAno
+                ).padStart(
+                  3,
+                  "0"
+                ),
 
-              String(
-                prioridadEstado
-              ),
+                String(
+                  prioridadEstado
+                ),
 
-              normalizeLoose(
-                getRowApoderado(row)
-              ),
+                normalizeLoose(
+                  getRowApoderado(
+                    row
+                  )
+                ),
 
-              normalizeLoose(
-                getRowAlias(row)
-              )
-            ].join(" | ")
-        };
-      })
+                normalizeLoose(
+                  getRowAlias(
+                    row
+                  )
+                )
+              ].join(" | ")
+          };
+        }
+      )
       .filter(
         (item) =>
           item.value
@@ -4068,7 +4192,9 @@ function poblarSelectorApoderados(
         savedApoderado
     );
 
-  if (existsSaved) {
+  if (
+    existsSaved
+  ) {
     select.value =
       savedApoderado;
   } else {
