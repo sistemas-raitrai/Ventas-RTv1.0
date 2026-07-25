@@ -3214,31 +3214,59 @@ async function loadDashboardData() {
   const anoActual =
     getAnoPrioritarioIndex();
 
-  /*
-    Tres líneas de carga independientes.
+  const inicioTotal =
+    performance.now();
 
-    Ninguna espera a la otra.
+  /*
+    Estas tres consultas comienzan inmediatamente
+    y de manera independiente.
   */
   const promiseResumen =
     cargarResumenAlertasIndex();
 
-  const resultadoAnoActual =
-    await cargarGruposIndexAno(
+  const promiseAnoActual =
+    cargarGruposIndexAno(
       anoActual
     );
 
+  const promiseAuxiliares =
+    loadDashboardAuxData();
+
   /*
-    Apenas tenemos el año actual,
-    activamos los selectores y el buscador.
+    Esperamos únicamente el año actual para habilitar
+    selectores y buscador lo antes posible.
   */
+  const resultadoAnoActual =
+    await promiseAnoActual;
+
   actualizarExperienciaPrincipalIndex({
     renderizarDashboardCompleto:
       false
   });
 
+  console.log(
+    "[INDEX] Selectores disponibles",
+    {
+      ano:
+        anoActual,
+
+      origen:
+        resultadoAnoActual.origen,
+
+      grupos:
+        resultadoAnoActual.rows.length,
+
+      desdeInicioMs:
+        Math.round(
+          performance.now() -
+          inicioTotal
+        )
+    }
+  );
+
   /*
-    Si el año actual vino de caché,
-    lo actualizamos sin bloquear la pantalla.
+    Si los grupos salieron desde caché,
+    actualizamos Firestore en segundo plano.
   */
   if (
     resultadoAnoActual.origen ===
@@ -3266,39 +3294,78 @@ async function loadDashboardData() {
   }
 
   /*
-    Detalles de alertas y años futuros
-    continúan en segundo plano.
+    Como esta promesa comenzó antes que la consulta
+    de grupos, probablemente ya estará terminando.
   */
-  const promiseAuxiliares =
-    loadDashboardAuxData()
-      .then(() => {
-        const rowsScope =
-          getRowsForCurrentScope(
-            getEffectiveUser()
-          );
+  await promiseAuxiliares;
 
-        renderDashboard(
-          rowsScope
-        );
-      });
+  const rowsScope =
+    getRowsForCurrentScope(
+      getEffectiveUser()
+    );
 
-  const promiseFuturos =
-    cargarAnosFuturosIndex();
+  renderDashboard(
+    rowsScope
+  );
 
-  await Promise.allSettled([
-    promiseResumen,
-    promiseAuxiliares,
-    promiseFuturos
-  ]);
+  console.log(
+    "[INDEX] Alertas disponibles",
+    {
+      alertas:
+        state.alertRows.length,
+
+      solicitudes:
+        state.solicitudesRows.length,
+
+      inscripciones:
+        state.inscripcionesRows.length,
+
+      desdeInicioMs:
+        Math.round(
+          performance.now() -
+          inicioTotal
+        )
+    }
+  );
 
   /*
-    Pintura final con toda la información
-    disponible.
+    No esperamos 2027, 2028 y 2029.
+    Se agregan silenciosamente después.
   */
-  actualizarExperienciaPrincipalIndex({
-    renderizarDashboardCompleto:
-      true
-  });
+  cargarAnosFuturosIndex()
+    .then(() => {
+      console.log(
+        "[INDEX] Años futuros disponibles",
+        {
+          gruposTotales:
+            state.rows.length,
+
+          desdeInicioMs:
+            Math.round(
+              performance.now() -
+              inicioTotal
+            )
+        }
+      );
+    })
+    .catch((error) => {
+      console.warn(
+        "[INDEX] No se pudieron cargar los años futuros:",
+        error
+      );
+    });
+
+  /*
+    Tampoco bloqueamos por el resumen.
+  */
+  promiseResumen.catch(
+    (error) => {
+      console.warn(
+        "[INDEX] No se pudo cargar el resumen rápido:",
+        error
+      );
+    }
+  );
 }
 
 /* =========================================================
