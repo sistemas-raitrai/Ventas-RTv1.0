@@ -12,53 +12,108 @@
   />
   <style>
     /* =========================================================
-       INDEX — FILTROS EN TRES FILAS
+       INDEX — FILTROS EN TRES FILAS DE ANCHO COMPLETO
     ========================================================= */
   
+    body[data-page="index"] .panel-filtro {
+      width: 100%;
+      box-sizing: border-box;
+    }
+  
+    body[data-page="index"] .panel-filtro .filtro-row,
     body[data-page="index"] .panel-filtro .filtro-row-triple {
-      display: grid;
-      grid-template-columns: 1fr;
-      gap: 14px;
-      width: 100%;
+      display: flex !important;
+      flex-direction: column !important;
+      align-items: stretch !important;
+      gap: 14px !important;
+      width: 100% !important;
+      max-width: none !important;
+      grid-template-columns: none !important;
     }
   
+    /*
+      Cada bloque ocupa obligatoriamente una línea completa.
+    */
     body[data-page="index"] .panel-filtro .filtro-bloque {
-      display: grid;
-      grid-template-columns: minmax(0, 1fr) 132px;
-      gap: 14px;
-      align-items: center;
-      width: 100%;
-      min-width: 0;
+      display: grid !important;
+      grid-template-columns: minmax(0, 1fr) 124px !important;
+      align-items: center !important;
+      gap: 14px !important;
+  
+      width: 100% !important;
+      max-width: none !important;
+      min-width: 0 !important;
+  
+      flex: 0 0 auto !important;
+      grid-column: 1 / -1 !important;
+      grid-row: auto !important;
+  
+      margin: 0 !important;
+      box-sizing: border-box !important;
     }
   
-    body[data-page="index"] .panel-filtro .filtro-bloque > select,
+    /*
+      Anula posibles reglas especiales para
+      primero, segundo o tercer selector.
+    */
+    body[data-page="index"] .panel-filtro .filtro-bloque:nth-child(1),
+    body[data-page="index"] .panel-filtro .filtro-bloque:nth-child(2),
+    body[data-page="index"] .panel-filtro .filtro-bloque:nth-child(3) {
+      width: 100% !important;
+      max-width: none !important;
+      min-width: 0 !important;
+      grid-column: 1 / -1 !important;
+    }
+  
+    /*
+      Select nativo.
+    */
+    body[data-page="index"] .panel-filtro .filtro-bloque > select {
+      width: 100% !important;
+      max-width: none !important;
+      min-width: 0 !important;
+      box-sizing: border-box !important;
+    }
+  
+    /*
+      Tom Select reemplaza visualmente al select original.
+    */
     body[data-page="index"] .panel-filtro .filtro-bloque > .ts-wrapper {
-      width: 100%;
-      min-width: 0;
-    }
-  
-    body[data-page="index"] .panel-filtro .filtro-bloque .ts-wrapper {
-      max-width: none;
+      width: 100% !important;
+      max-width: none !important;
+      min-width: 0 !important;
+      box-sizing: border-box !important;
     }
   
     body[data-page="index"] .panel-filtro .filtro-bloque .ts-control {
-      width: 100%;
-      min-height: 48px;
-      padding: 10px 14px;
-      border-radius: 14px;
-      box-sizing: border-box;
+      display: flex !important;
+      align-items: center !important;
+  
+      width: 100% !important;
+      max-width: none !important;
+      min-width: 0 !important;
+      min-height: 48px !important;
+  
+      padding: 10px 14px !important;
+      border-radius: 14px !important;
+      box-sizing: border-box !important;
     }
   
     body[data-page="index"] .panel-filtro .filtro-bloque .ts-control input {
-      min-width: 120px;
-      flex: 1 1 auto;
+      flex: 1 1 auto !important;
+      width: auto !important;
+      min-width: 120px !important;
+      max-width: 100% !important;
     }
   
+    /*
+      Desplegable del mismo ancho que el selector.
+    */
     body[data-page="index"] .panel-filtro .filtro-bloque .ts-dropdown {
-      width: 100%;
-      min-width: 100%;
-      max-width: 100%;
-      box-sizing: border-box;
+      width: 100% !important;
+      min-width: 100% !important;
+      max-width: 100% !important;
+      box-sizing: border-box !important;
     }
   
     body[data-page="index"] .panel-filtro .filtro-bloque .ts-dropdown-content {
@@ -71,22 +126,29 @@
       padding: 10px 12px;
     }
   
+    /*
+      Botones iguales en las tres filas.
+    */
     body[data-page="index"] .panel-filtro .filtro-bloque > button {
-      width: 132px;
-      min-width: 132px;
-      min-height: 48px;
-      margin: 0;
+      width: 124px !important;
+      min-width: 124px !important;
+      max-width: 124px !important;
+      min-height: 48px !important;
+  
+      margin: 0 !important;
+      box-sizing: border-box !important;
     }
   
     @media (max-width: 700px) {
       body[data-page="index"] .panel-filtro .filtro-bloque {
-        grid-template-columns: minmax(0, 1fr) 78px;
-        gap: 10px;
+        grid-template-columns: minmax(0, 1fr) 76px !important;
+        gap: 10px !important;
       }
   
       body[data-page="index"] .panel-filtro .filtro-bloque > button {
-        width: 78px;
-        min-width: 78px;
+        width: 76px !important;
+        min-width: 76px !important;
+        max-width: 76px !important;
       }
     }
   </style>
