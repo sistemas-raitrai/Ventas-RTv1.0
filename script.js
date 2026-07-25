@@ -59,6 +59,46 @@ const PRIVATE_NOTES_COLLECTION = "ventas_notas_privadas";
 const PRIVATE_NOTE_PAGE = "index";
 const ALERTAS_INSCRIPCIONES_COLLECTION = "ventas_alertas_inscripciones";
 
+const GRUPOS_RESUMEN_COLLECTION =
+  "ventas_grupos_resumen";
+
+const DASHBOARD_RESUMEN_COLLECTION =
+  "ventas_dashboard_resumen";
+
+const INDEX_GRUPOS_CACHE_PREFIX =
+  "ventas_index_grupos_";
+
+const INDEX_ALERTAS_CACHE_PREFIX =
+  "ventas_index_alertas_";
+
+const INDEX_CACHE_TTL_MS =
+  10 * 60 * 1000;
+
+function getAnoPrioritarioIndex() {
+  /*
+    En Index el año cambia el 1 de enero.
+
+    Durante 2026:
+    prioridad 2026.
+
+    Desde el 1 de enero de 2027:
+    prioridad 2027.
+  */
+  return new Date().getFullYear();
+}
+
+function getAnosActivosIndex() {
+  const anoActual =
+    getAnoPrioritarioIndex();
+
+  return [
+    anoActual,
+    anoActual + 1,
+    anoActual + 2,
+    anoActual + 3
+  ];
+}
+
 const searchableInstances = {};
 
 function destroySearchableSelect(id) {
@@ -109,22 +149,47 @@ function initSearchableSelect(id, placeholder = "Escribe para buscar...") {
 const state = {
   rows: [],
   rowsById: new Map(),
+
   alertRows: [],
   scopedRows: [],
+
   fichasPorFirmarRows: [],
   fichasCorregidasRows: [],
   fichasAbiertasRows: [],
   fichasCerradasRows: [],
   fichasAutorizadasRows: [],
+
   alertasCriticasRows: [],
   alertasWarningRows: [],
+
   solicitudesRows: [],
   solicitudesActualizacionRows: [],
+
   inscripcionesRows: [],
   inscripcionNuevoIngresoRows: [],
   inscripcionListaEsperaRows: [],
   listaEsperaPagadaRows: [],
-  aContactarRows: []
+
+  aContactarRows: [],
+
+  /*
+    Grupos livianos separados por año.
+  */
+  rowsPorAno: new Map(),
+  anosCargados: new Set(),
+
+  /*
+    Resumen pequeño de alertas.
+  */
+  dashboardResumen: null,
+
+  /*
+    Las consultas de detalle se guardan aquí
+    para no repetirlas.
+  */
+  promiseDatosAuxiliares: null,
+
+  datosAuxiliaresCargados: false
 };
 
 /* =========================================================
@@ -531,45 +596,80 @@ function getRowsForCurrentScope(effectiveUser) {
 }
 
 function formatYearBuckets(rows = []) {
-  const baseYear = getDashboardBaseYear();
-  const y1 = baseYear;
-  const y2 = baseYear + 1;
-  const y3 = baseYear + 2;
+  const baseYear =
+    getAnoPrioritarioIndex();
+
+  const y1 =
+    baseYear;
+
+  const y2 =
+    baseYear + 1;
+
+  const y3 =
+    baseYear + 2;
 
   let c1 = 0;
   let c2 = 0;
   let c3 = 0;
 
   rows.forEach((row) => {
-    const y = getAnoViajeNumber(row);
-    if (y === y1) c1 += 1;
-    else if (y === y2) c2 += 1;
-    else if (y === y3) c3 += 1;
+    const y =
+      getAnoViajeNumber(row);
+
+    if (y === y1) {
+      c1 += 1;
+    } else if (y === y2) {
+      c2 += 1;
+    } else if (y === y3) {
+      c3 += 1;
+    }
   });
 
   return `${pad2(c1)} | ${pad2(c2)} | ${pad2(c3)} | (${pad2(rows.length)})`;
 }
 
-function renderFichaAdminBucketLinks(targetId, tipo = "", rows = []) {
-  const el = $(targetId);
-  if (!el) return;
+function renderFichaAdminBucketLinks(
+  targetId,
+  tipo = "",
+  rows = []
+) {
+  const el =
+    $(targetId);
 
-  const baseYear = getDashboardBaseYear();
-  const years = [baseYear, baseYear + 1, baseYear + 2];
+  if (!el) {
+    return;
+  }
 
-  const counts = years.map((year) =>
-    rows.filter((row) => getAnoViajeNumber(row) === year).length
-  );
+  const baseYear =
+    getAnoPrioritarioIndex();
 
-  const yearLinks = years.map((year, index) => `
-    <a
-      href="#"
-      class="flow-number-link"
-      data-fichas-admin-tipo="${tipo}"
-      data-fichas-admin-year="${year}"
-      style="color:inherit;text-decoration:none;"
-    >${pad2(counts[index])}</a>
-  `);
+  const years = [
+    baseYear,
+    baseYear + 1,
+    baseYear + 2
+  ];
+
+  const counts =
+    years.map((year) =>
+      rows.filter(
+        (row) =>
+          getAnoViajeNumber(row) ===
+          year
+      ).length
+    );
+
+  const yearLinks =
+    years.map(
+      (year, index) => `
+        <a
+          href="#"
+          class="flow-number-link"
+          data-fichas-admin-tipo="${tipo}"
+          data-fichas-admin-year="${year}"
+          style="color:inherit;text-decoration:none;"
+        >${pad2(counts[index])}</a>
+      `
+    );
 
   const totalLink = `
     <a
@@ -581,7 +681,8 @@ function renderFichaAdminBucketLinks(targetId, tipo = "", rows = []) {
     >${pad2(rows.length)}</a>
   `;
 
-  el.innerHTML = `${yearLinks[0]} | ${yearLinks[1]} | ${yearLinks[2]} | (${totalLink})`;
+  el.innerHTML =
+    `${yearLinks[0]} | ${yearLinks[1]} | ${yearLinks[2]} | (${totalLink})`;
 }
 
 function resolveEstadoBucket(row = {}) {
@@ -2395,82 +2496,847 @@ function filtrarModalAlertasInscripciones() {
 /* =========================================================
    CARGA DE DATOS
 ========================================================= */
-async function loadDashboardData() {
-  const [
-    groupsSnap,
-    alertsSnap,
-    solicitudesSnap,
-    alertasInscripcionesSnap
-  ] = await Promise.all([
-    getDocs(collection(db, "ventas_cotizaciones")),
+function getDashboardResumenScopeKey() {
+  const effectiveUser =
+    getEffectiveUser();
 
-    getDocs(collection(db, ALERTAS_COLLECTION)),
+  if (!effectiveUser) {
+    return "general";
+  }
 
-    getDocs(collection(db, SOLICITUDES_COLLECTION)),
+  const vendorEmail =
+    isVendedorRole(effectiveUser)
+      ? normalizeEmail(effectiveUser.email || "")
+      : normalizeEmail(
+          getVendorFilter(effectiveUser) || ""
+        );
 
-    getDocs(
-      query(
-        collection(db, ALERTAS_INSCRIPCIONES_COLLECTION),
-        where("activa", "==", true)
+  if (!vendorEmail) {
+    return "general";
+  }
+
+  const safeEmail =
+    vendorEmail
+      .replace(/[^a-z0-9]+/gi, "_")
+      .replace(/^_+|_+$/g, "")
+      .toLowerCase();
+
+  return `vendor_${safeEmail}`;
+}
+
+function getIndexGruposCacheKey(ano) {
+  return (
+    INDEX_GRUPOS_CACHE_PREFIX +
+    String(ano)
+  );
+}
+
+function getIndexAlertasCacheKey() {
+  return (
+    INDEX_ALERTAS_CACHE_PREFIX +
+    getDashboardResumenScopeKey()
+  );
+}
+
+function guardarCacheIndex(
+  key,
+  data
+) {
+  try {
+    sessionStorage.setItem(
+      key,
+      JSON.stringify({
+        guardadoAt:
+          Date.now(),
+
+        data
+      })
+    );
+  } catch (error) {
+    console.warn(
+      "[INDEX] No se pudo guardar caché:",
+      error
+    );
+  }
+}
+
+function leerCacheIndex(
+  key
+) {
+  try {
+    const raw =
+      sessionStorage.getItem(
+        key
+      );
+
+    if (!raw) {
+      return null;
+    }
+
+    const parsed =
+      JSON.parse(raw);
+
+    const guardadoAt =
+      Number(
+        parsed?.guardadoAt || 0
+      );
+
+    if (
+      !guardadoAt ||
+      Date.now() - guardadoAt >
+        INDEX_CACHE_TTL_MS
+    ) {
+      sessionStorage.removeItem(
+        key
+      );
+
+      return null;
+    }
+
+    return (
+      parsed?.data ??
+      null
+    );
+  } catch (error) {
+    console.warn(
+      "[INDEX] Caché inválida:",
+      error
+    );
+
+    return null;
+  }
+}
+
+function mapGrupoResumenIndex(
+  docId,
+  data = {}
+) {
+  return {
+    id:
+      docId,
+
+    idGrupo:
+      data.idGrupo ||
+      data.groupDocId ||
+      docId,
+
+    ...data
+  };
+}
+
+function reconstruirRowsIndex() {
+  const anos =
+    getAnosActivosIndex();
+
+  state.rows =
+    anos.flatMap(
+      (ano) =>
+        state.rowsPorAno.get(
+          String(ano)
+        ) || []
+    );
+
+  state.rowsById =
+    new Map(
+      state.rows.map(
+        (row) => [
+          getRowId(row),
+          row
+        ]
       )
-    )
-  ]);
+    );
+}
 
-  state.rows = groupsSnap.docs.map((docSnap) => {
-    const data = docSnap.data() || {};
+async function consultarGruposResumenAno(
+  ano
+) {
+  const anoNumero =
+    Number(ano);
 
-    return {
-      id: docSnap.id,
-      idGrupo: data.idGrupo || docSnap.id,
-      ...data
-    };
-  });
+  const inicio =
+    performance.now();
 
-  state.rowsById = new Map(
-    state.rows.map((row) => [getRowId(row), row])
+  const snap =
+    await getDocs(
+      query(
+        collection(
+          db,
+          GRUPOS_RESUMEN_COLLECTION
+        ),
+
+        where(
+          "anoViaje",
+          "==",
+          anoNumero
+        )
+      )
+    );
+
+  const rows =
+    snap.docs.map(
+      (docSnap) =>
+        mapGrupoResumenIndex(
+          docSnap.id,
+          docSnap.data() || {}
+        )
+    );
+
+  console.log(
+    "[INDEX] Grupos resumen cargados",
+    {
+      ano:
+        anoNumero,
+
+      documentos:
+        snap.size,
+
+      duracionMs:
+        Math.round(
+          performance.now() -
+          inicio
+        )
+    }
   );
 
-  state.alertRows = alertsSnap.docs.map((docSnap) => ({
-    id: docSnap.id,
-    ...docSnap.data()
-  }));
+  return rows;
+}
 
-  state.solicitudesRows = solicitudesSnap.docs.map((docSnap) => ({
-    id: docSnap.id,
-    ...docSnap.data()
-  }));
+async function cargarGruposIndexAno(
+  ano,
+  {
+    forzar = false
+  } = {}
+) {
+  const anoTexto =
+    String(ano);
 
-  state.inscripcionesRows = alertasInscripcionesSnap.docs.map((docSnap) => ({
-    id: docSnap.id,
-    ...docSnap.data()
-  }));
+  if (
+    !forzar &&
+    state.rowsPorAno.has(
+      anoTexto
+    )
+  ) {
+    return {
+      origen:
+        "memoria",
 
-  console.log("[DASHBOARD] Alertas de inscripción cargadas", {
-    total: state.inscripcionesRows.length
+      rows:
+        state.rowsPorAno.get(
+          anoTexto
+        ) || []
+    };
+  }
+
+  if (!forzar) {
+    const cache =
+      leerCacheIndex(
+        getIndexGruposCacheKey(
+          anoTexto
+        )
+      );
+
+    if (
+      Array.isArray(cache)
+    ) {
+      state.rowsPorAno.set(
+        anoTexto,
+        cache
+      );
+
+      state.anosCargados.add(
+        anoTexto
+      );
+
+      reconstruirRowsIndex();
+
+      return {
+        origen:
+          "sessionStorage",
+
+        rows:
+          cache
+      };
+    }
+  }
+
+  const rows =
+    await consultarGruposResumenAno(
+      anoTexto
+    );
+
+  state.rowsPorAno.set(
+    anoTexto,
+    rows
+  );
+
+  state.anosCargados.add(
+    anoTexto
+  );
+
+  guardarCacheIndex(
+    getIndexGruposCacheKey(
+      anoTexto
+    ),
+    rows
+  );
+
+  reconstruirRowsIndex();
+
+  return {
+    origen:
+      "firestore",
+
+    rows
+  };
+}
+
+function getResumenNumber(
+  resumen = {},
+  key = ""
+) {
+  return Number(
+    resumen?.[key] || 0
+  );
+}
+
+function pintarResumenAlertasIndex(
+  resumen = {}
+) {
+  const setText = (
+    id,
+    value
+  ) => {
+    const el =
+      $(id);
+
+    if (el) {
+      el.textContent =
+        String(
+          Number(value || 0)
+        );
+    }
+  };
+
+  setText(
+    "count-sin-asignar",
+    getResumenNumber(
+      resumen,
+      "sinAsignar"
+    )
+  );
+
+  setText(
+    "count-a-contactar",
+    getResumenNumber(
+      resumen,
+      "aContactar"
+    )
+  );
+
+  setText(
+    "count-fichas-firmar",
+    getResumenNumber(
+      resumen,
+      "fichasPorFirmar"
+    )
+  );
+
+  setText(
+    "count-fichas-corregidas",
+    getResumenNumber(
+      resumen,
+      "fichasCorregidas"
+    )
+  );
+
+  setText(
+    "count-solicitudes-actualizacion",
+    getResumenNumber(
+      resumen,
+      "solicitudesActualizacion"
+    )
+  );
+
+  setText(
+    "count-alertas-criticas",
+    getResumenNumber(
+      resumen,
+      "alertasCriticas"
+    )
+  );
+
+  setText(
+    "count-alertas-warning",
+    getResumenNumber(
+      resumen,
+      "alertasWarning"
+    )
+  );
+
+  setText(
+    "count-inscripcion-nuevo-ingreso",
+    getResumenNumber(
+      resumen,
+      "nuevoIngresoPendiente"
+    )
+  );
+
+  setText(
+    "count-inscripcion-lista-espera",
+    getResumenNumber(
+      resumen,
+      "listaEsperaPendiente"
+    )
+  );
+
+  setText(
+    "count-lista-espera-pagada",
+    getResumenNumber(
+      resumen,
+      "listaEsperaPagadaPendienteConfirmar"
+    )
+  );
+
+  setText(
+    "count-reunion-3dias",
+    getResumenNumber(
+      resumen,
+      "reunionesProximosTresDias"
+    )
+  );
+
+  setSinAsignarManagementHref();
+
+  syncAlertRowsByRole(
+    getDashboardViewUser(
+      getEffectiveUser()
+    )
+  );
+}
+
+async function cargarResumenAlertasIndex() {
+  const cacheKey =
+    getIndexAlertasCacheKey();
+
+  const cache =
+    leerCacheIndex(
+      cacheKey
+    );
+
+  /*
+    Primero se pinta la caché.
+    Esto ocurre prácticamente de inmediato.
+  */
+  if (
+    cache &&
+    typeof cache === "object"
+  ) {
+    state.dashboardResumen =
+      cache;
+
+    pintarResumenAlertasIndex(
+      cache
+    );
+  }
+
+  try {
+    const scopeKey =
+      getDashboardResumenScopeKey();
+
+    const snap =
+      await getDoc(
+        doc(
+          db,
+          DASHBOARD_RESUMEN_COLLECTION,
+          scopeKey
+        )
+      );
+
+    if (!snap.exists()) {
+      console.warn(
+        `[INDEX] No existe el resumen ${scopeKey}. Se usarán los cálculos normales.`
+      );
+
+      return null;
+    }
+
+    const resumen =
+      snap.data() || {};
+
+    state.dashboardResumen =
+      resumen;
+
+    guardarCacheIndex(
+      cacheKey,
+      resumen
+    );
+
+    pintarResumenAlertasIndex(
+      resumen
+    );
+
+    console.log(
+      "[INDEX] Resumen de alertas cargado",
+      {
+        scope:
+          scopeKey
+      }
+    );
+
+    return resumen;
+  } catch (error) {
+    console.warn(
+      "[INDEX] No se pudo cargar resumen de alertas:",
+      error
+    );
+
+    return null;
+  }
+}
+
+function actualizarExperienciaPrincipalIndex({
+  renderizarDashboardCompleto = false
+} = {}) {
+  const effectiveUser =
+    getEffectiveUser();
+
+  if (!effectiveUser) {
+    return;
+  }
+
+  const rowsScope =
+    getRowsForCurrentScope(
+      effectiveUser
+    );
+
+  poblarSelectorVendedores(
+    effectiveUser
+  );
+
+  poblarSelectorGrupos(
+    effectiveUser,
+    rowsScope
+  );
+
+  poblarSelectorApoderados(
+    rowsScope
+  );
+
+  /*
+    El buscador usa estos grupos,
+    pero no necesariamente recalculamos
+    todas las alertas todavía.
+  */
+  state.scopedRows =
+    rowsScope;
+
+  initBuscadorDashboard();
+
+  if (
+    renderizarDashboardCompleto
+  ) {
+    renderDashboard(
+      rowsScope
+    );
+  }
+}
+
+async function loadDashboardAuxData() {
+  if (
+    state.promiseDatosAuxiliares
+  ) {
+    return state.promiseDatosAuxiliares;
+  }
+
+  state.promiseDatosAuxiliares =
+    (async () => {
+      const inicio =
+        performance.now();
+
+      const [
+        alertsSnap,
+        solicitudesSnap,
+        alertasInscripcionesSnap
+      ] = await Promise.all([
+        getDocs(
+          collection(
+            db,
+            ALERTAS_COLLECTION
+          )
+        ),
+
+        getDocs(
+          collection(
+            db,
+            SOLICITUDES_COLLECTION
+          )
+        ),
+
+        getDocs(
+          query(
+            collection(
+              db,
+              ALERTAS_INSCRIPCIONES_COLLECTION
+            ),
+
+            where(
+              "activa",
+              "==",
+              true
+            )
+          )
+        )
+      ]);
+
+      state.alertRows =
+        alertsSnap.docs.map(
+          (docSnap) => ({
+            id:
+              docSnap.id,
+
+            ...docSnap.data()
+          })
+        );
+
+      state.solicitudesRows =
+        solicitudesSnap.docs.map(
+          (docSnap) => ({
+            id:
+              docSnap.id,
+
+            ...docSnap.data()
+          })
+        );
+
+      state.inscripcionesRows =
+        alertasInscripcionesSnap.docs.map(
+          (docSnap) => ({
+            id:
+              docSnap.id,
+
+            ...docSnap.data()
+          })
+        );
+
+      state.datosAuxiliaresCargados =
+        true;
+
+      console.log(
+        "[INDEX] Detalles auxiliares cargados",
+        {
+          alertas:
+            state.alertRows.length,
+
+          solicitudes:
+            state.solicitudesRows.length,
+
+          inscripciones:
+            state.inscripcionesRows.length,
+
+          duracionMs:
+            Math.round(
+              performance.now() -
+              inicio
+            )
+        }
+      );
+
+      return true;
+    })()
+      .catch((error) => {
+        state.promiseDatosAuxiliares =
+          null;
+
+        throw error;
+      });
+
+  return state.promiseDatosAuxiliares;
+}
+
+async function asegurarDetallesDashboardCargados() {
+  try {
+    await loadDashboardAuxData();
+
+    const effectiveUser =
+      getEffectiveUser();
+
+    if (!effectiveUser) {
+      return;
+    }
+
+    const rowsScope =
+      getRowsForCurrentScope(
+        effectiveUser
+      );
+
+    renderDashboard(
+      rowsScope
+    );
+  } catch (error) {
+    console.error(
+      "[INDEX] No se pudieron preparar los detalles del dashboard:",
+      error
+    );
+
+    throw error;
+  }
+}
+
+async function cargarAnosFuturosIndex() {
+  const anoActual =
+    getAnoPrioritarioIndex();
+
+  const anosFuturos =
+    getAnosActivosIndex()
+      .filter(
+        (ano) =>
+          ano !== anoActual
+      );
+
+  await Promise.all(
+    anosFuturos.map(
+      (ano) =>
+        cargarGruposIndexAno(
+          ano
+        )
+    )
+  );
+
+  reconstruirRowsIndex();
+
+  actualizarExperienciaPrincipalIndex({
+    renderizarDashboardCompleto:
+      state.datosAuxiliaresCargados
+  });
+}
+
+async function loadDashboardData() {
+  const anoActual =
+    getAnoPrioritarioIndex();
+
+  /*
+    Tres líneas de carga independientes.
+
+    Ninguna espera a la otra.
+  */
+  const promiseResumen =
+    cargarResumenAlertasIndex();
+
+  const resultadoAnoActual =
+    await cargarGruposIndexAno(
+      anoActual
+    );
+
+  /*
+    Apenas tenemos el año actual,
+    activamos los selectores y el buscador.
+  */
+  actualizarExperienciaPrincipalIndex({
+    renderizarDashboardCompleto:
+      false
+  });
+
+  /*
+    Si el año actual vino de caché,
+    lo actualizamos sin bloquear la pantalla.
+  */
+  if (
+    resultadoAnoActual.origen ===
+    "sessionStorage"
+  ) {
+    cargarGruposIndexAno(
+      anoActual,
+      {
+        forzar:
+          true
+      }
+    )
+      .then(() => {
+        actualizarExperienciaPrincipalIndex({
+          renderizarDashboardCompleto:
+            state.datosAuxiliaresCargados
+        });
+      })
+      .catch((error) => {
+        console.warn(
+          "[INDEX] No se pudo refrescar el año actual:",
+          error
+        );
+      });
+  }
+
+  /*
+    Detalles de alertas y años futuros
+    continúan en segundo plano.
+  */
+  const promiseAuxiliares =
+    loadDashboardAuxData()
+      .then(() => {
+        const rowsScope =
+          getRowsForCurrentScope(
+            getEffectiveUser()
+          );
+
+        renderDashboard(
+          rowsScope
+        );
+      });
+
+  const promiseFuturos =
+    cargarAnosFuturosIndex();
+
+  await Promise.allSettled([
+    promiseResumen,
+    promiseAuxiliares,
+    promiseFuturos
+  ]);
+
+  /*
+    Pintura final con toda la información
+    disponible.
+  */
+  actualizarExperienciaPrincipalIndex({
+    renderizarDashboardCompleto:
+      true
   });
 }
 
 /* =========================================================
    DASHBOARD BASE
 ========================================================= */
-/* =========================================================
-   DASHBOARD BASE
-========================================================= */
 function getYearBucketCounts(rows = []) {
-  const baseYear = getDashboardBaseYear();
-  const years = [baseYear, baseYear + 1, baseYear + 2];
-  const counts = [0, 0, 0];
+  const baseYear =
+    getAnoPrioritarioIndex();
+
+  const years = [
+    baseYear,
+    baseYear + 1,
+    baseYear + 2
+  ];
+
+  const counts = [
+    0,
+    0,
+    0
+  ];
 
   rows.forEach((row) => {
-    const y = getAnoViajeNumber(row);
-    const index = years.indexOf(y);
-    if (index >= 0) counts[index] += 1;
+    const year =
+      getAnoViajeNumber(row);
+
+    const index =
+      years.indexOf(year);
+
+    if (index >= 0) {
+      counts[index] += 1;
+    }
   });
 
   return {
     years,
     counts,
-    total: rows.length
+    total:
+      rows.length
   };
 }
 
@@ -2915,25 +3781,97 @@ function construirColegioParaSelector(row = {}) {
   return colegioDesdeAlias || alias;
 }
 
-function construirLabelGrupoSelector(row = {}) {
-  const colegio = construirColegioParaSelector(row);
-  const cursoAno = construirCursoAnoParaSelector(row);
-  const apoderado = getRowApoderado(row);
+function construirLabelGrupoSelector(
+  row = {}
+) {
+  const ano =
+    getAnoViajeNumber(row) ||
+    "";
 
-  return [colegio, cursoAno, apoderado]
-    .filter((parte) => String(parte || "").trim())
-    .join(" — ");
-}
+  const colegio =
+    construirColegioParaSelector(
+      row
+    );
 
-function construirSortKeyGrupoSelector(row = {}) {
-  const colegio = construirColegioParaSelector(row);
-  const cursoAno = construirCursoAnoParaSelector(row);
-  const apoderado = getRowApoderado(row);
+  const cursoAno =
+    construirCursoAnoParaSelector(
+      row
+    );
+
+  const apoderado =
+    getRowApoderado(row);
 
   return [
-    normalizeLoose(colegio),
-    normalizeLoose(cursoAno),
-    normalizeLoose(apoderado)
+    ano,
+    colegio,
+    cursoAno,
+    apoderado
+  ]
+    .filter(
+      (parte) =>
+        String(
+          parte || ""
+        ).trim()
+    )
+    .join(" · ");
+}
+
+function construirSortKeyGrupoSelector(
+  row = {}
+) {
+  const anoActual =
+    getAnoPrioritarioIndex();
+
+  const ano =
+    getAnoViajeNumber(row) ||
+    9999;
+
+  const prioridadAno =
+    ano === anoActual
+      ? 0
+      : Math.max(
+          1,
+          ano - anoActual
+        );
+
+  const prioridadEstado =
+    isGanadaComercial(row)
+      ? 0
+      : 1;
+
+  const colegio =
+    construirColegioParaSelector(
+      row
+    );
+
+  const cursoAno =
+    construirCursoAnoParaSelector(
+      row
+    );
+
+  const apoderado =
+    getRowApoderado(row);
+
+  return [
+    String(
+      prioridadAno
+    ).padStart(3, "0"),
+
+    String(
+      prioridadEstado
+    ),
+
+    normalizeLoose(
+      colegio
+    ),
+
+    normalizeLoose(
+      cursoAno
+    ),
+
+    normalizeLoose(
+      apoderado
+    )
   ].join(" | ");
 }
 
@@ -3009,44 +3947,147 @@ function poblarSelectorGrupos(effectiveUser, rows = []) {
 /* =========================================================
    SELECTOR DE APODERADOS
 ========================================================= */
-function poblarSelectorApoderados(rows = []) {
-  const select = $("select-apoderado");
-  const btn = $("btn-ir-apoderado");
+function poblarSelectorApoderados(
+  rows = []
+) {
+  const select =
+    $("select-apoderado");
 
-  if (!select || !btn) return;
+  const btn =
+    $("btn-ir-apoderado");
 
-  const savedApoderado = getApoderadoFilter();
+  if (
+    !select ||
+    !btn
+  ) {
+    return;
+  }
 
-  select.innerHTML = `<option value="">Seleccionar Apoderado</option>`;
+  const savedApoderado =
+    getApoderadoFilter();
 
-  const items = rows
-    .map((row) => ({
-      value: getRowId(row),
-      label: `${getRowApoderado(row)} — ${getRowAlias(row)}`
-    }))
-    .filter((item) => item.value)
-    .sort((a, b) => a.label.localeCompare(b.label, "es", { sensitivity: "base" }));
+  select.innerHTML =
+    `<option value="">Seleccionar Apoderado</option>`;
 
-  items.forEach((item) => {
-    const option = document.createElement("option");
-    option.value = item.value;
-    option.textContent = item.label;
-    select.appendChild(option);
-  });
+  const anoActual =
+    getAnoPrioritarioIndex();
 
-  const existsSaved = items.some((item) => item.value === savedApoderado);
+  const items =
+    rows
+      .map((row) => {
+        const ano =
+          getAnoViajeNumber(row) ||
+          9999;
+
+        const prioridadAno =
+          ano === anoActual
+            ? 0
+            : Math.max(
+                1,
+                ano - anoActual
+              );
+
+        const prioridadEstado =
+          isGanadaComercial(row)
+            ? 0
+            : 1;
+
+        return {
+          value:
+            getRowId(row),
+
+          label:
+            [
+              ano,
+              getRowApoderado(row),
+              getRowAlias(row)
+            ].join(" · "),
+
+          sortKey:
+            [
+              String(
+                prioridadAno
+              ).padStart(3, "0"),
+
+              String(
+                prioridadEstado
+              ),
+
+              normalizeLoose(
+                getRowApoderado(row)
+              ),
+
+              normalizeLoose(
+                getRowAlias(row)
+              )
+            ].join(" | ")
+        };
+      })
+      .filter(
+        (item) =>
+          item.value
+      )
+      .sort(
+        (a, b) =>
+          a.sortKey.localeCompare(
+            b.sortKey,
+            "es",
+            {
+              sensitivity:
+                "base",
+
+              numeric:
+                true
+            }
+          )
+      );
+
+  items.forEach(
+    (item) => {
+      const option =
+        document.createElement(
+          "option"
+        );
+
+      option.value =
+        item.value;
+
+      option.textContent =
+        item.label;
+
+      select.appendChild(
+        option
+      );
+    }
+  );
+
+  const existsSaved =
+    items.some(
+      (item) =>
+        item.value ===
+        savedApoderado
+    );
 
   if (existsSaved) {
-    select.value = savedApoderado;
+    select.value =
+      savedApoderado;
   } else {
-    select.value = "";
+    select.value =
+      "";
+
     clearApoderadoFilter();
   }
 
-  select.disabled = !items.length;
-  btn.disabled = !items.length;
+  select.disabled =
+    !items.length;
 
-  initSearchableSelect("select-apoderado", "Buscar apoderado...");
+  btn.disabled =
+    !items.length;
+
+  initSearchableSelect(
+    "select-apoderado",
+    "Buscar apoderado..."
+  );
 }
 
 /* =========================================================
@@ -3095,45 +4136,95 @@ function buildScopeText(realUser, effectiveUser) {
    RENDER
 ========================================================= */
 async function renderPantalla() {
-  const realUser = getRealUser();
-  const effectiveUser = getEffectiveUser();
+  const realUser =
+    getRealUser();
 
-  if (!realUser || !effectiveUser) return;
+  const effectiveUser =
+    getEffectiveUser();
 
-  if (isVendedorRole(effectiveUser)) {
-    setVendorFilter(effectiveUser.email);
+  if (
+    !realUser ||
+    !effectiveUser
+  ) {
+    return;
+  }
+
+  if (
+    isVendedorRole(
+      effectiveUser
+    )
+  ) {
+    setVendorFilter(
+      effectiveUser.email
+    );
   }
 
   setHeaderState({
     realUser,
     effectiveUser,
-    scopeText: buildScopeText(realUser, effectiveUser)
+
+    scopeText:
+      buildScopeText(
+        realUser,
+        effectiveUser
+      )
   });
 
   renderActingUserSwitcher({
     realUser,
     effectiveUser,
-    users: VENTAS_USERS
+    users:
+      VENTAS_USERS
   });
+
+  /*
+    Reinicia datos auxiliares cuando cambia
+    el usuario efectivo o el filtro vendedor.
+  */
+  state.promiseDatosAuxiliares =
+    null;
+
+  state.datosAuxiliaresCargados =
+    false;
+
+  state.alertRows =
+    [];
+
+  state.solicitudesRows =
+    [];
+
+  state.inscripcionesRows =
+    [];
 
   inicializarDashboardEnCeros();
 
+  /*
+    La nota no bloquea el resto.
+  */
+  loadPrivateNote()
+    .catch((error) => {
+      console.error(
+        "Error cargando nota privada:",
+        error
+      );
+    });
+
   try {
-    await Promise.all([
-      loadDashboardData(),
-      loadPrivateNote()
-    ]);
-  
-    const rowsScope = getRowsForCurrentScope(effectiveUser);
-  
-    poblarSelectorVendedores(effectiveUser);
-    poblarSelectorGrupos(effectiveUser, rowsScope);
-    poblarSelectorApoderados(rowsScope);
-    renderDashboard(rowsScope);
-    initBuscadorDashboard();
+    await loadDashboardData();
   } catch (error) {
-    console.error("Error cargando dashboard:", error);
-    inicializarDashboardEnCeros();
+    console.error(
+      "Error cargando dashboard:",
+      error
+    );
+
+    reconstruirRowsIndex();
+
+    if (state.rows.length) {
+      actualizarExperienciaPrincipalIndex({
+        renderizarDashboardCompleto:
+          false
+      });
+    }
   }
 }
 
@@ -3353,13 +4444,28 @@ async function initPage() {
     });
   }
 
-  if (linkFichasFirmar && !linkFichasFirmar.dataset.bound) {
-    linkFichasFirmar.dataset.bound = "1";
+  if (
+    linkFichasFirmar &&
+    !linkFichasFirmar.dataset.bound
+  ) {
+    linkFichasFirmar.dataset.bound =
+      "1";
   
-    linkFichasFirmar.addEventListener("click", (e) => {
-      e.preventDefault();
-      openFichasPorFirmarModal();
-    });
+    linkFichasFirmar.addEventListener(
+      "click",
+      async (e) => {
+        e.preventDefault();
+  
+        try {
+          await asegurarDetallesDashboardCargados();
+          openFichasPorFirmarModal();
+        } catch (error) {
+          alert(
+            "No se pudieron cargar las fichas por firmar."
+          );
+        }
+      }
+    );
   }
   
   if (btnCerrarFichasFirmar && !btnCerrarFichasFirmar.dataset.bound) {
@@ -3370,13 +4476,28 @@ async function initPage() {
     });
   }
 
-  if (linkFichasCorregidas && !linkFichasCorregidas.dataset.bound) {
-    linkFichasCorregidas.dataset.bound = "1";
+  if (
+    linkFichasCorregidas &&
+    !linkFichasCorregidas.dataset.bound
+  ) {
+    linkFichasCorregidas.dataset.bound =
+      "1";
   
-    linkFichasCorregidas.addEventListener("click", (e) => {
-      e.preventDefault();
-      openFichasCorregidasModal();
-    });
+    linkFichasCorregidas.addEventListener(
+      "click",
+      async (e) => {
+        e.preventDefault();
+  
+        try {
+          await asegurarDetallesDashboardCargados();
+          openFichasCorregidasModal();
+        } catch (error) {
+          alert(
+            "No se pudieron cargar las fichas corregidas."
+          );
+        }
+      }
+    );
   }
   
   if (btnCerrarFichasCorregidas && !btnCerrarFichasCorregidas.dataset.bound) {
@@ -3427,13 +4548,28 @@ async function initPage() {
     });
   }
 
-  if (linkSolicitudesActualizacion && !linkSolicitudesActualizacion.dataset.bound) {
-    linkSolicitudesActualizacion.dataset.bound = "1";
+  if (
+    linkSolicitudesActualizacion &&
+    !linkSolicitudesActualizacion.dataset.bound
+  ) {
+    linkSolicitudesActualizacion.dataset.bound =
+      "1";
   
-    linkSolicitudesActualizacion.addEventListener("click", (e) => {
-      e.preventDefault();
-      openSolicitudesActualizacionModal();
-    });
+    linkSolicitudesActualizacion.addEventListener(
+      "click",
+      async (e) => {
+        e.preventDefault();
+  
+        try {
+          await asegurarDetallesDashboardCargados();
+          openSolicitudesActualizacionModal();
+        } catch (error) {
+          alert(
+            "No se pudieron cargar las solicitudes de actualización."
+          );
+        }
+      }
+    );
   }
   
   if (btnCerrarSolicitudesActualizacion && !btnCerrarSolicitudesActualizacion.dataset.bound) {
@@ -3454,13 +4590,28 @@ async function initPage() {
     });
   }
 
-  if (linkAlertasCriticas && !linkAlertasCriticas.dataset.bound) {
-    linkAlertasCriticas.dataset.bound = "1";
+  if (
+    linkAlertasCriticas &&
+    !linkAlertasCriticas.dataset.bound
+  ) {
+    linkAlertasCriticas.dataset.bound =
+      "1";
   
-    linkAlertasCriticas.addEventListener("click", (e) => {
-      e.preventDefault();
-      openAlertasCriticasModal();
-    });
+    linkAlertasCriticas.addEventListener(
+      "click",
+      async (e) => {
+        e.preventDefault();
+  
+        try {
+          await asegurarDetallesDashboardCargados();
+          openAlertasCriticasModal();
+        } catch (error) {
+          alert(
+            "No se pudieron cargar las alertas críticas."
+          );
+        }
+      }
+    );
   }
   
   if (btnCerrarAlertasCriticas && !btnCerrarAlertasCriticas.dataset.bound) {
@@ -3471,13 +4622,28 @@ async function initPage() {
     });
   }
   
-  if (linkAlertasWarning && !linkAlertasWarning.dataset.bound) {
-    linkAlertasWarning.dataset.bound = "1";
+  if (
+    linkAlertasWarning &&
+    !linkAlertasWarning.dataset.bound
+  ) {
+    linkAlertasWarning.dataset.bound =
+      "1";
   
-    linkAlertasWarning.addEventListener("click", (e) => {
-      e.preventDefault();
-      openAlertasWarningModal();
-    });
+    linkAlertasWarning.addEventListener(
+      "click",
+      async (e) => {
+        e.preventDefault();
+  
+        try {
+          await asegurarDetallesDashboardCargados();
+          openAlertasWarningModal();
+        } catch (error) {
+          alert(
+            "No se pudieron cargar las alertas pendientes."
+          );
+        }
+      }
+    );
   }
   
   if (btnCerrarAlertasWarning && !btnCerrarAlertasWarning.dataset.bound) {
@@ -3522,36 +4688,81 @@ async function initPage() {
     linkInscripcionNuevoIngreso &&
     !linkInscripcionNuevoIngreso.dataset.bound
   ) {
-    linkInscripcionNuevoIngreso.dataset.bound = "1";
-
-    linkInscripcionNuevoIngreso.addEventListener("click", (e) => {
-      e.preventDefault();
-      openAlertasInscripcionesModal("nuevo_ingreso");
-    });
+    linkInscripcionNuevoIngreso.dataset.bound =
+      "1";
+  
+    linkInscripcionNuevoIngreso.addEventListener(
+      "click",
+      async (e) => {
+        e.preventDefault();
+  
+        try {
+          await asegurarDetallesDashboardCargados();
+  
+          openAlertasInscripcionesModal(
+            "nuevo_ingreso"
+          );
+        } catch (error) {
+          alert(
+            "No se pudieron cargar las inscripciones de Nuevo Ingreso."
+          );
+        }
+      }
+    );
   }
 
   if (
     linkInscripcionListaEspera &&
     !linkInscripcionListaEspera.dataset.bound
   ) {
-    linkInscripcionListaEspera.dataset.bound = "1";
-
-    linkInscripcionListaEspera.addEventListener("click", (e) => {
-      e.preventDefault();
-      openAlertasInscripcionesModal("lista_espera");
-    });
+    linkInscripcionListaEspera.dataset.bound =
+      "1";
+  
+    linkInscripcionListaEspera.addEventListener(
+      "click",
+      async (e) => {
+        e.preventDefault();
+  
+        try {
+          await asegurarDetallesDashboardCargados();
+  
+          openAlertasInscripcionesModal(
+            "lista_espera"
+          );
+        } catch (error) {
+          alert(
+            "No se pudieron cargar las inscripciones de Lista de Espera."
+          );
+        }
+      }
+    );
   }
 
   if (
     linkListaEsperaPagada &&
     !linkListaEsperaPagada.dataset.bound
   ) {
-    linkListaEsperaPagada.dataset.bound = "1";
-
-    linkListaEsperaPagada.addEventListener("click", (e) => {
-      e.preventDefault();
-      openAlertasInscripcionesModal("lista_espera_pagada");
-    });
+    linkListaEsperaPagada.dataset.bound =
+      "1";
+  
+    linkListaEsperaPagada.addEventListener(
+      "click",
+      async (e) => {
+        e.preventDefault();
+  
+        try {
+          await asegurarDetallesDashboardCargados();
+  
+          openAlertasInscripcionesModal(
+            "lista_espera_pagada"
+          );
+        } catch (error) {
+          alert(
+            "No se pudieron cargar las listas de espera pagadas."
+          );
+        }
+      }
+    );
   }
 
   if (
@@ -3603,21 +4814,37 @@ async function initPage() {
    BUSCADOR GLOBAL DE GRUPOS
 ========================================================= */
 
-function buildSearchText(row = {}) {
-  let text = "";
+function buildSearchText(
+  row = {}
+) {
+  const busquedaResumen =
+    String(
+      row.busquedaTexto || ""
+    ).trim();
 
-  function extract(obj) {
-    if (!obj) return;
-    if (typeof obj === "object") {
-      Object.values(obj).forEach(extract);
-    } else {
-      text += " " + String(obj);
-    }
+  if (busquedaResumen) {
+    return normalizeLoose(
+      busquedaResumen
+    );
   }
 
-  extract(row);
-
-  return normalizeLoose(text);
+  return normalizeLoose(
+    [
+      getRowId(row),
+      getNumeroNegocio(row),
+      getRowAlias(row),
+      getRowApoderado(row),
+      row.colegio,
+      row.curso,
+      row.anoViaje,
+      row.destino,
+      row.destinoPrincipal,
+      row.programa,
+      row.vendedora,
+      row.vendedoraCorreo,
+      row.estado
+    ].join(" ")
+  );
 }
 
 function evaluarBusqueda(textoGrupo, query) {
@@ -3641,56 +4868,182 @@ function evaluarBusqueda(textoGrupo, query) {
   return q.split(" ").every(p => textoGrupo.includes(p));
 }
 
-function filtrarGruposPorBusqueda(rows, query) {
-  if (!query) return rows;
+function filtrarGruposPorBusqueda(
+  rows = [],
+  query = ""
+) {
+  const filtrados =
+    query
+      ? rows.filter(
+          (row) => {
+            const text =
+              buildSearchText(
+                row
+              );
 
-  return rows.filter(row => {
-    const text = buildSearchText(row);
-    return evaluarBusqueda(text, query);
-  });
+            return evaluarBusqueda(
+              text,
+              query
+            );
+          }
+        )
+      : [...rows];
+
+  return filtrados.sort(
+    (a, b) =>
+      construirSortKeyGrupoSelector(
+        a
+      ).localeCompare(
+        construirSortKeyGrupoSelector(
+          b
+        ),
+        "es",
+        {
+          sensitivity:
+            "base",
+
+          numeric:
+            true
+        }
+      )
+  );
 }
 
-function renderResultadosBusqueda(rows) {
-  const cont = $("buscador-resultados");
-  if (!cont) return;
+function renderResultadosBusqueda(
+  rows = []
+) {
+  const cont =
+    $("buscador-resultados");
 
-  if (!rows.length) {
-    cont.innerHTML = `<div class="buscador-item">Sin resultados</div>`;
+  if (!cont) {
     return;
   }
 
-  cont.innerHTML = rows.slice(0, 20).map(row => {
-    const id = getRowId(row);
+  if (!rows.length) {
+    cont.innerHTML =
+      `<div class="buscador-item">Sin resultados</div>`;
 
-    return `
-      <div class="buscador-item" onclick="location.href='grupo.html?id=${id}'">
-        <strong>${getRowAlias(row)}</strong><br>
-        ${row.colegio || ""} — ${getRowApoderado(row)}<br>
-        <span style="opacity:.6">${row.estado || ""}</span>
-      </div>
-    `;
-  }).join("");
+    return;
+  }
+
+  cont.innerHTML =
+    rows
+      .slice(0, 30)
+      .map((row) => {
+        const id =
+          getRowId(row);
+
+        const ano =
+          getAnoViajeNumber(row) ||
+          "Sin año";
+
+        return `
+          <div
+            class="buscador-item"
+            data-group-result="${escapeHtml(id)}"
+            style="cursor:pointer;"
+          >
+            <strong>
+              ${escapeHtml(
+                `${ano} · ${getRowAlias(row)}`
+              )}
+            </strong>
+            <br>
+
+            ${escapeHtml(
+              row.colegio || ""
+            )}
+            —
+            ${escapeHtml(
+              getRowApoderado(row)
+            )}
+            <br>
+
+            <span style="opacity:.6">
+              ${escapeHtml(
+                row.estado || ""
+              )}
+            </span>
+          </div>
+        `;
+      })
+      .join("");
+
+  cont
+    .querySelectorAll(
+      "[data-group-result]"
+    )
+    .forEach((item) => {
+      item.addEventListener(
+        "click",
+        () => {
+          const id =
+            String(
+              item.dataset.groupResult || ""
+            ).trim();
+
+          if (!id) {
+            return;
+          }
+
+          location.href =
+            `grupo.html?id=${encodeURIComponent(id)}`;
+        }
+      );
+    });
 }
 
 function initBuscadorDashboard() {
-  const input = $("input-buscador-grupos");
-  if (!input || input.dataset.bound) return;
+  const input =
+    $("input-buscador-grupos");
 
-  input.dataset.bound = "1";
+  if (
+    !input ||
+    input.dataset.bound
+  ) {
+    return;
+  }
 
-  input.addEventListener("input", () => {
-    const query = input.value;
+  input.dataset.bound =
+    "1";
 
-    const baseRows = state.scopedRows || [];
+  input.addEventListener(
+    "input",
+    () => {
+      const query =
+        input.value;
 
-    const filtrados = filtrarGruposPorBusqueda(baseRows, query);
+      const effectiveUser =
+        getEffectiveUser();
 
-    // 👉 render lista flotante
-    renderResultadosBusqueda(filtrados);
+      const baseRows =
+        getRowsForCurrentScope(
+          effectiveUser
+        );
 
-    // 👉 actualizar TODO el dashboard con filtro
-    renderDashboard(filtrados);
-  });
+      const filtrados =
+        filtrarGruposPorBusqueda(
+          baseRows,
+          query
+        );
+
+      renderResultadosBusqueda(
+        filtrados
+      );
+
+      /*
+        Los resultados del buscador no deben
+        alterar el scope base utilizado por
+        la siguiente búsqueda.
+      */
+      renderDashboard(
+        filtrados
+      );
+
+      state.scopedRows =
+        baseRows;
+    }
+  );
 }
 
 initPage();
