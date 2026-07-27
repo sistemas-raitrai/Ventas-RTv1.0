@@ -237,19 +237,13 @@ function actualizarContadorAlertaHome(
       : 0;
 
   /*
-    Actualiza el número visible.
+    Siempre actualizamos el número visible,
+    tanto en alertas administrativas como
+    en alertas de ventas.
   */
   contador.textContent =
     String(cantidad);
 
-  /*
-    Los contadores del bloque
-    "Estado administrativo de fichas"
-    no están dentro de .alert-row.
-
-    Por eso, en esos casos solamente
-    actualizamos el número.
-  */
   const fila =
     contador.closest(
       ".alert-row"
@@ -260,7 +254,30 @@ function actualizarContadorAlertaHome(
   }
 
   /*
-    Desde 1 alerta:
+    Las alertas de ventas son informativas
+    dentro del Home administrativo.
+
+    Se muestran sus cantidades, pero nunca
+    se resaltan ni titilan.
+  */
+  const perteneceAlertasVentas =
+    !!contador.closest(
+      '[data-home-alertas-seccion="ventas"]'
+    );
+
+  if (perteneceAlertasVentas) {
+    fila.classList.remove(
+      "alerta-activa",
+      "alerta-urgente"
+    );
+
+    return;
+  }
+
+  /*
+    Solo para alertas administrativas:
+
+    Desde 1:
     resalta el bloque.
   */
   fila.classList.toggle(
@@ -269,7 +286,7 @@ function actualizarContadorAlertaHome(
   );
 
   /*
-    Desde 6 alertas:
+    Desde 6:
     activa la pulsación.
   */
   fila.classList.toggle(
