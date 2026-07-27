@@ -3267,8 +3267,8 @@ async function loadDashboardData() {
     performance.now();
 
   /*
-    Estas tres consultas comienzan inmediatamente
-    y de manera independiente.
+    Todas las cargas comienzan inmediatamente
+    y en paralelo.
   */
   const promiseResumen =
     cargarResumenAlertasIndex();
@@ -3278,12 +3278,15 @@ async function loadDashboardData() {
       anoActual
     );
 
+  const promiseAnosFuturos =
+    cargarAnosFuturosIndex();
+
   const promiseAuxiliares =
     loadDashboardAuxData();
 
   /*
-    Esperamos únicamente el año actual para habilitar
-    selectores y buscador lo antes posible.
+    Esperamos solamente el año actual para dejar
+    disponible cuanto antes el selector administrativo.
   */
   const resultadoAnoActual =
     await promiseAnoActual;
@@ -3294,7 +3297,7 @@ async function loadDashboardData() {
   });
 
   console.log(
-    "[INDEX] Selectores disponibles",
+    "[INDEX] Selectores iniciales disponibles",
     {
       ano:
         anoActual,
@@ -3314,8 +3317,8 @@ async function loadDashboardData() {
   );
 
   /*
-    Si los grupos salieron desde caché,
-    actualizamos Firestore en segundo plano.
+    Si el año actual salió de sessionStorage,
+    se refresca desde Firestore en segundo plano.
   */
   if (
     resultadoAnoActual.origen ===
@@ -3343,8 +3346,36 @@ async function loadDashboardData() {
   }
 
   /*
-    Como esta promesa comenzó antes que la consulta
-    de grupos, probablemente ya estará terminando.
+    Los años futuros ya están cargándose en paralelo.
+    Cuando terminan, se reconstruye inmediatamente
+    el selector comercial.
+  */
+  promiseAnosFuturos
+    .then(() => {
+      console.log(
+        "[INDEX] Años futuros disponibles",
+        {
+          gruposTotales:
+            state.rows.length,
+
+          desdeInicioMs:
+            Math.round(
+              performance.now() -
+              inicioTotal
+            )
+        }
+      );
+    })
+    .catch((error) => {
+      console.warn(
+        "[INDEX] No se pudieron cargar los años futuros:",
+        error
+      );
+    });
+
+  /*
+    Las alertas siguen cargándose sin bloquear
+    los selectores comercial y administrativo.
   */
   await promiseAuxiliares;
 
@@ -3377,36 +3408,6 @@ async function loadDashboardData() {
     }
   );
 
-  /*
-    No esperamos 2027, 2028 y 2029.
-    Se agregan silenciosamente después.
-  */
-  cargarAnosFuturosIndex()
-    .then(() => {
-      console.log(
-        "[INDEX] Años futuros disponibles",
-        {
-          gruposTotales:
-            state.rows.length,
-
-          desdeInicioMs:
-            Math.round(
-              performance.now() -
-              inicioTotal
-            )
-        }
-      );
-    })
-    .catch((error) => {
-      console.warn(
-        "[INDEX] No se pudieron cargar los años futuros:",
-        error
-      );
-    });
-
-  /*
-    Tampoco bloqueamos por el resumen.
-  */
   promiseResumen.catch(
     (error) => {
       console.warn(
