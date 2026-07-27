@@ -5,6 +5,7 @@ import {
   getDoc,
   getDocs,
   query,
+  where,
   orderBy,
   limit,
   setDoc,
@@ -61,12 +62,6 @@ const GRUPOS_RESUMEN_COLLECTION =
 const ARCHIVED_COLLECTION =
   "ventas_cotizaciones_archivadas";
 
-const ASIGNADOS_CACHE_KEY =
-  "ventas_asignados_grupos_resumen";
-
-const ASIGNADOS_CACHE_TTL_MS =
-  10 * 60 * 1000;
-
 /* =========================================================
    ESTADO
 ========================================================= */
@@ -75,6 +70,9 @@ const state = {
   effectiveUser: null,
   rows: [],
   filteredRows: [],
+  
+  analysisRows: [],
+  analysisRowsPromise: null,
   tab: new URLSearchParams(window.location.search).get("tab") === "asignados"
     ? "asignados"
     : "sin_asignar",
@@ -1100,7 +1098,71 @@ function getTopProfileRecommendations(allRecommendations = [], selectedVendorEma
   return picks.slice(0, 4);
 }
 
+async function asegurarDatosRecomendacionCargados() {
+  if (
+    Array.isArray(
+      state.analysisRows
+    ) &&
+    state.analysisRows.length
+  ) {
+    return state.analysisRows;
+  }
+
+  if (
+    state.analysisRowsPromise
+  ) {
+    return state.analysisRowsPromise;
+  }
+
+  state.analysisRowsPromise =
+    (async () => {
+      setProgressStatus({
+        text:
+          "Preparando análisis comercial...",
+
+        meta:
+          "Cargando cartera histórica para la sugerencia...",
+
+        progress:
+          35
+      });
+
+      const snap =
+        await getDocs(
+          collection(
+            db,
+            GRUPOS_RESUMEN_COLLECTION
+          )
+        );
+
+      state.analysisRows =
+        snap.docs.map(
+          mapGrupoResumenAsignados
+        );
+
+      console.log(
+        "[ASIGNADOS] Datos de recomendación cargados",
+        {
+          documentos:
+            state.analysisRows.length
+        }
+      );
+
+      return state.analysisRows;
+    })()
+      .catch((error) => {
+        state.analysisRowsPromise =
+          null;
+
+        throw error;
+      });
+
+  return state.analysisRowsPromise;
+}
+
 async function analyzeVendorAssignmentRecommendation(sourceRow = {}, selectedVendor = {}) {
+  const analysisRows =
+    await asegurarDatosRecomendacionCargados();
   const vendors = getVendorOptions();
   const vendorMap = new Map(
     vendors.map((vendor) => [normalizeEmail(vendor.email || ""), createVendorRecommendationBase(vendor)])
@@ -1120,7 +1182,7 @@ async function analyzeVendorAssignmentRecommendation(sourceRow = {}, selectedVen
   let totalSameComunaTerritory = 0;
   const relatedGroupDetails = [];
 
-  state.rows.forEach((candidate) => {
+  analysisRows.forEach((candidate) => {
     if (getRowId(candidate) === currentId) return;
 
     const candidateVendorEmail = getRowVendorEmail(candidate);
@@ -1327,73 +1389,6 @@ async function analyzeVendorAssignmentRecommendation(sourceRow = {}, selectedVen
 /* =========================================================
    CARGA
 ========================================================= */
-function guardarCacheAsignados(
-  rows = []
-) {
-  try {
-    sessionStorage.setItem(
-      ASIGNADOS_CACHE_KEY,
-      JSON.stringify({
-        guardadoAt:
-          Date.now(),
-
-        rows
-      })
-    );
-  } catch (error) {
-    console.warn(
-      "[ASIGNADOS] No se pudo guardar la caché:",
-      error
-    );
-  }
-}
-
-function leerCacheAsignados() {
-  try {
-    const raw =
-      sessionStorage.getItem(
-        ASIGNADOS_CACHE_KEY
-      );
-
-    if (!raw) {
-      return null;
-    }
-
-    const parsed =
-      JSON.parse(raw);
-
-    const guardadoAt =
-      Number(
-        parsed?.guardadoAt || 0
-      );
-
-    if (
-      !guardadoAt ||
-      Date.now() - guardadoAt >
-        ASIGNADOS_CACHE_TTL_MS
-    ) {
-      sessionStorage.removeItem(
-        ASIGNADOS_CACHE_KEY
-      );
-
-      return null;
-    }
-
-    return Array.isArray(
-      parsed?.rows
-    )
-      ? parsed.rows
-      : null;
-  } catch (error) {
-    console.warn(
-      "[ASIGNADOS] Caché inválida:",
-      error
-    );
-
-    return null;
-  }
-}
-
 function mapGrupoResumenAsignados(
   docSnap
 ) {
@@ -1425,9 +1420,55 @@ function aplicarRowsAsignados(
   applyFilters();
 }
 
-async function loadData({
-  forzar = false
-} = {}) {
+async function consultarAsignacionesSegunTab() {
+  const asignado =
+    state.tab === "asignados";
+
+  const inicio =
+    performance.now();
+
+  const consulta =
+    query(
+      collection(
+        db,
+        GRUPOS_RESUMEN_COLLECTION
+      ),
+
+      where(
+        "asignado",
+        "==",
+        asignado
+      )
+    );
+
+  const snap =
+    await getDocs(
+      consulta
+    );
+
+  console.log(
+    "[ASIGNADOS] Consulta filtrada cargada",
+    {
+      tab:
+        state.tab,
+
+      asignado,
+
+      documentos:
+        snap.size,
+
+      firestoreMs:
+        Math.round(
+          performance.now() -
+          inicio
+        )
+    }
+  );
+
+  return snap;
+}
+
+async function loadData() {
   const inicioTotal =
     performance.now();
 
@@ -1437,10 +1478,12 @@ async function loadData({
         "Cargando asignaciones...",
 
       meta:
-        "Preparando vista comercial...",
+        state.tab === "sin_asignar"
+          ? "Buscando grupos sin vendedor..."
+          : "Buscando grupos asignados...",
 
       progress:
-        10
+        20
     });
 
     if (
@@ -1448,131 +1491,43 @@ async function loadData({
     ) {
       $("asignadosLoadHint")
         .textContent =
-        "Preparando vista comercial...";
+        state.tab === "sin_asignar"
+          ? "Buscando grupos sin vendedor..."
+          : "Buscando grupos asignados...";
     }
 
-    const vendorOptions =
-      getVendorOptions();
-
-    setProgressStatus({
-      text:
-        "Cargando asignaciones...",
-
-      meta:
-        `Vendedoras detectadas: ${vendorOptions.length}`,
-
-      progress:
-        20
-    });
-
     /*
-      Primero usamos la caché.
-
-      Esto permite mostrar la tabla inmediatamente
-      cuando el usuario vuelve a la página.
-    */
-    if (!forzar) {
-      const cache =
-        leerCacheAsignados();
-
-      if (cache) {
-        aplicarRowsAsignados(
-          cache
-        );
-
-        if (
-          $("asignadosLoadHint")
-        ) {
-          $("asignadosLoadHint")
-            .textContent =
-            `${state.filteredRows.length} grupo(s) mostrados desde caché. Actualizando...`;
-        }
-
-        console.log(
-          "[ASIGNADOS] Datos mostrados desde sessionStorage",
-          {
-            documentos:
-              cache.length
-          }
-        );
-      }
-    }
-
-    setProgressStatus({
-      text:
-        "Actualizando asignaciones...",
-
-      meta:
-        "Consultando colección rápida...",
-
-      progress:
-        38
-    });
-
-    const inicioFirestore =
-      performance.now();
-
-    /*
-      IMPORTANTE:
-
-      Ya no descargamos ventas_cotizaciones.
-      Leemos la colección liviana.
+      Solamente consulta los documentos
+      necesarios para la pestaña actual.
     */
     const snap =
-      await getDocs(
-        collection(
-          db,
-          GRUPOS_RESUMEN_COLLECTION
-        )
-      );
+      await consultarAsignacionesSegunTab();
 
-    console.log(
-      "[ASIGNADOS] Colección resumen cargada",
-      {
-        documentos:
-          snap.size,
-
-        firestoreMs:
-          Math.round(
-            performance.now() -
-            inicioFirestore
-          )
-      }
-    );
-
-    setProgressStatus({
-      text:
-        "Procesando grupos...",
-
-      meta:
-        `Documentos recibidos: ${snap.size}`,
-
-      progress:
-        60
-    });
-
-    const rows =
+    state.rows =
       snap.docs.map(
         mapGrupoResumenAsignados
       );
 
-    /*
-      Reemplazamos la caché por datos actuales.
-    */
-    aplicarRowsAsignados(
-      rows
-    );
+    setProgressStatus({
+      text:
+        "Preparando tabla...",
 
-    guardarCacheAsignados(
-      rows
-    );
+      meta:
+        `Documentos recibidos: ${state.rows.length}`,
+
+      progress:
+        70
+    });
+
+    populateFilters();
+    applyFilters();
 
     setProgressStatus({
       text:
         "Asignaciones cargadas.",
 
       meta:
-        `${state.filteredRows.length} grupo(s) visibles en la vista actual.`,
+        `${state.filteredRows.length} grupo(s) visibles.`,
 
       progress:
         100,
@@ -1590,9 +1545,12 @@ async function loadData({
     }
 
     console.log(
-      "[ASIGNADOS] Carga finalizada",
+      "[ASIGNADOS] Carga filtrada finalizada",
       {
-        grupos:
+        tab:
+          state.tab,
+
+        recibidos:
           state.rows.length,
 
         visibles:
@@ -2761,20 +2719,54 @@ function bindPageEvents() {
     );
   }
 
-  if (btnTabSinAsignar && !btnTabSinAsignar.dataset.bound) {
-    btnTabSinAsignar.dataset.bound = "1";
-    btnTabSinAsignar.addEventListener("click", () => {
-      state.tab = "sin_asignar";
-      applyFilters();
-    });
+  if (
+    btnTabSinAsignar &&
+    !btnTabSinAsignar.dataset.bound
+  ) {
+    btnTabSinAsignar.dataset.bound =
+      "1";
+  
+    btnTabSinAsignar.addEventListener(
+      "click",
+      async () => {
+        if (
+          state.tab ===
+          "sin_asignar"
+        ) {
+          return;
+        }
+  
+        state.tab =
+          "sin_asignar";
+  
+        await loadData();
+      }
+    );
   }
 
-  if (btnTabAsignados && !btnTabAsignados.dataset.bound) {
-    btnTabAsignados.dataset.bound = "1";
-    btnTabAsignados.addEventListener("click", () => {
-      state.tab = "asignados";
-      applyFilters();
-    });
+  if (
+    btnTabAsignados &&
+    !btnTabAsignados.dataset.bound
+  ) {
+    btnTabAsignados.dataset.bound =
+      "1";
+  
+    btnTabAsignados.addEventListener(
+      "click",
+      async () => {
+        if (
+          state.tab ===
+          "asignados"
+        ) {
+          return;
+        }
+  
+        state.tab =
+          "asignados";
+  
+        await loadData();
+      }
+    );
   }
 
   if (tbody && !tbody.dataset.bound) {
