@@ -77,6 +77,67 @@ const state = {
    HELPERS GENERALES
 ========================================================= */
 
+function actualizarContadorAlertaHome(
+  id = "",
+  value = 0
+) {
+  const contador =
+    $(id);
+
+  if (!contador) {
+    return;
+  }
+
+  const numero =
+    Number(value || 0);
+
+  const cantidad =
+    Number.isFinite(numero)
+      ? Math.max(0, numero)
+      : 0;
+
+  /*
+    Actualiza el número visible.
+  */
+  contador.textContent =
+    String(cantidad);
+
+  /*
+    Los contadores del bloque
+    "Estado administrativo de fichas"
+    no están dentro de .alert-row.
+
+    Por eso, en esos casos solamente
+    actualizamos el número.
+  */
+  const fila =
+    contador.closest(
+      ".alert-row"
+    );
+
+  if (!fila) {
+    return;
+  }
+
+  /*
+    Desde 1 alerta:
+    resalta el bloque.
+  */
+  fila.classList.toggle(
+    "alerta-activa",
+    cantidad > 0
+  );
+
+  /*
+    Desde 6 alertas:
+    activa la pulsación.
+  */
+  fila.classList.toggle(
+    "alerta-urgente",
+    cantidad > 5
+  );
+}
+
 function normalizeLoose(value = "") {
   return String(value ?? "")
     .normalize("NFD")
@@ -1078,8 +1139,32 @@ function renderInscripcionesHomeCards(rows = []) {
 ========================================================= */
 
 function setText(id, value) {
-  const el = $(id);
-  if (el) el.textContent = String(value);
+  const elemento = $(id);
+
+  if (!elemento) {
+    return;
+  }
+
+  /*
+    Solamente los contadores de alertas
+    deben activar el resaltado visual.
+  */
+  if (elemento.closest(".alert-row")) {
+    actualizarContadorAlertaHome(
+      id,
+      value
+    );
+
+    return;
+  }
+
+  /*
+    Los demás textos del Home:
+    títulos, subtítulos, resúmenes,
+    contadores administrativos, etc.
+  */
+  elemento.textContent =
+    String(value ?? "");
 }
 
 function poblarSelectorAnoFichas(scopedRows = []) {
