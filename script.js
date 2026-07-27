@@ -73,6 +73,53 @@ const INDEX_ALERTAS_CACHE_PREFIX =
 const INDEX_CACHE_TTL_MS =
   10 * 60 * 1000;
 
+/* =========================================================
+   MEDICIÓN DE RENDIMIENTO DEL INDEX
+========================================================= */
+
+const indexPerformance = {
+  cargaId: "",
+  inicio: 0
+};
+
+function iniciarMedicionIndex() {
+  indexPerformance.cargaId =
+    Date.now().toString(36);
+
+  indexPerformance.inicio =
+    performance.now();
+
+  console.log(
+    `[INDEX][${indexPerformance.cargaId}][INICIO]`,
+    {
+      fecha:
+        new Date().toLocaleString("es-CL")
+    }
+  );
+}
+
+function logRendimientoIndex(
+  etapa = "",
+  datos = {}
+) {
+  if (!indexPerformance.inicio) {
+    iniciarMedicionIndex();
+  }
+
+  console.log(
+    `[INDEX][${indexPerformance.cargaId}][${etapa}]`,
+    {
+      ...datos,
+
+      desdeInicioMs:
+        Math.round(
+          performance.now() -
+          indexPerformance.inicio
+        )
+    }
+  );
+}
+
 function getAnoPrioritarioIndex() {
   /*
     En Index el año cambia el 1 de enero.
@@ -2740,20 +2787,45 @@ async function cargarGruposIndexAno(
   const anoTexto =
     String(ano);
 
+  const inicio =
+    performance.now();
+
   if (
     !forzar &&
     state.rowsPorAno.has(
       anoTexto
     )
   ) {
+    const rows =
+      state.rowsPorAno.get(
+        anoTexto
+      ) || [];
+
+    logRendimientoIndex(
+      "GRUPOS_AÑO",
+      {
+        ano:
+          Number(anoTexto),
+
+        origen:
+          "memoria",
+
+        documentos:
+          rows.length,
+
+        duracionMs:
+          Math.round(
+            performance.now() -
+            inicio
+          )
+      }
+    );
+
     return {
       origen:
         "memoria",
 
-      rows:
-        state.rowsPorAno.get(
-          anoTexto
-        ) || []
+      rows
     };
   }
 
@@ -2778,6 +2850,26 @@ async function cargarGruposIndexAno(
       );
 
       reconstruirRowsIndex();
+
+      logRendimientoIndex(
+        "GRUPOS_AÑO",
+        {
+          ano:
+            Number(anoTexto),
+
+          origen:
+            "sessionStorage",
+
+          documentos:
+            cache.length,
+
+          duracionMs:
+            Math.round(
+              performance.now() -
+              inicio
+            )
+        }
+      );
 
       return {
         origen:
@@ -2811,6 +2903,26 @@ async function cargarGruposIndexAno(
   );
 
   reconstruirRowsIndex();
+
+  logRendimientoIndex(
+    "GRUPOS_AÑO",
+    {
+      ano:
+        Number(anoTexto),
+
+      origen:
+        "firestore",
+
+      documentos:
+        rows.length,
+
+      duracionMs:
+        Math.round(
+          performance.now() -
+          inicio
+        )
+    }
+  );
 
   return {
     origen:
@@ -3071,6 +3183,36 @@ function actualizarExperienciaPrincipalIndex({
   }
 }
 
+async function consultarColeccionAuxiliarIndex(
+  nombre = "",
+  crearConsulta
+) {
+  const inicio =
+    performance.now();
+
+  const snap =
+    await crearConsulta();
+
+  logRendimientoIndex(
+    "CONSULTA_AUXILIAR",
+    {
+      coleccion:
+        nombre,
+
+      documentos:
+        snap.size,
+
+      duracionMs:
+        Math.round(
+          performance.now() -
+          inicio
+        )
+    }
+  );
+
+  return snap;
+}
+
 async function loadDashboardAuxData() {
   if (
     state.promiseDatosAuxiliares
@@ -3088,35 +3230,50 @@ async function loadDashboardAuxData() {
         solicitudesSnap,
         alertasInscripcionesSnap
       ] = await Promise.all([
-        getDocs(
-          collection(
-            db,
-            ALERTAS_COLLECTION
-          )
-        ),
-
-        getDocs(
-          collection(
-            db,
-            SOLICITUDES_COLLECTION
-          )
-        ),
-
-        getDocs(
-          query(
-            collection(
-              db,
-              ALERTAS_INSCRIPCIONES_COLLECTION
-            ),
-
-            where(
-              "activa",
-              "==",
-              true
+        consultarColeccionAuxiliarIndex(
+          ALERTAS_COLLECTION,
+          () =>
+            getDocs(
+              collection(
+                db,
+                ALERTAS_COLLECTION
+              )
             )
-          )
+        ),
+
+        consultarColeccionAuxiliarIndex(
+          SOLICITUDES_COLLECTION,
+          () =>
+            getDocs(
+              collection(
+                db,
+                SOLICITUDES_COLLECTION
+              )
+            )
+        ),
+
+        consultarColeccionAuxiliarIndex(
+          ALERTAS_INSCRIPCIONES_COLLECTION,
+          () =>
+            getDocs(
+              query(
+                collection(
+                  db,
+                  ALERTAS_INSCRIPCIONES_COLLECTION
+                ),
+
+                where(
+                  "activa",
+                  "==",
+                  true
+                )
+              )
+            )
         )
       ]);
+
+      const inicioProcesamiento =
+        performance.now();
 
       state.alertRows =
         alertsSnap.docs.map(
@@ -3151,8 +3308,8 @@ async function loadDashboardAuxData() {
       state.datosAuxiliaresCargados =
         true;
 
-      console.log(
-        "[INDEX] Detalles auxiliares cargados",
+      logRendimientoIndex(
+        "AUXILIARES_LISTOS",
         {
           alertas:
             state.alertRows.length,
@@ -3163,7 +3320,13 @@ async function loadDashboardAuxData() {
           inscripciones:
             state.inscripcionesRows.length,
 
-          duracionMs:
+          procesamientoMs:
+            Math.round(
+              performance.now() -
+              inicioProcesamiento
+            ),
+
+          duracionTotalMs:
             Math.round(
               performance.now() -
               inicio
@@ -3612,6 +3775,12 @@ function getDashboardViewUser(effectiveUser = null) {
 }
 
 function renderDashboard(rows = []) {
+  const inicioRenderDashboard =
+    performance.now();
+
+  const inicioDiagrama =
+    performance.now();
+  
   const setText = (id, value) => {
     const el = $(id);
     if (el) el.textContent = String(value);
@@ -3633,6 +3802,12 @@ function renderDashboard(rows = []) {
   const ganadas = getBucketRows(scopedRows, "ganadas");
   const autorizadas = getBucketRows(scopedRows, "autorizadas");
   const cerradas = getBucketRows(scopedRows, "cerradas");
+
+  const finClasificacionDiagrama =
+    performance.now();
+
+  const inicioAlertas =
+    performance.now();
 
   const fichasPorFirmar = getFichasPorFirmarSegunUsuario(scopedRows, viewUser);
   state.fichasPorFirmarRows = fichasPorFirmar;
@@ -3752,6 +3927,47 @@ function renderDashboard(rows = []) {
 
   syncAlertRowsByRole(viewUser);
 
+  logRendimientoIndex(
+    "ALERTAS_RENDER",
+    {
+      gruposScope:
+        scopedRows.length,
+
+      fichasPorFirmar:
+        fichasPorFirmar.length,
+
+      fichasCorregidas:
+        fichasCorregidas.length,
+
+      solicitudes:
+        solicitudesActualizacion.length,
+
+      alertasCriticas:
+        alertasCriticas.length,
+
+      alertasPendientes:
+        alertasWarning.length,
+
+      nuevoIngreso:
+        state.inscripcionNuevoIngresoRows.length,
+
+      listaEspera:
+        state.inscripcionListaEsperaRows.length,
+
+      listaEsperaPagada:
+        state.listaEsperaPagadaRows.length,
+
+      reunionesTresDias:
+        reuniones3DiasRows.length,
+
+      duracionMs:
+        Math.round(
+          performance.now() -
+          inicioAlertas
+        )
+    }
+  );
+
   // FLUJO CON LINKS
   renderBucketLinks("contactados-top", "contactados", contactados);
   renderBucketLinks("cotizando-top", "cotizando", cotizando);
@@ -3762,6 +3978,49 @@ function renderDashboard(rows = []) {
   renderFichaAdminBucketLinks("abiertas-top", "abiertas", state.fichasAbiertasRows);
   renderFichaAdminBucketLinks("cerradas-top", "cerradas", state.fichasCerradasRows);
   renderFichaAdminBucketLinks("autorizadas-top", "autorizadas", state.fichasAutorizadasRows);
+  logRendimientoIndex(
+    "DIAGRAMA_RENDER",
+    {
+      gruposScope:
+        scopedRows.length,
+
+      contactados:
+        contactados.length,
+
+      cotizando:
+        cotizando.length,
+
+      reunion:
+        reunion.length,
+
+      perdidas:
+        perdidas.length,
+
+      recotizando:
+        recotizando.length,
+
+      ganadas:
+        ganadas.length,
+
+      clasificacionMs:
+        Math.round(
+          finClasificacionDiagrama -
+          inicioDiagrama
+        ),
+
+      pintadoMs:
+        Math.round(
+          performance.now() -
+          finClasificacionDiagrama
+        ),
+
+      duracionRenderCompletoMs:
+        Math.round(
+          performance.now() -
+          inicioRenderDashboard
+        )
+    }
+  );
 }
 /* =========================================================
    SELECTOR DE VENDEDORES
@@ -4271,6 +4530,9 @@ function poblarSelectorGruposComerciales(
   effectiveUser,
   rows = []
 ) {
+  const inicioSelector =
+    performance.now();
+  
   const select =
     $("select-grupo-comercial");
 
@@ -4381,6 +4643,26 @@ function poblarSelectorGruposComerciales(
       }
     }
   );
+  
+  logRendimientoIndex(
+    "SELECTOR_COMERCIAL",
+    {
+      filasRecibidas:
+        rows.length,
+
+      filasValidas:
+        rowsComerciales.length,
+
+      opciones:
+        items.length,
+
+      duracionMs:
+        Math.round(
+          performance.now() -
+          inicioSelector
+        )
+    }
+  );
 }
 
 /* =========================================================
@@ -4389,6 +4671,9 @@ function poblarSelectorGruposComerciales(
 function poblarSelectorGruposAdministrativos(
   rows = []
 ) {
+  const inicioSelector =
+    performance.now();
+  
   const select =
     $("select-grupo-administrativo");
 
@@ -4496,6 +4781,26 @@ function poblarSelectorGruposAdministrativos(
       }
     }
   );
+  
+  logRendimientoIndex(
+    "SELECTOR_ADMINISTRATIVO",
+    {
+      filasRecibidas:
+        rows.length,
+
+      filasValidas:
+        rowsAdministrativos.length,
+
+      opciones:
+        items.length,
+
+      duracionMs:
+        Math.round(
+          performance.now() -
+          inicioSelector
+        )
+    }
+  );
 }
 
 /* =========================================================
@@ -4556,6 +4861,21 @@ async function renderPantalla() {
   ) {
     return;
   }
+  
+  iniciarMedicionIndex();
+
+  logRendimientoIndex(
+    "USUARIO",
+    {
+      correo:
+        normalizeEmail(
+          effectiveUser.email || ""
+        ),
+  
+      rol:
+        effectiveUser.rol || ""
+    }
+  );
 
   if (
     isVendedorRole(
