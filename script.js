@@ -1338,6 +1338,96 @@ function getSolicitudesActualizacionSegunUsuario(rows = [], effectiveUser = null
     });
 }
 
+function actualizarEstadoVisualAlerta(
+  contadorId = "",
+  cantidad = 0
+) {
+  const contador =
+    $(contadorId);
+
+  if (!contador) {
+    return;
+  }
+
+  const row =
+    contador.closest(
+      ".alert-row"
+    ) ||
+    contador.closest(
+      ".alert-row-wrap"
+    );
+
+  if (!row) {
+    return;
+  }
+
+  const total =
+    Math.max(
+      0,
+      Number(cantidad) || 0
+    );
+
+  /*
+    Primero limpia ambos estados.
+  */
+  row.classList.remove(
+    "alerta-activa",
+    "alerta-urgente"
+  );
+
+  /*
+    Cero:
+    apariencia normal.
+  */
+  if (total <= 0) {
+    return;
+  }
+
+  /*
+    Desde uno:
+    resaltado suave.
+  */
+  row.classList.add(
+    "alerta-activa"
+  );
+
+  /*
+    Desde seis:
+    pulsación de emergencia.
+  */
+  if (total > 5) {
+    row.classList.add(
+      "alerta-urgente"
+    );
+  }
+}
+
+function setContadorAlertaIndex(
+  contadorId = "",
+  cantidad = 0
+) {
+  const total =
+    Math.max(
+      0,
+      Number(cantidad) || 0
+    );
+
+  const el =
+    $(contadorId);
+
+  if (!el) {
+    return;
+  }
+
+  el.textContent =
+    String(total);
+
+  actualizarEstadoVisualAlerta(
+    contadorId,
+    total
+  );
+}
+
 function setAlertRowVisibleByChild(childId, visible = true) {
   const child = $(childId);
   const row = child?.closest(".alert-row") || child?.closest(".alert-row-wrap");
@@ -2944,22 +3034,7 @@ function getResumenNumber(
 function pintarResumenAlertasIndex(
   resumen = {}
 ) {
-  const setText = (
-    id,
-    value
-  ) => {
-    const el =
-      $(id);
-
-    if (el) {
-      el.textContent =
-        String(
-          Number(value || 0)
-        );
-    }
-  };
-
-  setText(
+  setContadorAlertaIndex(
     "count-sin-asignar",
     getResumenNumber(
       resumen,
@@ -2967,7 +3042,7 @@ function pintarResumenAlertasIndex(
     )
   );
 
-  setText(
+  setContadorAlertaIndex(
     "count-a-contactar",
     getResumenNumber(
       resumen,
@@ -2975,7 +3050,7 @@ function pintarResumenAlertasIndex(
     )
   );
 
-  setText(
+  setContadorAlertaIndex(
     "count-fichas-firmar",
     getResumenNumber(
       resumen,
@@ -2983,7 +3058,7 @@ function pintarResumenAlertasIndex(
     )
   );
 
-  setText(
+  setContadorAlertaIndex(
     "count-fichas-corregidas",
     getResumenNumber(
       resumen,
@@ -2991,7 +3066,7 @@ function pintarResumenAlertasIndex(
     )
   );
 
-  setText(
+  setContadorAlertaIndex(
     "count-solicitudes-actualizacion",
     getResumenNumber(
       resumen,
@@ -2999,7 +3074,7 @@ function pintarResumenAlertasIndex(
     )
   );
 
-  setText(
+  setContadorAlertaIndex(
     "count-alertas-criticas",
     getResumenNumber(
       resumen,
@@ -3007,7 +3082,7 @@ function pintarResumenAlertasIndex(
     )
   );
 
-  setText(
+  setContadorAlertaIndex(
     "count-alertas-warning",
     getResumenNumber(
       resumen,
@@ -3015,7 +3090,7 @@ function pintarResumenAlertasIndex(
     )
   );
 
-  setText(
+  setContadorAlertaIndex(
     "count-inscripcion-nuevo-ingreso",
     getResumenNumber(
       resumen,
@@ -3023,7 +3098,7 @@ function pintarResumenAlertasIndex(
     )
   );
 
-  setText(
+  setContadorAlertaIndex(
     "count-inscripcion-lista-espera",
     getResumenNumber(
       resumen,
@@ -3031,7 +3106,7 @@ function pintarResumenAlertasIndex(
     )
   );
 
-  setText(
+  setContadorAlertaIndex(
     "count-lista-espera-pagada",
     getResumenNumber(
       resumen,
@@ -3039,7 +3114,7 @@ function pintarResumenAlertasIndex(
     )
   );
 
-  setText(
+  setContadorAlertaIndex(
     "count-reunion-3dias",
     getResumenNumber(
       resumen,
@@ -3720,26 +3795,62 @@ function inicializarDashboardEnCeros() {
   state.inscripcionListaEsperaRows = [];
   state.listaEsperaPagadaRows = [];
 
-  const setText = (id, value) => {
-    const el = $(id);
-    if (el) el.textContent = value;
-  };
-
-  setText("count-sin-asignar", "0");
+  setContadorAlertaIndex(
+    "count-sin-asignar",
+    0
+  );
+  
   setSinAsignarManagementHref();
-
-  setText("count-a-contactar", "0");
-  setText("count-fichas-firmar", "0");
-  setText("count-fichas-corregidas", "0");
-  setText("count-solicitudes-actualizacion", "0");
-
-  setText("count-inscripcion-nuevo-ingreso", "0");
-  setText("count-inscripcion-lista-espera", "0");
-  setText("count-lista-espera-pagada", "0");
-
-  setText("count-alertas-criticas", "0");
-  setText("count-alertas-warning", "0");
-  setText("count-reunion-3dias", "0");
+  
+  setContadorAlertaIndex(
+    "count-a-contactar",
+    0
+  );
+  
+  setContadorAlertaIndex(
+    "count-fichas-firmar",
+    0
+  );
+  
+  setContadorAlertaIndex(
+    "count-fichas-corregidas",
+    0
+  );
+  
+  setContadorAlertaIndex(
+    "count-solicitudes-actualizacion",
+    0
+  );
+  
+  setContadorAlertaIndex(
+    "count-inscripcion-nuevo-ingreso",
+    0
+  );
+  
+  setContadorAlertaIndex(
+    "count-inscripcion-lista-espera",
+    0
+  );
+  
+  setContadorAlertaIndex(
+    "count-lista-espera-pagada",
+    0
+  );
+  
+  setContadorAlertaIndex(
+    "count-alertas-criticas",
+    0
+  );
+  
+  setContadorAlertaIndex(
+    "count-alertas-warning",
+    0
+  );
+  
+  setContadorAlertaIndex(
+    "count-reunion-3dias",
+    0
+  );
 
   syncAlertRowsByRole(getEffectiveUser());
 
@@ -3781,11 +3892,6 @@ function renderDashboard(rows = []) {
   const inicioDiagrama =
     performance.now();
   
-  const setText = (id, value) => {
-    const el = $(id);
-    if (el) el.textContent = String(value);
-  };
-
   const effectiveUser = getEffectiveUser();
   const viewUser = getDashboardViewUser(effectiveUser);
 
@@ -3897,33 +4003,62 @@ function renderDashboard(rows = []) {
   );
 
   // ALERTAS
-  setText("count-sin-asignar", sinAsignarRows.length);
+  setContadorAlertaIndex(
+    "count-sin-asignar",
+    sinAsignarRows.length
+  );
+  
   setSinAsignarManagementHref();
-
-  setText("count-a-contactar", aContactarRows.length);
-
-  setText("count-fichas-firmar", fichasPorFirmar.length);
-  setText("count-fichas-corregidas", fichasCorregidas.length);
-  setText("count-solicitudes-actualizacion", solicitudesActualizacion.length);
-
-  setText(
+  
+  setContadorAlertaIndex(
+    "count-a-contactar",
+    aContactarRows.length
+  );
+  
+  setContadorAlertaIndex(
+    "count-fichas-firmar",
+    fichasPorFirmar.length
+  );
+  
+  setContadorAlertaIndex(
+    "count-fichas-corregidas",
+    fichasCorregidas.length
+  );
+  
+  setContadorAlertaIndex(
+    "count-solicitudes-actualizacion",
+    solicitudesActualizacion.length
+  );
+  
+  setContadorAlertaIndex(
     "count-inscripcion-nuevo-ingreso",
     state.inscripcionNuevoIngresoRows.length
   );
-
-  setText(
+  
+  setContadorAlertaIndex(
     "count-inscripcion-lista-espera",
     state.inscripcionListaEsperaRows.length
   );
-
-  setText(
+  
+  setContadorAlertaIndex(
     "count-lista-espera-pagada",
     state.listaEsperaPagadaRows.length
   );
-
-  setText("count-alertas-criticas", alertasCriticas.length);
-  setText("count-alertas-warning", alertasWarning.length);
-  setText("count-reunion-3dias", reuniones3DiasRows.length);
+  
+  setContadorAlertaIndex(
+    "count-alertas-criticas",
+    alertasCriticas.length
+  );
+  
+  setContadorAlertaIndex(
+    "count-alertas-warning",
+    alertasWarning.length
+  );
+  
+  setContadorAlertaIndex(
+    "count-reunion-3dias",
+    reuniones3DiasRows.length
+  );
 
   syncAlertRowsByRole(viewUser);
 
