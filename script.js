@@ -52,7 +52,6 @@ import {
    CONFIG
 ========================================================= */
 const GITHUB_HOME_URL = "https://sistemas-raitrai.github.io/Ventas-RT/";
-const APODERADO_FILTER_KEY = "ventas_dashboard_apoderado";
 const ALERTAS_COLLECTION = "ventas_alertas";
 const SOLICITUDES_COLLECTION = "ventas_solicitudes_actualizacion";
 const PRIVATE_NOTES_COLLECTION = "ventas_notas_privadas";
@@ -112,35 +111,82 @@ function destroySearchableSelect(id) {
   delete searchableInstances[id];
 }
 
-function initSearchableSelect(id, placeholder = "Escribe para buscar...") {
+function initSearchableSelect(
+  id,
+  placeholder = "Escribe para buscar...",
+  {
+    onChange = null
+  } = {}
+) {
   const el = $(id);
-  if (!el) return;
+
+  if (!el) {
+    return null;
+  }
 
   destroySearchableSelect(id);
 
-  if (typeof window.TomSelect === "undefined") return;
+  if (typeof window.TomSelect === "undefined") {
+    return null;
+  }
 
-  el.setAttribute("placeholder", placeholder);
-
-  const instance = new window.TomSelect(el, {
-    create: false,
-    allowEmptyOption: true,
-    maxOptions: 1000,
-    searchField: ["text"],
-    sortField: [
-      { field: "$score" },
-      { field: "$order" }
-    ],
-    openOnFocus: true,
-    closeAfterSelect: true,
+  el.setAttribute(
+    "placeholder",
     placeholder
-  });
+  );
+
+  const instance =
+    new window.TomSelect(
+      el,
+      {
+        create: false,
+        allowEmptyOption: true,
+        maxOptions: 1000,
+
+        searchField: [
+          "text"
+        ],
+
+        sortField: [
+          {
+            field: "$score"
+          },
+          {
+            field: "$order"
+          }
+        ],
+
+        openOnFocus: true,
+        closeAfterSelect: true,
+        placeholder,
+
+        onChange(value) {
+          const selectedValue =
+            String(value || "").trim();
+
+          if (
+            !selectedValue ||
+            typeof onChange !== "function"
+          ) {
+            return;
+          }
+
+          onChange(
+            selectedValue,
+            instance
+          );
+        }
+      }
+    );
 
   if (el.disabled) {
     instance.disable();
   }
 
-  searchableInstances[id] = instance;
+  searchableInstances[id] =
+    instance;
+
+  return instance;
 }
 
 /* =========================================================
@@ -306,23 +352,6 @@ function getMeetingDate(row = {}) {
   return null;
 }
 
-function getApoderadoFilter() {
-  return String(sessionStorage.getItem(APODERADO_FILTER_KEY) || "").trim();
-}
-
-function setApoderadoFilter(value = "") {
-  const finalValue = String(value || "").trim();
-  if (finalValue) {
-    sessionStorage.setItem(APODERADO_FILTER_KEY, finalValue);
-  } else {
-    sessionStorage.removeItem(APODERADO_FILTER_KEY);
-  }
-}
-
-function clearApoderadoFilter() {
-  sessionStorage.removeItem(APODERADO_FILTER_KEY);
-}
-
 function getPrivateNoteDocId() {
   const uid = String(auth.currentUser?.uid || "").trim();
   if (!uid) return "";
@@ -483,6 +512,26 @@ function bindPrivateNotePanel() {
       await savePrivateNote();
     });
   }
+}
+
+function abrirGrupoDesdeSelector(
+  idGrupo = ""
+) {
+  const id =
+    String(idGrupo || "").trim();
+
+  if (!id) {
+    return;
+  }
+
+  /*
+    Se conserva el grupo seleccionado por coherencia
+    con el resto del sistema.
+  */
+  setGroupFilter(id);
+
+  location.href =
+    `grupo.html?id=${encodeURIComponent(id)}`;
 }
 
 function getRowId(row = {}) {
@@ -3013,12 +3062,12 @@ function actualizarExperienciaPrincipalIndex({
     effectiveUser
   );
 
-  poblarSelectorGrupos(
+  poblarSelectorGruposComerciales(
     effectiveUser,
     rowsScope
   );
-
-  poblarSelectorApoderados(
+  
+  poblarSelectorGruposAdministrativos(
     rowsScope
   );
 
@@ -3795,57 +3844,229 @@ function getAliasColegioSortKey(alias = "") {
     .trim();
 }
 
-function extraerBloquesCursoAnoDesdeAlias(alias = "") {
-  let text = String(alias || "").trim();
-  const bloques = [];
+function extraerBloquesCursoAnoDesdeAlias(
+  alias = ""
+) {
+  let text =
+    String(alias || "").trim();
 
-  while (bloques.length < 2) {
-    const match = text.match(/^([0-9A-Z]+(?:\s*[A-Z]+)?\s*\(\d{4}\))\s*/i);
-    if (!match) break;
+  const bloques =
+    [];
 
-    bloques.push(match[1].replace(/\s+/g, " ").trim());
-    text = text.slice(match[0].length).trim();
+  while (
+    bloques.length < 2
+  ) {
+    const match =
+      text.match(
+        /^([0-9]{1,2}\s*[A-ZÁÉÍÓÚÑ]*\s*\(\d{4}\))\s*/i
+      );
+
+    if (!match) {
+      break;
+    }
+
+    bloques.push(
+      match[1]
+        .replace(/\s+/g, " ")
+        .trim()
+    );
+
+    text =
+      text
+        .slice(match[0].length)
+        .trim();
   }
 
   return bloques;
 }
 
-function extraerColegioDesdeAlias(alias = "") {
-  let text = String(alias || "").trim();
+function extraerDatosCursoAno(
+  bloque = ""
+) {
+  const match =
+    String(bloque || "")
+      .trim()
+      .match(
+        /^([0-9]{1,2})\s*([A-ZÁÉÍÓÚÑ]*)\s*\((\d{4})\)$/i
+      );
 
-  text = text.replace(/^([0-9A-Z]+(?:\s*[A-Z]+)?\s*\(\d{4}\)\s*){1,2}/i, "").trim();
-  text = text.replace(/^\s*[—\-|,:]+\s*/g, "").trim();
+  if (!match) {
+    return null;
+  }
+
+  const numero =
+    Number(match[1]);
+
+  const letra =
+    String(match[2] || "")
+      .trim()
+      .toUpperCase();
+
+  const ano =
+    Number(match[3]);
+
+  if (
+    !Number.isFinite(numero) ||
+    !Number.isFinite(ano)
+  ) {
+    return null;
+  }
+
+  return {
+    numero,
+    letra,
+    ano
+  };
+}
+
+function avanzarCursoEscolar(
+  numeroCurso,
+  cantidadAnos = 0
+) {
+  let curso =
+    Number(numeroCurso);
+
+  let pasos =
+    Math.max(
+      0,
+      Number(cantidadAnos) || 0
+    );
+
+  if (
+    !Number.isFinite(curso) ||
+    curso <= 0
+  ) {
+    return null;
+  }
+
+  while (pasos > 0) {
+    /*
+      Transición:
+      8° básico → 1° medio.
+    */
+    if (curso === 8) {
+      curso = 1;
+    } else if (curso >= 4) {
+      /*
+        No existe un curso posterior a 4° medio.
+        Se mantiene en 4 para evitar mostrar 5°, 6°, etc.
+      */
+      curso = 4;
+    } else {
+      curso += 1;
+    }
+
+    pasos -= 1;
+  }
+
+  return curso;
+}
+
+function calcularCursoActualDesdeAlias(
+  row = {},
+  fechaActual = new Date()
+) {
+  const alias =
+    getRowAlias(row);
+
+  const bloques =
+    extraerBloquesCursoAnoDesdeAlias(
+      alias
+    );
+
+  /*
+    El primer bloque representa:
+    curso cuando se creó el grupo + año de creación.
+  */
+  const datosBase =
+    extraerDatosCursoAno(
+      bloques[0] || ""
+    );
+
+  if (!datosBase) {
+    return String(
+      row.curso || ""
+    ).trim();
+  }
+
+  const anoActual =
+    fechaActual.getFullYear();
+
+  const diferenciaAnos =
+    Math.max(
+      0,
+      anoActual - datosBase.ano
+    );
+
+  const cursoActual =
+    avanzarCursoEscolar(
+      datosBase.numero,
+      diferenciaAnos
+    );
+
+  if (!cursoActual) {
+    return String(
+      row.curso || ""
+    ).trim();
+  }
+
+  return `${cursoActual}${datosBase.letra}`;
+}
+
+function extraerColegioDesdeAlias(
+  alias = ""
+) {
+  let text =
+    String(alias || "").trim();
+
+  /*
+    Quita hasta dos bloques iniciales:
+    1C (2025) 3C (2027)
+  */
+  text =
+    text
+      .replace(
+        /^([0-9]{1,2}\s*[A-ZÁÉÍÓÚÑ]*\s*\(\d{4}\)\s*){1,2}/i,
+        ""
+      )
+      .trim();
+
+  /*
+    Quita separadores sobrantes.
+  */
+  text =
+    text
+      .replace(
+        /^\s*[—\-|,:]+\s*/g,
+        ""
+      )
+      .trim();
 
   return text;
 }
 
-function construirCursoAnoParaSelector(row = {}) {
-  const alias = getRowAlias(row);
-  const bloquesAlias = extraerBloquesCursoAnoDesdeAlias(alias);
+function construirColegioParaSelector(
+  row = {}
+) {
+  const colegio =
+    String(row.colegio || "").trim();
 
-  if (bloquesAlias.length) {
-    return bloquesAlias.join(" ");
+  if (colegio) {
+    return colegio;
   }
 
-  const curso = String(row.curso || "").trim();
-  const anoMatch = String(row.anoViaje || "").match(/\d{4}/);
-  const ano = anoMatch ? anoMatch[0] : "";
+  const alias =
+    getRowAlias(row);
 
-  if (curso && ano) return `${curso} (${ano})`;
-  if (curso) return curso;
-  if (ano) return `(${ano})`;
+  const colegioDesdeAlias =
+    extraerColegioDesdeAlias(
+      alias
+    );
 
-  return "";
-}
-
-function construirColegioParaSelector(row = {}) {
-  const colegio = String(row.colegio || "").trim();
-  if (colegio) return colegio;
-
-  const alias = getRowAlias(row);
-  const colegioDesdeAlias = extraerColegioDesdeAlias(alias);
-
-  return colegioDesdeAlias || alias;
+  return (
+    colegioDesdeAlias ||
+    alias
+  );
 }
 
 function construirLabelGrupoSelector(
@@ -3860,59 +4081,102 @@ function construirLabelGrupoSelector(
       row
     );
 
-  const cursoAno =
-    construirCursoAnoParaSelector(
+  const cursoActual =
+    calcularCursoActualDesdeAlias(
       row
     );
+
+  const colegioCurso =
+    [
+      colegio,
+      cursoActual
+    ]
+      .filter(
+        (parte) =>
+          String(parte || "").trim()
+      )
+      .join(" ");
 
   const apoderado =
     getRowApoderado(row);
 
+  const estado =
+    String(
+      row.estado ||
+      "Sin estado"
+    ).trim();
+
   return [
     ano,
-    colegio,
-    cursoAno,
-    apoderado
+    colegioCurso,
+    apoderado,
+    estado
   ]
     .filter(
       (parte) =>
-        String(
-          parte || ""
-        ).trim()
+        String(parte || "").trim()
     )
     .join(" · ");
 }
 
-function construirSortKeyGrupoSelector(
+function getPrioridadEstadoAdministrativo(
   row = {}
 ) {
-  const anoActual =
-    getAnoPrioritarioIndex();
+  const bucket =
+    resolveEstadoBucket(row);
 
-  const ano =
-    getAnoViajeNumber(row) ||
-    9999;
+  const prioridades = {
+    ganadas: 1,
+    reunion: 2,
+    cotizando: 3,
+    recotizando: 4,
+    contactados: 5
+  };
 
-  const prioridadAno =
-    ano === anoActual
-      ? 0
-      : Math.max(
-          1,
-          ano - anoActual
-        );
+  return (
+    prioridades[bucket] ||
+    99
+  );
+}
 
-  const prioridadEstado =
-    isGanadaComercial(row)
-      ? 0
-      : 1;
+function esEstadoVisibleEnSelectores(
+  row = {}
+) {
+  return (
+    resolveEstadoBucket(row) !==
+    "perdidas"
+  );
+}
 
+function esEstadoAdministrativoVisible(
+  row = {}
+) {
+  const bucket =
+    resolveEstadoBucket(row);
+
+  return [
+    "ganadas",
+    "reunion",
+    "cotizando",
+    "recotizando",
+    "contactados"
+  ].includes(bucket);
+}
+
+function construirSortKeyComercial(
+  row = {}
+) {
   const colegio =
     construirColegioParaSelector(
       row
     );
 
-  const cursoAno =
-    construirCursoAnoParaSelector(
+  const ano =
+    getAnoViajeNumber(row) ||
+    9999;
+
+  const cursoActual =
+    calcularCursoActualDesdeAlias(
       row
     );
 
@@ -3920,20 +4184,97 @@ function construirSortKeyGrupoSelector(
     getRowApoderado(row);
 
   return [
-    String(
-      prioridadAno
-    ).padStart(3, "0"),
+    normalizeLoose(colegio),
 
-    String(
-      prioridadEstado
+    String(ano)
+      .padStart(4, "0"),
+
+    normalizeLoose(
+      cursoActual
     ),
 
     normalizeLoose(
-      colegio
+      apoderado
+    )
+  ].join(" | ");
+}
+
+function construirSortKeyAdministrativo(
+  row = {}
+) {
+  const colegio =
+    construirColegioParaSelector(
+      row
+    );
+
+  const prioridadEstado =
+    getPrioridadEstadoAdministrativo(
+      row
+    );
+
+  const cursoActual =
+    calcularCursoActualDesdeAlias(
+      row
+    );
+
+  const apoderado =
+    getRowApoderado(row);
+
+  const ano =
+    getAnoViajeNumber(row) ||
+    9999;
+
+  return [
+    normalizeLoose(colegio),
+
+    String(prioridadEstado)
+      .padStart(2, "0"),
+
+    String(ano)
+      .padStart(4, "0"),
+
+    normalizeLoose(
+      cursoActual
     ),
 
     normalizeLoose(
-      cursoAno
+      apoderado
+    )
+  ].join(" | ");
+}
+
+/*
+  Esta función se mantiene porque también la utiliza
+  el buscador general del dashboard.
+*/
+function construirSortKeyGrupoSelector(
+  row = {}
+) {
+  const colegio =
+    construirColegioParaSelector(
+      row
+    );
+
+  const ano =
+    getAnoViajeNumber(row) ||
+    9999;
+
+  const cursoActual =
+    calcularCursoActualDesdeAlias(
+      row
+    );
+
+  const apoderado =
+    getRowApoderado(row);
+
+  return [
+    normalizeLoose(colegio),
+
+    String(ano)
+      .padStart(4, "0"),
+
+    normalizeLoose(
+      cursoActual
     ),
 
     normalizeLoose(
@@ -3945,91 +4286,48 @@ function construirSortKeyGrupoSelector(
 /* =========================================================
    SELECTOR DE GRUPOS
 ========================================================= */
-function poblarSelectorGrupos(
+function poblarSelectorGruposComerciales(
   effectiveUser,
   rows = []
 ) {
   const select =
-    $("select-grupo");
-
-  const btn =
-    $("btn-ir-grupo");
+    $("select-grupo-comercial");
 
   if (
     !select ||
-    !btn ||
     !effectiveUser
   ) {
     return;
   }
 
-  const vendorFilter =
-    getVendorFilter(
-      effectiveUser
-    );
-
-  const savedGroup =
-    getGroupFilter();
-
-  select.innerHTML =
-    "";
-
-  const defaultOption =
-    document.createElement(
-      "option"
-    );
-
-  defaultOption.value =
-    "";
+  const anoActual =
+    getAnoPrioritarioIndex();
 
   /*
-    El texto inicial debe comportarse como buscador,
-    no como selector tradicional.
+    Comercial:
+    desde el próximo año en adelante.
+    En 2026 muestra 2027, 2028, 2029...
   */
-  if (
-    isVendedorRole(
-      effectiveUser
-    )
-  ) {
-    defaultOption.textContent =
-      "Buscar grupo...";
-  } else if (
-    vendorFilter
-  ) {
-    const vendedores =
-      getVendorUsers();
+  const rowsComerciales =
+    dedupeRowsByGroup(rows)
+      .filter(
+        (row) => {
+          const anoViaje =
+            getAnoViajeNumber(row);
 
-    const vendedor =
-      vendedores.find(
-        (v) =>
-          normalizeEmail(
-            v.email
-          ) ===
-          normalizeEmail(
-            vendorFilter
-          )
+          return (
+            anoViaje !== null &&
+            anoViaje >= anoActual + 1 &&
+            esEstadoVisibleEnSelectores(row)
+          );
+        }
       );
 
-    const nombreVendedor =
-      vendedor
-        ? `${vendedor.nombre || ""} ${vendedor.apellido || ""}`.trim()
-        : "";
-
-    defaultOption.textContent =
-      nombreVendedor
-        ? `Buscar grupo de ${nombreVendedor}...`
-        : "Buscar grupo...";
-  } else {
-    defaultOption.textContent =
-      "Buscar grupo...";
-  }
-
-  select.appendChild(
-    defaultOption
-  );
+  select.innerHTML =
+    `<option value="">Buscar grupo comercial...</option>`;
 
   const items =
-    rows
+    rowsComerciales
       .map(
         (row) => ({
           value:
@@ -4041,7 +4339,7 @@ function poblarSelectorGrupos(
             ),
 
           sortKey:
-            construirSortKeyGrupoSelector(
+            construirSortKeyComercial(
               row
             )
         })
@@ -4056,11 +4354,8 @@ function poblarSelectorGrupos(
             b.sortKey,
             "es",
             {
-              sensitivity:
-                "base",
-
-              numeric:
-                true
+              sensitivity: "base",
+              numeric: true
             }
           )
       );
@@ -4084,135 +4379,86 @@ function poblarSelectorGrupos(
     }
   );
 
-  const existsSaved =
-    items.some(
-      (item) =>
-        item.value ===
-        savedGroup
-    );
-
-  if (
-    existsSaved
-  ) {
-    select.value =
-      savedGroup;
-  } else {
-    select.value =
-      "";
-
-    clearGroupFilter();
-  }
+  /*
+    Siempre comienza vacío.
+    Es un acceso directo, no un filtro persistente.
+  */
+  select.value =
+    "";
 
   select.disabled =
     !items.length;
 
-  btn.disabled =
-    !items.length;
-
   initSearchableSelect(
-    "select-grupo",
-    "Buscar por colegio, curso, año o apoderado..."
+    "select-grupo-comercial",
+    "Buscar grupo comercial por colegio, curso, año o apoderado...",
+    {
+      onChange(value) {
+        abrirGrupoDesdeSelector(
+          value
+        );
+      }
+    }
   );
 }
 
 /* =========================================================
-   SELECTOR DE APODERADOS
+   SELECTOR DE GRUPOS ADMINISTRATIVOS
 ========================================================= */
-function poblarSelectorApoderados(
+function poblarSelectorGruposAdministrativos(
   rows = []
 ) {
   const select =
-    $("select-apoderado");
+    $("select-grupo-administrativo");
 
-  const btn =
-    $("btn-ir-apoderado");
-
-  if (
-    !select ||
-    !btn
-  ) {
+  if (!select) {
     return;
   }
-
-  const savedApoderado =
-    getApoderadoFilter();
-
-  /*
-    El texto inicial ahora dice Buscar apoderado.
-  */
-  select.innerHTML =
-    `<option value="">Buscar apoderado...</option>`;
 
   const anoActual =
     getAnoPrioritarioIndex();
 
-  const items =
-    rows
-      .map(
+  /*
+    Administrativo:
+    solamente grupos del año actual.
+
+    Durante 2026:
+    muestra grupos que viajan en 2026.
+  */
+  const rowsAdministrativos =
+    dedupeRowsByGroup(rows)
+      .filter(
         (row) => {
-          const ano =
-            getAnoViajeNumber(
+          const anoViaje =
+            getAnoViajeNumber(row);
+
+          return (
+            anoViaje === anoActual &&
+            esEstadoAdministrativoVisible(row)
+          );
+        }
+      );
+
+  select.innerHTML =
+    `<option value="">Buscar grupo administrativo...</option>`;
+
+  const items =
+    rowsAdministrativos
+      .map(
+        (row) => ({
+          value:
+            getRowId(row),
+
+          label:
+            construirLabelGrupoSelector(
               row
-            ) ||
-            9999;
+            ),
 
-          const prioridadAno =
-            ano === anoActual
-              ? 0
-              : Math.max(
-                  1,
-                  ano - anoActual
-                );
-
-          const prioridadEstado =
-            isGanadaComercial(
+          sortKey:
+            construirSortKeyAdministrativo(
               row
             )
-              ? 0
-              : 1;
-
-          return {
-            value:
-              getRowId(row),
-
-            label:
-              [
-                ano,
-                getRowApoderado(
-                  row
-                ),
-                getRowAlias(
-                  row
-                )
-              ].join(" · "),
-
-            sortKey:
-              [
-                String(
-                  prioridadAno
-                ).padStart(
-                  3,
-                  "0"
-                ),
-
-                String(
-                  prioridadEstado
-                ),
-
-                normalizeLoose(
-                  getRowApoderado(
-                    row
-                  )
-                ),
-
-                normalizeLoose(
-                  getRowAlias(
-                    row
-                  )
-                )
-              ].join(" | ")
-          };
-        }
+        })
       )
       .filter(
         (item) =>
@@ -4224,11 +4470,8 @@ function poblarSelectorApoderados(
             b.sortKey,
             "es",
             {
-              sensitivity:
-                "base",
-
-              numeric:
-                true
+              sensitivity: "base",
+              numeric: true
             }
           )
       );
@@ -4252,34 +4495,25 @@ function poblarSelectorApoderados(
     }
   );
 
-  const existsSaved =
-    items.some(
-      (item) =>
-        item.value ===
-        savedApoderado
-    );
-
-  if (
-    existsSaved
-  ) {
-    select.value =
-      savedApoderado;
-  } else {
-    select.value =
-      "";
-
-    clearApoderadoFilter();
-  }
+  /*
+    Siempre comienza vacío.
+  */
+  select.value =
+    "";
 
   select.disabled =
     !items.length;
 
-  btn.disabled =
-    !items.length;
-
   initSearchableSelect(
-    "select-apoderado",
-    "Buscar apoderado..."
+    "select-grupo-administrativo",
+    "Buscar grupo administrativo por colegio, curso, año o apoderado...",
+    {
+      onChange(value) {
+        abrirGrupoDesdeSelector(
+          value
+        );
+      }
+    }
   );
 }
 
@@ -4463,9 +4697,8 @@ async function initPage() {
     }
   });
 
-  const btnIrVendedor = $("btn-ir-vendedor");
-  const btnIrGrupo = $("btn-ir-grupo");
-  const btnIrApoderado = $("btn-ir-apoderado");
+  const btnIrVendedor =
+    $("btn-ir-vendedor");
 
   const linkSinAsignar = $("link-sin-asignar");
 
@@ -4529,8 +4762,6 @@ async function initPage() {
   const buscadorAlertasInscripciones =
     $("alertas-inscripciones-buscador");
   
-  const selectGrupo = $("select-grupo");
-  const selectApoderado = $("select-apoderado");
 
   if (btnIrVendedor && !btnIrVendedor.dataset.bound) {
     btnIrVendedor.dataset.bound = "1";
@@ -4549,28 +4780,6 @@ async function initPage() {
       clearGroupFilter();
       clearApoderadoFilter();
       await renderPantalla();
-    });
-  }
-
-  if (btnIrGrupo && !btnIrGrupo.dataset.bound) {
-    btnIrGrupo.dataset.bound = "1";
-
-    btnIrGrupo.addEventListener("click", () => {
-      const grupoSeleccionado = String(selectGrupo?.value || "").trim();
-
-      setGroupFilter(grupoSeleccionado);
-      setApoderadoFilter(grupoSeleccionado);
-
-      if (selectApoderado) {
-        selectApoderado.value = grupoSeleccionado || "";
-      }
-
-      if (!grupoSeleccionado) {
-        alert("Debes seleccionar un grupo.");
-        return;
-      }
-      
-      location.href = `grupo.html?id=${encodeURIComponent(grupoSeleccionado)}`;
     });
   }
 
@@ -4612,28 +4821,6 @@ async function initPage() {
       if (e.target === modalAContactar) {
         closeAContactarModal();
       }
-    });
-  }
-
-  if (btnIrApoderado && !btnIrApoderado.dataset.bound) {
-    btnIrApoderado.dataset.bound = "1";
-
-    btnIrApoderado.addEventListener("click", () => {
-      const apoderadoSeleccionado = String(selectApoderado?.value || "").trim();
-
-      setApoderadoFilter(apoderadoSeleccionado);
-      setGroupFilter(apoderadoSeleccionado);
-
-      if (selectGrupo) {
-        selectGrupo.value = apoderadoSeleccionado || "";
-      }
-
-      if (!apoderadoSeleccionado) {
-        alert("Debes seleccionar un apoderado.");
-        return;
-      }
-      
-      location.href = `grupo.html?id=${encodeURIComponent(apoderadoSeleccionado)}`;
     });
   }
 
