@@ -91,6 +91,7 @@
     }
 
     body[data-page="home"] .alert-row{
+      position:relative;
       margin:0;
       padding:14px 14px;
       display:grid;
@@ -103,8 +104,13 @@
       box-shadow:none;
       font-size:14px;
       line-height:1.25;
+    
+      transition:
+        background .18s ease,
+        border-color .18s ease,
+        box-shadow .18s ease;
     }
-
+    
     body[data-page="home"] .alert-row strong{
       color:#26133d;
       font-size:18px;
@@ -125,6 +131,67 @@
       font-size:12px;
       font-weight:900;
       white-space:nowrap;
+    }
+    
+    /* =========================================================
+       HOME — ALERTAS ACTIVAS
+    ========================================================= */
+    
+    /*
+      Cuando hay entre 1 y 5 registros pendientes.
+    */
+    body[data-page="home"] .alert-row.alerta-activa{
+      background:
+        linear-gradient(
+          135deg,
+          rgba(238,230,248,.98),
+          rgba(250,247,253,.98)
+        );
+    
+      border-color:rgba(91,52,128,.34);
+    
+      box-shadow:
+        0 8px 20px rgba(49,25,75,.10);
+    }
+    
+    body[data-page="home"] .alert-row.alerta-activa strong{
+      color:#5b2780;
+    }
+    
+    body[data-page="home"] .alert-row.alerta-activa a{
+      background:#5b347b;
+      color:#fff;
+    }
+    
+    /*
+      Cuando hay más de 5 registros pendientes.
+    */
+    body[data-page="home"] .alert-row.alerta-urgente{
+      border-color:rgba(116,62,151,.60);
+    
+      animation:
+        homeAlertaUrgente 1.45s ease-in-out infinite;
+    }
+    
+    @keyframes homeAlertaUrgente{
+      0%,
+      100%{
+        box-shadow:
+          0 8px 20px rgba(49,25,75,.10),
+          0 0 0 0 rgba(116,62,151,0);
+      }
+    
+      50%{
+        box-shadow:
+          0 10px 24px rgba(49,25,75,.17),
+          0 0 0 5px rgba(116,62,151,.18);
+      }
+    }
+    
+    @media (prefers-reduced-motion:reduce){
+      body[data-page="home"] .alert-row.alerta-urgente{
+        animation:none;
+      }
     }
 
     body[data-page="home"] .home-search-grid{
