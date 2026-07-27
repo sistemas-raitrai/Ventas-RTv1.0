@@ -4670,29 +4670,50 @@ async function initPage() {
         sessionStorage.removeItem(ACTING_USER_KEY);
         clearVendorFilter();
         clearGroupFilter();
-        clearApoderadoFilter();
+    
         await signOut(auth);
+    
         location.href = "login.html";
       } catch (error) {
-        alert("Error al cerrar sesión: " + error.message);
+        alert(
+          "Error al cerrar sesión: " +
+          error.message
+        );
       }
     },
     onActAs: async (selectedEmail) => {
-      const realUser = getRealUser();
-      if (!realUser || realUser.rol !== "admin") return;
-      if (!selectedEmail) return;
-
-      sessionStorage.setItem(ACTING_USER_KEY, selectedEmail);
+      const realUser =
+        getRealUser();
+    
+      if (
+        !realUser ||
+        realUser.rol !== "admin"
+      ) {
+        return;
+      }
+    
+      if (!selectedEmail) {
+        return;
+      }
+    
+      sessionStorage.setItem(
+        ACTING_USER_KEY,
+        selectedEmail
+      );
+    
       clearVendorFilter();
       clearGroupFilter();
-      clearApoderadoFilter();
+    
       renderPantalla();
     },
     onResetActAs: async () => {
-      sessionStorage.removeItem(ACTING_USER_KEY);
+      sessionStorage.removeItem(
+        ACTING_USER_KEY
+      );
+    
       clearVendorFilter();
       clearGroupFilter();
-      clearApoderadoFilter();
+    
       renderPantalla();
     }
   });
