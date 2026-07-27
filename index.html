@@ -11,7 +11,7 @@
     href="https://cdn.jsdelivr.net/npm/tom-select@2.4.3/dist/css/tom-select.css"
   />
 <style>
-      /* =========================================================
+    /* =========================================================
        INDEX — FILTROS EN TRES FILAS DE ANCHO COMPLETO
     ========================================================= */
   
@@ -267,13 +267,36 @@
       Los módulos siguientes quedan por debajo
       del desplegable.
     */
-    body[data-page="index"] .panel-grupos,
-    body[data-page="index"] .panel-seguimiento-griveros {
-      position:
-        relative !important;
+    body[data-page="index"] .panel-grupos {
+      position: relative !important;
+      z-index: 1 !important;
+    }
+  
+    /* =========================================================
+       INDEX — SEPARACIÓN DE ALERTAS
+    ========================================================= */
     
-      z-index:
-        1 !important;
+    body[data-page="index"] .alert-section {
+      display: grid;
+      gap: 10px;
+    }
+    
+    body[data-page="index"] .alert-section + .alert-section {
+      margin-top: 24px;
+      padding-top: 20px;
+      border-top: 1px solid rgba(49, 25, 75, 0.12);
+    }
+    
+    body[data-page="index"] .alert-section-title {
+      margin: 0 0 2px;
+      color: #31194b;
+      font-size: 15px;
+      font-weight: 900;
+      line-height: 1.2;
+    }
+    
+    body[data-page="index"] .alert-section-title.is-ventas {
+      margin-top: 2px;
     }
 </style>
 </head>
@@ -290,89 +313,100 @@
     <section class="left-column">
       <div class="panel panel-alertas">
         <h2>ALERTAS</h2>
-
-        <div class="alert-row">
-          <span>Hay</span>
-          <strong id="count-sin-asignar">0</strong>
-          <span>contactos</span>
-          <a href="#" id="link-sin-asignar">Sin Asignar</a>
+      
+        <!-- ===============================================
+             ALERTAS ADMINISTRATIVAS
+        ================================================ -->
+        <div class="alert-section">
+          <h3 class="alert-section-title">
+            Alertas Administrativas
+          </h3>
+      
+          <div class="alert-row">
+            <span>Hay</span>
+            <strong id="count-fichas-firmar">0</strong>
+            <span>fichas nuevas por firmar</span>
+            <a href="#" id="link-fichas-firmar">Ver</a>
+          </div>
+      
+          <div class="alert-row">
+            <span>Hay</span>
+            <strong id="count-fichas-corregidas">0</strong>
+            <span>fichas corregidas</span>
+            <a href="#" id="link-fichas-corregidas">Ver</a>
+          </div>
+      
+          <div class="alert-row">
+            <span>Hay</span>
+            <strong id="count-solicitudes-actualizacion">0</strong>
+            <span>solicitudes de actualización de fichas</span>
+            <a href="#" id="link-solicitudes-actualizacion">Ver</a>
+          </div>
+      
+          <div class="alert-row">
+            <span>Hay</span>
+            <strong id="count-inscripcion-nuevo-ingreso">0</strong>
+            <span>inscripciones Nuevo Ingreso pendientes</span>
+            <a href="#" id="link-inscripcion-nuevo-ingreso">Ver</a>
+          </div>
+      
+          <div class="alert-row">
+            <span>Hay</span>
+            <strong id="count-inscripcion-lista-espera">0</strong>
+            <span>inscripciones Lista de Espera pendientes</span>
+            <a href="#" id="link-inscripcion-lista-espera">Ver</a>
+          </div>
+      
+          <div class="alert-row">
+            <span>Hay</span>
+            <strong id="count-lista-espera-pagada">0</strong>
+            <span>listas de espera pendientes por confirmar</span>
+            <a href="#" id="link-lista-espera-pagada">Ver</a>
+          </div>
         </div>
-
-        <div class="alert-row">
-          <span>Hay</span>
-          <strong id="count-a-contactar">0</strong>
-          <span>contactos</span>
-          <a href="#" id="link-a-contactar">A contactar</a>
+      
+        <!-- ===============================================
+             ALERTAS DE VENTAS
+        ================================================ -->
+        <div class="alert-section">
+          <h3 class="alert-section-title is-ventas">
+            Alertas Ventas
+          </h3>
+      
+          <div class="alert-row">
+            <span>Hay</span>
+            <strong id="count-alertas-criticas">0</strong>
+            <span>alertas críticas</span>
+            <a href="#" id="link-alertas-criticas">Ver</a>
+          </div>
+      
+          <div class="alert-row">
+            <span>Hay</span>
+            <strong id="count-alertas-warning">0</strong>
+            <span>alertas pendientes</span>
+            <a href="#" id="link-alertas-warning">Ver</a>
+          </div>
+      
+          <div class="alert-row">
+            <span>Hay</span>
+            <strong id="count-sin-asignar">0</strong>
+            <span>contactos sin asignar</span>
+            <a href="#" id="link-sin-asignar">Ver</a>
+          </div>
+      
+          <div class="alert-row">
+            <span>Hay</span>
+            <strong id="count-a-contactar">0</strong>
+            <span>contactos a contactar</span>
+            <a href="#" id="link-a-contactar">Ver</a>
+          </div>
+      
+          <div class="alert-row alert-row-wrap">
+            <span>Hay</span>
+            <strong id="count-reunion-3dias">0</strong>
+            <span>reuniones confirmadas en los próximos tres días</span>
+          </div>
         </div>
-
-        <div class="alert-row">
-          <span>Hay</span>
-          <strong id="count-fichas-firmar">0</strong>
-          <span>fichas por firmar</span>
-          <a href="#" id="link-fichas-firmar">Ver</a>
-        </div>
-
-        <div class="alert-row">
-          <span>Hay</span>
-          <strong id="count-fichas-corregidas">0</strong>
-          <span>fichas corregidas</span>
-          <a href="#" id="link-fichas-corregidas">Ver</a>
-        </div>
-
-        <div class="alert-row">
-          <span>Hay</span>
-          <strong id="count-solicitudes-actualizacion">0</strong>
-          <span>solicitudes de actualización</span>
-          <a href="#" id="link-solicitudes-actualizacion">Ver</a>
-        </div>
-        
-        <div class="alert-row">
-          <span>Hay</span>
-          <strong id="count-alertas-criticas">0</strong>
-          <span>alertas críticas</span>
-          <a href="#" id="link-alertas-criticas">Ver</a>
-        </div>
-        
-        <div class="alert-row">
-          <span>Hay</span>
-          <strong id="count-alertas-warning">0</strong>
-          <span>alertas pendientes</span>
-          <a href="#" id="link-alertas-warning">Ver</a>
-        </div>
-
-        <div class="alert-row">
-          <span>Hay</span>
-          <strong id="count-inscripcion-nuevo-ingreso">0</strong>
-          <span>inscripciones Nuevo Ingreso pendientes</span>
-          <a href="#" id="link-inscripcion-nuevo-ingreso">Ver</a>
-        </div>
-        
-        <div class="alert-row">
-          <span>Hay</span>
-          <strong id="count-inscripcion-lista-espera">0</strong>
-          <span>inscripciones Lista de Espera pendientes</span>
-          <a href="#" id="link-inscripcion-lista-espera">Ver</a>
-        </div>
-        
-        <div class="alert-row">
-          <span>Hay</span>
-          <strong id="count-lista-espera-pagada">0</strong>
-          <span>listas de espera pendientes por confirmar</span>
-          <a href="#" id="link-lista-espera-pagada">Ver</a>
-        </div>
-        
-        <div class="alert-row alert-row-wrap">
-          <span>Hay</span>
-          <strong id="count-reunion-3dias">0</strong>
-          <span>reunión confirmada en los próximos tres días.</span>
-        </div>
-
-        <!-- <div class="alert-row">
-          <span>Hay</span>
-          <strong id="count-pendientes">0</strong>
-          <span>grupos Pendientes</span>
-          <a href="#" id="link-pendientes">Ver</a>
-        </div>-->
       </div>
 
       <div class="panel panel-importante" id="panel-private-note">
@@ -478,26 +512,6 @@
             </select>
           </div>
         
-        </div>
-      </div>
-
-      <div class="panel panel-seguimiento-griveros" id="panel-seguimiento-griveros" hidden>
-        <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:12px;">
-          <div>
-            <h2 style="margin:0;">SEGUIMIENTO COMERCIAL</h2>
-            <p style="margin:4px 0 0; color:#6a6078; font-size:13px;">
-              Vista especial de seguimiento comercial.
-            </p>
-          </div>
-      
-          <a
-            href="seguimiento.html?vendor=griveros@raitrai.cl"
-            target="_blank"
-            rel="noopener"
-            style="text-decoration:none; background:#3b2357; color:#fff; border-radius:999px; padding:10px 14px; font-weight:700;"
-          >
-            Abrir completo
-          </a>
         </div>
       </div>
 
