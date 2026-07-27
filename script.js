@@ -4799,7 +4799,6 @@ async function initPage() {
       }
 
       clearGroupFilter();
-      clearApoderadoFilter();
       await renderPantalla();
     });
   }
