@@ -2,6 +2,7 @@ import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/
 import {
   collection,
   doc,
+  getDoc,
   getDocs,
   query,
   orderBy,
@@ -42,10 +43,29 @@ import {
 /* =========================================================
    CONFIG
 ========================================================= */
-const GITHUB_HOME_URL = "https://sistemas-raitrai.github.io/Ventas-RT/";
-const DETALLE_GRUPO_URL = "grupo.html";
-const ARCHIVE_PASSWORD = "Raitrai2026";
-const ARCHIVED_COLLECTION = "ventas_cotizaciones_archivadas";
+const GITHUB_HOME_URL =
+  "https://sistemas-raitrai.github.io/Ventas-RT/";
+
+const DETALLE_GRUPO_URL =
+  "grupo.html";
+
+const ARCHIVE_PASSWORD =
+  "Raitrai2026";
+
+const GRUPOS_COLLECTION =
+  "ventas_cotizaciones";
+
+const GRUPOS_RESUMEN_COLLECTION =
+  "ventas_grupos_resumen";
+
+const ARCHIVED_COLLECTION =
+  "ventas_cotizaciones_archivadas";
+
+const ASIGNADOS_CACHE_KEY =
+  "ventas_asignados_grupos_resumen";
+
+const ASIGNADOS_CACHE_TTL_MS =
+  10 * 60 * 1000;
 
 /* =========================================================
    ESTADO
@@ -210,13 +230,28 @@ function getAnoViajeNumber(row = {}) {
 
 function getSearchTarget(row = {}) {
   return normalizeSearch([
+    row.busquedaTexto,
+
     row.idGrupo,
+    row.groupDocId,
+    row.numeroNegocio,
     row.codigoRegistro,
+
     row.aliasGrupo,
+    row.nombreGrupo,
     row.colegio,
+    row.curso,
+
     row.nombreCliente,
+    row.nombreCliente2,
+
+    row.comunaCiudad,
+    row.comuna,
+    row.destino,
+
     row.estado,
     row.vendedora,
+    row.vendedoraCorreo,
     row.anoViaje
   ].join(" "));
 }
@@ -1292,94 +1327,313 @@ async function analyzeVendorAssignmentRecommendation(sourceRow = {}, selectedVen
 /* =========================================================
    CARGA
 ========================================================= */
-async function loadData() {
+function guardarCacheAsignados(
+  rows = []
+) {
+  try {
+    sessionStorage.setItem(
+      ASIGNADOS_CACHE_KEY,
+      JSON.stringify({
+        guardadoAt:
+          Date.now(),
+
+        rows
+      })
+    );
+  } catch (error) {
+    console.warn(
+      "[ASIGNADOS] No se pudo guardar la caché:",
+      error
+    );
+  }
+}
+
+function leerCacheAsignados() {
+  try {
+    const raw =
+      sessionStorage.getItem(
+        ASIGNADOS_CACHE_KEY
+      );
+
+    if (!raw) {
+      return null;
+    }
+
+    const parsed =
+      JSON.parse(raw);
+
+    const guardadoAt =
+      Number(
+        parsed?.guardadoAt || 0
+      );
+
+    if (
+      !guardadoAt ||
+      Date.now() - guardadoAt >
+        ASIGNADOS_CACHE_TTL_MS
+    ) {
+      sessionStorage.removeItem(
+        ASIGNADOS_CACHE_KEY
+      );
+
+      return null;
+    }
+
+    return Array.isArray(
+      parsed?.rows
+    )
+      ? parsed.rows
+      : null;
+  } catch (error) {
+    console.warn(
+      "[ASIGNADOS] Caché inválida:",
+      error
+    );
+
+    return null;
+  }
+}
+
+function mapGrupoResumenAsignados(
+  docSnap
+) {
+  const data =
+    docSnap.data() || {};
+
+  return {
+    id:
+      docSnap.id,
+
+    idGrupo:
+      data.idGrupo ||
+      data.groupDocId ||
+      docSnap.id,
+
+    ...data
+  };
+}
+
+function aplicarRowsAsignados(
+  rows = []
+) {
+  state.rows =
+    Array.isArray(rows)
+      ? rows
+      : [];
+
+  populateFilters();
+  applyFilters();
+}
+
+async function loadData({
+  forzar = false
+} = {}) {
+  const inicioTotal =
+    performance.now();
+
   try {
     setProgressStatus({
-      text: "Cargando asignaciones...",
-      meta: "Preparando vista comercial...",
-      progress: 10
+      text:
+        "Cargando asignaciones...",
+
+      meta:
+        "Preparando vista comercial...",
+
+      progress:
+        10
     });
 
-    if ($("asignadosLoadHint")) {
-      $("asignadosLoadHint").textContent = "Preparando vista comercial...";
+    if (
+      $("asignadosLoadHint")
+    ) {
+      $("asignadosLoadHint")
+        .textContent =
+        "Preparando vista comercial...";
     }
 
-    const vendorOptions = getVendorOptions();
+    const vendorOptions =
+      getVendorOptions();
 
     setProgressStatus({
-      text: "Cargando asignaciones...",
-      meta: `Vendedoras detectadas: ${vendorOptions.length}`,
-      progress: 20
+      text:
+        "Cargando asignaciones...",
+
+      meta:
+        `Vendedoras detectadas: ${vendorOptions.length}`,
+
+      progress:
+        20
     });
 
-    if ($("asignadosLoadHint")) {
-      $("asignadosLoadHint").textContent = `Vendedoras detectadas: ${vendorOptions.length}`;
+    /*
+      Primero usamos la caché.
+
+      Esto permite mostrar la tabla inmediatamente
+      cuando el usuario vuelve a la página.
+    */
+    if (!forzar) {
+      const cache =
+        leerCacheAsignados();
+
+      if (cache) {
+        aplicarRowsAsignados(
+          cache
+        );
+
+        if (
+          $("asignadosLoadHint")
+        ) {
+          $("asignadosLoadHint")
+            .textContent =
+            `${state.filteredRows.length} grupo(s) mostrados desde caché. Actualizando...`;
+        }
+
+        console.log(
+          "[ASIGNADOS] Datos mostrados desde sessionStorage",
+          {
+            documentos:
+              cache.length
+          }
+        );
+      }
     }
 
-    const snap = await getDocs(collection(db, "ventas_cotizaciones"));
-
     setProgressStatus({
-      text: "Procesando grupos...",
-      meta: `Documentos recibidos: ${snap.size}`,
-      progress: 55
+      text:
+        "Actualizando asignaciones...",
+
+      meta:
+        "Consultando colección rápida...",
+
+      progress:
+        38
     });
 
-    if ($("asignadosLoadHint")) {
-      $("asignadosLoadHint").textContent = `Procesando ${snap.size} grupo(s)...`;
+    const inicioFirestore =
+      performance.now();
+
+    /*
+      IMPORTANTE:
+
+      Ya no descargamos ventas_cotizaciones.
+      Leemos la colección liviana.
+    */
+    const snap =
+      await getDocs(
+        collection(
+          db,
+          GRUPOS_RESUMEN_COLLECTION
+        )
+      );
+
+    console.log(
+      "[ASIGNADOS] Colección resumen cargada",
+      {
+        documentos:
+          snap.size,
+
+        firestoreMs:
+          Math.round(
+            performance.now() -
+            inicioFirestore
+          )
+      }
+    );
+
+    setProgressStatus({
+      text:
+        "Procesando grupos...",
+
+      meta:
+        `Documentos recibidos: ${snap.size}`,
+
+      progress:
+        60
+    });
+
+    const rows =
+      snap.docs.map(
+        mapGrupoResumenAsignados
+      );
+
+    /*
+      Reemplazamos la caché por datos actuales.
+    */
+    aplicarRowsAsignados(
+      rows
+    );
+
+    guardarCacheAsignados(
+      rows
+    );
+
+    setProgressStatus({
+      text:
+        "Asignaciones cargadas.",
+
+      meta:
+        `${state.filteredRows.length} grupo(s) visibles en la vista actual.`,
+
+      progress:
+        100,
+
+      type:
+        "success"
+    });
+
+    if (
+      $("asignadosLoadHint")
+    ) {
+      $("asignadosLoadHint")
+        .textContent =
+        `${state.filteredRows.length} grupo(s) listos en la vista actual.`;
     }
 
-    state.rows = snap.docs.map((docSnap) => {
-      const data = docSnap.data() || {};
-      return {
-        id: docSnap.id,
-        idGrupo: data.idGrupo || docSnap.id,
-        ...data
-      };
-    });
+    console.log(
+      "[ASIGNADOS] Carga finalizada",
+      {
+        grupos:
+          state.rows.length,
 
-    setProgressStatus({
-      text: "Aplicando filtros...",
-      meta: `Total grupos cargados: ${state.rows.length}`,
-      progress: 78
-    });
+        visibles:
+          state.filteredRows.length,
 
-    populateFilters();
-
-    if ($("asignadosLoadHint")) {
-      $("asignadosLoadHint").textContent = "Aplicando filtros y renderizando tabla...";
-    }
-
-    setProgressStatus({
-      text: "Renderizando tabla...",
-      meta: "Preparando resumen, tabs y filas...",
-      progress: 90
-    });
-
-    applyFilters();
-
-    setProgressStatus({
-      text: "Asignaciones cargadas.",
-      meta: `${state.filteredRows.length} grupo(s) visibles en la vista actual.`,
-      progress: 100,
-      type: "success"
-    });
-
-    if ($("asignadosLoadHint")) {
-      $("asignadosLoadHint").textContent = `${state.filteredRows.length} grupo(s) listos en la vista actual.`;
-    }
+        duracionTotalMs:
+          Math.round(
+            performance.now() -
+            inicioTotal
+          )
+      }
+    );
 
     clearProgressStatus();
   } catch (error) {
-    console.error(error);
+    console.error(
+      "[ASIGNADOS] Error cargando datos:",
+      error
+    );
+
     setProgressStatus({
-      text: "Error cargando asignaciones.",
-      meta: error.message || "No se pudo leer Firestore.",
-      progress: 100,
-      type: "error"
+      text:
+        "Error cargando asignaciones.",
+
+      meta:
+        error.message ||
+        "No se pudo leer Firestore.",
+
+      progress:
+        100,
+
+      type:
+        "error"
     });
 
-    if ($("asignadosLoadHint")) {
-      $("asignadosLoadHint").textContent = "Error al cargar la vista comercial.";
+    if (
+      $("asignadosLoadHint")
+    ) {
+      $("asignadosLoadHint")
+        .textContent =
+        "Error al cargar la vista comercial.";
     }
   }
 }
@@ -1881,8 +2135,29 @@ async function persistAssignment({
   });
   clearProgressStatus();
 
-  await loadData();
-
+  /*
+    Actualizamos inmediatamente la fila local,
+    sin esperar la sincronización del resumen.
+  */
+  row.vendedora =
+    nuevaVendedora;
+  
+  row.vendedoraCorreo =
+    nuevaVendedoraCorreo;
+  
+  row.requiereAsignacion =
+    false;
+  
+  row.estado =
+    "A contactar";
+  
+  sessionStorage.removeItem(
+    ASIGNADOS_CACHE_KEY
+  );
+  
+  populateFilters();
+  applyFilters();
+  
   alert(
     tipo === "Asignación"
       ? `El grupo ${idGrupo} fue asignado a ${nuevaVendedora}.`
@@ -2090,25 +2365,65 @@ async function archiveGroup(idGrupo) {
       progress: 35
     });
 
-    const id = String(idGrupo);
-
+    const id =
+      String(idGrupo);
+    
+    /*
+      La tabla usa ventas_grupos_resumen,
+      pero para archivar necesitamos recuperar
+      el documento original completo.
+    */
+    const originalRef =
+      doc(
+        db,
+        GRUPOS_COLLECTION,
+        id
+      );
+    
+    const originalSnap =
+      await getDoc(
+        originalRef
+      );
+    
+    if (!originalSnap.exists()) {
+      throw new Error(
+        `No existe el documento original del grupo ${id}.`
+      );
+    }
+    
+    const originalData =
+      originalSnap.data() || {};
+    
     const archivedData = {
-      ...row,
-
-      // Metadata de archivo
-      archivado: true,
-      archivadoEn: serverTimestamp(),
-      archivadoPor: getNombreUsuario(state.effectiveUser),
-      archivadoPorCorreo: normalizeEmail(state.realUser?.email || ""),
-      motivoArchivado: normalizeText(motivo),
-
-      // Conservamos referencia de origen
-      coleccionOrigen: "ventas_cotizaciones",
-      idOriginal: id
+      ...originalData,
+    
+      archivado:
+        true,
+    
+      archivadoEn:
+        serverTimestamp(),
+    
+      archivadoPor:
+        getNombreUsuario(
+          state.effectiveUser
+        ),
+    
+      archivadoPorCorreo:
+        normalizeEmail(
+          state.realUser?.email || ""
+        ),
+    
+      motivoArchivado:
+        normalizeText(
+          motivo
+        ),
+    
+      coleccionOrigen:
+        GRUPOS_COLLECTION,
+    
+      idOriginal:
+        id
     };
-
-    // Evita guardar el campo interno "id" duplicado si venía desde el map local
-    delete archivedData.id;
 
     // 1) Copia el documento principal a la colección de archivados
     await setDoc(doc(db, ARCHIVED_COLLECTION, id), archivedData, { merge: true });
@@ -2124,7 +2439,13 @@ async function archiveGroup(idGrupo) {
     });
 
     // 3) Elimina el documento principal de la colección activa
-    await deleteDoc(doc(db, "ventas_cotizaciones", id));
+    await deleteDoc(
+      doc(
+        db,
+        GRUPOS_COLLECTION,
+        id
+      )
+    );
 
     setProgressStatus({
       text: "Grupo archivado.",
@@ -2328,9 +2649,31 @@ async function removeAssignment(idGrupo) {
     });
     clearProgressStatus();
 
-    await loadData();
-
-    alert(`El grupo ${idGrupo} quedó Sin asignar.`);
+    /*
+      Actualizamos la vista local inmediatamente.
+    */
+    row.vendedora =
+      "Sin asignar";
+    
+    row.vendedoraCorreo =
+      "";
+    
+    row.requiereAsignacion =
+      true;
+    
+    row.estado =
+      "A contactar";
+    
+    sessionStorage.removeItem(
+      ASIGNADOS_CACHE_KEY
+    );
+    
+    populateFilters();
+    applyFilters();
+    
+    alert(
+      `El grupo ${idGrupo} quedó Sin asignar.`
+    );
   } catch (error) {
     console.error(error);
     setProgressStatus({
@@ -2396,11 +2739,26 @@ function bindPageEvents() {
     });
   }
 
-  if (btnRecargar && !btnRecargar.dataset.bound) {
-    btnRecargar.dataset.bound = "1";
-    btnRecargar.addEventListener("click", async () => {
-      await loadData();
-    });
+  if (
+    btnRecargar &&
+    !btnRecargar.dataset.bound
+  ) {
+    btnRecargar.dataset.bound =
+      "1";
+  
+    btnRecargar.addEventListener(
+      "click",
+      async () => {
+        sessionStorage.removeItem(
+          ASIGNADOS_CACHE_KEY
+        );
+  
+        await loadData({
+          forzar:
+            true
+        });
+      }
+    );
   }
 
   if (btnTabSinAsignar && !btnTabSinAsignar.dataset.bound) {
