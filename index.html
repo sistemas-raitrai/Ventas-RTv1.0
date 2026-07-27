@@ -151,6 +151,16 @@
         max-width: 76px !important;
       }
     }
+  
+    /*
+      Los buscadores Comercial y Administrativo no tienen botón.
+      Por eso utilizan todo el ancho disponible.
+    */
+    body[data-page="index"]
+    .panel-filtro
+    .filtro-bloque.filtro-bloque-sin-boton {
+      grid-template-columns: minmax(0, 1fr) !important;
+    }
     /* =========================================================
        INDEX — LISTAS TOM SELECT SOBRE LOS MÓDULOS INFERIORES
     ========================================================= */
@@ -450,18 +460,22 @@
             <button id="btn-ir-vendedor">Ir</button>
           </div>
         
-          <div class="filtro-bloque">
-            <select id="select-grupo">
-              <option value="">Seleccionar Grupo</option>
+          <div class="filtro-bloque filtro-bloque-sin-boton">
+            <select
+              id="select-grupo-comercial"
+              aria-label="Buscar grupo comercial"
+            >
+              <option value="">Buscar grupo de años próximos...</option>
             </select>
-            <button id="btn-ir-grupo">Ir</button>
           </div>
-        
-          <div class="filtro-bloque">
-            <select id="select-apoderado">
-              <option value="">Seleccionar Apoderado</option>
+          
+          <div class="filtro-bloque filtro-bloque-sin-boton">
+            <select
+              id="select-grupo-administrativo"
+              aria-label="Buscar grupo administrativo"
+            >
+              <option value="">Buscar grupo año actual ...</option>
             </select>
-            <button id="btn-ir-apoderado">Ir</button>
           </div>
         
         </div>
