@@ -295,8 +295,134 @@
       line-height: 1.2;
     }
     
-    body[data-page="index"] .alert-section-title.is-ventas {
+    body[data-page="index"] .alert-section-title.is-administrativas {
       margin-top: 2px;
+    }
+    
+    /* =========================================================
+       INDEX — ALERTAS ACTIVAS Y URGENTES
+    ========================================================= */
+    
+    /*
+      Estado normal:
+      cero alertas.
+    */
+    body[data-page="index"] .panel-alertas .alert-row {
+      position: relative;
+      transition:
+        background-color 0.2s ease,
+        border-color 0.2s ease,
+        box-shadow 0.2s ease,
+        transform 0.2s ease;
+    }
+    
+    /*
+      Entre 1 y 5:
+      resaltado suave acorde a la estética morada.
+    */
+    body[data-page="index"]
+    .panel-alertas
+    .alert-row.alerta-activa {
+      background:
+        linear-gradient(
+          135deg,
+          #f8f4fc 0%,
+          #efe7f7 100%
+        );
+    
+      border-color:
+        rgba(91, 48, 132, 0.30);
+    
+      box-shadow:
+        0 7px 18px
+        rgba(64, 33, 96, 0.10);
+    }
+    
+    /*
+      El número activo adquiere más contraste.
+    */
+    body[data-page="index"]
+    .panel-alertas
+    .alert-row.alerta-activa
+    strong {
+      color:
+        #5a2d82;
+    
+      transform:
+        scale(1.06);
+    }
+    
+    /*
+      El botón también acompaña el estado activo.
+    */
+    body[data-page="index"]
+    .panel-alertas
+    .alert-row.alerta-activa
+    a {
+      background:
+        #e6d8f2;
+    
+      color:
+        #3a1d59;
+    }
+    
+    /*
+      Desde 6 alertas:
+      pulso suave tipo baliza.
+    */
+    body[data-page="index"]
+    .panel-alertas
+    .alert-row.alerta-urgente {
+      border-color:
+        rgba(113, 53, 166, 0.58);
+    
+      animation:
+        pulsoAlertaIndex
+        1.45s
+        ease-in-out
+        infinite;
+    }
+    
+    body[data-page="index"]
+    .panel-alertas
+    .alert-row.alerta-urgente
+    strong {
+      color:
+        #421363;
+    
+      font-weight:
+        950;
+    }
+    
+    @keyframes pulsoAlertaIndex {
+      0%,
+      100% {
+        box-shadow:
+          0 7px 18px
+          rgba(64, 33, 96, 0.10),
+          0 0 0 0
+          rgba(111, 55, 161, 0);
+      }
+    
+      50% {
+        box-shadow:
+          0 10px 24px
+          rgba(64, 33, 96, 0.17),
+          0 0 0 5px
+          rgba(111, 55, 161, 0.13);
+      }
+    }
+    
+    /*
+      Respeta la preferencia del sistema del usuario.
+    */
+    @media (prefers-reduced-motion: reduce) {
+      body[data-page="index"]
+      .panel-alertas
+      .alert-row.alerta-urgente {
+        animation:
+          none;
+      }
     }
 </style>
 </head>
