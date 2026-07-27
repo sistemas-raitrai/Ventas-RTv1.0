@@ -38,10 +38,26 @@ import {
    CONFIG
 ========================================================= */
 
-const GITHUB_HOME_URL = "https://sistemas-raitrai.github.io/Ventas-RT/home.html";
-const ALERTAS_COLLECTION = "ventas_alertas";
-const SOLICITUDES_COLLECTION = "ventas_solicitudes_actualizacion";
-const ALERTAS_INSCRIPCIONES_COLLECTION = "ventas_alertas_inscripciones";
+const GITHUB_HOME_URL =
+  "https://sistemas-raitrai.github.io/Ventas-RT/home.html";
+
+const GRUPOS_RESUMEN_COLLECTION =
+  "ventas_grupos_resumen";
+
+const ALERTAS_COLLECTION =
+  "ventas_alertas";
+
+const SOLICITUDES_COLLECTION =
+  "ventas_solicitudes_actualizacion";
+
+const ALERTAS_INSCRIPCIONES_COLLECTION =
+  "ventas_alertas_inscripciones";
+
+const HOME_GRUPOS_CACHE_KEY =
+  "ventas_home_grupos_resumen";
+
+const HOME_GRUPOS_CACHE_TTL_MS =
+  10 * 60 * 1000;
 
 
 /* =========================================================
@@ -76,6 +92,130 @@ const state = {
 /* =========================================================
    HELPERS GENERALES
 ========================================================= */
+
+function getAnosActivosHome() {
+  const anoActual =
+    new Date().getFullYear();
+
+  /*
+    En 2026 cargará:
+    2026, 2027, 2028 y 2029.
+
+    Los años anteriores quedan fuera
+    de la carga principal del Home.
+  */
+  return [
+    anoActual,
+    anoActual + 1,
+    anoActual + 2,
+    anoActual + 3
+  ];
+}
+
+function guardarCacheGruposHome(
+  rows = []
+) {
+  try {
+    sessionStorage.setItem(
+      HOME_GRUPOS_CACHE_KEY,
+      JSON.stringify({
+        guardadoAt:
+          Date.now(),
+
+        rows
+      })
+    );
+  } catch (error) {
+    console.warn(
+      "[HOME] No se pudo guardar caché de grupos:",
+      error
+    );
+  }
+}
+
+function leerCacheGruposHome() {
+  try {
+    const raw =
+      sessionStorage.getItem(
+        HOME_GRUPOS_CACHE_KEY
+      );
+
+    if (!raw) {
+      return null;
+    }
+
+    const parsed =
+      JSON.parse(raw);
+
+    const guardadoAt =
+      Number(
+        parsed?.guardadoAt || 0
+      );
+
+    if (
+      !guardadoAt ||
+      Date.now() - guardadoAt >
+        HOME_GRUPOS_CACHE_TTL_MS
+    ) {
+      sessionStorage.removeItem(
+        HOME_GRUPOS_CACHE_KEY
+      );
+
+      return null;
+    }
+
+    return Array.isArray(
+      parsed?.rows
+    )
+      ? parsed.rows
+      : null;
+  } catch (error) {
+    console.warn(
+      "[HOME] Caché de grupos inválida:",
+      error
+    );
+
+    return null;
+  }
+}
+
+function aplicarGruposHome(
+  rows = []
+) {
+  state.rows =
+    dedupeRowsByGroup(
+      rows
+    );
+
+  state.rowsById =
+    new Map(
+      state.rows.map(
+        (row) => [
+          getRowId(row),
+          row
+        ]
+      )
+    );
+}
+
+function mapGrupoResumenHome(
+  docSnap
+) {
+  const data =
+    docSnap.data() || {};
+
+  return {
+    id:
+      docSnap.id,
+
+    idGrupo:
+      data.idGrupo ||
+      data.groupDocId ||
+      docSnap.id,
+
+    ...data
+  };
+}
 
 function actualizarContadorAlertaHome(
   id = "",
@@ -934,69 +1074,216 @@ function getAlertsForScope(rows = [], predicate = () => false) {
    CARGA DE DATOS
 ========================================================= */
 
+async function cargarGruposResumenHome() {
+  const anos =
+    getAnosActivosHome();
+
+  const inicio =
+    performance.now();
+
+  /*
+    Se consultan los años en paralelo.
+  */
+  const snapshots =
+    await Promise.all(
+      anos.map(
+        (ano) =>
+          getDocs(
+            query(
+              collection(
+                db,
+                GRUPOS_RESUMEN_COLLECTION
+              ),
+
+              where(
+                "anoViaje",
+                "==",
+                ano
+              )
+            )
+          )
+      )
+    );
+
+  const rows =
+    snapshots.flatMap(
+      (snap) =>
+        snap.docs.map(
+          mapGrupoResumenHome
+        )
+    );
+
+  console.log(
+    "[HOME] Grupos resumen cargados",
+    {
+      anos,
+      documentos:
+        rows.length,
+      duracionMs:
+        Math.round(
+          performance.now() -
+          inicio
+        )
+    }
+  );
+
+  return rows;
+}
+
 async function loadHomeData() {
-  console.time("HOME_TOTAL");
+  const inicioTotal =
+    performance.now();
 
-  console.time("CARGA_FIRESTORE_TOTAL");
-
-  console.time("ventas_cotizaciones");
-  const groupsSnap = await getDocs(collection(db, "ventas_cotizaciones"));
-  console.timeEnd("ventas_cotizaciones");
-
-  console.time("ventas_alertas");
-  const alertsSnap = await getDocs(collection(db, ALERTAS_COLLECTION));
-  console.timeEnd("ventas_alertas");
-
-  console.time("ventas_solicitudes_actualizacion");
-  const solicitudesSnap = await getDocs(collection(db, SOLICITUDES_COLLECTION));
-  console.timeEnd("ventas_solicitudes_actualizacion");
-
-
-  console.timeEnd("CARGA_FIRESTORE_TOTAL");
-
-  console.time("PROCESAR_DATOS_HOME");
-
-  state.rows = groupsSnap.docs.map((docSnap) => {
-    const data = docSnap.data() || {};
-
-    return {
-      id: docSnap.id,
-      idGrupo: data.idGrupo || docSnap.id,
-      ...data
-    };
-  });
-
-  state.rowsById = new Map(
-    state.rows.map((row) => [getRowId(row), row])
-  );
-  
-  state.inscripcionesRows = [];
-
-  const alertasInscripcionesSnap = await getDocs(
-    query(
-      collection(db, ALERTAS_INSCRIPCIONES_COLLECTION),
-      where("activa", "==", true)
-    )
+  console.log(
+    "[HOME] Iniciando carga rápida..."
   );
 
-  state.inscripcionesRows = alertasInscripcionesSnap.docs.map((docSnap) => ({
-    id: docSnap.id,
-    ...docSnap.data()
-  }));
+  /*
+    1. Primero intentamos mostrar los grupos
+       guardados durante esta sesión.
 
-  state.alertRows = alertsSnap.docs.map((docSnap) => ({
-    id: docSnap.id,
-    ...docSnap.data()
-  }));
+    Esto permite que al volver al Home,
+    grupos, fichas y buscadores aparezcan
+    prácticamente de inmediato.
+  */
+  const gruposCache =
+    leerCacheGruposHome();
 
-  state.solicitudesRows = solicitudesSnap.docs.map((docSnap) => ({
-    id: docSnap.id,
-    ...docSnap.data()
-  }));
+  if (gruposCache) {
+    aplicarGruposHome(
+      gruposCache
+    );
 
+    console.log(
+      "[HOME] Grupos cargados desde sessionStorage",
+      {
+        documentos:
+          gruposCache.length
+      }
+    );
+  }
 
-  console.timeEnd("PROCESAR_DATOS_HOME");
-  console.timeEnd("HOME_TOTAL");
+  /*
+    2. Todas las consultas de Firestore comienzan
+       al mismo tiempo.
+
+    Ya no esperamos una colección antes de
+    comenzar la siguiente.
+  */
+  const promiseGrupos =
+    cargarGruposResumenHome();
+
+  const promiseAlertas =
+    getDocs(
+      collection(
+        db,
+        ALERTAS_COLLECTION
+      )
+    );
+
+  const promiseSolicitudes =
+    getDocs(
+      collection(
+        db,
+        SOLICITUDES_COLLECTION
+      )
+    );
+
+  const promiseInscripciones =
+    getDocs(
+      query(
+        collection(
+          db,
+          ALERTAS_INSCRIPCIONES_COLLECTION
+        ),
+
+        where(
+          "activa",
+          "==",
+          true
+        )
+      )
+    );
+
+  /*
+    3. Esperamos las cuatro consultas juntas.
+  */
+  const [
+    gruposRows,
+    alertsSnap,
+    solicitudesSnap,
+    alertasInscripcionesSnap
+  ] = await Promise.all([
+    promiseGrupos,
+    promiseAlertas,
+    promiseSolicitudes,
+    promiseInscripciones
+  ]);
+
+  /*
+    4. Reemplazamos la copia de caché
+       por la información actualizada.
+  */
+  aplicarGruposHome(
+    gruposRows
+  );
+
+  guardarCacheGruposHome(
+    gruposRows
+  );
+
+  state.alertRows =
+    alertsSnap.docs.map(
+      (docSnap) => ({
+        id:
+          docSnap.id,
+
+        ...docSnap.data()
+      })
+    );
+
+  state.solicitudesRows =
+    solicitudesSnap.docs.map(
+      (docSnap) => ({
+        id:
+          docSnap.id,
+
+        ...docSnap.data()
+      })
+    );
+
+  state.inscripcionesRows =
+    alertasInscripcionesSnap.docs.map(
+      (docSnap) => ({
+        id:
+          docSnap.id,
+
+        ...docSnap.data()
+      })
+    );
+
+  console.log(
+    "[HOME] Carga rápida finalizada",
+    {
+      grupos:
+        state.rows.length,
+
+      alertas:
+        state.alertRows.length,
+
+      solicitudes:
+        state.solicitudesRows.length,
+
+      inscripciones:
+        state.inscripcionesRows.length,
+
+      duracionTotalMs:
+        Math.round(
+          performance.now() -
+          inicioTotal
+        )
+    }
+  );
 }
 
 
@@ -2287,9 +2574,31 @@ async function renderPantalla() {
     subtitle: "Panel principal"
   });
 
-  renderActingUserSwitcher(VENTAS_USERS);
-
+  renderActingUserSwitcher(
+    VENTAS_USERS
+  );
+  
+  /*
+    Si existe caché, pintamos inmediatamente
+    grupos, fichas y buscadores.
+  */
+  const gruposCache =
+    leerCacheGruposHome();
+  
+  if (gruposCache) {
+    aplicarGruposHome(
+      gruposCache
+    );
+  
+    renderHome();
+    initSearchers();
+  }
+  
+  /*
+    Después actualizamos desde Firestore.
+  */
   await loadHomeData();
+  
   renderHome();
   initSearchers();
 }
