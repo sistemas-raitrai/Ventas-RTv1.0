@@ -237,9 +237,7 @@ function actualizarContadorAlertaHome(
       : 0;
 
   /*
-    Siempre actualizamos el número visible,
-    tanto en alertas administrativas como
-    en alertas de ventas.
+    Siempre actualizamos el número visible.
   */
   contador.textContent =
     String(cantidad);
@@ -254,18 +252,24 @@ function actualizarContadorAlertaHome(
   }
 
   /*
-    Las alertas de ventas son informativas
-    dentro del Home administrativo.
+    Estas alertas pertenecen a Ventas.
 
-    Se muestran sus cantidades, pero nunca
-    se resaltan ni titilan.
+    Dentro del Home administrativo
+    son solamente informativas,
+    por lo que nunca deben resaltarse.
   */
-  const perteneceAlertasVentas =
-    !!contador.closest(
-      '[data-home-alertas-seccion="ventas"]'
-    );
+  const idsAlertasVentas =
+    new Set([
+      "count-alertas-criticas",
+      "count-alertas-warning",
+      "count-sin-asignar",
+      "count-a-contactar",
+      "count-reunion-3dias"
+    ]);
 
-  if (perteneceAlertasVentas) {
+  if (
+    idsAlertasVentas.has(id)
+  ) {
     fila.classList.remove(
       "alerta-activa",
       "alerta-urgente"
@@ -275,10 +279,11 @@ function actualizarContadorAlertaHome(
   }
 
   /*
-    Solo para alertas administrativas:
+    El resto de las filas corresponde
+    a Alertas Administrativas.
 
     Desde 1:
-    resalta el bloque.
+    se resalta.
   */
   fila.classList.toggle(
     "alerta-activa",
