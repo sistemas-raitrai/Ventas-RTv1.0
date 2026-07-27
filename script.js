@@ -1324,25 +1324,6 @@ function syncAlertRowsByRole(effectiveUser = null) {
   setAlertRowVisibleByChild("count-pendientes", false);
 }
 
-function syncSeguimientoGriverosPanel(effectiveUser = null) {
-  const user = effectiveUser || getEffectiveUser();
-  const panel = $("panel-seguimiento-griveros");
-  const iframe = $("iframe-seguimiento-griveros");
-
-  if (!panel) return;
-
-  const email = normalizeEmail(user?.email || "");
-  const esGriveros = email === "griveros@raitrai.cl";
-
-  panel.hidden = !esGriveros;
-
-  if (!esGriveros || !iframe) return;
-
-  const anoActual = new Date().getFullYear();
-
-  iframe.src = `seguimiento.html?embedded=1&vendor=griveros@raitrai.cl&ano=${anoActual}`;
-}
-
 function isReunionEnProximosTresDias(row = {}) {
   if (resolveEstadoBucket(row) !== "reunion") return false;
 
@@ -3770,7 +3751,6 @@ function renderDashboard(rows = []) {
   setText("count-reunion-3dias", reuniones3DiasRows.length);
 
   syncAlertRowsByRole(viewUser);
-  syncSeguimientoGriverosPanel(viewUser);
 
   // FLUJO CON LINKS
   renderBucketLinks("contactados-top", "contactados", contactados);
