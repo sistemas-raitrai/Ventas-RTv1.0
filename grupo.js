@@ -674,14 +674,38 @@ async function loadInscripciones() {
         );
       })
       .sort((a, b) => {
-        const ordenA = getOrdenOperativoInscripcion(a);
-        const ordenB = getOrdenOperativoInscripcion(b);
-
-        if (ordenA !== ordenB) return ordenA - ordenB;
-
-        const fechaA = dateValue(getFechaFormularioInscripcion(a));
-        const fechaB = dateValue(getFechaFormularioInscripcion(b));
-
+        const anuladaA =
+          estaInscripcionAnulada(a);
+      
+        const anuladaB =
+          estaInscripcionAnulada(b);
+      
+        if (anuladaA !== anuladaB) {
+          return anuladaA
+            ? 1
+            : -1;
+        }
+      
+        const ordenA =
+          getOrdenOperativoInscripcion(a);
+      
+        const ordenB =
+          getOrdenOperativoInscripcion(b);
+      
+        if (ordenA !== ordenB) {
+          return ordenA - ordenB;
+        }
+      
+        const fechaA =
+          dateValue(
+            getFechaFormularioInscripcion(a)
+          );
+      
+        const fechaB =
+          dateValue(
+            getFechaFormularioInscripcion(b)
+          );
+      
         return fechaB - fechaA;
       });
 
@@ -992,15 +1016,37 @@ function ensureEmailBulkUi() {
 }
 
 function buildDestinatariosApoderadosInscripcion() {
-  const vistos = new Set();
+  const vistos =
+    new Set();
 
   return state.inscripciones
+    /*
+      Los anulados siguen visibles en la nómina,
+      pero no deben recibir correos de ficha médica.
+    */
+    .filter(
+      estaInscripcionActiva
+    )
     .map((item) => {
-      const correo = normalizeEmail(getByPath(item, "contactoPrincipal.correo") || "");
-      const nombreResponsable = getResponsablePrincipalNombre(item);
-      const nombreParticipante = buildNombreCompletoInscripcion(item);
-      const documento = getInscripcionDocumento(item);
-      const pendienteFicha = fichaMedicaPendiente(item);
+      const correo =
+        normalizeEmail(
+          getByPath(
+            item,
+            "contactoPrincipal.correo"
+          ) || ""
+        );
+
+      const nombreResponsable =
+        getResponsablePrincipalNombre(item);
+
+      const nombreParticipante =
+        buildNombreCompletoInscripcion(item);
+
+      const documento =
+        getInscripcionDocumento(item);
+
+      const pendienteFicha =
+        fichaMedicaPendiente(item);
 
       return {
         id: item.id,
@@ -1011,15 +1057,40 @@ function buildDestinatariosApoderadosInscripcion() {
         pendienteFicha
       };
     })
-    .filter((d) => {
-      if (!d.correo) return false;
-      if (vistos.has(d.correo)) return false;
-      vistos.add(d.correo);
+    .filter((destinatario) => {
+      if (!destinatario.correo) {
+        return false;
+      }
+
+      if (
+        vistos.has(
+          destinatario.correo
+        )
+      ) {
+        return false;
+      }
+
+      vistos.add(
+        destinatario.correo
+      );
+
       return true;
     })
     .sort((a, b) => {
-      if (a.pendienteFicha !== b.pendienteFicha) return a.pendienteFicha ? -1 : 1;
-      return a.nombreParticipante.localeCompare(b.nombreParticipante, "es");
+      if (
+        a.pendienteFicha !==
+        b.pendienteFicha
+      ) {
+        return a.pendienteFicha
+          ? -1
+          : 1;
+      }
+
+      return a.nombreParticipante
+        .localeCompare(
+          b.nombreParticipante,
+          "es"
+        );
     });
 }
 
@@ -2573,35 +2644,73 @@ function getEstadoOperativoInscripcionLabel(item = {}) {
 }
 
 function getOrdenOperativoInscripcion(item = {}) {
-  const tipo = normalizeSearchLocal(getInscripcionTipoReal(item));
-  const estadoCupo = normalizeSearchLocal(item.estadoCupo || "");
+  /*
+    Todos los anulados van al final,
+    independientemente del tipo de inscripción.
+  */
+  if (estaInscripcionAnulada(item)) {
+    return 1000;
+  }
 
-  // 1. Lista de espera, con sus variantes
+  const tipo =
+    normalizeSearchLocal(
+      getInscripcionTipoReal(item)
+    );
+
+  const estadoCupo =
+    normalizeSearchLocal(
+      item.estadoCupo || ""
+    );
+
   if (
     tipo === "lista_espera_confirmada" ||
-    (tipo === "lista_espera" && estadoCupo === "confirmado")
-  ) return 1;
+    (
+      tipo === "lista_espera" &&
+      estadoCupo === "confirmado"
+    )
+  ) {
+    return 1;
+  }
 
   if (
     tipo === "lista_espera_pagada" ||
-    (tipo === "lista_espera" && estadoCupo === "pagado")
-  ) return 2;
+    (
+      tipo === "lista_espera" &&
+      estadoCupo === "pagado"
+    )
+  ) {
+    return 2;
+  }
 
-  if (tipo === "lista_espera") return 3;
+  if (tipo === "lista_espera") {
+    return 3;
+  }
 
-  // 2. Nuevos ingresos, con sus variantes
   if (
     tipo === "nuevo_ingreso_confirmado" ||
-    (tipo === "nuevo_ingreso" && estadoCupo === "confirmado")
-  ) return 4;
+    (
+      tipo === "nuevo_ingreso" &&
+      estadoCupo === "confirmado"
+    )
+  ) {
+    return 4;
+  }
 
-  if (tipo === "nuevo_ingreso") return 5;
+  if (tipo === "nuevo_ingreso") {
+    return 5;
+  }
 
-  // 3. Inscripción inicial / nómina final
-  if (tipo === "nomina_inicial" || tipo === "nomina_final" || tipo === "sistema_pagos") return 6;
+  if (
+    tipo === "nomina_inicial" ||
+    tipo === "nomina_final" ||
+    tipo === "sistema_pagos"
+  ) {
+    return 6;
+  }
 
-  // 4. Otros
-  if (tipo === "liberado") return 7;
+  if (tipo === "liberado") {
+    return 7;
+  }
 
   return 99;
 }
@@ -2719,11 +2828,24 @@ function getInscripcionesSistemaPagos() {
 }
 
 function fichaMedicaPendiente(item = {}) {
-  const tipo = normalizeSearchLocal(getInscripcionTipoReal(item));
+  /*
+    Una persona anulada no debe seguir apareciendo
+    como ficha médica pendiente.
+  */
+  if (estaInscripcionAnulada(item)) {
+    return false;
+  }
 
-  // Regla de negocio:
-  // Solo las inscripciones importadas desde Sistema de Pagos
-  // quedan pendientes de completar Nómina Final / Ficha Médica.
+  const tipo =
+    normalizeSearchLocal(
+      getInscripcionTipoReal(item)
+    );
+
+  /*
+    Regla actual del sistema:
+    solo las inscripciones importadas originalmente
+    desde Sistema de Pagos usan este indicador.
+  */
   if (tipo !== "sistema_pagos") {
     return false;
   }
@@ -2735,6 +2857,24 @@ function fichaMedicaPendiente(item = {}) {
     item.nominaFinalCompletada === true ||
     item.fichaMedicaEstado === "completa" ||
     item.fichaMedicaEstado === "completada"
+  );
+}
+
+function getInscripcionesConFichaMedicaPendiente() {
+  return state.inscripciones.filter(
+    (item) =>
+      estaInscripcionActiva(item) &&
+      esNominaFinalOperativa(item) &&
+      fichaMedicaPendiente(item)
+  );
+}
+
+function getInscripcionesConFichaMedicaCompleta() {
+  return state.inscripciones.filter(
+    (item) =>
+      estaInscripcionActiva(item) &&
+      esNominaFinalOperativa(item) &&
+      !fichaMedicaPendiente(item)
   );
 }
 
@@ -2788,8 +2928,12 @@ function getLiberadosPermitidos() {
 }
 
 function getLiberadosUsados() {
-  return state.inscripciones.filter((item) =>
-    normalizeSearchLocal(getInscripcionTipoReal(item)) === "liberado"
+  return state.inscripciones.filter(
+    (item) =>
+      estaInscripcionActiva(item) &&
+      normalizeSearchLocal(
+        getInscripcionTipoReal(item)
+      ) === "liberado"
   ).length;
 }
 
@@ -2797,6 +2941,8 @@ function renderInscripcionPasajerosPanel() {
   const panel = $("panelInscripcionPasajeros");
   const box = $("panelInscripcionPasajerosBody");
   if (!panel || !box) return;
+
+  asegurarEstilosInscripcionesAnuladas();
 
   const visible = shouldShowInscripcionPanel();
   panel.classList.toggle("hidden", !visible);
@@ -2885,45 +3031,160 @@ function renderInscripcionPasajerosPanel() {
     return;
   }
 
-  const totalBruto = state.inscripciones.length;
-  const capacidad = Number(state.group?.cantidadGrupo || 0);
+  const totalBruto =
+    state.inscripciones.length;
   
-  const nominaFinalOperativa = state.inscripciones.filter(esNominaFinalOperativa).length;
-  const nominaInicial = getInscripcionesNominaInicial().length;
+  const totalAnulados =
+    state.inscripciones.filter(
+      estaInscripcionAnulada
+    ).length;
   
-  const fichaPendiente = getInscripcionesConFichaMedicaPendiente().length;
-  const fichaCompleta = getInscripcionesConFichaMedicaCompleta().length;
+  const inscripcionesActivas =
+    state.inscripciones.filter(
+      estaInscripcionActiva
+    );
   
-  const nuevosConfirmados = state.inscripciones.filter((x) => {
-    const tipo = normalizeSearchLocal(getInscripcionTipoReal(x));
-    const estadoCupo = normalizeSearchLocal(x.estadoCupo || "");
-    return tipo === "nuevo_ingreso_confirmado" || (tipo === "nuevo_ingreso" && estadoCupo === "confirmado");
-  }).length;
+  const totalViajan =
+    inscripcionesActivas.length;
   
-  const nuevosPendientes = state.inscripciones.filter((x) => {
-    const tipo = normalizeSearchLocal(getInscripcionTipoReal(x));
-    const estadoCupo = normalizeSearchLocal(x.estadoCupo || "");
-    return tipo === "nuevo_ingreso" && estadoCupo !== "confirmado";
-  }).length;
+  const capacidad =
+    Number(
+      state.group?.cantidadGrupo || 0
+    );
   
-  const esperaPendiente = state.inscripciones.filter((x) => {
-    const tipo = normalizeSearchLocal(getInscripcionTipoReal(x));
-    const estadoCupo = normalizeSearchLocal(x.estadoCupo || "");
-    return tipo === "lista_espera" && estadoCupo !== "pagado" && estadoCupo !== "confirmado";
-  }).length;
+  const nominaFinalOperativa =
+    inscripcionesActivas.filter(
+      esNominaFinalOperativa
+    ).length;
   
-  const esperaPagada = state.inscripciones.filter((x) => {
-    const tipo = normalizeSearchLocal(getInscripcionTipoReal(x));
-    const estadoCupo = normalizeSearchLocal(x.estadoCupo || "");
-    return tipo === "lista_espera_pagada" || (tipo === "lista_espera" && estadoCupo === "pagado");
-  }).length;
+  const nominaInicial =
+    getInscripcionesNominaInicial()
+      .filter(
+        estaInscripcionActiva
+      )
+      .length;
   
-  const esperaConfirmada = state.inscripciones.filter((x) => {
-    const tipo = normalizeSearchLocal(getInscripcionTipoReal(x));
-    const estadoCupo = normalizeSearchLocal(x.estadoCupo || "");
-    return tipo === "lista_espera_confirmada" || (tipo === "lista_espera" && estadoCupo === "confirmado");
-  }).length;
-
+  const fichaPendiente =
+    getInscripcionesConFichaMedicaPendiente()
+      .length;
+  
+  const fichaCompleta =
+    getInscripcionesConFichaMedicaCompleta()
+      .length;
+  
+  const nuevosConfirmados =
+    inscripcionesActivas.filter((item) => {
+      const tipo =
+        normalizeSearchLocal(
+          getInscripcionTipoReal(item)
+        );
+  
+      const estadoCupo =
+        normalizeSearchLocal(
+          item.estadoCupo || ""
+        );
+  
+      return (
+        tipo ===
+          "nuevo_ingreso_confirmado" ||
+        (
+          tipo ===
+            "nuevo_ingreso" &&
+          estadoCupo ===
+            "confirmado"
+        )
+      );
+    }).length;
+  
+  const nuevosPendientes =
+    inscripcionesActivas.filter((item) => {
+      const tipo =
+        normalizeSearchLocal(
+          getInscripcionTipoReal(item)
+        );
+  
+      const estadoCupo =
+        normalizeSearchLocal(
+          item.estadoCupo || ""
+        );
+  
+      return (
+        tipo ===
+          "nuevo_ingreso" &&
+        estadoCupo !==
+          "confirmado"
+      );
+    }).length;
+  
+  const esperaPendiente =
+    inscripcionesActivas.filter((item) => {
+      const tipo =
+        normalizeSearchLocal(
+          getInscripcionTipoReal(item)
+        );
+  
+      const estadoCupo =
+        normalizeSearchLocal(
+          item.estadoCupo || ""
+        );
+  
+      return (
+        tipo ===
+          "lista_espera" &&
+        estadoCupo !==
+          "pagado" &&
+        estadoCupo !==
+          "confirmado"
+      );
+    }).length;
+  
+  const esperaPagada =
+    inscripcionesActivas.filter((item) => {
+      const tipo =
+        normalizeSearchLocal(
+          getInscripcionTipoReal(item)
+        );
+  
+      const estadoCupo =
+        normalizeSearchLocal(
+          item.estadoCupo || ""
+        );
+  
+      return (
+        tipo ===
+          "lista_espera_pagada" ||
+        (
+          tipo ===
+            "lista_espera" &&
+          estadoCupo ===
+            "pagado"
+        )
+      );
+    }).length;
+  
+  const esperaConfirmada =
+    inscripcionesActivas.filter((item) => {
+      const tipo =
+        normalizeSearchLocal(
+          getInscripcionTipoReal(item)
+        );
+  
+      const estadoCupo =
+        normalizeSearchLocal(
+          item.estadoCupo || ""
+        );
+  
+      return (
+        tipo ===
+          "lista_espera_confirmada" ||
+        (
+          tipo ===
+            "lista_espera" &&
+          estadoCupo ===
+            "confirmado"
+        )
+      );
+    }).length;
   const liberadosPermitidos = getLiberadosPermitidos();
   const liberadosUsados = getLiberadosUsados();
 
@@ -2969,9 +3230,26 @@ function renderInscripcionPasajerosPanel() {
                 (tipoRealKey === "lista_espera" && estadoCupoKey === "pagado");
 
               return `
-                <tr class="${escapeHtml(getTipoInscripcionClass(item))}">
+                <tr
+                    class="${escapeHtml(
+                      [
+                        getTipoInscripcionClass(item),
+                        estaInscripcionAnulada(item)
+                          ? "inscripcion-anulada-row"
+                          : ""
+                      ]
+                        .filter(Boolean)
+                        .join(" ")
+                    )}"
+                  >
                   <td>${index + 1}</td>
-                  <td>${escapeHtml(getEstadoOperativoInscripcionLabel(item))}</td>
+                  <td>
+                    ${escapeHtml(
+                      getEstadoOperativoInscripcionLabel(item)
+                    )}
+                  
+                    ${getEstadoViajeInscripcionHtml(item)}
+                  </td>
                   <td>${escapeHtml(formatFechaFormularioTabla(getFechaFormularioInscripcion(item)))}</td>
                   <td>
                     <button
@@ -3037,7 +3315,12 @@ function renderInscripcionPasajerosPanel() {
 
       <div class="grupo-kpi">
         <div class="info-label">Total inscritos</div>
-        <div class="info-value">${escapeHtml(`${nominaFinalOperativa} viajan / ${totalBruto} inscritos`)}</div>
+      
+        <div class="info-value">
+          ${escapeHtml(
+            `${totalViajan} viajan / ${totalAnulados} anulados / ${totalBruto} inscritos`
+          )}
+        </div>
       </div>
 
       <div class="grupo-kpi">
@@ -6641,11 +6924,154 @@ function buildNombreCompletoInscripcion(item = {}) {
     .trim();
 }
 
-function getTipoAlertaInscripcionHome(item = {}) {
-  const tipo = normalizeSearchLocal(getInscripcionTipoReal(item));
-  const estadoCupo = normalizeSearchLocal(item.estadoCupo || "");
+function estaInscripcionAnulada(item = {}) {
+  const estadoViaje = normalizeSearchLocal(
+    item.estadoViaje || ""
+  );
 
-  if (tipo === "nuevo_ingreso" && estadoCupo !== "confirmado") {
+  return (
+    item.anulado === true ||
+    item.viaja === false ||
+    estadoViaje === "no_viaja"
+  );
+}
+
+function estaInscripcionActiva(item = {}) {
+  return !estaInscripcionAnulada(item);
+}
+
+function getMotivoAnulacionInscripcion(item = {}) {
+  if (!estaInscripcionAnulada(item)) {
+    return "";
+  }
+
+  const motivo = normalizeSearchLocal(
+    item.motivoAnulacion || ""
+  );
+
+  if (
+    motivo === "no_viaja_sistema_pagos" ||
+    item.viaja === false ||
+    normalizeSearchLocal(item.estadoViaje || "") === "no_viaja"
+  ) {
+    return "No viaja según Sistema de Pagos";
+  }
+
+  if (motivo === "eliminado_sistema_pagos") {
+    return "Eliminado en Sistema de Pagos";
+  }
+
+  return cleanText(item.motivoAnulacion || "") ||
+    "Pasajero anulado";
+}
+
+function getEstadoViajeInscripcionHtml(item = {}) {
+  if (!estaInscripcionAnulada(item)) {
+    return "";
+  }
+
+  return `
+    <div class="inscripcion-anulada-box">
+      <span class="inscripcion-anulada-badge">
+        ANULADO
+      </span>
+
+      <span class="inscripcion-anulada-motivo">
+        ${escapeHtml(getMotivoAnulacionInscripcion(item))}
+      </span>
+    </div>
+  `;
+}
+
+function asegurarEstilosInscripcionesAnuladas() {
+  if (
+    document.getElementById(
+      "estilosInscripcionesAnuladas"
+    )
+  ) {
+    return;
+  }
+
+  const style =
+    document.createElement("style");
+
+  style.id =
+    "estilosInscripcionesAnuladas";
+
+  style.textContent = `
+    .inscripcion-table tr.inscripcion-anulada-row > td {
+      background: #eeeeee !important;
+      color: #686868 !important;
+      opacity: 0.9;
+    }
+
+    .inscripcion-table tr.inscripcion-anulada-row:hover > td {
+      background: #e4e4e4 !important;
+    }
+
+    .inscripcion-table tr.inscripcion-anulada-row .inscripcion-doc-link {
+      color: #5f5f5f !important;
+    }
+
+    .inscripcion-anulada-box {
+      margin-top: 7px;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .inscripcion-anulada-badge {
+      display: inline-flex;
+      align-items: center;
+      min-height: 22px;
+      padding: 3px 8px;
+      border-radius: 999px;
+      background: #626262;
+      color: #ffffff;
+      font-size: 10px;
+      font-weight: 900;
+      letter-spacing: 0.05em;
+    }
+
+    .inscripcion-anulada-motivo {
+      color: #5f5f5f;
+      font-size: 11px;
+      font-weight: 700;
+      line-height: 1.25;
+    }
+  `;
+
+  document.head.appendChild(style);
+}
+
+function getTipoAlertaInscripcionHome(item = {}) {
+  /*
+    Una persona que aún no existe en Sistema de Pagos
+    puede seguir normalmente como inscripción inicial,
+    nuevo ingreso o lista de espera.
+
+    Solo se cierra la alerta cuando existe una
+    anulación explícita.
+  */
+  if (estaInscripcionAnulada(item)) {
+    return "";
+  }
+
+  const tipo =
+    normalizeSearchLocal(
+      getInscripcionTipoReal(item)
+    );
+
+  const estadoCupo =
+    normalizeSearchLocal(
+      item.estadoCupo || ""
+    );
+
+  if (
+    tipo === "nuevo_ingreso" &&
+    estadoCupo !== "confirmado"
+  ) {
     return "nuevo_ingreso_pendiente";
   }
 
@@ -6659,7 +7085,10 @@ function getTipoAlertaInscripcionHome(item = {}) {
 
   if (
     tipo === "lista_espera_pagada" ||
-    (tipo === "lista_espera" && estadoCupo === "pagado")
+    (
+      tipo === "lista_espera" &&
+      estadoCupo === "pagado"
+    )
   ) {
     return "lista_espera_pagada_pendiente_confirmar";
   }
@@ -6671,14 +7100,37 @@ function getDocIdAlertaInscripcion(inscripcionId = "") {
   return `${String(state.groupDocId || state.groupId || "").trim()}_${String(inscripcionId || "").trim()}`;
 }
 
-function buildPayloadAlertaInscripcion(item = {}, tipoAlerta = "") {
-  const nombreParticipante = buildNombreCompletoInscripcion(item);
-  const nombreResponsable = getResponsablePrincipalNombre(item);
-  const correoResponsable = normalizeEmail(getByPath(item, "contactoPrincipal.correo") || "");
+function buildPayloadAlertaInscripcion(
+  item = {},
+  tipoAlerta = ""
+) {
+  const nombreParticipante =
+    buildNombreCompletoInscripcion(item);
+
+  const nombreResponsable =
+    getResponsablePrincipalNombre(item);
+
+  const correoResponsable =
+    normalizeEmail(
+      getByPath(
+        item,
+        "contactoPrincipal.correo"
+      ) || ""
+    );
+
   const telefonoResponsable =
-    getByPath(item, "contactoPrincipal.celular") ||
-    getByPath(item, "contactoPrincipal.telefono") ||
-    getByPath(item, "contactoPrincipal.whatsapp") ||
+    getByPath(
+      item,
+      "contactoPrincipal.celular"
+    ) ||
+    getByPath(
+      item,
+      "contactoPrincipal.telefono"
+    ) ||
+    getByPath(
+      item,
+      "contactoPrincipal.whatsapp"
+    ) ||
     "";
 
   return {
@@ -6686,62 +7138,200 @@ function buildPayloadAlertaInscripcion(item = {}, tipoAlerta = "") {
     resuelta: false,
 
     tipoAlerta,
-    tipoInscripcion: getInscripcionTipoReal(item),
-    estadoCupo: item.estadoCupo || "",
+    tipoInscripcion:
+      getInscripcionTipoReal(item),
 
-    idGrupo: String(state.groupId || ""),
-    groupDocId: String(state.groupDocId || ""),
-    inscripcionId: String(item.id || ""),
+    estadoCupo:
+      item.estadoCupo || "",
 
-    anoViaje: cleanText(state.group?.anoViaje || ""),
-    colegio: cleanText(state.group?.colegio || ""),
-    curso: cleanText(state.group?.curso || ""),
-    aliasGrupo:
-      cleanText(state.group?.aliasGrupo) ||
-      cleanText(state.group?.nombreGrupo) ||
-      cleanText(state.group?.colegio) ||
+    /*
+      Copia liviana del estado de viaje.
+
+      Home e Index pueden filtrar anulados
+      sin descargar la inscripción completa.
+    */
+    viaja:
+      item.viaja !== false,
+
+    anulado:
+      estaInscripcionAnulada(item),
+
+    estadoViaje:
+      item.estadoViaje || "",
+
+    motivoAnulacion:
+      item.motivoAnulacion || "",
+
+    idGrupo:
       String(state.groupId || ""),
 
-    vendedora: cleanText(state.group?.vendedora || state.group?.vendedoraCorreo || ""),
-    vendedoraCorreo: normalizeEmail(state.group?.vendedoraCorreo || ""),
+    groupDocId:
+      String(state.groupDocId || ""),
 
-    documento: getInscripcionDocumento(item),
+    inscripcionId:
+      String(item.id || ""),
+
+    anoViaje:
+      cleanText(
+        state.group?.anoViaje || ""
+      ),
+
+    colegio:
+      cleanText(
+        state.group?.colegio || ""
+      ),
+
+    curso:
+      cleanText(
+        state.group?.curso || ""
+      ),
+
+    aliasGrupo:
+      cleanText(
+        state.group?.aliasGrupo
+      ) ||
+      cleanText(
+        state.group?.nombreGrupo
+      ) ||
+      cleanText(
+        state.group?.colegio
+      ) ||
+      String(state.groupId || ""),
+
+    vendedora:
+      cleanText(
+        state.group?.vendedora ||
+        state.group?.vendedoraCorreo ||
+        ""
+      ),
+
+    vendedoraCorreo:
+      normalizeEmail(
+        state.group?.vendedoraCorreo || ""
+      ),
+
+    documento:
+      getInscripcionDocumento(item),
+
     nombreParticipante,
     nombreResponsable,
     correoResponsable,
     telefonoResponsable,
 
-    fechaFormulario: getFechaFormularioInscripcion(item) || null,
-    actualizadoAt: serverTimestamp(),
-    actualizadoPor: getDisplayName(state.effectiveUser),
-    actualizadoPorCorreo: state.effectiveEmail
+    fechaFormulario:
+      getFechaFormularioInscripcion(item) ||
+      null,
+
+    actualizadoAt:
+      serverTimestamp(),
+
+    actualizadoPor:
+      getDisplayName(
+        state.effectiveUser
+      ),
+
+    actualizadoPorCorreo:
+      state.effectiveEmail
   };
 }
 
-async function sincronizarAlertaInscripcion(item = {}) {
-  if (!item?.id) return;
+async function sincronizarAlertaInscripcion(
+  item = {}
+) {
+  if (!item?.id) {
+    return;
+  }
 
-  const tipoAlerta = getTipoAlertaInscripcionHome(item);
-  const alertaId = getDocIdAlertaInscripcion(item.id);
-  const ref = doc(db, ALERTAS_INSCRIPCIONES_COLLECTION, alertaId);
+  const tipoAlerta =
+    getTipoAlertaInscripcionHome(item);
 
+  const alertaId =
+    getDocIdAlertaInscripcion(
+      item.id
+    );
+
+  const ref =
+    doc(
+      db,
+      ALERTAS_INSCRIPCIONES_COLLECTION,
+      alertaId
+    );
+
+  /*
+    Si está anulado o ya no tiene un estado
+    pendiente, cerramos la alerta existente.
+  */
   if (!tipoAlerta) {
-    await setDoc(ref, {
-      activa: false,
-      resuelta: true,
-      resueltaAt: serverTimestamp(),
-      resueltaPor: getDisplayName(state.effectiveUser),
-      resueltaPorCorreo: state.effectiveEmail,
-      actualizadoAt: serverTimestamp()
-    }, { merge: true });
+    await setDoc(
+      ref,
+      {
+        activa: false,
+        resuelta: true,
+
+        tipoInscripcion:
+          getInscripcionTipoReal(item),
+
+        estadoCupo:
+          item.estadoCupo || "",
+
+        viaja:
+          item.viaja !== false,
+
+        anulado:
+          estaInscripcionAnulada(item),
+
+        estadoViaje:
+          item.estadoViaje || "",
+
+        motivoAnulacion:
+          item.motivoAnulacion || "",
+
+        motivoResolucion:
+          estaInscripcionAnulada(item)
+            ? "pasajero_anulado"
+            : "estado_inscripcion_resuelto",
+
+        idGrupo:
+          String(state.groupId || ""),
+
+        groupDocId:
+          String(state.groupDocId || ""),
+
+        inscripcionId:
+          String(item.id || ""),
+
+        resueltaAt:
+          serverTimestamp(),
+
+        resueltaPor:
+          getDisplayName(
+            state.effectiveUser
+          ),
+
+        resueltaPorCorreo:
+          state.effectiveEmail,
+
+        actualizadoAt:
+          serverTimestamp()
+      },
+      {
+        merge: true
+      }
+    );
 
     return;
   }
 
-  await setDoc(ref, {
-    ...buildPayloadAlertaInscripcion(item, tipoAlerta),
-    creadaAt: item.alertaCreadaAt || serverTimestamp()
-  }, { merge: true });
+  await setDoc(
+    ref,
+    buildPayloadAlertaInscripcion(
+      item,
+      tipoAlerta
+    ),
+    {
+      merge: true
+    }
+  );
 }
 
 async function sincronizarAlertasInscripcionesGrupo() {
