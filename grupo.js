@@ -2842,9 +2842,10 @@ function fichaMedicaPendiente(item = {}) {
     );
 
   /*
-    Regla actual del sistema:
-    solo las inscripciones importadas originalmente
-    desde Sistema de Pagos usan este indicador.
+    Regla actual:
+    solamente pasajeros originalmente importados
+    desde Sistema de Pagos tienen ficha médica pendiente
+    por este flujo.
   */
   if (tipo !== "sistema_pagos") {
     return false;
@@ -2875,18 +2876,6 @@ function getInscripcionesConFichaMedicaCompleta() {
       estaInscripcionActiva(item) &&
       esNominaFinalOperativa(item) &&
       !fichaMedicaPendiente(item)
-  );
-}
-
-function getInscripcionesConFichaMedicaPendiente() {
-  return state.inscripciones.filter((item) =>
-    esNominaFinalOperativa(item) && fichaMedicaPendiente(item)
-  );
-}
-
-function getInscripcionesConFichaMedicaCompleta() {
-  return state.inscripciones.filter((item) =>
-    esNominaFinalOperativa(item) && !fichaMedicaPendiente(item)
   );
 }
 
