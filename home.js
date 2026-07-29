@@ -1338,27 +1338,56 @@ function getInscripcionEstadoCupoHome(item = {}) {
   return normalizeLoose(item.estadoCupo || "");
 }
 
-function esInscripcionNuevoIngresoPendiente(item = {}) {
+function esAlertaInscripcionActivaHome(
+  item = {}
+) {
+  const estadoViaje =
+    normalizeLoose(
+      item.estadoViaje || ""
+    );
+
   return (
     item.activa !== false &&
     item.resuelta !== true &&
-    item.tipoAlerta === "nuevo_ingreso_pendiente"
+    item.anulado !== true &&
+    item.viaja !== false &&
+    estadoViaje !== "no_viaja"
   );
 }
 
-function esInscripcionListaEsperaPendiente(item = {}) {
+function esInscripcionNuevoIngresoPendiente(
+  item = {}
+) {
   return (
-    item.activa !== false &&
-    item.resuelta !== true &&
-    item.tipoAlerta === "lista_espera_pendiente"
+    esAlertaInscripcionActivaHome(
+      item
+    ) &&
+    item.tipoAlerta ===
+      "nuevo_ingreso_pendiente"
   );
 }
 
-function esListaEsperaPagadaPendienteConfirmar(item = {}) {
+function esInscripcionListaEsperaPendiente(
+  item = {}
+) {
   return (
-    item.activa !== false &&
-    item.resuelta !== true &&
-    item.tipoAlerta === "lista_espera_pagada_pendiente_confirmar"
+    esAlertaInscripcionActivaHome(
+      item
+    ) &&
+    item.tipoAlerta ===
+      "lista_espera_pendiente"
+  );
+}
+
+function esListaEsperaPagadaPendienteConfirmar(
+  item = {}
+) {
+  return (
+    esAlertaInscripcionActivaHome(
+      item
+    ) &&
+    item.tipoAlerta ===
+      "lista_espera_pagada_pendiente_confirmar"
   );
 }
 
