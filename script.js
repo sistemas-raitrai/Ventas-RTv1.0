@@ -2275,27 +2275,55 @@ function closeAlertasWarningModal() {
    ALERTAS DE INSCRIPCIONES
 ========================================================= */
 
-function esInscripcionNuevoIngresoPendiente(item = {}) {
+function esAlertaInscripcionActivaDashboard(
+  item = {}
+) {
+  const estadoViaje =
+    normalizeLoose(
+      item.estadoViaje || ""
+    );
+
   return (
     item.activa !== false &&
     item.resuelta !== true &&
-    String(item.tipoAlerta || "").trim() === "nuevo_ingreso_pendiente"
+    item.anulado !== true &&
+    item.viaja !== false &&
+    estadoViaje !== "no_viaja"
   );
 }
 
-function esInscripcionListaEsperaPendiente(item = {}) {
+function esInscripcionNuevoIngresoPendiente(
+  item = {}
+) {
   return (
-    item.activa !== false &&
-    item.resuelta !== true &&
-    String(item.tipoAlerta || "").trim() === "lista_espera_pendiente"
+    esAlertaInscripcionActivaDashboard(
+      item
+    ) &&
+    item.tipoAlerta ===
+      "nuevo_ingreso_pendiente"
   );
 }
 
-function esListaEsperaPagadaPendienteConfirmar(item = {}) {
+function esInscripcionListaEsperaPendiente(
+  item = {}
+) {
   return (
-    item.activa !== false &&
-    item.resuelta !== true &&
-    String(item.tipoAlerta || "").trim() ===
+    esAlertaInscripcionActivaDashboard(
+      item
+    ) &&
+    item.tipoAlerta ===
+      "lista_espera_pendiente"
+  );
+}
+
+function esListaEsperaPagadaPendienteConfirmar(
+  item = {}
+) {
+  return (
+    esAlertaInscripcionActivaDashboard(
+      item
+    ) &&
+    item.tipoAlerta ===
       "lista_espera_pagada_pendiente_confirmar"
   );
 }
