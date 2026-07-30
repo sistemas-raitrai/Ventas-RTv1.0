@@ -1967,10 +1967,19 @@ async function updateVendorPreview() {
 }
 
 function setRegistroNameOnlyMode(enabled = false) {
+  /*
+   * Cuando enabled es true:
+   * Registro puede modificar solamente:
+   *
+   * - Nombre del colegio
+   * - Agregar un logo
+   * - Reemplazar el logo
+   * - Eliminar el logo
+   *
+   * Todo lo demás permanece bloqueado.
+   */
   const idsToLock = [
     "numeroColegioInput",
-    "logoInput",
-    "quitarLogoCheck",
     "vendedorSelectModal",
     "comunaInput",
     "ciudadInput",
@@ -1986,18 +1995,42 @@ function setRegistroNameOnlyMode(enabled = false) {
   });
 
   document
-    .querySelectorAll("#contactosContainer input, #contactosContainer select, #contactosContainer textarea, #contactosContainer button")
+    .querySelectorAll(
+      "#contactosContainer input, " +
+      "#contactosContainer select, " +
+      "#contactosContainer textarea, " +
+      "#contactosContainer button"
+    )
     .forEach((el) => {
       el.disabled = enabled;
     });
 
+  /*
+   * Estos campos siempre deben permanecer disponibles
+   * para el rol Registro dentro del modal de edición.
+   */
   const colegioInput = $("colegioInput");
-  if (colegioInput) colegioInput.disabled = false;
+  const logoInput = $("logoInput");
+  const quitarLogoCheck = $("quitarLogoCheck");
+
+  if (colegioInput) {
+    colegioInput.disabled = false;
+  }
+
+  if (logoInput) {
+    logoInput.disabled = false;
+  }
+
+  if (quitarLogoCheck) {
+    quitarLogoCheck.disabled = false;
+  }
 
   const hint = $("vendorEditHint");
+
   if (hint && enabled) {
     hint.classList.remove("hidden");
-    hint.textContent = "Rol registro: solo puedes modificar el nombre del colegio.";
+    hint.textContent =
+      "Rol registro: puedes modificar el nombre del colegio y administrar su logo.";
   }
 }
 
@@ -2487,73 +2520,253 @@ async function saveSeguimientoModal() {
   }
 }
 
-async function saveRegistroNombreOnly() {
+async function saveRegistroNombreYLogo() {
   const old = { ...state.editingOriginal };
-  const nuevoNombre = normalizeText($("colegioInput")?.value || "");
+
+  const nuevoNombre = normalizeText(
+    $("colegioInput")?.value || ""
+  );
 
   if (!nuevoNombre) {
     alert("Debes indicar el nombre del colegio.");
     return;
   }
 
-  if (normalizeText(old.colegio) === nuevoNombre) {
+  const nombreAnterior = normalizeText(old.colegio || "");
+
+  const logoAnteriorUrl = String(
+    old.logoUrl ||
+    old.logoColegioUrl ||
+    ""
+  ).trim();
+
+  const logoAnteriorPath = String(
+    old.logoPath ||
+    old.logoColegioPath ||
+    ""
+  ).trim();
+
+  const nombreCambio = nombreAnterior !== nuevoNombre;
+  const tieneLogoNuevo = !!state.pendingLogoFile;
+  const solicitaEliminarLogo =
+    !!state.removeCurrentLogo && !tieneLogoNuevo;
+
+  const logoCambio =
+    tieneLogoNuevo ||
+    (solicitaEliminarLogo && !!logoAnteriorUrl);
+
+  /*
+   * Si no cambió ni el nombre ni el logo,
+   * simplemente cerramos el modal.
+   */
+  if (!nombreCambio && !logoCambio) {
     closeModal();
     return;
   }
 
+  let logoNuevoUrl = logoAnteriorUrl;
+  let logoNuevoPath = logoAnteriorPath;
+  let logoSubidoPath = "";
+
   try {
     setProgressStatus({
-      text: "Guardando nombre del colegio.",
-      meta: "Rol registro: solo se actualizará el nombre.",
-      progress: 40
+      text: "Guardando colegio...",
+      meta: tieneLogoNuevo
+        ? "Preparando nuevo logo..."
+        : solicitaEliminarLogo
+          ? "Eliminando logo..."
+          : "Actualizando nombre...",
+      progress: 25
     });
+
+    /*
+     * Si Registro seleccionó un logo nuevo,
+     * primero lo subimos a Firebase Storage.
+     */
+    if (tieneLogoNuevo) {
+      setProgressStatus({
+        text: "Guardando colegio...",
+        meta: "Subiendo nuevo logo...",
+        progress: 45
+      });
+
+      const logoSubido = await uploadSchoolLogo(
+        state.pendingLogoFile,
+        {
+          correoVendedor: old.correoVendedor,
+          numeroColegio: old.numeroColegio
+        }
+      );
+
+      logoNuevoUrl = logoSubido.logoUrl;
+      logoNuevoPath = logoSubido.logoPath;
+      logoSubidoPath = logoSubido.logoPath;
+    }
+
+    /*
+     * Si se marcó Quitar logo y no se seleccionó
+     * uno nuevo, se limpian ambos campos.
+     */
+    if (solicitaEliminarLogo) {
+      logoNuevoUrl = "";
+      logoNuevoPath = "";
+    }
 
     const itemRef = doc(
       db,
       "ventas_cartera",
-      old.correoVendedor,
+      normalizeEmail(old.correoVendedor),
       "items",
-      old.numeroColegio
+      String(old.numeroColegio)
     );
 
-    await setDoc(itemRef, {
+    const updatePayload = {
       colegio: nuevoNombre,
       colegioNormalizado: normalizeSearch(nuevoNombre),
-      actualizadoPor: normalizeEmail(state.realUser?.email || ""),
+      actualizadoPor: normalizeEmail(
+        state.realUser?.email || ""
+      ),
       fechaActualizacion: serverTimestamp()
-    }, { merge: true });
+    };
 
-    await writeCarteraHistory({
-      correoVendedor: old.correoVendedor,
-      numeroColegio: old.numeroColegio,
-      tipo: "Edición registro",
-      asunto: "Cambio de nombre del colegio",
-      mensaje: `Rol registro modificó el nombre del colegio: ${old.colegio || "vacío"} → ${nuevoNombre}.`,
-      metadata: {
-        changes: [
-          {
-            key: "colegio",
-            label: "Colegio",
-            before: old.colegio || "",
-            after: nuevoNombre
-          }
-        ]
-      }
+    /*
+     * Los campos del logo solamente se incluyen
+     * cuando realmente existe una modificación.
+     */
+    if (logoCambio) {
+      updatePayload.logoUrl = logoNuevoUrl;
+      updatePayload.logoPath = logoNuevoPath;
+      updatePayload.logoColegioUrl = logoNuevoUrl;
+      updatePayload.logoColegioPath = logoNuevoPath;
+    }
+
+    setProgressStatus({
+      text: "Guardando colegio...",
+      meta: "Actualizando información...",
+      progress: 70
     });
+
+    await setDoc(
+      itemRef,
+      updatePayload,
+      { merge: true }
+    );
+
+    /*
+     * Después de guardar correctamente Firestore,
+     * eliminamos el archivo anterior.
+     *
+     * Esto aplica tanto al reemplazar como al quitar.
+     */
+    if (
+      logoCambio &&
+      logoAnteriorPath &&
+      logoAnteriorPath !== logoNuevoPath
+    ) {
+      await deleteLogoFromStorage(logoAnteriorPath);
+    }
+
+    const changes = [];
+
+    if (nombreCambio) {
+      changes.push({
+        key: "colegio",
+        label: "Colegio",
+        before: nombreAnterior,
+        after: nuevoNombre
+      });
+    }
+
+    if (tieneLogoNuevo) {
+      changes.push({
+        key: "logo",
+        label: "Logo",
+        before: logoAnteriorUrl
+          ? "Logo existente"
+          : "Sin logo",
+        after: logoAnteriorUrl
+          ? "Logo reemplazado"
+          : "Logo agregado"
+      });
+    } else if (solicitaEliminarLogo) {
+      changes.push({
+        key: "logo",
+        label: "Logo",
+        before: "Logo existente",
+        after: "Logo eliminado"
+      });
+    }
+
+    /*
+     * El historial no debe impedir que el cambio principal
+     * quede guardado si por alguna razón falla su escritura.
+     */
+    try {
+      await writeCarteraHistory({
+        correoVendedor: old.correoVendedor,
+        numeroColegio: old.numeroColegio,
+        tipo: "Edición registro",
+        asunto:
+          nombreCambio && logoCambio
+            ? "Actualización de nombre y logo"
+            : logoCambio
+              ? "Actualización de logo"
+              : "Cambio de nombre del colegio",
+        mensaje:
+          buildHistorySummaryForChanges(changes) ||
+          "Rol registro actualizó la información permitida del colegio.",
+        metadata: {
+          changes
+        }
+      });
+    } catch (historyError) {
+      console.warn(
+        "El colegio fue actualizado, pero no se pudo guardar el historial:",
+        historyError
+      );
+    }
 
     closeModal();
 
     setProgressStatus({
-      text: "Nombre actualizado.",
-      meta: "Solo se modificó el nombre del colegio.",
+      text: "Colegio actualizado.",
+      meta:
+        nombreCambio && logoCambio
+          ? "Se actualizaron el nombre y el logo."
+          : logoCambio
+            ? "El logo fue actualizado correctamente."
+            : "El nombre fue actualizado correctamente.",
       progress: 100,
       type: "success"
     });
 
+    clearProgressStatus();
     await loadData();
   } catch (error) {
     console.error(error);
-    alert("No se pudo guardar el nombre del colegio: " + (error.message || error));
+
+    /*
+     * Si alcanzamos a subir un logo, pero Firestore no pudo
+     * guardar la referencia, eliminamos el archivo nuevo
+     * para evitar dejar archivos huérfanos.
+     */
+    if (logoSubidoPath) {
+      await deleteLogoFromStorage(logoSubidoPath);
+    }
+
+    setProgressStatus({
+      text: "Error guardando colegio.",
+      meta:
+        error.message ||
+        "No se pudo actualizar el nombre o el logo.",
+      progress: 100,
+      type: "error"
+    });
+
+    alert(
+      "No se pudo actualizar el colegio: " +
+      (error.message || error)
+    );
   }
 }
 
@@ -2563,11 +2776,13 @@ async function saveModal() {
 
   if (!canCreate && !canEdit) return;
 
-  if (state.modalMode === "edit" && isRegistroRole(state.effectiveUser)) {
-    await saveRegistroNombreOnly();
+  if (
+    state.modalMode === "edit" &&
+    isRegistroRole(state.effectiveUser)
+  ) {
+    await saveRegistroNombreYLogo();
     return;
   }
-
   const input = readModalInput();
   const validation = validateRowInput(input);
   if (validation) {
