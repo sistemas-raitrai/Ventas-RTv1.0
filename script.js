@@ -3478,6 +3478,55 @@ async function asegurarDetallesDashboardCargados() {
   }
 }
 
+function mostrarEstadoSelectorComercial(
+  mensaje = "Cargando grupos comerciales...",
+  {
+    deshabilitado = true
+  } = {}
+) {
+  const select =
+    $("select-grupo-comercial");
+
+  if (!select) {
+    return;
+  }
+
+  /*
+    Si Tom Select ya estaba creado,
+    se destruye antes de cambiar las opciones.
+  */
+  destroySearchableSelect(
+    "select-grupo-comercial"
+  );
+
+  select.innerHTML = "";
+
+  const option =
+    document.createElement(
+      "option"
+    );
+
+  option.value = "";
+  option.textContent = mensaje;
+  option.selected = true;
+
+  select.appendChild(
+    option
+  );
+
+  select.value = "";
+  select.disabled = deshabilitado;
+
+  /*
+    Se vuelve a crear Tom Select para que
+    el mensaje también aparezca visualmente.
+  */
+  initSearchableSelect(
+    "select-grupo-comercial",
+    mensaje
+  );
+}
+
 async function cargarAnosFuturosIndex() {
   const anoActual =
     getAnoPrioritarioIndex();
@@ -3489,21 +3538,48 @@ async function cargarAnosFuturosIndex() {
           ano !== anoActual
       );
 
-  await Promise.all(
-    anosFuturos.map(
-      (ano) =>
-        cargarGruposIndexAno(
-          ano
-        )
-    )
-  );
+  const resultados =
+    await Promise.all(
+      anosFuturos.map(
+        async (ano) => {
+          const resultado =
+            await cargarGruposIndexAno(
+              ano
+            );
 
+          return {
+            ano,
+            origen:
+              resultado?.origen || "",
+            grupos:
+              Array.isArray(
+                resultado?.rows
+              )
+                ? resultado.rows.length
+                : 0
+          };
+        }
+      )
+    );
+
+  /*
+    Une nuevamente año actual y años futuros
+    dentro de state.rows.
+  */
   reconstruirRowsIndex();
 
-  actualizarExperienciaPrincipalIndex({
-    renderizarDashboardCompleto:
-      state.datosAuxiliaresCargados
-  });
+  logRendimientoIndex(
+    "AÑOS_FUTUROS_LISTOS",
+    {
+      anos:
+        resultados,
+
+      gruposTotales:
+        state.rows.length
+    }
+  );
+
+  return resultados;
 }
 
 async function loadDashboardData() {
@@ -3514,8 +3590,15 @@ async function loadDashboardData() {
     performance.now();
 
   /*
-    Todas las cargas comienzan inmediatamente
-    y en paralelo.
+    Mostramos de inmediato que el selector comercial
+    todavía está cargando sus años futuros.
+  */
+  mostrarEstadoSelectorComercial(
+    "Cargando grupos comerciales..."
+  );
+
+  /*
+    Todas las consultas comienzan en paralelo.
   */
   const promiseResumen =
     cargarResumenAlertasIndex();
@@ -3532,11 +3615,13 @@ async function loadDashboardData() {
     loadDashboardAuxData();
 
   /*
-    Esperamos solamente el año actual para dejar
-    disponible cuanto antes el selector administrativo.
+    Primero esperamos el año actual para dejar disponible
+    rápidamente el selector administrativo.
   */
   const resultadoAnoActual =
     await promiseAnoActual;
+
+  reconstruirRowsIndex();
 
   actualizarExperienciaPrincipalIndex({
     renderizarDashboardCompleto:
@@ -3544,16 +3629,21 @@ async function loadDashboardData() {
   });
 
   console.log(
-    "[INDEX] Selectores iniciales disponibles",
+    "[INDEX] Año actual disponible",
     {
       ano:
         anoActual,
 
       origen:
-        resultadoAnoActual.origen,
+        resultadoAnoActual?.origen ||
+        "",
 
       grupos:
-        resultadoAnoActual.rows.length,
+        Array.isArray(
+          resultadoAnoActual?.rows
+        )
+          ? resultadoAnoActual.rows.length
+          : 0,
 
       desdeInicioMs:
         Math.round(
@@ -3564,11 +3654,11 @@ async function loadDashboardData() {
   );
 
   /*
-    Si el año actual salió de sessionStorage,
-    se refresca desde Firestore en segundo plano.
+    Si el año actual salió desde sessionStorage,
+    se actualiza desde Firestore en segundo plano.
   */
   if (
-    resultadoAnoActual.origen ===
+    resultadoAnoActual?.origen ===
     "sessionStorage"
   ) {
     cargarGruposIndexAno(
@@ -3579,6 +3669,8 @@ async function loadDashboardData() {
       }
     )
       .then(() => {
+        reconstruirRowsIndex();
+
         actualizarExperienciaPrincipalIndex({
           renderizarDashboardCompleto:
             state.datosAuxiliaresCargados
@@ -3593,51 +3685,88 @@ async function loadDashboardData() {
   }
 
   /*
-    Los años futuros ya están cargándose en paralelo.
-    Cuando terminan, se reconstruye inmediatamente
-    el selector comercial.
-  */
-  promiseAnosFuturos
-    .then(() => {
-      console.log(
-        "[INDEX] Años futuros disponibles",
-        {
-          gruposTotales:
-            state.rows.length,
+    IMPORTANTE:
 
-          desdeInicioMs:
-            Math.round(
-              performance.now() -
-              inicioTotal
-            )
-        }
-      );
-    })
-    .catch((error) => {
-      console.warn(
-        "[INDEX] No se pudieron cargar los años futuros:",
-        error
-      );
+    Ahora sí esperamos explícitamente los años futuros.
+
+    Esto garantiza que el selector comercial se reconstruya
+    durante la primera carga y no solamente después
+    de actualizar la página.
+  */
+  try {
+    const resultadosFuturos =
+      await promiseAnosFuturos;
+
+    reconstruirRowsIndex();
+
+    actualizarExperienciaPrincipalIndex({
+      renderizarDashboardCompleto:
+        false
     });
 
+    console.log(
+      "[INDEX] Años futuros disponibles",
+      {
+        resultados:
+          resultadosFuturos,
+
+        gruposTotales:
+          state.rows.length,
+
+        desdeInicioMs:
+          Math.round(
+            performance.now() -
+            inicioTotal
+          )
+      }
+    );
+  } catch (error) {
+    console.warn(
+      "[INDEX] No se pudieron cargar los años futuros:",
+      error
+    );
+
+    mostrarEstadoSelectorComercial(
+      "No se pudieron cargar los grupos comerciales"
+    );
+  }
+
   /*
-    Las alertas siguen cargándose sin bloquear
-    los selectores comercial y administrativo.
+    Las alertas y solicitudes se estaban cargando
+    paralelamente. Ahora esperamos su resultado.
   */
   await promiseAuxiliares;
 
+  const effectiveUser =
+    getEffectiveUser();
+
+  if (!effectiveUser) {
+    return;
+  }
+
   const rowsScope =
     getRowsForCurrentScope(
-      getEffectiveUser()
+      effectiveUser
     );
 
-  renderDashboard(
-    rowsScope
-  );
+  /*
+    Render final del dashboard.
+    En este punto ya tenemos:
+    - año actual;
+    - años futuros;
+    - datos auxiliares.
+  */
+  actualizarExperienciaPrincipalIndex({
+    renderizarDashboardCompleto:
+      true
+  });
 
   console.log(
-    "[INDEX] Alertas disponibles",
+    "[INDEX] Dashboard completo disponible",
     {
+      gruposScope:
+        rowsScope.length,
+
       alertas:
         state.alertRows.length,
 
@@ -3647,7 +3776,7 @@ async function loadDashboardData() {
       inscripciones:
         state.inscripcionesRows.length,
 
-      desdeInicioMs:
+      duracionTotalMs:
         Math.round(
           performance.now() -
           inicioTotal
@@ -3655,6 +3784,10 @@ async function loadDashboardData() {
     }
   );
 
+  /*
+    El resumen rápido no debe bloquear
+    el funcionamiento del dashboard.
+  */
   promiseResumen.catch(
     (error) => {
       console.warn(
