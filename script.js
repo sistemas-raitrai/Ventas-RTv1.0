@@ -3492,13 +3492,18 @@ function mostrarEstadoSelectorComercial(
   }
 
   /*
-    Si Tom Select ya estaba creado,
-    se destruye antes de cambiar las opciones.
+    Primero elimina cualquier Tom Select anterior.
   */
   destroySearchableSelect(
     "select-grupo-comercial"
   );
 
+  /*
+    Durante la carga dejamos solamente el select nativo.
+
+    No creamos Tom Select todavía, porque después
+    podría restaurar esta opción antigua al destruirse.
+  */
   select.innerHTML = "";
 
   const option =
@@ -3516,15 +3521,6 @@ function mostrarEstadoSelectorComercial(
 
   select.value = "";
   select.disabled = deshabilitado;
-
-  /*
-    Se vuelve a crear Tom Select para que
-    el mensaje también aparezca visualmente.
-  */
-  initSearchableSelect(
-    "select-grupo-comercial",
-    mensaje
-  );
 }
 
 async function cargarAnosFuturosIndex() {
@@ -4839,6 +4835,20 @@ function poblarSelectorGruposComerciales(
     return;
   }
 
+    /*
+    IMPORTANTE:
+
+    Se debe destruir Tom Select ANTES de modificar
+    el contenido del select nativo.
+
+    Si se destruye después, Tom Select puede restaurar
+    las opciones antiguas, como el mensaje
+    "Cargando grupos comerciales...".
+  */
+  destroySearchableSelect(
+    "select-grupo-comercial"
+  );
+
   const anoActual =
     getAnoPrioritarioIndex();
 
@@ -4976,6 +4986,14 @@ function poblarSelectorGruposAdministrativos(
   if (!select) {
     return;
   }
+
+  /*
+    Destruye la instancia visual antes de modificar
+    las opciones del select original.
+  */
+  destroySearchableSelect(
+    "select-grupo-administrativo"
+  );
 
   const anoActual =
     getAnoPrioritarioIndex();
