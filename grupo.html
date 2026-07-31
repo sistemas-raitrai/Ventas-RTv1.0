@@ -216,6 +216,98 @@
       font-size: 12px;
       color: #5f6b7a;
     }
+
+    /* =========================================================
+     INSCRIPCIÓN DE PASAJEROS
+     ORGANIZACIÓN DE BOTONES POR FUNCIONALIDAD
+    ========================================================= */
+    
+    .inscripcion-acciones {
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      margin-top: 14px;
+    }
+    
+    .inscripcion-acciones-grupo {
+      width: 100%;
+      padding: 12px 14px;
+      border: 1px solid rgba(72, 42, 112, 0.1);
+      border-radius: 14px;
+      background: rgba(248, 246, 252, 0.72);
+    }
+    
+    .inscripcion-acciones-titulo {
+      margin-bottom: 9px;
+      font-size: 11px;
+      font-weight: 800;
+      line-height: 1.2;
+      color: #6d5a83;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+    
+    .inscripcion-acciones-botones {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px;
+    }
+    
+    
+    /* Estado principal de la inscripción */
+    
+    .inscripcion-acciones-estado {
+      background: rgba(242, 237, 249, 0.86);
+      border-color: rgba(72, 42, 112, 0.16);
+    }
+    
+    
+    /* Gestión operativa de la nómina */
+    
+    .inscripcion-acciones-gestion {
+      background: rgba(255, 248, 220, 0.52);
+      border-color: rgba(209, 165, 0, 0.16);
+    }
+    
+    
+    /* Acciones delicadas */
+    
+    .inscripcion-acciones-avanzadas {
+      background: rgba(255, 244, 240, 0.74);
+      border-color: rgba(235, 105, 58, 0.18);
+    }
+    
+    .inscripcion-acciones-avanzadas .inscripcion-acciones-titulo {
+      color: #b45838;
+    }
+    
+    
+    /* Evita que los botones se estiren innecesariamente */
+    
+    .inscripcion-acciones-botones button {
+      width: auto;
+      max-width: 100%;
+    }
+    
+    
+    /* Pantallas pequeñas */
+    
+    @media (max-width: 680px) {
+      .inscripcion-acciones-grupo {
+        padding: 12px;
+      }
+    
+      .inscripcion-acciones-botones {
+        align-items: stretch;
+      }
+    
+      .inscripcion-acciones-botones button {
+        width: 100%;
+        justify-content: center;
+      }
+    }
     .grupo-hero-actions{
       display: flex;
       flex-wrap: wrap;
@@ -2521,54 +2613,171 @@
               <p class="grupo-panel-sub">Link público, estado de inscripción y nómina básica</p>
             </div>
       
-            <div class="grupo-hero-actions" style="margin-top:0;">
-              <button id="btnCopiarLinkInscripcion" class="btn-ok" type="button">
-                Copiar link activo
-              </button>
+            <div class="inscripcion-acciones">
             
-              <button id="btnHabilitarInscripcion" class="btn-dark" type="button">
-                Abrir inscripción inicial
-              </button>
+              <!-- ==========================================
+                   1. ESTADO Y APERTURA DE LA INSCRIPCIÓN
+              =========================================== -->
+              <section class="inscripcion-acciones-grupo inscripcion-acciones-estado">
+                <div class="inscripcion-acciones-titulo">
+                  Estado de inscripción
+                </div>
             
-              <button id="btnCerrarInscripcion" class="btn-danger" type="button">
-                Cerrar inscripción
-              </button>
+                <div class="inscripcion-acciones-botones">
+                  <button
+                    id="btnCopiarLinkInscripcion"
+                    class="btn-ok"
+                    type="button"
+                  >
+                    Copiar link activo
+                  </button>
             
-              <button id="btnAbrirNuevosInscritos" class="btn-pill" type="button">
-                Abrir nuevos ingresos
-              </button>
+                  <button
+                    id="btnHabilitarInscripcion"
+                    class="btn-dark"
+                    type="button"
+                  >
+                    Abrir inscripción inicial
+                  </button>
             
-              <button id="btnAbrirListaEspera" class="btn-pill" type="button">
-                Abrir lista de espera
-              </button>
+                  <button
+                    id="btnCerrarInscripcion"
+                    class="btn-danger"
+                    type="button"
+                  >
+                    Cerrar inscripción
+                  </button>
+                </div>
+              </section>
             
-              <button id="btnCrearLinkLiberados" class="btn-pill" type="button">
-                Crear link liberados
-              </button>
-
-              <button id="btnGenerarLinkNominaPublica" class="btn-pill" type="button">
-                Link Nómina
-              </button>
             
-              <button id="btnExportarInscripcionesExcel" class="btn-pill" type="button">
-                Exportar Excel
-              </button>
-
-              <button id="btnNominaInicialPagos" class="btn-ok hidden" type="button">
-                Cargado en Pagos
-              </button>
+              <!-- ==========================================
+                   2. ENLACES ESPECIALES PARA PASAJEROS
+              =========================================== -->
+              <section class="inscripcion-acciones-grupo">
+                <div class="inscripcion-acciones-titulo">
+                  Enlaces para pasajeros
+                </div>
             
-              <button id="btnExportarInscripcionesCsv" class="btn-pill" type="button">
-                Exportar CSV
-              </button>
-
-              <button id="btnEditarNominaInscripcion" class="btn-editar-nomina hidden" type="button">
-                Editar Nómina
-              </button>
-
-              <button id="btnResetearCicloInscripcion" class="btn-reset-admin hidden" type="button">
-                Resetear
-              </button>
+                <div class="inscripcion-acciones-botones">
+                  <button
+                    id="btnAbrirNuevosInscritos"
+                    class="btn-pill"
+                    type="button"
+                  >
+                    Abrir nuevos ingresos
+                  </button>
+            
+                  <button
+                    id="btnAbrirListaEspera"
+                    class="btn-pill"
+                    type="button"
+                  >
+                    Abrir lista de espera
+                  </button>
+            
+                  <button
+                    id="btnCrearLinkLiberados"
+                    class="btn-pill"
+                    type="button"
+                  >
+                    Crear link liberados
+                  </button>
+                </div>
+              </section>
+            
+            
+              <!-- ==========================================
+                   3. GESTIÓN DE LA NÓMINA
+              =========================================== -->
+              <section class="inscripcion-acciones-grupo inscripcion-acciones-gestion">
+                <div class="inscripcion-acciones-titulo">
+                  Gestión de nómina
+                </div>
+            
+                <div class="inscripcion-acciones-botones">
+                  <button
+                    id="btnEditarNominaInscripcion"
+                    class="btn-editar-nomina hidden"
+                    type="button"
+                  >
+                    Editar Nómina
+                  </button>
+            
+                  <button
+                    id="btnNominaInicialPagos"
+                    class="btn-ok hidden"
+                    type="button"
+                  >
+                    Cargada a Pagos
+                  </button>
+                </div>
+              </section>
+            
+            
+              <!-- ==========================================
+                   4. COMUNICACIONES Y ARCHIVOS
+              =========================================== -->
+              <section class="inscripcion-acciones-grupo">
+                <div class="inscripcion-acciones-titulo">
+                  Comunicaciones y archivos
+                </div>
+            
+                <div class="inscripcion-acciones-botones">
+                  <button
+                    id="btnCorreosInscripcion"
+                    class="btn-pill"
+                    type="button"
+                  >
+                    Correos
+                  </button>
+            
+                  <button
+                    id="btnGenerarLinkNominaPublica"
+                    class="btn-pill"
+                    type="button"
+                  >
+                    Link Nómina
+                  </button>
+            
+                  <button
+                    id="btnExportarInscripcionesExcel"
+                    class="btn-pill"
+                    type="button"
+                  >
+                    Exportar Excel
+                  </button>
+            
+                  <button
+                    id="btnExportarInscripcionesCsv"
+                    class="btn-pill"
+                    type="button"
+                  >
+                    Exportar CSV
+                  </button>
+                </div>
+              </section>
+            
+            
+              <!-- ==========================================
+                   5. ACCIONES AVANZADAS
+              =========================================== -->
+              <section class="inscripcion-acciones-grupo inscripcion-acciones-avanzadas">
+                <div class="inscripcion-acciones-titulo">
+                  Acciones avanzadas
+                </div>
+            
+                <div class="inscripcion-acciones-botones">
+                  <button
+                    id="btnResetearCicloInscripcion"
+                    class="btn-reset hidden"
+                    type="button"
+                  >
+                    Resetear ciclo
+                  </button>
+                </div>
+              </section>
+            
             </div>
           </div>
       
