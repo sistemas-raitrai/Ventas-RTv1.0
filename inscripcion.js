@@ -1078,18 +1078,32 @@ function obtenerExtensionArchivo(file) {
 }
 
 function validarArchivoEspecial(file, label) {
-  if (!file) throw new Error(`Falta archivo: ${label}`);
+  if (!file) {
+    throw new Error(`Falta archivo: ${label}`);
+  }
 
   const maxBytes = 8 * 1024 * 1024;
 
   if (file.size > maxBytes) {
-    throw new Error(`${label} supera el máximo permitido de 8 MB.`);
+    throw new Error(
+      `${label} supera el máximo permitido de 8 MB.`
+    );
   }
 
-  const tipo = file.type || "";
+  const tiposPermitidos = [
+    "image/jpeg",
+    "image/png",
+    "image/webp"
+  ];
 
-  if (!tipo.startsWith("image/") && tipo !== "application/pdf") {
-    throw new Error(`${label} debe ser imagen o PDF.`);
+  const tipo = String(file.type || "")
+    .trim()
+    .toLowerCase();
+
+  if (!tiposPermitidos.includes(tipo)) {
+    throw new Error(
+      `${label} debe ser una imagen JPG, PNG o WEBP. No se permiten archivos PDF.`
+    );
   }
 }
 
@@ -1620,12 +1634,14 @@ function validarFormulario() {
 
     if (requiereCarnetIdentidad()) {
       if (!carnetFrenteFile?.files?.length) {
-        errores.push("Debe adjuntar la imagen o PDF del documento de identidad por el frente.");
-      }
+        errores.push(
+          "Debe adjuntar una imagen JPG, PNG o WEBP del documento de identidad por el frente."
+        );
   
       if (!carnetReversoFile?.files?.length) {
-        errores.push("Debe adjuntar la imagen o PDF del documento de identidad por el reverso.");
-      }
+        errores.push(
+          "Debe adjuntar una imagen JPG, PNG o WEBP del documento de identidad por el reverso."
+        );
     }
   
     if (requiereComprobantePago() && !comprobantePagoFile?.files?.length) {
