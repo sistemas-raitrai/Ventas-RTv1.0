@@ -7585,26 +7585,78 @@ async function enviarNominaInicialPagos() {
       setNominaPagosProgress(enviados, validos.length);
     }
 
-    const correoVendedora = getCorreoVendedoraGrupoParaCopia();
-
-    if (correoVendedora) {
-      const ejemplo = validos[0];
+    const correoVendedora =
+      getCorreoVendedoraGrupoParaCopia();
     
-      const resumenVendedora = `
+    const correoRaitrai =
+      "raitrai@raitrai.cl";
+    
+    const destinatariosResumen = [
+      correoVendedora,
+      correoRaitrai
+    ]
+      .map((correo) =>
+        normalizeEmail(correo || "")
+      )
+      .filter(Boolean)
+      .filter(
+        (correo, index, lista) =>
+          lista.indexOf(correo) === index
+      );
+    
+    const ejemplo = validos[0];
+    
+    const resumenVendedora = `
     Se realizó el envío de correos de acceso al sistema de pagos.
     
-    Grupo: ${state.group?.aliasGrupo || state.group?.nombreGrupo || state.group?.colegio || state.groupId}
-    Vendedora: ${state.group?.vendedora || "—"}
+    Grupo: ${
+      state.group?.aliasGrupo ||
+      state.group?.nombreGrupo ||
+      state.group?.colegio ||
+      state.groupId
+    }
+    
+    Vendedora: ${
+      state.group?.vendedora || "—"
+    }
+    
+    Correo vendedora detectado: ${
+      correoVendedora || "No detectado"
+    }
+    
     Total enviados: ${validos.length}
     Total sin correo: ${sinCorreo.length}
     
     Correos enviados:
-    ${validos.map((d) => `- ${d.nombreParticipante || "Participante"} · ${d.correo}`).join("\n")}
+    ${
+      validos
+        .map(
+          (d) =>
+            `- ${
+              d.nombreParticipante ||
+              "Participante"
+            } · ${d.correo}`
+        )
+        .join("\n")
+    }
     
     Participantes sin correo:
-    ${sinCorreo.length
-      ? sinCorreo.map((d) => `- ${d.nombreParticipante || "Participante"} · ${d.documento || "sin documento"}`).join("\n")
-      : "- Ninguno"}
+    ${
+      sinCorreo.length
+        ? sinCorreo
+            .map(
+              (d) =>
+                `- ${
+                  d.nombreParticipante ||
+                  "Participante"
+                } · ${
+                  d.documento ||
+                  "sin documento"
+                }`
+            )
+            .join("\n")
+        : "- Ninguno"
+    }
     
     ----------------------------------------
     EJEMPLO DEL CORREO ENVIADO A APODERADOS
@@ -7613,44 +7665,113 @@ async function enviarNominaInicialPagos() {
     ${cuerpo}
     `.trim();
     
-      await addDoc(collection(db, "correos_nomina_inicial_pagos"), {
+    await addDoc(
+      collection(
+        db,
+        "correos_nomina_inicial_pagos"
+      ),
+      {
         batchId,
-        tipoCorreo: "resumen_vendedora",
-        estado: "pendiente",
     
-        destinatario: correoVendedora,
-        to: correoVendedora,
+        tipoCorreo:
+          "resumen_vendedora",
     
-        asunto: `Resumen envío pagos · ${state.group?.aliasGrupo || state.group?.colegio || state.groupId}`,
-        subject: `Resumen envío pagos · ${state.group?.aliasGrupo || state.group?.colegio || state.groupId}`,
+        estado:
+          "pendiente",
     
-        cuerpo: resumenVendedora,
-        body: resumenVendedora,
+        destinatario:
+          destinatariosResumen,
     
-        idGrupo: String(state.groupId || ""),
-        groupDocId: String(state.groupDocId || ""),
+        to:
+          destinatariosResumen,
+    
+        asunto:
+          `Resumen envío pagos · ${
+            state.group?.aliasGrupo ||
+            state.group?.colegio ||
+            state.groupId
+          }`,
+    
+        subject:
+          `Resumen envío pagos · ${
+            state.group?.aliasGrupo ||
+            state.group?.colegio ||
+            state.groupId
+          }`,
+    
+        cuerpo:
+          resumenVendedora,
+    
+        body:
+          resumenVendedora,
+    
+        idGrupo:
+          String(state.groupId || ""),
+    
+        groupDocId:
+          String(state.groupDocId || ""),
     
         grupo:
-          cleanText(state.group?.aliasGrupo) ||
-          cleanText(state.group?.nombreGrupo) ||
-          normalizeTextUpper(state.group?.colegio || ""),
+          cleanText(
+            state.group?.aliasGrupo
+          ) ||
+          cleanText(
+            state.group?.nombreGrupo
+          ) ||
+          normalizeTextUpper(
+            state.group?.colegio || ""
+          ),
     
-        colegio: normalizeTextUpper(state.group?.colegio || ""),
-        curso: normalizeTextUpper(state.group?.curso || ""),
-        anoViaje: cleanText(state.group?.anoViaje || ""),
+        colegio:
+          normalizeTextUpper(
+            state.group?.colegio || ""
+          ),
     
-        documento: ejemplo?.documento || "",
-        nombreParticipante: ejemplo?.nombreParticipante || "",
-        nombreResponsable: "Vendedora",
+        curso:
+          normalizeTextUpper(
+            state.group?.curso || ""
+          ),
     
-        totalCorreos: validos.length,
-        totalSinCorreo: sinCorreo.length,
+        anoViaje:
+          cleanText(
+            state.group?.anoViaje || ""
+          ),
     
-        creadoPor: getDisplayName(state.effectiveUser),
-        creadoPorCorreo: state.effectiveEmail,
-        creadoAt: serverTimestamp()
-      });
-    }
+        documento:
+          ejemplo?.documento || "",
+    
+        nombreParticipante:
+          ejemplo?.nombreParticipante || "",
+    
+        nombreResponsable:
+          "Vendedora / Rai Trai",
+    
+        correoVendedora:
+          correoVendedora || "",
+    
+        correoCopiaFija:
+          correoRaitrai,
+    
+        destinatariosResumen,
+    
+        totalCorreos:
+          validos.length,
+    
+        totalSinCorreo:
+          sinCorreo.length,
+    
+        creadoPor:
+          getDisplayName(
+            state.effectiveUser
+          ),
+    
+        creadoPorCorreo:
+          state.effectiveEmail,
+    
+        creadoAt:
+          serverTimestamp()
+      }
+    );
 
     await saveGroupPatch(
       {
