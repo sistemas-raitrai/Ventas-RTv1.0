@@ -1885,8 +1885,56 @@ function getAnoViajeInscripcion() {
   return Number(state.group?.anoViaje || 0);
 }
 
+function tieneProcesoPrincipalAntiguoInvalido() {
+  /*
+    Para grupos cuya nómina viene de Sistema de Pagos,
+    el único proceso principal válido es:
+
+    nomina_final
+
+    Algunas fichas antiguas pueden conservar:
+    - inscripcionHabilitada: true
+    - fase normal
+    - fase nuevos
+    - fase lista_espera
+
+    Esas marcas pertenecen al flujo anterior y no deben
+    impedir abrir Nómina final / ficha médica.
+  */
+  if (!grupoVieneSistemaAntiguo()) {
+    return false;
+  }
+
+  if (state.group?.inscripcionHabilitada !== true) {
+    return false;
+  }
+
+  const faseGuardada =
+    normalizeSearchLocal(
+      getInscripcionEstadoActual()
+    );
+
+  return faseGuardada !== "nomina_final";
+}
+
 function inscripcionPrincipalEstaCerrada() {
-  return !state.group?.inscripcionHabilitada || getInscripcionEstadoActual() === "cerrada";
+  /*
+    Una marca antigua inválida se considera cerrada
+    únicamente para decidir qué proceso principal ofrecer.
+
+    No se modifican Lista de espera, Nuevos ingresos
+    ni Cupos liberados.
+  */
+  if (tieneProcesoPrincipalAntiguoInvalido()) {
+    return true;
+  }
+
+  return (
+    state.group?.inscripcionHabilitada !== true ||
+    normalizeSearchLocal(
+      getInscripcionEstadoActual()
+    ) === "cerrada"
+  );
 }
 
 function esFechaListaEsperaAutomatica() {
@@ -3389,27 +3437,48 @@ function getInscripcionesConFichaMedicaCompleta() {
 }
 
 function getEstadoListaPasajerosLabel() {
-  if (!state.inscripciones.length && !state.group?.inscripcionHabilitada) {
+  /*
+    Para Sistema de Pagos, una marca antigua distinta
+    de nomina_final no representa un proceso principal.
+  */
+  if (tieneProcesoPrincipalAntiguoInvalido()) {
+    return "Nómina final / ficha médica pendiente de apertura";
+  }
+
+  if (
+    !state.inscripciones.length &&
+    !state.group?.inscripcionHabilitada
+  ) {
     return "Sin inscripciones";
   }
 
-  const estado = normalizeSearchLocal(getInscripcionEstadoActual());
-  const abierta = !!state.group?.inscripcionHabilitada;
+  const estado =
+    normalizeSearchLocal(
+      getInscripcionEstadoActual()
+    );
+
+  const abierta =
+    state.group?.inscripcionHabilitada === true;
 
   if (estado === "normal") {
-    return abierta ? "Inscripción inicial abierta" : "Inscripción inicial cerrada";
+    return abierta
+      ? "Inscripción inicial abierta"
+      : "Inscripción inicial cerrada";
   }
 
   if (estado === "nomina_final") {
-    return abierta ? "Nómina final / ficha médica abierta" : "Nómina final / ficha médica cerrada";
+    return abierta
+      ? "Nómina final / ficha médica abierta"
+      : "Nómina final / ficha médica cerrada";
   }
 
-  if (estado === "nuevos") {
-    return abierta ? "Nuevos ingresos abierta" : "Nuevos ingresos cerrada";
-  }
-
-  if (estado === "lista_espera") {
-    return abierta ? "Lista de espera abierta" : "Lista de espera cerrada";
+  /*
+    Nuevos ingresos y Lista de espera ahora son
+    procesos paralelos. No deben definir el estado
+    del proceso principal.
+  */
+  if (grupoVieneSistemaAntiguo()) {
+    return "Nómina final / ficha médica pendiente de apertura";
   }
 
   return "Inscripción cerrada";
@@ -6900,6 +6969,20 @@ async function cerrarInscripcion() {
     return;
   }
 
+  /*
+    No permitimos cerrar como Inscripción inicial una marca
+    antigua de un grupo importado desde Sistema de Pagos.
+  
+    Ese grupo debe abrir primero Nómina final / ficha médica.
+  */
+  if (tieneProcesoPrincipalAntiguoInvalido()) {
+    alert(
+      "Este grupo no tiene un proceso principal válido abierto. Debes abrir Nómina final / ficha médica."
+    );
+  
+    return;
+  }
+
   if (!state.group?.inscripcionHabilitada) {
     alert("No hay una inscripción activa para cerrar.");
     return;
@@ -8001,8 +8084,26 @@ window.reenviarCorreoTransferenciaListaEspera = async function ({ rut = "", insc
 };
 
 async function copyGroupInscripcionLink() {
-  if (!state.group?.inscripcionHabilitada || !state.group?.tokenInscripcion) {
-    alert("Este grupo todavía no tiene una inscripción habilitada.");
+  /*
+    No permitimos copiar links antiguos que figuran
+    activos en grupos importados desde Sistema de Pagos.
+  */
+  if (tieneProcesoPrincipalAntiguoInvalido()) {
+    alert(
+      "Este grupo todavía no tiene abierta la Nómina final / ficha médica."
+    );
+
+    return;
+  }
+
+  if (
+    state.group?.inscripcionHabilitada !== true ||
+    !state.group?.tokenInscripcion
+  ) {
+    alert(
+      "Este grupo todavía no tiene un proceso principal habilitado."
+    );
+
     return;
   }
 
@@ -8014,13 +8115,25 @@ async function copyGroupInscripcionLink() {
     state.group?.inscripcion?.labelActual ||
     getInscripcionFaseLabel(fase);
 
-  const link = getInscripcionPublicLink(state.groupId, state.group.tokenInscripcion, fase);
+  const link =
+    getInscripcionPublicLink(
+      state.groupId,
+      state.group.tokenInscripcion,
+      fase
+    );
 
   try {
-    await navigator.clipboard.writeText(link);
-    showSaveNotice(`Link copiado: ${label}.`);
+    await navigator.clipboard.writeText(
+      link
+    );
+
+    showSaveNotice(
+      `Link copiado: ${label}.`
+    );
   } catch {
-    alert(`No se pudo copiar automáticamente.\n\nCopia este link:\n\n${link}`);
+    alert(
+      `No se pudo copiar automáticamente.\n\nCopia este link:\n\n${link}`
+    );
   }
 }
 
@@ -10535,12 +10648,22 @@ function syncButtons() {
       !estadoLiberadosVisible.activo
     );
 
-  const inscripcionYaHabilitada = !!state.group?.inscripcionHabilitada;
-  const tieneInscripciones = state.inscripciones.length > 0;
-
-  const labelActivo =
-    state.group?.inscripcion?.labelActual ||
-    getInscripcionFaseLabel(getInscripcionEstadoActual());
+  /*
+    No basta con leer inscripcionHabilitada.
+  
+    En grupos de Sistema de Pagos puede existir una marca
+    antigua de Inscripción inicial que ya no representa
+    un proceso principal válido.
+  */
+  const procesoPrincipalAntiguoInvalido =
+    tieneProcesoPrincipalAntiguoInvalido();
+  
+  const inscripcionPrincipalYaHabilitada =
+    state.group?.inscripcionHabilitada === true &&
+    !procesoPrincipalAntiguoInvalido;
+  
+  const tieneInscripciones =
+    state.inscripciones.length > 0;
 
   if (btnHabilitarInscripcion) {
     const puedePrincipal =
@@ -10583,25 +10706,36 @@ function syncButtons() {
       fasePrincipal ===
       "nomina_final";
   
+    /*
+      Si existe una marca antigua inválida, el botón
+      no debe ofrecer copiar ese link.
+    */
+    btnCopiarLinkInscripcion.classList.toggle(
+      "hidden",
+      !inscripcionPrincipalYaHabilitada
+    );
+  
     btnCopiarLinkInscripcion.disabled =
-      !inscripcionYaHabilitada;
+      !inscripcionPrincipalYaHabilitada;
   
     btnCopiarLinkInscripcion.textContent =
-      !inscripcionYaHabilitada
-        ? "Sin link principal activo"
-        : esFichaMedica
-          ? "Copiar link ficha médica"
-          : "Copiar link inscripción inicial";
+      esFichaMedica
+        ? "Copiar link ficha médica"
+        : "Copiar link inscripción inicial";
   }
 
   if (btnCerrarInscripcion) {
     const puedeCerrarPrincipal =
-      inscripcionYaHabilitada &&
+      inscripcionPrincipalYaHabilitada &&
       puedeAbrirCerrarFasesInscripcion();
   
+    /*
+      Una fase antigua inválida no debe ofrecer
+      "Cerrar inscripción inicial".
+    */
     btnCerrarInscripcion.classList.toggle(
       "hidden",
-      !inscripcionYaHabilitada
+      !inscripcionPrincipalYaHabilitada
     );
   
     btnCerrarInscripcion.disabled =
@@ -10611,7 +10745,7 @@ function syncButtons() {
       normalizeSearchLocal(
         getInscripcionEstadoActual()
       );
-    
+  
     btnCerrarInscripcion.textContent =
       fasePrincipal === "nomina_final"
         ? "Cerrar ficha médica"
