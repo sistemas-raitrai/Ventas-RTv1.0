@@ -85,6 +85,10 @@ const state = {
   // sin descargar la nómina completa.
   grupoTieneNominaSistemaPagos: false,
   
+  // Fase que se abrirá después de confirmar
+  // si el grupo incluye polera.
+  fasePendienteConfirmacionPolera: "",
+  
   reencuadrePdf: {
     inscripcionId: "",
     imagenes: [],
@@ -5079,25 +5083,284 @@ function getInscripcionPublicLink(groupId, token, fase = "normal") {
   return `${base}?grupo=${encodeURIComponent(groupId)}&fase=${encodeURIComponent(fase)}&token=${encodeURIComponent(token)}`;
 }
 
+function abrirModalConfirmacionPolera(fase = "normal") {
+  const faseNormalizada =
+    normalizeSearchLocal(fase);
+
+  const contexto =
+    getContextoInscripcionGrupo(
+      faseNormalizada
+    );
+
+  state.fasePendienteConfirmacionPolera =
+    faseNormalizada;
+
+  const elementos =
+    getElementosIncluidosGrupo();
+
+  const checkbox =
+    $("confirmarPoleraInscripcion");
+
+  if (checkbox) {
+    /*
+      getElementosIncluidosGrupo() ya aplica
+      la regla de compatibilidad:
+
+      - Sin configuración guardada: true.
+      - Guardado como true: true.
+      - Guardado como false: false.
+    */
+    checkbox.checked =
+      elementos.polera === true;
+  }
+
+  setText(
+    "tituloConfirmarPoleraInscripcion",
+    "Confirmar polera del grupo"
+  );
+
+  setText(
+    "subtituloConfirmarPoleraInscripcion",
+    `Antes de abrir "${contexto.labelFase}", confirma si el grupo incluye polera.`
+  );
+
+  const btnContinuar =
+    $("btnGuardarYAbrirInscripcion");
+
+  if (btnContinuar) {
+    btnContinuar.disabled = false;
+    btnContinuar.textContent =
+      `Guardar y abrir ${contexto.labelFase}`;
+  }
+
+  openModal(
+    "modalConfirmarPoleraInscripcion"
+  );
+}
+
+function cerrarModalConfirmacionPolera() {
+  state.fasePendienteConfirmacionPolera = "";
+
+  closeModal(
+    "modalConfirmarPoleraInscripcion"
+  );
+}
+
+function revisarTodosLosElementosDesdeConfirmacion() {
+  cerrarModalConfirmacionPolera();
+
+  /*
+    Abre el mismo modal de Situación del grupo,
+    donde están todos los elementos incluidos.
+  */
+  openSituacionModal();
+}
+
 async function abrirInscripcionPrincipalDesdeBoton() {
   if (canGestionarInscripcionInicial()) {
-    await cambiarFaseInscripcion("normal");
+    abrirModalConfirmacionPolera(
+      "normal"
+    );
+
     return;
   }
 
   if (canGestionarNominaFinal()) {
-    await cambiarFaseInscripcion("nomina_final");
+    abrirModalConfirmacionPolera(
+      "nomina_final"
+    );
+
     return;
   }
 
-  alert(getBlockedInscripcionMessage());
+  alert(
+    getBlockedInscripcionMessage()
+  );
+}
+
+async function guardarPoleraYAbrirInscripcion() {
+  const fase =
+    normalizeSearchLocal(
+      state.fasePendienteConfirmacionPolera || ""
+    );
+
+  if (
+    fase !== "normal" &&
+    fase !== "nomina_final"
+  ) {
+    alert(
+      "No se pudo determinar qué formulario se debe abrir."
+    );
+
+    return;
+  }
+
+  const checkbox =
+    $("confirmarPoleraInscripcion");
+
+  const tienePolera =
+    checkbox?.checked === true;
+
+  const elementosAnteriores =
+    getElementosIncluidosGrupo();
+
+  const btn =
+    $("btnGuardarYAbrirInscripcion");
+
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = "Guardando...";
+  }
+
+  try {
+    /*
+      Conservamos todos los elementos existentes
+      y modificamos únicamente polera.
+    */
+    const elementosActuales = {
+      ...(state.group?.elementosIncluidos || {}),
+
+      poleron:
+        elementosAnteriores.poleron,
+
+      polera:
+        tienePolera,
+
+      soporteCelular:
+        elementosAnteriores.soporteCelular,
+
+      portapasaporte:
+        elementosAnteriores.portapasaporte,
+
+      toalla:
+        elementosAnteriores.toalla,
+
+      cortesias:
+        elementosAnteriores.cortesias,
+
+      otros:
+        elementosAnteriores.otros,
+
+      otrosDetalle:
+        elementosAnteriores.otros
+          ? elementosAnteriores.otrosDetalle
+          : "",
+
+      actualizadoPor:
+        getDisplayName(
+          state.effectiveUser
+        ),
+
+      actualizadoPorCorreo:
+        state.effectiveEmail,
+
+      actualizadoAt:
+        serverTimestamp()
+    };
+
+    const cambioPolera =
+      elementosAnteriores.polera !==
+      tienePolera;
+
+    /*
+      Guardamos incluso cuando no había configuración previa.
+      Así el grupo queda con una decisión explícita.
+    */
+    await saveGroupPatch(
+      {
+        elementosIncluidos:
+          elementosActuales
+      },
+      {
+        tipoMovimiento:
+          "polera_confirmada_antes_inscripcion",
+
+        modulo:
+          "inscripcion",
+
+        titulo:
+          "Polera confirmada antes de abrir inscripción",
+
+        mensaje:
+          `${getDisplayName(state.effectiveUser)} confirmó que el grupo ${
+            tienePolera
+              ? "sí incluye"
+              : "no incluye"
+          } polera antes de abrir el formulario.`,
+
+        cambios: cambioPolera
+          ? [
+              {
+                campo:
+                  "elementosIncluidos.polera",
+
+                anterior:
+                  elementosAnteriores.polera,
+
+                nuevo:
+                  tienePolera
+              }
+            ]
+          : [],
+
+        metadata: {
+          faseInscripcion:
+            fase,
+
+          tienePolera
+        }
+      }
+    );
+
+    closeModal(
+      "modalConfirmarPoleraInscripcion"
+    );
+
+    state.fasePendienteConfirmacionPolera = "";
+
+    /*
+      Abrimos la fase sin repetir el confirm()
+      del navegador, porque el usuario ya confirmó
+      mediante este modal.
+    */
+    await cambiarFaseInscripcion(
+      fase,
+      {
+        confirmarApertura: false
+      }
+    );
+  } catch (error) {
+    console.error(
+      "[grupo] guardarPoleraYAbrirInscripcion",
+      error
+    );
+
+    alert(
+      "No se pudo guardar la configuración de polera: " +
+      (
+        error?.message ||
+        "Error desconocido"
+      )
+    );
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent =
+        "Guardar y abrir formulario";
+    }
+  }
 }
 
 async function enableGroupInscripcion() {
   await abrirInscripcionPrincipalDesdeBoton();
 }
 
-async function cambiarFaseInscripcion(fase = "normal") {
+async function cambiarFaseInscripcion(
+  fase = "normal",
+  {
+    confirmarApertura = true
+  } = {}
+) {
   const faseNormalizada = normalizeSearchLocal(fase);
 
   let puedeGestionar = false;
@@ -5121,8 +5384,13 @@ async function cambiarFaseInscripcion(fase = "normal") {
   const label = contexto.labelFase;
   const tokenInscripcion = generateInscripcionToken(32);
 
-  const ok = confirm(`¿Quieres abrir "${label}" y generar un nuevo link público?`);
-  if (!ok) return;
+  if (confirmarApertura) {
+    const ok = confirm(
+      `¿Quieres abrir "${label}" y generar un nuevo link público?`
+    );
+  
+    if (!ok) return;
+  }
 
   const link = getInscripcionPublicLink(state.groupId, tokenInscripcion, faseNormalizada);
 
@@ -9980,6 +10248,41 @@ function bindEvents() {
   $("btnCrearFicha")?.addEventListener("click", openFichaEditor);
   $("btnAbrirFichaPdf")?.addEventListener("click", openFichaPdf);
   $("btnHabilitarInscripcion")?.addEventListener("click", abrirInscripcionPrincipalDesdeBoton);
+  $("btnCerrarConfirmarPoleraInscripcion")
+    ?.addEventListener(
+      "click",
+      cerrarModalConfirmacionPolera
+    );
+  
+  $("btnCancelarConfirmarPoleraInscripcion")
+    ?.addEventListener(
+      "click",
+      cerrarModalConfirmacionPolera
+    );
+  
+  $("btnRevisarElementosDesdeInscripcion")
+    ?.addEventListener(
+      "click",
+      revisarTodosLosElementosDesdeConfirmacion
+    );
+  
+  $("btnGuardarYAbrirInscripcion")
+    ?.addEventListener(
+      "click",
+      guardarPoleraYAbrirInscripcion
+    );
+  $("modalConfirmarPoleraInscripcion")
+    ?.addEventListener(
+      "click",
+      (event) => {
+        if (
+          event.target?.id ===
+          "modalConfirmarPoleraInscripcion"
+        ) {
+          cerrarModalConfirmacionPolera();
+        }
+      }
+    );
   $("btnCerrarInscripcion")?.addEventListener("click", cerrarInscripcion);
   $("btnAbrirNuevosInscritos")?.addEventListener("click", () => cambiarFaseInscripcion("nuevos"));
   $("btnAbrirListaEspera")?.addEventListener("click", () => cambiarFaseInscripcion("lista_espera"));
