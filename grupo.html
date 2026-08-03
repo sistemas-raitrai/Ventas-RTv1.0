@@ -290,6 +290,221 @@
       width: auto;
       max-width: 100%;
     }
+
+    /* =========================================================
+       BOTONES DE PROCESOS DE INSCRIPCIÓN
+    ========================================================= */
+    
+    .inscripcion-proceso-item {
+      display: flex;
+      flex-direction: column;
+      gap: 7px;
+      padding: 10px 12px;
+      border-radius: 12px;
+      border: 1px solid rgba(58, 42, 82, 0.1);
+      background: rgba(255, 255, 255, 0.72);
+    }
+    
+    .inscripcion-proceso-label {
+      font-size: 10px;
+      font-weight: 900;
+      line-height: 1.2;
+      color: #6d5a83;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    
+    .inscripcion-proceso-botones {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    
+    /* Proceso principal: inscripción inicial / ficha médica */
+    
+    .btn-principal-abrir {
+      min-height: 44px;
+      padding: 0 16px;
+      border: none;
+      border-radius: 14px;
+      background: linear-gradient(
+        135deg,
+        #4a2570 0%,
+        #6b47a8 100%
+      );
+      color: #fff;
+      font-size: 14px;
+      font-weight: 900;
+      cursor: pointer;
+    }
+    
+    .btn-principal-copiar {
+      min-height: 44px;
+      padding: 0 16px;
+      border: none;
+      border-radius: 14px;
+      background: #09832e;
+      color: #fff;
+      font-size: 14px;
+      font-weight: 900;
+      cursor: pointer;
+    }
+    
+    .btn-principal-cerrar {
+      min-height: 44px;
+      padding: 0 16px;
+      border: none;
+      border-radius: 14px;
+      background: #f97316;
+      color: #fff;
+      font-size: 14px;
+      font-weight: 900;
+      cursor: pointer;
+    }
+    
+    /* Nuevo ingreso */
+    
+    .btn-nuevos-abrir {
+      min-height: 42px;
+      padding: 0 14px;
+      border: none;
+      border-radius: 12px;
+      background: #16a34a;
+      color: #fff;
+      font-size: 13px;
+      font-weight: 900;
+      cursor: pointer;
+    }
+    
+    .btn-nuevos-copiar {
+      min-height: 42px;
+      padding: 0 14px;
+      border: none;
+      border-radius: 12px;
+      background: #facc15;
+      color: #3b2b00;
+      font-size: 13px;
+      font-weight: 900;
+      cursor: pointer;
+    }
+    
+    .btn-nuevos-cerrar {
+      min-height: 42px;
+      padding: 0 14px;
+      border: none;
+      border-radius: 12px;
+      background: #dc2626;
+      color: #fff;
+      font-size: 13px;
+      font-weight: 900;
+      cursor: pointer;
+    }
+    
+    /* Lista de espera */
+    
+    .btn-lista-abrir {
+      min-height: 42px;
+      padding: 0 14px;
+      border: none;
+      border-radius: 12px;
+      background: #f97316;
+      color: #fff;
+      font-size: 13px;
+      font-weight: 900;
+      cursor: pointer;
+    }
+    
+    .btn-lista-copiar {
+      min-height: 42px;
+      padding: 0 14px;
+      border: none;
+      border-radius: 12px;
+      background: #facc15;
+      color: #3b2b00;
+      font-size: 13px;
+      font-weight: 900;
+      cursor: pointer;
+    }
+    
+    .btn-lista-cerrar {
+      min-height: 42px;
+      padding: 0 14px;
+      border: none;
+      border-radius: 12px;
+      background: #dc2626;
+      color: #fff;
+      font-size: 13px;
+      font-weight: 900;
+      cursor: pointer;
+    }
+    
+    /* Cupos liberados */
+    
+    .btn-liberados-abrir {
+      min-height: 42px;
+      padding: 0 14px;
+      border: none;
+      border-radius: 12px;
+      background: #887a98;
+      color: #fff;
+      font-size: 13px;
+      font-weight: 900;
+      cursor: pointer;
+    }
+    
+    .btn-liberados-copiar {
+      min-height: 42px;
+      padding: 0 14px;
+      border: none;
+      border-radius: 12px;
+      background: #7c3aed;
+      color: #fff;
+      font-size: 13px;
+      font-weight: 900;
+      cursor: pointer;
+    }
+    
+    .btn-liberados-cerrar {
+      min-height: 42px;
+      padding: 0 14px;
+      border: none;
+      border-radius: 12px;
+      background: #3b1368;
+      color: #fff;
+      font-size: 13px;
+      font-weight: 900;
+      cursor: pointer;
+    }
+    
+    .btn-principal-abrir:disabled,
+    .btn-principal-copiar:disabled,
+    .btn-principal-cerrar:disabled,
+    .btn-nuevos-abrir:disabled,
+    .btn-nuevos-copiar:disabled,
+    .btn-nuevos-cerrar:disabled,
+    .btn-lista-abrir:disabled,
+    .btn-lista-copiar:disabled,
+    .btn-lista-cerrar:disabled,
+    .btn-liberados-abrir:disabled,
+    .btn-liberados-copiar:disabled,
+    .btn-liberados-cerrar:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+    }
+    
+    @media (max-width: 680px) {
+      .inscripcion-proceso-item {
+        width: 100%;
+      }
+    
+      .inscripcion-proceso-botones {
+        flex-direction: column;
+      }
+    
+      .inscripcion-proceso-botones button {
+        width: 100%;
+      }
+    }
     
     
     /* Pantallas pequeñas */
@@ -2632,26 +2847,26 @@
                 <div class="inscripcion-acciones-botones">
                   <button
                     id="btnCopiarLinkInscripcion"
-                    class="btn-ok"
+                    class="btn-principal-copiar"
                     type="button"
                   >
-                    Copiar link activo
+                    Sin link principal activo
                   </button>
-            
+                  
                   <button
                     id="btnHabilitarInscripcion"
-                    class="btn-dark"
+                    class="btn-principal-abrir"
                     type="button"
                   >
                     Abrir inscripción inicial
                   </button>
-            
+                  
                   <button
                     id="btnCerrarInscripcion"
-                    class="btn-danger"
+                    class="btn-principal-cerrar"
                     type="button"
                   >
-                    Cerrar inscripción
+                    Cerrar inscripción inicial
                   </button>
                 </div>
               </section>
@@ -2669,29 +2884,115 @@
                 </div>
               
                 <div class="inscripcion-acciones-botones">
-                  <button
-                    id="btnAbrirNuevosInscritos"
-                    class="btn-pill"
-                    type="button"
+              
+                  <!-- NUEVOS INGRESOS -->
+                  <div
+                    id="procesoNuevosIngresos"
+                    class="inscripcion-proceso-item"
                   >
-                    Abrir nuevos ingresos
-                  </button>
-            
-                  <button
-                    id="btnAbrirListaEspera"
-                    class="btn-pill"
-                    type="button"
+                    <div class="inscripcion-proceso-label">
+                      Nuevos ingresos
+                    </div>
+              
+                    <div class="inscripcion-proceso-botones">
+                      <button
+                        id="btnAbrirNuevosInscritos"
+                        class="btn-nuevos-abrir"
+                        type="button"
+                      >
+                        Abrir nuevos ingresos
+                      </button>
+              
+                      <button
+                        id="btnCopiarLinkNuevos"
+                        class="btn-nuevos-copiar hidden"
+                        type="button"
+                      >
+                        Copiar link nuevos ingresos
+                      </button>
+              
+                      <button
+                        id="btnCerrarNuevosInscritos"
+                        class="btn-nuevos-cerrar hidden"
+                        type="button"
+                      >
+                        Cerrar nuevos ingresos
+                      </button>
+                    </div>
+                  </div>
+              
+                  <!-- LISTA DE ESPERA -->
+                  <div
+                    id="procesoListaEspera"
+                    class="inscripcion-proceso-item"
                   >
-                    Abrir lista de espera
-                  </button>
-            
-                  <button
-                    id="btnCrearLinkLiberados"
-                    class="btn-pill"
-                    type="button"
+                    <div class="inscripcion-proceso-label">
+                      Lista de espera
+                    </div>
+              
+                    <div class="inscripcion-proceso-botones">
+                      <button
+                        id="btnAbrirListaEspera"
+                        class="btn-lista-abrir"
+                        type="button"
+                      >
+                        Abrir lista de espera
+                      </button>
+              
+                      <button
+                        id="btnCopiarLinkListaEspera"
+                        class="btn-lista-copiar hidden"
+                        type="button"
+                      >
+                        Copiar link lista de espera
+                      </button>
+              
+                      <button
+                        id="btnCerrarListaEspera"
+                        class="btn-lista-cerrar hidden"
+                        type="button"
+                      >
+                        Cerrar lista de espera
+                      </button>
+                    </div>
+                  </div>
+              
+                  <!-- CUPOS LIBERADOS -->
+                  <div
+                    id="procesoLiberados"
+                    class="inscripcion-proceso-item"
                   >
-                    Crear link liberados
-                  </button>
+                    <div class="inscripcion-proceso-label">
+                      Cupos liberados
+                    </div>
+              
+                    <div class="inscripcion-proceso-botones">
+                      <button
+                        id="btnCrearLinkLiberados"
+                        class="btn-liberados-abrir"
+                        type="button"
+                      >
+                        Crear link liberados
+                      </button>
+              
+                      <button
+                        id="btnCopiarLinkLiberados"
+                        class="btn-liberados-copiar hidden"
+                        type="button"
+                      >
+                        Copiar link liberados
+                      </button>
+              
+                      <button
+                        id="btnCerrarLinkLiberados"
+                        class="btn-liberados-cerrar hidden"
+                        type="button"
+                      >
+                        Cerrar link liberados
+                      </button>
+                    </div>
+                  </div>
+              
                 </div>
               </section>
             
