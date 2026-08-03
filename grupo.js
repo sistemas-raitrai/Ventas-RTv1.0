@@ -7226,10 +7226,19 @@ async function copyGroupInscripcionLink() {
 }
 
 function canResetearCicloInscripcion() {
-  const rol = String(state.effectiveUser?.rol || "").toLowerCase();
-  const email = normalizeEmail(state.effectiveEmail || "");
+  const rol = String(
+    state.effectiveUser?.rol || ""
+  ).toLowerCase();
 
-  return rol === "admin" || email === "chernandez@raitrai.cl";
+  const email = normalizeEmail(
+    state.effectiveEmail || ""
+  );
+
+  return (
+    rol === "admin" ||
+    rol === "supervision" ||
+    email === "chernandez@raitrai.cl"
+  );
 }
 
 function canEditarNominaInscripcion() {
@@ -9480,22 +9489,6 @@ function tieneBotonVisible(contenedorId) {
   });
 }
 
-[
-  "bloqueEstadoInscripcion",
-  "bloqueEnlacesPasajeros",
-  "bloqueGestionNomina",
-  "bloqueComunicacionesArchivos",
-  "bloqueAccionesAvanzadas"
-].forEach((id) => {
-  const bloque = $(id);
-  if (!bloque) return;
-
-  bloque.classList.toggle(
-    "hidden",
-    !tieneBotonVisible(id)
-  );
-});
-
 function syncButtons() {
   ensureBotonCorreosInscripcion();
   const editable = canEditGroup();
@@ -9586,18 +9579,33 @@ function syncButtons() {
     getInscripcionFaseLabel(getInscripcionEstadoActual());
 
   if (btnHabilitarInscripcion) {
+    const puedePrincipal =
+      puedeInicial ||
+      puedeNominaFinal;
+  
+    btnHabilitarInscripcion.classList.toggle(
+      "hidden",
+      !puedePrincipal
+    );
+  
     if (grupoVieneSistemaAntiguo()) {
-      btnHabilitarInscripcion.textContent = puedeReabrirFasePasada() && nominaFinalYaCerrada()
-        ? "Reabrir nómina final / ficha médica"
-        : "Abrir nómina final / ficha médica";
-
-      btnHabilitarInscripcion.disabled = !puedeNominaFinal;
+      btnHabilitarInscripcion.textContent =
+        puedeReabrirFasePasada() &&
+        nominaFinalYaCerrada()
+          ? "Reabrir nómina final / ficha médica"
+          : "Abrir nómina final / ficha médica";
+  
+      btnHabilitarInscripcion.disabled =
+        !puedeNominaFinal;
     } else {
-      btnHabilitarInscripcion.textContent = puedeReabrirFasePasada() && inscripcionInicialYaCerrada()
-        ? "Reabrir inscripción inicial"
-        : "Abrir inscripción inicial";
-
-      btnHabilitarInscripcion.disabled = !puedeInicial;
+      btnHabilitarInscripcion.textContent =
+        puedeReabrirFasePasada() &&
+        inscripcionInicialYaCerrada()
+          ? "Reabrir inscripción inicial"
+          : "Abrir inscripción inicial";
+  
+      btnHabilitarInscripcion.disabled =
+        !puedeInicial;
     }
   }
 
@@ -9609,10 +9617,22 @@ function syncButtons() {
   }
 
   if (btnCerrarInscripcion) {
-    btnCerrarInscripcion.disabled = !inscripcionYaHabilitada || !puedeAbrirCerrarFasesInscripcion();
-    btnCerrarInscripcion.textContent = inscripcionYaHabilitada
-      ? `Cerrar ${labelActivo}`
-      : "Cerrar inscripción";
+    const puedeCerrarPrincipal =
+      inscripcionYaHabilitada &&
+      puedeAbrirCerrarFasesInscripcion();
+  
+    btnCerrarInscripcion.classList.toggle(
+      "hidden",
+      !inscripcionYaHabilitada
+    );
+  
+    btnCerrarInscripcion.disabled =
+      !puedeCerrarPrincipal;
+  
+    btnCerrarInscripcion.textContent =
+      inscripcionYaHabilitada
+        ? `Cerrar ${labelActivo}`
+        : "Cerrar inscripción";
   }
 
   if (btnCorreosInscripcion) {
@@ -9713,17 +9733,46 @@ function syncButtons() {
   }
 
   if (btnNominaInicialPagos) {
-    const puedeGestionarPagos = puedeOperarListaEsperaAdministrativa();
+    const puedeGestionarPagos =
+      puedeOperarListaEsperaAdministrativa();
   
-    btnNominaInicialPagos.classList.toggle("hidden", !puedeGestionarPagos);
-    btnNominaInicialPagos.disabled = !puedeGestionarPagos;
+    btnNominaInicialPagos.classList.toggle(
+      "hidden",
+      !puedeGestionarPagos
+    );
   
-    const estadoPagos = getEstadoNominaInicialPagos();
+    btnNominaInicialPagos.disabled =
+      !puedeGestionarPagos;
   
-    btnNominaInicialPagos.textContent = estadoPagos.cargada
-      ? "Reenviar aviso / actualizar carga pagos"
-      : "Cargado a Pagos";
+    const estadoPagos =
+      getEstadoNominaInicialPagos();
+  
+    btnNominaInicialPagos.textContent =
+      estadoPagos.cargada
+        ? "Reenviar aviso / actualizar carga pagos"
+        : "Cargado a Pagos";
   }
+  
+  /*
+    Después de definir la visibilidad de todos los botones,
+    ocultamos las categorías que quedaron sin acciones visibles.
+  */
+  [
+    "bloqueEstadoInscripcion",
+    "bloqueEnlacesPasajeros",
+    "bloqueGestionNomina",
+    "bloqueComunicacionesArchivos",
+    "bloqueAccionesAvanzadas"
+  ].forEach((id) => {
+    const bloque = $(id);
+  
+    if (!bloque) return;
+  
+    bloque.classList.toggle(
+      "hidden",
+      !tieneBotonVisible(id)
+    );
+  });
   
   const btnContrato = $("btnCrearContrato");
   if (btnContrato) btnContrato.disabled = !autorizada;
