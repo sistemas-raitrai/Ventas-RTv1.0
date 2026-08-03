@@ -3746,6 +3746,147 @@
     </div>
   </div>
 
+  <!-- MODAL CONFIRMAR POLERA ANTES DE ABRIR INSCRIPCIÓN -->
+  <div
+    class="modal"
+    id="modalConfirmarPoleraInscripcion"
+  >
+    <div
+      class="modal-card"
+      style="width:min(720px,100%);"
+    >
+      <div class="modal-head">
+        <div>
+          <h3
+            class="modal-title"
+            id="tituloConfirmarPoleraInscripcion"
+          >
+            Confirmar polera del grupo
+          </h3>
+
+          <div
+            class="helper"
+            id="subtituloConfirmarPoleraInscripcion"
+            style="margin-top:5px;"
+          >
+            Revisa esta información antes de abrir el formulario.
+          </div>
+        </div>
+
+        <button
+          class="modal-close"
+          id="btnCerrarConfirmarPoleraInscripcion"
+          type="button"
+          aria-label="Cerrar"
+        >
+          ×
+        </button>
+      </div>
+
+      <div class="modal-body">
+        <div
+          style="
+            padding:18px;
+            border:1px solid rgba(75,42,122,.16);
+            border-radius:18px;
+            background:linear-gradient(
+              135deg,
+              #faf8fd 0%,
+              #f2ebf9 100%
+            );
+          "
+        >
+          <div
+            style="
+              margin-bottom:14px;
+              font-size:18px;
+              font-weight:900;
+              color:#2b1940;
+            "
+          >
+            ¿Este grupo tiene polera?
+          </div>
+
+          <label
+            class="elemento-check-card"
+            style="
+              background:#fff;
+              max-width:100%;
+            "
+          >
+            <input
+              id="confirmarPoleraInscripcion"
+              type="checkbox"
+            />
+
+            <span>
+              Sí, este grupo tiene polera
+            </span>
+          </label>
+
+          <div
+            id="mensajeConfirmarPoleraInscripcion"
+            class="helper"
+            style="
+              margin-top:14px;
+              font-size:13px;
+              line-height:1.55;
+            "
+          >
+            Si está marcado, el formulario solicitará la talla
+            de polera a cada pasajero. Si está desmarcado,
+            la pregunta de talla no aparecerá.
+          </div>
+        </div>
+
+        <div
+          style="
+            margin-top:16px;
+            padding:15px 16px;
+            border-radius:16px;
+            background:#fff8dc;
+            border:1px solid rgba(209,165,0,.22);
+            color:#66501b;
+            font-size:13px;
+            line-height:1.55;
+          "
+        >
+          <strong>Importante:</strong>
+
+          recuerda revisar también polerón, soporte para celular,
+          portapasaporte, toalla, cortesías y otros elementos desde
+          <strong>Editar situación</strong>.
+        </div>
+      </div>
+
+      <div class="modal-actions">
+        <button
+          class="btn-pill"
+          id="btnCancelarConfirmarPoleraInscripcion"
+          type="button"
+        >
+          Cancelar
+        </button>
+
+        <button
+          class="btn-pill"
+          id="btnRevisarElementosDesdeInscripcion"
+          type="button"
+        >
+          Revisar todos los elementos
+        </button>
+
+        <button
+          class="btn-dark"
+          id="btnGuardarYAbrirInscripcion"
+          type="button"
+        >
+          Guardar y abrir formulario
+        </button>
+      </div>
+    </div>
+  </div>
+
   <!-- MODAL REENCUADRE FICHA PDF -->
   <div class="modal" id="modalReencuadreFicha">
     <div class="modal-card">
