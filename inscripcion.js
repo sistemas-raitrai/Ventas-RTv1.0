@@ -199,20 +199,68 @@ async function cargarGrupo() {
 
   grupoData = { id: snap.id, ...snap.data() };
 
-  const esLinkLiberado = faseUrl === "liberado";
+  let inscripcionHabilitada = false;
+  let tokenGrupo = "";
   
-  const inscripcionHabilitada = esLinkLiberado
-    ? !!grupoData.linkLiberadosActivo
-    : !!grupoData.inscripcionHabilitada;
+  if (
+    faseUrl === "normal" ||
+    faseUrl === "nomina_final"
+  ) {
+    inscripcionHabilitada =
+      !!grupoData.inscripcionHabilitada;
   
-  const tokenGrupo = esLinkLiberado
-    ? limpiarTexto(grupoData.tokenInscripcionLiberados)
-    : limpiarTexto(grupoData.tokenInscripcion);
-
-  if (!esLinkLiberado && grupoData.inscripcionEstado === "cerrada") {
-    mostrarMensaje("error", "La inscripción para este grupo se encuentra cerrada.");
-    bloquearFormulario();
-    return;
+    tokenGrupo =
+      limpiarTexto(
+        grupoData.tokenInscripcion ||
+        grupoData?.inscripcion?.tokenActual ||
+        ""
+      );
+  
+    if (
+      grupoData.inscripcionEstado ===
+      "cerrada"
+    ) {
+      mostrarMensaje(
+        "error",
+        "La inscripción para este grupo se encuentra cerrada."
+      );
+  
+      bloquearFormulario();
+      return;
+    }
+  } else if (faseUrl === "nuevos") {
+    inscripcionHabilitada =
+      grupoData?.inscripcionNuevos?.activo ===
+      true;
+  
+    tokenGrupo =
+      limpiarTexto(
+        grupoData?.inscripcionNuevos
+          ?.tokenActual || ""
+      );
+  } else if (faseUrl === "lista_espera") {
+    inscripcionHabilitada =
+      grupoData?.inscripcionListaEspera
+        ?.activo === true;
+  
+    tokenGrupo =
+      limpiarTexto(
+        grupoData?.inscripcionListaEspera
+          ?.tokenActual || ""
+      );
+  } else if (faseUrl === "liberado") {
+    inscripcionHabilitada =
+      grupoData.linkLiberadosActivo === true ||
+      grupoData?.inscripcionLiberados
+        ?.activo === true;
+  
+    tokenGrupo =
+      limpiarTexto(
+        grupoData.tokenInscripcionLiberados ||
+        grupoData?.inscripcionLiberados
+          ?.tokenActual ||
+        ""
+      );
   }
 
   correoCambios = limpiarTexto(grupoData.correoCambiosInscripcion) || CORREO_ADMIN;
