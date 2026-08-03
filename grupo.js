@@ -81,6 +81,13 @@ const state = {
   inscripcionesCargando: false,
   nominaVisible: false,
   
+  // Indica desde dónde se cargó la tabla visible.
+  inscripcionesFuente: "",
+  
+  // Guarda fichas completas ya consultadas individualmente.
+  // Evita volver a descargar la misma ficha varias veces.
+  inscripcionesDetalleCache: new Map(),
+  
   // Permite reconocer grupos importados desde Sistema de Pagos
   // sin descargar la nómina completa.
   grupoTieneNominaSistemaPagos: false,
@@ -423,6 +430,8 @@ async function loadAll() {
   state.inscripcionesCargadas = false;
   state.inscripcionesCargando = false;
   state.nominaVisible = false;
+  state.inscripcionesFuente = "";
+  state.inscripcionesDetalleCache = new Map();
   
   await Promise.all([
     loadMeetings(),
@@ -648,92 +657,369 @@ async function detectarNominaSistemaPagosGrupo() {
   }
 }
 
+function ordenarInscripcionesNomina(
+  items = []
+) {
+  return [...items].sort(
+    (a, b) => {
+      const anuladaA =
+        estaInscripcionAnulada(a);
+
+      const anuladaB =
+        estaInscripcionAnulada(b);
+
+      if (anuladaA !== anuladaB) {
+        return anuladaA
+          ? 1
+          : -1;
+      }
+
+      const ordenA =
+        getOrdenOperativoInscripcion(a);
+
+      const ordenB =
+        getOrdenOperativoInscripcion(b);
+
+      if (ordenA !== ordenB) {
+        return ordenA - ordenB;
+      }
+
+      const fechaA =
+        dateValue(
+          getFechaFormularioInscripcion(a)
+        );
+
+      const fechaB =
+        dateValue(
+          getFechaFormularioInscripcion(b)
+        );
+
+      return fechaB - fechaA;
+    }
+  );
+}
+
 async function loadInscripciones() {
   state.inscripciones = [];
   state.inscripcionesCargando = true;
+  state.inscripcionesFuente = "";
+
+  /*
+    Cada recarga de la nómina invalida los detalles completos
+    almacenados. Así PDF, correo y edición no reutilizan una
+    ficha anterior a una modificación.
+  */
+  state.inscripcionesDetalleCache = new Map();
 
   try {
-    const snap = await getDocs(
-      collection(
-        db,
-        "ventas_cotizaciones",
-        String(state.groupDocId),
-        "inscripciones"
-      )
-    );
-
-    state.inscripciones = snap.docs
-      .map((d) => ({
-        id: d.id,
-        ...d.data()
-      }))
-      .filter((item) => {
-        const estadoPrivacidad = normalizeSearchLocal(
-          item?.privacidad?.estado || ""
-        );
-
-        return (
-          estadoPrivacidad !== "eliminada_logica" &&
-          estadoPrivacidad !== "archivada"
-        );
-      })
-      .sort((a, b) => {
-        const anuladaA =
-          estaInscripcionAnulada(a);
-      
-        const anuladaB =
-          estaInscripcionAnulada(b);
-      
-        if (anuladaA !== anuladaB) {
-          return anuladaA
-            ? 1
-            : -1;
-        }
-      
-        const ordenA =
-          getOrdenOperativoInscripcion(a);
-      
-        const ordenB =
-          getOrdenOperativoInscripcion(b);
-      
-        if (ordenA !== ordenB) {
-          return ordenA - ordenB;
-        }
-      
-        const fechaA =
-          dateValue(
-            getFechaFormularioInscripcion(a)
-          );
-      
-        const fechaB =
-          dateValue(
-            getFechaFormularioInscripcion(b)
-          );
-      
-        return fechaB - fechaA;
-      });
-
-    state.inscripcionesCargadas = true;
-    
     /*
-      Si al cargar la nómina completa aparecen pasajeros importados,
-      mantenemos actualizada la detección del grupo.
+      ETAPA 1:
+      primero leemos la vista liviana.
     */
-    if (getInscripcionesSistemaPagos().length > 0) {
-      state.grupoTieneNominaSistemaPagos = true;
+    const resumenSnap =
+      await getDocs(
+        collection(
+          db,
+          "ventas_cotizaciones",
+          String(state.groupDocId),
+          "nomina_resumen"
+        )
+      );
+
+    if (!resumenSnap.empty) {
+      state.inscripciones =
+        ordenarInscripcionesNomina(
+          resumenSnap.docs
+            .map((d) => ({
+              id: d.id,
+              ...d.data(),
+
+              /*
+                Esta marca permite saber que el objeto
+                visible no contiene la ficha completa.
+              */
+              esResumenNomina: true
+            }))
+            .filter((item) => {
+              const estadoPrivacidad =
+                normalizeSearchLocal(
+                  item?.privacidad?.estado ||
+                  ""
+                );
+
+              return (
+                estadoPrivacidad !==
+                  "eliminada_logica" &&
+                estadoPrivacidad !==
+                  "archivada"
+              );
+            })
+        );
+
+      state.inscripcionesFuente =
+        "nomina_resumen";
+    } else {
+      /*
+        Respaldo de seguridad.
+
+        Si un grupo todavía no tiene resumen,
+        usamos la colección completa para no
+        dejar la página sin nómina.
+      */
+      const inscripcionesSnap =
+        await getDocs(
+          collection(
+            db,
+            "ventas_cotizaciones",
+            String(state.groupDocId),
+            "inscripciones"
+          )
+        );
+
+      state.inscripciones =
+        ordenarInscripcionesNomina(
+          inscripcionesSnap.docs
+            .map((d) => ({
+              id: d.id,
+              ...d.data(),
+              esResumenNomina: false
+            }))
+            .filter((item) => {
+              const estadoPrivacidad =
+                normalizeSearchLocal(
+                  item?.privacidad?.estado ||
+                  ""
+                );
+
+              return (
+                estadoPrivacidad !==
+                  "eliminada_logica" &&
+                estadoPrivacidad !==
+                  "archivada"
+              );
+            })
+        );
+
+      state.inscripcionesFuente =
+        "inscripciones_completas";
+
+      console.warn(
+        "[grupo] nomina_resumen vacío; se usaron inscripciones completas.",
+        {
+          groupDocId:
+            state.groupDocId
+        }
+      );
     }
-    
+
+    state.inscripcionesCargadas =
+      true;
+
+    if (
+      getInscripcionesSistemaPagos()
+        .length > 0
+    ) {
+      state.grupoTieneNominaSistemaPagos =
+        true;
+    }
+
     await sincronizarAlertasInscripcionesGrupo();
   } catch (error) {
-    console.error("[grupo] loadInscripciones", error);
+    console.error(
+      "[grupo] loadInscripciones",
+      error
+    );
 
     state.inscripciones = [];
     state.inscripcionesCargadas = false;
+    state.inscripcionesFuente = "";
 
     throw error;
   } finally {
-    state.inscripcionesCargando = false;
+    state.inscripcionesCargando =
+      false;
   }
+}
+
+async function cargarInscripcionCompletaPorId(
+  inscripcionId = ""
+) {
+  const id =
+    String(
+      inscripcionId || ""
+    ).trim();
+
+  if (!id) {
+    return null;
+  }
+
+  /*
+    Si ya fue descargada anteriormente,
+    devolvemos la copia guardada.
+  */
+  if (
+    state.inscripcionesDetalleCache
+      .has(id)
+  ) {
+    return state
+      .inscripcionesDetalleCache
+      .get(id);
+  }
+
+  const inscripcionRef =
+    doc(
+      db,
+      "ventas_cotizaciones",
+      String(state.groupDocId),
+      "inscripciones",
+      id
+    );
+
+  const snap =
+    await getDoc(
+      inscripcionRef
+    );
+
+  if (!snap.exists()) {
+    return null;
+  }
+
+  const completa = {
+    id: snap.id,
+    ...snap.data(),
+    esResumenNomina: false
+  };
+
+  state.inscripcionesDetalleCache
+    .set(
+      id,
+      completa
+    );
+
+  return completa;
+}
+
+function reemplazarInscripcionEnEstado(
+  inscripcionCompleta
+) {
+  if (!inscripcionCompleta?.id) {
+    return;
+  }
+
+  const index =
+    state.inscripciones.findIndex(
+      (item) =>
+        String(item.id) ===
+        String(inscripcionCompleta.id)
+    );
+
+  if (index < 0) {
+    return;
+  }
+
+  /*
+    Reemplazamos solamente ese pasajero.
+    El resto de la nómina sigue siendo liviana.
+  */
+  state.inscripciones[index] =
+    inscripcionCompleta;
+}
+
+async function obtenerInscripcionCompleta(
+  inscripcionId = ""
+) {
+  const itemVisible =
+    state.inscripciones.find(
+      (item) =>
+        String(item.id) ===
+        String(inscripcionId)
+    );
+
+  if (!itemVisible) {
+    return null;
+  }
+
+  /*
+    Si ya es un documento completo,
+    no volvemos a consultar Firestore.
+  */
+  if (
+    itemVisible.esResumenNomina !==
+      true
+  ) {
+    return itemVisible;
+  }
+
+  const completa =
+    await cargarInscripcionCompletaPorId(
+      inscripcionId
+    );
+
+  if (!completa) {
+    return null;
+  }
+
+  reemplazarInscripcionEnEstado(
+    completa
+  );
+
+  return completa;
+}
+
+async function cargarTodasLasInscripcionesCompletas({
+  mostrarProgreso = true
+} = {}) {
+  if (!state.inscripcionesCargadas) {
+    const cargada = await asegurarNominaCargada({
+      mostrar: true,
+      renderizar: true
+    });
+
+    if (!cargada) {
+      return false;
+    }
+  }
+
+  const ids = state.inscripciones
+    .map((item) => String(item.id || "").trim())
+    .filter(Boolean);
+
+  if (!ids.length) {
+    return true;
+  }
+
+  const completas = [];
+
+  for (let index = 0; index < ids.length; index += 1) {
+    const id = ids[index];
+
+    if (mostrarProgreso) {
+      showSaveNotice(
+        `Cargando fichas completas: ${index + 1} de ${ids.length}`
+      );
+    }
+
+    const completa = await cargarInscripcionCompletaPorId(id);
+
+    if (!completa) {
+      console.error(
+        "[grupo] No se pudo cargar inscripción completa",
+        {
+          groupDocId: state.groupDocId,
+          inscripcionId: id
+        }
+      );
+
+      return false;
+    }
+
+    completas.push(completa);
+  }
+
+  state.inscripciones =
+    ordenarInscripcionesNomina(completas);
+
+  return true;
 }
 
 async function asegurarNominaCargada({
@@ -809,15 +1095,78 @@ async function toggleNominaPasajeros() {
 }
 
 async function recargarNominaPasajeros() {
-  if (state.inscripcionesCargando) return;
+  if (state.inscripcionesCargando) {
+    return;
+  }
 
   state.inscripcionesCargadas = false;
   state.nominaVisible = true;
+  state.inscripcionesFuente = "";
+  state.inscripcionesDetalleCache =
+    new Map();
 
   await asegurarNominaCargada({
     mostrar: true,
     renderizar: true
   });
+}
+
+function esperar(ms = 0) {
+  return new Promise(
+    (resolve) =>
+      window.setTimeout(
+        resolve,
+        ms
+      )
+  );
+}
+
+async function recargarNominaDespuesDeCambio() {
+  /*
+    El resumen se actualiza mediante Cloud Function.
+    Damos un margen breve antes de volver a consultarlo.
+  */
+  await esperar(900);
+
+  state.inscripcionesDetalleCache =
+    new Map();
+
+  await loadInscripciones();
+
+  renderInscripcionPasajerosPanel();
+  syncButtons();
+}
+
+async function recargarNominaCompletaDespuesDeCambio() {
+  /*
+    El trigger necesita un pequeño margen para
+    actualizar nomina_resumen.
+  */
+  await esperar(900);
+
+  /*
+    Primero volvemos a leer el resumen actualizado.
+  */
+  await loadInscripciones();
+
+  /*
+    El modal Editar nómina necesita todos los campos
+    completos de cada inscripción.
+  */
+  const cargadas =
+    await cargarTodasLasInscripcionesCompletas({
+      mostrarProgreso: false
+    });
+
+  if (!cargadas) {
+    throw new Error(
+      "No fue posible volver a cargar las fichas completas."
+    );
+  }
+
+  renderInscripcionPasajerosPanel();
+  renderEditarNominaInscripcionModal();
+  syncButtons();
 }
 
 function canManageEmailTemplates() {
@@ -3338,6 +3687,7 @@ function renderInscripcionPasajerosPanel() {
               <th>Tipo pasajero</th>
               <th>Nacionalidad</th>
               <th>Sexo / género</th>
+              <th>Carnet identidad</th>
               <th>Responsable</th>
               <th>Correo responsable</th>
               <th>Celular responsable</th>
@@ -3396,8 +3746,21 @@ function renderInscripcionPasajerosPanel() {
                   <td>${escapeHtml(formatDateOnlyForTable(getByPath(item, "identificacion.fechaNacimiento")))}</td>
                   <td>${escapeHtml(formatInscripcionValue(item.tipoViajante || item.tipoParticipacion || ""))}</td>
                   <td>${escapeHtml(getInscripcionNacionalidad(item))}</td>
-                  <td>${escapeHtml(getInscripcionGenero(item))}</td>
-                  <td>${escapeHtml(getResponsablePrincipalNombre(item))}</td>
+                  <td>
+                    ${escapeHtml(
+                      getInscripcionGenero(item)
+                    )}
+                  </td>
+                  
+                  <td>
+                    ${getCarnetIdentidadHtml(item)}
+                  </td>
+                  
+                  <td>
+                    ${escapeHtml(
+                      getResponsablePrincipalNombre(item)
+                    )}
+                  </td>
                   <td>${escapeHtml(getByPath(item, "contactoPrincipal.correo") || "—")}</td>
                   <td>${escapeHtml(getByPath(item, "contactoPrincipal.celular") || getByPath(item, "contactoPrincipal.telefono") || getByPath(item, "contactoPrincipal.whatsapp") || "—")}</td>
                   <td>
@@ -3490,6 +3853,15 @@ function renderInscripcionPasajerosPanel() {
       <div><strong>Liberados generado por:</strong> ${escapeHtml(liberadosInfo.actualizadoPor || liberadosInfo.linkGeneradoPor || "—")}</div>
     </div>
     <div class="nomina-loaded-footer">
+      <div class="nomina-carga-text">
+        Fuente de carga:
+        ${
+          state.inscripcionesFuente ===
+            "nomina_resumen"
+            ? "Resumen liviano"
+            : "Documentos completos"
+        }
+      </div>
       <button
         id="btnVerNominaPasajeros"
         class="btn-pill"
@@ -3564,6 +3936,157 @@ function getInscripcionGenero(item = {}) {
   if (normalizeSearchLocal(genero) === "otro" && generoOtro) return generoOtro;
 
   return genero ? formatInscripcionValue(genero) : "—";
+}
+
+function getCarnetIdentidadResumen(
+  item = {}
+) {
+  const carnetFrente =
+    getByPath(
+      item,
+      "archivosEspeciales.carnetFrente"
+    ) ||
+    getByPath(
+      item,
+      "archivos.carnetFrente"
+    ) ||
+    null;
+
+  const carnetReverso =
+    getByPath(
+      item,
+      "archivosEspeciales.carnetReverso"
+    ) ||
+    getByPath(
+      item,
+      "archivos.carnetReverso"
+    ) ||
+    null;
+
+  const tieneFrente =
+    item.tieneCarnetFrente === true ||
+    item?.carnet?.tieneCarnetFrente === true ||
+    !!carnetFrente;
+
+  const tieneReverso =
+    item.tieneCarnetReverso === true ||
+    item?.carnet?.tieneCarnetReverso === true ||
+    !!carnetReverso;
+
+  const informadoSistemaPagos =
+    item?.sistemaPagos?.tieneCarnetIdentidad === true ||
+    item?.sistemaPagos?.tieneCredencial === true ||
+    item?.sistemaPagos?.tiene_credencial === true ||
+    item?.sistemaPagos?.tiene_credencial === 1 ||
+    item?.tieneCredencial === true;
+
+  const tiene =
+    item.tieneCarnetIdentidad === true ||
+    item?.carnet?.tieneCarnetIdentidad === true ||
+    informadoSistemaPagos ||
+    (tieneFrente && tieneReverso);
+
+  let origen =
+    cleanText(
+      item.origenCarnetIdentidad ||
+      item?.carnet?.origenCarnetIdentidad ||
+      ""
+    );
+
+  if (!origen) {
+    if (
+      informadoSistemaPagos &&
+      (tieneFrente || tieneReverso)
+    ) {
+      origen =
+        "sistema_pagos_y_formulario";
+    } else if (informadoSistemaPagos) {
+      origen =
+        "sistema_pagos";
+    } else if (
+      tieneFrente ||
+      tieneReverso
+    ) {
+      origen =
+        "formulario";
+    }
+  }
+
+  return {
+    tiene,
+    origen,
+    tieneFrente,
+    tieneReverso
+  };
+}
+
+function getCarnetIdentidadHtml(
+  item = {}
+) {
+  const carnet =
+    getCarnetIdentidadResumen(
+      item
+    );
+
+  if (carnet.tiene) {
+    let detalle =
+      "Carnet disponible";
+
+    if (
+      carnet.origen ===
+      "sistema_pagos"
+    ) {
+      detalle =
+        "Informado por Sistema de Pagos";
+    }
+
+    if (
+      carnet.origen ===
+      "formulario"
+    ) {
+      detalle =
+        "Cargado mediante formulario";
+    }
+
+    if (
+      carnet.origen ===
+      "sistema_pagos_y_formulario"
+    ) {
+      detalle =
+        "Disponible en Sistema de Pagos y formulario";
+    }
+
+    return `
+      <span
+        class="status-chip status-ok"
+        title="${escapeHtml(detalle)}"
+      >
+        Con carnet
+      </span>
+    `;
+  }
+
+  if (
+    carnet.tieneFrente ||
+    carnet.tieneReverso
+  ) {
+    return `
+      <span
+        class="status-chip status-warning"
+        title="Solo existe una cara del carnet"
+      >
+        Incompleto
+      </span>
+    `;
+  }
+
+  return `
+    <span
+      class="status-chip status-pending"
+    >
+      Sin carnet
+    </span>
+  `;
 }
 
 function getResponsablePrincipalNombre(item = {}) {
@@ -3739,22 +4262,55 @@ function renderPdfDocumentoImagen(label = "", url = "") {
   `;
 }
 
-async function descargarFichaInscripcionPdf(inscripcionId = "") {
-  const item = state.inscripciones.find((x) => String(x.id) === String(inscripcionId));
+async function descargarFichaInscripcionPdf(
+  inscripcionId = ""
+) {
+  const item =
+    await obtenerInscripcionCompleta(
+      inscripcionId
+    );
 
   if (!item) {
-    alert("No se encontró la inscripción seleccionada.");
+    alert(
+      "No se pudo cargar la ficha completa de la inscripción seleccionada."
+    );
+
     return;
   }
 
-  const imagenes = await prepararImagenesReencuadreInscripcion(item);
+  try {
+    const imagenes =
+      await prepararImagenesReencuadreInscripcion(
+        item
+      );
 
-  if (imagenes.length) {
-    abrirModalReencuadreFicha(inscripcionId, imagenes);
-    return;
+    if (imagenes.length) {
+      abrirModalReencuadreFicha(
+        inscripcionId,
+        imagenes
+      );
+
+      return;
+    }
+
+    await generarFichaInscripcionPdfFinal(
+      inscripcionId,
+      {}
+    );
+  } catch (error) {
+    console.error(
+      "[grupo] descargarFichaInscripcionPdf",
+      error
+    );
+
+    alert(
+      "No se pudo preparar la ficha PDF: " +
+      (
+        error?.message ||
+        "Error desconocido"
+      )
+    );
   }
-
-  await generarFichaInscripcionPdfFinal(inscripcionId, {});
 }
 
 function getFechaCambioEstadoInscripcionPdf(item = {}) {
@@ -3776,10 +4332,16 @@ function getFechaCambioEstadoInscripcionPdf(item = {}) {
 }
 
 async function generarFichaInscripcionPdfFinal(inscripcionId = "", recortes = {}) {
-  const item = state.inscripciones.find((x) => String(x.id) === String(inscripcionId));
-
+  const item =
+    await obtenerInscripcionCompleta(
+      inscripcionId
+    );
+  
   if (!item) {
-    alert("No se encontró la inscripción seleccionada.");
+    alert(
+      "No se pudo cargar la ficha completa de la inscripción seleccionada."
+    );
+  
     return;
   }
 
@@ -6323,9 +6885,7 @@ async function marcarListaEsperaPagada(inscripcionId = "") {
       }
     });
 
-    await loadInscripciones();
-    renderInscripcionPasajerosPanel();
-    syncButtons();
+    await recargarNominaDespuesDeCambio();
 
     showSaveNotice("Lista de espera marcada como pagada.");
   } catch (error) {
@@ -6403,9 +6963,7 @@ async function confirmarCupoListaEspera(inscripcionId = "") {
     }
   });
 
-  await loadInscripciones();
-  renderInscripcionPasajerosPanel();
-  syncButtons();
+  await recargarNominaDespuesDeCambio();
 
   showSaveNotice("Cupo confirmado correctamente.");
 }
@@ -6474,9 +7032,7 @@ async function confirmarNuevoIngreso(inscripcionId = "") {
     }
   });
 
-  await loadInscripciones();
-  renderInscripcionPasajerosPanel();
-  syncButtons();
+  await recargarNominaDespuesDeCambio();
 
   showSaveNotice("Nuevo ingreso confirmado correctamente.");
 }
@@ -6549,34 +7105,59 @@ function getPatchCorreoInscripcionCliente(item = {}, nuevoCorreo = "") {
   };
 }
 
-function openReenviarCorreoInscripcionModal(inscripcionId = "") {
-  const item = state.inscripciones.find((x) => x.id === inscripcionId);
+async function openReenviarCorreoInscripcionModal(
+  inscripcionId = ""
+) {
+  const item =
+    await obtenerInscripcionCompleta(
+      inscripcionId
+    );
 
   if (!item) {
-    alert("No se encontró la inscripción seleccionada.");
+    alert(
+      "No se pudo cargar la inscripción completa."
+    );
+
     return;
   }
 
-  const actual = getCorreoClienteInscripcion(item);
-  const nombre = buildNombreCompletoInscripcion(item);
-  const tipo = getEstadoOperativoInscripcionLabel(item);
+  const actual =
+    getCorreoClienteInscripcion(
+      item
+    );
 
-  const nuevoCorreo = prompt(
-    [
-      `Reenviar correo oficial de inscripción`,
-      ``,
-      `Pasajero: ${nombre || "—"}`,
-      `Tipo: ${tipo}`,
-      `Correo actual: ${actual || "sin correo"}`,
-      ``,
-      `Ingresa el nuevo correo al que se reenviará el correo oficial:`
-    ].join("\n"),
-    actual || ""
+  const nombre =
+    buildNombreCompletoInscripcion(
+      item
+    );
+
+  const tipo =
+    getEstadoOperativoInscripcionLabel(
+      item
+    );
+
+  const nuevoCorreo =
+    prompt(
+      [
+        "Reenviar correo oficial de inscripción",
+        "",
+        `Pasajero: ${nombre || "—"}`,
+        `Tipo: ${tipo}`,
+        `Correo actual: ${actual || "sin correo"}`,
+        "",
+        "Ingresa el nuevo correo al que se reenviará el correo oficial:"
+      ].join("\n"),
+      actual || ""
+    );
+
+  if (nuevoCorreo === null) {
+    return;
+  }
+
+  await reenviarCorreoInscripcionCliente(
+    inscripcionId,
+    nuevoCorreo
   );
-
-  if (nuevoCorreo === null) return;
-
-  reenviarCorreoInscripcionCliente(inscripcionId, nuevoCorreo);
 }
 
 async function reenviarCorreoInscripcionCliente(inscripcionId = "", nuevoCorreoRaw = "") {
@@ -6592,10 +7173,16 @@ async function reenviarCorreoInscripcionCliente(inscripcionId = "", nuevoCorreoR
     return;
   }
 
-  const item = state.inscripciones.find((x) => x.id === inscripcionId);
-
+  const item =
+    await obtenerInscripcionCompleta(
+      inscripcionId
+    );
+  
   if (!item) {
-    alert("No se encontró la inscripción seleccionada.");
+    alert(
+      "No se pudo cargar la inscripción completa."
+    );
+  
     return;
   }
 
@@ -6673,9 +7260,7 @@ async function reenviarCorreoInscripcionCliente(inscripcionId = "", nuevoCorreoR
     }
   });
 
-  await loadInscripciones();
-  renderInscripcionPasajerosPanel();
-  syncButtons();
+  await recargarNominaDespuesDeCambio();
 
   showSaveNotice("Correo actualizado y reenvío generado correctamente.");
 }
@@ -6712,7 +7297,33 @@ window.archivarInscripcionesGrupo = async function ({ rut = "", confirmar = fals
     return;
   }
 
-  console.table(candidatos.map((item) => ({
+  const candidatosCompletos = [];
+
+  for (const candidato of candidatos) {
+    const completa =
+      await obtenerInscripcionCompleta(
+        candidato.id
+      );
+  
+    if (completa) {
+      candidatosCompletos.push(
+        completa
+      );
+    }
+  }
+  
+  if (
+    candidatosCompletos.length !==
+    candidatos.length
+  ) {
+    alert(
+      "No fue posible cargar todas las fichas completas. No se realizará el archivo."
+    );
+  
+    return;
+  }
+
+  console.table(candidatosCompletos.map((item) => ({
     id: item.id,
     documento: getInscripcionDocumento(item),
     nombre: buildNombreCompletoInscripcion(item),
@@ -6745,13 +7356,13 @@ window.archivarInscripcionesGrupo = async function ({ rut = "", confirmar = fals
     rutBuscado: rut || "",
     motivo: motivo || "Archivo manual desde consola",
 
-    totalInscritos: candidatos.length,
+    totalInscritos:   candidatosCompletos.length,
 
     creadoPor: getDisplayName(state.effectiveUser),
     creadoPorCorreo: state.effectiveEmail,
     creadoAt: serverTimestamp(),
 
-    inscripciones: candidatos.map((item) => ({
+    inscripciones: candidatosCompletos.map((item) => ({
       id: item.id,
       documento: getInscripcionDocumento(item),
       nombre: buildNombreCompletoInscripcion(item),
@@ -6760,7 +7371,7 @@ window.archivarInscripcionesGrupo = async function ({ rut = "", confirmar = fals
     }))
   });
 
-  for (const item of candidatos) {
+  for (const item of candidatosCompletos) {
     const inscRef = doc(
       db,
       "ventas_cotizaciones",
@@ -6807,13 +7418,14 @@ window.archivarInscripcionesGrupo = async function ({ rut = "", confirmar = fals
     tipoMovimiento: rutBuscado ? "inscripcion_archivada_por_rut" : "inscripciones_archivadas_masivo",
     modulo: "inscripcion",
     titulo: rutBuscado ? "Inscripción archivada por RUT" : "Inscripciones archivadas masivamente",
-    mensaje: `${getDisplayName(state.effectiveUser)} archivó ${candidatos.length} inscripción(es) del grupo.`,
+    mensaje: `${getDisplayName(state.effectiveUser)} archivó ${candidatosCompletos.length} inscripción(es) del grupo.`,
     metadata: {
       archivoId,
       rutBuscado: rut || "",
       motivo: motivo || "Archivo manual desde consola",
-      totalArchivadas: candidatos.length,
-      inscripciones: candidatos.map((item) => ({
+      totalArchivadas:
+        candidatosCompletos.length,
+      inscripciones: candidatosCompletos.map((item) => ({
         id: item.id,
         documento: getInscripcionDocumento(item),
         nombre: buildNombreCompletoInscripcion(item),
@@ -6822,11 +7434,11 @@ window.archivarInscripcionesGrupo = async function ({ rut = "", confirmar = fals
     }
   });
 
-  await loadInscripciones();
-  renderInscripcionPasajerosPanel();
-  syncButtons();
+  await recargarNominaDespuesDeCambio();
 
-  console.log(`Listo. Archivadas ${candidatos.length} inscripción(es). Archivo: ${archivoId}`);
+  console.log(
+    `Listo. Archivadas ${candidatosCompletos.length} inscripción(es). Archivo: ${archivoId}`
+  );
 };
 
 window.borrarInscripcionesGrupo = async function ({ rut = "", confirmar = false } = {}) {
@@ -6917,9 +7529,7 @@ window.borrarInscripcionesGrupo = async function ({ rut = "", confirmar = false 
     }
   });
 
-  await loadInscripciones();
-  renderInscripcionPasajerosPanel();
-  syncButtons();
+  await recargarNominaDespuesDeCambio();
 
   console.log(`Listo. Borradas ${candidatos.length} inscripción(es).`);
 };
@@ -7161,7 +7771,24 @@ window.reenviarCorreoTransferenciaListaEspera = async function ({ rut = "", insc
     return null;
   }
 
-  if (normalizeSearchLocal(getInscripcionTipoReal(item)) !== "lista_espera") {
+  const itemCompleto =
+    await obtenerInscripcionCompleta(
+      item.id
+    );
+  
+  if (!itemCompleto) {
+    console.warn(
+      "No se pudo cargar la inscripción completa para reenviar a transferencias."
+    );
+  
+    return null;
+  }
+
+  if (
+    normalizeSearchLocal(
+      getInscripcionTipoReal(itemCompleto)
+    ) !== "lista_espera"
+  ) {
     console.warn("Esta función solo aplica a inscripciones de lista de espera.");
     return null;
   }
@@ -7172,7 +7799,7 @@ window.reenviarCorreoTransferenciaListaEspera = async function ({ rut = "", insc
     estado: "pendiente",
 
     destinatario: "transferencia@raitrai.cl",
-    payload: item,
+    payload: itemCompleto,
 
     idGrupo: String(state.groupId || ""),
     groupDocId: String(state.groupDocId || ""),
@@ -7296,13 +7923,80 @@ async function resetearCicloInscripcion() {
     return;
   }
 
-  const faseNueva = getFaseResetInscripcionSeleccionada();
-  const contexto = getContextoInscripcionGrupo(faseNueva);
-  const accionInscritos = normalizeSearchLocal($("reset_accion_inscritos")?.value || "conservar");
-  const debeArchivar = accionInscritos === "archivar";
-  const motivo = cleanText($("reset_motivo")?.value || "");
-
-  const totalInscritos = state.inscripciones.length;
+  const faseNueva =
+    getFaseResetInscripcionSeleccionada();
+  
+  const contexto =
+    getContextoInscripcionGrupo(
+      faseNueva
+    );
+  
+  const accionInscritos =
+    normalizeSearchLocal(
+      $("reset_accion_inscritos")?.value ||
+      "conservar"
+    );
+  
+  const debeArchivar =
+    accionInscritos === "archivar";
+  
+  const motivo =
+    cleanText(
+      $("reset_motivo")?.value || ""
+    );
+  
+  /*
+    Como la nómina ahora se carga bajo demanda,
+    primero debemos consultarla antes de contar
+    o archivar pasajeros.
+  */
+  if (
+    debeArchivar &&
+    !state.inscripcionesCargadas
+  ) {
+    const nominaCargada =
+      await asegurarNominaCargada({
+        mostrar: false,
+        renderizar: false
+      });
+  
+    if (!nominaCargada) {
+      alert(
+        "No fue posible cargar la nómina. El ciclo no será reseteado."
+      );
+  
+      return;
+    }
+  }
+  
+  /*
+    Si se archivarán inscritos, necesitamos
+    los documentos completos y no solamente
+    el resumen liviano.
+  */
+  if (
+    debeArchivar &&
+    state.inscripciones.length > 0
+  ) {
+    const cargadas =
+      await cargarTodasLasInscripcionesCompletas({
+        mostrarProgreso: true
+      });
+  
+    if (!cargadas) {
+      alert(
+        "No fue posible cargar todas las fichas completas. El ciclo no será reseteado."
+      );
+  
+      return;
+    }
+  }
+  
+  /*
+    Se calcula después de cargar la nómina.
+  */
+  const totalInscritos =
+    state.inscripciones.length;
 
   const mensajeConfirmacion = [
     "¿Confirmas resetear el ciclo de inscripción?",
@@ -10393,9 +11087,22 @@ function optionHtml(options = [], selected = "") {
   }).join("");
 }
 
-function openEditarNominaInscripcionModal() {
+async function openEditarNominaInscripcionModal() {
   if (!canEditarNominaInscripcion()) {
     alert("No tienes permisos para editar la nómina.");
+    return;
+  }
+
+  const cargadas =
+    await cargarTodasLasInscripcionesCompletas({
+      mostrarProgreso: true
+    });
+
+  if (!cargadas) {
+    alert(
+      "No fue posible cargar todas las fichas completas. No se abrirá la edición de nómina."
+    );
+
     return;
   }
 
@@ -10648,9 +11355,16 @@ async function guardarNominaInscripcion(inscripcionId = "") {
     return;
   }
 
-  const item = state.inscripciones.find((x) => x.id === inscripcionId);
+  const item =
+    await obtenerInscripcionCompleta(
+      inscripcionId
+    );
+  
   if (!item) {
-    alert("No se encontró la inscripción.");
+    alert(
+      "No se pudo cargar la inscripción completa."
+    );
+  
     return;
   }
 
@@ -10692,12 +11406,11 @@ async function guardarNominaInscripcion(inscripcionId = "") {
     }
   });
 
-  await loadInscripciones();
-  renderInscripcionPasajerosPanel();
-  renderEditarNominaInscripcionModal();
-  syncButtons();
-
-  showSaveNotice("Inscripción actualizada.");
+  await recargarNominaCompletaDespuesDeCambio();
+  
+  showSaveNotice(
+    "Inscripción actualizada."
+  );
 }
 
 async function archivarNominaInscripcion(inscripcionId = "") {
@@ -10706,9 +11419,16 @@ async function archivarNominaInscripcion(inscripcionId = "") {
     return;
   }
 
-  const item = state.inscripciones.find((x) => x.id === inscripcionId);
+  const item =
+    await obtenerInscripcionCompleta(
+      inscripcionId
+    );
+  
   if (!item) {
-    alert("No se encontró la inscripción.");
+    alert(
+      "No se pudo cargar la inscripción completa."
+    );
+  
     return;
   }
 
@@ -10756,12 +11476,11 @@ async function archivarNominaInscripcion(inscripcionId = "") {
     }
   });
 
-  await loadInscripciones();
-  renderInscripcionPasajerosPanel();
-  renderEditarNominaInscripcionModal();
-  syncButtons();
-
-  showSaveNotice("Inscripción archivada.");
+  await recargarNominaCompletaDespuesDeCambio();
+  
+  showSaveNotice(
+    "Inscripción archivada."
+  );
 }
 
 /* =========================================================
