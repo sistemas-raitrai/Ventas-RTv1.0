@@ -6179,6 +6179,111 @@ async function cambiarFaseInscripcion(
   }
 }
 
+async function copiarLinkProcesoInscripcion({
+  link = "",
+  mensaje = "Link copiado."
+} = {}) {
+  const linkLimpio =
+    cleanText(link || "");
+
+  if (!linkLimpio) {
+    alert(
+      "No se encontró un link activo para este proceso."
+    );
+
+    return;
+  }
+
+  try {
+    await navigator.clipboard.writeText(
+      linkLimpio
+    );
+
+    showSaveNotice(
+      mensaje
+    );
+  } catch {
+    alert(
+      `No se pudo copiar automáticamente.\n\nCopia este link:\n\n${linkLimpio}`
+    );
+  }
+}
+
+async function copiarLinkNuevosIngresos() {
+  const estado =
+    getEstadoNuevosIngresos();
+
+  if (!estado.activo) {
+    alert(
+      "El proceso de Nuevos ingresos no está abierto."
+    );
+
+    return;
+  }
+
+  await copiarLinkProcesoInscripcion({
+    link: estado.link,
+    mensaje:
+      "Link de Nuevos ingresos copiado."
+  });
+}
+
+async function copiarLinkListaEspera() {
+  const estado =
+    getEstadoListaEsperaLink();
+
+  if (!estado.activo) {
+    alert(
+      "La Lista de espera no está abierta."
+    );
+
+    return;
+  }
+
+  await copiarLinkProcesoInscripcion({
+    link: estado.link,
+    mensaje:
+      "Link de Lista de espera copiado."
+  });
+}
+
+async function copiarLinkLiberados() {
+  const estado =
+    getEstadoLiberadosLink();
+
+  if (!estado.activo) {
+    alert(
+      "El link de Cupos liberados no está abierto."
+    );
+
+    return;
+  }
+
+  let link =
+    cleanText(
+      estado.link || ""
+    );
+
+  /*
+    Compatibilidad con grupos antiguos que solamente
+    tienen guardado el token.
+  */
+  if (!link && estado.token) {
+    link =
+      getInscripcionPublicLink(
+        state.groupId,
+        estado.token,
+        "liberado"
+      );
+  }
+
+  await copiarLinkProcesoInscripcion({
+    link,
+    mensaje:
+      "Link de Cupos liberados copiado."
+  });
+}
+
 async function toggleNuevosIngresos() {
   if (!canGestionarNuevosIngresos()) {
     alert(
@@ -6569,81 +6674,19 @@ async function cerrarListaEspera() {
 
 async function crearLinkLiberados() {
   if (!canGestionarLiberados()) {
-    alert(getBlockedInscripcionMessage());
+    alert(
+      getBlockedInscripcionMessage()
+    );
+
     return;
   }
 
   const estadoActual =
     getEstadoLiberadosLink();
 
-  /*
-    Si está abierto, el mismo botón lo cierra.
-  */
   if (estadoActual.activo) {
-    const okCerrar = confirm(
-      "¿Quieres cerrar el link de cupos liberados?"
-    );
-
-    if (!okCerrar) return;
-
-    await saveGroupPatch(
-      {
-        linkLiberadosActivo: false,
-
-        inscripcionLiberados: {
-          ...(state.group?.inscripcionLiberados || {}),
-
-          activo: false,
-
-          cerradoPor:
-            getDisplayName(state.effectiveUser),
-
-          cerradoPorCorreo:
-            state.effectiveEmail,
-
-          cerradoAt:
-            serverTimestamp(),
-
-          actualizadoPor:
-            getDisplayName(state.effectiveUser),
-
-          actualizadoPorCorreo:
-            state.effectiveEmail,
-
-          actualizadoAt:
-            serverTimestamp()
-        }
-      },
-      {
-        tipoMovimiento:
-          "inscripcion_liberados_cerrada",
-
-        modulo:
-          "inscripcion",
-
-        titulo:
-          "Link de liberados cerrado",
-
-        mensaje:
-          `${getDisplayName(state.effectiveUser)} cerró el link para cupos liberados.`,
-
-        cambios: [
-          {
-            campo:
-              "linkLiberadosActivo",
-
-            anterior:
-              true,
-
-            nuevo:
-              false
-          }
-        ]
-      }
-    );
-
-    showSaveNotice(
-      "Link de liberados cerrado."
+    alert(
+      "El link de Cupos liberados ya está abierto."
     );
 
     return;
@@ -6660,7 +6703,7 @@ async function crearLinkLiberados() {
     );
 
   const ok = confirm(
-    "¿Quieres abrir el link para cupos liberados?"
+    "¿Quieres abrir el link para Cupos liberados?"
   );
 
   if (!ok) return;
@@ -6668,17 +6711,24 @@ async function crearLinkLiberados() {
   await saveGroupPatch(
     {
       linkLiberadosActivo: true,
-      tokenInscripcionLiberados: token,
+      tokenInscripcionLiberados:
+        token,
 
       inscripcionLiberados: {
-        ...(state.group?.inscripcionLiberados || {}),
+        ...(
+          state.group
+            ?.inscripcionLiberados ||
+          {}
+        ),
 
         activo: true,
         tokenActual: token,
         linkActual: link,
 
         abiertoPor:
-          getDisplayName(state.effectiveUser),
+          getDisplayName(
+            state.effectiveUser
+          ),
 
         abiertoPorCorreo:
           state.effectiveEmail,
@@ -6687,7 +6737,9 @@ async function crearLinkLiberados() {
           serverTimestamp(),
 
         actualizadoPor:
-          getDisplayName(state.effectiveUser),
+          getDisplayName(
+            state.effectiveUser
+          ),
 
         actualizadoPorCorreo:
           state.effectiveEmail,
@@ -6707,7 +6759,9 @@ async function crearLinkLiberados() {
         "Link de liberados abierto",
 
       mensaje:
-        `${getDisplayName(state.effectiveUser)} abrió el link para cupos liberados.`,
+        `${getDisplayName(
+          state.effectiveUser
+        )} abrió el link para Cupos liberados.`,
 
       cambios: [
         {
@@ -6725,16 +6779,115 @@ async function crearLinkLiberados() {
   );
 
   try {
-    await navigator.clipboard.writeText(link);
+    await navigator.clipboard.writeText(
+      link
+    );
 
     showSaveNotice(
-      "Link de liberados abierto y copiado."
+      "Link de Cupos liberados abierto y copiado."
     );
   } catch {
     alert(
-      `Link de liberados:\n\n${link}`
+      `Link de Cupos liberados:\n\n${link}`
     );
   }
+}
+
+async function cerrarLinkLiberados() {
+  if (!canGestionarLiberados()) {
+    alert(
+      getBlockedInscripcionMessage()
+    );
+
+    return;
+  }
+
+  const estadoActual =
+    getEstadoLiberadosLink();
+
+  if (!estadoActual.activo) {
+    alert(
+      "El link de Cupos liberados ya está cerrado."
+    );
+
+    return;
+  }
+
+  const ok = confirm(
+    "¿Quieres cerrar el link de Cupos liberados?"
+  );
+
+  if (!ok) return;
+
+  await saveGroupPatch(
+    {
+      linkLiberadosActivo: false,
+
+      inscripcionLiberados: {
+        ...(
+          state.group
+            ?.inscripcionLiberados ||
+          {}
+        ),
+
+        activo: false,
+
+        cerradoPor:
+          getDisplayName(
+            state.effectiveUser
+          ),
+
+        cerradoPorCorreo:
+          state.effectiveEmail,
+
+        cerradoAt:
+          serverTimestamp(),
+
+        actualizadoPor:
+          getDisplayName(
+            state.effectiveUser
+          ),
+
+        actualizadoPorCorreo:
+          state.effectiveEmail,
+
+        actualizadoAt:
+          serverTimestamp()
+      }
+    },
+    {
+      tipoMovimiento:
+        "inscripcion_liberados_cerrada",
+
+      modulo:
+        "inscripcion",
+
+      titulo:
+        "Link de liberados cerrado",
+
+      mensaje:
+        `${getDisplayName(
+          state.effectiveUser
+        )} cerró el link para Cupos liberados.`,
+
+      cambios: [
+        {
+          campo:
+            "linkLiberadosActivo",
+
+          anterior:
+            true,
+
+          nuevo:
+            false
+        }
+      ]
+    }
+  );
+
+  showSaveNotice(
+    "Link de Cupos liberados cerrado."
+  );
 }
 
 async function cerrarInscripcion() {
@@ -10267,10 +10420,35 @@ function syncButtons() {
 
   const btnHabilitarInscripcion = $("btnHabilitarInscripcion");
   const btnCerrarInscripcion = $("btnCerrarInscripcion");
-  const btnAbrirNuevosInscritos = $("btnAbrirNuevosInscritos");
-  const btnAbrirListaEspera = $("btnAbrirListaEspera");
-  const btnCrearLinkLiberados = $("btnCrearLinkLiberados");
-  const btnCopiarLinkInscripcion = $("btnCopiarLinkInscripcion");
+  const btnAbrirNuevosInscritos =
+    $("btnAbrirNuevosInscritos");
+  
+  const btnCopiarLinkNuevos =
+    $("btnCopiarLinkNuevos");
+  
+  const btnCerrarNuevosInscritos =
+    $("btnCerrarNuevosInscritos");
+  
+  const btnAbrirListaEspera =
+    $("btnAbrirListaEspera");
+  
+  const btnCopiarLinkListaEspera =
+    $("btnCopiarLinkListaEspera");
+  
+  const btnCerrarListaEspera =
+    $("btnCerrarListaEspera");
+  
+  const btnCrearLinkLiberados =
+    $("btnCrearLinkLiberados");
+  
+  const btnCopiarLinkLiberados =
+    $("btnCopiarLinkLiberados");
+  
+  const btnCerrarLinkLiberados =
+    $("btnCerrarLinkLiberados");
+  
+  const btnCopiarLinkInscripcion =
+    $("btnCopiarLinkInscripcion");
   const btnExportarInscripcionesExcel = $("btnExportarInscripcionesExcel");
   const btnExportarInscripcionesCsv = $("btnExportarInscripcionesCsv");
   const btnResetearCicloInscripcion = $("btnResetearCicloInscripcion");
@@ -10323,10 +10501,24 @@ function syncButtons() {
   }
 
   if (btnCopiarLinkInscripcion) {
-    btnCopiarLinkInscripcion.disabled = !inscripcionYaHabilitada;
-    btnCopiarLinkInscripcion.textContent = inscripcionYaHabilitada
-      ? "Copiar link activo"
-      : "Sin link activo";
+    const fasePrincipal =
+      normalizeSearchLocal(
+        getInscripcionEstadoActual()
+      );
+  
+    const esFichaMedica =
+      fasePrincipal ===
+      "nomina_final";
+  
+    btnCopiarLinkInscripcion.disabled =
+      !inscripcionYaHabilitada;
+  
+    btnCopiarLinkInscripcion.textContent =
+      !inscripcionYaHabilitada
+        ? "Sin link principal activo"
+        : esFichaMedica
+          ? "Copiar link ficha médica"
+          : "Copiar link inscripción inicial";
   }
 
   if (btnCerrarInscripcion) {
@@ -10342,10 +10534,15 @@ function syncButtons() {
     btnCerrarInscripcion.disabled =
       !puedeCerrarPrincipal;
   
+    const fasePrincipal =
+      normalizeSearchLocal(
+        getInscripcionEstadoActual()
+      );
+    
     btnCerrarInscripcion.textContent =
-      inscripcionYaHabilitada
-        ? `Cerrar ${labelActivo}`
-        : "Cerrar inscripción";
+      fasePrincipal === "nomina_final"
+        ? "Cerrar ficha médica"
+        : "Cerrar inscripción inicial";
   }
 
   if (btnCorreosInscripcion) {
@@ -10363,61 +10560,126 @@ function syncButtons() {
   const estadoLiberados =
     getEstadoLiberadosLink();
   
-  if (btnAbrirNuevosInscritos) {
-    const mostrarNuevos =
-      puedeNuevos ||
-      estadoNuevos.activo;
+  /*
+    NUEVOS INGRESOS
   
+    Cerrado:
+    - muestra Abrir.
+  
+    Abierto:
+    - muestra Copiar.
+    - muestra Cerrar.
+  */
+  if (btnAbrirNuevosInscritos) {
     btnAbrirNuevosInscritos.classList.toggle(
       "hidden",
-      !mostrarNuevos
+      estadoNuevos.activo ||
+      !puedeNuevos
     );
   
     btnAbrirNuevosInscritos.disabled =
-      !puedeNuevos;
-  
-    btnAbrirNuevosInscritos.textContent =
-      estadoNuevos.activo
-        ? "Cerrar nuevos ingresos"
-        : "Abrir nuevos ingresos";
+      !puedeNuevos ||
+      estadoNuevos.activo;
   }
   
-  if (btnAbrirListaEspera) {
-    const mostrarLista =
-      puedeListaEspera ||
-      estadoListaEspera.activo;
+  if (btnCopiarLinkNuevos) {
+    btnCopiarLinkNuevos.classList.toggle(
+      "hidden",
+      !estadoNuevos.activo
+    );
   
+    btnCopiarLinkNuevos.disabled =
+      !estadoNuevos.activo ||
+      !estadoNuevos.link;
+  }
+  
+  if (btnCerrarNuevosInscritos) {
+    btnCerrarNuevosInscritos.classList.toggle(
+      "hidden",
+      !estadoNuevos.activo
+    );
+  
+    btnCerrarNuevosInscritos.disabled =
+      !estadoNuevos.activo ||
+      !puedeNuevos;
+  }
+  
+  /*
+    LISTA DE ESPERA
+  */
+  if (btnAbrirListaEspera) {
     btnAbrirListaEspera.classList.toggle(
       "hidden",
-      !mostrarLista
+      estadoListaEspera.activo ||
+      !puedeListaEspera
     );
   
     btnAbrirListaEspera.disabled =
-      !puedeListaEspera;
-  
-    btnAbrirListaEspera.textContent =
-      estadoListaEspera.activo
-        ? "Cerrar lista de espera"
-        : "Abrir lista de espera";
+      !puedeListaEspera ||
+      estadoListaEspera.activo;
   }
   
-  if (btnCrearLinkLiberados) {
-    const mostrarLiberados =
-      puedeLiberados ||
-      estadoLiberados.activo;
+  if (btnCopiarLinkListaEspera) {
+    btnCopiarLinkListaEspera.classList.toggle(
+      "hidden",
+      !estadoListaEspera.activo
+    );
   
+    btnCopiarLinkListaEspera.disabled =
+      !estadoListaEspera.activo ||
+      !estadoListaEspera.link;
+  }
+  
+  if (btnCerrarListaEspera) {
+    btnCerrarListaEspera.classList.toggle(
+      "hidden",
+      !estadoListaEspera.activo
+    );
+  
+    btnCerrarListaEspera.disabled =
+      !estadoListaEspera.activo ||
+      !puedeListaEspera;
+  }
+  
+  /*
+    CUPOS LIBERADOS
+  */
+  if (btnCrearLinkLiberados) {
     btnCrearLinkLiberados.classList.toggle(
       "hidden",
-      !mostrarLiberados
+      estadoLiberados.activo ||
+      !puedeLiberados
     );
   
     btnCrearLinkLiberados.disabled =
-      !puedeLiberados;
+      !puedeLiberados ||
+      estadoLiberados.activo;
+  }
   
-    btnCrearLinkLiberados.textContent =
-      estadoLiberados.activo
-        ? "Cerrar link liberados"
-        : "Crear link liberados";
+  if (btnCopiarLinkLiberados) {
+    const tieneLinkLiberados =
+      !!estadoLiberados.link ||
+      !!estadoLiberados.token;
+  
+    btnCopiarLinkLiberados.classList.toggle(
+      "hidden",
+      !estadoLiberados.activo
+    );
+  
+    btnCopiarLinkLiberados.disabled =
+      !estadoLiberados.activo ||
+      !tieneLinkLiberados;
+  }
+  
+  if (btnCerrarLinkLiberados) {
+    btnCerrarLinkLiberados.classList.toggle(
+      "hidden",
+      !estadoLiberados.activo
+    );
+  
+    btnCerrarLinkLiberados.disabled =
+      !estadoLiberados.activo ||
+      !puedeLiberados;
   }
 
   if (btnExportarInscripcionesExcel) {
@@ -11763,19 +12025,55 @@ function bindEvents() {
   $("btnAbrirNuevosInscritos")
     ?.addEventListener(
       "click",
-      toggleNuevosIngresos
+      abrirNuevosIngresos
+    );
+  
+  $("btnCopiarLinkNuevos")
+    ?.addEventListener(
+      "click",
+      copiarLinkNuevosIngresos
+    );
+  
+  $("btnCerrarNuevosInscritos")
+    ?.addEventListener(
+      "click",
+      cerrarNuevosIngresos
     );
   
   $("btnAbrirListaEspera")
     ?.addEventListener(
       "click",
-      toggleListaEspera
+      abrirListaEspera
+    );
+  
+  $("btnCopiarLinkListaEspera")
+    ?.addEventListener(
+      "click",
+      copiarLinkListaEspera
+    );
+  
+  $("btnCerrarListaEspera")
+    ?.addEventListener(
+      "click",
+      cerrarListaEspera
     );
   
   $("btnCrearLinkLiberados")
     ?.addEventListener(
       "click",
       crearLinkLiberados
+    );
+  
+  $("btnCopiarLinkLiberados")
+    ?.addEventListener(
+      "click",
+      copiarLinkLiberados
+    );
+  
+  $("btnCerrarLinkLiberados")
+    ?.addEventListener(
+      "click",
+      cerrarLinkLiberados
     );
   $("btnCopiarLinkInscripcion")?.addEventListener("click", copyGroupInscripcionLink);
 
