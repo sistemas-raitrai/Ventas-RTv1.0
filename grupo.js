@@ -10420,6 +10420,22 @@ function syncButtons() {
 
   const btnHabilitarInscripcion = $("btnHabilitarInscripcion");
   const btnCerrarInscripcion = $("btnCerrarInscripcion");
+
+  /*
+    Contenedores completos de las fases correlativas.
+  
+    Ocultaremos la tarjeta completa cuando esa fase
+    no corresponda al usuario actual.
+  */
+  const procesoNuevosIngresos =
+    $("procesoNuevosIngresos");
+  
+  const procesoListaEspera =
+    $("procesoListaEspera");
+  
+  const procesoLiberados =
+    $("procesoLiberados");
+  
   const btnAbrirNuevosInscritos =
     $("btnAbrirNuevosInscritos");
   
@@ -10461,6 +10477,63 @@ function syncButtons() {
   const puedeNuevos = canGestionarNuevosIngresos();
   const puedeListaEspera = canGestionarListaEspera();
   const puedeLiberados = canGestionarLiberados();
+
+  /*
+    Admin y Supervisión pueden ver y manejar ambas fases,
+    sin importar la fecha.
+  */
+  const puedeVerAmbasFases =
+    esAdminOSupervisionInscripcion();
+  
+  /*
+    Para los demás roles, las fases son correlativas:
+  
+    - Antes del 16 de marzo:
+      Nuevos ingresos.
+  
+    - Desde el 16 de marzo:
+      Lista de espera.
+  */
+  const mostrarProcesoNuevos =
+    puedeVerAmbasFases ||
+    correspondeNuevosIngresosPorFecha();
+  
+  const mostrarProcesoListaEspera =
+    puedeVerAmbasFases ||
+    correspondeListaEsperaPorFecha();
+
+  /*
+    Ocultamos la tarjeta completa.
+  
+    Esto evita que quede visible solamente el título
+    "Nuevos ingresos" sin ningún botón.
+  */
+  procesoNuevosIngresos
+    ?.classList.toggle(
+      "hidden",
+      !mostrarProcesoNuevos
+    );
+  
+  procesoListaEspera
+    ?.classList.toggle(
+      "hidden",
+      !mostrarProcesoListaEspera
+    );
+  
+  /*
+    Liberados es paralelo a todos los ciclos.
+    Su tarjeta solamente depende del permiso general
+    para gestionar Liberados o de que ya exista activa.
+  */
+  const estadoLiberadosVisible =
+    getEstadoLiberadosLink();
+  
+  procesoLiberados
+    ?.classList.toggle(
+      "hidden",
+      !puedeLiberados &&
+      !estadoLiberadosVisible.activo
+    );
 
   const inscripcionYaHabilitada = !!state.group?.inscripcionHabilitada;
   const tieneInscripciones = state.inscripciones.length > 0;
@@ -10573,6 +10646,7 @@ function syncButtons() {
   if (btnAbrirNuevosInscritos) {
     btnAbrirNuevosInscritos.classList.toggle(
       "hidden",
+      !mostrarProcesoNuevos ||
       estadoNuevos.activo ||
       !puedeNuevos
     );
@@ -10585,6 +10659,7 @@ function syncButtons() {
   if (btnCopiarLinkNuevos) {
     btnCopiarLinkNuevos.classList.toggle(
       "hidden",
+      !mostrarProcesoNuevos ||
       !estadoNuevos.activo
     );
   
@@ -10596,6 +10671,7 @@ function syncButtons() {
   if (btnCerrarNuevosInscritos) {
     btnCerrarNuevosInscritos.classList.toggle(
       "hidden",
+      !mostrarProcesoNuevos ||
       !estadoNuevos.activo
     );
   
@@ -10603,13 +10679,13 @@ function syncButtons() {
       !estadoNuevos.activo ||
       !puedeNuevos;
   }
-  
   /*
     LISTA DE ESPERA
   */
   if (btnAbrirListaEspera) {
     btnAbrirListaEspera.classList.toggle(
       "hidden",
+      !mostrarProcesoListaEspera ||
       estadoListaEspera.activo ||
       !puedeListaEspera
     );
@@ -10622,6 +10698,7 @@ function syncButtons() {
   if (btnCopiarLinkListaEspera) {
     btnCopiarLinkListaEspera.classList.toggle(
       "hidden",
+      !mostrarProcesoListaEspera ||
       !estadoListaEspera.activo
     );
   
@@ -10633,6 +10710,7 @@ function syncButtons() {
   if (btnCerrarListaEspera) {
     btnCerrarListaEspera.classList.toggle(
       "hidden",
+      !mostrarProcesoListaEspera ||
       !estadoListaEspera.activo
     );
   
