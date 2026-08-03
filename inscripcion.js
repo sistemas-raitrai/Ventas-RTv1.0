@@ -1680,28 +1680,55 @@ function validarFormulario() {
     errores.push("Debe aceptar la declaración de responsabilidad.");
   }
 
-    if (requiereCarnetIdentidad()) {
-      if (!carnetFrenteFile?.files?.length) {
-        errores.push(
-          "Debe adjuntar una imagen JPG, PNG o WEBP del documento de identidad por el frente."
-        );
-  
-      if (!carnetReversoFile?.files?.length) {
-        errores.push(
-          "Debe adjuntar una imagen JPG, PNG o WEBP del documento de identidad por el reverso."
-        );
+  if (requiereCarnetIdentidad()) {
+    if (!carnetFrenteFile?.files?.length) {
+      errores.push(
+        "Debe adjuntar una imagen JPG, PNG o WEBP del documento de identidad por el frente."
+      );
     }
   
-    if (requiereComprobantePago() && !comprobantePagoFile?.files?.length) {
-      errores.push("Debe adjuntar el comprobante de transferencia.");
+    if (!carnetReversoFile?.files?.length) {
+      errores.push(
+        "Debe adjuntar una imagen JPG, PNG o WEBP del documento de identidad por el reverso."
+      );
     }
-
-  if (faseUrl === "lista_espera" && !$("aceptaCondicionesListaEspera")?.checked) {
-      errores.push("Debe aceptar las condiciones de la Lista de Espera.");
-    }
-  if (!$("aceptaVeracidad")?.checked) errores.push("Debe aceptar la declaración de veracidad.");
-  if (!$("aceptaUsoInterno")?.checked) errores.push("Debe autorizar el uso interno de la información.");
-  if (!$("aceptaCambiosCorreo")?.checked) errores.push("Debe aceptar la condición de modificación posterior.");
+  }
+  
+  if (
+    requiereComprobantePago() &&
+    !comprobantePagoFile?.files?.length
+  ) {
+    errores.push(
+      "Debe adjuntar el comprobante de transferencia."
+    );
+  }
+  
+  if (
+    faseUrl === "lista_espera" &&
+    !$("aceptaCondicionesListaEspera")?.checked
+  ) {
+    errores.push(
+      "Debe aceptar las condiciones de la Lista de Espera."
+    );
+  }
+  
+  if (!$("aceptaVeracidad")?.checked) {
+    errores.push(
+      "Debe aceptar la declaración de veracidad."
+    );
+  }
+  
+  if (!$("aceptaUsoInterno")?.checked) {
+    errores.push(
+      "Debe autorizar el uso interno de la información."
+    );
+  }
+  
+  if (!$("aceptaCambiosCorreo")?.checked) {
+    errores.push(
+      "Debe aceptar la condición de modificación posterior."
+    );
+  }
 
   return errores;
 }
