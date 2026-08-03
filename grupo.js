@@ -822,8 +822,20 @@ async function loadInscripciones() {
       state.grupoTieneNominaSistemaPagos =
         true;
     }
-
-    await sincronizarAlertasInscripcionesGrupo();
+    
+    /*
+      La nómina ya está cargada y puede mostrarse.
+    
+      La revisión de alertas se ejecuta en segundo plano
+      para que no bloquee la visualización de pasajeros.
+    */
+    sincronizarAlertasInscripcionesGrupo()
+      .catch((error) => {
+        console.error(
+          "[grupo] sincronización de alertas en segundo plano",
+          error
+        );
+      });
   } catch (error) {
     console.error(
       "[grupo] loadInscripciones",
