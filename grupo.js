@@ -396,6 +396,13 @@ function bindHeaderActions() {
    LOAD
 ========================================================= */
 async function loadAll() {
+  /*
+    Ocultamos las acciones mientras se carga el grupo
+    y se vuelven a calcular los permisos.
+  */
+  $("inscripcionAcciones")
+    ?.classList.add("hidden");
+
   if (!state.requestedId) {
     renderFatal("Falta el parámetro ?id= en la URL.");
     return;
@@ -10479,6 +10486,15 @@ function syncButtons() {
       !tieneBotonVisible(id)
     );
   });
+
+  /*
+    Todos los botones y categorías ya tienen aplicada
+    su visibilidad según rol, permisos y estado del grupo.
+  
+    Recién ahora mostramos el contenedor completo.
+  */
+  $("inscripcionAcciones")
+    ?.classList.remove("hidden");
   
   const btnContrato = $("btnCrearContrato");
   if (btnContrato) btnContrato.disabled = !autorizada;
