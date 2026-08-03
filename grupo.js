@@ -1552,10 +1552,19 @@ function puedeAbrirCerrarFasesInscripcion() {
 }
 
 function puedeReabrirFasePasada() {
-  const rol = String(state.effectiveUser?.rol || "").toLowerCase();
-  const email = normalizeEmail(state.effectiveEmail || "");
+  const rol = String(
+    state.effectiveUser?.rol || ""
+  ).toLowerCase();
 
-  return rol === "admin" || email === "chernandez@raitrai.cl";
+  const email = normalizeEmail(
+    state.effectiveEmail || ""
+  );
+
+  return (
+    rol === "admin" ||
+    rol === "supervision" ||
+    email === "chernandez@raitrai.cl"
+  );
 }
 
 function puedeOperarListaEsperaAdministrativa() {
@@ -1710,48 +1719,176 @@ function canGestionarNominaFinal() {
   return true;
 }
 
+function esAdminOSupervisionInscripcion() {
+  const rol = String(
+    state.effectiveUser?.rol || ""
+  ).toLowerCase();
+
+  return (
+    rol === "admin" ||
+    rol === "supervision"
+  );
+}
+
+function getEstadoNuevosIngresos() {
+  const data =
+    state.group?.inscripcionNuevos || {};
+
+  return {
+    activo: data.activo === true,
+    token: cleanText(
+      data.tokenActual || ""
+    ),
+    link: cleanText(
+      data.linkActual || ""
+    )
+  };
+}
+
+function getEstadoListaEsperaLink() {
+  const data =
+    state.group?.inscripcionListaEspera || {};
+
+  return {
+    activo: data.activo === true,
+    token: cleanText(
+      data.tokenActual || ""
+    ),
+    link: cleanText(
+      data.linkActual || ""
+    )
+  };
+}
+
+function getEstadoLiberadosLink() {
+  const data =
+    state.group?.inscripcionLiberados || {};
+
+  return {
+    activo:
+      state.group?.linkLiberadosActivo === true ||
+      data.activo === true,
+
+    token: cleanText(
+      state.group?.tokenInscripcionLiberados ||
+      data.tokenActual ||
+      ""
+    ),
+
+    link: cleanText(
+      data.linkActual || ""
+    )
+  };
+}
+
+function grupoTieneFlujoBaseDisponible() {
+  /*
+    Sistema nuevo:
+    debe haberse cerrado la inscripción inicial.
+
+    Sistema de Pagos:
+    puede operar nuevos ingresos/lista de espera aunque
+    la importación todavía no se haya ejecutado.
+  */
+  if (grupoVieneSistemaAntiguo()) {
+    return true;
+  }
+
+  if (grupoTieneFirmaVendedor(state.group)) {
+    return true;
+  }
+
+  return inscripcionInicialYaCerrada();
+}
+
 function canGestionarNuevosIngresos() {
-  if (!puedeAbrirCerrarFasesInscripcion()) return false;
-  if (!inscripcionPrincipalEstaCerrada()) return false;
+  if (
+    normalizeState(state.group?.estado) !==
+    "ganada"
+  ) {
+    return false;
+  }
 
-  if (!correspondeNuevosIngresosPorFecha()) return false;
+  if (!puedeAbrirCerrarFasesInscripcion()) {
+    return false;
+  }
 
-  // Si NO viene del sistema antiguo, primero debe haber cerrado inscripción inicial.
-  if (!grupoVieneSistemaAntiguo() && !inscripcionInicialYaCerrada()) return false;
+  /*
+    Admin y Supervisión pueden abrir o cerrar
+    esta fase en cualquier fecha.
+  */
+  if (esAdminOSupervisionInscripcion()) {
+    return true;
+  }
+
+  /*
+    Para usuarios normales solamente corresponde
+    antes del 16 de marzo del año del viaje.
+  */
+  if (!correspondeNuevosIngresosPorFecha()) {
+    return false;
+  }
+
+  if (!grupoTieneFlujoBaseDisponible()) {
+    return false;
+  }
 
   return true;
 }
 
 function canGestionarListaEspera() {
-  if (!puedeAbrirCerrarFasesInscripcion()) return false;
-  if (!inscripcionPrincipalEstaCerrada()) return false;
+  if (
+    normalizeState(state.group?.estado) !==
+    "ganada"
+  ) {
+    return false;
+  }
 
-  if (!correspondeListaEsperaPorFecha()) return false;
+  if (!puedeAbrirCerrarFasesInscripcion()) {
+    return false;
+  }
 
-  // Si NO viene del sistema antiguo, primero debe haber cerrado inscripción inicial.
-  if (!grupoVieneSistemaAntiguo() && !inscripcionInicialYaCerrada()) return false;
+  /*
+    Admin y Supervisión pueden abrir o cerrar
+    Lista de espera sin restricción de fecha.
+  */
+  if (esAdminOSupervisionInscripcion()) {
+    return true;
+  }
+
+  /*
+    Usuarios normales:
+    desde el 16 de marzo del año del viaje.
+  */
+  if (!correspondeListaEsperaPorFecha()) {
+    return false;
+  }
+
+  if (!grupoTieneFlujoBaseDisponible()) {
+    return false;
+  }
 
   return true;
 }
 
 function canGestionarLiberados() {
-  if (normalizeState(state.group?.estado) !== "ganada") return false;
-
-  // Sistema antiguo: puede habilitar liberados cuando estime.
-  if (grupoVieneSistemaAntiguo()) {
-    return puedeAbrirCerrarFasesInscripcion();
+  if (
+    normalizeState(state.group?.estado) !==
+    "ganada"
+  ) {
+    return false;
   }
 
-  // Sistema nuevo: primero debe existir o haberse cerrado la inscripción inicial.
-  const yaExisteFlujo =
-    !!state.group?.inscripcionHabilitada ||
-    !!state.group?.tokenInscripcion ||
-    !!state.group?.inscripcion?.tokenActual ||
-    inscripcionInicialYaCerrada();
+  if (!puedeAbrirCerrarFasesInscripcion()) {
+    return false;
+  }
 
-  if (!yaExisteFlujo) return false;
-
-  return puedeAbrirCerrarFasesInscripcion();
+  /*
+    Liberados está disponible en cualquier etapa.
+    No depende de que la inscripción principal esté
+    abierta o cerrada.
+  */
+  return true;
 }
 
 function canConfirmarListaEspera() {
@@ -5461,70 +5598,546 @@ async function cambiarFaseInscripcion(
   }
 }
 
+async function toggleNuevosIngresos() {
+  if (!canGestionarNuevosIngresos()) {
+    alert(
+      "No tienes permisos o Nuevo ingreso no corresponde por fecha."
+    );
+
+    return;
+  }
+
+  const estadoActual =
+    getEstadoNuevosIngresos();
+
+  if (estadoActual.activo) {
+    await cerrarNuevosIngresos();
+    return;
+  }
+
+  await abrirNuevosIngresos();
+}
+
+async function abrirNuevosIngresos() {
+  const token =
+    generateInscripcionToken(32);
+
+  const link =
+    getInscripcionPublicLink(
+      state.groupId,
+      token,
+      "nuevos"
+    );
+
+  const esExcepcion =
+    esAdminOSupervisionInscripcion() &&
+    !correspondeNuevosIngresosPorFecha();
+
+  const ok = confirm(
+    esExcepcion
+      ? "Nuevo ingreso no corresponde actualmente por fecha. ¿Quieres abrirlo como excepción de Admin/Supervisión?"
+      : "¿Quieres abrir Nuevo ingreso y generar un nuevo link?"
+  );
+
+  if (!ok) return;
+
+  await saveGroupPatch(
+    {
+      inscripcionNuevos: {
+        ...(state.group?.inscripcionNuevos || {}),
+
+        activo: true,
+        tokenActual: token,
+        linkActual: link,
+
+        abiertoPor:
+          getDisplayName(state.effectiveUser),
+
+        abiertoPorCorreo:
+          state.effectiveEmail,
+
+        abiertoAt:
+          serverTimestamp(),
+
+        actualizadoPor:
+          getDisplayName(state.effectiveUser),
+
+        actualizadoPorCorreo:
+          state.effectiveEmail,
+
+        actualizadoAt:
+          serverTimestamp(),
+
+        excepcionFecha:
+          esExcepcion
+      }
+    },
+    {
+      tipoMovimiento:
+        "nuevos_ingresos_abiertos",
+
+      modulo:
+        "inscripcion",
+
+      titulo:
+        "Nuevo ingreso abierto",
+
+      mensaje:
+        `${getDisplayName(state.effectiveUser)} abrió el link de Nuevo ingreso.`,
+
+      cambios: [
+        {
+          campo:
+            "inscripcionNuevos.activo",
+
+          anterior:
+            false,
+
+          nuevo:
+            true
+        }
+      ],
+
+      metadata: {
+        excepcionFecha:
+          esExcepcion,
+
+        tokenGenerado:
+          true
+      }
+    }
+  );
+
+  try {
+    await navigator.clipboard.writeText(link);
+
+    showSaveNotice(
+      "Nuevo ingreso abierto y link copiado."
+    );
+  } catch {
+    alert(
+      `Nuevo ingreso abierto.\n\nLink:\n${link}`
+    );
+  }
+}
+
+async function cerrarNuevosIngresos() {
+  const estadoActual =
+    getEstadoNuevosIngresos();
+
+  if (!estadoActual.activo) return;
+
+  const ok = confirm(
+    "¿Quieres cerrar el link de Nuevo ingreso?"
+  );
+
+  if (!ok) return;
+
+  await saveGroupPatch(
+    {
+      inscripcionNuevos: {
+        ...(state.group?.inscripcionNuevos || {}),
+
+        activo: false,
+
+        cerradoPor:
+          getDisplayName(state.effectiveUser),
+
+        cerradoPorCorreo:
+          state.effectiveEmail,
+
+        cerradoAt:
+          serverTimestamp(),
+
+        actualizadoPor:
+          getDisplayName(state.effectiveUser),
+
+        actualizadoPorCorreo:
+          state.effectiveEmail,
+
+        actualizadoAt:
+          serverTimestamp()
+      }
+    },
+    {
+      tipoMovimiento:
+        "nuevos_ingresos_cerrados",
+
+      modulo:
+        "inscripcion",
+
+      titulo:
+        "Nuevo ingreso cerrado",
+
+      mensaje:
+        `${getDisplayName(state.effectiveUser)} cerró el link de Nuevo ingreso.`,
+
+      cambios: [
+        {
+          campo:
+            "inscripcionNuevos.activo",
+
+          anterior:
+            true,
+
+          nuevo:
+            false
+        }
+      ]
+    }
+  );
+
+  showSaveNotice(
+    "Nuevo ingreso cerrado correctamente."
+  );
+}
+
+async function toggleListaEspera() {
+  if (!canGestionarListaEspera()) {
+    alert(
+      "No tienes permisos o Lista de espera no corresponde por fecha."
+    );
+
+    return;
+  }
+
+  const estadoActual =
+    getEstadoListaEsperaLink();
+
+  if (estadoActual.activo) {
+    await cerrarListaEspera();
+    return;
+  }
+
+  await abrirListaEspera();
+}
+
+async function abrirListaEspera() {
+  const token =
+    generateInscripcionToken(32);
+
+  const link =
+    getInscripcionPublicLink(
+      state.groupId,
+      token,
+      "lista_espera"
+    );
+
+  const esExcepcion =
+    esAdminOSupervisionInscripcion() &&
+    !correspondeListaEsperaPorFecha();
+
+  const ok = confirm(
+    esExcepcion
+      ? "Lista de espera todavía no corresponde por fecha. ¿Quieres abrirla como excepción de Admin/Supervisión?"
+      : "¿Quieres abrir Lista de espera y generar un nuevo link?"
+  );
+
+  if (!ok) return;
+
+  await saveGroupPatch(
+    {
+      inscripcionListaEspera: {
+        ...(state.group?.inscripcionListaEspera || {}),
+
+        activo: true,
+        tokenActual: token,
+        linkActual: link,
+
+        abiertoPor:
+          getDisplayName(state.effectiveUser),
+
+        abiertoPorCorreo:
+          state.effectiveEmail,
+
+        abiertoAt:
+          serverTimestamp(),
+
+        actualizadoPor:
+          getDisplayName(state.effectiveUser),
+
+        actualizadoPorCorreo:
+          state.effectiveEmail,
+
+        actualizadoAt:
+          serverTimestamp(),
+
+        excepcionFecha:
+          esExcepcion
+      }
+    },
+    {
+      tipoMovimiento:
+        "lista_espera_abierta",
+
+      modulo:
+        "inscripcion",
+
+      titulo:
+        "Lista de espera abierta",
+
+      mensaje:
+        `${getDisplayName(state.effectiveUser)} abrió el link de Lista de espera.`,
+
+      cambios: [
+        {
+          campo:
+            "inscripcionListaEspera.activo",
+
+          anterior:
+            false,
+
+          nuevo:
+            true
+        }
+      ],
+
+      metadata: {
+        excepcionFecha:
+          esExcepcion,
+
+        tokenGenerado:
+          true
+      }
+    }
+  );
+
+  try {
+    await navigator.clipboard.writeText(link);
+
+    showSaveNotice(
+      "Lista de espera abierta y link copiado."
+    );
+  } catch {
+    alert(
+      `Lista de espera abierta.\n\nLink:\n${link}`
+    );
+  }
+}
+
+async function cerrarListaEspera() {
+  const estadoActual =
+    getEstadoListaEsperaLink();
+
+  if (!estadoActual.activo) return;
+
+  const ok = confirm(
+    "¿Quieres cerrar el link de Lista de espera?"
+  );
+
+  if (!ok) return;
+
+  await saveGroupPatch(
+    {
+      inscripcionListaEspera: {
+        ...(state.group?.inscripcionListaEspera || {}),
+
+        activo: false,
+
+        cerradoPor:
+          getDisplayName(state.effectiveUser),
+
+        cerradoPorCorreo:
+          state.effectiveEmail,
+
+        cerradoAt:
+          serverTimestamp(),
+
+        actualizadoPor:
+          getDisplayName(state.effectiveUser),
+
+        actualizadoPorCorreo:
+          state.effectiveEmail,
+
+        actualizadoAt:
+          serverTimestamp()
+      }
+    },
+    {
+      tipoMovimiento:
+        "lista_espera_cerrada",
+
+      modulo:
+        "inscripcion",
+
+      titulo:
+        "Lista de espera cerrada",
+
+      mensaje:
+        `${getDisplayName(state.effectiveUser)} cerró el link de Lista de espera.`,
+
+      cambios: [
+        {
+          campo:
+            "inscripcionListaEspera.activo",
+
+          anterior:
+            true,
+
+          nuevo:
+            false
+        }
+      ]
+    }
+  );
+
+  showSaveNotice(
+    "Lista de espera cerrada correctamente."
+  );
+}
+
 async function crearLinkLiberados() {
   if (!canGestionarLiberados()) {
     alert(getBlockedInscripcionMessage());
     return;
   }
 
-  if (normalizeState(state.group?.estado) !== "ganada") {
-    alert("El link de liberados solo se puede crear cuando el grupo está en estado GANADA.");
+  const estadoActual =
+    getEstadoLiberadosLink();
+
+  /*
+    Si está abierto, el mismo botón lo cierra.
+  */
+  if (estadoActual.activo) {
+    const okCerrar = confirm(
+      "¿Quieres cerrar el link de cupos liberados?"
+    );
+
+    if (!okCerrar) return;
+
+    await saveGroupPatch(
+      {
+        linkLiberadosActivo: false,
+
+        inscripcionLiberados: {
+          ...(state.group?.inscripcionLiberados || {}),
+
+          activo: false,
+
+          cerradoPor:
+            getDisplayName(state.effectiveUser),
+
+          cerradoPorCorreo:
+            state.effectiveEmail,
+
+          cerradoAt:
+            serverTimestamp(),
+
+          actualizadoPor:
+            getDisplayName(state.effectiveUser),
+
+          actualizadoPorCorreo:
+            state.effectiveEmail,
+
+          actualizadoAt:
+            serverTimestamp()
+        }
+      },
+      {
+        tipoMovimiento:
+          "inscripcion_liberados_cerrada",
+
+        modulo:
+          "inscripcion",
+
+        titulo:
+          "Link de liberados cerrado",
+
+        mensaje:
+          `${getDisplayName(state.effectiveUser)} cerró el link para cupos liberados.`,
+
+        cambios: [
+          {
+            campo:
+              "linkLiberadosActivo",
+
+            anterior:
+              true,
+
+            nuevo:
+              false
+          }
+        ]
+      }
+    );
+
+    showSaveNotice(
+      "Link de liberados cerrado."
+    );
+
     return;
   }
 
-  const permitidos = getLiberadosPermitidos();
-  const usados = getLiberadosUsados();
+  const token =
+    generateInscripcionToken(32);
 
-  if (permitidos && usados >= permitidos) {
-    const okCupo = confirm(
-      `Ya están usados ${usados} de ${permitidos} cupos liberados. ¿Quieres generar el link de todas formas?`
+  const link =
+    getInscripcionPublicLink(
+      state.groupId,
+      token,
+      "liberado"
     );
-    if (!okCupo) return;
-  }
 
-  const tokenLiberados = generateInscripcionToken(32);
-  const link = getInscripcionPublicLink(state.groupId, tokenLiberados, "liberado");
+  const ok = confirm(
+    "¿Quieres abrir el link para cupos liberados?"
+  );
 
-  const ok = confirm("¿Quieres crear/regenerar el link para cupos liberados?");
   if (!ok) return;
 
   await saveGroupPatch(
     {
       linkLiberadosActivo: true,
-      tokenInscripcionLiberados: tokenLiberados,
+      tokenInscripcionLiberados: token,
 
       inscripcionLiberados: {
         ...(state.group?.inscripcionLiberados || {}),
+
         activo: true,
-        tokenActual: tokenLiberados,
+        tokenActual: token,
         linkActual: link,
-        tipoInscripcionActual: "liberado",
-        estadoCupoActual: "confirmado",
 
-        actualizadoPor: getDisplayName(state.effectiveUser),
-        actualizadoPorCorreo: state.effectiveEmail,
-        actualizadoAt: serverTimestamp(),
+        abiertoPor:
+          getDisplayName(state.effectiveUser),
 
-        linkGeneradoPor: state.group?.inscripcionLiberados?.linkGeneradoPor || getDisplayName(state.effectiveUser),
-        linkGeneradoPorCorreo: state.group?.inscripcionLiberados?.linkGeneradoPorCorreo || state.effectiveEmail,
-        linkGeneradoAt: state.group?.inscripcionLiberados?.linkGeneradoAt || serverTimestamp()
+        abiertoPorCorreo:
+          state.effectiveEmail,
+
+        abiertoAt:
+          serverTimestamp(),
+
+        actualizadoPor:
+          getDisplayName(state.effectiveUser),
+
+        actualizadoPorCorreo:
+          state.effectiveEmail,
+
+        actualizadoAt:
+          serverTimestamp()
       }
     },
     {
-      tipoMovimiento: "inscripcion_liberados_habilitada",
-      modulo: "inscripcion",
-      titulo: "Link de liberados habilitado",
-      mensaje: `${getDisplayName(state.effectiveUser)} creó/regeneró el link para cupos liberados.`,
+      tipoMovimiento:
+        "inscripcion_liberados_habilitada",
+
+      modulo:
+        "inscripcion",
+
+      titulo:
+        "Link de liberados abierto",
+
+      mensaje:
+        `${getDisplayName(state.effectiveUser)} abrió el link para cupos liberados.`,
+
       cambios: [
         {
-          campo: "tokenInscripcionLiberados",
-          anterior: state.group?.tokenInscripcionLiberados || "",
-          nuevo: tokenLiberados
-        },
-        {
-          campo: "linkLiberadosActivo",
-          anterior: !!state.group?.linkLiberadosActivo,
-          nuevo: true
+          campo:
+            "linkLiberadosActivo",
+
+          anterior:
+            false,
+
+          nuevo:
+            true
         }
       ]
     }
@@ -5532,10 +6145,14 @@ async function crearLinkLiberados() {
 
   try {
     await navigator.clipboard.writeText(link);
-    showSaveNotice("Link de liberados creado y copiado.");
+
+    showSaveNotice(
+      "Link de liberados abierto y copiado."
+    );
   } catch {
-    showSaveNotice("Link de liberados creado correctamente.");
-    alert(`Link liberados:\n\n${link}`);
+    alert(
+      `Link de liberados:\n\n${link}`
+    );
   }
 }
 
@@ -8851,6 +9468,34 @@ function ensureBotonCorreosInscripcion() {
   btnCerrar.insertAdjacentElement("afterend", btn);
 }
 
+function tieneBotonVisible(contenedorId) {
+  const contenedor = $(contenedorId);
+
+  if (!contenedor) return false;
+
+  return [
+    ...contenedor.querySelectorAll("button")
+  ].some((btn) => {
+    return !btn.classList.contains("hidden");
+  });
+}
+
+[
+  "bloqueEstadoInscripcion",
+  "bloqueEnlacesPasajeros",
+  "bloqueGestionNomina",
+  "bloqueComunicacionesArchivos",
+  "bloqueAccionesAvanzadas"
+].forEach((id) => {
+  const bloque = $(id);
+  if (!bloque) return;
+
+  bloque.classList.toggle(
+    "hidden",
+    !tieneBotonVisible(id)
+  );
+});
+
 function syncButtons() {
   ensureBotonCorreosInscripcion();
   const editable = canEditGroup();
@@ -8976,35 +9621,70 @@ function syncButtons() {
     btnCorreosInscripcion.classList.toggle("hidden", !puedeCorreo);
   }
 
+  const estadoNuevos =
+    getEstadoNuevosIngresos();
+  
+  const estadoListaEspera =
+    getEstadoListaEsperaLink();
+  
+  const estadoLiberados =
+    getEstadoLiberadosLink();
+  
   if (btnAbrirNuevosInscritos) {
-    btnAbrirNuevosInscritos.disabled = !puedeNuevos;
-
-    if (!inscripcionPrincipalEstaCerrada()) {
-      btnAbrirNuevosInscritos.textContent = "Nuevos ingresos (cerrar link activo primero)";
-    } else if (!correspondeNuevosIngresosPorFecha()) {
-      btnAbrirNuevosInscritos.textContent = "Nuevos ingresos no corresponde por fecha";
-    } else {
-      btnAbrirNuevosInscritos.textContent = "Abrir nuevos ingresos";
-    }
+    const mostrarNuevos =
+      puedeNuevos ||
+      estadoNuevos.activo;
+  
+    btnAbrirNuevosInscritos.classList.toggle(
+      "hidden",
+      !mostrarNuevos
+    );
+  
+    btnAbrirNuevosInscritos.disabled =
+      !puedeNuevos;
+  
+    btnAbrirNuevosInscritos.textContent =
+      estadoNuevos.activo
+        ? "Cerrar nuevos ingresos"
+        : "Abrir nuevos ingresos";
   }
-
+  
   if (btnAbrirListaEspera) {
-    btnAbrirListaEspera.disabled = !puedeListaEspera;
-
-    if (!inscripcionPrincipalEstaCerrada()) {
-      btnAbrirListaEspera.textContent = "Lista de espera (cerrar link activo primero)";
-    } else if (!correspondeListaEsperaPorFecha()) {
-      btnAbrirListaEspera.textContent = "Lista de espera aún no corresponde";
-    } else {
-      btnAbrirListaEspera.textContent = "Abrir lista de espera";
-    }
+    const mostrarLista =
+      puedeListaEspera ||
+      estadoListaEspera.activo;
+  
+    btnAbrirListaEspera.classList.toggle(
+      "hidden",
+      !mostrarLista
+    );
+  
+    btnAbrirListaEspera.disabled =
+      !puedeListaEspera;
+  
+    btnAbrirListaEspera.textContent =
+      estadoListaEspera.activo
+        ? "Cerrar lista de espera"
+        : "Abrir lista de espera";
   }
-
+  
   if (btnCrearLinkLiberados) {
-    btnCrearLinkLiberados.disabled = !puedeLiberados;
-    btnCrearLinkLiberados.textContent = state.group?.linkLiberadosActivo
-      ? "Regenerar link liberados"
-      : "Crear link liberados";
+    const mostrarLiberados =
+      puedeLiberados ||
+      estadoLiberados.activo;
+  
+    btnCrearLinkLiberados.classList.toggle(
+      "hidden",
+      !mostrarLiberados
+    );
+  
+    btnCrearLinkLiberados.disabled =
+      !puedeLiberados;
+  
+    btnCrearLinkLiberados.textContent =
+      estadoLiberados.activo
+        ? "Cerrar link liberados"
+        : "Crear link liberados";
   }
 
   if (btnExportarInscripcionesExcel) {
@@ -10284,9 +10964,23 @@ function bindEvents() {
       }
     );
   $("btnCerrarInscripcion")?.addEventListener("click", cerrarInscripcion);
-  $("btnAbrirNuevosInscritos")?.addEventListener("click", () => cambiarFaseInscripcion("nuevos"));
-  $("btnAbrirListaEspera")?.addEventListener("click", () => cambiarFaseInscripcion("lista_espera"));
-  $("btnCrearLinkLiberados")?.addEventListener("click", crearLinkLiberados);
+  $("btnAbrirNuevosInscritos")
+    ?.addEventListener(
+      "click",
+      toggleNuevosIngresos
+    );
+  
+  $("btnAbrirListaEspera")
+    ?.addEventListener(
+      "click",
+      toggleListaEspera
+    );
+  
+  $("btnCrearLinkLiberados")
+    ?.addEventListener(
+      "click",
+      crearLinkLiberados
+    );
   $("btnCopiarLinkInscripcion")?.addEventListener("click", copyGroupInscripcionLink);
 
   document.addEventListener("click", async (event) => {
