@@ -125,12 +125,17 @@
     }
 
     .summary-card {
+      appearance: none;
+      width: 100%;
+      min-width: 0;
       background: #fff;
       border: 1px solid #ddd5e4;
       border-radius: 14px;
       padding: 16px;
+      text-align: left;
+      font: inherit;
     }
-
+    
     .summary-card span {
       display: block;
       font-size: 12px;
@@ -138,12 +143,57 @@
       color: #756b80;
       font-weight: 800;
     }
-
+    
     .summary-card strong {
       display: block;
       margin-top: 6px;
       font-size: 28px;
       color: #2b1940;
+    }
+    
+    .summary-card small {
+      display: block;
+      margin-top: 5px;
+      color: #85798e;
+      font-size: 10px;
+      font-weight: 700;
+    }
+    
+    button.summary-card {
+      cursor: pointer;
+      transition:
+        transform .15s ease,
+        border-color .15s ease,
+        box-shadow .15s ease,
+        background .15s ease;
+    }
+    
+    button.summary-card:hover,
+    button.summary-card:focus-visible {
+      transform: translateY(-1px);
+      border-color: #8b6ca4;
+      box-shadow:
+        0 7px 18px
+        rgba(
+          43,
+          25,
+          64,
+          .09
+        );
+      outline: none;
+    }
+    
+    button.summary-card.active {
+      border-color: #4a2570;
+      background: #eee5f5;
+      box-shadow:
+        0 0 0 3px
+        rgba(
+          74,
+          37,
+          112,
+          .13
+        );
     }
 
     .operations-block {
@@ -1122,36 +1172,118 @@
         </button>
       </div>
 
-      <section class="summary">
+      <section
+        class="summary"
+        id="summaryGestionNomina"
+      >
+        <button
+          class="summary-card summary-filter"
+          type="button"
+          data-summary-filter="todos"
+          title="Mostrar todos los grupos"
+        >
+          <span>
+            Grupos
+          </span>
+      
+          <strong id="sumGrupos">
+            0
+          </strong>
+      
+          <small>
+            Mostrar todos
+          </small>
+        </button>
+      
         <div class="summary-card">
-          <span>Grupos</span>
-          <strong id="sumGrupos">0</strong>
+          <span>
+            Pasajeros
+          </span>
+      
+          <strong id="sumPax">
+            0
+          </strong>
+      
+          <small>
+            Total visible
+          </small>
         </div>
-
-        <div class="summary-card">
-          <span>Pasajeros</span>
-          <strong id="sumPax">0</strong>
-        </div>
-
-        <div class="summary-card">
-          <span>Fichas pendientes</span>
-          <strong id="sumPendientes">0</strong>
-        </div>
-
-        <div class="summary-card">
-          <span>Sin carnet</span>
-          <strong id="sumSinCarnet">0</strong>
-        </div>
-
-        <div class="summary-card">
-          <span>Links activos</span>
-          <strong id="sumLinks">0</strong>
-        </div>
-
-        <div class="summary-card">
-          <span>Archivadas</span>
-          <strong id="sumArchivadas">0</strong>
-        </div>
+      
+        <button
+          class="summary-card summary-filter"
+          type="button"
+          data-summary-filter="pendiente"
+          title="Mostrar grupos con fichas pendientes"
+        >
+          <span>
+            Fichas pendientes
+          </span>
+      
+          <strong id="sumPendientes">
+            0
+          </strong>
+      
+          <small>
+            Ver grupos
+          </small>
+        </button>
+      
+        <button
+          class="summary-card summary-filter"
+          type="button"
+          data-summary-filter="sin_carnet"
+          title="Mostrar grupos con pasajeros sin carnet"
+        >
+          <span>
+            Sin carnet
+          </span>
+      
+          <strong id="sumSinCarnet">
+            0
+          </strong>
+      
+          <small>
+            Ver grupos
+          </small>
+        </button>
+      
+        <button
+          class="summary-card summary-filter"
+          type="button"
+          data-summary-filter="link_activo"
+          title="Mostrar grupos con links activos"
+        >
+          <span>
+            Links activos
+          </span>
+      
+          <strong id="sumLinks">
+            0
+          </strong>
+      
+          <small>
+            Ver grupos
+          </small>
+        </button>
+      
+        <button
+          class="summary-card summary-filter"
+          type="button"
+          data-summary-filter="archivada"
+          title="Mostrar nóminas archivadas"
+        >
+          <span>
+            Archivadas
+          </span>
+      
+          <strong id="sumArchivadas">
+            0
+          </strong>
+      
+          <small>
+            Ver grupos
+          </small>
+        </button>
       </section>
 
       <section class="operations-block">
@@ -1232,7 +1364,10 @@
         </div>
       </section>
 
-      <div class="table-card">
+      <div
+        class="table-card"
+        id="tablaGruposGestion"
+      >
         <div class="table-wrap">
           <table class="main-table">
             <thead>
@@ -1372,6 +1507,7 @@
         id="modalContenido"
         class="modal-content hidden"
       >
+
         <div class="modal-toolbar">
           <button
             id="btnAbrirGrupo"
@@ -1380,7 +1516,23 @@
           >
             Abrir grupo
           </button>
-
+        
+          <button
+            id="btnGestionarFichasMedicas"
+            class="btn-primary"
+            type="button"
+          >
+            Gestionar fichas médicas
+          </button>
+        
+          <button
+            id="btnVerFichasGrupo"
+            class="btn-secondary"
+            type="button"
+          >
+            Ver fichas del grupo
+          </button>
+        
           <button
             id="btnGestionarPulseras"
             class="btn-primary"
@@ -1388,7 +1540,7 @@
           >
             Gestionar pulseras NFC
           </button>
-
+        
           <button
             id="btnExportarCsv"
             class="btn-secondary"
@@ -1396,7 +1548,7 @@
           >
             Exportar CSV
           </button>
-
+        
           <button
             id="btnCargadoPagos"
             class="btn-primary"
@@ -1404,7 +1556,7 @@
           >
             Marcar cargado a pagos
           </button>
-
+        
           <button
             id="btnArchivar"
             class="btn-secondary"
@@ -1412,7 +1564,7 @@
           >
             Archivar nómina
           </button>
-
+        
           <button
             id="btnResetear"
             class="btn-danger"
