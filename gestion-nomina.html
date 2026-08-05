@@ -371,22 +371,100 @@
       margin-bottom: 18px;
     }
 
+    .kpi-blocks {
+      display: grid;
+      gap: 14px;
+    }
+    
+    .kpi-block {
+      padding: 14px;
+      border: 1px solid #e2d9e8;
+      border-radius: 16px;
+      background: #faf8fc;
+    }
+    
+    .kpi-block.general {
+      background: #f7f3fa;
+    }
+    
+    .kpi-block.inscripciones {
+      background: #fffaf0;
+      border-color: #ead8aa;
+    }
+    
+    .kpi-block.sistema-pagos {
+      background: #f1f8f3;
+      border-color: #cfe2d4;
+    }
+    
+    .kpi-block-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 14px;
+      align-items: flex-start;
+      margin-bottom: 11px;
+    }
+    
+    .kpi-block-head h3 {
+      margin: 0;
+      color: #2b1940;
+      font-size: 15px;
+    }
+    
+    .kpi-block-head p {
+      margin: 3px 0 0;
+      color: #776b83;
+      font-size: 12px;
+    }
+    
     .kpi-grid {
       display: grid;
-      grid-template-columns: repeat(6, minmax(0, 1fr));
       gap: 10px;
     }
-
+    
+    .kpi-grid.general {
+      grid-template-columns:
+        repeat(
+          6,
+          minmax(0, 1fr)
+        );
+    }
+    
+    .kpi-grid.inscripciones {
+      grid-template-columns:
+        repeat(
+          6,
+          minmax(0, 1fr)
+        );
+    }
+    
+    .kpi-grid.sistema-pagos {
+      grid-template-columns:
+        repeat(
+          2,
+          minmax(0, 240px)
+        );
+    }
+    
     .kpi {
       appearance: none;
       width: 100%;
-      padding: 14px;
-      border-radius: 14px;
-      background: #f8f5fb;
+      min-width: 0;
+      padding: 13px;
       border: 1px solid #e6deec;
+      border-radius: 14px;
+      background: #fff;
       text-align: left;
     }
-
+    
+    .kpi-block.inscripciones .kpi {
+      border-color: #e8d9b5;
+    }
+    
+    .kpi-block.sistema-pagos .kpi {
+      border-color: #d3e4d7;
+    }
+    
     button.kpi {
       cursor: pointer;
       transition:
@@ -394,31 +472,56 @@
         border-color .15s ease,
         box-shadow .15s ease;
     }
-
+    
     button.kpi:hover,
     button.kpi:focus-visible {
       transform: translateY(-1px);
       border-color: #8a6ca1;
-      box-shadow: 0 7px 18px rgba(43, 25, 64, .09);
+      box-shadow:
+        0 7px 18px
+        rgba(
+          43,
+          25,
+          64,
+          .09
+        );
       outline: none;
     }
-
+    
     button.kpi.active {
       border-color: #4a2570;
-      box-shadow: 0 0 0 3px rgba(74, 37, 112, .13);
+      box-shadow:
+        0 0 0 3px
+        rgba(
+          74,
+          37,
+          112,
+          .13
+        );
     }
-
-    .kpi-grid.secondary {
-      grid-template-columns: repeat(8, minmax(0, 1fr));
-      margin-top: 10px;
+    
+    .kpi span {
+      display: block;
+      color: #776b83;
+      font-size: 10px;
+      line-height: 1.2;
+      font-weight: 900;
+      text-transform: uppercase;
     }
-
-    .kpi-grid.secondary .kpi {
-      padding: 12px;
+    
+    .kpi strong {
+      display: block;
+      margin-top: 6px;
+      color: #2b1940;
+      font-size: 24px;
     }
-
-    .kpi-grid.secondary .kpi strong {
-      font-size: 21px;
+    
+    .kpi-help {
+      display: block;
+      margin-top: 4px;
+      color: #8a7e93;
+      font-size: 10px;
+      line-height: 1.25;
     }
 
     .nomina-filter-bar {
@@ -883,12 +986,21 @@
         grid-template-columns: repeat(3, 1fr);
       }
 
-      .kpi-grid {
-        grid-template-columns: repeat(3, 1fr);
+      .kpi-grid.general,
+      .kpi-grid.inscripciones {
+        grid-template-columns:
+          repeat(
+            3,
+            minmax(0, 1fr)
+          );
       }
-
-      .kpi-grid.secondary {
-        grid-template-columns: repeat(4, 1fr);
+      
+      .kpi-grid.sistema-pagos {
+        grid-template-columns:
+          repeat(
+            2,
+            minmax(0, 1fr)
+          );
       }
     }
 
@@ -910,13 +1022,19 @@
       .gestion-page {
         padding: 14px;
       }
-
+    
       .toolbar,
       .summary,
-      .kpi-grid,
+      .kpi-grid.general,
+      .kpi-grid.inscripciones,
+      .kpi-grid.sistema-pagos,
       .phase-grid,
       .alerts-toolbar {
         grid-template-columns: 1fr;
+      }
+    
+      .kpi-block-head {
+        display: block;
       }
     }
   </style>
@@ -1280,136 +1398,258 @@
 
         <section
           id="modalKpisNomina"
+          class="kpi-blocks"
         >
-          <div class="kpi-grid">
-            <button
-              class="kpi"
-              type="button"
-              data-nomina-filtro="todos"
-            >
-              <span>Total inscritos</span>
-              <strong id="kTotal">0</strong>
-            </button>
-
-            <button
-              class="kpi"
-              type="button"
-              data-nomina-filtro="viajan"
-            >
-              <span>Viajan confirmados</span>
-              <strong id="kViajan">0</strong>
-            </button>
-
-            <button
-              class="kpi"
-              type="button"
-              data-nomina-filtro="gestion"
-            >
-              <span>Pendientes de gestión</span>
-              <strong id="kGestion">0</strong>
-            </button>
-
-            <button
-              class="kpi"
-              type="button"
-              data-nomina-filtro="anulados"
-            >
-              <span>Anulados</span>
-              <strong id="kAnulados">0</strong>
-            </button>
-
-            <button
-              class="kpi"
-              type="button"
-              data-nomina-filtro="ficha_pendiente"
-            >
-              <span>Ficha pendiente</span>
-              <strong id="kFichaPendiente">0</strong>
-            </button>
-
-            <button
-              class="kpi"
-              type="button"
-              data-nomina-filtro="sin_carnet"
-            >
-              <span>Sin carnet</span>
-              <strong id="kSinCarnet">0</strong>
-            </button>
-          </div>
-
-          <div class="kpi-grid secondary">
-            <button
-              class="kpi"
-              type="button"
-              data-nomina-filtro="lista_confirmada"
-            >
-              <span>LE confirmada</span>
-              <strong id="kListaConfirmada">0</strong>
-            </button>
-
-            <button
-              class="kpi"
-              type="button"
-              data-nomina-filtro="nuevo_confirmado"
-            >
-              <span>Nuevo confirmado</span>
-              <strong id="kNuevoConfirmado">0</strong>
-            </button>
-
-            <button
-              class="kpi"
-              type="button"
-              data-nomina-filtro="liberado"
-            >
-              <span>Liberados</span>
-              <strong id="kLiberados">0</strong>
-            </button>
-
-            <button
-              class="kpi"
-              type="button"
-              data-nomina-filtro="sistema_completo"
-            >
-              <span>SP ficha completa</span>
-              <strong id="kSistemaCompleto">0</strong>
-            </button>
-
-            <button
-              class="kpi"
-              type="button"
-              data-nomina-filtro="sistema_pendiente"
-            >
-              <span>SP ficha pendiente</span>
-              <strong id="kSistemaPendiente">0</strong>
-            </button>
-
-            <button
-              class="kpi"
-              type="button"
-              data-nomina-filtro="nuevo_pendiente"
-            >
-              <span>Nuevo pendiente</span>
-              <strong id="kNuevoPendiente">0</strong>
-            </button>
-
-            <button
-              class="kpi"
-              type="button"
-              data-nomina-filtro="lista_pagada"
-            >
-              <span>LE pagada</span>
-              <strong id="kListaPagada">0</strong>
-            </button>
-
-            <button
-              class="kpi"
-              type="button"
-              data-nomina-filtro="lista_pendiente"
-            >
-              <span>LE pendiente</span>
-              <strong id="kListaPendiente">0</strong>
-            </button>
-          </div>
+          <!-- BLOQUE 1: PANORAMA GENERAL -->
+          <section class="kpi-block general">
+            <div class="kpi-block-head">
+              <div>
+                <h3>
+                  Resumen general de la nómina
+                </h3>
+        
+                <p>
+                  Panorama completo de pasajeros, pendientes y documentos.
+                </p>
+              </div>
+            </div>
+        
+            <div class="kpi-grid general">
+              <button
+                class="kpi"
+                type="button"
+                data-nomina-filtro="todos"
+              >
+                <span>
+                  Total inscritos
+                </span>
+        
+                <strong id="kTotal">
+                  0
+                </strong>
+              </button>
+        
+              <button
+                class="kpi"
+                type="button"
+                data-nomina-filtro="viajan"
+              >
+                <span>
+                  Viajan confirmados
+                </span>
+        
+                <strong id="kViajan">
+                  0
+                </strong>
+              </button>
+        
+              <button
+                class="kpi"
+                type="button"
+                data-nomina-filtro="gestion"
+              >
+                <span>
+                  Pendientes de gestión
+                </span>
+        
+                <strong id="kGestion">
+                  0
+                </strong>
+              </button>
+        
+              <button
+                class="kpi"
+                type="button"
+                data-nomina-filtro="anulados"
+              >
+                <span>
+                  Anulados
+                </span>
+        
+                <strong id="kAnulados">
+                  0
+                </strong>
+              </button>
+        
+              <button
+                class="kpi"
+                type="button"
+                data-nomina-filtro="ficha_pendiente"
+              >
+                <span>
+                  Ficha médica pendiente
+                </span>
+        
+                <strong id="kFichaPendiente">
+                  0
+                </strong>
+        
+                <small class="kpi-help">
+                  Corresponde principalmente a Sistema de Pagos.
+                </small>
+              </button>
+        
+              <button
+                class="kpi"
+                type="button"
+                data-nomina-filtro="sin_carnet"
+              >
+                <span>
+                  Sin carnet
+                </span>
+        
+                <strong id="kSinCarnet">
+                  0
+                </strong>
+              </button>
+            </div>
+          </section>
+        
+          <!-- BLOQUE 2: NUEVOS INGRESOS Y CUPOS -->
+          <section class="kpi-block inscripciones">
+            <div class="kpi-block-head">
+              <div>
+                <h3>
+                  Nuevos ingresos y cupos
+                </h3>
+        
+                <p>
+                  Estado administrativo de nuevos ingresos, listas de espera y liberados.
+                </p>
+              </div>
+            </div>
+        
+            <div class="kpi-grid inscripciones">
+              <button
+                class="kpi"
+                type="button"
+                data-nomina-filtro="nuevo_pendiente"
+              >
+                <span>
+                  Nuevo ingreso pendiente
+                </span>
+        
+                <strong id="kNuevoPendiente">
+                  0
+                </strong>
+              </button>
+        
+              <button
+                class="kpi"
+                type="button"
+                data-nomina-filtro="nuevo_confirmado"
+              >
+                <span>
+                  Nuevo ingreso confirmado
+                </span>
+        
+                <strong id="kNuevoConfirmado">
+                  0
+                </strong>
+              </button>
+        
+              <button
+                class="kpi"
+                type="button"
+                data-nomina-filtro="lista_pendiente"
+              >
+                <span>
+                  Lista de espera pendiente
+                </span>
+        
+                <strong id="kListaPendiente">
+                  0
+                </strong>
+              </button>
+        
+              <button
+                class="kpi"
+                type="button"
+                data-nomina-filtro="lista_pagada"
+              >
+                <span>
+                  Lista de espera pagada
+                </span>
+        
+                <strong id="kListaPagada">
+                  0
+                </strong>
+              </button>
+        
+              <button
+                class="kpi"
+                type="button"
+                data-nomina-filtro="lista_confirmada"
+              >
+                <span>
+                  Lista de espera confirmada
+                </span>
+        
+                <strong id="kListaConfirmada">
+                  0
+                </strong>
+              </button>
+        
+              <button
+                class="kpi"
+                type="button"
+                data-nomina-filtro="liberado"
+              >
+                <span>
+                  Cupos liberados
+                </span>
+        
+                <strong id="kLiberados">
+                  0
+                </strong>
+              </button>
+            </div>
+          </section>
+        
+          <!-- BLOQUE 3: SISTEMA DE PAGOS -->
+          <section class="kpi-block sistema-pagos">
+            <div class="kpi-block-head">
+              <div>
+                <h3>
+                  Sistema de Pagos · Ficha médica
+                </h3>
+        
+                <p>
+                  Solo los pasajeros importados desde Sistema de Pagos pueden tener su ficha médica pendiente.
+                </p>
+              </div>
+            </div>
+        
+            <div class="kpi-grid sistema-pagos">
+              <button
+                class="kpi"
+                type="button"
+                data-nomina-filtro="sistema_completo"
+              >
+                <span>
+                  SP con ficha completa
+                </span>
+        
+                <strong id="kSistemaCompleto">
+                  0
+                </strong>
+              </button>
+        
+              <button
+                class="kpi"
+                type="button"
+                data-nomina-filtro="sistema_pendiente"
+              >
+                <span>
+                  SP con ficha pendiente
+                </span>
+        
+                <strong id="kSistemaPendiente">
+                  0
+                </strong>
+              </button>
+            </div>
+          </section>
         </section>
 
         <section class="modal-section">
