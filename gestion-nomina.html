@@ -499,7 +499,7 @@
     }
 
     .passenger-table {
-      min-width: 1300px;
+      min-width: 1480px;
     }
 
     .alerts-table {
@@ -621,6 +621,39 @@
       display: flex;
       gap: 7px;
       flex-wrap: wrap;
+    }
+
+    .passenger-row-actions {
+      display: flex;
+      min-width: 150px;
+      gap: 7px;
+      flex-wrap: wrap;
+    }
+
+    .passenger-action-btn {
+      min-height: 36px;
+      padding: 7px 11px;
+      border: 0;
+      border-radius: 9px;
+      color: #fff;
+      font-size: 11px;
+      line-height: 1.2;
+      font-weight: 900;
+      cursor: pointer;
+      white-space: normal;
+    }
+
+    .passenger-action-btn.action-confirm {
+      background: #16803c;
+    }
+
+    .passenger-action-btn.action-paid {
+      background: #d97706;
+    }
+
+    .passenger-action-btn:disabled {
+      opacity: .48;
+      cursor: wait;
     }
 
     .modal-open {
@@ -1212,13 +1245,14 @@
                   <th>Correo</th>
                   <th>Teléfono</th>
                   <th>Carnet</th>
+                  <th>Gestión</th>
                 </tr>
               </thead>
 
               <tbody id="pasajerosTbody">
                 <tr>
                   <td
-                    colspan="10"
+                    colspan="11"
                     class="gn-empty"
                   >
                     No hay pasajeros cargados.
