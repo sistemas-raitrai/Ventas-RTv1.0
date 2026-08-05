@@ -64,7 +64,10 @@ const state = {
 
   alertaListadoActual: [],
   alertaTipoActual: "",
-  pasajeroFocoId: ""
+  pasajeroFocoId: "",
+
+  // Filtro aplicado dentro del modal de nómina.
+  nominaFiltro: "todos"
 };
 
 init();
@@ -360,6 +363,40 @@ function bindEvents() {
     ?.addEventListener(
       "input",
       renderListadoAlertas
+    );
+
+  $("modalKpisNomina")
+    ?.addEventListener(
+      "click",
+      (event) => {
+        const card =
+          event.target.closest(
+            "[data-nomina-filtro]"
+          );
+
+        if (!card) {
+          return;
+        }
+
+        state.nominaFiltro =
+          card.dataset.nominaFiltro ||
+          "todos";
+
+        renderKpisModal();
+        renderPasajeros();
+      }
+    );
+
+  $("btnMostrarTodaNomina")
+    ?.addEventListener(
+      "click",
+      () => {
+        state.nominaFiltro =
+          "todos";
+
+        renderKpisModal();
+        renderPasajeros();
+      }
     );
 
   document.addEventListener(
@@ -1653,11 +1690,6 @@ function renderModal(
   const grupo =
     state.current.data;
 
-  const resumen =
-    resumirNomina(
-      state.nomina
-    );
-
   $("modalTitulo").textContent =
     grupo.aliasGrupo ||
     [
@@ -1684,42 +1716,14 @@ function renderModal(
         : "Inscripción inicial"
     }`;
 
-  [
-    [
-      "kTotal",
-      resumen.total
-    ],
-    [
-      "kActivos",
-      resumen.activos
-    ],
-    [
-      "kAnulados",
-      resumen.anulados
-    ],
-    [
-      "kCompleta",
-      resumen.fichaCompleta
-    ],
-    [
-      "kPendiente",
-      resumen.fichaPendiente
-    ],
-    [
-      "kCarnet",
-      resumen.conCarnet
-    ],
-    [
-      "kSinCarnet",
-      resumen.sinCarnet
-    ]
-  ].forEach(
-    ([id, value]) =>
-      set(
-        id,
-        value
-      )
-  );
+  /*
+    Al abrir un grupo mostramos la nómina completa.
+    Después el usuario puede filtrar presionando un KPI.
+  */
+  state.nominaFiltro =
+    "todos";
+
+  renderKpisModal();
 
   $("fasesContenedor").innerHTML =
     [
@@ -1825,10 +1829,873 @@ function renderFase(
   `;
 }
 
-function renderPasajeros() {
-  const campos =
-    camposPasajero;
+function getTipoRealNomina(
+  item = {}
+) {
+  const raw =
+    item.tipoInscripcion ||
+    item.estadoInscripcion ||
+    item.faseInscripcion ||
+    "";
 
+  const key =
+    normalizar(raw)
+      .replace(
+        /\s+/g,
+        "_"
+      );
+
+  if (
+    key ===
+    "inscripcion_inicial"
+  ) {
+    return "nomina_inicial";
+  }
+
+  if (
+    key ===
+    "nomina_final_ficha_medica"
+  ) {
+    return "nomina_final";
+  }
+
+  if (
+    key ===
+    "sistema_de_pagos"
+  ) {
+    return "sistema_pagos";
+  }
+
+  if (
+    key ===
+    "cupo_liberado"
+  ) {
+    return "liberado";
+  }
+
+  return key ||
+    "nomina_inicial";
+}
+
+function getEstadoCupoNomina(
+  item = {}
+) {
+  return normalizar(
+    item.estadoCupo ||
+    ""
+  )
+    .replace(
+      /\s+/g,
+      "_"
+    );
+}
+
+function estaAnuladoNomina(
+  item = {}
+) {
+  return camposPasajero
+    .estaAnulada(
+      item
+    );
+}
+
+function fichaCompletaNomina(
+  item = {}
+) {
+  return camposPasajero
+    .fichaCompleta(
+      item
+    );
+}
+
+function getCategoriaOperativa(
+  item = {}
+) {
+  if (
+    estaAnuladoNomina(
+      item
+    )
+  ) {
+    return "anulado";
+  }
+
+  const tipo =
+    getTipoRealNomina(
+      item
+    );
+
+  const estadoCupo =
+    getEstadoCupoNomina(
+      item
+    );
+
+  if (
+    tipo ===
+      "lista_espera_confirmada" ||
+    (
+      tipo ===
+        "lista_espera" &&
+      estadoCupo ===
+        "confirmado"
+    )
+  ) {
+    return "lista_confirmada";
+  }
+
+  if (
+    tipo ===
+      "nuevo_ingreso_confirmado" ||
+    (
+      tipo ===
+        "nuevo_ingreso" &&
+      estadoCupo ===
+        "confirmado"
+    )
+  ) {
+    return "nuevo_confirmado";
+  }
+
+  if (
+    tipo ===
+    "liberado"
+  ) {
+    return "liberado";
+  }
+
+  if (
+    tipo ===
+    "sistema_pagos"
+  ) {
+    return fichaCompletaNomina(
+      item
+    )
+      ? "sistema_completo"
+      : "sistema_pendiente";
+  }
+
+  if (
+    tipo ===
+      "nomina_inicial" ||
+    tipo ===
+      "nomina_final"
+  ) {
+    return fichaCompletaNomina(
+      item
+    )
+      ? "nomina_base_completa"
+      : "nomina_base_pendiente";
+  }
+
+  if (
+    tipo ===
+    "nuevo_ingreso"
+  ) {
+    return "nuevo_pendiente";
+  }
+
+  if (
+    tipo ===
+      "lista_espera_pagada" ||
+    (
+      tipo ===
+        "lista_espera" &&
+      estadoCupo ===
+        "pagado"
+    )
+  ) {
+    return "lista_pagada";
+  }
+
+  if (
+    tipo ===
+    "lista_espera"
+  ) {
+    return "lista_pendiente";
+  }
+
+  return "otro";
+}
+
+const ORDEN_CATEGORIAS_NOMINA = {
+  lista_confirmada:
+    1,
+
+  nuevo_confirmado:
+    2,
+
+  liberado:
+    3,
+
+  nomina_base_completa:
+    4,
+
+  nomina_base_pendiente:
+    5,
+
+  sistema_completo:
+    6,
+
+  sistema_pendiente:
+    7,
+
+  nuevo_pendiente:
+    8,
+
+  lista_pagada:
+    9,
+
+  lista_pendiente:
+    10,
+
+  otro:
+    90,
+
+  anulado:
+    1000
+};
+
+function getOrdenNomina(
+  item = {}
+) {
+  return (
+    ORDEN_CATEGORIAS_NOMINA[
+      getCategoriaOperativa(
+        item
+      )
+    ] ||
+    90
+  );
+}
+
+function ordenarNominaGestion(
+  items = []
+) {
+  return [
+    ...items
+  ].sort(
+    (a, b) => {
+      const orden =
+        getOrdenNomina(a) -
+        getOrdenNomina(b);
+
+      if (orden !== 0) {
+        return orden;
+      }
+
+      const apellidoA =
+        normalizar(
+          camposPasajero.apellidos(
+            a
+          )
+        );
+
+      const apellidoB =
+        normalizar(
+          camposPasajero.apellidos(
+            b
+          )
+        );
+
+      const byApellido =
+        apellidoA.localeCompare(
+          apellidoB,
+          "es",
+          {
+            sensitivity:
+              "base",
+            numeric:
+              true
+          }
+        );
+
+      if (byApellido !== 0) {
+        return byApellido;
+      }
+
+      return normalizar(
+        camposPasajero.nombres(
+          a
+        )
+      ).localeCompare(
+        normalizar(
+          camposPasajero.nombres(
+            b
+          )
+        ),
+        "es",
+        {
+          sensitivity:
+            "base",
+          numeric:
+            true
+        }
+      );
+    }
+  );
+}
+
+function esViajaConfirmado(
+  item = {}
+) {
+  return [
+    "lista_confirmada",
+    "nuevo_confirmado",
+    "liberado",
+    "nomina_base_completa",
+    "nomina_base_pendiente",
+    "sistema_completo",
+    "sistema_pendiente"
+  ].includes(
+    getCategoriaOperativa(
+      item
+    )
+  );
+}
+
+function requiereGestion(
+  item = {}
+) {
+  return [
+    "nuevo_pendiente",
+    "lista_pagada",
+    "lista_pendiente"
+  ].includes(
+    getCategoriaOperativa(
+      item
+    )
+  );
+}
+
+function getResumenOperativoNomina() {
+  const items =
+    state.nomina;
+
+  const activos =
+    items.filter(
+      (item) =>
+        !estaAnuladoNomina(
+          item
+        )
+    );
+
+  const countCategoria =
+    (categoria) =>
+      items.filter(
+        (item) =>
+          getCategoriaOperativa(
+            item
+          ) ===
+          categoria
+      ).length;
+
+  return {
+    total:
+      items.length,
+
+    viajan:
+      items.filter(
+        esViajaConfirmado
+      ).length,
+
+    gestion:
+      items.filter(
+        requiereGestion
+      ).length,
+
+    anulados:
+      countCategoria(
+        "anulado"
+      ),
+
+    fichaPendiente:
+      activos.filter(
+        (item) =>
+          !fichaCompletaNomina(
+            item
+          )
+      ).length,
+
+    sinCarnet:
+      activos.filter(
+        (item) =>
+          !camposPasajero
+            .tieneCarnet(
+              item
+            )
+      ).length,
+
+    listaConfirmada:
+      countCategoria(
+        "lista_confirmada"
+      ),
+
+    nuevoConfirmado:
+      countCategoria(
+        "nuevo_confirmado"
+      ),
+
+    liberados:
+      countCategoria(
+        "liberado"
+      ),
+
+    sistemaCompleto:
+      countCategoria(
+        "sistema_completo"
+      ),
+
+    sistemaPendiente:
+      countCategoria(
+        "sistema_pendiente"
+      ),
+
+    nuevoPendiente:
+      countCategoria(
+        "nuevo_pendiente"
+      ),
+
+    listaPagada:
+      countCategoria(
+        "lista_pagada"
+      ),
+
+    listaPendiente:
+      countCategoria(
+        "lista_pendiente"
+      )
+  };
+}
+
+function renderKpisModal() {
+  const resumen =
+    getResumenOperativoNomina();
+
+  const valores = {
+    kTotal:
+      resumen.total,
+
+    kViajan:
+      resumen.viajan,
+
+    kGestion:
+      resumen.gestion,
+
+    kAnulados:
+      resumen.anulados,
+
+    kFichaPendiente:
+      resumen.fichaPendiente,
+
+    kSinCarnet:
+      resumen.sinCarnet,
+
+    kListaConfirmada:
+      resumen.listaConfirmada,
+
+    kNuevoConfirmado:
+      resumen.nuevoConfirmado,
+
+    kLiberados:
+      resumen.liberados,
+
+    kSistemaCompleto:
+      resumen.sistemaCompleto,
+
+    kSistemaPendiente:
+      resumen.sistemaPendiente,
+
+    kNuevoPendiente:
+      resumen.nuevoPendiente,
+
+    kListaPagada:
+      resumen.listaPagada,
+
+    kListaPendiente:
+      resumen.listaPendiente
+  };
+
+  Object.entries(
+    valores
+  ).forEach(
+    ([id, value]) =>
+      set(
+        id,
+        value
+      )
+  );
+
+  document
+    .querySelectorAll(
+      "#modalKpisNomina [data-nomina-filtro]"
+    )
+    .forEach(
+      (card) => {
+        card.classList.toggle(
+          "active",
+          card.dataset.nominaFiltro ===
+            state.nominaFiltro
+        );
+      }
+    );
+
+  const filtroLabel =
+    getFiltroNominaLabel(
+      state.nominaFiltro
+    );
+
+  set(
+    "nominaFiltroActual",
+    filtroLabel
+  );
+
+  $("btnMostrarTodaNomina")
+    ?.classList.toggle(
+      "hidden",
+      state.nominaFiltro ===
+        "todos"
+    );
+}
+
+function getFiltroNominaLabel(
+  filtro = "todos"
+) {
+  const labels = {
+    todos:
+      "Mostrando toda la nómina",
+
+    viajan:
+      "Mostrando pasajeros que viajan",
+
+    gestion:
+      "Mostrando pendientes de gestión",
+
+    anulados:
+      "Mostrando anulados / no viajan",
+
+    ficha_pendiente:
+      "Mostrando fichas médicas pendientes",
+
+    sin_carnet:
+      "Mostrando pasajeros sin carnet",
+
+    lista_confirmada:
+      "Mostrando lista de espera confirmada",
+
+    nuevo_confirmado:
+      "Mostrando nuevos ingresos confirmados",
+
+    liberado:
+      "Mostrando cupos liberados",
+
+    sistema_completo:
+      "Mostrando Sistema de Pagos con ficha completa",
+
+    sistema_pendiente:
+      "Mostrando Sistema de Pagos con ficha pendiente",
+
+    nuevo_pendiente:
+      "Mostrando nuevos ingresos pendientes",
+
+    lista_pagada:
+      "Mostrando lista de espera pagada",
+
+    lista_pendiente:
+      "Mostrando lista de espera pendiente"
+  };
+
+  return labels[filtro] ||
+    labels.todos;
+}
+
+function filtrarNominaModal(
+  items = []
+) {
+  const filtro =
+    state.nominaFiltro ||
+    "todos";
+
+  if (
+    filtro ===
+    "todos"
+  ) {
+    return items;
+  }
+
+  if (
+    filtro ===
+    "viajan"
+  ) {
+    return items.filter(
+      esViajaConfirmado
+    );
+  }
+
+  if (
+    filtro ===
+    "gestion"
+  ) {
+    return items.filter(
+      requiereGestion
+    );
+  }
+
+  if (
+    filtro ===
+    "anulados"
+  ) {
+    return items.filter(
+      estaAnuladoNomina
+    );
+  }
+
+  if (
+    filtro ===
+    "ficha_pendiente"
+  ) {
+    return items.filter(
+      (item) =>
+        !estaAnuladoNomina(
+          item
+        ) &&
+        !fichaCompletaNomina(
+          item
+        )
+    );
+  }
+
+  if (
+    filtro ===
+    "sin_carnet"
+  ) {
+    return items.filter(
+      (item) =>
+        !estaAnuladoNomina(
+          item
+        ) &&
+        !camposPasajero
+          .tieneCarnet(
+            item
+          )
+    );
+  }
+
+  return items.filter(
+    (item) =>
+      getCategoriaOperativa(
+        item
+      ) ===
+      filtro
+  );
+}
+
+function getSeccionNomina(
+  item = {}
+) {
+  if (
+    estaAnuladoNomina(
+      item
+    )
+  ) {
+    return "anulados";
+  }
+
+  if (
+    requiereGestion(
+      item
+    )
+  ) {
+    return "gestion";
+  }
+
+  return "viajan";
+}
+
+function getSeccionNominaLabel(
+  seccion = ""
+) {
+  if (
+    seccion ===
+    "viajan"
+  ) {
+    return "NÓMINA QUE VIAJA";
+  }
+
+  if (
+    seccion ===
+    "gestion"
+  ) {
+    return "PENDIENTES DE GESTIÓN";
+  }
+
+  return "ANULADOS / NO VIAJAN";
+}
+
+function getEstadoOperativoLabel(
+  item = {}
+) {
+  const categoria =
+    getCategoriaOperativa(
+      item
+    );
+
+  const labels = {
+    lista_confirmada:
+      "Lista de espera confirmada",
+
+    nuevo_confirmado:
+      "Nuevo ingreso confirmado",
+
+    liberado:
+      "Cupo liberado",
+
+    nomina_base_completa:
+      "Nómina final / ficha completa",
+
+    nomina_base_pendiente:
+      "Nómina final / ficha pendiente",
+
+    sistema_completo:
+      "Sistema de Pagos · Ficha completa",
+
+    sistema_pendiente:
+      "Sistema de Pagos · Ficha pendiente",
+
+    nuevo_pendiente:
+      "Nuevo ingreso pendiente",
+
+    lista_pagada:
+      "Lista de espera pagada",
+
+    lista_pendiente:
+      "Lista de espera pendiente",
+
+    otro:
+      "Inscripción",
+
+    anulado:
+      getMotivoAnulacion(
+        item
+      )
+  };
+
+  return labels[categoria] ||
+    "Inscripción";
+}
+
+function getTipoVisibleNomina(
+  item = {}
+) {
+  const categoria =
+    getCategoriaOperativa(
+      item
+    );
+
+  if (
+    categoria ===
+    "anulado"
+  ) {
+    return "Anulado";
+  }
+
+  const labels = {
+    lista_confirmada:
+      "Lista de espera",
+
+    nuevo_confirmado:
+      "Nuevo ingreso",
+
+    liberado:
+      "Cupo liberado",
+
+    nomina_base_completa:
+      "Nómina final",
+
+    nomina_base_pendiente:
+      "Nómina final",
+
+    sistema_completo:
+      "Sistema de Pagos",
+
+    sistema_pendiente:
+      "Sistema de Pagos",
+
+    nuevo_pendiente:
+      "Nuevo ingreso",
+
+    lista_pagada:
+      "Lista de espera",
+
+    lista_pendiente:
+      "Lista de espera",
+
+    otro:
+      camposPasajero.tipo(
+        item
+      ) ||
+      "Inscripción"
+  };
+
+  return labels[categoria] ||
+    "Inscripción";
+}
+
+function getMotivoAnulacion(
+  item = {}
+) {
+  const estadoViaje =
+    normalizar(
+      item.estadoViaje ||
+      ""
+    )
+      .replace(
+        /\s+/g,
+        "_"
+      );
+
+  const motivo =
+    String(
+      item.motivoAnulacion ||
+      item.anuladoMotivo ||
+      item.motivoNoViaja ||
+      item.sistemaPagosMotivo ||
+      ""
+    ).trim();
+
+  if (
+    estadoViaje ===
+      "eliminado_en_sp" ||
+    estadoViaje ===
+      "eliminado_sistema_pagos" ||
+    item.eliminadoSistemaPagos ===
+      true
+  ) {
+    return "Eliminado en Sistema de Pagos";
+  }
+
+  if (
+    item.viaja === false ||
+    estadoViaje ===
+      "no_viaja"
+  ) {
+    return motivo ||
+      "No viaja según Sistema de Pagos";
+  }
+
+  return motivo ||
+    "Anulación administrativa";
+}
+
+function getClaseFilaNomina(
+  item = {}
+) {
+  return `nomina-row-${
+    getCategoriaOperativa(
+      item
+    )
+  }`;
+}
+
+function renderPasajeros() {
   const tbody =
     $("pasajerosTbody");
 
@@ -1836,14 +2703,24 @@ function renderPasajeros() {
     return;
   }
 
-  if (!state.nomina.length) {
+  const ordenadas =
+    ordenarNominaGestion(
+      state.nomina
+    );
+
+  const visibles =
+    filtrarNominaModal(
+      ordenadas
+    );
+
+  if (!visibles.length) {
     tbody.innerHTML = `
       <tr>
         <td
           colspan="10"
           class="gn-empty"
         >
-          No hay pasajeros.
+          No hay pasajeros para este filtro.
         </td>
       </tr>
     `;
@@ -1851,9 +2728,36 @@ function renderPasajeros() {
     return;
   }
 
+  let seccionAnterior =
+    "";
+
   tbody.innerHTML =
-    state.nomina.map(
+    visibles.map(
       (item) => {
+        const seccion =
+          getSeccionNomina(
+            item
+          );
+
+        const separador =
+          seccion !==
+          seccionAnterior
+            ? `
+              <tr class="nomina-section-row">
+                <td colspan="10">
+                  ${esc(
+                    getSeccionNominaLabel(
+                      seccion
+                    )
+                  )}
+                </td>
+              </tr>
+            `
+            : "";
+
+        seccionAnterior =
+          seccion;
+
         const esFoco =
           state.pasajeroFocoId &&
           String(
@@ -1864,21 +2768,49 @@ function renderPasajeros() {
             state.pasajeroFocoId
           );
 
+        const anulada =
+          estaAnuladoNomina(
+            item
+          );
+
         return `
+          ${separador}
+
           <tr
             data-inscripcion-row="${esc(
               item.id ||
               ""
             )}"
-            class="${
-              esFoco
-                ? "is-focus"
-                : ""
-            }"
+            class="${esc(
+              [
+                getClaseFilaNomina(
+                  item
+                ),
+                esFoco
+                  ? "is-focus"
+                  : "",
+                anulada
+                  ? "is-anulado"
+                  : ""
+              ]
+                .filter(Boolean)
+                .join(" ")
+            )}"
           >
             <td>
+              <strong>
+                ${esc(
+                  camposPasajero.documento(
+                    item
+                  ) ||
+                  "—"
+                )}
+              </strong>
+            </td>
+
+            <td>
               ${esc(
-                campos.documento(
+                camposPasajero.nombres(
                   item
                 ) ||
                 "—"
@@ -1887,7 +2819,7 @@ function renderPasajeros() {
 
             <td>
               ${esc(
-                campos.nombres(
+                camposPasajero.apellidos(
                   item
                 ) ||
                 "—"
@@ -1895,36 +2827,29 @@ function renderPasajeros() {
             </td>
 
             <td>
-              ${esc(
-                campos.apellidos(
-                  item
-                ) ||
-                "—"
-              )}
+              <span class="nomina-type-pill">
+                ${esc(
+                  getTipoVisibleNomina(
+                    item
+                  )
+                )}
+              </span>
             </td>
 
             <td>
-              ${esc(
-                campos.tipo(
-                  item
-                ) ||
-                "—"
-              )}
-            </td>
-
-            <td>
-              ${esc(
-                campos.estado(
-                  item
-                ) ||
-                "—"
-              )}
+              <strong>
+                ${esc(
+                  getEstadoOperativoLabel(
+                    item
+                  )
+                )}
+              </strong>
             </td>
 
             <td>
               <span
                 class="badge ${
-                  campos.fichaCompleta(
+                  fichaCompletaNomina(
                     item
                   )
                     ? "ok"
@@ -1932,7 +2857,7 @@ function renderPasajeros() {
                 }"
               >
                 ${
-                  campos.fichaCompleta(
+                  fichaCompletaNomina(
                     item
                   )
                     ? "Completa"
@@ -1943,9 +2868,7 @@ function renderPasajeros() {
 
             <td>
               ${
-                campos.estaAnulada(
-                  item
-                )
+                anulada
                   ? "Sí"
                   : "No"
               }
@@ -1953,7 +2876,7 @@ function renderPasajeros() {
 
             <td>
               ${esc(
-                campos.correo(
+                camposPasajero.correo(
                   item
                 ) ||
                 "—"
@@ -1962,7 +2885,7 @@ function renderPasajeros() {
 
             <td>
               ${esc(
-                campos.telefono(
+                camposPasajero.telefono(
                   item
                 ) ||
                 "—"
@@ -1971,7 +2894,7 @@ function renderPasajeros() {
 
             <td>
               ${
-                campos.tieneCarnet(
+                camposPasajero.tieneCarnet(
                   item
                 )
                   ? "Sí"
@@ -2218,6 +3141,9 @@ function cerrarModal() {
 
   state.pasajeroFocoId =
     "";
+
+  state.nominaFiltro =
+    "todos";
 
   if (
     !$("modalAlertasInscripciones")
