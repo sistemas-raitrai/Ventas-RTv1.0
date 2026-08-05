@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Gestión de Nómina 2026 | Sistema Ventas RT</title>
+  <link rel="stylesheet" href="estilos.css" />
+  <link rel="icon" type="image/png" href="IMG/logo-raitrai.png" />
+  <style>
+    .gestion-page{padding:20px 30px 34px}.gestion-panel{background:#f2f0f5;border:1px solid #d8d1df;border-radius:22px;padding:22px}.gestion-head{display:flex;justify-content:space-between;gap:16px;align-items:center;flex-wrap:wrap}.gestion-head h1{margin:0;color:var(--header);font-size:30px}.gestion-head p{margin:5px 0 0;color:#6a6075}.toolbar{display:grid;grid-template-columns:2fr 1fr 1fr auto;gap:12px;margin:20px 0}.toolbar input,.toolbar select{width:100%;height:44px;border:1px solid #cfc6d8;border-radius:10px;padding:0 12px;background:#fff}.btn-primary,.btn-secondary,.btn-copy,.btn-danger{border:0;border-radius:10px;min-height:40px;padding:0 14px;font-weight:800;cursor:pointer}.btn-primary{background:#4a2570;color:#fff}.btn-secondary{background:#6b6178;color:#fff}.btn-copy{background:#facc15;color:#3b2b00}.btn-danger{background:#991b1b;color:#fff}.summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:18px}.summary-card{background:#fff;border:1px solid #ddd5e4;border-radius:14px;padding:16px}.summary-card span{display:block;font-size:12px;text-transform:uppercase;color:#756b80;font-weight:800}.summary-card strong{display:block;margin-top:6px;font-size:28px;color:#2b1940}.table-card{background:#fff;border:1px solid #ddd5e4;border-radius:16px;overflow:hidden}.table-wrap{overflow:auto}.main-table{width:100%;min-width:1100px;border-collapse:collapse}.main-table th{background:#2b1940;color:#fff;text-align:left;padding:12px;font-size:12px;text-transform:uppercase}.main-table td{padding:12px;border-bottom:1px solid #eee9f1;vertical-align:middle}.group-link{border:0;background:none;text-align:left;color:#2b1940;cursor:pointer}.group-link strong{display:block;font-size:14px}.group-link small{display:block;margin-top:4px;color:#7b7086}.status-pill{display:inline-flex;min-height:26px;align-items:center;border-radius:999px;padding:0 9px;font-size:11px;font-weight:900}.status-pill.ok{background:#dcfce7;color:#166534}.status-pill.warn{background:#fef3c7;color:#a16207}.empty{text-align:center;padding:28px!important;color:#6a6075;font-weight:700}.modal{position:fixed;inset:0;display:none;align-items:center;justify-content:center;padding:15px;background:rgba(20,10,28,.62);z-index:3000}.modal.show{display:flex}.modal-card{width:min(1500px,calc(100vw - 30px));height:calc(100vh - 30px);background:#fff;border-radius:22px;overflow:hidden;display:flex;flex-direction:column}.modal-head{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:16px 20px;border-bottom:1px solid #e5dfea}.modal-head h2{margin:0;color:#2b1940}.modal-head p{margin:4px 0 0;color:#6a6075}.modal-close{width:42px;height:42px;border:0;border-radius:12px;background:#eee7f5;font-size:22px;cursor:pointer}.modal-content{padding:18px;overflow:auto}.kpi-grid{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:10px}.kpi{padding:14px;border-radius:14px;background:#f8f5fb;border:1px solid #e6deec}.kpi span{display:block;font-size:11px;text-transform:uppercase;color:#776b83;font-weight:800}.kpi strong{display:block;margin-top:6px;color:#2b1940}.modal-section{margin-top:18px}.modal-section h3{margin:0 0 12px;color:#2b1940}.section-head{display:flex;justify-content:space-between;align-items:center;gap:12px}.section-head p{margin:4px 0 0;color:#6a6075}.phase-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}.phase-card{border:1px solid #ddd4e5;border-radius:14px;padding:14px;background:#faf8fc}.phase-card.active{background:#eef9f1;border-color:#c9e6d2}.phase-card>div:first-child{display:flex;justify-content:space-between;gap:8px}.phase-card span{font-size:12px;color:#6a6075}.phase-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}.passenger-table-wrap{overflow:auto;border:1px solid #e4dce9;border-radius:14px}.passenger-table{width:100%;min-width:1300px;border-collapse:collapse}.passenger-table th{position:sticky;top:0;background:#f1eaf7;color:#2b1940;text-align:left;padding:10px;font-size:11px;text-transform:uppercase}.passenger-table td{padding:10px;border-bottom:1px solid #eee9f1;font-size:13px}.passenger-table tr.is-anulado td{opacity:.55;background:#f8f8f8}.row-actions{display:flex;gap:6px}.row-actions button{border:0;border-radius:8px;padding:7px 9px;font-weight:800;cursor:pointer;background:#eee7f5;color:#4a2570}.row-actions .danger-lite{background:#fde8e8;color:#991b1b}.modal-open{overflow:hidden}.hidden{display:none!important}button:disabled{opacity:.45;cursor:not-allowed}
+    @media(max-width:1000px){.toolbar{grid-template-columns:1fr 1fr}.summary{grid-template-columns:repeat(2,1fr)}.kpi-grid{grid-template-columns:repeat(2,1fr)}.phase-grid{grid-template-columns:1fr 1fr}}@media(max-width:650px){.gestion-page{padding:14px}.toolbar,.summary,.kpi-grid,.phase-grid{grid-template-columns:1fr}}
+  </style>
+</head>
+<body class="ventas-body" data-page="gestion-nomina">
+  <div id="layout-top"></div>
+  <main class="page-shell gestion-page">
+    <section class="gestion-panel">
+      <div class="gestion-head"><div><h1>Gestión de Nómina 2026</h1><p>Administración de links, fases y pasajeros por grupo.</p></div></div>
+      <div class="toolbar">
+        <input id="buscador" type="text" placeholder="Buscar colegio, curso, negocio, vendedor..." />
+        <select id="filtroVendedora"><option value="todos">Todos los vendedores</option></select>
+        <select id="filtroEstadoNomina"><option value="todos">Todas las nóminas</option><option value="pendientes">Con ficha pendiente</option><option value="completas">Ficha completa</option><option value="sin_carnet">Con pasajeros sin carnet</option></select>
+        <button id="btnRecargar" class="btn-primary" type="button">Recargar</button>
+      </div>
+      <section class="summary"><div class="summary-card"><span>Grupos</span><strong id="sumGrupos">0</strong></div><div class="summary-card"><span>Pasajeros</span><strong id="sumPasajeros">0</strong></div><div class="summary-card"><span>Fichas pendientes</span><strong id="sumFichasPendientes">0</strong></div><div class="summary-card"><span>Sin carnet</span><strong id="sumSinCarnet">0</strong></div></section>
+      <div class="table-card"><div class="table-wrap"><table class="main-table"><thead><tr><th>Grupo</th><th>Negocio</th><th>Vendedor</th><th>Destino</th><th>Pax</th><th>Ficha médica</th><th>Carnet</th><th>Acción</th></tr></thead><tbody id="tbodyGestionNomina"><tr><td colspan="8" class="empty">Cargando grupos...</td></tr></tbody></table></div></div>
+    </section>
+  </main>
+
+  <div class="modal" id="modalGestionNomina">
+    <div class="modal-card">
+      <header class="modal-head"><div><h2 id="modalTitulo">Gestión de nómina</h2><p id="modalSubtitulo"></p></div><button id="btnCerrarModal" class="modal-close" type="button">×</button></header>
+      <div class="modal-content" id="modalContenido"></div>
+    </div>
+  </div>
+
+  <script type="module" src="layout.js"></script>
+  <script type="module" src="gestion-nomina.js"></script>
+</body>
+</html>
