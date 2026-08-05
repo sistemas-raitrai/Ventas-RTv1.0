@@ -1,0 +1,247 @@
+/* RENOMBRAR COMO: ficha-medica.css */
+
+:root {
+  --navy: #172052;
+  --yellow: #f8c900;
+  --ink: #20263d;
+  --muted: #667085;
+  --line: #dfe3ec;
+  --soft: #f5f7fb;
+  --danger: #a61b1b;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: Inter, Arial, sans-serif;
+  background: #eef1f6;
+  color: var(--ink);
+}
+
+.hidden { display: none !important; }
+
+.app-shell {
+  width: min(1500px, calc(100% - 32px));
+  margin: 24px auto 48px;
+}
+
+.topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 18px;
+}
+
+.topbar h1 { margin: 0; color: var(--navy); }
+.topbar p { margin: 5px 0 0; color: var(--muted); }
+
+.actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+button, .button-link {
+  border: 0;
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-weight: 800;
+  cursor: pointer;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-primary { background: var(--navy); color: white; }
+.btn-yellow { background: var(--yellow); color: var(--navy); }
+.btn-light { background: white; color: var(--navy); border: 1px solid var(--line); }
+.btn-danger { background: #feecec; color: var(--danger); }
+
+.panel {
+  background: white;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  box-shadow: 0 12px 32px rgba(26, 32, 68, .08);
+  padding: 20px;
+  margin-bottom: 18px;
+}
+
+.kpis {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(140px, 1fr));
+  gap: 12px;
+}
+
+.kpi {
+  background: var(--soft);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 15px;
+}
+
+.kpi-label { color: var(--muted); font-size: 12px; font-weight: 800; text-transform: uppercase; }
+.kpi-value { color: var(--navy); font-size: 27px; font-weight: 900; margin-top: 5px; }
+
+.filters {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr;
+  gap: 10px;
+}
+
+input, select, textarea {
+  width: 100%;
+  border: 1px solid #cdd3df;
+  border-radius: 9px;
+  padding: 10px 11px;
+  font: inherit;
+  background: white;
+}
+
+textarea { min-height: 92px; resize: vertical; }
+
+.table-wrap { overflow: auto; }
+table { width: 100%; border-collapse: collapse; min-width: 1100px; }
+th, td { border-bottom: 1px solid var(--line); text-align: left; padding: 11px 9px; vertical-align: top; }
+th { color: var(--navy); background: var(--soft); position: sticky; top: 0; }
+.status { display: inline-flex; padding: 5px 8px; border-radius: 999px; font-size: 12px; font-weight: 900; }
+.status-complete { background: #dcfce7; color: #166534; }
+.status-pending { background: #fff3c4; color: #854d0e; }
+.status-cancelled { background: #fee2e2; color: #991b1b; }
+.alert-chip { display: inline-flex; padding: 5px 8px; border-radius: 999px; background: #fee2e2; color: #991b1b; font-size: 12px; font-weight: 800; margin: 2px; }
+.no-alerts { color: #667085; }
+
+.modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 20, 45, .72);
+  z-index: 9999;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+}
+
+.modal-card {
+  background: white;
+  width: min(1150px, 100%);
+  max-height: 92vh;
+  overflow: auto;
+  border-radius: 18px;
+  padding: 22px;
+}
+
+.modal-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 15px;
+  align-items: start;
+  position: sticky;
+  top: -22px;
+  background: white;
+  padding: 5px 0 14px;
+  z-index: 3;
+}
+
+.edit-section {
+  border: 1px solid var(--line);
+  border-radius: 13px;
+  padding: 15px;
+  margin: 12px 0;
+}
+
+.edit-section h3 { margin: 0 0 12px; color: var(--navy); }
+.edit-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.field label { display: block; font-weight: 800; font-size: 13px; margin-bottom: 5px; color: #3a415c; }
+.field.is-wide { grid-column: 1 / -1; }
+
+.notice {
+  padding: 13px;
+  border-radius: 10px;
+  background: #fff8d8;
+  border: 1px solid #f6d65e;
+  color: #6f5200;
+}
+
+.medical-sheet {
+  width: min(1000px, 100%);
+  margin: 0 auto 24px;
+  background: white;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 28px;
+  box-shadow: 0 8px 25px rgba(23,32,82,.08);
+}
+
+.sheet-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+  border-bottom: 4px solid var(--yellow);
+  padding-bottom: 18px;
+  margin-bottom: 18px;
+}
+
+.sheet-header h1 { color: var(--navy); margin: 2px 0; }
+.sheet-header p { margin: 3px 0 0; font-size: 19px; font-weight: 800; }
+.sheet-kicker { color: var(--muted); font-size: 12px; text-transform: uppercase; font-weight: 900; }
+.sheet-status { padding: 8px 11px; border-radius: 999px; height: fit-content; font-weight: 900; }
+.sheet-status.is-complete { background: #dcfce7; color: #166534; }
+.sheet-status.is-pending { background: #fff3c4; color: #854d0e; }
+
+.sheet-section { margin: 18px 0; break-inside: avoid; }
+.sheet-section h2 {
+  margin: 0 0 9px;
+  color: var(--navy);
+  font-size: 17px;
+  padding: 7px 10px;
+  background: var(--soft);
+  border-left: 5px solid var(--yellow);
+}
+
+.sheet-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); border: 1px solid var(--line); }
+.sheet-row { padding: 9px 10px; border-bottom: 1px solid var(--line); min-height: 55px; }
+.sheet-row:nth-child(odd) { border-right: 1px solid var(--line); }
+.sheet-label { font-size: 11px; color: var(--muted); text-transform: uppercase; font-weight: 900; }
+.sheet-value { margin-top: 4px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.sheet-important { background: #fff1f1; }
+.alert-list { padding: 8px; border: 1px solid var(--line); }
+.sheet-footer { margin-top: 20px; color: var(--muted); font-size: 11px; text-align: center; }
+
+.print-page-break { break-after: page; page-break-after: always; }
+
+.loading, .error-box {
+  background: white;
+  border-radius: 14px;
+  padding: 25px;
+  text-align: center;
+  border: 1px solid var(--line);
+}
+
+.error-box { color: var(--danger); }
+
+@media (max-width: 850px) {
+  .kpis { grid-template-columns: repeat(2, 1fr); }
+  .filters, .edit-grid, .sheet-grid { grid-template-columns: 1fr; }
+  .sheet-row:nth-child(odd) { border-right: 0; }
+  .topbar, .sheet-header { align-items: stretch; flex-direction: column; }
+}
+
+@media print {
+  @page { size: A4; margin: 10mm; }
+
+  body { background: white; }
+  .no-print, .topbar, .panel.no-print { display: none !important; }
+  .app-shell { width: 100%; margin: 0; }
+  .medical-sheet {
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+  }
+  .sheet-section { margin: 10px 0; }
+  .sheet-row { min-height: 42px; padding: 6px 8px; }
+}
