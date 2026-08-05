@@ -4,6 +4,10 @@ import {
   getDownloadURL
 } from "https://www.gstatic.com/firebasejs/11.7.3/firebase-storage.js";
 
+import {
+  fichaCompleta as fichaMedicaCompletaSegunFlujo
+} from "./inscripciones-manager.js";
+
 const $ = (id) =>
   document.getElementById(id);
 
@@ -2209,41 +2213,10 @@ function getTipo(
 }
 
 function esFichaCompleta(
-  item
+  item = {}
 ) {
-  if (
-    item?.fichaCompleta ===
-      true ||
-    item?.fichaMedicaCompleta ===
-      true ||
-    item?.nominaFinalCompleta ===
-      true ||
-    item?.fichaMedicaCompletada ===
-      true
-  ) {
-    return true;
-  }
-
-  const estado =
-    normalize(
-      first(
-        item,
-        [
-          "fichaMedicaEstado",
-          "estadoFichaMedica",
-          "fichaMedica.estado"
-        ]
-      )
-    );
-
-  return [
-    "completa",
-    "completada",
-    "completo",
-    "ok",
-    "confirmada"
-  ].includes(
-    estado
+  return fichaMedicaCompletaSegunFlujo(
+    item
   );
 }
 
