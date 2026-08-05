@@ -12,7 +12,7 @@ import {
   query,
   where
 } from "https://www.gstatic.com/firebasejs/11.7.3/firebase-firestore.js";
-
+ 
 import {
   onAuthStateChanged,
   signOut
@@ -489,44 +489,26 @@ function bindEvents() {
   $("btnAbrirGrupo")
     ?.addEventListener(
       "click",
-      () =>
-        window.open(
-          `grupo.html?id=${encodeURIComponent(
-            state.current?.groupId ||
-            state.current?.docId ||
-            ""
-          )}`,
-          "_blank",
-          "noopener"
-        )
+      abrirGrupoCompleto
     );
-
-    $("btnGestionarPulseras")
-      ?.addEventListener(
-        "click",
-        () => {
-          const idGrupo =
-            state.current?.docId ||
-            state.current?.groupId ||
-            "";
   
-          if (!idGrupo) {
-            alert(
-              "No se pudo identificar el grupo."
-            );
+  $("btnGestionarFichasMedicas")
+    ?.addEventListener(
+      "click",
+      abrirGestionFichasMedicas
+    );
   
-            return;
-          }
+  $("btnVerFichasGrupo")
+    ?.addEventListener(
+      "click",
+      abrirFichasMedicasGrupo
+    );
   
-          window.open(
-            `gestion-pulseras-nfc.html?id=${encodeURIComponent(
-              idGrupo
-            )}`,
-            "_blank",
-            "noopener"
-          );
-        }
-      );
+  $("btnGestionarPulseras")
+    ?.addEventListener(
+      "click",
+      abrirGestionPulseras
+    );
   
   document
     .querySelectorAll(
@@ -3726,6 +3708,154 @@ async function manejarFase(
     button.disabled =
       false;
   }
+}
+
+function getGrupoActualIds() {
+  return {
+    /*
+      docId corresponde al documento real dentro de
+      ventas_cotizaciones.
+
+      Es el identificador que necesitan las páginas
+      de fichas médicas para encontrar directamente
+      la subcolección de inscripciones.
+    */
+    docId:
+      String(
+        state.current?.docId ||
+        ""
+      ).trim(),
+
+    /*
+      groupId corresponde al idGrupo comercial.
+
+      Se mantiene para abrir grupo.html, porque esa
+      página ya sabe resolver ambos identificadores.
+    */
+    groupId:
+      String(
+        state.current?.groupId ||
+        ""
+      ).trim()
+  };
+}
+
+function abrirGrupoCompleto() {
+  const {
+    docId,
+    groupId
+  } =
+    getGrupoActualIds();
+
+  const idGrupo =
+    groupId ||
+    docId;
+
+  if (!idGrupo) {
+    alert(
+      "No se pudo identificar el grupo."
+    );
+
+    return;
+  }
+
+  window.open(
+    `grupo.html?id=${encodeURIComponent(
+      idGrupo
+    )}`,
+    "_blank",
+    "noopener"
+  );
+}
+
+function abrirGestionFichasMedicas() {
+  const {
+    docId,
+    groupId
+  } =
+    getGrupoActualIds();
+
+  /*
+    Para acceder a:
+    ventas_cotizaciones/{groupDocId}/inscripciones
+
+    preferimos siempre docId.
+  */
+  const idGrupo =
+    docId ||
+    groupId;
+
+  if (!idGrupo) {
+    alert(
+      "No se pudo identificar el grupo para gestionar sus fichas médicas."
+    );
+
+    return;
+  }
+
+  window.open(
+    `gestion-fichas-medicas.html?id=${encodeURIComponent(
+      idGrupo
+    )}`,
+    "_blank",
+    "noopener"
+  );
+}
+
+function abrirFichasMedicasGrupo() {
+  const {
+    docId,
+    groupId
+  } =
+    getGrupoActualIds();
+
+  const idGrupo =
+    docId ||
+    groupId;
+
+  if (!idGrupo) {
+    alert(
+      "No se pudo identificar el grupo para abrir sus fichas médicas."
+    );
+
+    return;
+  }
+
+  window.open(
+    `fichas-medicas-grupo.html?id=${encodeURIComponent(
+      idGrupo
+    )}`,
+    "_blank",
+    "noopener"
+  );
+}
+
+function abrirGestionPulseras() {
+  const {
+    docId,
+    groupId
+  } =
+    getGrupoActualIds();
+
+  const idGrupo =
+    docId ||
+    groupId;
+
+  if (!idGrupo) {
+    alert(
+      "No se pudo identificar el grupo."
+    );
+
+    return;
+  }
+
+  window.open(
+    `gestion-pulseras-nfc.html?id=${encodeURIComponent(
+      idGrupo
+    )}`,
+    "_blank",
+    "noopener"
+  );
 }
 
 async function accionSimple(
