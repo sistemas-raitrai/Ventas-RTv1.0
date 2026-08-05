@@ -2,53 +2,1008 @@
 <html lang="es">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Gestión de Nómina | Sistema Ventas RT</title>
-  <link rel="stylesheet" href="estilos.css" />
-  <link rel="icon" type="image/png" href="IMG/logo-raitrai.png" />
+  <meta
+    name="viewport"
+    content="width=device-width,initial-scale=1"
+  />
+
+  <title>
+    Gestión de Nómina 2026 | Sistema Ventas RT
+  </title>
+
+  <link
+    rel="stylesheet"
+    href="estilos.css"
+  />
+
+  <link
+    rel="icon"
+    type="image/png"
+    href="IMG/logo-raitrai.png"
+  />
+
   <style>
-    .gn-page{padding:18px 30px 30px}.gn-panel{background:#efefef;border:3px dashed var(--line);padding:20px 22px}
-    .gn-head{display:flex;justify-content:space-between;gap:16px;align-items:center;flex-wrap:wrap;margin-bottom:16px}.gn-head h2{margin:0;color:var(--header);font-size:30px}.gn-head p{margin:5px 0 0;color:#666}
-    .gn-toolbar{display:grid;grid-template-columns:180px 220px 220px minmax(260px,1fr) auto;gap:10px;align-items:end;margin-bottom:16px}.gn-field{display:flex;flex-direction:column;gap:6px}.gn-field label{font-weight:800;font-size:12px;color:var(--header);text-transform:uppercase}.gn-field input,.gn-field select{height:42px;border:2px solid var(--line);border-radius:8px;padding:0 12px;background:#fff}.gn-btn{height:42px;border:0;border-radius:9px;padding:0 15px;background:var(--header);color:#fff;font-weight:800;cursor:pointer}.gn-btn.sec{background:#6b6178}.gn-btn.ok{background:#09832e}.gn-btn.warn{background:#f97316}.gn-btn.danger{background:#991b1b}.gn-btn:disabled{opacity:.45;cursor:not-allowed}
-    .gn-summary{display:grid;grid-template-columns:repeat(6,minmax(130px,1fr));gap:10px;margin-bottom:16px}.gn-card{background:#fff;border:2px solid #d7dde6;border-radius:12px;padding:13px}.gn-card span{font-size:11px;font-weight:900;color:#6d6480;text-transform:uppercase}.gn-card strong{display:block;margin-top:5px;font-size:28px;color:var(--header)}
-    .gn-table-wrap{overflow:auto;background:#fff;border:2px solid #d7dde6;border-radius:12px}.gn-table{width:100%;min-width:1100px;border-collapse:collapse}.gn-table th{position:sticky;top:0;background:var(--header);color:#fff;padding:11px;text-align:left;font-size:12px}.gn-table td{padding:11px;border-bottom:1px solid #e5e7eb;vertical-align:middle}.gn-table tbody tr{cursor:pointer}.gn-table tbody tr:hover td{background:#faf8fd}.gn-group{font-weight:900;color:var(--header)}.gn-sub{font-size:12px;color:#777;margin-top:4px}.badge{display:inline-flex;padding:5px 9px;border-radius:999px;font-size:11px;font-weight:900}.badge.ok{background:#dcfce7;color:#166534}.badge.warn{background:#fef3c7;color:#a16207}.badge.bad{background:#fee2e2;color:#991b1b}.badge.muted{background:#e5e7eb;color:#475569}
-    .gn-modal{position:fixed;inset:0;background:rgba(20,10,28,.62);display:none;align-items:center;justify-content:center;padding:14px;z-index:1400}.gn-modal.show{display:flex}.gn-modal-card{width:min(1500px,calc(100vw - 28px));height:calc(100vh - 28px);background:#fff;border-radius:20px;display:flex;flex-direction:column;overflow:hidden}.gn-modal-head{padding:16px 20px;border-bottom:1px solid #ddd;display:flex;justify-content:space-between;gap:12px;align-items:center}.gn-modal-head h3{margin:0;color:var(--header)}.gn-close{width:40px;height:40px;border:0;border-radius:12px;font-size:22px;cursor:pointer}.gn-modal-body{padding:18px;overflow:auto;flex:1}.gn-kpis{display:grid;grid-template-columns:repeat(7,minmax(110px,1fr));gap:10px;margin-bottom:16px}.gn-kpi{padding:12px;border:1px solid #ddd;border-radius:12px;background:#fafafa}.gn-kpi span{display:block;font-size:10px;text-transform:uppercase;font-weight:900;color:#777}.gn-kpi strong{font-size:22px;color:var(--header)}
-    .gn-section{border:1px solid #ddd;border-radius:14px;margin-bottom:14px;overflow:hidden}.gn-section-head{padding:12px 14px;background:#f5effb;font-weight:900;color:var(--header)}.gn-section-body{padding:14px}.gn-fases{display:grid;grid-template-columns:repeat(4,minmax(220px,1fr));gap:10px}.gn-fase{border:1px solid #ddd;border-radius:12px;padding:12px}.gn-fase h4{margin:0 0 8px}.gn-actions{display:flex;flex-wrap:wrap;gap:7px}.gn-actions .gn-btn{height:36px;font-size:12px}.gn-pass-table{width:100%;min-width:1050px;border-collapse:collapse}.gn-pass-table th{background:#f5effb;padding:9px;text-align:left;font-size:11px}.gn-pass-table td{padding:9px;border-bottom:1px solid #eee;font-size:13px}.gn-pass-wrap{overflow:auto}.gn-empty{text-align:center;padding:28px;color:#666;font-weight:800}.hidden{display:none!important}
-    @media(max-width:1100px){.gn-toolbar{grid-template-columns:1fr 1fr}.gn-summary{grid-template-columns:repeat(3,1fr)}.gn-fases{grid-template-columns:1fr 1fr}.gn-kpis{grid-template-columns:repeat(4,1fr)}}
-    @media(max-width:700px){.gn-page{padding:12px}.gn-toolbar,.gn-summary,.gn-fases,.gn-kpis{grid-template-columns:1fr}.gn-modal-card{width:100vw;height:100vh;border-radius:0}}
+    .gestion-page {
+      padding: 20px 30px 34px;
+    }
+
+    .gestion-panel {
+      background: #f2f0f5;
+      border: 1px solid #d8d1df;
+      border-radius: 22px;
+      padding: 22px;
+    }
+
+    .gestion-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .gestion-head h1 {
+      margin: 0;
+      color: var(--header);
+      font-size: 30px;
+    }
+
+    .gestion-head p {
+      margin: 5px 0 0;
+      color: #6a6075;
+    }
+
+    .toolbar {
+      display: grid;
+      grid-template-columns: 2fr 1fr 1fr auto;
+      gap: 12px;
+      margin: 20px 0;
+    }
+
+    .toolbar input,
+    .toolbar select,
+    .alert-search {
+      width: 100%;
+      height: 44px;
+      border: 1px solid #cfc6d8;
+      border-radius: 10px;
+      padding: 0 12px;
+      background: #fff;
+    }
+
+    .btn-primary,
+    .btn-secondary,
+    .btn-copy,
+    .btn-danger,
+    .gn-btn {
+      border: 0;
+      border-radius: 10px;
+      min-height: 40px;
+      padding: 0 14px;
+      font-weight: 800;
+      cursor: pointer;
+    }
+
+    .btn-primary,
+    .gn-btn {
+      background: #4a2570;
+      color: #fff;
+    }
+
+    .btn-secondary {
+      background: #6b6178;
+      color: #fff;
+    }
+
+    .btn-copy {
+      background: #facc15;
+      color: #3b2b00;
+    }
+
+    .btn-danger,
+    .gn-btn.danger {
+      background: #991b1b;
+      color: #fff;
+    }
+
+    .gn-btn.ok {
+      background: #166534;
+      color: #fff;
+    }
+
+    .summary {
+      display: grid;
+      grid-template-columns: repeat(6, minmax(0, 1fr));
+      gap: 12px;
+      margin-bottom: 18px;
+    }
+
+    .summary-card {
+      background: #fff;
+      border: 1px solid #ddd5e4;
+      border-radius: 14px;
+      padding: 16px;
+    }
+
+    .summary-card span {
+      display: block;
+      font-size: 12px;
+      text-transform: uppercase;
+      color: #756b80;
+      font-weight: 800;
+    }
+
+    .summary-card strong {
+      display: block;
+      margin-top: 6px;
+      font-size: 28px;
+      color: #2b1940;
+    }
+
+    .operations-block {
+      margin-bottom: 18px;
+      padding: 16px;
+      border: 1px solid #d9cfe2;
+      border-radius: 16px;
+      background: #ebe3f2;
+    }
+
+    .operations-title {
+      margin: 0;
+      color: #2b1940;
+      font-size: 18px;
+    }
+
+    .operations-subtitle {
+      margin: 4px 0 14px;
+      color: #6a6075;
+      font-size: 13px;
+    }
+
+    .operations-kpis {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .operation-kpi {
+      appearance: none;
+      width: 100%;
+      text-align: left;
+      border: 1px solid #d6cadf;
+      border-radius: 14px;
+      background: #fff;
+      padding: 15px;
+      cursor: pointer;
+      transition:
+        transform .15s ease,
+        box-shadow .15s ease,
+        border-color .15s ease;
+    }
+
+    .operation-kpi:hover,
+    .operation-kpi:focus-visible {
+      transform: translateY(-1px);
+      border-color: #8b6ca4;
+      box-shadow: 0 8px 22px rgba(43, 25, 64, .09);
+      outline: none;
+    }
+
+    .operation-kpi.has-items {
+      background: #fff8e7;
+      border-color: #e7bd58;
+    }
+
+    .operation-kpi-label {
+      display: block;
+      color: #6e6079;
+      font-size: 11px;
+      font-weight: 900;
+      text-transform: uppercase;
+    }
+
+    .operation-kpi-value {
+      display: block;
+      margin-top: 5px;
+      color: #2b1940;
+      font-size: 30px;
+      font-weight: 900;
+    }
+
+    .operation-kpi-help {
+      display: block;
+      margin-top: 5px;
+      color: #776b83;
+      font-size: 12px;
+    }
+
+    .table-card {
+      background: #fff;
+      border: 1px solid #ddd5e4;
+      border-radius: 16px;
+      overflow: hidden;
+    }
+
+    .table-wrap {
+      overflow: auto;
+    }
+
+    .main-table {
+      width: 100%;
+      min-width: 1200px;
+      border-collapse: collapse;
+    }
+
+    .main-table th {
+      background: #2b1940;
+      color: #fff;
+      text-align: left;
+      padding: 12px;
+      font-size: 12px;
+      text-transform: uppercase;
+    }
+
+    .main-table td {
+      padding: 12px;
+      border-bottom: 1px solid #eee9f1;
+      vertical-align: middle;
+    }
+
+    .gn-group {
+      color: #2b1940;
+      font-size: 14px;
+      font-weight: 900;
+    }
+
+    .gn-sub {
+      margin-top: 4px;
+      color: #7b7086;
+      font-size: 12px;
+    }
+
+    .gn-empty {
+      text-align: center;
+      padding: 28px !important;
+      color: #6a6075;
+      font-weight: 700;
+    }
+
+    .badge {
+      display: inline-flex;
+      min-height: 26px;
+      align-items: center;
+      border-radius: 999px;
+      padding: 0 9px;
+      font-size: 11px;
+      font-weight: 900;
+    }
+
+    .badge.ok {
+      background: #dcfce7;
+      color: #166534;
+    }
+
+    .badge.warn {
+      background: #fef3c7;
+      color: #a16207;
+    }
+
+    .badge.muted {
+      background: #ece7f0;
+      color: #6b6178;
+    }
+
+    .modal {
+      position: fixed;
+      inset: 0;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 15px;
+      background: rgba(20, 10, 28, .62);
+      z-index: 3000;
+    }
+
+    .modal.show {
+      display: flex;
+    }
+
+    .modal-card {
+      width: min(1500px, calc(100vw - 30px));
+      height: calc(100vh - 30px);
+      background: #fff;
+      border-radius: 22px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .modal-card.alerts-card {
+      width: min(1350px, calc(100vw - 30px));
+      height: min(780px, calc(100vh - 30px));
+    }
+
+    .modal-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      padding: 16px 20px;
+      border-bottom: 1px solid #e5dfea;
+    }
+
+    .modal-head h2 {
+      margin: 0;
+      color: #2b1940;
+    }
+
+    .modal-head p {
+      margin: 4px 0 0;
+      color: #6a6075;
+    }
+
+    .modal-close {
+      width: 42px;
+      height: 42px;
+      border: 0;
+      border-radius: 12px;
+      background: #eee7f5;
+      font-size: 22px;
+      cursor: pointer;
+    }
+
+    .modal-content {
+      padding: 18px;
+      overflow: auto;
+    }
+
+    .modal-loading {
+      padding: 40px 18px;
+      text-align: center;
+      color: #6a6075;
+      font-weight: 800;
+    }
+
+    .modal-toolbar {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-bottom: 18px;
+    }
+
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(7, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .kpi {
+      padding: 14px;
+      border-radius: 14px;
+      background: #f8f5fb;
+      border: 1px solid #e6deec;
+    }
+
+    .kpi span {
+      display: block;
+      font-size: 11px;
+      text-transform: uppercase;
+      color: #776b83;
+      font-weight: 800;
+    }
+
+    .kpi strong {
+      display: block;
+      margin-top: 6px;
+      color: #2b1940;
+      font-size: 24px;
+    }
+
+    .modal-section {
+      margin-top: 18px;
+    }
+
+    .modal-section h3 {
+      margin: 0 0 12px;
+      color: #2b1940;
+    }
+
+    .phase-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .gn-fase {
+      border: 1px solid #ddd4e5;
+      border-radius: 14px;
+      padding: 14px;
+      background: #faf8fc;
+    }
+
+    .gn-fase h4 {
+      margin: 0;
+      color: #2b1940;
+    }
+
+    .gn-actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-top: 12px;
+    }
+
+    .passenger-table-wrap,
+    .alerts-table-wrap {
+      overflow: auto;
+      border: 1px solid #e4dce9;
+      border-radius: 14px;
+    }
+
+    .passenger-table,
+    .alerts-table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    .passenger-table {
+      min-width: 1300px;
+    }
+
+    .alerts-table {
+      min-width: 1250px;
+    }
+
+    .passenger-table th,
+    .alerts-table th {
+      position: sticky;
+      top: 0;
+      background: #f1eaf7;
+      color: #2b1940;
+      text-align: left;
+      padding: 10px;
+      font-size: 11px;
+      text-transform: uppercase;
+      z-index: 1;
+    }
+
+    .passenger-table td,
+    .alerts-table td {
+      padding: 10px;
+      border-bottom: 1px solid #eee9f1;
+      font-size: 13px;
+      vertical-align: top;
+    }
+
+    .passenger-table tr.is-focus td {
+      background: #fff3bf;
+      box-shadow:
+        inset 0 1px 0 #e8bf35,
+        inset 0 -1px 0 #e8bf35;
+    }
+
+    .alerts-toolbar {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 12px;
+      align-items: center;
+      margin-bottom: 14px;
+    }
+
+    .alerts-summary {
+      color: #6a6075;
+      font-size: 13px;
+      font-weight: 800;
+    }
+
+    .alert-row-actions {
+      display: flex;
+      gap: 7px;
+      flex-wrap: wrap;
+    }
+
+    .modal-open {
+      overflow: hidden;
+    }
+
+    .hidden {
+      display: none !important;
+    }
+
+    button:disabled {
+      opacity: .45;
+      cursor: not-allowed;
+    }
+
+    @media (max-width: 1150px) {
+      .summary {
+        grid-template-columns: repeat(3, 1fr);
+      }
+
+      .kpi-grid {
+        grid-template-columns: repeat(4, 1fr);
+      }
+    }
+
+    @media (max-width: 1000px) {
+      .toolbar {
+        grid-template-columns: 1fr 1fr;
+      }
+
+      .phase-grid {
+        grid-template-columns: 1fr 1fr;
+      }
+
+      .operations-kpis {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 650px) {
+      .gestion-page {
+        padding: 14px;
+      }
+
+      .toolbar,
+      .summary,
+      .kpi-grid,
+      .phase-grid,
+      .alerts-toolbar {
+        grid-template-columns: 1fr;
+      }
+    }
   </style>
 </head>
-<body class="ventas-body" data-page="gestion-nomina">
+
+<body
+  class="ventas-body"
+  data-page="gestion-nomina"
+>
   <div id="layout-top"></div>
-  <main class="page-shell gn-page">
-    <section class="page-card gn-panel">
-      <div class="gn-head"><div><h2>Gestión de nóminas 2026</h2><p>Selecciona un grupo para administrar sus links, fases y pasajeros.</p></div></div>
-      <div class="gn-toolbar">
-        <div class="gn-field"><label>Año</label><select id="gnAno"><option value="2026">2026</option></select></div>
-        <div class="gn-field"><label>Vendedor(a)</label><select id="gnVendedor"><option value="todos">Todos</option></select></div>
-        <div class="gn-field"><label>Estado nómina</label><select id="gnEstado"><option value="todos">Todos</option><option value="pendiente">Con pendientes</option><option value="completa">Completa</option><option value="link_activo">Link activo</option><option value="archivada">Archivada</option></select></div>
-        <div class="gn-field"><label>Buscar</label><input id="gnBuscar" type="text" placeholder="Colegio, curso, negocio, vendedor..." /></div>
-        <button id="gnRecargar" class="gn-btn" type="button">Recargar</button>
+
+  <main class="page-shell gestion-page">
+    <section class="gestion-panel">
+      <div class="gestion-head">
+        <div>
+          <h1>
+            Gestión de Nómina 2026
+          </h1>
+
+          <p>
+            Administración de links, fases y pasajeros por grupo.
+          </p>
+        </div>
       </div>
-      <div class="gn-summary">
-        <div class="gn-card"><span>Grupos</span><strong id="sumGrupos">0</strong></div><div class="gn-card"><span>Pasajeros</span><strong id="sumPax">0</strong></div><div class="gn-card"><span>Fichas pendientes</span><strong id="sumPendientes">0</strong></div><div class="gn-card"><span>Sin carnet</span><strong id="sumSinCarnet">0</strong></div><div class="gn-card"><span>Links activos</span><strong id="sumLinks">0</strong></div><div class="gn-card"><span>Archivadas</span><strong id="sumArchivadas">0</strong></div>
+
+      <div class="toolbar">
+        <input
+          id="gnBuscar"
+          type="text"
+          placeholder="Buscar colegio, curso, negocio, vendedor..."
+        />
+
+        <select id="gnVendedor">
+          <option value="todos">
+            Todos los vendedores
+          </option>
+        </select>
+
+        <select id="gnEstado">
+          <option value="todos">
+            Todas las nóminas
+          </option>
+
+          <option value="pendiente">
+            Con ficha pendiente
+          </option>
+
+          <option value="completa">
+            Ficha completa
+          </option>
+
+          <option value="link_activo">
+            Con link activo
+          </option>
+
+          <option value="archivada">
+            Archivadas
+          </option>
+        </select>
+
+        <button
+          id="gnRecargar"
+          class="btn-primary"
+          type="button"
+        >
+          Recargar
+        </button>
       </div>
-      <div class="gn-table-wrap"><table class="gn-table"><thead><tr><th>Grupo</th><th>N.º negocio</th><th>Vendedor(a)</th><th>Destino</th><th>Pax</th><th>Fichas pendientes</th><th>Carnet</th><th>Estado</th><th>Acción</th></tr></thead><tbody id="gnTbody"><tr><td colspan="9" class="gn-empty">Cargando grupos...</td></tr></tbody></table></div>
+
+      <section class="summary">
+        <div class="summary-card">
+          <span>Grupos</span>
+          <strong id="sumGrupos">0</strong>
+        </div>
+
+        <div class="summary-card">
+          <span>Pasajeros</span>
+          <strong id="sumPax">0</strong>
+        </div>
+
+        <div class="summary-card">
+          <span>Fichas pendientes</span>
+          <strong id="sumPendientes">0</strong>
+        </div>
+
+        <div class="summary-card">
+          <span>Sin carnet</span>
+          <strong id="sumSinCarnet">0</strong>
+        </div>
+
+        <div class="summary-card">
+          <span>Links activos</span>
+          <strong id="sumLinks">0</strong>
+        </div>
+
+        <div class="summary-card">
+          <span>Archivadas</span>
+          <strong id="sumArchivadas">0</strong>
+        </div>
+      </section>
+
+      <section class="operations-block">
+        <h2 class="operations-title">
+          Gestión de nuevas inscripciones
+        </h2>
+
+        <p class="operations-subtitle">
+          Presiona una tarjeta para ver los pasajeros y llegar directamente a su nómina.
+        </p>
+
+        <div class="operations-kpis">
+          <button
+            id="kpiNuevosPendientes"
+            class="operation-kpi"
+            type="button"
+            data-alerta-kpi="nuevo_ingreso"
+          >
+            <span class="operation-kpi-label">
+              Nuevos ingresos pendientes
+            </span>
+
+            <strong
+              id="sumNuevosPendientes"
+              class="operation-kpi-value"
+            >
+              0
+            </strong>
+
+            <span class="operation-kpi-help">
+              Pendientes de confirmar
+            </span>
+          </button>
+
+          <button
+            id="kpiListaEsperaPendiente"
+            class="operation-kpi"
+            type="button"
+            data-alerta-kpi="lista_espera"
+          >
+            <span class="operation-kpi-label">
+              Lista de espera pendiente
+            </span>
+
+            <strong
+              id="sumListaEsperaPendiente"
+              class="operation-kpi-value"
+            >
+              0
+            </strong>
+
+            <span class="operation-kpi-help">
+              Pendientes de marcar como pagadas
+            </span>
+          </button>
+
+          <button
+            id="kpiListaEsperaPagada"
+            class="operation-kpi"
+            type="button"
+            data-alerta-kpi="lista_espera_pagada"
+          >
+            <span class="operation-kpi-label">
+              Lista de espera pagada
+            </span>
+
+            <strong
+              id="sumListaEsperaPagada"
+              class="operation-kpi-value"
+            >
+              0
+            </strong>
+
+            <span class="operation-kpi-help">
+              Pendientes de confirmar cupo
+            </span>
+          </button>
+        </div>
+      </section>
+
+      <div class="table-card">
+        <div class="table-wrap">
+          <table class="main-table">
+            <thead>
+              <tr>
+                <th>Grupo</th>
+                <th>Negocio</th>
+                <th>Vendedor</th>
+                <th>Destino</th>
+                <th>Pax</th>
+                <th>Ficha médica</th>
+                <th>Carnet</th>
+                <th>Estado</th>
+                <th>Acción</th>
+              </tr>
+            </thead>
+
+            <tbody id="gnTbody">
+              <tr>
+                <td
+                  colspan="9"
+                  class="gn-empty"
+                >
+                  Cargando grupos...
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
     </section>
   </main>
 
-  <div id="gnModal" class="gn-modal" aria-hidden="true"><div class="gn-modal-card">
-    <div class="gn-modal-head"><div><h3 id="modalTitulo">Gestión de nómina</h3><div id="modalSubtitulo" class="gn-sub"></div></div><button id="modalCerrar" class="gn-close">×</button></div>
-    <div id="modalCargando" class="gn-empty">Cargando nómina...</div>
-    <div id="modalContenido" class="gn-modal-body hidden">
-      <div class="gn-kpis"><div class="gn-kpi"><span>Total</span><strong id="kTotal">0</strong></div><div class="gn-kpi"><span>Activos</span><strong id="kActivos">0</strong></div><div class="gn-kpi"><span>Anulados</span><strong id="kAnulados">0</strong></div><div class="gn-kpi"><span>Ficha completa</span><strong id="kCompleta">0</strong></div><div class="gn-kpi"><span>Ficha pendiente</span><strong id="kPendiente">0</strong></div><div class="gn-kpi"><span>Con carnet</span><strong id="kCarnet">0</strong></div><div class="gn-kpi"><span>Sin carnet</span><strong id="kSinCarnet">0</strong></div></div>
-      <section class="gn-section"><div class="gn-section-head">Links y fases</div><div class="gn-section-body"><div id="fasesContenedor" class="gn-fases"></div></div></section>
-      <section class="gn-section"><div class="gn-section-head">Gestión operativa</div><div class="gn-section-body gn-actions"><button id="btnExportarCsv" class="gn-btn sec">Exportar CSV</button><button id="btnCargadoPagos" class="gn-btn ok">Marcar cargado a pagos</button><button id="btnArchivar" class="gn-btn warn">Archivar nómina</button><button id="btnResetear" class="gn-btn danger">Resetear ciclo</button><button id="btnAbrirGrupo" class="gn-btn sec">Abrir ficha completa del grupo</button></div></section>
-      <section class="gn-section"><div class="gn-section-head">Pasajeros</div><div class="gn-section-body"><div class="gn-pass-wrap"><table class="gn-pass-table"><thead><tr><th>RUT</th><th>Nombre</th><th>Apellido</th><th>Tipo</th><th>Estado</th><th>Ficha</th><th>Anulado</th><th>Correo</th><th>Teléfono</th><th>Carnet</th></tr></thead><tbody id="pasajerosTbody"></tbody></table></div></div></section>
-    </div>
-  </div></div>
+  <div
+    class="modal"
+    id="modalAlertasInscripciones"
+  >
+    <div class="modal-card alerts-card">
+      <header class="modal-head">
+        <div>
+          <h2 id="alertasInscripcionesTitulo">
+            Gestión de inscripciones
+          </h2>
 
-  <script type="module" src="layout.js"></script>
-  <script type="module" src="gestion-nomina.js"></script>
+          <p id="alertasInscripcionesSubtitulo"></p>
+        </div>
+
+        <button
+          id="btnCerrarAlertas"
+          class="modal-close"
+          type="button"
+          aria-label="Cerrar"
+        >
+          ×
+        </button>
+      </header>
+
+      <div class="modal-content">
+        <div class="alerts-toolbar">
+          <input
+            id="buscadorAlertasInscripciones"
+            class="alert-search"
+            type="text"
+            placeholder="Buscar pasajero, grupo, negocio, vendedor..."
+          />
+
+          <div
+            id="alertasInscripcionesResumen"
+            class="alerts-summary"
+          >
+            0 pasajero(s)
+          </div>
+        </div>
+
+        <div class="alerts-table-wrap">
+          <table class="alerts-table">
+            <thead>
+              <tr>
+                <th>Pasajero</th>
+                <th>Grupo</th>
+                <th>Negocio</th>
+                <th>Vendedor</th>
+                <th>Responsable</th>
+                <th>Teléfono</th>
+                <th>Fecha</th>
+                <th>Acciones</th>
+              </tr>
+            </thead>
+
+            <tbody id="alertasInscripcionesTbody">
+              <tr>
+                <td
+                  colspan="8"
+                  class="gn-empty"
+                >
+                  No hay pasajeros para mostrar.
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div
+    class="modal"
+    id="gnModal"
+  >
+    <div class="modal-card">
+      <header class="modal-head">
+        <div>
+          <h2 id="modalTitulo">
+            Gestión de nómina
+          </h2>
+
+          <p id="modalSubtitulo"></p>
+        </div>
+
+        <button
+          id="modalCerrar"
+          class="modal-close"
+          type="button"
+          aria-label="Cerrar"
+        >
+          ×
+        </button>
+      </header>
+
+      <div
+        id="modalCargando"
+        class="modal-loading"
+      >
+        Cargando nómina...
+      </div>
+
+      <div
+        id="modalContenido"
+        class="modal-content hidden"
+      >
+        <div class="modal-toolbar">
+          <button
+            id="btnAbrirGrupo"
+            class="btn-secondary"
+            type="button"
+          >
+            Abrir grupo
+          </button>
+
+          <button
+            id="btnExportarCsv"
+            class="btn-secondary"
+            type="button"
+          >
+            Exportar CSV
+          </button>
+
+          <button
+            id="btnCargadoPagos"
+            class="btn-primary"
+            type="button"
+          >
+            Marcar cargado a pagos
+          </button>
+
+          <button
+            id="btnArchivar"
+            class="btn-secondary"
+            type="button"
+          >
+            Archivar nómina
+          </button>
+
+          <button
+            id="btnResetear"
+            class="btn-danger"
+            type="button"
+          >
+            Resetear ciclo
+          </button>
+        </div>
+
+        <section class="kpi-grid">
+          <div class="kpi">
+            <span>Total</span>
+            <strong id="kTotal">0</strong>
+          </div>
+
+          <div class="kpi">
+            <span>Activos</span>
+            <strong id="kActivos">0</strong>
+          </div>
+
+          <div class="kpi">
+            <span>Anulados</span>
+            <strong id="kAnulados">0</strong>
+          </div>
+
+          <div class="kpi">
+            <span>Ficha completa</span>
+            <strong id="kCompleta">0</strong>
+          </div>
+
+          <div class="kpi">
+            <span>Ficha pendiente</span>
+            <strong id="kPendiente">0</strong>
+          </div>
+
+          <div class="kpi">
+            <span>Con carnet</span>
+            <strong id="kCarnet">0</strong>
+          </div>
+
+          <div class="kpi">
+            <span>Sin carnet</span>
+            <strong id="kSinCarnet">0</strong>
+          </div>
+        </section>
+
+        <section class="modal-section">
+          <h3>
+            Links y fases de inscripción
+          </h3>
+
+          <div
+            id="fasesContenedor"
+            class="phase-grid"
+          ></div>
+        </section>
+
+        <section class="modal-section">
+          <h3>Pasajeros</h3>
+
+          <div class="passenger-table-wrap">
+            <table class="passenger-table">
+              <thead>
+                <tr>
+                  <th>RUT</th>
+                  <th>Nombre</th>
+                  <th>Apellido</th>
+                  <th>Tipo</th>
+                  <th>Estado</th>
+                  <th>Ficha médica</th>
+                  <th>Anulado</th>
+                  <th>Correo</th>
+                  <th>Teléfono</th>
+                  <th>Carnet</th>
+                </tr>
+              </thead>
+
+              <tbody id="pasajerosTbody">
+                <tr>
+                  <td
+                    colspan="10"
+                    class="gn-empty"
+                  >
+                    No hay pasajeros cargados.
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </div>
+    </div>
+  </div>
+
+  <script
+    type="module"
+    src="layout.js"
+  ></script>
+
+  <script
+    type="module"
+    src="gestion-nomina.js"
+  ></script>
 </body>
 </html>
