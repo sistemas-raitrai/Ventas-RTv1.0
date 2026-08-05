@@ -365,6 +365,12 @@ function bindEvents() {
       renderListadoAlertas
     );
 
+  $("pasajerosTbody")
+    ?.addEventListener(
+      "click",
+      manejarAccionPasajero
+    );
+
   $("modalKpisNomina")
     ?.addEventListener(
       "click",
@@ -2717,7 +2723,7 @@ function renderPasajeros() {
     tbody.innerHTML = `
       <tr>
         <td
-          colspan="10"
+          colspan="11"
           class="gn-empty"
         >
           No hay pasajeros para este filtro.
@@ -2744,7 +2750,7 @@ function renderPasajeros() {
           seccionAnterior
             ? `
               <tr class="nomina-section-row">
-                <td colspan="10">
+                <td colspan="11">
                   ${esc(
                     getSeccionNominaLabel(
                       seccion
@@ -2901,10 +2907,247 @@ function renderPasajeros() {
                   : "No"
               }
             </td>
+
+            <td>
+              <div class="passenger-row-actions">
+                ${getAccionOperativaHtml(
+                  item
+                )}
+              </div>
+            </td>
           </tr>
         `;
       }
     ).join("");
+}
+
+async function manejarAccionPasajero(
+  event
+) {
+  const button =
+    event.target.closest(
+      "[data-pasajero-action]"
+    );
+
+  if (!button) {
+    return;
+  }
+
+  const accion =
+    button.dataset
+      .pasajeroAction;
+
+  const inscripcionId =
+    button.dataset
+      .inscripcionId;
+
+  if (
+    !accion ||
+    !inscripcionId ||
+    !state.current
+  ) {
+    return;
+  }
+
+  const item =
+    state.nomina.find(
+      (row) =>
+        String(row.id) ===
+        String(inscripcionId)
+    );
+
+  const nombre =
+    [
+      camposPasajero.nombres(
+        item ||
+        {}
+      ),
+      camposPasajero.apellidos(
+        item ||
+        {}
+      )
+    ]
+      .filter(Boolean)
+      .join(" ")
+      .trim() ||
+    "esta persona";
+
+  let mensaje =
+    "";
+
+  if (
+    accion ===
+    "confirmar_nuevo"
+  ) {
+    mensaje =
+      `¿Confirmar nuevo ingreso para ${nombre}?`;
+  }
+
+  if (
+    accion ===
+    "marcar_pagado"
+  ) {
+    mensaje =
+      `¿Confirmar que ${nombre} pagó los $100.000 de lista de espera?`;
+  }
+
+  if (
+    accion ===
+    "confirmar_cupo"
+  ) {
+    mensaje =
+      `¿Confirmar cupo para ${nombre} desde lista de espera pagada?`;
+  }
+
+  if (
+    !mensaje ||
+    !confirm(mensaje)
+  ) {
+    return;
+  }
+
+  const textoOriginal =
+    button.textContent;
+
+  try {
+    button.disabled =
+      true;
+
+    button.textContent =
+      "Procesando...";
+
+    if (
+      accion ===
+      "confirmar_nuevo"
+    ) {
+      await state.manager
+        .confirmarNuevoIngreso(
+          state.current,
+          inscripcionId
+        );
+    }
+
+    if (
+      accion ===
+      "marcar_pagado"
+    ) {
+      await state.manager
+        .marcarListaEsperaPagada(
+          state.current,
+          inscripcionId
+        );
+    }
+
+    if (
+      accion ===
+      "confirmar_cupo"
+    ) {
+      await state.manager
+        .confirmarCupoListaEspera(
+          state.current,
+          inscripcionId
+        );
+    }
+
+    /*
+      Volvemos a consultar el resumen actualizado.
+      También refrescamos las alertas superiores.
+    */
+    await refrescarModal();
+    await cargarAlertasInscripciones();
+
+    alert(
+      "Acción realizada correctamente."
+    );
+  } catch (error) {
+    console.error(
+      "[gestion-nomina] manejarAccionPasajero",
+      error
+    );
+
+    alert(
+      error.message ||
+      "No se pudo completar la acción."
+    );
+  } finally {
+    button.disabled =
+      false;
+
+    button.textContent =
+      textoOriginal;
+  }
+}
+
+function getAccionOperativaHtml(
+  item = {}
+) {
+  const categoria =
+    getCategoriaOperativa(
+      item
+    );
+
+  if (
+    categoria ===
+    "nuevo_pendiente"
+  ) {
+    return `
+      <button
+        class="passenger-action-btn action-confirm"
+        type="button"
+        data-pasajero-action="confirmar_nuevo"
+        data-inscripcion-id="${esc(
+          item.id ||
+          ""
+        )}"
+      >
+        Confirmar nuevo ingreso
+      </button>
+    `;
+  }
+
+  if (
+    categoria ===
+    "lista_pendiente"
+  ) {
+    return `
+      <button
+        class="passenger-action-btn action-paid"
+        type="button"
+        data-pasajero-action="marcar_pagado"
+        data-inscripcion-id="${esc(
+          item.id ||
+          ""
+        )}"
+      >
+        Marcar pagado
+      </button>
+    `;
+  }
+
+  if (
+    categoria ===
+    "lista_pagada"
+  ) {
+    return `
+      <button
+        class="passenger-action-btn action-confirm"
+        type="button"
+        data-pasajero-action="confirmar_cupo"
+        data-inscripcion-id="${esc(
+          item.id ||
+          ""
+        )}"
+      >
+        Confirmar cupo
+      </button>
+    `;
+  }
+
+  return `
+    <span class="gn-sub">
+      Sin acción pendiente
+    </span>
+  `;
 }
 
 function enfocarPasajeroPendiente() {
