@@ -377,6 +377,27 @@ function bindEvents() {
       aplicarFiltros
     );
 
+  $("summaryGestionNomina")
+    ?.addEventListener(
+      "click",
+      (event) => {
+        const card =
+          event.target.closest(
+            "[data-summary-filter]"
+          );
+  
+        if (!card) {
+          return;
+        }
+  
+        filtrarDesdeKpiResumen(
+          card.dataset
+            .summaryFilter ||
+          "todos"
+        );
+      }
+    );
+
   $("gnRecargar")
     ?.addEventListener(
       "click",
@@ -1586,7 +1607,8 @@ function aplicarFiltros() {
   const q =
     normalizar(
       $("gnBuscar")
-        ?.value
+        ?.value ||
+      ""
     );
 
   const v =
@@ -1602,48 +1624,154 @@ function aplicarFiltros() {
   state.filtered =
     state.rows
       .filter(
-        (row) =>
-          (
+        (row) => {
+          const coincideBusqueda =
             !q ||
             row.search.includes(
               q
-            )
-          ) &&
-          (
+            );
+
+          const coincideVendedor =
             v === "todos" ||
-            row.vendedora === v
-          ) &&
-          (
-            e === "todos" ||
-            (
-              e === "pendiente" &&
-              row.pendientes > 0
-            ) ||
-            (
-              e === "completa" &&
+            row.vendedora === v;
+
+          let coincideEstado =
+            true;
+
+          if (
+            e ===
+            "pendiente"
+          ) {
+            coincideEstado =
+              row.pendientes > 0;
+          }
+
+          if (
+            e ===
+            "sin_carnet"
+          ) {
+            coincideEstado =
+              row.sinCarnet > 0;
+          }
+
+          if (
+            e ===
+            "completa"
+          ) {
+            coincideEstado =
               row.total > 0 &&
-              row.pendientes === 0
-            ) ||
-            (
-              e === "link_activo" &&
-              row.linkActivo
-            ) ||
-            (
-              e === "archivada" &&
-              row.archivada
-            )
-          )
+              row.pendientes === 0;
+          }
+
+          if (
+            e ===
+            "link_activo"
+          ) {
+            coincideEstado =
+              row.linkActivo ===
+              true;
+          }
+
+          if (
+            e ===
+            "archivada"
+          ) {
+            coincideEstado =
+              row.archivada ===
+              true;
+          }
+
+          return (
+            coincideBusqueda &&
+            coincideVendedor &&
+            coincideEstado
+          );
+        }
       )
       .sort(
         (a, b) =>
           a.titulo.localeCompare(
             b.titulo,
-            "es"
+            "es",
+            {
+              sensitivity:
+                "base",
+              numeric:
+                true
+            }
           )
       );
 
+  actualizarKpiResumenActivo(
+    e
+  );
+
   renderRows();
   renderSummary();
+}
+
+function actualizarKpiResumenActivo(
+  filtro = "todos"
+) {
+  document
+    .querySelectorAll(
+      "[data-summary-filter]"
+    )
+    .forEach(
+      (card) => {
+        card.classList.toggle(
+          "active",
+          card.dataset
+            .summaryFilter ===
+            filtro
+        );
+      }
+    );
+}
+
+function filtrarDesdeKpiResumen(
+  filtro = "todos"
+) {
+  const selectEstado =
+    $("gnEstado");
+
+  if (!selectEstado) {
+    return;
+  }
+
+  const filtrosValidos =
+    new Set([
+      "todos",
+      "pendiente",
+      "sin_carnet",
+      "link_activo",
+      "archivada"
+    ]);
+
+  const filtroSeguro =
+    filtrosValidos.has(
+      filtro
+    )
+      ? filtro
+      : "todos";
+
+  selectEstado.value =
+    filtroSeguro;
+
+  aplicarFiltros();
+
+  window.setTimeout(
+    () => {
+      $("tablaGruposGestion")
+        ?.scrollIntoView({
+          behavior:
+            "smooth",
+          block:
+            "start"
+        });
+    },
+    80
+  );
 }
 
 function renderRows() {
@@ -1783,45 +1911,100 @@ function renderMensaje(
 }
 
 function renderSummary() {
+  /*
+    Los KPI superiores representan el universo
+    del año y vendedor seleccionados.
+
+    El filtro de estado no debe alterar sus cifras,
+    porque las tarjetas sirven para cambiar de filtro.
+  */
+  const vendedorSeleccionado =
+    $("gnVendedor")
+      ?.value ||
+    "todos";
+
+  const q =
+    normalizar(
+      $("gnBuscar")
+        ?.value ||
+      ""
+    );
+
+  const baseResumen =
+    state.rows.filter(
+      (row) => {
+        const coincideBusqueda =
+          !q ||
+          row.search.includes(
+            q
+          );
+
+        const coincideVendedor =
+          vendedorSeleccionado ===
+            "todos" ||
+          row.vendedora ===
+            vendedorSeleccionado;
+
+        return (
+          coincideBusqueda &&
+          coincideVendedor
+        );
+      }
+    );
+
+  const sumar =
+    (key) =>
+      baseResumen.reduce(
+        (total, row) =>
+          total +
+          Number(
+            row[key] ||
+            0
+          ),
+        0
+      );
+
   set(
     "sumGrupos",
-    state.filtered.length
+    baseResumen.length
   );
 
   set(
     "sumPax",
-    sum(
+    sumar(
       "total"
     )
   );
 
   set(
     "sumPendientes",
-    sum(
+    sumar(
       "pendientes"
     )
   );
 
   set(
     "sumSinCarnet",
-    sum(
+    sumar(
       "sinCarnet"
     )
   );
 
   set(
     "sumLinks",
-    state.filtered.filter(
+    baseResumen.filter(
       (row) =>
-        row.linkActivo
+        row.linkActivo ===
+        true
     ).length
   );
 
   set(
     "sumArchivadas",
-    state.filtered.filter(
+    baseResumen.filter(
       (row) =>
-        row.archivada
+        row.archivada ===
+        true
     ).length
   );
 }
