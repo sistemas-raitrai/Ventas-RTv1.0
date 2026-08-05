@@ -43,7 +43,15 @@ import {
 const $ = (id) =>
   document.getElementById(id);
 
-const ANO_GESTION = 2026;
+const ANO_ACTUAL =
+  new Date()
+    .getFullYear();
+
+const ANO_MINIMO_GESTION =
+  ANO_ACTUAL - 1;
+
+const ANO_MAXIMO_GESTION =
+  ANO_ACTUAL + 2;
 
 const ALERTAS_INSCRIPCIONES_COLLECTION =
   "ventas_alertas_inscripciones";
@@ -53,6 +61,9 @@ const state = {
   user: null,
   email: "",
   canSeeAll: false,
+
+  anoSeleccionado:
+    ANO_ACTUAL,
 
   rows: [],
   filtered: [],
@@ -79,6 +90,9 @@ init();
 
 async function init() {
   await waitForLayoutReady();
+
+  configurarSelectorAnos();
+  actualizarTituloAno();
   bindEvents();
 
   onAuthStateChanged(
@@ -93,6 +107,147 @@ async function init() {
       await cargarPantalla();
     }
   );
+}
+
+function configurarSelectorAnos() {
+  const select =
+    $("gnAno");
+
+  if (!select) {
+    return;
+  }
+
+  const anos =
+    [];
+
+  for (
+    let ano = ANO_MAXIMO_GESTION;
+    ano >= ANO_MINIMO_GESTION;
+    ano -= 1
+  ) {
+    anos.push(
+      ano
+    );
+  }
+
+  select.innerHTML =
+    anos
+      .map(
+        (ano) => `
+          <option
+            value="${ano}"
+            ${
+              ano ===
+              state.anoSeleccionado
+                ? "selected"
+                : ""
+            }
+          >
+            ${ano}
+          </option>
+        `
+      )
+      .join("");
+
+  select.value =
+    String(
+      state.anoSeleccionado
+    );
+}
+
+function actualizarTituloAno() {
+  const ano =
+    Number(
+      state.anoSeleccionado ||
+      ANO_ACTUAL
+    );
+
+  const titulo =
+    $("tituloAnoGestion");
+
+  if (titulo) {
+    titulo.textContent =
+      String(
+        ano
+      );
+  }
+
+  document.title =
+    `Gestión de Nómina ${ano} | Sistema Ventas RT`;
+}
+
+async function cambiarAnoGestion() {
+  const select =
+    $("gnAno");
+
+  const nuevoAno =
+    Number(
+      select?.value ||
+      ANO_ACTUAL
+    );
+
+  if (
+    !Number.isInteger(
+      nuevoAno
+    ) ||
+    nuevoAno < 2000
+  ) {
+    return;
+  }
+
+  if (
+    nuevoAno ===
+    state.anoSeleccionado
+  ) {
+    return;
+  }
+
+  state.anoSeleccionado =
+    nuevoAno;
+
+  state.rows =
+    [];
+
+  state.filtered =
+    [];
+
+  state.alertasInscripciones =
+    [];
+
+  state.nuevosPendientes =
+    [];
+
+  state.listaEsperaPendientes =
+    [];
+
+  state.listaEsperaPagadas =
+    [];
+
+  const buscador =
+    $("gnBuscar");
+
+  if (buscador) {
+    buscador.value =
+      "";
+  }
+
+  const estado =
+    $("gnEstado");
+
+  if (estado) {
+    estado.value =
+      "todos";
+  }
+
+  actualizarTituloAno();
+
+  renderMensaje(
+    `Cargando grupos ${nuevoAno}...`
+  );
+
+  renderKpisInscripciones();
+
+  await cargarPantalla();
 }
 
 async function bootstrap() {
@@ -208,6 +363,12 @@ function bindEvents() {
     ?.addEventListener(
       "change",
       aplicarFiltros
+    );
+
+  $("gnAno")
+    ?.addEventListener(
+      "change",
+      cambiarAnoGestion
     );
 
   $("gnEstado")
@@ -329,7 +490,8 @@ function bindEvents() {
           "click",
           () => {
             abrirListadoAlertas(
-              card.dataset.alertaKpi
+              card.dataset
+                .alertaKpi
             );
           }
         );
@@ -347,7 +509,8 @@ function bindEvents() {
             event.preventDefault();
 
             abrirListadoAlertas(
-              card.dataset.alertaKpi
+              card.dataset
+                .alertaKpi
             );
           }
         );
@@ -405,7 +568,8 @@ function bindEvents() {
         }
 
         state.nominaFiltro =
-          card.dataset.nominaFiltro ||
+          card.dataset
+            .nominaFiltro ||
           "todos";
 
         renderKpisModal();
@@ -428,13 +592,18 @@ function bindEvents() {
   document.addEventListener(
     "keydown",
     (event) => {
-      if (event.key !== "Escape") {
+      if (
+        event.key !==
+        "Escape"
+      ) {
         return;
       }
 
       if (
         $("modalAlertasInscripciones")
-          ?.classList.contains("show")
+          ?.classList.contains(
+            "show"
+          )
       ) {
         cerrarListadoAlertas();
         return;
@@ -442,7 +611,9 @@ function bindEvents() {
 
       if (
         $("gnModal")
-          ?.classList.contains("show")
+          ?.classList.contains(
+            "show"
+          )
       ) {
         cerrarModal();
       }
@@ -451,6 +622,12 @@ function bindEvents() {
 }
 
 async function cargarPantalla() {
+  actualizarTituloAno();
+
+  renderMensaje(
+    `Cargando grupos ${state.anoSeleccionado}...`
+  );
+
   await Promise.all([
     cargarGrupos(),
     cargarAlertasInscripciones()
@@ -459,7 +636,7 @@ async function cargarPantalla() {
 
 async function cargarGrupos() {
   renderMensaje(
-    "Cargando grupos 2026..."
+    `Cargando grupos ${state.anoSeleccionado}...`
   );
 
   try {
@@ -473,7 +650,9 @@ async function cargarGrupos() {
           where(
             "anoViaje",
             "==",
-            ANO_GESTION
+            Number(
+              state.anoSeleccionado
+            )
           )
         )
       );
@@ -507,7 +686,7 @@ async function cargarGrupos() {
     );
 
     renderMensaje(
-      "No se pudieron cargar los grupos."
+      `No se pudieron cargar los grupos ${state.anoSeleccionado}.`
     );
   }
 }
@@ -583,7 +762,9 @@ function clasificarAlertasInscripciones() {
 
       if (row.id) {
         docIdsPermitidos.add(
-          String(row.id)
+          String(
+            row.id
+          )
         );
       }
     }
@@ -604,7 +785,10 @@ function clasificarAlertasInscripciones() {
 
           if (
             ano &&
-            ano !== ANO_GESTION
+            ano !==
+              Number(
+                state.anoSeleccionado
+              )
           ) {
             return false;
           }
@@ -1731,7 +1915,7 @@ function renderModal(
   $("modalSubtitulo").textContent =
     `Año ${
       grupo.anoViaje ||
-      ANO_GESTION
+      state.anoSeleccionado
     } · Negocio ${
       grupo.numeroNegocio ||
       "—"
