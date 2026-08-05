@@ -506,7 +506,7 @@ function bindEvents() {
           );
         }
       );
-
+  
   document
     .querySelectorAll(
       "[data-alerta-kpi]"
