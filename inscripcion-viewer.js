@@ -2500,126 +2500,155 @@ function generarVentanaImpresion(
         <style>
           @page {
             size: A4;
-            margin: 14mm;
+            margin: 12mm;
           }
-
+        
           * {
             box-sizing: border-box;
           }
-
+        
           html,
           body {
             margin: 0;
             padding: 0;
           }
-
+        
           body {
             font-family:
               Arial,
               Helvetica,
               sans-serif;
-
+        
             color: #231331;
-            font-size: 11px;
-            line-height: 1.25;
+            font-size: 9px;
+            line-height: 1.16;
             background: #ffffff;
           }
-
+        
           .top {
-            margin-bottom: 12px;
+            margin-bottom: 7px;
           }
-
+        
           .brand {
-            margin-bottom: 4px;
+            margin-bottom: 2px;
             color: #4b1979;
-            font-size: 10px;
+            font-size: 7px;
             font-weight: 900;
             letter-spacing: .06em;
             text-transform: uppercase;
           }
-
+        
           .doc-main-title {
-            margin: 0 0 10px;
+            margin: 0 0 6px;
             color: #251033;
-            font-size: 18px;
-            line-height: 1.1;
+            font-size: 14px;
+            line-height: 1.05;
             text-transform: uppercase;
           }
-
+        
           .group-name-box {
-            padding: 9px 11px;
+            padding: 6px 8px;
             border: 1px solid #d9cde3;
-            border-radius: 9px;
-            background: #fff;
+            border-radius: 7px;
+            background: #ffffff;
           }
-
+        
           .group-label {
-            margin-bottom: 3px;
+            margin-bottom: 2px;
             color: #786883;
-            font-size: 8px;
+            font-size: 6px;
             font-weight: 900;
             text-transform: uppercase;
           }
-
+        
           .group-name {
             color: #251033;
-            font-size: 15px;
+            font-size: 12px;
+            line-height: 1.05;
             font-weight: 900;
             text-transform: uppercase;
           }
-
+        
+          /*
+            Cada sección mantiene unido su título con
+            el comienzo de la tabla.
+          */
+          .print-section {
+            margin-top: 6px;
+            break-inside: avoid;
+            page-break-inside: avoid;
+          }
+        
           .section-title {
-            margin: 10px 0 5px;
-            padding-bottom: 3px;
+            margin: 0 0 3px;
+            padding-bottom: 2px;
             border-bottom: 2px solid #4b1979;
             color: #4b1979;
-            font-size: 10px;
+            font-size: 7px;
             font-weight: 900;
             text-transform: uppercase;
+            break-after: avoid;
+            page-break-after: avoid;
           }
-
+        
           .form-grid {
             overflow: hidden;
             border: 1px solid #ddd3e6;
-            border-radius: 9px;
-            background: #fff;
-            break-inside: avoid;
+            border-radius: 7px;
+            background: #ffffff;
           }
-
+        
           .row {
             display: grid;
-            grid-template-columns: 170px 1fr;
-            min-height: 25px;
+            grid-template-columns: 145px 1fr;
+            min-height: 17px;
             border-bottom: 1px solid #eee8f2;
             break-inside: avoid;
+            page-break-inside: avoid;
           }
-
+        
           .row:last-child {
             border-bottom: 0;
           }
-
+        
           .label {
             display: flex;
             align-items: center;
-            padding: 6px 8px;
+            padding: 3px 6px;
             color: #5a4967;
-            font-size: 8px;
+            font-size: 6px;
+            line-height: 1.1;
             font-weight: 900;
             text-transform: uppercase;
           }
-
+        
           .value {
             display: flex;
             align-items: center;
             min-width: 0;
-            padding: 6px 8px;
+            padding: 3px 6px;
             color: #21142c;
-            font-size: 10px;
+            font-size: 8px;
+            line-height: 1.15;
             font-weight: 700;
             overflow-wrap: anywhere;
             white-space: pre-wrap;
           }
-
+        
+          /*
+            Los documentos siempre comienzan en una
+            página nueva, como ocurre en grupo.js.
+          */
+          .docs-page {
+            page-break-before: always;
+            break-before: page;
+            padding-top: 1px;
+          }
+        
+          .docs-page .section-title {
+            margin-top: 0;
+          }
+        
           .docs-grid {
             display: grid;
             grid-template-columns:
@@ -2627,49 +2656,57 @@ function generarVentanaImpresion(
                 2,
                 minmax(0, 1fr)
               );
-
-            gap: 10px;
-            margin-top: 8px;
+        
+            gap: 8px;
+            margin-top: 5px;
           }
-
+        
           .doc-card {
-            padding: 8px;
+            padding: 6px;
             border: 1px solid #ddd6e8;
-            border-radius: 10px;
+            border-radius: 8px;
             break-inside: avoid;
+            page-break-inside: avoid;
           }
-
+        
           .doc-card .doc-title {
-            margin: 0 0 6px;
+            margin: 0 0 4px;
             color: #4b1979;
-            font-size: 10px;
+            font-size: 7px;
             font-weight: 900;
+            text-transform: uppercase;
           }
-
+        
           .doc-card img {
             display: block;
             width: 100%;
-            max-height: 230px;
+            height: 185px;
             object-fit: contain;
-            border-radius: 6px;
+            border-radius: 5px;
             background: #f7f3fb;
           }
-
-          .docs-page {
-            page-break-before: always;
-            break-before: page;
-          }
-
+        
           .footer {
-            margin-top: 12px;
+            margin-top: 7px;
             color: #786883;
-            font-size: 9px;
+            font-size: 6px;
           }
-
+        
           @media print {
             body {
               print-color-adjust: exact;
               -webkit-print-color-adjust: exact;
+            }
+        
+            .print-section {
+              break-inside: avoid;
+              page-break-inside: avoid;
+            }
+        
+            .row,
+            .doc-card {
+              break-inside: avoid;
+              page-break-inside: avoid;
             }
           }
         </style>
@@ -2700,38 +2737,44 @@ function generarVentanaImpresion(
           </div>
         </div>
 
-        <div class="section-title">
-          Datos de la persona inscrita
-        </div>
+        <section class="print-section">
+          <div class="section-title">
+            Datos de la persona inscrita
+          </div>
+        
+          <div class="form-grid">
+            ${renderPdfRowsViewer(
+              filasPersona
+            )}
+          </div>
+        </section>
 
-        <div class="form-grid">
-          ${renderPdfRowsViewer(
-            filasPersona
-          )}
-        </div>
-
-        <div class="section-title">
-          Datos del grupo
-        </div>
-
-        <div class="form-grid">
-          ${renderPdfRowsViewer(
-            filasGrupo
-          )}
-        </div>
+        <section class="print-section">
+          <div class="section-title">
+            Datos del grupo
+          </div>
+        
+          <div class="form-grid">
+            ${renderPdfRowsViewer(
+              filasGrupo
+            )}
+          </div>
+        </section>
 
         ${
           filasEncargados.length
             ? `
-              <div class="section-title">
-                Encargado(s) del grupo
-              </div>
-
-              <div class="form-grid">
-                ${renderPdfRowsViewer(
-                  filasEncargados
-                )}
-              </div>
+              <section class="print-section">
+                <div class="section-title">
+                  Encargado(s) del grupo
+                </div>
+        
+                <div class="form-grid">
+                  ${renderPdfRowsViewer(
+                    filasEncargados
+                  )}
+                </div>
+              </section>
             `
             : ""
         }
@@ -2739,15 +2782,15 @@ function generarVentanaImpresion(
         ${
           documentosHtml
             ? `
-              <div class="docs-page">
+              <section class="docs-page">
                 <div class="section-title">
                   Documentos adjuntos
                 </div>
-
+        
                 <div class="docs-grid">
                   ${documentosHtml}
                 </div>
-              </div>
+              </section>
             `
             : ""
         }
