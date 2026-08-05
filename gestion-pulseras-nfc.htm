@@ -1,0 +1,297 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Gestión de Pulseras NFC | Sistema Ventas RT</title>
+  <link rel="stylesheet" href="estilos.css" />
+  <link rel="icon" type="image/png" href="IMG/logo-raitrai.png" />
+
+  <style>
+    .nfc-page { padding: 20px 30px 40px; }
+    .nfc-panel {
+      max-width: 1450px;
+      margin: 0 auto;
+      padding: 22px;
+      border: 1px solid #d8d1df;
+      border-radius: 22px;
+      background: #f2f0f5;
+    }
+    .nfc-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 14px;
+      align-items: flex-start;
+      flex-wrap: wrap;
+    }
+    .nfc-head h1 { margin: 0; color: #2b1940; font-size: 30px; }
+    .nfc-head p { margin: 5px 0 0; color: #6a6075; }
+    .nfc-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+    .nfc-btn {
+      min-height: 42px;
+      padding: 0 15px;
+      border: 0;
+      border-radius: 10px;
+      background: #4a2570;
+      color: #fff;
+      font-weight: 900;
+      cursor: pointer;
+    }
+    .nfc-btn.secondary { background: #6b6178; }
+    .nfc-btn.success { background: #166534; }
+    .nfc-btn.warning { background: #b45309; }
+    .nfc-btn:disabled { opacity: .45; cursor: not-allowed; }
+    .nfc-grid {
+      display: grid;
+      grid-template-columns: minmax(280px, .85fr) minmax(0, 1.8fr);
+      gap: 18px;
+      margin-top: 20px;
+    }
+    .nfc-card {
+      padding: 18px;
+      border: 1px solid #ded6e4;
+      border-radius: 16px;
+      background: #fff;
+    }
+    .nfc-card h2, .nfc-card h3 { margin: 0 0 12px; color: #2b1940; }
+    .nfc-field { margin-top: 12px; }
+    .nfc-field label {
+      display: block;
+      margin-bottom: 5px;
+      color: #62566d;
+      font-size: 12px;
+      font-weight: 900;
+      text-transform: uppercase;
+    }
+    .nfc-field input, .nfc-field select {
+      width: 100%;
+      min-height: 44px;
+      border: 1px solid #cec4d7;
+      border-radius: 10px;
+      padding: 0 11px;
+      background: #fff;
+    }
+    .nfc-summary {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 10px;
+      margin-top: 16px;
+    }
+    .nfc-kpi {
+      padding: 13px;
+      border: 1px solid #e1d9e7;
+      border-radius: 13px;
+      background: #faf8fc;
+    }
+    .nfc-kpi span {
+      display: block;
+      color: #786d82;
+      font-size: 10px;
+      font-weight: 900;
+      text-transform: uppercase;
+    }
+    .nfc-kpi strong {
+      display: block;
+      margin-top: 4px;
+      color: #2b1940;
+      font-size: 24px;
+    }
+    .writer-box {
+      margin-top: 16px;
+      padding: 18px;
+      border: 2px solid #cabbd7;
+      border-radius: 16px;
+      background: #f8f4fb;
+      text-align: center;
+    }
+    .writer-code {
+      margin: 12px 0;
+      font-size: clamp(26px, 5vw, 46px);
+      color: #2b1940;
+      font-weight: 1000;
+      letter-spacing: .04em;
+      overflow-wrap: anywhere;
+    }
+    .writer-person { color: #5f526b; font-size: 18px; font-weight: 900; }
+    .writer-status {
+      min-height: 25px;
+      margin-top: 12px;
+      color: #6a6075;
+      font-weight: 900;
+    }
+    .writer-status.ok { color: #166534; }
+    .writer-status.error { color: #991b1b; }
+    .table-wrap {
+      max-height: 580px;
+      margin-top: 16px;
+      overflow: auto;
+      border: 1px solid #e0d8e5;
+      border-radius: 14px;
+    }
+    .nfc-table { width: 100%; min-width: 850px; border-collapse: collapse; }
+    .nfc-table th {
+      position: sticky;
+      top: 0;
+      padding: 10px;
+      background: #2b1940;
+      color: #fff;
+      text-align: left;
+      font-size: 11px;
+      text-transform: uppercase;
+      z-index: 1;
+    }
+    .nfc-table td { padding: 10px; border-bottom: 1px solid #eee9f1; font-size: 13px; }
+    .row-current td { background: #fff7d6; }
+    .row-written td { background: #eaf8ee; }
+    .pill {
+      display: inline-flex;
+      min-height: 25px;
+      align-items: center;
+      padding: 0 8px;
+      border-radius: 999px;
+      background: #ece7f0;
+      color: #5c5066;
+      font-size: 11px;
+      font-weight: 900;
+    }
+    .pill.ok { background: #dcfce7; color: #166534; }
+    .notice {
+      margin-top: 14px;
+      padding: 12px;
+      border-radius: 12px;
+      background: #fff7d6;
+      color: #735c00;
+      font-size: 13px;
+      font-weight: 800;
+    }
+    .hidden { display: none !important; }
+
+    @media (max-width: 900px) {
+      .nfc-page { padding: 14px; }
+      .nfc-grid { grid-template-columns: 1fr; }
+      .nfc-summary { grid-template-columns: repeat(2, 1fr); }
+    }
+  </style>
+</head>
+
+<body class="ventas-body" data-page="gestion-pulseras-nfc">
+  <div id="layout-top"></div>
+
+  <main class="page-shell nfc-page">
+    <section class="nfc-panel">
+      <header class="nfc-head">
+        <div>
+          <h1>Gestión de Pulseras NFC</h1>
+          <p id="nfcSubtitulo">Cargando grupo y nómina...</p>
+        </div>
+
+        <div class="nfc-actions">
+          <button id="btnVolverNomina" class="nfc-btn secondary" type="button">
+            Volver a Gestión de Nómina
+          </button>
+
+          <button id="btnLeerPulsera" class="nfc-btn secondary" type="button">
+            Abrir lector
+          </button>
+        </div>
+      </header>
+
+      <div class="nfc-grid">
+        <aside class="nfc-card">
+          <h2>Configuración</h2>
+
+          <div class="nfc-field">
+            <label for="nfcModalidad">Modalidad</label>
+            <select id="nfcModalidad">
+              <option value="individual">Individual por pasajero</option>
+              <option value="grupal">Mismo código para todo el grupo</option>
+            </select>
+          </div>
+
+          <div class="nfc-field">
+            <label for="nfcCantidadGrupal">Cantidad de pulseras grupales</label>
+            <input id="nfcCantidadGrupal" type="number" min="1" value="1" disabled />
+          </div>
+
+          <div class="nfc-actions" style="margin-top:16px">
+            <button id="btnGenerarCodigos" class="nfc-btn" type="button">
+              Generar códigos
+            </button>
+
+            <button id="btnGuardarAsociaciones" class="nfc-btn secondary" type="button" disabled>
+              Guardar asociaciones
+            </button>
+          </div>
+
+          <div class="notice">
+            La pulsera guardará solamente un texto como
+            <strong>10661-001-JP</strong>. La relación con el pasajero quedará guardada en Firebase.
+          </div>
+
+          <div class="nfc-summary">
+            <div class="nfc-kpi"><span>Viajan</span><strong id="kViajan">0</strong></div>
+            <div class="nfc-kpi"><span>Códigos</span><strong id="kCodigos">0</strong></div>
+            <div class="nfc-kpi"><span>Grabadas</span><strong id="kGrabadas">0</strong></div>
+            <div class="nfc-kpi"><span>Pendientes</span><strong id="kPendientes">0</strong></div>
+          </div>
+
+          <div id="nfcCompatibilidad" class="notice">
+            Comprobando compatibilidad NFC...
+          </div>
+        </aside>
+
+        <section class="nfc-card">
+          <h2>Grabación guiada</h2>
+
+          <div class="writer-box">
+            <div id="writerProgreso" class="pill">Sin lote generado</div>
+            <div id="writerPersona" class="writer-person">—</div>
+            <div id="writerCodigo" class="writer-code">—</div>
+
+            <div class="nfc-actions" style="justify-content:center">
+              <button id="btnAnterior" class="nfc-btn secondary" type="button" disabled>
+                Anterior
+              </button>
+
+              <button id="btnGrabarActual" class="nfc-btn success" type="button" disabled>
+                Grabar esta pulsera
+              </button>
+
+              <button id="btnSiguiente" class="nfc-btn secondary" type="button" disabled>
+                Siguiente
+              </button>
+            </div>
+
+            <div id="writerEstado" class="writer-status">
+              Genera los códigos para comenzar.
+            </div>
+          </div>
+
+          <div class="table-wrap">
+            <table class="nfc-table">
+              <thead>
+                <tr>
+                  <th>N.º</th>
+                  <th>Pasajero</th>
+                  <th>RUT</th>
+                  <th>Código NFC</th>
+                  <th>Estado</th>
+                  <th>Acción</th>
+                </tr>
+              </thead>
+              <tbody id="nfcTbody">
+                <tr>
+                  <td colspan="6">Cargando nómina...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </div>
+    </section>
+  </main>
+
+  <script type="module" src="layout.js"></script>
+  <script type="module" src="gestion-pulseras-nfc.js"></script>
+</body>
+</html>
