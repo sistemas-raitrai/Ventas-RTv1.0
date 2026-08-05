@@ -1,0 +1,189 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Lector de Pulseras NFC | Rai Trai</title>
+  <link rel="stylesheet" href="estilos.css" />
+  <link rel="icon" type="image/png" href="IMG/logo-raitrai.png" />
+
+  <style>
+    .reader-page {
+      min-height: 100vh;
+      padding: 22px;
+      background: #f2f0f5;
+    }
+    .reader-shell { width: min(900px, 100%); margin: 0 auto; }
+    .reader-card {
+      padding: 22px;
+      border: 1px solid #d8d1df;
+      border-radius: 22px;
+      background: #fff;
+      box-shadow: 0 14px 36px rgba(43, 25, 64, .09);
+    }
+    .reader-card + .reader-card { margin-top: 16px; }
+    .reader-title { margin: 0; color: #2b1940; font-size: 30px; }
+    .reader-sub { margin: 6px 0 0; color: #6a6075; }
+    .reader-field { margin-top: 18px; }
+    .reader-field label {
+      display: block;
+      margin-bottom: 6px;
+      color: #62566d;
+      font-size: 12px;
+      font-weight: 900;
+      text-transform: uppercase;
+    }
+    .reader-field input {
+      width: 100%;
+      min-height: 48px;
+      border: 1px solid #cec4d7;
+      border-radius: 11px;
+      padding: 0 13px;
+      font-size: 18px;
+    }
+    .reader-actions { display: flex; gap: 9px; flex-wrap: wrap; margin-top: 16px; }
+    .reader-btn {
+      min-height: 46px;
+      padding: 0 17px;
+      border: 0;
+      border-radius: 11px;
+      background: #4a2570;
+      color: #fff;
+      font-weight: 900;
+      cursor: pointer;
+    }
+    .reader-btn.secondary { background: #6b6178; }
+    .reader-btn:disabled { opacity: .45; cursor: not-allowed; }
+    .reader-state {
+      min-height: 25px;
+      margin-top: 14px;
+      color: #6a6075;
+      font-weight: 900;
+    }
+    .reader-state.ok { color: #166534; }
+    .reader-state.error { color: #991b1b; }
+    .reader-code {
+      margin: 8px 0 18px;
+      color: #2b1940;
+      font-size: clamp(28px, 7vw, 50px);
+      font-weight: 1000;
+      text-align: center;
+      overflow-wrap: anywhere;
+    }
+    .data-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+    }
+    .data-card {
+      padding: 13px;
+      border: 1px solid #e2dbe7;
+      border-radius: 13px;
+      background: #faf8fc;
+    }
+    .data-card span {
+      display: block;
+      color: #786d82;
+      font-size: 10px;
+      font-weight: 900;
+      text-transform: uppercase;
+    }
+    .data-card strong {
+      display: block;
+      margin-top: 5px;
+      color: #2b1940;
+      font-size: 16px;
+      overflow-wrap: anywhere;
+    }
+    .hidden { display: none !important; }
+    .warning {
+      margin-top: 15px;
+      padding: 12px;
+      border-radius: 12px;
+      background: #fff7d6;
+      color: #735c00;
+      font-size: 13px;
+      font-weight: 800;
+    }
+    @media (max-width: 650px) {
+      .reader-page { padding: 12px; }
+      .data-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+
+<body>
+  <main class="reader-page">
+    <div class="reader-shell">
+      <section class="reader-card">
+        <h1 class="reader-title">Lector de Pulseras NFC</h1>
+        <p class="reader-sub">
+          Ingresa el número de negocio del grupo y luego acerca una pulsera.
+        </p>
+
+        <div class="reader-field">
+          <label for="claveNegocio">Clave del grupo</label>
+          <input
+            id="claveNegocio"
+            type="password"
+            inputmode="numeric"
+            autocomplete="off"
+            placeholder="Ejemplo: 10661"
+          />
+        </div>
+
+        <div class="reader-actions">
+          <button id="btnValidarClave" class="reader-btn" type="button">
+            Ingresar
+          </button>
+
+          <button id="btnCerrarSesionGrupo" class="reader-btn secondary hidden" type="button">
+            Cambiar grupo
+          </button>
+        </div>
+
+        <div id="readerEstado" class="reader-state">
+          Ingresa la clave para comenzar.
+        </div>
+
+        <div class="warning">
+          Esta primera versión valida el número de negocio contra Firebase. Para publicar
+          información médica de forma externa, después conviene proteger la consulta con una
+          Cloud Function y permisos específicos.
+        </div>
+      </section>
+
+      <section id="readerPanel" class="reader-card hidden">
+        <div class="reader-actions" style="justify-content:center">
+          <button id="btnEscanearNfc" class="reader-btn" type="button">
+            Leer pulsera NFC
+          </button>
+        </div>
+
+        <div class="reader-field">
+          <label for="codigoManual">Prueba manual del código</label>
+          <input
+            id="codigoManual"
+            type="text"
+            autocomplete="off"
+            placeholder="Ejemplo: 10661-001-JP"
+          />
+        </div>
+
+        <div class="reader-actions">
+          <button id="btnBuscarManual" class="reader-btn secondary" type="button">
+            Buscar código manualmente
+          </button>
+        </div>
+      </section>
+
+      <section id="resultadoPanel" class="reader-card hidden">
+        <div id="resultadoCodigo" class="reader-code">—</div>
+        <div id="resultadoDatos" class="data-grid"></div>
+      </section>
+    </div>
+  </main>
+
+  <script type="module" src="leer-pulsera-nfc.js"></script>
+</body>
+</html>
