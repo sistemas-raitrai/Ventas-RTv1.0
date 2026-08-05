@@ -4,6 +4,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/11.7.3/firebase-firestore.js";
 
 const PUBLIC_FORM_URL = "https://sistemas-raitrai.github.io/Ventas-RT/inscripcion.html";
+const ALERTAS_INSCRIPCIONES_COLLECTION = "ventas_alertas_inscripciones";
 
 export function crearInscripcionesManager({ db, usuario = {}, onChange = null } = {}) {
   if (!db) throw new Error("crearInscripcionesManager requiere db.");
@@ -21,6 +22,25 @@ export function crearInscripcionesManager({ db, usuario = {}, onChange = null } 
     return esAdminOSupervision() || rol === "registro" || [
       "yenny@raitrai.cl", "administracion@raitrai.cl", "raitrai@raitrai.cl",
       "giras@raitrai.cl", "sistemas@raitrai.cl"
+    ].includes(email);
+  }
+
+  function puedeMarcarListaEsperaPagada() {
+    return esAdminOSupervision() || [
+      "yenny@raitrai.cl",
+      "administracion@raitrai.cl",
+      "raitrai@raitrai.cl",
+      "sistemas@raitrai.cl"
+    ].includes(email);
+  }
+
+  function puedeConfirmarIngresoOCupo() {
+    return esAdminOSupervision() || rol === "registro" || [
+      "yenny@raitrai.cl",
+      "administracion@raitrai.cl",
+      "raitrai@raitrai.cl",
+      "giras@raitrai.cl",
+      "sistemas@raitrai.cl"
     ].includes(email);
   }
 
@@ -286,6 +306,827 @@ export function crearInscripcionesManager({ db, usuario = {}, onChange = null } 
     await notificarCambio(grupoCtx, "pasajero_actualizado", { inscripcionId: String(id), campos: Object.keys(patch) });
   }
 
+
+  function getAlertaInscripcionId(grupoCtx, inscripcionId) {
+    return `${String(grupoCtx?.docId || grupoCtx?.groupId || "").trim()}_${String(inscripcionId || "").trim()}`;
+  }
+
+  async function guardarAlertaInscripcion(
+    grupoCtx,
+    inscripcion,
+    {
+      tipoAlerta = "",
+      activa = true,
+      resuelta = false
+    } = {}
+  ) {
+    const inscripcionId = String(inscripcion?.id || "").trim();
+
+    if (!inscripcionId) {
+      return;
+    }
+
+    const alertaRef = doc(
+      db,
+      ALERTAS_INSCRIPCIONES_COLLECTION,
+      getAlertaInscripcionId(grupoCtx, inscripcionId)
+    );
+
+    const payload = {
+      activa: activa === true,
+      resuelta: resuelta === true,
+
+      tipoAlerta,
+      tipoInscripcion: tipo(inscripcion),
+      estadoCupo: texto(inscripcion?.estadoCupo),
+
+      idGrupo: String(grupoCtx?.groupId || ""),
+      groupDocId: String(grupoCtx?.docId || ""),
+      inscripcionId,
+
+      anoViaje: grupoCtx?.data?.anoViaje || "",
+      colegio: texto(grupoCtx?.data?.colegio),
+      curso: texto(grupoCtx?.data?.curso),
+      aliasGrupo:
+        texto(grupoCtx?.data?.aliasGrupo) ||
+        texto(grupoCtx?.data?.nombreGrupo) ||
+        texto(grupoCtx?.data?.colegio) ||
+        String(grupoCtx?.groupId || ""),
+
+      vendedora:
+        texto(grupoCtx?.data?.vendedora) ||
+        texto(grupoCtx?.data?.vendedoraCorreo),
+
+      vendedoraCorreo:
+        normalizarEmail(
+          grupoCtx?.data?.vendedoraCorreo ||
+          ""
+        ),
+
+      documento: documento(inscripcion),
+
+      nombreParticipante:
+        [nombres(inscripcion), apellidos(inscripcion)]
+          .filter(Boolean)
+          .join(" ")
+          .trim(),
+
+      nombreResponsable:
+        texto(
+          valor(
+            inscripcion,
+            [
+              "contactoPrincipal.nombre",
+              "contactoPrincipal.nombreCompleto",
+              "responsable.nombre",
+              "apoderado.nombre"
+            ]
+          )
+        ),
+
+      correoResponsable:
+        normalizarEmail(
+          valor(
+            inscripcion,
+            [
+              "contactoPrincipal.correo",
+              "responsable.correo",
+              "apoderado.correo",
+              "correo"
+            ]
+          )
+        ),
+
+      telefonoResponsable:
+        texto(
+          valor(
+            inscripcion,
+            [
+              "contactoPrincipal.celular",
+              "contactoPrincipal.telefono",
+              "contactoPrincipal.whatsapp",
+              "responsable.telefono",
+              "apoderado.telefono",
+              "telefono"
+            ]
+          )
+        ),
+
+      fechaFormulario:
+        valor(
+          inscripcion,
+          [
+            "meta.fechaInscripcion",
+            "meta.fechaFormularioCliente",
+            "fechaInscripcion",
+            "fechaFormularioCliente",
+            "creadoEn",
+            "createdAt",
+            "fechaCreacion",
+            "fechaAprobacion"
+          ]
+        ) || null,
+
+      actualizadoAt: serverTimestamp(),
+      actualizadoPor: nombreUsuario,
+      actualizadoPorCorreo: email
+    };
+
+    if (resuelta === true) {
+      payload.resueltaAt = serverTimestamp();
+      payload.resueltaPor = nombreUsuario;
+      payload.resueltaPorCorreo = email;
+    } else {
+      payload.resueltaAt = deleteField();
+      payload.resueltaPor = deleteField();
+      payload.resueltaPorCorreo = deleteField();
+    }
+
+    await setDoc(
+      alertaRef,
+      payload,
+      {
+        merge: true
+      }
+    );
+  }
+
+  async function registrarHistorialOperacion(
+    grupoCtx,
+    {
+      tipoMovimiento,
+      titulo,
+      mensaje,
+      inscripcion
+    }
+  ) {
+    try {
+      await setDoc(
+        doc(
+          collection(
+            db,
+            "ventas_historial"
+          )
+        ),
+        {
+          idGrupo: grupoCtx.groupId,
+          groupDocId: grupoCtx.docId,
+
+          tipoMovimiento,
+          modulo: "inscripcion",
+          titulo,
+          mensaje,
+
+          metadata: {
+            inscripcionId:
+              String(
+                inscripcion?.id ||
+                ""
+              ),
+
+            documento:
+              documento(
+                inscripcion
+              ),
+
+            nombreCompleto:
+              [
+                nombres(inscripcion),
+                apellidos(inscripcion)
+              ]
+                .filter(Boolean)
+                .join(" ")
+                .trim()
+          },
+
+          fecha: serverTimestamp(),
+          creadoPor: nombreUsuario,
+          creadoPorCorreo: email
+        }
+      );
+    } catch (error) {
+      console.warn(
+        "[inscripciones-manager] registrarHistorialOperacion",
+        error
+      );
+    }
+  }
+
+  async function esperarActualizacionResumen(
+    grupoCtx,
+    inscripcionId,
+    {
+      tipoEsperado = "",
+      estadoCupoEsperado = "",
+      intentos = 7,
+      esperaMs = 450
+    } = {}
+  ) {
+    const normalTipo =
+      normalizar(
+        tipoEsperado
+      )
+        .replace(
+          /\s+/g,
+          "_"
+        );
+
+    const normalEstado =
+      normalizar(
+        estadoCupoEsperado
+      )
+        .replace(
+          /\s+/g,
+          "_"
+        );
+
+    for (
+      let intento = 0;
+      intento < intentos;
+      intento += 1
+    ) {
+      await new Promise(
+        (resolve) =>
+          window.setTimeout(
+            resolve,
+            esperaMs
+          )
+      );
+
+      try {
+        const snap =
+          await getDoc(
+            doc(
+              db,
+              "ventas_cotizaciones",
+              String(grupoCtx.docId),
+              "nomina_resumen",
+              String(inscripcionId)
+            )
+          );
+
+        if (!snap.exists()) {
+          continue;
+        }
+
+        const data =
+          snap.data() ||
+          {};
+
+        const tipoActual =
+          normalizar(
+            data.tipoInscripcion ||
+            data.estadoInscripcion ||
+            ""
+          )
+            .replace(
+              /\s+/g,
+              "_"
+            );
+
+        const estadoActual =
+          normalizar(
+            data.estadoCupo ||
+            ""
+          )
+            .replace(
+              /\s+/g,
+              "_"
+            );
+
+        const coincideTipo =
+          !normalTipo ||
+          tipoActual ===
+            normalTipo;
+
+        const coincideEstado =
+          !normalEstado ||
+          estadoActual ===
+            normalEstado;
+
+        if (
+          coincideTipo &&
+          coincideEstado
+        ) {
+          return true;
+        }
+      } catch (error) {
+        console.warn(
+          "[inscripciones-manager] esperando nomina_resumen",
+          error
+        );
+      }
+    }
+
+    return false;
+  }
+
+  async function marcarListaEsperaPagada(
+    grupoCtx,
+    inscripcionId
+  ) {
+    if (!puedeMarcarListaEsperaPagada()) {
+      throw new Error(
+        "Solo Administración, Supervisión o Admin pueden marcar la lista de espera como pagada."
+      );
+    }
+
+    const item =
+      await cargarInscripcionCompleta(
+        grupoCtx,
+        inscripcionId
+      );
+
+    if (!item) {
+      throw new Error(
+        "No se encontró la inscripción seleccionada."
+      );
+    }
+
+    const tipoActual =
+      normalizar(
+        tipo(item)
+      )
+        .replace(
+          /\s+/g,
+          "_"
+        );
+
+    const estadoActual =
+      normalizar(
+        item.estadoCupo ||
+        ""
+      )
+        .replace(
+          /\s+/g,
+          "_"
+        );
+
+    const esListaPendiente =
+      tipoActual ===
+        "lista_espera" &&
+      ![
+        "pagado",
+        "confirmado"
+      ].includes(
+        estadoActual
+      );
+
+    if (!esListaPendiente) {
+      throw new Error(
+        "Esta inscripción ya no está como lista de espera pendiente."
+      );
+    }
+
+    await updateDoc(
+      doc(
+        db,
+        "ventas_cotizaciones",
+        String(grupoCtx.docId),
+        "inscripciones",
+        String(inscripcionId)
+      ),
+      {
+        tipoInscripcion:
+          "lista_espera_pagada",
+
+        estadoCupo:
+          "pagado",
+
+        listaEsperaPagada:
+          true,
+
+        listaEsperaPagadaPor:
+          nombreUsuario,
+
+        listaEsperaPagadaPorCorreo:
+          email,
+
+        listaEsperaPagadaAt:
+          serverTimestamp(),
+
+        actualizadoAt:
+          serverTimestamp(),
+
+        actualizadoPor:
+          nombreUsuario,
+
+        actualizadoPorCorreo:
+          email
+      }
+    );
+
+    const actualizado = {
+      ...item,
+      tipoInscripcion:
+        "lista_espera_pagada",
+      estadoCupo:
+        "pagado",
+      listaEsperaPagada:
+        true
+    };
+
+    /*
+      La alerta no desaparece:
+      cambia desde "pendiente de pago" a
+      "pagada pendiente de confirmar".
+    */
+    await guardarAlertaInscripcion(
+      grupoCtx,
+      actualizado,
+      {
+        tipoAlerta:
+          "lista_espera_pagada_pendiente_confirmar",
+
+        activa:
+          true,
+
+        resuelta:
+          false
+      }
+    );
+
+    await registrarHistorialOperacion(
+      grupoCtx,
+      {
+        tipoMovimiento:
+          "inscripcion_lista_espera_pagada",
+
+        titulo:
+          "Lista de espera pagada",
+
+        mensaje:
+          `${nombreUsuario} marcó como pagada la lista de espera de ${
+            [
+              nombres(item),
+              apellidos(item)
+            ]
+              .filter(Boolean)
+              .join(" ")
+              .trim() ||
+            "una persona"
+          }.`,
+
+        inscripcion:
+          item
+      }
+    );
+
+    cacheDetalle.delete(
+      `${grupoCtx.docId}:${inscripcionId}`
+    );
+
+    await esperarActualizacionResumen(
+      grupoCtx,
+      inscripcionId,
+      {
+        tipoEsperado:
+          "lista_espera_pagada",
+
+        estadoCupoEsperado:
+          "pagado"
+      }
+    );
+
+    await notificarCambio(
+      grupoCtx,
+      "lista_espera_pagada",
+      {
+        inscripcionId:
+          String(inscripcionId)
+      }
+    );
+
+    return actualizado;
+  }
+
+  async function confirmarCupoListaEspera(
+    grupoCtx,
+    inscripcionId
+  ) {
+    if (!puedeConfirmarIngresoOCupo()) {
+      throw new Error(
+        "Solo Registro, Administración, Supervisión o Admin pueden confirmar el cupo."
+      );
+    }
+
+    const item =
+      await cargarInscripcionCompleta(
+        grupoCtx,
+        inscripcionId
+      );
+
+    if (!item) {
+      throw new Error(
+        "No se encontró la inscripción seleccionada."
+      );
+    }
+
+    const estadoActual =
+      normalizar(
+        item.estadoCupo ||
+        ""
+      )
+        .replace(
+          /\s+/g,
+          "_"
+        );
+
+    if (
+      estadoActual !==
+      "pagado"
+    ) {
+      throw new Error(
+        "Antes de confirmar el cupo, la lista de espera debe estar marcada como pagada."
+      );
+    }
+
+    await updateDoc(
+      doc(
+        db,
+        "ventas_cotizaciones",
+        String(grupoCtx.docId),
+        "inscripciones",
+        String(inscripcionId)
+      ),
+      {
+        tipoInscripcion:
+          "lista_espera_confirmada",
+
+        estadoCupo:
+          "confirmado",
+
+        confirmadoDesdeListaEspera:
+          true,
+
+        confirmadoCupoPor:
+          nombreUsuario,
+
+        confirmadoCupoPorCorreo:
+          email,
+
+        confirmadoCupoAt:
+          serverTimestamp(),
+
+        actualizadoAt:
+          serverTimestamp(),
+
+        actualizadoPor:
+          nombreUsuario,
+
+        actualizadoPorCorreo:
+          email
+      }
+    );
+
+    const actualizado = {
+      ...item,
+      tipoInscripcion:
+        "lista_espera_confirmada",
+      estadoCupo:
+        "confirmado",
+      confirmadoDesdeListaEspera:
+        true
+    };
+
+    await guardarAlertaInscripcion(
+      grupoCtx,
+      actualizado,
+      {
+        tipoAlerta:
+          "",
+
+        activa:
+          false,
+
+        resuelta:
+          true
+      }
+    );
+
+    await registrarHistorialOperacion(
+      grupoCtx,
+      {
+        tipoMovimiento:
+          "inscripcion_lista_espera_confirmada",
+
+        titulo:
+          "Cupo confirmado desde lista de espera pagada",
+
+        mensaje:
+          `${nombreUsuario} confirmó cupo para ${
+            [
+              nombres(item),
+              apellidos(item)
+            ]
+              .filter(Boolean)
+              .join(" ")
+              .trim() ||
+            "una persona"
+          } desde lista de espera pagada.`,
+
+        inscripcion:
+          item
+      }
+    );
+
+    cacheDetalle.delete(
+      `${grupoCtx.docId}:${inscripcionId}`
+    );
+
+    await esperarActualizacionResumen(
+      grupoCtx,
+      inscripcionId,
+      {
+        tipoEsperado:
+          "lista_espera_confirmada",
+
+        estadoCupoEsperado:
+          "confirmado"
+      }
+    );
+
+    await notificarCambio(
+      grupoCtx,
+      "lista_espera_confirmada",
+      {
+        inscripcionId:
+          String(inscripcionId)
+      }
+    );
+
+    return actualizado;
+  }
+
+  async function confirmarNuevoIngreso(
+    grupoCtx,
+    inscripcionId
+  ) {
+    if (!puedeConfirmarIngresoOCupo()) {
+      throw new Error(
+        "Solo Registro, Administración, Supervisión o Admin pueden confirmar nuevos ingresos."
+      );
+    }
+
+    const item =
+      await cargarInscripcionCompleta(
+        grupoCtx,
+        inscripcionId
+      );
+
+    if (!item) {
+      throw new Error(
+        "No se encontró la inscripción seleccionada."
+      );
+    }
+
+    const tipoActual =
+      normalizar(
+        tipo(item)
+      )
+        .replace(
+          /\s+/g,
+          "_"
+        );
+
+    const estadoActual =
+      normalizar(
+        item.estadoCupo ||
+        ""
+      )
+        .replace(
+          /\s+/g,
+          "_"
+        );
+
+    if (
+      tipoActual !==
+        "nuevo_ingreso" ||
+      estadoActual ===
+        "confirmado"
+    ) {
+      throw new Error(
+        "Esta inscripción ya no está como nuevo ingreso pendiente."
+      );
+    }
+
+    await updateDoc(
+      doc(
+        db,
+        "ventas_cotizaciones",
+        String(grupoCtx.docId),
+        "inscripciones",
+        String(inscripcionId)
+      ),
+      {
+        tipoInscripcion:
+          "nuevo_ingreso_confirmado",
+
+        estadoCupo:
+          "confirmado",
+
+        nuevoIngresoConfirmado:
+          true,
+
+        nuevoIngresoConfirmadoPor:
+          nombreUsuario,
+
+        nuevoIngresoConfirmadoPorCorreo:
+          email,
+
+        nuevoIngresoConfirmadoAt:
+          serverTimestamp(),
+
+        actualizadoAt:
+          serverTimestamp(),
+
+        actualizadoPor:
+          nombreUsuario,
+
+        actualizadoPorCorreo:
+          email
+      }
+    );
+
+    const actualizado = {
+      ...item,
+      tipoInscripcion:
+        "nuevo_ingreso_confirmado",
+      estadoCupo:
+        "confirmado",
+      nuevoIngresoConfirmado:
+        true
+    };
+
+    await guardarAlertaInscripcion(
+      grupoCtx,
+      actualizado,
+      {
+        tipoAlerta:
+          "",
+
+        activa:
+          false,
+
+        resuelta:
+          true
+      }
+    );
+
+    await registrarHistorialOperacion(
+      grupoCtx,
+      {
+        tipoMovimiento:
+          "inscripcion_nuevo_ingreso_confirmado",
+
+        titulo:
+          "Nuevo ingreso confirmado",
+
+        mensaje:
+          `${nombreUsuario} confirmó como nuevo ingreso a ${
+            [
+              nombres(item),
+              apellidos(item)
+            ]
+              .filter(Boolean)
+              .join(" ")
+              .trim() ||
+            "una persona"
+          }.`,
+
+        inscripcion:
+          item
+      }
+    );
+
+    cacheDetalle.delete(
+      `${grupoCtx.docId}:${inscripcionId}`
+    );
+
+    await esperarActualizacionResumen(
+      grupoCtx,
+      inscripcionId,
+      {
+        tipoEsperado:
+          "nuevo_ingreso_confirmado",
+
+        estadoCupoEsperado:
+          "confirmado"
+      }
+    );
+
+    await notificarCambio(
+      grupoCtx,
+      "nuevo_ingreso_confirmado",
+      {
+        inscripcionId:
+          String(inscripcionId)
+      }
+    );
+
+    return actualizado;
+  }
+
   async function resetearCiclo(grupoCtx) {
     if (!esAdminOSupervision()) throw new Error("Solo Admin o Supervisión pueden resetear el ciclo.");
     await updateDoc(doc(db, "ventas_cotizaciones", grupoCtx.docId), {
@@ -347,8 +1188,12 @@ export function crearInscripcionesManager({ db, usuario = {}, onChange = null } 
   return {
     resolverGrupo, recargarGrupo, detectarOrigenNomina, cargarNomina,
     cargarInscripcionCompleta, obtenerEstadoFases, abrirFase, cerrarFase,
-    marcarCargadoPagos, actualizarPasajero, resetearCiclo, archivarNomina,
-    puedeGestionarLinks, puedeAdministrarNomina, esAdminOSupervision
+    marcarCargadoPagos, actualizarPasajero,
+    marcarListaEsperaPagada, confirmarCupoListaEspera, confirmarNuevoIngreso,
+    resetearCiclo, archivarNomina,
+    puedeGestionarLinks, puedeAdministrarNomina,
+    puedeMarcarListaEsperaPagada, puedeConfirmarIngresoOCupo,
+    esAdminOSupervision
   };
 }
 
