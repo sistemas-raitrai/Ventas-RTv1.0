@@ -1,0 +1,44 @@
+<!-- RENOMBRAR COMO: fichas-medicas-grupo.html -->
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Fichas médicas del grupo | Sistema Ventas RT</title>
+  <link rel="stylesheet" href="ficha-medica.css">
+</head>
+<body>
+  <main class="app-shell">
+    <header class="topbar no-print">
+      <div>
+        <h1>Fichas médicas del grupo</h1>
+        <p id="pageSubtitle">Cargando grupo...</p>
+      </div>
+
+      <div class="actions">
+        <a id="btnVolver" class="button-link btn-light" href="#">Volver a gestión</a>
+        <select id="printFilter">
+          <option value="viajan">Solo pasajeros activos</option>
+          <option value="completas">Solo fichas completas</option>
+          <option value="alertas">Solo fichas con alertas</option>
+          <option value="todas">Todas, incluidos anulados</option>
+        </select>
+        <button id="btnPrint" class="btn-yellow" type="button">Descargar / imprimir PDF grupal</button>
+      </div>
+    </header>
+
+    <section id="summaryPanel" class="panel no-print hidden">
+      <div class="notice">
+        <strong id="summaryText"></strong>
+        Cada pasajero comenzará en una página nueva al imprimir o guardar como PDF.
+      </div>
+    </section>
+
+    <section id="loadingBox" class="loading">Cargando todas las fichas...</section>
+    <section id="errorBox" class="error-box hidden"></section>
+    <section id="sheetsContainer"></section>
+  </main>
+
+  <script type="module" src="fichas-medicas-grupo.js"></script>
+</body>
+</html>
