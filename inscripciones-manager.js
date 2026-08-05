@@ -1332,7 +1332,182 @@ function tipo(i) { return texto(valor(i,["tipoInscripcion","tipo","pasajero.tipo
 function estado(i) { return texto(valor(i,["estado","estadoInscripcion","estadoCupo","pasajero.estado"])); }
 function correo(i) { return texto(valor(i,["correo","contactoPrincipal.correo","pasajero.correo","datosContacto.correo"])); }
 function telefono(i) { return texto(valor(i,["telefono","contactoPrincipal.telefono","contactoPrincipal.celular","pasajero.telefono"])); }
-function fichaCompleta(i) { return valor(i,["fichaCompleta","fichaMedicaCompleta","fichaMedica.completa","estadoFichaMedica"]) === true || ["completa","completo","ok","confirmada"].includes(normalizar(valor(i,["fichaCompleta","estadoFichaMedica"]))); }
+export function fichaCompleta(
+  i = {}
+) {
+  const tipoNormalizado =
+    normalizar(
+      valor(
+        i,
+        [
+          "tipoInscripcion",
+          "tipo",
+          "estadoInscripcion",
+          "faseInscripcion",
+          "pasajero.tipo"
+        ]
+      )
+    )
+      .replace(
+        /\s+/g,
+        "_"
+      );
+
+  /*
+    Regla de negocio:
+
+    Los formularios públicos exigen completar
+    la ficha médica antes de poder guardarse.
+
+    Por lo tanto, estas inscripciones siempre
+    tienen ficha médica completa.
+  */
+  const tiposFormularioCompleto =
+    new Set([
+      "inscripcion_inicial",
+      "nomina_inicial",
+      "normal",
+
+      "nomina_final",
+      "nomina_final_ficha_medica",
+
+      "nuevo_ingreso",
+      "nuevo_ingreso_confirmado",
+      "nuevos",
+      "nuevo_inscrito",
+
+      "lista_espera",
+      "lista_espera_pagada",
+      "lista_espera_confirmada",
+
+      "liberado",
+      "cupo_liberado"
+    ]);
+
+  if (
+    tiposFormularioCompleto.has(
+      tipoNormalizado
+    )
+  ) {
+    return true;
+  }
+
+  /*
+    Único origen que puede tener una ficha médica
+    realmente pendiente:
+
+    Sistema de Pagos.
+
+    En ese caso revisamos las marcas explícitas
+    que indican que posteriormente completó
+    la ficha médica.
+  */
+  if (
+    tipoNormalizado ===
+      "sistema_pagos" ||
+    tipoNormalizado ===
+      "sistema_de_pagos"
+  ) {
+    const marcaBooleana =
+      valor(
+        i,
+        [
+          "fichaCompleta",
+          "fichaMedicaCompleta",
+          "nominaFinalCompleta",
+          "fichaMedicaCompletada",
+          "nominaFinalCompletada",
+          "fichaMedica.completa"
+        ]
+      );
+
+    if (
+      marcaBooleana ===
+      true
+    ) {
+      return true;
+    }
+
+    const estadoFicha =
+      normalizar(
+        valor(
+          i,
+          [
+            "fichaMedicaEstado",
+            "estadoFichaMedica",
+            "fichaMedica.estado"
+          ]
+        )
+      )
+        .replace(
+          /\s+/g,
+          "_"
+        );
+
+    return [
+      "completa",
+      "completada",
+      "completo",
+      "ok",
+      "confirmada"
+    ].includes(
+      estadoFicha
+    );
+  }
+
+  /*
+    Respaldo para inscripciones antiguas o con
+    un tipo no reconocido.
+
+    No las declaramos completas automáticamente:
+    revisamos sus marcas explícitas.
+  */
+  const marcaBooleana =
+    valor(
+      i,
+      [
+        "fichaCompleta",
+        "fichaMedicaCompleta",
+        "nominaFinalCompleta",
+        "fichaMedicaCompletada",
+        "nominaFinalCompletada",
+        "fichaMedica.completa"
+      ]
+    );
+
+  if (
+    marcaBooleana ===
+    true
+  ) {
+    return true;
+  }
+
+  const estadoFicha =
+    normalizar(
+      valor(
+        i,
+        [
+          "fichaMedicaEstado",
+          "estadoFichaMedica",
+          "fichaMedica.estado"
+        ]
+      )
+    )
+      .replace(
+        /\s+/g,
+        "_"
+      );
+
+  return [
+    "completa",
+    "completada",
+    "completo",
+    "ok",
+    "confirmada"
+  ].includes(
+    estadoFicha
+  );
+}
 function tieneCarnet(i) { return valor(i,["tieneCarnet","tieneCarnetIdentidad","sistemaPagos.tieneCarnet","documentos.carnetIdentidad"]) === true; }
 function estaAnulada(i) { return i?.anulado === true || i?.anulada === true || normalizar(estado(i)).includes("anulad") || normalizar(i?.estadoViaje).includes("no viaja"); }
 function texto(v) { return String(v ?? "").trim(); }
