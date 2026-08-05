@@ -1,0 +1,107 @@
+<!-- RENOMBRAR COMO: gestion-fichas-medicas.html -->
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Gestión de fichas médicas | Sistema Ventas RT</title>
+  <link rel="stylesheet" href="ficha-medica.css">
+</head>
+<body>
+  <main class="app-shell">
+    <header class="topbar">
+      <div>
+        <h1>Gestión de fichas médicas</h1>
+        <p id="groupSubtitle">Cargando grupo...</p>
+      </div>
+
+      <div class="actions no-print">
+        <a id="btnVolverNomina" class="button-link btn-light" href="#">Volver a gestión de nómina</a>
+        <a id="btnVerGrupo" class="button-link btn-light" href="#">Ficha consolidada</a>
+        <button id="btnRecargar" class="btn-primary" type="button">Recargar</button>
+      </div>
+    </header>
+
+    <section id="loadingBox" class="loading">Cargando fichas médicas...</section>
+    <section id="errorBox" class="error-box hidden"></section>
+
+    <section id="content" class="hidden">
+      <div class="panel">
+        <div class="kpis">
+          <div class="kpi"><div class="kpi-label">Pasajeros</div><div id="kpiTotal" class="kpi-value">0</div></div>
+          <div class="kpi"><div class="kpi-label">Fichas completas</div><div id="kpiCompletas" class="kpi-value">0</div></div>
+          <div class="kpi"><div class="kpi-label">Pendientes</div><div id="kpiPendientes" class="kpi-value">0</div></div>
+          <div class="kpi"><div class="kpi-label">Con alertas</div><div id="kpiAlertas" class="kpi-value">0</div></div>
+          <div class="kpi"><div class="kpi-label">Anulados</div><div id="kpiAnulados" class="kpi-value">0</div></div>
+        </div>
+      </div>
+
+      <section class="panel">
+        <div class="filters">
+          <input id="searchInput" type="search" placeholder="Buscar por nombre, RUT, correo o teléfono">
+          <select id="statusFilter">
+            <option value="">Todas las fichas</option>
+            <option value="completa">Completas</option>
+            <option value="pendiente">Pendientes</option>
+            <option value="alerta">Con alertas médicas</option>
+            <option value="anulado">Anulados</option>
+          </select>
+          <select id="typeFilter">
+            <option value="">Todos los tipos</option>
+          </select>
+        </div>
+      </section>
+
+      <section class="panel table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Pasajero</th>
+              <th>Documento</th>
+              <th>Tipo</th>
+              <th>Estado ficha</th>
+              <th>Alertas</th>
+              <th>Responsable</th>
+              <th>Última actualización</th>
+              <th>Acciones</th>
+            </tr>
+          </thead>
+          <tbody id="tableBody"></tbody>
+        </table>
+      </section>
+    </section>
+  </main>
+
+  <div id="editModal" class="modal hidden">
+    <div class="modal-card">
+      <div class="modal-head">
+        <div>
+          <h2 id="editTitle">Editar ficha médica</h2>
+          <p>Los cambios quedarán registrados en el historial de la inscripción.</p>
+        </div>
+        <button id="btnCloseModal" class="btn-light" type="button">Cerrar</button>
+      </div>
+
+      <form id="editForm">
+        <div id="editFields"></div>
+
+        <section class="edit-section">
+          <h3>Registro de la modificación</h3>
+          <div class="field">
+            <label for="editReason">Motivo de la corrección *</label>
+            <textarea id="editReason" required placeholder="Ej.: Corrección informada por apoderado vía correo."></textarea>
+          </div>
+        </section>
+
+        <div class="actions">
+          <button id="btnSaveEdit" class="btn-primary" type="submit">Guardar cambios</button>
+          <button id="btnCancelEdit" class="btn-light" type="button">Cancelar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script type="module" src="gestion-fichas-medicas.js"></script>
+</body>
+</html>
