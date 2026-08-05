@@ -71,20 +71,71 @@ export function crearInscripcionesManager({ db, usuario = {}, onChange = null } 
     }
   }
 
-  async function cargarNomina(grupoCtx, { completa = false } = {}) {
+  async function cargarNomina(
+    grupoCtx,
+    {
+      completa = false
+    } = {}
+  ) {
     cacheDetalle.clear();
-    const base = collection(db, "ventas_cotizaciones", grupoCtx.docId);
-    const resumen = await getDocs(collection(base, "nomina_resumen"));
-    let items;
-
-    if (!resumen.empty && !completa) {
-      items = resumen.docs.map(d => ({ id: d.id, ...d.data(), esResumenNomina: true }));
-    } else {
-      const full = await getDocs(collection(base, "inscripciones"));
-      items = full.docs.map(d => ({ id: d.id, ...d.data(), esResumenNomina: false }));
+  
+    if (!grupoCtx?.docId) {
+      throw new Error(
+        "No se pudo determinar el documento del grupo."
+      );
     }
-
-    return ordenarNomina(items.filter(noEliminada));
+  
+    const groupDocId =
+      String(grupoCtx.docId);
+  
+    const resumenSnap =
+      await getDocs(
+        collection(
+          db,
+          "ventas_cotizaciones",
+          groupDocId,
+          "nomina_resumen"
+        )
+      );
+  
+    let items = [];
+  
+    if (
+      !resumenSnap.empty &&
+      !completa
+    ) {
+      items =
+        resumenSnap.docs.map(
+          (documento) => ({
+            id: documento.id,
+            ...documento.data(),
+            esResumenNomina: true
+          })
+        );
+    } else {
+      const inscripcionesSnap =
+        await getDocs(
+          collection(
+            db,
+            "ventas_cotizaciones",
+            groupDocId,
+            "inscripciones"
+          )
+        );
+  
+      items =
+        inscripcionesSnap.docs.map(
+          (documento) => ({
+            id: documento.id,
+            ...documento.data(),
+            esResumenNomina: false
+          })
+        );
+    }
+  
+    return ordenarNomina(
+      items.filter(noEliminada)
+    );
   }
 
   async function cargarInscripcionCompleta(grupoCtx, id) {
