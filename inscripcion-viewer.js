@@ -1530,303 +1530,1265 @@ export function crearInscripcionViewer({
     );
   }
 
-  function generarVentanaImpresion(
-    recortes = {}
+  function getValorTexto(
+  item = {},
+  paths = [],
+  fallback = "—"
+) {
+  const value =
+    first(
+      item,
+      paths
+    );
+
+  const texto =
+    String(
+      value ?? ""
+    ).trim();
+
+  return texto ||
+    fallback;
+}
+
+function formatFechaSoloDia(
+  value
+) {
+  if (!value) {
+    return "—";
+  }
+
+  /*
+    Si Firestore entrega Timestamp.
+  */
+  if (
+    typeof value?.toDate ===
+    "function"
   ) {
-    const item =
-      state.item;
+    const date =
+      value.toDate();
 
-    if (!item) {
-      return;
+    return date.toLocaleDateString(
+      "es-CL",
+      {
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric"
+      }
+    );
+  }
+
+  if (
+    typeof value === "object" &&
+    typeof value.seconds ===
+      "number"
+  ) {
+    const date =
+      new Date(
+        value.seconds * 1000
+      );
+
+    return date.toLocaleDateString(
+      "es-CL",
+      {
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric"
+      }
+    );
+  }
+
+  const raw =
+    String(
+      value
+    ).trim();
+
+  /*
+    Evitamos que una fecha YYYY-MM-DD cambie
+    de día por zona horaria.
+  */
+  const match =
+    raw.match(
+      /^(\d{4})-(\d{2})-(\d{2})/
+    );
+
+  if (match) {
+    return `${match[3]}-${match[2]}-${match[1]}`;
+  }
+
+  const date =
+    new Date(
+      value
+    );
+
+  if (
+    Number.isNaN(
+      date.getTime()
+    )
+  ) {
+    return raw ||
+      "—";
+  }
+
+  return date.toLocaleDateString(
+    "es-CL",
+    {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric"
     }
+  );
+}
 
-    const win =
-      window.open(
-        "",
-        "_blank"
+function formatFechaHoraPdf(
+  value
+) {
+  if (!value) {
+    return "—";
+  }
+
+  let date =
+    null;
+
+  if (
+    typeof value?.toDate ===
+    "function"
+  ) {
+    date =
+      value.toDate();
+  } else if (
+    typeof value === "object" &&
+    typeof value.seconds ===
+      "number"
+  ) {
+    date =
+      new Date(
+        value.seconds * 1000
+      );
+  } else {
+    const parsed =
+      new Date(
+        value
       );
 
-    if (!win) {
-      alert(
-        "El navegador bloqueó la ventana emergente. Permite pop-ups para imprimir la ficha."
-      );
-
-      return;
+    if (
+      !Number.isNaN(
+        parsed.getTime()
+      )
+    ) {
+      date =
+        parsed;
     }
+  }
 
-    const grupo =
-      getGrupoData?.() ||
-      {};
+  if (!date) {
+    return String(
+      value
+    );
+  }
 
-    const datos =
-      construirFilasImpresion(
-        item
+  return date.toLocaleString(
+    "es-CL",
+    {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false
+    }
+  );
+}
+
+function normalizarTituloPdf(
+  value
+) {
+  return String(
+    value ?? ""
+  )
+    .replaceAll(
+      "_",
+      " "
+    )
+    .trim()
+    .replace(
+      /\b\w/g,
+      (letter) =>
+        letter.toUpperCase()
+    );
+}
+
+function getTipoInscripcionTituloPdf(
+  item = {}
+) {
+  const tipo =
+    normalize(
+      first(
+        item,
+        [
+          "tipoInscripcion",
+          "estadoInscripcion",
+          "tipo"
+        ]
+      )
+    )
+      .replace(
+        /\s+/g,
+        "_"
       );
 
-    const docs =
-      state.documentos
-        .filter(
-          (doc) =>
-            doc.esImagen
-        )
-        .map(
-          (doc) => ({
-            ...doc,
-            url:
-              recortes[
-                doc.key
-              ] ||
-              doc.url
-          })
+  const estadoCupo =
+    normalize(
+      first(
+        item,
+        [
+          "estadoCupo"
+        ]
+      )
+    )
+      .replace(
+        /\s+/g,
+        "_"
+      );
+
+  if (
+    tipo ===
+      "sistema_pagos" ||
+    tipo ===
+      "sistema_de_pagos"
+  ) {
+    return esFichaCompleta(
+      item
+    )
+      ? "Sistema de Pagos · Ficha completa"
+      : "Sistema de Pagos · Ficha pendiente";
+  }
+
+  if (
+    tipo ===
+      "nuevo_ingreso_confirmado" ||
+    (
+      tipo ===
+        "nuevo_ingreso" &&
+      estadoCupo ===
+        "confirmado"
+    )
+  ) {
+    return "Nuevo ingreso confirmado";
+  }
+
+  if (
+    tipo ===
+    "nuevo_ingreso"
+  ) {
+    return "Nuevo ingreso pendiente";
+  }
+
+  if (
+    tipo ===
+      "lista_espera_confirmada" ||
+    (
+      tipo ===
+        "lista_espera" &&
+      estadoCupo ===
+        "confirmado"
+    )
+  ) {
+    return "Lista de espera confirmada";
+  }
+
+  if (
+    tipo ===
+      "lista_espera_pagada" ||
+    (
+      tipo ===
+        "lista_espera" &&
+      estadoCupo ===
+        "pagado"
+    )
+  ) {
+    return "Lista de espera pagada";
+  }
+
+  if (
+    tipo ===
+    "lista_espera"
+  ) {
+    return "Lista de espera pendiente";
+  }
+
+  if (
+    tipo ===
+      "nomina_final" ||
+    tipo ===
+      "nomina_final_ficha_medica"
+  ) {
+    return "Nómina final · Ficha médica";
+  }
+
+  if (
+    tipo ===
+      "inscripcion_inicial" ||
+    tipo ===
+      "nomina_inicial" ||
+    tipo ===
+      "normal"
+  ) {
+    return "Inscripción inicial";
+  }
+
+  if (
+    tipo ===
+      "liberado" ||
+    tipo ===
+      "cupo_liberado"
+  ) {
+    return "Cupo liberado";
+  }
+
+  return normalizarTituloPdf(
+    tipo ||
+    "Inscripción"
+  );
+}
+
+function getFechaCambioEstadoPdf(
+  item = {}
+) {
+  const tipo =
+    normalize(
+      first(
+        item,
+        [
+          "tipoInscripcion",
+          "estadoInscripcion",
+          "tipo"
+        ]
+      )
+    )
+      .replace(
+        /\s+/g,
+        "_"
+      );
+
+  if (
+    tipo ===
+    "nuevo_ingreso_confirmado"
+  ) {
+    return (
+      item.nuevoIngresoConfirmadoAt ||
+      item.confirmadoAt ||
+      ""
+    );
+  }
+
+  if (
+    tipo ===
+    "lista_espera_pagada"
+  ) {
+    return (
+      item.listaEsperaPagadaAt ||
+      ""
+    );
+  }
+
+  if (
+    tipo ===
+    "lista_espera_confirmada"
+  ) {
+    return (
+      item.confirmadoCupoAt ||
+      item.confirmadoAt ||
+      ""
+    );
+  }
+
+  return "";
+}
+
+function getTituloGrupoPdfViewer(
+  grupo = {}
+) {
+  return (
+    String(
+      grupo.aliasGrupo ||
+      grupo.nombreGrupo ||
+      ""
+    ).trim() ||
+    [
+      grupo.curso,
+      grupo.colegio
+    ]
+      .filter(Boolean)
+      .join(" ") ||
+    `Grupo ${
+      grupo.idGrupo ||
+      grupo.groupId ||
+      ""
+    }`
+  );
+}
+
+function getEncargadosGrupoPdfViewer(
+  grupo = {}
+) {
+  const encargados =
+    [];
+
+  const agregar =
+    (
+      nombre,
+      correo,
+      telefono
+    ) => {
+      const encargado = {
+        nombre:
+          String(
+            nombre ||
+            ""
+          ).trim(),
+
+        correo:
+          String(
+            correo ||
+            ""
+          ).trim(),
+
+        telefono:
+          String(
+            telefono ||
+            ""
+          ).trim()
+      };
+
+      if (
+        encargado.nombre ||
+        encargado.correo ||
+        encargado.telefono
+      ) {
+        encargados.push(
+          encargado
         );
+      }
+    };
 
-    const nombre =
-      getNombreCompleto(
-        item
-      );
+  agregar(
+    grupo.nombreCliente ||
+    grupo.encargadoNombre ||
+    grupo.contactoNombre,
 
-    const html = `
-      <!doctype html>
-      <html lang="es">
-        <head>
-          <meta charset="utf-8" />
+    grupo.correoCliente ||
+    grupo.encargadoCorreo ||
+    grupo.contactoCorreo,
 
-          <title>
+    grupo.celularCliente ||
+    grupo.telefonoCliente ||
+    grupo.encargadoTelefono ||
+    grupo.contactoTelefono
+  );
+
+  agregar(
+    grupo.nombreCliente2 ||
+    grupo.encargadoNombre2 ||
+    grupo.contactoNombre2,
+
+    grupo.correoCliente2 ||
+    grupo.encargadoCorreo2 ||
+    grupo.contactoCorreo2,
+
+    grupo.celularCliente2 ||
+    grupo.telefonoCliente2 ||
+    grupo.encargadoTelefono2 ||
+    grupo.contactoTelefono2
+  );
+
+  if (
+    Array.isArray(
+      grupo.encargados
+    )
+  ) {
+    grupo.encargados.forEach(
+      (encargado) => {
+        agregar(
+          encargado?.nombre,
+          encargado?.correo,
+          encargado?.telefono ||
+          encargado?.celular
+        );
+      }
+    );
+  }
+
+  return encargados;
+}
+
+function renderPdfRowsViewer(
+  filas = []
+) {
+  return filas
+    .filter(
+      ([, value]) =>
+        String(
+          value ?? ""
+        ).trim() !==
+        ""
+    )
+    .map(
+      ([label, value]) => `
+        <div class="row">
+          <div class="label">
             ${esc(
-              `Ficha ${nombre}`
+              label
             )}
-          </title>
+          </div>
 
-          <style>
-            * {
-              box-sizing: border-box;
-            }
+          <div class="value">
+            ${esc(
+              value ||
+              "—"
+            )}
+          </div>
+        </div>
+      `
+    )
+    .join("");
+}
 
+function renderPdfDocumentoViewer(
+  label = "",
+  url = ""
+) {
+  if (!url) {
+    return "";
+  }
+
+  return `
+    <div class="doc-card">
+      <div class="doc-title">
+        ${esc(
+          label
+        )}
+      </div>
+
+      <img
+        src="${esc(
+          url
+        )}"
+        alt="${esc(
+          label
+        )}"
+      />
+    </div>
+  `;
+}
+
+function generarVentanaImpresion(
+  recortes = {}
+) {
+  const item =
+    state.item;
+
+  if (!item) {
+    return;
+  }
+
+  const win =
+    window.open(
+      "",
+      "_blank"
+    );
+
+  if (!win) {
+    alert(
+      "El navegador bloqueó la ventana emergente. Permite pop-ups para imprimir la ficha."
+    );
+
+    return;
+  }
+
+  /*
+    Mostramos una pantalla provisional mientras
+    se termina de construir la ficha.
+  */
+  win.document.open();
+
+  win.document.write(`
+    <!doctype html>
+    <html lang="es">
+      <head>
+        <meta charset="utf-8" />
+      </head>
+
+      <body
+        style="
+          font-family:Arial,sans-serif;
+          padding:30px;
+          color:#2b1940;
+        "
+      >
+        Generando ficha...
+      </body>
+    </html>
+  `);
+
+  win.document.close();
+
+  const grupo =
+    getGrupoData?.() ||
+    {};
+  
+  const grupoCtx =
+    getGrupoCtx?.() ||
+    {};
+
+  const grupoTitulo =
+    getTituloGrupoPdfViewer(
+      grupo
+    );
+
+  const tipoInscripcionTitulo =
+    getTipoInscripcionTituloPdf(
+      item
+    );
+
+  const encargados =
+    getEncargadosGrupoPdfViewer(
+      grupo
+    );
+
+  const fechaFormulario =
+    firstRaw(
+      item,
+      [
+        "meta.fechaInscripcion",
+        "meta.fechaFormularioCliente",
+        "fechaInscripcion",
+        "fechaFormularioCliente",
+        "createdAt",
+        "creadoEn",
+        "fechaCreacion"
+      ]
+    );
+
+  const fechaCambioEstado =
+    getFechaCambioEstadoPdf(
+      item
+    );
+
+  const numeroNegocio =
+    String(
+      grupo.numeroNegocio ||
+      grupo.negocioId ||
+      grupo.ficha?.numeroNegocio ||
+      grupoCtx.numeroNegocio ||
+      "—"
+    );
+
+  const idGrupo =
+    String(
+      grupo.idGrupo ||
+      grupo.groupId ||
+      grupo.docId ||
+      grupoCtx.groupId ||
+      grupoCtx.docId ||
+      "—"
+    );
+
+  const filasPersona = [
+    [
+      "Nombres",
+      getValorTexto(
+        item,
+        [
+          "identificacion.nombres",
+          "identificacion.nombre",
+          "nombres",
+          "nombre"
+        ]
+      )
+    ],
+
+    [
+      "Apellidos",
+      [
+        getValorTexto(
+          item,
+          [
+            "identificacion.primerApellido",
+            "primerApellido"
+          ],
+          ""
+        ),
+
+        getValorTexto(
+          item,
+          [
+            "identificacion.segundoApellido",
+            "segundoApellido"
+          ],
+          ""
+        )
+      ]
+        .filter(Boolean)
+        .join(" ") ||
+      getValorTexto(
+        item,
+        [
+          "identificacion.apellidos",
+          "apellidos",
+          "apellido"
+        ]
+      )
+    ],
+
+    [
+      "RUT / Documento",
+      getDocumento(
+        item
+      )
+    ],
+
+    [
+      "Fecha nacimiento",
+      formatFechaSoloDia(
+        firstRaw(
+          item,
+          [
+            "identificacion.fechaNacimiento",
+            "fechaNacimiento"
+          ]
+        )
+      )
+    ],
+
+    [
+      "Tipo pasajero(a)",
+      getValorTexto(
+        item,
+        [
+          "identificacion.tipoPasajero",
+          "tipoPasajero",
+          "tipoViajante",
+          "tipoParticipacion",
+          "pasajero.tipo"
+        ]
+      )
+    ],
+
+    [
+      "Nacionalidad",
+      getValorTexto(
+        item,
+        [
+          "identificacion.nacionalidad",
+          "nacionalidad"
+        ]
+      )
+    ],
+
+    [
+      "Género",
+      getValorTexto(
+        item,
+        [
+          "identificacion.genero",
+          "identificacion.sexo",
+          "genero",
+          "sexo"
+        ]
+      )
+    ],
+
+    [
+      "Tipo inscripción",
+      tipoInscripcionTitulo
+    ],
+
+    [
+      "Fecha creación formulario",
+      formatFechaHoraPdf(
+        fechaFormulario
+      )
+    ],
+
+    ...(
+      fechaCambioEstado
+        ? [
+            [
+              "Fecha cambio de estado",
+              formatFechaHoraPdf(
+                fechaCambioEstado
+              )
+            ]
+          ]
+        : []
+    ),
+
+    [
+      "Apoderado(a)",
+      getValorTexto(
+        item,
+        [
+          "contactoPrincipal.nombreCompleto",
+          "contactoPrincipal.nombre",
+          "responsable.nombre",
+          "apoderado.nombre"
+        ]
+      )
+    ],
+
+    [
+      "Correo apoderado(a)",
+      getValorTexto(
+        item,
+        [
+          "contactoPrincipal.correo",
+          "responsable.correo",
+          "apoderado.correo",
+          "correo"
+        ]
+      )
+    ],
+
+    [
+      "Celular apoderado(a)",
+      getValorTexto(
+        item,
+        [
+          "contactoPrincipal.celular",
+          "contactoPrincipal.telefono",
+          "contactoPrincipal.whatsapp",
+          "responsable.telefono",
+          "apoderado.telefono",
+          "telefono"
+        ]
+      )
+    ]
+  ];
+
+  const filasGrupo = [
+    [
+      "Grupo",
+      grupoTitulo
+    ],
+
+    [
+      "N° negocio",
+      numeroNegocio
+    ],
+
+    [
+      "ID grupo",
+      idGrupo
+    ],
+
+    [
+      "Nombre colegio",
+      String(
+        grupo.colegio ||
+        "—"
+      ).toUpperCase()
+    ],
+
+    [
+      "Curso al momento de inscribirse",
+      String(
+        grupo.curso ||
+        "—"
+      ).toUpperCase()
+    ],
+
+    [
+      "Año viaje",
+      String(
+        grupo.anoViaje ||
+        "—"
+      )
+    ],
+
+    [
+      "Vendedor(a)",
+      String(
+        grupo.vendedora ||
+        grupo.vendedoraCorreo ||
+        "—"
+      )
+    ]
+  ];
+
+  const filasEncargados =
+    encargados.flatMap(
+      (
+        encargado,
+        index
+      ) => {
+        const suffix =
+          index === 0
+            ? ""
+            : " 2°";
+
+        return [
+          [
+            `Nombre${suffix}`,
+            encargado.nombre ||
+            "—"
+          ],
+
+          [
+            `Correo${suffix}`,
+            encargado.correo ||
+            "—"
+          ],
+
+          [
+            `Teléfono${suffix}`,
+            encargado.telefono ||
+            "—"
+          ]
+        ];
+      }
+    );
+
+  const documentosHtml =
+    state.documentos
+      .filter(
+        (documento) =>
+          documento.esImagen
+      )
+      .map(
+        (documento) => {
+          const url =
+            recortes[
+              documento.key
+            ] ||
+            documento.url;
+
+          return renderPdfDocumentoViewer(
+            documento.label,
+            url
+          );
+        }
+      )
+      .filter(Boolean)
+      .join("");
+
+  const nombrePersona =
+    getNombreCompleto(
+      item
+    ) ||
+    getDocumento(
+      item
+    ) ||
+    "inscripcion";
+
+  const nombreArchivo =
+    `ficha-inscripcion-${getDocumento(
+      item
+    ) || state.inscripcionId || "pasajero"}`;
+
+  const html = `
+    <!doctype html>
+    <html lang="es">
+      <head>
+        <meta charset="utf-8" />
+
+        <title>
+          ${esc(
+            nombreArchivo
+          )}
+        </title>
+
+        <style>
+          @page {
+            size: A4;
+            margin: 14mm;
+          }
+
+          * {
+            box-sizing: border-box;
+          }
+
+          html,
+          body {
+            margin: 0;
+            padding: 0;
+          }
+
+          body {
+            font-family:
+              Arial,
+              Helvetica,
+              sans-serif;
+
+            color: #231331;
+            font-size: 11px;
+            line-height: 1.25;
+            background: #ffffff;
+          }
+
+          .top {
+            margin-bottom: 12px;
+          }
+
+          .brand {
+            margin-bottom: 4px;
+            color: #4b1979;
+            font-size: 10px;
+            font-weight: 900;
+            letter-spacing: .06em;
+            text-transform: uppercase;
+          }
+
+          .doc-main-title {
+            margin: 0 0 10px;
+            color: #251033;
+            font-size: 18px;
+            line-height: 1.1;
+            text-transform: uppercase;
+          }
+
+          .group-name-box {
+            padding: 9px 11px;
+            border: 1px solid #d9cde3;
+            border-radius: 9px;
+            background: #fff;
+          }
+
+          .group-label {
+            margin-bottom: 3px;
+            color: #786883;
+            font-size: 8px;
+            font-weight: 900;
+            text-transform: uppercase;
+          }
+
+          .group-name {
+            color: #251033;
+            font-size: 15px;
+            font-weight: 900;
+            text-transform: uppercase;
+          }
+
+          .section-title {
+            margin: 10px 0 5px;
+            padding-bottom: 3px;
+            border-bottom: 2px solid #4b1979;
+            color: #4b1979;
+            font-size: 10px;
+            font-weight: 900;
+            text-transform: uppercase;
+          }
+
+          .form-grid {
+            overflow: hidden;
+            border: 1px solid #ddd3e6;
+            border-radius: 9px;
+            background: #fff;
+            break-inside: avoid;
+          }
+
+          .row {
+            display: grid;
+            grid-template-columns: 170px 1fr;
+            min-height: 25px;
+            border-bottom: 1px solid #eee8f2;
+            break-inside: avoid;
+          }
+
+          .row:last-child {
+            border-bottom: 0;
+          }
+
+          .label {
+            display: flex;
+            align-items: center;
+            padding: 6px 8px;
+            color: #5a4967;
+            font-size: 8px;
+            font-weight: 900;
+            text-transform: uppercase;
+          }
+
+          .value {
+            display: flex;
+            align-items: center;
+            min-width: 0;
+            padding: 6px 8px;
+            color: #21142c;
+            font-size: 10px;
+            font-weight: 700;
+            overflow-wrap: anywhere;
+            white-space: pre-wrap;
+          }
+
+          .docs-grid {
+            display: grid;
+            grid-template-columns:
+              repeat(
+                2,
+                minmax(0, 1fr)
+              );
+
+            gap: 10px;
+            margin-top: 8px;
+          }
+
+          .doc-card {
+            padding: 8px;
+            border: 1px solid #ddd6e8;
+            border-radius: 10px;
+            break-inside: avoid;
+          }
+
+          .doc-card .doc-title {
+            margin: 0 0 6px;
+            color: #4b1979;
+            font-size: 10px;
+            font-weight: 900;
+          }
+
+          .doc-card img {
+            display: block;
+            width: 100%;
+            max-height: 230px;
+            object-fit: contain;
+            border-radius: 6px;
+            background: #f7f3fb;
+          }
+
+          .docs-page {
+            page-break-before: always;
+            break-before: page;
+          }
+
+          .footer {
+            margin-top: 12px;
+            color: #786883;
+            font-size: 9px;
+          }
+
+          @media print {
             body {
-              margin: 0;
-              padding: 24px;
-              font-family: Arial, sans-serif;
-              color: #23172f;
+              print-color-adjust: exact;
+              -webkit-print-color-adjust: exact;
             }
+          }
+        </style>
+      </head>
 
-            h1 {
-              margin: 0;
-              font-size: 24px;
-            }
+      <body>
+        <div class="top">
+          <div class="brand">
+            Formulario de inscripción
+          </div>
 
-            .subtitle {
-              margin: 6px 0 18px;
-              color: #6b6075;
-            }
-
-            .section {
-              margin-top: 18px;
-              break-inside: avoid;
-            }
-
-            .section h2 {
-              margin: 0 0 8px;
-              padding: 8px 10px;
-              background: #ede5f4;
-              font-size: 14px;
-              text-transform: uppercase;
-            }
-
-            .rows {
-              border: 1px solid #ddd3e5;
-            }
-
-            .row {
-              display: grid;
-              grid-template-columns: 190px 1fr;
-              border-bottom: 1px solid #eee8f2;
-            }
-
-            .row:last-child {
-              border-bottom: 0;
-            }
-
-            .label {
-              padding: 8px 10px;
-              background: #f7f3fa;
-              font-size: 10px;
-              font-weight: 800;
-              text-transform: uppercase;
-            }
-
-            .value {
-              padding: 8px 10px;
-              white-space: pre-wrap;
-            }
-
-            .documents {
-              display: grid;
-              grid-template-columns: 1fr 1fr;
-              gap: 12px;
-            }
-
-            .doc {
-              break-inside: avoid;
-              border: 1px solid #ddd3e5;
-              padding: 10px;
-            }
-
-            .doc strong {
-              display: block;
-              margin-bottom: 8px;
-            }
-
-            .doc img {
-              display: block;
-              width: 100%;
-              max-height: 430px;
-              object-fit: contain;
-            }
-
-            .footer {
-              margin-top: 18px;
-              color: #786c81;
-              font-size: 10px;
-            }
-
-            @media print {
-              body {
-                padding: 0;
-              }
-            }
-          </style>
-        </head>
-
-        <body>
-          <h1>
-            Ficha individual de inscripción
+          <h1 class="doc-main-title">
+            ${esc(
+              tipoInscripcionTitulo
+            )}
           </h1>
 
-          <div class="subtitle">
-            ${esc(
-              nombre
-            )} · ${esc(
-              getDocumento(
-                item
-              )
-            )} · Grupo ${esc(
-              grupo.aliasGrupo ||
-              grupo.colegio ||
-              ""
-            )}
+          <div class="group-name-box">
+            <div class="group-label">
+              Grupo
+            </div>
+
+            <div class="group-name">
+              ${esc(
+                grupoTitulo
+              )}
+            </div>
           </div>
+        </div>
 
-          ${
-            datos
-              .map(
-                (section) => `
-                  <section class="section">
-                    <h2>
-                      ${esc(
-                        section.title
-                      )}
-                    </h2>
+        <div class="section-title">
+          Datos de la persona inscrita
+        </div>
 
-                    <div class="rows">
-                      ${
-                        section.rows
-                          .filter(
-                            ([, value]) =>
-                              String(
-                                value ??
-                                ""
-                              ).trim()
-                          )
-                          .map(
-                            ([label, value]) => `
-                              <div class="row">
-                                <div class="label">
-                                  ${esc(
-                                    label
-                                  )}
-                                </div>
+        <div class="form-grid">
+          ${renderPdfRowsViewer(
+            filasPersona
+          )}
+        </div>
 
-                                <div class="value">
-                                  ${esc(
-                                    value ||
-                                    "—"
-                                  )}
-                                </div>
-                              </div>
-                            `
-                          )
-                          .join("")
-                      }
-                    </div>
-                  </section>
-                `
+        <div class="section-title">
+          Datos del grupo
+        </div>
+
+        <div class="form-grid">
+          ${renderPdfRowsViewer(
+            filasGrupo
+          )}
+        </div>
+
+        ${
+          filasEncargados.length
+            ? `
+              <div class="section-title">
+                Encargado(s) del grupo
+              </div>
+
+              <div class="form-grid">
+                ${renderPdfRowsViewer(
+                  filasEncargados
+                )}
+              </div>
+            `
+            : ""
+        }
+
+        ${
+          documentosHtml
+            ? `
+              <div class="docs-page">
+                <div class="section-title">
+                  Documentos adjuntos
+                </div>
+
+                <div class="docs-grid">
+                  ${documentosHtml}
+                </div>
+              </div>
+            `
+            : ""
+        }
+
+        <div class="footer">
+          Documento generado desde Gestión de Nómina el
+          ${esc(
+            new Date()
+              .toLocaleString(
+                "es-CL"
               )
-              .join("")
-          }
+          )}.
+        </div>
 
-          ${
-            docs.length
-              ? `
-                <section class="section">
-                  <h2>
-                    Documentos
-                  </h2>
+        <script>
+          window.onload = function () {
+            document.title =
+              ${JSON.stringify(
+                nombreArchivo
+              )};
 
-                  <div class="documents">
-                    ${
-                      docs
-                        .map(
-                          (doc) => `
-                            <div class="doc">
-                              <strong>
-                                ${esc(
-                                  doc.label
-                                )}
-                              </strong>
+            setTimeout(
+              function () {
+                window.print();
+              },
+              600
+            );
+          };
+        </script>
+      </body>
+    </html>
+  `;
 
-                              <img
-                                src="${esc(
-                                  doc.url
-                                )}"
-                                alt="${esc(
-                                  doc.label
-                                )}"
-                              />
-                            </div>
-                          `
-                        )
-                        .join("")
-                    }
-                  </div>
-                </section>
-              `
-              : ""
-          }
+  win.document.open();
 
-          <div class="footer">
-            Documento generado el ${esc(
-              new Date()
-                .toLocaleString(
-                  "es-CL"
-                )
-            )}.
-          </div>
+  win.document.write(
+    html
+  );
 
-          <script>
-            window.onload = function () {
-              window.print();
-            };
-          </script>
-        </body>
-      </html>
-    `;
-
-    win.document.open();
-    win.document.write(
-      html
-    );
-    win.document.close();
-  }
+  win.document.close();
+}
 
   function construirFilasImpresion(
     item
