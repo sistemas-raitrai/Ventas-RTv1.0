@@ -387,9 +387,102 @@ function generarToken() { const bytes = new Uint8Array(24); crypto.getRandomValu
 function noEliminada(i) { const e = normalizar(i?.privacidad?.estado); return e !== "eliminada_logica" && e !== "archivada"; }
 function ordenarNomina(items) { return [...items].sort((a,b) => Number(estaAnulada(a))-Number(estaAnulada(b)) || nombres(a).localeCompare(nombres(b), "es")); }
 function valor(i, paths) { for (const p of paths) { const v = p.split(".").reduce((o,k)=>o?.[k], i); if (v !== undefined && v !== null && String(v).trim() !== "") return v; } return ""; }
-function documento(i) { return texto(valor(i,["rut","documento","pasajero.rut","datosPersonales.rut","participante.rut"])); }
-function nombres(i) { return texto(valor(i,["nombre","nombres","pasajero.nombre","datosPersonales.nombres","participante.nombres"])); }
-function apellidos(i) { const directo=texto(valor(i,["apellido","apellidos","pasajero.apellido","datosPersonales.apellidos"])); if(directo)return directo; return [valor(i,["primerApellido","datosPersonales.primerApellido"]),valor(i,["segundoApellido","datosPersonales.segundoApellido"])].filter(Boolean).join(" "); }
+function documento(i) {
+  return texto(
+    valor(
+      i,
+      [
+        "identificacion.documento",
+        "identificacion.rutCompleto",
+        "identificacion.documentoNormalizado",
+        "rut",
+        "documento",
+        "pasajero.rut",
+        "datosPersonales.rut",
+        "participante.rut"
+      ]
+    ) || i?.id
+  );
+}
+
+function nombres(i) {
+  return texto(
+    valor(
+      i,
+      [
+        "identificacion.nombres",
+        "identificacion.nombre",
+        "nombre",
+        "nombres",
+        "pasajero.nombre",
+        "pasajero.nombres",
+        "datosPersonales.nombre",
+        "datosPersonales.nombres",
+        "participante.nombre",
+        "participante.nombres"
+      ]
+    )
+  );
+}
+
+function apellidos(i) {
+  const directo =
+    texto(
+      valor(
+        i,
+        [
+          "identificacion.apellidos",
+          "apellido",
+          "apellidos",
+          "pasajero.apellido",
+          "pasajero.apellidos",
+          "datosPersonales.apellido",
+          "datosPersonales.apellidos",
+          "participante.apellido",
+          "participante.apellidos"
+        ]
+      )
+    );
+
+  if (directo) {
+    return directo;
+  }
+
+  const primerApellido =
+    texto(
+      valor(
+        i,
+        [
+          "identificacion.primerApellido",
+          "primerApellido",
+          "pasajero.primerApellido",
+          "datosPersonales.primerApellido",
+          "participante.primerApellido"
+        ]
+      )
+    );
+
+  const segundoApellido =
+    texto(
+      valor(
+        i,
+        [
+          "identificacion.segundoApellido",
+          "segundoApellido",
+          "pasajero.segundoApellido",
+          "datosPersonales.segundoApellido",
+          "participante.segundoApellido"
+        ]
+      )
+    );
+
+  return [
+    primerApellido,
+    segundoApellido
+  ]
+    .filter(Boolean)
+    .join(" ");
+}
 function tipo(i) { return texto(valor(i,["tipoInscripcion","tipo","pasajero.tipo"])); }
 function estado(i) { return texto(valor(i,["estado","estadoInscripcion","estadoCupo","pasajero.estado"])); }
 function correo(i) { return texto(valor(i,["correo","contactoPrincipal.correo","pasajero.correo","datosContacto.correo"])); }
