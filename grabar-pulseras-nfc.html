@@ -1,0 +1,498 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta
+    name="viewport"
+    content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"
+  />
+
+  <meta name="theme-color" content="#2b1940" />
+
+  <title>Grabar Pulseras NFC | Rai Trai</title>
+
+  <link rel="icon" type="image/png" href="IMG/logo-raitrai.png" />
+
+  <style>
+    :root {
+      color-scheme: light;
+      font-family: Arial, Helvetica, sans-serif;
+      background: #f1edf4;
+      color: #2b1940;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      background: #f1edf4;
+    }
+
+    button,
+    input {
+      font: inherit;
+    }
+
+    .mobile-page {
+      min-height: 100dvh;
+      padding: 12px;
+    }
+
+    .mobile-shell {
+      width: min(620px, 100%);
+      margin: 0 auto;
+    }
+
+    .mobile-card {
+      padding: 17px;
+      border: 1px solid #d7cfe0;
+      border-radius: 20px;
+      background: #fff;
+      box-shadow: 0 10px 28px rgba(43, 25, 64, .08);
+    }
+
+    .mobile-card + .mobile-card {
+      margin-top: 12px;
+    }
+
+    .mobile-title {
+      margin: 0;
+      font-size: 24px;
+    }
+
+    .mobile-sub {
+      margin: 5px 0 0;
+      color: #706579;
+      font-size: 13px;
+    }
+
+    .group-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: flex-start;
+    }
+
+    .group-number {
+      margin-top: 4px;
+      font-size: 28px;
+      font-weight: 1000;
+    }
+
+    .connection-pill {
+      display: inline-flex;
+      min-height: 28px;
+      align-items: center;
+      padding: 0 10px;
+      border-radius: 999px;
+      background: #ece7f0;
+      color: #62566d;
+      font-size: 11px;
+      font-weight: 900;
+    }
+
+    .connection-pill.ok {
+      background: #dcfce7;
+      color: #166534;
+    }
+
+    .connection-pill.error {
+      background: #fee2e2;
+      color: #991b1b;
+    }
+
+    .progress-copy {
+      margin-top: 13px;
+      color: #5f526a;
+      font-size: 14px;
+      font-weight: 900;
+      text-align: center;
+    }
+
+    .progress-track {
+      height: 14px;
+      margin-top: 8px;
+      overflow: hidden;
+      border-radius: 999px;
+      background: #e6dfea;
+    }
+
+    .progress-bar {
+      width: 0;
+      height: 100%;
+      border-radius: inherit;
+      background: #4a2570;
+      transition: width .25s ease;
+    }
+
+    .current-card {
+      text-align: center;
+    }
+
+    .current-label {
+      color: #786d82;
+      font-size: 11px;
+      font-weight: 900;
+      text-transform: uppercase;
+    }
+
+    .current-person {
+      min-height: 34px;
+      margin-top: 10px;
+      color: #51445c;
+      font-size: 20px;
+      font-weight: 900;
+    }
+
+    .current-code {
+      margin: 12px 0;
+      color: #2b1940;
+      font-size: clamp(30px, 10vw, 52px);
+      font-weight: 1000;
+      letter-spacing: .03em;
+      line-height: 1.05;
+      overflow-wrap: anywhere;
+    }
+
+    .write-button {
+      width: 100%;
+      min-height: 82px;
+      border: 0;
+      border-radius: 18px;
+      background: #166534;
+      color: #fff;
+      font-size: 23px;
+      font-weight: 1000;
+      cursor: pointer;
+      touch-action: manipulation;
+    }
+
+    .write-button:active {
+      transform: scale(.99);
+    }
+
+    .write-button:disabled {
+      opacity: .45;
+      cursor: not-allowed;
+    }
+
+    .mobile-actions {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 9px;
+      margin-top: 11px;
+    }
+
+    .mobile-button {
+      min-height: 48px;
+      border: 0;
+      border-radius: 12px;
+      background: #6b6178;
+      color: #fff;
+      font-weight: 900;
+      cursor: pointer;
+      touch-action: manipulation;
+    }
+
+    .mobile-button.primary {
+      background: #4a2570;
+    }
+
+    .mobile-button.warning {
+      background: #b45309;
+    }
+
+    .mobile-button:disabled {
+      opacity: .45;
+      cursor: not-allowed;
+    }
+
+    .write-state {
+      min-height: 48px;
+      margin-top: 12px;
+      padding: 12px;
+      border-radius: 12px;
+      background: #f5f1f8;
+      color: #655970;
+      font-size: 14px;
+      font-weight: 900;
+      line-height: 1.35;
+    }
+
+    .write-state.ok {
+      background: #eaf8ee;
+      color: #166534;
+    }
+
+    .write-state.error {
+      background: #fff0f0;
+      color: #991b1b;
+    }
+
+    .compatibility {
+      margin-top: 10px;
+      padding: 11px;
+      border-radius: 11px;
+      background: #fff7d6;
+      color: #735c00;
+      font-size: 12px;
+      font-weight: 800;
+      line-height: 1.4;
+    }
+
+    .list-toggle {
+      width: 100%;
+      min-height: 48px;
+      border: 0;
+      border-radius: 12px;
+      background: #4a2570;
+      color: #fff;
+      font-weight: 900;
+      cursor: pointer;
+    }
+
+    .mobile-list {
+      max-height: 420px;
+      margin-top: 12px;
+      overflow: auto;
+      border: 1px solid #e0d8e6;
+      border-radius: 13px;
+    }
+
+    .mobile-row {
+      display: grid;
+      grid-template-columns: 42px minmax(0, 1fr) auto;
+      gap: 9px;
+      align-items: center;
+      width: 100%;
+      padding: 12px;
+      border: 0;
+      border-bottom: 1px solid #eee9f1;
+      background: #fff;
+      color: #2b1940;
+      text-align: left;
+      cursor: pointer;
+    }
+
+    .mobile-row.current {
+      background: #fff7d6;
+    }
+
+    .mobile-row.done {
+      background: #eaf8ee;
+    }
+
+    .mobile-row-number {
+      font-weight: 1000;
+    }
+
+    .mobile-row-person {
+      min-width: 0;
+    }
+
+    .mobile-row-person strong,
+    .mobile-row-person span {
+      display: block;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .mobile-row-person span {
+      margin-top: 3px;
+      color: #786d82;
+      font-size: 12px;
+    }
+
+    .mobile-row-state {
+      font-size: 11px;
+      font-weight: 900;
+    }
+
+    .login-message {
+      padding: 25px 15px;
+      text-align: center;
+    }
+
+    .hidden {
+      display: none !important;
+    }
+  </style>
+</head>
+
+<body>
+  <main class="mobile-page">
+    <div class="mobile-shell">
+      <section
+        id="authPanel"
+        class="mobile-card login-message"
+      >
+        <h1 class="mobile-title">
+          Grabación NFC
+        </h1>
+
+        <p
+          id="authMensaje"
+          class="mobile-sub"
+        >
+          Verificando sesión...
+        </p>
+      </section>
+
+      <div
+        id="appPanel"
+        class="hidden"
+      >
+        <section class="mobile-card">
+          <div class="group-head">
+            <div>
+              <div class="current-label">
+                Grupo
+              </div>
+
+              <div
+                id="grupoNumero"
+                class="group-number"
+              >
+                —
+              </div>
+
+              <div
+                id="grupoNombre"
+                class="mobile-sub"
+              >
+                —
+              </div>
+            </div>
+
+            <span
+              id="estadoConexion"
+              class="connection-pill"
+            >
+              Conectando
+            </span>
+          </div>
+
+          <div
+            id="progresoTexto"
+            class="progress-copy"
+          >
+            0 de 0 grabadas
+          </div>
+
+          <div class="progress-track">
+            <div
+              id="barraProgreso"
+              class="progress-bar"
+            ></div>
+          </div>
+        </section>
+
+        <section class="mobile-card current-card">
+          <div class="current-label">
+            Pulsera actual
+          </div>
+
+          <div
+            id="actualPersona"
+            class="current-person"
+          >
+            —
+          </div>
+
+          <div
+            id="actualCodigo"
+            class="current-code"
+          >
+            —
+          </div>
+
+          <button
+            id="btnGrabar"
+            class="write-button"
+            type="button"
+            disabled
+          >
+            GRABAR PULSERA
+          </button>
+
+          <div class="mobile-actions">
+            <button
+              id="btnAnterior"
+              class="mobile-button"
+              type="button"
+              disabled
+            >
+              Anterior
+            </button>
+
+            <button
+              id="btnSiguiente"
+              class="mobile-button"
+              type="button"
+              disabled
+            >
+              Siguiente
+            </button>
+          </div>
+
+          <div class="mobile-actions">
+            <button
+              id="btnSaltar"
+              class="mobile-button warning"
+              type="button"
+              disabled
+            >
+              Saltar pendiente
+            </button>
+
+            <button
+              id="btnPantallaActiva"
+              class="mobile-button primary"
+              type="button"
+            >
+              Mantener pantalla activa
+            </button>
+          </div>
+
+          <div
+            id="estadoGrabacion"
+            class="write-state"
+          >
+            Cargando lote...
+          </div>
+
+          <div
+            id="compatibilidadNfc"
+            class="compatibility"
+          >
+            Comprobando Web NFC...
+          </div>
+        </section>
+
+        <section class="mobile-card">
+          <button
+            id="btnToggleLista"
+            class="list-toggle"
+            type="button"
+          >
+            Ver lista completa
+          </button>
+
+          <div
+            id="listaPulseras"
+            class="mobile-list hidden"
+          ></div>
+        </section>
+      </div>
+    </div>
+  </main>
+
+  <script
+    type="module"
+    src="grabar-pulseras-nfc.js"
+  ></script>
+</body>
+</html>
