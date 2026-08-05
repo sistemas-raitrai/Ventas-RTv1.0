@@ -36,6 +36,10 @@ import {
   camposPasajero
 } from "./inscripciones-manager.js";
 
+import {
+  crearInscripcionViewer
+} from "./inscripcion-viewer.js";
+
 const $ = (id) =>
   document.getElementById(id);
 
@@ -54,6 +58,7 @@ const state = {
   filtered: [],
 
   manager: null,
+  viewer: null,
   current: null,
   nomina: [],
 
@@ -128,6 +133,21 @@ async function bootstrap() {
     crearInscripcionesManager({
       db,
       usuario: state.user
+    });
+
+  state.viewer =
+    crearInscripcionViewer({
+      manager:
+        state.manager,
+
+      getGrupoCtx:
+        () =>
+          state.current,
+
+      getGrupoData:
+        () =>
+          state.current?.data ||
+          {}
     });
 }
 
@@ -2804,14 +2824,22 @@ function renderPasajeros() {
             )}"
           >
             <td>
-              <strong>
+              <button
+                type="button"
+                class="rut-viewer-link"
+                data-ver-ficha-inscripcion="${esc(
+                  item.id ||
+                  ""
+                )}"
+                title="Abrir ficha individual"
+              >
                 ${esc(
                   camposPasajero.documento(
                     item
                   ) ||
                   "—"
                 )}
-              </strong>
+              </button>
             </td>
 
             <td>
@@ -2924,6 +2952,28 @@ function renderPasajeros() {
 async function manejarAccionPasajero(
   event
 ) {
+  const viewButton =
+    event.target.closest(
+      "[data-ver-ficha-inscripcion]"
+    );
+
+  if (viewButton) {
+    try {
+      await state.viewer
+        .abrir(
+          viewButton.dataset
+            .verFichaInscripcion
+        );
+    } catch (error) {
+      alert(
+        error.message ||
+        "No se pudo abrir la ficha."
+      );
+    }
+
+    return;
+  }
+
   const button =
     event.target.closest(
       "[data-pasajero-action]"
