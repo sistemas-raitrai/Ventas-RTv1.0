@@ -373,15 +373,67 @@
 
     .kpi-grid {
       display: grid;
-      grid-template-columns: repeat(7, minmax(0, 1fr));
+      grid-template-columns: repeat(6, minmax(0, 1fr));
       gap: 10px;
     }
 
     .kpi {
+      appearance: none;
+      width: 100%;
       padding: 14px;
       border-radius: 14px;
       background: #f8f5fb;
       border: 1px solid #e6deec;
+      text-align: left;
+    }
+
+    button.kpi {
+      cursor: pointer;
+      transition:
+        transform .15s ease,
+        border-color .15s ease,
+        box-shadow .15s ease;
+    }
+
+    button.kpi:hover,
+    button.kpi:focus-visible {
+      transform: translateY(-1px);
+      border-color: #8a6ca1;
+      box-shadow: 0 7px 18px rgba(43, 25, 64, .09);
+      outline: none;
+    }
+
+    button.kpi.active {
+      border-color: #4a2570;
+      box-shadow: 0 0 0 3px rgba(74, 37, 112, .13);
+    }
+
+    .kpi-grid.secondary {
+      grid-template-columns: repeat(8, minmax(0, 1fr));
+      margin-top: 10px;
+    }
+
+    .kpi-grid.secondary .kpi {
+      padding: 12px;
+    }
+
+    .kpi-grid.secondary .kpi strong {
+      font-size: 21px;
+    }
+
+    .nomina-filter-bar {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: center;
+      flex-wrap: wrap;
+      margin: 14px 0 10px;
+      padding: 10px 12px;
+      border-radius: 12px;
+      background: #f6f2f9;
+      color: #5e526a;
+      font-size: 13px;
+      font-weight: 800;
     }
 
     .kpi span {
@@ -476,10 +528,79 @@
     }
 
     .passenger-table tr.is-focus td {
-      background: #fff3bf;
       box-shadow:
-        inset 0 1px 0 #e8bf35,
-        inset 0 -1px 0 #e8bf35;
+        inset 0 2px 0 #d8a900,
+        inset 0 -2px 0 #d8a900;
+    }
+
+    .nomina-section-row td {
+      position: sticky;
+      top: 34px;
+      z-index: 1;
+      padding: 9px 12px !important;
+      background: #2b1940 !important;
+      color: #fff;
+      font-size: 11px !important;
+      font-weight: 900;
+      letter-spacing: .06em;
+    }
+
+    .nomina-row-lista_confirmada td {
+      background: #ffe7b8;
+    }
+
+    .nomina-row-nuevo_confirmado td {
+      background: #e5f7e9;
+    }
+
+    .nomina-row-liberado td {
+      background: #eafaf0;
+    }
+
+    .nomina-row-nomina_base_completa td {
+      background: #f8f4fb;
+    }
+
+    .nomina-row-nomina_base_pendiente td {
+      background: #fff7d6;
+    }
+
+    .nomina-row-sistema_completo td {
+      background: #eef8f0;
+    }
+
+    .nomina-row-sistema_pendiente td {
+      background: #fff4c7;
+    }
+
+    .nomina-row-nuevo_pendiente td {
+      background: #fff8dc;
+    }
+
+    .nomina-row-lista_pagada td {
+      background: #ffe8e8;
+    }
+
+    .nomina-row-lista_pendiente td {
+      background: #fff1f3;
+    }
+
+    .nomina-row-anulado td {
+      background: #eeeeee;
+      color: #716b76;
+    }
+
+    .nomina-type-pill {
+      display: inline-flex;
+      min-height: 26px;
+      align-items: center;
+      padding: 0 9px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, .72);
+      border: 1px solid rgba(43, 25, 64, .11);
+      color: #352442;
+      font-size: 11px;
+      font-weight: 900;
     }
 
     .alerts-toolbar {
@@ -521,6 +642,10 @@
       }
 
       .kpi-grid {
+        grid-template-columns: repeat(3, 1fr);
+      }
+
+      .kpi-grid.secondary {
         grid-template-columns: repeat(4, 1fr);
       }
     }
@@ -911,40 +1036,137 @@
           </button>
         </div>
 
-        <section class="kpi-grid">
-          <div class="kpi">
-            <span>Total</span>
-            <strong id="kTotal">0</strong>
+        <section
+          id="modalKpisNomina"
+        >
+          <div class="kpi-grid">
+            <button
+              class="kpi"
+              type="button"
+              data-nomina-filtro="todos"
+            >
+              <span>Total inscritos</span>
+              <strong id="kTotal">0</strong>
+            </button>
+
+            <button
+              class="kpi"
+              type="button"
+              data-nomina-filtro="viajan"
+            >
+              <span>Viajan confirmados</span>
+              <strong id="kViajan">0</strong>
+            </button>
+
+            <button
+              class="kpi"
+              type="button"
+              data-nomina-filtro="gestion"
+            >
+              <span>Pendientes de gestión</span>
+              <strong id="kGestion">0</strong>
+            </button>
+
+            <button
+              class="kpi"
+              type="button"
+              data-nomina-filtro="anulados"
+            >
+              <span>Anulados</span>
+              <strong id="kAnulados">0</strong>
+            </button>
+
+            <button
+              class="kpi"
+              type="button"
+              data-nomina-filtro="ficha_pendiente"
+            >
+              <span>Ficha pendiente</span>
+              <strong id="kFichaPendiente">0</strong>
+            </button>
+
+            <button
+              class="kpi"
+              type="button"
+              data-nomina-filtro="sin_carnet"
+            >
+              <span>Sin carnet</span>
+              <strong id="kSinCarnet">0</strong>
+            </button>
           </div>
 
-          <div class="kpi">
-            <span>Activos</span>
-            <strong id="kActivos">0</strong>
-          </div>
+          <div class="kpi-grid secondary">
+            <button
+              class="kpi"
+              type="button"
+              data-nomina-filtro="lista_confirmada"
+            >
+              <span>LE confirmada</span>
+              <strong id="kListaConfirmada">0</strong>
+            </button>
 
-          <div class="kpi">
-            <span>Anulados</span>
-            <strong id="kAnulados">0</strong>
-          </div>
+            <button
+              class="kpi"
+              type="button"
+              data-nomina-filtro="nuevo_confirmado"
+            >
+              <span>Nuevo confirmado</span>
+              <strong id="kNuevoConfirmado">0</strong>
+            </button>
 
-          <div class="kpi">
-            <span>Ficha completa</span>
-            <strong id="kCompleta">0</strong>
-          </div>
+            <button
+              class="kpi"
+              type="button"
+              data-nomina-filtro="liberado"
+            >
+              <span>Liberados</span>
+              <strong id="kLiberados">0</strong>
+            </button>
 
-          <div class="kpi">
-            <span>Ficha pendiente</span>
-            <strong id="kPendiente">0</strong>
-          </div>
+            <button
+              class="kpi"
+              type="button"
+              data-nomina-filtro="sistema_completo"
+            >
+              <span>SP ficha completa</span>
+              <strong id="kSistemaCompleto">0</strong>
+            </button>
 
-          <div class="kpi">
-            <span>Con carnet</span>
-            <strong id="kCarnet">0</strong>
-          </div>
+            <button
+              class="kpi"
+              type="button"
+              data-nomina-filtro="sistema_pendiente"
+            >
+              <span>SP ficha pendiente</span>
+              <strong id="kSistemaPendiente">0</strong>
+            </button>
 
-          <div class="kpi">
-            <span>Sin carnet</span>
-            <strong id="kSinCarnet">0</strong>
+            <button
+              class="kpi"
+              type="button"
+              data-nomina-filtro="nuevo_pendiente"
+            >
+              <span>Nuevo pendiente</span>
+              <strong id="kNuevoPendiente">0</strong>
+            </button>
+
+            <button
+              class="kpi"
+              type="button"
+              data-nomina-filtro="lista_pagada"
+            >
+              <span>LE pagada</span>
+              <strong id="kListaPagada">0</strong>
+            </button>
+
+            <button
+              class="kpi"
+              type="button"
+              data-nomina-filtro="lista_pendiente"
+            >
+              <span>LE pendiente</span>
+              <strong id="kListaPendiente">0</strong>
+            </button>
           </div>
         </section>
 
@@ -961,6 +1183,20 @@
 
         <section class="modal-section">
           <h3>Pasajeros</h3>
+
+          <div class="nomina-filter-bar">
+            <span id="nominaFiltroActual">
+              Mostrando toda la nómina
+            </span>
+
+            <button
+              id="btnMostrarTodaNomina"
+              class="btn-secondary hidden"
+              type="button"
+            >
+              Mostrar todos
+            </button>
+          </div>
 
           <div class="passenger-table-wrap">
             <table class="passenger-table">
