@@ -623,6 +623,215 @@
       flex-wrap: wrap;
     }
 
+    .rut-viewer-link {
+      border: 0;
+      padding: 0;
+      background: transparent;
+      color: #3b1368;
+      font: inherit;
+      font-weight: 900;
+      text-decoration: underline;
+      cursor: pointer;
+    }
+
+    .rut-viewer-link:hover {
+      color: #15803d;
+    }
+
+    .viewer-modal-card {
+      width: min(1250px, calc(100vw - 30px));
+      height: calc(100vh - 30px);
+    }
+
+    .viewer-header-actions {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .viewer-section {
+      margin-top: 18px;
+    }
+
+    .viewer-section:first-child {
+      margin-top: 0;
+    }
+
+    .viewer-section h3 {
+      margin: 0 0 10px;
+      color: #2b1940;
+    }
+
+    .viewer-data-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .viewer-data-card {
+      min-width: 0;
+      padding: 12px;
+      border: 1px solid #e4dce9;
+      border-radius: 12px;
+      background: #faf8fc;
+    }
+
+    .viewer-data-card span {
+      display: block;
+      margin-bottom: 5px;
+      color: #776b83;
+      font-size: 10px;
+      font-weight: 900;
+      text-transform: uppercase;
+    }
+
+    .viewer-data-card strong {
+      display: block;
+      color: #2b1940;
+      font-size: 13px;
+      line-height: 1.45;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+    }
+
+    .viewer-doc-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .viewer-doc-card {
+      overflow: hidden;
+      border: 1px solid #ddd4e5;
+      border-radius: 14px;
+      background: #fff;
+    }
+
+    .viewer-doc-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      align-items: center;
+      padding: 10px 12px;
+      background: #f4eef8;
+    }
+
+    .viewer-doc-head button {
+      border: 0;
+      border-radius: 8px;
+      padding: 7px 9px;
+      background: #4a2570;
+      color: #fff;
+      font-size: 11px;
+      font-weight: 900;
+      cursor: pointer;
+    }
+
+    .viewer-doc-card img {
+      display: block;
+      width: 100%;
+      height: 310px;
+      object-fit: contain;
+      background: #eeeaf1;
+    }
+
+    .viewer-file-box,
+    .viewer-empty {
+      padding: 22px;
+      color: #706579;
+      text-align: center;
+      font-weight: 800;
+    }
+
+    .viewer-crop-card {
+      width: min(1180px, calc(100vw - 30px));
+      height: min(760px, calc(100vh - 30px));
+    }
+
+    .viewer-crop-layout {
+      display: grid;
+      grid-template-columns: 250px minmax(0, 1fr);
+      gap: 16px;
+    }
+
+    .viewer-crop-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .viewer-crop-list button {
+      border: 1px solid #d7cde0;
+      border-radius: 11px;
+      padding: 11px;
+      background: #faf8fc;
+      color: #4a2570;
+      text-align: left;
+      font-weight: 900;
+      cursor: pointer;
+    }
+
+    .viewer-crop-list button.active {
+      border-color: #4a2570;
+      background: #ebe1f3;
+    }
+
+    .viewer-crop-preview {
+      padding: 12px;
+      border-radius: 14px;
+      background: #f5f1f8;
+    }
+
+    .viewer-crop-canvas-box {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 440px;
+      overflow: hidden;
+      border-radius: 12px;
+      background: #241b2d;
+    }
+
+    #viewerCropCanvas {
+      max-width: 100%;
+      max-height: 100%;
+      cursor: grab;
+    }
+
+    #viewerCropCanvas:active {
+      cursor: grabbing;
+    }
+
+    .viewer-crop-toolbar {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-top: 10px;
+    }
+
+    .viewer-crop-state {
+      margin-top: 9px;
+      color: #6a6075;
+      font-size: 12px;
+      font-weight: 800;
+    }
+
+    @media (max-width: 850px) {
+      .viewer-data-grid,
+      .viewer-doc-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .viewer-crop-layout {
+        grid-template-columns: 1fr;
+      }
+
+      .viewer-crop-canvas-box {
+        height: 320px;
+      }
+    }
+
     .passenger-row-actions {
       display: flex;
       min-width: 150px;
@@ -1262,6 +1471,179 @@
             </table>
           </div>
         </section>
+      </div>
+    </div>
+  </div>
+
+  <!-- FICHA INDIVIDUAL DESDE EL RUT -->
+  <div
+    class="modal"
+    id="modalFichaInscripcion"
+  >
+    <div class="modal-card viewer-modal-card">
+      <header class="modal-head">
+        <div>
+          <h2 id="fichaInscripcionTitulo">
+            Ficha individual
+          </h2>
+
+          <p id="fichaInscripcionSubtitulo"></p>
+        </div>
+
+        <div class="viewer-header-actions">
+          <button
+            id="btnImprimirFichaInscripcion"
+            class="btn-secondary"
+            type="button"
+          >
+            Imprimir
+          </button>
+
+          <button
+            id="btnPrepararPdfFichaInscripcion"
+            class="btn-primary"
+            type="button"
+          >
+            Preparar PDF
+          </button>
+
+          <button
+            id="btnCerrarFichaInscripcion"
+            class="modal-close"
+            type="button"
+            aria-label="Cerrar"
+          >
+            ×
+          </button>
+        </div>
+      </header>
+
+      <div
+        id="fichaInscripcionLoading"
+        class="modal-loading"
+      >
+        Cargando ficha completa...
+      </div>
+
+      <div
+        id="fichaInscripcionContent"
+        class="modal-content hidden"
+      >
+        <div id="fichaDatosGrid"></div>
+
+        <section class="viewer-section">
+          <h3>Documentos e imágenes</h3>
+
+          <div
+            id="fichaDocumentosGrid"
+            class="viewer-doc-grid"
+          ></div>
+        </section>
+      </div>
+    </div>
+  </div>
+
+  <!-- REENCUADRE DE IMÁGENES PARA PDF -->
+  <div
+    class="modal"
+    id="modalReencuadreViewer"
+  >
+    <div class="modal-card viewer-crop-card">
+      <header class="modal-head">
+        <div>
+          <h2>
+            Preparar imágenes para la ficha
+          </h2>
+
+          <p>
+            Arrastra, amplía o gira cada documento antes de imprimir.
+          </p>
+        </div>
+
+        <button
+          id="btnCerrarReencuadreViewer"
+          class="modal-close"
+          type="button"
+          aria-label="Cerrar"
+        >
+          ×
+        </button>
+      </header>
+
+      <div class="modal-content">
+        <div class="viewer-crop-layout">
+          <div
+            id="reencuadreListaViewer"
+            class="viewer-crop-list"
+          ></div>
+
+          <div class="viewer-crop-preview">
+            <div class="viewer-crop-canvas-box">
+              <canvas
+                id="viewerCropCanvas"
+                width="900"
+                height="540"
+              ></canvas>
+            </div>
+
+            <div class="viewer-crop-toolbar">
+              <button
+                id="btnViewerZoomMenos"
+                class="btn-secondary"
+                type="button"
+              >
+                − Zoom
+              </button>
+
+              <button
+                id="btnViewerZoomMas"
+                class="btn-secondary"
+                type="button"
+              >
+                + Zoom
+              </button>
+
+              <button
+                id="btnViewerRotarIzq"
+                class="btn-secondary"
+                type="button"
+              >
+                ↺ Rotar
+              </button>
+
+              <button
+                id="btnViewerRotarDer"
+                class="btn-secondary"
+                type="button"
+              >
+                ↻ Rotar
+              </button>
+
+              <button
+                id="btnViewerCentrar"
+                class="btn-secondary"
+                type="button"
+              >
+                Centrar
+              </button>
+
+              <button
+                id="btnGenerarPdfViewer"
+                class="btn-primary"
+                type="button"
+              >
+                Generar / imprimir PDF
+              </button>
+            </div>
+
+            <div
+              id="viewerCropEstado"
+              class="viewer-crop-state"
+            >
+              Selecciona una imagen.
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   </div>
