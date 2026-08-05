@@ -480,6 +480,33 @@ function bindEvents() {
         )
     );
 
+    $("btnGestionarPulseras")
+      ?.addEventListener(
+        "click",
+        () => {
+          const idGrupo =
+            state.current?.docId ||
+            state.current?.groupId ||
+            "";
+  
+          if (!idGrupo) {
+            alert(
+              "No se pudo identificar el grupo."
+            );
+  
+            return;
+          }
+  
+          window.open(
+            `gestion-pulseras-nfc.html?id=${encodeURIComponent(
+              idGrupo
+            )}`,
+            "_blank",
+            "noopener"
+          );
+        }
+      );
+
   document
     .querySelectorAll(
       "[data-alerta-kpi]"
