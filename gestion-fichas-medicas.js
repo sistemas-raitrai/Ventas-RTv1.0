@@ -309,7 +309,7 @@ async function saveEdit(event) {
   if (!item) return;
 
   const patch = {};
-  const changes = [];
+  const cambios = [];
 
   document.querySelectorAll("[data-edit-path]").forEach((input) => {
     const path = input.dataset.editPath;
@@ -321,11 +321,15 @@ async function saveEdit(event) {
 
     if (JSON.stringify(oldValue ?? "") !== JSON.stringify(newValue)) {
       patch[path] = newValue;
-      changes.push({ campo: path, anterior: oldValue ?? "", nuevo: newValue });
+      cambios.push({
+        campo: path,
+        anterior: oldValue ?? "",
+        nuevo: newValue
+      });
     }
   });
 
-  if (!changes.length) {
+  if (!cambios.length) {
     alert("No hay cambios para guardar.");
     return;
   }
