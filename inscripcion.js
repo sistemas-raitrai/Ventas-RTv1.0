@@ -1748,12 +1748,8 @@ function validarFormulario() {
 // PAYLOAD
 // -----------------------------------------------------------------------------
 function construirConsentimientoPayload() {
-  const version = obtenerVersionConsentimientoGrupo();
-
   const respuestaApoderado =
-    usaConsentimientoV2()
-      ? obtenerRadio("autorizaApoderadoCoordinador")
-      : "";
+    obtenerRadio("autorizaApoderadoCoordinador");
 
   let autorizaApoderadoCoordinador = null;
 
@@ -1766,12 +1762,9 @@ function construirConsentimientoPayload() {
   }
 
   return {
-    versionConsentimiento: version,
+    versionConsentimiento: VERSION_CONSENTIMIENTO_NUEVA,
 
-    autorizaApoderadoCoordinador:
-      usaConsentimientoV2()
-        ? autorizaApoderadoCoordinador
-        : null,
+    autorizaApoderadoCoordinador,
 
     aceptaVeracidad:
       !!$("aceptaVeracidad")?.checked,
@@ -2301,17 +2294,11 @@ function resetDefaults() {
 // HELPERS UI
 // -----------------------------------------------------------------------------
 function obtenerVersionConsentimientoGrupo() {
-  const version = Number(
-    grupoData?.versionConsentimientoFicha || 1
-  );
-
-  return version >= VERSION_CONSENTIMIENTO_NUEVA
-    ? VERSION_CONSENTIMIENTO_NUEVA
-    : 1;
+  return VERSION_CONSENTIMIENTO_NUEVA;
 }
 
 function usaConsentimientoV2() {
-  return obtenerVersionConsentimientoGrupo() >= VERSION_CONSENTIMIENTO_NUEVA;
+  return true;
 }
 
 function reemplazarTextoLabelCheckbox(inputId, texto) {
