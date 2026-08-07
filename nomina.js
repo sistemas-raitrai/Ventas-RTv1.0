@@ -23,6 +23,32 @@ const db = getFirestore(app);
 
 const $ = (id) => document.getElementById(id);
 
+/*
+ * EXCLUSIONES TEMPORALES DE LA NÓMINA PÚBLICA
+ *
+ * IMPORTANTE:
+ * - Esto NO elimina inscripciones.
+ * - NO modifica Firebase.
+ * - NO cambia estados.
+ * - Solamente impide que estas personas aparezcan en esta nómina pública.
+ *
+ * Cuando ya no sea necesario ocultarlos, basta con eliminar sus nombres
+ * de esta lista o dejar el Set vacío.
+ */
+const PASAJEROS_OCULTOS_TEMPORALMENTE = new Set([
+  "THIAGO AGUSTIN LEON ACAUNA",
+  "MATIAS ALEJANDRO HEYSER HUILIPAN",
+  "CRISTOBAL MATUS JOFRE",
+  "LISSETTE GRACIELA ACUNA GALAZ",
+  "VALENTIN ALONSO DIAZ MORAGREGA",
+  "MATEO ALBERTO GARRIDO ALAIGA",
+  "NANCY LYHA ALIAGA AGUERO",
+  "LUIS ALBERTO GARRIDO FLORES",
+  "MONSERRAT BELEN AGURTO ACEVEDO",
+  "VICENTE AGUSTIN SOLAR SASSI",
+  "AMANDA ISIDORA NUNEZ BECAR"
+]);
+
 init();
 
 async function init() {
@@ -91,7 +117,8 @@ async function init() {
           fechaOrden: getPublicDateTimeMs(fechaOriginal)
         };
       })
-      .filter((p) => p.nombre);
+      .filter((p) => p.nombre)
+      .filter((p) => !estaOcultoTemporalmente(p.nombre));
       
       pasajeros = deduplicarPasajeros(pasajeros)
         .sort((a, b) => a.fechaOrden - b.fechaOrden);
@@ -294,6 +321,12 @@ function normalizarNombreParaComparar(value = "") {
     .toUpperCase()
     .replace(/\s+/g, " ")
     .trim();
+}
+
+function estaOcultoTemporalmente(nombre = "") {
+  const nombreNormalizado = normalizarNombreParaComparar(nombre);
+
+  return PASAJEROS_OCULTOS_TEMPORALMENTE.has(nombreNormalizado);
 }
 
 function escapeHtml(value = "") {
