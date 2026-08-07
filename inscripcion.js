@@ -135,6 +135,7 @@ const TELEFONO_ADMIN = "+56 (2) 2236 3232";
 const WHATSAPP_ADMIN = "(+569) 9818 3857";
 const COLECCION_INSCRIPCIONES_PENDIENTES = "inscripciones_pendientes_publicas";
 const COLECCION_SESIONES_PUBLICAS = "inscripciones_sesiones_publicas";
+const VERSION_CONSENTIMIENTO_NUEVA = 2;
 
 
 // -----------------------------------------------------------------------------
@@ -304,6 +305,7 @@ async function cargarGrupo() {
   if (chipAno) chipAno.textContent = String(grupoData.anoViaje || "-");
   
   renderBannerFaseInscripcion();
+  aplicarVersionConsentimientoUI();
   aplicarConfiguracionPolera();
 }
 
@@ -1711,6 +1713,15 @@ function validarFormulario() {
       "Debe aceptar las condiciones de la Lista de Espera."
     );
   }
+
+  if (
+    usaConsentimientoV2() &&
+    !obtenerRadio("autorizaApoderadoCoordinador")
+  ) {
+    errores.push(
+      "Debe indicar si autoriza o no compartir información con el/la apoderado(a) encargado(a) de la coordinación general del viaje."
+    );
+  }
   
   if (!$("aceptaVeracidad")?.checked) {
     errores.push(
@@ -1736,6 +1747,52 @@ function validarFormulario() {
 // -----------------------------------------------------------------------------
 // PAYLOAD
 // -----------------------------------------------------------------------------
+function construirConsentimientoPayload() {
+  const version = obtenerVersionConsentimientoGrupo();
+
+  const respuestaApoderado =
+    usaConsentimientoV2()
+      ? obtenerRadio("autorizaApoderadoCoordinador")
+      : "";
+
+  let autorizaApoderadoCoordinador = null;
+
+  if (respuestaApoderado === "si") {
+    autorizaApoderadoCoordinador = true;
+  }
+
+  if (respuestaApoderado === "no") {
+    autorizaApoderadoCoordinador = false;
+  }
+
+  return {
+    versionConsentimiento: version,
+
+    autorizaApoderadoCoordinador:
+      usaConsentimientoV2()
+        ? autorizaApoderadoCoordinador
+        : null,
+
+    aceptaVeracidad:
+      !!$("aceptaVeracidad")?.checked,
+
+    aceptaUsoInterno:
+      !!$("aceptaUsoInterno")?.checked,
+
+    aceptaCambiosCorreo:
+      !!$("aceptaCambiosCorreo")?.checked,
+
+    aceptaCondicionesListaEspera:
+      faseUrl === "lista_espera"
+        ? !!$("aceptaCondicionesListaEspera")?.checked
+        : false,
+
+    correoCambios: CORREO_ADMIN,
+    telefonoCambios: TELEFONO_ADMIN,
+    whatsappCambios: WHATSAPP_ADMIN
+  };
+}
+
 function construirPayloadBase() {
   const tipoViajante = obtenerRadio("tipoViajante");
   const esEstudiante = tipoViajante === "estudiante";
@@ -2076,23 +2133,13 @@ function construirPayloadBase() {
       observaciones: limpiarTexto($("adultoObservacionesCompromiso")?.value)
     },
 
-    consentimiento: {
-      aceptaVeracidad: !!$("aceptaVeracidad")?.checked,
-      aceptaUsoInterno: !!$("aceptaUsoInterno")?.checked,
-      aceptaCambiosCorreo: !!$("aceptaCambiosCorreo")?.checked,
-      aceptaCondicionesListaEspera: faseUrl === "lista_espera"
-        ? !!$("aceptaCondicionesListaEspera")?.checked
-        : false,
-      correoCambios: CORREO_ADMIN,
-      telefonoCambios: TELEFONO_ADMIN,
-      whatsappCambios: WHATSAPP_ADMIN
-    },
+    consentimiento: construirConsentimientoPayload(),
 
     meta: {
       fechaInscripcion: new Date().toISOString(),
       fechaFormularioCliente: new Date().toISOString(),
       canal: "formulario_publico",
-      versionFormulario: 4,
+      versionFormulario: 5,
       creadoDesde: window.location.href,
       estado: "inscrito"
     }
@@ -2253,6 +2300,204 @@ function resetDefaults() {
 // -----------------------------------------------------------------------------
 // HELPERS UI
 // -----------------------------------------------------------------------------
+function obtenerVersionConsentimientoGrupo() {
+  const version = Number(
+    grupoData?.versionConsentimientoFicha || 1
+  );
+
+  return version >= VERSION_CONSENTIMIENTO_NUEVA
+    ? VERSION_CONSENTIMIENTO_NUEVA
+    : 1;
+}
+
+function usaConsentimientoV2() {
+  return obtenerVersionConsentimientoGrupo() >= VERSION_CONSENTIMIENTO_NUEVA;
+}
+
+function reemplazarTextoLabelCheckbox(inputId, texto) {
+  const input = $(inputId);
+  if (!input) return;
+
+  const label = input.closest("label");
+  if (!label) return;
+
+  Array.from(label.childNodes).forEach((node) => {
+    if (node !== input) {
+      node.remove();
+    }
+  });
+
+  label.appendChild(document.createTextNode(` ${texto}`));
+}
+
+function aplicarVersionConsentimientoUI() {
+  const version = obtenerVersionConsentimientoGrupo();
+  const esV2 = usaConsentimientoV2();
+
+  // ---------------------------------------------------------------------------
+  // RUT: dejar claro en TODOS los formularios de quién es el RUT
+  // ---------------------------------------------------------------------------
+
+  const labelRut = document.querySelector('label[for="rutNumero"]');
+
+  if (labelRut) {
+    labelRut.innerHTML =
+      'RUT de la persona que viaja <span class="req">*</span>';
+  }
+
+  if (rutHint) {
+    rutHint.innerHTML = `
+      <strong>Importante:</strong>
+      ingrese el RUT del estudiante, profesor o adulto que participará en el viaje.
+      Si usted está completando el formulario como apoderado(a),
+      <strong>no ingrese su propio RUT</strong>.
+    `;
+  }
+
+  // ---------------------------------------------------------------------------
+  // RUT previo de Nómina Final
+  // ---------------------------------------------------------------------------
+
+  const labelRutValidacion =
+    document.querySelector('label[for="rutValidacionNumero"]');
+
+  if (labelRutValidacion) {
+    labelRutValidacion.innerHTML =
+      'RUT de la persona que viaja <span class="req">*</span>';
+  }
+
+  if (cardValidacionNominaFinal) {
+    let avisoRut = $("avisoRutPersonaViaja");
+
+    if (!avisoRut) {
+      avisoRut = document.createElement("div");
+      avisoRut.id = "avisoRutPersonaViaja";
+      avisoRut.className = "notice time";
+
+      avisoRut.style.marginBottom = "18px";
+
+      avisoRut.innerHTML = `
+        <div style="
+          font-size:20px;
+          line-height:1.3;
+          font-weight:900;
+          margin-bottom:8px;
+        ">
+          ⚠️ RUT DE LA PERSONA QUE VIAJA
+        </div>
+
+        <div style="font-size:15px; line-height:1.55;">
+          Ingrese el RUT del estudiante, profesor o adulto que participará
+          en el viaje.
+
+          <br><br>
+
+          Si usted es padre, madre o apoderado(a),
+          <strong>NO ingrese su propio RUT.</strong>
+        </div>
+      `;
+
+      cardValidacionNominaFinal.prepend(avisoRut);
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Pregunta nueva: SOLO V2
+  // ---------------------------------------------------------------------------
+
+  let bloqueAutorizacion = $("bloqueAutorizacionApoderadoCoordinador");
+
+  if (esV2) {
+    if (!bloqueAutorizacion) {
+      bloqueAutorizacion = document.createElement("div");
+
+      bloqueAutorizacion.id =
+        "bloqueAutorizacionApoderadoCoordinador";
+
+      bloqueAutorizacion.className = "notice privacy";
+
+      bloqueAutorizacion.style.marginTop = "20px";
+
+      bloqueAutorizacion.innerHTML = `
+        <div style="
+          font-size:17px;
+          font-weight:800;
+          margin-bottom:10px;
+        ">
+          Compartir información con el/la apoderado(a) encargado(a) del viaje
+        </div>
+
+        <div style="
+          line-height:1.55;
+          margin-bottom:14px;
+        ">
+          ¿Autoriza que el/la apoderado(a) encargado(a) de la coordinación
+          general del viaje pueda conocer información relevante del estudiante,
+          incluyendo antecedentes médicos cuando sean necesarios para su
+          seguridad y cuidado durante el viaje?
+          <span class="req">*</span>
+        </div>
+
+        <div style="
+          display:flex;
+          flex-wrap:wrap;
+          gap:10px;
+        ">
+          <label class="option-pill">
+            <input
+              type="radio"
+              name="autorizaApoderadoCoordinador"
+              value="si"
+              required
+            >
+            Sí, autorizo
+          </label>
+
+          <label class="option-pill">
+            <input
+              type="radio"
+              name="autorizaApoderadoCoordinador"
+              value="no"
+            >
+            No, no autorizo
+          </label>
+        </div>
+      `;
+
+      const seccionDatosViajante =
+        rutCompletoWrap?.closest("section.card");
+
+      if (seccionDatosViajante) {
+        seccionDatosViajante.appendChild(bloqueAutorizacion);
+      }
+    }
+  } else {
+    bloqueAutorizacion?.remove();
+  }
+
+  // ---------------------------------------------------------------------------
+  // Consentimiento final
+  // ---------------------------------------------------------------------------
+
+  const textoConsentimientoV1 =
+    "Autorizo el uso interno de esta información exclusivamente para la correcta operación del viaje";
+
+  const textoConsentimientoV2 =
+    "Autorizo el uso interno de esta información para la correcta planificación, coordinación y operación del viaje. Entiendo y acepto que la ficha médica y los antecedentes relevantes de la persona que viaja podrán ser consultados por los coordinadores de Turismo Rai Trai y por los adultos acompañantes responsables del grupo durante el viaje, cuando sea necesario para su seguridad, cuidado, asistencia o atención ante una eventualidad.";
+
+  reemplazarTextoLabelCheckbox(
+    "aceptaUsoInterno",
+    esV2
+      ? textoConsentimientoV2
+      : textoConsentimientoV1
+  );
+
+  // Dejamos la versión visible internamente en el formulario.
+  if (form) {
+    form.dataset.versionConsentimiento = String(version);
+  }
+}
+
 function grupoIncluyePolera() {
   /*
     Regla:
@@ -2433,147 +2678,208 @@ function renderBannerFaseInscripcion() {
   if (!box) return;
 
   const contexto = getContextoFormulario();
-
   const btn = $("btnComenzar");
 
   if (btn) {
     btn.textContent = "Comenzar formulario";
   }
 
+  const titulo = (icono, texto) => `
+    <div style="
+      font-size:24px;
+      line-height:1.2;
+      font-weight:900;
+      margin-bottom:14px;
+    ">
+      ${icono} ${texto}
+    </div>
+  `;
+
   if (contexto.clave === "nuevo_ingreso") {
     box.className = "notice time";
+
     box.innerHTML = `
-      <strong>Formulario de Nuevo ingreso:</strong><br><br>
-    
+      ${titulo("🟣", "NUEVO INGRESO")}
+
       Estás solicitando incorporarte al grupo de viaje después de la nómina inicial.
-      Nuestro equipo revisará la solicitud y realizará la gestión correspondiente para habilitar el sistema de pago.
-    
+      Nuestro equipo revisará la solicitud y realizará la gestión correspondiente
+      para habilitar el sistema de pago.
+
       <br><br>
-    
-      Es posible que existan cuotas retroactivas o condiciones particulares según la fecha de incorporación.
-      Administración informará los pasos a seguir para regularizar la incorporación al grupo.
-    
+
+      Es posible que existan cuotas retroactivas o condiciones particulares según
+      la fecha de incorporación. Administración informará los pasos a seguir para
+      regularizar la incorporación al grupo.
+
       <br><br>
-    
-      Antes de comenzar, debes tener disponible la cédula de identidad vigente por ambos lados.
+
+      Antes de comenzar, debes tener disponible la cédula de identidad vigente
+      por ambos lados.
     `;
   } else if (contexto.clave === "lista_espera") {
     box.className = "notice error";
+
     box.innerHTML = `
-      <strong>Formulario de Lista de espera:</strong><br><br>
-      
+      ${titulo("🟡", "LISTA DE ESPERA")}
+
       Estás solicitando ingresar a la lista de espera del grupo de viaje.
-      Actualmente el cupo <strong>aún no se encuentra confirmado</strong> y dependerá de la disponibilidad final del grupo.
-      
+      Actualmente el cupo <strong>aún no se encuentra confirmado</strong>
+      y dependerá de la disponibilidad final del grupo.
+
       <br><br>
-      
+
       Para solicitar el ingreso, se debe realizar un abono inicial de
-      <strong>$100.000 CLP</strong> y completar este formulario con la documentación solicitada.
-      
+      <strong>$100.000 CLP</strong> y completar este formulario con la
+      documentación solicitada.
+
       <br><br>
-      
+
       <strong>Importante:</strong>
-      
+
       <ol style="margin-top:8px; padding-left:20px;">
         <li>
-          El abono y el envío de este formulario no garantizan automáticamente la asignación del cupo.
+          El abono y el envío de este formulario no garantizan automáticamente
+          la asignación del cupo.
         </li>
-      
+
         <li>
-          Si el cupo es confirmado, existirá un plazo de <strong>48 horas</strong> para regularizar el pago retroactivo correspondiente a las cuotas ya pagadas por el grupo y quedar al día.
+          Si el cupo es confirmado, existirá un plazo de
+          <strong>48 horas</strong> para regularizar el pago retroactivo
+          correspondiente a las cuotas ya pagadas por el grupo y quedar al día.
         </li>
-      
+
         <li>
-          Si el pago no se regulariza dentro del plazo indicado, la reserva podrá cancelarse y el cupo podrá ser asignado a otro pasajero en lista de espera.
+          Si el pago no se regulariza dentro del plazo indicado, la reserva podrá
+          cancelarse y el cupo podrá ser asignado a otro pasajero en lista de espera.
         </li>
-      
+
         <li>
-          Una vez confirmado e incorporado al grupo, el viaje quedará sujeto a las condiciones generales contratadas por el curso.
+          Una vez confirmado e incorporado al grupo, el viaje quedará sujeto a
+          las condiciones generales contratadas por el curso.
         </li>
-      
+
         <li>
-          En caso de desistimiento voluntario, rechazo del cupo confirmado o incumplimiento de los plazos indicados, el abono realizado no será reembolsable.
+          En caso de desistimiento voluntario, rechazo del cupo confirmado o
+          incumplimiento de los plazos indicados, el abono realizado no será
+          reembolsable.
         </li>
-      
+
         <li>
-          Si Turismo Rai Trai no logra confirmar el cupo, se realizará la devolución total del abono efectuado.
+          Si Turismo Rai Trai no logra confirmar el cupo, se realizará la devolución
+          total del abono efectuado.
         </li>
       </ol>
-      
+
       <hr style="margin:14px 0;">
-      
+
       <strong>Datos de transferencia:</strong><br>
       Turismo Raitrai<br>
       RUT: 78.384.230-0<br>
       Banco Chile<br>
       Cuenta Corriente N° 033 98-07<br>
       Correo comprobante: transferencia@raitrai.cl
-      
+
       <br><br>
-      
+
       <strong>Antes de comenzar debes tener disponible:</strong>
-      
+
       <ul style="margin-top:8px;">
         <li>Cédula de identidad vigente por ambos lados</li>
         <li>Comprobante de pago</li>
         <li>Información médica y personal del pasajero</li>
       </ul>
 
-      El equipo de Administración revisará posteriormente la solicitud e informará si el cupo puede ser asignado definitivamente.
+      El equipo de Administración revisará posteriormente la solicitud e informará
+      si el cupo puede ser asignado definitivamente.
 
-      <label style="display:flex; gap:10px; align-items:flex-start; margin-top:16px; font-weight:700;">
-        <input type="checkbox" id="aceptaCondicionesListaEspera" style="margin-top:3px;">
+      <label style="
+        display:flex;
+        gap:10px;
+        align-items:flex-start;
+        margin-top:16px;
+        font-weight:700;
+      ">
+        <input
+          type="checkbox"
+          id="aceptaCondicionesListaEspera"
+          style="margin-top:3px;"
+        >
+
         <span>
-          Declaro que leí y acepto las condiciones de la Lista de Espera, incluyendo que el abono no garantiza automáticamente la asignación del cupo y que la confirmación queda sujeta a disponibilidad.
+          Declaro que leí y acepto las condiciones de la Lista de Espera,
+          incluyendo que el abono no garantiza automáticamente la asignación
+          del cupo y que la confirmación queda sujeta a disponibilidad.
         </span>
       </label>
     `;
   } else if (contexto.clave === "liberado") {
     box.className = "notice ok";
+
     box.innerHTML = `
-      <strong>Registro Adultos.</strong><br>
-      Estás ingresando al grupo mediante un cupo liberado completo o parcial. A continuación registra la información solicitada para registrar correctamente la participación en el viaje.
+      ${titulo("🔵", "REGISTRO DE ADULTOS")}
+
+      Estás ingresando al grupo mediante un cupo liberado completo o parcial.
+      A continuación registra la información solicitada para registrar
+      correctamente la participación en el viaje.
     `;
   } else if (contexto.clave === "nomina_final") {
     box.className = "notice privacy";
+
     box.innerHTML = `
-      <strong>Formulario para Nómina final y ficha médica.</strong><br>
-      Este formulario permitirá completar la nómina definitiva del viaje y registrar información médica, documental y operacional necesaria para la participación.
+      ${titulo("🩺", "NÓMINA FINAL Y FICHA MÉDICA")}
+
+      <strong>
+        Estás por completar la información definitiva de la persona que viaja.
+      </strong>
+
+      <br><br>
+
+      Este formulario permitirá completar la nómina definitiva del viaje y
+      registrar la información médica, personal, documental y operacional
+      necesaria para su participación.
     `;
   } else {
     box.className = "notice privacy";
+
     box.innerHTML = `
-      <strong>Formulario de Inscripción Inicial.</strong><br><br>
-  
-      Este formulario corresponde a la <strong>Inscripción Inicial</strong> de la persona que viaja.
-  
+      ${titulo("📝", "INSCRIPCIÓN INICIAL")}
+
+      Este formulario corresponde a la
+      <strong>Inscripción Inicial</strong> de la persona que viaja.
+
       <br><br>
-  
-      Una vez enviado, la información será recibida y revisada por el equipo de Turismo Rai Trai como parte del proceso administrativo del viaje.
-  
+
+      Una vez enviado, la información será recibida y revisada por el equipo
+      de Turismo Rai Trai como parte del proceso administrativo del viaje.
+
       <br><br>
-  
+
       En esta etapa <strong>aún no se habilita el sistema de pagos</strong>.
-  
+
       <br><br>
-  
-      Cuando el grupo complete el proceso de <strong>Nómina del Viaje</strong>, Turismo Rai Trai enviará un correo electrónico con la habilitación de pagos, el enlace correspondiente y las instrucciones necesarias para continuar.
+
+      Cuando el grupo complete el proceso de
+      <strong>Nómina del Viaje</strong>, Turismo Rai Trai enviará un correo
+      electrónico con la habilitación de pagos, el enlace correspondiente
+      y las instrucciones necesarias para continuar.
     `;
   }
 
   box.classList.remove("hidden");
+
   if (contexto.clave === "lista_espera") {
     const checkListaEspera = $("aceptaCondicionesListaEspera");
-  
+
     if (btn) {
       btn.disabled = true;
       btn.textContent = "Acepta las condiciones para comenzar";
     }
-  
+
     checkListaEspera?.addEventListener("change", () => {
       if (!btn) return;
-  
+
       btn.disabled = !checkListaEspera.checked;
+
       btn.textContent = checkListaEspera.checked
         ? "Comenzar formulario"
         : "Acepta las condiciones para comenzar";
