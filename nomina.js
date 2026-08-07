@@ -317,7 +317,9 @@ function normalizarRutKey(value = "") {
 function normalizarNombreParaComparar(value = "") {
   return String(value || "")
     .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[\u0300-\u036f]/g, "")       // elimina tildes
+    .replace(/[\u200B-\u200D\uFEFF]/g, "") // elimina caracteres invisibles
+    .replace(/[^\p{L}\p{N}]+/gu, " ")      // cualquier separador pasa a espacio
     .toUpperCase()
     .replace(/\s+/g, " ")
     .trim();
