@@ -28,6 +28,50 @@ import {
   EDIT_FIELDS
 } from "./ficha-medica-common.js";
 
+/*
+  CAMPOS DEL EDITOR MÉDICO
+
+  EDIT_FIELDS puede contener campos generales de la ficha,
+  pero Gestión Fichas Médicas NO debe permitir modificar
+  identidad, nómina ni datos administrativos.
+
+  Estos campos quedan exclusivamente en Gestión Nómina.
+*/
+const MEDICAL_EDIT_FIELDS =
+  EDIT_FIELDS.filter(
+    (field) => {
+      const path =
+        clean(
+          field?.path
+        );
+
+      if (!path) {
+        return false;
+      }
+
+      const camposNomina =
+        [
+          "identificacion.",
+          "contactoPrincipal.",
+          "documentoIdentidad.",
+          "tipoViajante",
+          "tipoParticipacion",
+          "tipoInscripcion",
+          "faseInscripcion",
+          "estadoCupo"
+        ];
+
+      return !camposNomina.some(
+        (prefix) =>
+          path ===
+            prefix ||
+          path.startsWith(
+            prefix
+          )
+      );
+    }
+  );
+
 const state = {
   groupDocId: "",
   groupId: "",
@@ -235,34 +279,100 @@ function onTableClick(event) {
 }
 
 function openEdit(id) {
-  if (!canEditMedicalData(state.user)) {
-    alert("No tienes permisos para editar fichas médicas.");
+  if (
+    !canEditMedicalData(
+      state.user
+    )
+  ) {
+    alert(
+      "No tienes permisos para editar fichas médicas."
+    );
+
     return;
   }
 
-  const item = state.items.find((row) => row.id === id);
-  if (!item) return;
+  const item =
+    state.items.find(
+      (row) =>
+        row.id ===
+        id
+    );
 
-  state.editingId = id;
-  $("editTitle").textContent = `Editar ficha · ${passengerName(item)}`;
-  $("editReason").value = "";
+  if (!item) {
+    return;
+  }
 
-  const sections = [...new Set(EDIT_FIELDS.map((field) => field.section))];
+  state.editingId =
+    id;
 
-  $("editFields").innerHTML = sections.map((sectionName) => {
-    const fields = EDIT_FIELDS.filter((field) => field.section === sectionName);
+  $("editTitle").textContent =
+    `Editar ficha médica · ${passengerName(
+      item
+    )}`;
 
-    return `
-      <section class="edit-section">
-        <h3>${escapeHtml(sectionName)}</h3>
-        <div class="edit-grid">
-          ${fields.map((field) => renderInput(field, getByPath(item, field.path))).join("")}
-        </div>
-      </section>
-    `;
-  }).join("");
+  $("editReason").value =
+    "";
 
-  $("editModal").classList.remove("hidden");
+  /*
+    IMPORTANTE:
+    usamos exclusivamente MEDICAL_EDIT_FIELDS.
+  */
+  const sections =
+    [
+      ...new Set(
+        MEDICAL_EDIT_FIELDS.map(
+          (field) =>
+            field.section
+        )
+      )
+    ];
+
+  $("editFields").innerHTML =
+    sections
+      .map(
+        (sectionName) => {
+          const fields =
+            MEDICAL_EDIT_FIELDS.filter(
+              (field) =>
+                field.section ===
+                sectionName
+            );
+
+          return `
+            <section class="edit-section">
+              <h3>
+                ${escapeHtml(
+                  sectionName
+                )}
+              </h3>
+
+              <div class="edit-grid">
+                ${
+                  fields
+                    .map(
+                      (field) =>
+                        renderInput(
+                          field,
+                          getByPath(
+                            item,
+                            field.path
+                          )
+                        )
+                    )
+                    .join("")
+                }
+              </div>
+            </section>
+          `;
+        }
+      )
+      .join("");
+
+  $("editModal")
+    .classList
+    .remove(
+      "hidden"
+    );
 }
 
 function renderInput(field, value) {
@@ -297,88 +407,325 @@ function renderInput(field, value) {
 async function saveEdit(event) {
   event.preventDefault();
 
-  if (!state.editingId || !canEditMedicalData(state.user)) return;
-
-  const reason = clean($("editReason").value);
-  if (!reason) {
-    alert("Debes indicar el motivo de la corrección.");
+  if (
+    !state.editingId ||
+    !canEditMedicalData(
+      state.user
+    )
+  ) {
     return;
   }
 
-  const item = state.items.find((row) => row.id === state.editingId);
-  if (!item) return;
-
-  const patch = {};
-  const cambios = [];
-
-  document.querySelectorAll("[data-edit-path]").forEach((input) => {
-    const path = input.dataset.editPath;
-    const type = input.dataset.editType;
-    const oldValue = getByPath(item, path);
-    const newValue = type === "array"
-      ? clean(input.value).split(",").map(clean).filter(Boolean)
-      : clean(input.value);
-
-    if (JSON.stringify(oldValue ?? "") !== JSON.stringify(newValue)) {
-      patch[path] = newValue;
-      cambios.push({
-        campo: path,
-        anterior: oldValue ?? "",
-        nuevo: newValue
-      });
-    }
-  });
-
-  if (!cambios.length) {
-    alert("No hay cambios para guardar.");
-    return;
-  }
-
-  // Mantiene nombreCompleto consistente cuando cambian nombres o apellidos.
-  const nombres = patch["identificacion.nombres"] ?? item?.identificacion?.nombres ?? "";
-  const apellido1 = patch["identificacion.primerApellido"] ?? item?.identificacion?.primerApellido ?? "";
-  const apellido2 = patch["identificacion.segundoApellido"] ?? item?.identificacion?.segundoApellido ?? "";
-  patch["identificacion.nombreCompleto"] = [nombres, apellido1, apellido2].filter(Boolean).join(" ");
-
-  patch["auditoriaFichaMedica.actualizadoAt"] = serverTimestamp();
-  patch["auditoriaFichaMedica.actualizadoPor"] = state.user.nombre;
-  patch["auditoriaFichaMedica.actualizadoPorCorreo"] = state.user.email;
-  patch["auditoriaFichaMedica.motivoUltimoCambio"] = reason;
-  patch["auditoriaFichaMedica.version"] = Number(item?.auditoriaFichaMedica?.version || 0) + 1;
-
-  const button = $("btnSaveEdit");
-  button.disabled = true;
-  button.textContent = "Guardando...";
-
-  try {
-    const inscriptionRef = doc(
-      db,
-      "ventas_cotizaciones",
-      state.groupDocId,
-      "inscripciones",
-      state.editingId
+  const reason =
+    clean(
+      $("editReason").value
     );
 
-    await updateDoc(inscriptionRef, patch);
+  if (!reason) {
+    alert(
+      "Debes indicar el motivo de la corrección."
+    );
 
-    await addDoc(collection(inscriptionRef, "historial_ficha"), {
-      fecha: serverTimestamp(),
-      usuarioNombre: state.user.nombre,
-      usuarioCorreo: state.user.email,
-      motivo: reason,
-      cambios,
-      origen: "gestion_fichas_medicas"
-    });
+    return;
+  }
+
+  const item =
+    state.items.find(
+      (row) =>
+        row.id ===
+        state.editingId
+    );
+
+  if (!item) {
+    return;
+  }
+
+  const patch =
+    {};
+
+  const cambios =
+    [];
+
+  /*
+    Solamente tomamos inputs que fueron creados
+    desde MEDICAL_EDIT_FIELDS.
+  */
+  document
+    .querySelectorAll(
+      "#editModal [data-edit-path]"
+    )
+    .forEach(
+      (input) => {
+        const path =
+          input.dataset
+            .editPath;
+
+        /*
+          SEGUNDO BLINDAJE:
+
+          incluso si alguien agrega accidentalmente
+          un input administrativo al HTML, no dejamos
+          que se guarde si su ruta no pertenece a
+          MEDICAL_EDIT_FIELDS.
+        */
+        const permitido =
+          MEDICAL_EDIT_FIELDS.some(
+            (field) =>
+              field.path ===
+              path
+          );
+
+        if (!permitido) {
+          console.warn(
+            "[gestion-fichas-medicas] Campo rechazado:",
+            path
+          );
+
+          return;
+        }
+
+        const type =
+          input.dataset
+            .editType;
+
+        const oldValue =
+          getByPath(
+            item,
+            path
+          );
+
+        const newValue =
+          type ===
+          "array"
+            ? clean(
+                input.value
+              )
+                .split(",")
+                .map(clean)
+                .filter(Boolean)
+            : clean(
+                input.value
+              );
+
+        if (
+          JSON.stringify(
+            oldValue ??
+            ""
+          ) !==
+          JSON.stringify(
+            newValue
+          )
+        ) {
+          /*
+            GUARDADO QUIRÚRGICO.
+
+            patch utiliza la ruta exacta:
+            antecedentesMedicos.x
+            dieta.x
+            etc.
+          */
+          patch[path] =
+            newValue;
+
+          cambios.push({
+            campo:
+              path,
+
+            anterior:
+              oldValue ??
+              "",
+
+            nuevo:
+              newValue
+          });
+        }
+      }
+    );
+
+  if (!cambios.length) {
+    alert(
+      "No hay cambios para guardar."
+    );
+
+    return;
+  }
+
+  patch[
+    "auditoriaFichaMedica.actualizadoAt"
+  ] =
+    serverTimestamp();
+
+  patch[
+    "auditoriaFichaMedica.actualizadoPor"
+  ] =
+    state.user.nombre;
+
+  patch[
+    "auditoriaFichaMedica.actualizadoPorCorreo"
+  ] =
+    state.user.email;
+
+  patch[
+    "auditoriaFichaMedica.motivoUltimoCambio"
+  ] =
+    reason;
+
+  patch[
+    "auditoriaFichaMedica.version"
+  ] =
+    Number(
+      item
+        ?.auditoriaFichaMedica
+        ?.version ||
+      0
+    ) + 1;
+
+  const button =
+    $("btnSaveEdit");
+
+  button.disabled =
+    true;
+
+  button.textContent =
+    "Guardando...";
+
+  try {
+    const inscriptionRef =
+      doc(
+        db,
+        "ventas_cotizaciones",
+        state.groupDocId,
+        "inscripciones",
+        state.editingId
+      );
+
+    /*
+      MODIFICA SOLAMENTE LAS RUTAS
+      QUE REALMENTE CAMBIARON.
+    */
+    await updateDoc(
+      inscriptionRef,
+      patch
+    );
+
+    /*
+      HISTORIAL INDIVIDUAL DE LA FICHA MÉDICA.
+    */
+    await addDoc(
+      collection(
+        inscriptionRef,
+        "historial_ficha"
+      ),
+      {
+        fecha:
+          serverTimestamp(),
+
+        usuarioNombre:
+          state.user.nombre,
+
+        usuarioCorreo:
+          state.user.email,
+
+        motivo:
+          reason,
+
+        cambios,
+
+        origen:
+          "gestion_fichas_medicas"
+      }
+    );
+
+    /*
+      HISTORIAL GENERAL DEL GRUPO.
+
+      grupo.js ya consulta ventas_historial
+      mediante idGrupo.
+    */
+    await addDoc(
+      collection(
+        db,
+        "ventas_historial"
+      ),
+      {
+        idGrupo:
+          state.groupId,
+
+        groupDocId:
+          state.groupDocId,
+
+        tipoMovimiento:
+          "edicion_ficha_medica",
+
+        modulo:
+          "ficha_medica",
+
+        titulo:
+          "Edición de ficha médica",
+
+        mensaje:
+          `${state.user.nombre} modificó la ficha médica de ${passengerName(
+            item
+          )}. Motivo: ${reason}`,
+
+        cambios,
+
+        metadata: {
+          inscripcionId:
+            state.editingId,
+
+          documento:
+            passengerDocument(
+              item
+            ),
+
+          nombreCompleto:
+            passengerName(
+              item
+            ),
+
+          motivo:
+            reason,
+
+          origen:
+            "gestion_fichas_medicas"
+        },
+
+        fecha:
+          serverTimestamp(),
+
+        creadoPor:
+          state.user.nombre,
+
+        creadoPorCorreo:
+          state.user.email
+      }
+    );
 
     closeModal();
+
     await loadPage();
-    alert("Ficha médica actualizada correctamente.");
+
+    alert(
+      "Ficha médica actualizada correctamente."
+    );
   } catch (error) {
-    console.error(error);
-    alert(`No fue posible guardar: ${error.message || "Error desconocido"}`);
+    console.error(
+      error
+    );
+
+    alert(
+      `No fue posible guardar: ${
+        error.message ||
+        "Error desconocido"
+      }`
+    );
   } finally {
-    button.disabled = false;
-    button.textContent = "Guardar cambios";
+    button.disabled =
+      false;
+
+    button.textContent =
+      "Guardar cambios";
   }
 }
 
