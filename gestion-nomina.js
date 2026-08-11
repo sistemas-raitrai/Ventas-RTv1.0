@@ -2136,7 +2136,7 @@ function renderRows() {
                   ]
                     .filter(Boolean)
                     .map(
-                      escapeHtml
+                      esc
                     )
                     .join(" · ")
                 }
@@ -4756,6 +4756,84 @@ function asegurarModalEditorNomina() {
   );
 }
 
+function renderSeccionEditorNomina(
+  titulo,
+  descripcion = ""
+) {
+  return `
+    <div
+      style="
+        grid-column:1 / -1;
+        margin-top:8px;
+        padding-top:14px;
+        border-top:1px solid #e3dce8;
+      "
+    >
+      <div
+        style="
+          color:#2b1940;
+          font-size:15px;
+          font-weight:900;
+        "
+      >
+        ${esc(
+          titulo
+        )}
+      </div>
+
+      ${
+        descripcion
+          ? `
+            <div
+              class="gn-sub"
+              style="margin-top:3px"
+            >
+              ${esc(
+                descripcion
+              )}
+            </div>
+          `
+          : ""
+      }
+    </div>
+  `;
+}
+
+function renderCheckboxEditorNomina({
+  label,
+  path,
+  checked = false
+}) {
+  return `
+    <label
+      style="
+        grid-column:1 / -1;
+        display:flex;
+        align-items:center;
+        gap:9px;
+        font-weight:700;
+        padding:9px 0;
+      "
+    >
+      <input
+        type="checkbox"
+        data-nomina-edit-path="${esc(
+          path
+        )}"
+        ${
+          checked
+            ? "checked"
+            : ""
+        }
+      >
+
+      ${esc(
+        label
+      )}
+    </label>
+  `;
+}
+
 function renderCampoEditorNomina({
   label,
   path,
@@ -4860,8 +4938,45 @@ async function abrirEditorNomina(
   $("editarNominaMotivo").value =
     "";
 
-  const campos = [
-    {
+  const principal =
+    item.contactoPrincipal ||
+    {};
+
+  const secundario =
+    item.contactoSecundario ||
+    {};
+
+  const existeSecundario =
+    secundario.aplica ===
+      true ||
+    !!(
+      String(
+        secundario.nombre ||
+        ""
+      ).trim() ||
+      String(
+        secundario.correo ||
+        ""
+      ).trim() ||
+      String(
+        secundario.celular ||
+        secundario.telefono ||
+        ""
+      ).trim()
+    );
+
+  /*
+    IMPORTANTE:
+    no reconstruimos objetos completos.
+    Cada input representa una ruta Firestore exacta.
+  */
+  $("editarNominaCampos").innerHTML = `
+    ${renderSeccionEditorNomina(
+      "Datos del pasajero",
+      "Identificación y datos administrativos de quien viaja."
+    )}
+
+    ${renderCampoEditorNomina({
       label:
         "RUT / Documento",
       path:
@@ -4870,8 +4985,9 @@ async function abrirEditorNomina(
         camposPasajero.documento(
           item
         )
-    },
-    {
+    })}
+
+    ${renderCampoEditorNomina({
       label:
         "Nombres",
       path:
@@ -4881,8 +4997,9 @@ async function abrirEditorNomina(
           item,
           "identificacion.nombres"
         )
-    },
-    {
+    })}
+
+    ${renderCampoEditorNomina({
       label:
         "Primer apellido",
       path:
@@ -4892,8 +5009,9 @@ async function abrirEditorNomina(
           item,
           "identificacion.primerApellido"
         )
-    },
-    {
+    })}
+
+    ${renderCampoEditorNomina({
       label:
         "Segundo apellido",
       path:
@@ -4903,8 +5021,9 @@ async function abrirEditorNomina(
           item,
           "identificacion.segundoApellido"
         )
-    },
-    {
+    })}
+
+    ${renderCampoEditorNomina({
       label:
         "Fecha de nacimiento",
       path:
@@ -4916,8 +5035,9 @@ async function abrirEditorNomina(
         ),
       type:
         "date"
-    },
-    {
+    })}
+
+    ${renderCampoEditorNomina({
       label:
         "Tipo de viajante",
       path:
@@ -4926,8 +5046,9 @@ async function abrirEditorNomina(
         item.tipoViajante ||
         item.tipoParticipacion ||
         ""
-    },
-    {
+    })}
+
+    ${renderCampoEditorNomina({
       label:
         "Nacionalidad",
       path:
@@ -4937,8 +5058,9 @@ async function abrirEditorNomina(
           item,
           "identificacion.nacionalidad"
         )
-    },
-    {
+    })}
+
+    ${renderCampoEditorNomina({
       label:
         "Género / Sexo",
       path:
@@ -4948,58 +5070,115 @@ async function abrirEditorNomina(
           item,
           "identificacion.genero"
         )
-    },
+    })}
 
-    /*
-      DATOS DEL APODERADO / RESPONSABLE
-    */
-    {
+    ${renderSeccionEditorNomina(
+      "Responsable principal",
+      "Adulto principal registrado para este pasajero."
+    )}
+
+    ${renderCampoEditorNomina({
       label:
-        "Nombre apoderado / responsable",
+        "Nombre",
       path:
         "contactoPrincipal.nombre",
       value:
-        getByPathNomina(
-          item,
-          "contactoPrincipal.nombre"
-        )
-    },
-    {
+        principal.nombre ||
+        ""
+    })}
+
+    ${renderCampoEditorNomina({
       label:
-        "Correo apoderado / responsable",
+        "Relación",
+      path:
+        "contactoPrincipal.relacion",
+      value:
+        principal.relacion ||
+        principal.relacionBase ||
+        ""
+    })}
+
+    ${renderCampoEditorNomina({
+      label:
+        "Correo",
       path:
         "contactoPrincipal.correo",
       value:
-        getByPathNomina(
-          item,
-          "contactoPrincipal.correo"
-        ),
+        principal.correo ||
+        "",
       type:
         "email"
-    },
-    {
+    })}
+
+    ${renderCampoEditorNomina({
       label:
-        "Celular apoderado / responsable",
+        "Teléfono",
       path:
         "contactoPrincipal.celular",
       value:
-        getByPathNomina(
-          item,
-          "contactoPrincipal.celular"
-        ) ||
-        getByPathNomina(
-          item,
-          "contactoPrincipal.telefono"
-        )
-    }
-  ];
+        principal.celular ||
+        principal.telefono ||
+        ""
+    })}
 
-  $("editarNominaCampos").innerHTML =
-    campos
-      .map(
-        renderCampoEditorNomina
-      )
-      .join("");
+    ${renderSeccionEditorNomina(
+      "Responsable secundario",
+      "Segundo adulto responsable. Es un dato de nómina, no de ficha médica."
+    )}
+
+    ${renderCheckboxEditorNomina({
+      label:
+        "Este pasajero tiene responsable secundario",
+      path:
+        "contactoSecundario.aplica",
+      checked:
+        existeSecundario
+    })}
+
+    ${renderCampoEditorNomina({
+      label:
+        "Nombre",
+      path:
+        "contactoSecundario.nombre",
+      value:
+        secundario.nombre ||
+        ""
+    })}
+
+    ${renderCampoEditorNomina({
+      label:
+        "Relación",
+      path:
+        "contactoSecundario.relacion",
+      value:
+        secundario.relacion ||
+        secundario.relacionBase ||
+        ""
+    })}
+
+    ${renderCampoEditorNomina({
+      label:
+        "Correo",
+      path:
+        "contactoSecundario.correo",
+      value:
+        secundario.correo ||
+        "",
+      type:
+        "email"
+    })}
+
+    ${renderCampoEditorNomina({
+      label:
+        "Teléfono",
+      path:
+        "contactoSecundario.celular",
+      value:
+        secundario.celular ||
+        secundario.telefono ||
+        ""
+    })}
+  `;
 
   $("modalEditarNominaPasajero")
     .style.display =
@@ -5045,23 +5224,46 @@ function leerValoresEditorNomina() {
           input.dataset
             .nominaEditPath;
 
-        let value =
-          String(
-            input.value ||
-            ""
-          ).trim();
+        let value;
 
         /*
-          Mantiene la convención de nombres en mayúsculas
-          que ya usa el sistema.
+          contactoSecundario.aplica
+          debe guardarse como boolean real.
         */
         if (
+          input.type ===
+          "checkbox"
+        ) {
+          value =
+            input.checked ===
+            true;
+        } else {
+          value =
+            String(
+              input.value ||
+              ""
+            ).trim();
+        }
+
+        /*
+          Convención actual del sistema:
+          nombres y relaciones normalizados
+          para evitar diferencias visuales.
+        */
+        if (
+          typeof value ===
+            "string" &&
           [
             "identificacion.nombres",
             "identificacion.primerApellido",
             "identificacion.segundoApellido",
             "identificacion.nacionalidad",
-            "contactoPrincipal.nombre"
+
+            "contactoPrincipal.nombre",
+            "contactoPrincipal.relacion",
+
+            "contactoSecundario.nombre",
+            "contactoSecundario.relacion"
           ].includes(
             path
           )
@@ -5073,8 +5275,14 @@ function leerValoresEditorNomina() {
         }
 
         if (
-          path ===
-          "contactoPrincipal.correo"
+          typeof value ===
+            "string" &&
+          [
+            "contactoPrincipal.correo",
+            "contactoSecundario.correo"
+          ].includes(
+            path
+          )
         ) {
           value =
             value.toLowerCase();
@@ -5084,7 +5292,8 @@ function leerValoresEditorNomina() {
           value;
 
         /*
-          Estas dos rutas deben mantenerse iguales.
+          El documento se mantiene sincronizado
+          con rutCompleto sin reemplazar identificacion.
         */
         if (
           path ===
@@ -5096,6 +5305,10 @@ function leerValoresEditorNomina() {
             value;
         }
 
+        /*
+          Conservamos compatibilidad con registros
+          que usan tipoParticipacion.
+        */
         if (
           path ===
           "tipoViajante"
