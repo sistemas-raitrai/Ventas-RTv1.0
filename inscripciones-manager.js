@@ -306,6 +306,842 @@ export function crearInscripcionesManager({ db, usuario = {}, onChange = null } 
     await notificarCambio(grupoCtx, "pasajero_actualizado", { inscripcionId: String(id), campos: Object.keys(patch) });
   }
 
+  const CAMPOS_EDITABLES_NOMINA = new Set([
+    "identificacion.documento",
+    "identificacion.rutCompleto",
+
+    "identificacion.nombres",
+    "identificacion.primerApellido",
+    "identificacion.segundoApellido",
+    "identificacion.fechaNacimiento",
+    "identificacion.nacionalidad",
+    "identificacion.genero",
+
+    "tipoViajante",
+    "tipoParticipacion",
+
+    "contactoPrincipal.nombre",
+    "contactoPrincipal.correo",
+    "contactoPrincipal.celular"
+  ]);
+
+  const CAMPOS_CRITICOS_SISTEMA_PAGOS = new Set([
+    "identificacion.documento",
+    "identificacion.rutCompleto",
+
+    "identificacion.nombres",
+    "identificacion.primerApellido",
+    "identificacion.segundoApellido",
+    "identificacion.fechaNacimiento",
+    "identificacion.nacionalidad",
+    "identificacion.genero",
+
+    "tipoViajante",
+    "tipoParticipacion",
+
+    "contactoPrincipal.nombre",
+    "contactoPrincipal.correo",
+    "contactoPrincipal.celular"
+  ]);
+
+  function getByPathManager(
+    object = {},
+    path = ""
+  ) {
+    return String(path || "")
+      .split(".")
+      .reduce(
+        (current, key) =>
+          current?.[key],
+        object
+      );
+  }
+
+  function valoresIgualesManager(
+    anterior,
+    nuevo
+  ) {
+    return JSON.stringify(
+      anterior ?? ""
+    ) === JSON.stringify(
+      nuevo ?? ""
+    );
+  }
+
+  function getNombrePasajeroManager(
+    item = {}
+  ) {
+    return [
+      nombres(item),
+      apellidos(item)
+    ]
+      .filter(Boolean)
+      .join(" ")
+      .trim() ||
+      "Pasajero";
+  }
+
+  async function registrarHistorialNominaPasajero(
+    grupoCtx,
+    inscripcion,
+    {
+      motivo = "",
+      cambios = [],
+      tipoMovimiento =
+        "edicion_nomina_inscripcion",
+      titulo =
+        "Edición de nómina",
+      origen =
+        "gestion_nomina"
+    } = {}
+  ) {
+    const inscripcionRef =
+      doc(
+        db,
+        "ventas_cotizaciones",
+        String(grupoCtx.docId),
+        "inscripciones",
+        String(inscripcion.id)
+      );
+
+    /*
+      HISTORIAL INDIVIDUAL DEL PASAJERO
+    */
+    await setDoc(
+      doc(
+        collection(
+          inscripcionRef,
+          "historial_nomina"
+        )
+      ),
+      {
+        fecha:
+          serverTimestamp(),
+
+        usuarioNombre:
+          nombreUsuario,
+
+        usuarioCorreo:
+          email,
+
+        motivo:
+          texto(motivo),
+
+        cambios:
+          Array.isArray(cambios)
+            ? cambios
+            : [],
+
+        origen:
+          texto(origen),
+
+        tipoMovimiento
+      }
+    );
+
+    /*
+      HISTORIAL GENERAL DEL GRUPO.
+
+      grupo.js ya consulta ventas_historial,
+      por lo tanto aparecerá automáticamente allí.
+    */
+    await setDoc(
+      doc(
+        collection(
+          db,
+          "ventas_historial"
+        )
+      ),
+      {
+        idGrupo:
+          grupoCtx.groupId,
+
+        groupDocId:
+          grupoCtx.docId,
+
+        tipoMovimiento,
+
+        modulo:
+          "inscripcion",
+
+        titulo,
+
+        mensaje:
+          `${nombreUsuario} modificó la nómina de ${getNombrePasajeroManager(
+            inscripcion
+          )}. Motivo: ${texto(motivo)}`,
+
+        cambios:
+          Array.isArray(cambios)
+            ? cambios
+            : [],
+
+        metadata: {
+          inscripcionId:
+            String(
+              inscripcion.id ||
+              ""
+            ),
+
+          documento:
+            documento(
+              inscripcion
+            ),
+
+          nombreCompleto:
+            getNombrePasajeroManager(
+              inscripcion
+            ),
+
+          motivo:
+            texto(motivo),
+
+          origen:
+            texto(origen)
+        },
+
+        fecha:
+          serverTimestamp(),
+
+        creadoPor:
+          nombreUsuario,
+
+        creadoPorCorreo:
+          email
+      }
+    );
+  }
+
+  async function guardarAlertaCambioDatosCriticos(
+    grupoCtx,
+    inscripcion,
+    cambios = [],
+    {
+      origen =
+        "gestion_nomina",
+      motivo =
+        ""
+    } = {}
+  ) {
+    const cambiosCriticos =
+      cambios.filter(
+        (cambio) =>
+          CAMPOS_CRITICOS_SISTEMA_PAGOS.has(
+            String(
+              cambio?.campo ||
+              ""
+            )
+          )
+      );
+
+    if (!cambiosCriticos.length) {
+      return false;
+    }
+
+    const inscripcionId =
+      String(
+        inscripcion?.id ||
+        ""
+      ).trim();
+
+    if (!inscripcionId) {
+      return false;
+    }
+
+    /*
+      Usamos un ID distinto a las alertas de
+      Nuevo ingreso / Lista de espera para no
+      sobrescribirlas.
+    */
+    const alertaId =
+      `${String(
+        grupoCtx.docId ||
+        grupoCtx.groupId ||
+        ""
+      )}_${inscripcionId}_cambio_datos_criticos`;
+
+    await setDoc(
+      doc(
+        db,
+        ALERTAS_INSCRIPCIONES_COLLECTION,
+        alertaId
+      ),
+      {
+        activa:
+          true,
+
+        resuelta:
+          false,
+
+        tipoAlerta:
+          "cambio_datos_criticos",
+
+        requiereActualizarSistemaPagos:
+          true,
+
+        idGrupo:
+          String(
+            grupoCtx.groupId ||
+            ""
+          ),
+
+        groupDocId:
+          String(
+            grupoCtx.docId ||
+            ""
+          ),
+
+        inscripcionId,
+
+        anoViaje:
+          grupoCtx?.data?.anoViaje ||
+          "",
+
+        colegio:
+          texto(
+            grupoCtx?.data?.colegio
+          ),
+
+        curso:
+          texto(
+            grupoCtx?.data?.curso
+          ),
+
+        aliasGrupo:
+          texto(
+            grupoCtx?.data?.aliasGrupo ||
+            grupoCtx?.data?.nombreGrupo ||
+            grupoCtx?.data?.colegio
+          ),
+
+        numeroNegocio:
+          texto(
+            grupoCtx?.data?.numeroNegocio
+          ),
+
+        vendedora:
+          texto(
+            grupoCtx?.data?.vendedora ||
+            grupoCtx?.data?.vendedoraCorreo
+          ),
+
+        vendedoraCorreo:
+          normalizarEmail(
+            grupoCtx?.data?.vendedoraCorreo ||
+            ""
+          ),
+
+        documento:
+          documento(
+            inscripcion
+          ),
+
+        nombreParticipante:
+          getNombrePasajeroManager(
+            inscripcion
+          ),
+
+        nombreResponsable:
+          texto(
+            getByPathManager(
+              inscripcion,
+              "contactoPrincipal.nombre"
+            )
+          ),
+
+        correoResponsable:
+          normalizarEmail(
+            getByPathManager(
+              inscripcion,
+              "contactoPrincipal.correo"
+            )
+          ),
+
+        telefonoResponsable:
+          texto(
+            getByPathManager(
+              inscripcion,
+              "contactoPrincipal.celular"
+            ) ||
+            getByPathManager(
+              inscripcion,
+              "contactoPrincipal.telefono"
+            )
+          ),
+
+        cambios:
+          cambiosCriticos,
+
+        motivo:
+          texto(motivo),
+
+        origen:
+          texto(origen),
+
+        actualizadoAt:
+          serverTimestamp(),
+
+        actualizadoPor:
+          nombreUsuario,
+
+        actualizadoPorCorreo:
+          email
+      },
+      {
+        merge:
+          true
+      }
+    );
+
+    return true;
+  }
+
+  async function actualizarDatosNomina(
+    grupoCtx,
+    inscripcionId,
+    valores = {},
+    motivo = ""
+  ) {
+    if (!puedeAdministrarNomina()) {
+      throw new Error(
+        "No tienes permisos para editar la nómina."
+      );
+    }
+
+    const motivoLimpio =
+      texto(
+        motivo
+      );
+
+    if (!motivoLimpio) {
+      throw new Error(
+        "Debes indicar el motivo de la modificación."
+      );
+    }
+
+    const item =
+      await cargarInscripcionCompleta(
+        grupoCtx,
+        inscripcionId
+      );
+
+    if (!item) {
+      throw new Error(
+        "No se encontró la inscripción seleccionada."
+      );
+    }
+
+    const patch =
+      {};
+
+    const cambios =
+      [];
+
+    for (
+      const [
+        path,
+        nuevoValor
+      ]
+      of Object.entries(
+        valores ||
+        {}
+      )
+    ) {
+      if (
+        !CAMPOS_EDITABLES_NOMINA.has(
+          path
+        )
+      ) {
+        console.warn(
+          "[inscripciones-manager] Campo de nómina rechazado:",
+          path
+        );
+
+        continue;
+      }
+
+      const anterior =
+        getByPathManager(
+          item,
+          path
+        );
+
+      if (
+        valoresIgualesManager(
+          anterior,
+          nuevoValor
+        )
+      ) {
+        continue;
+      }
+
+      patch[path] =
+        nuevoValor;
+
+      cambios.push({
+        campo:
+          path,
+
+        anterior:
+          anterior ?? "",
+
+        nuevo:
+          nuevoValor ?? ""
+      });
+    }
+
+    if (!cambios.length) {
+      return {
+        ok:
+          true,
+
+        sinCambios:
+          true,
+
+        cambios:
+          []
+      };
+    }
+
+    /*
+      Si cambió nombre o apellidos,
+      mantenemos nombreCompleto consistente.
+
+      IMPORTANTE:
+      solamente actualizamos esta ruta puntual.
+      NO reemplazamos identificacion completa.
+    */
+    const cambiaNombre =
+      [
+        "identificacion.nombres",
+        "identificacion.primerApellido",
+        "identificacion.segundoApellido"
+      ].some(
+        (path) =>
+          Object.prototype
+            .hasOwnProperty
+            .call(
+              patch,
+              path
+            )
+      );
+
+    if (cambiaNombre) {
+      const nuevosNombres =
+        patch[
+          "identificacion.nombres"
+        ] ??
+        getByPathManager(
+          item,
+          "identificacion.nombres"
+        ) ??
+        "";
+
+      const nuevoApellido1 =
+        patch[
+          "identificacion.primerApellido"
+        ] ??
+        getByPathManager(
+          item,
+          "identificacion.primerApellido"
+        ) ??
+        "";
+
+      const nuevoApellido2 =
+        patch[
+          "identificacion.segundoApellido"
+        ] ??
+        getByPathManager(
+          item,
+          "identificacion.segundoApellido"
+        ) ??
+        "";
+
+      patch[
+        "identificacion.nombreCompleto"
+      ] =
+        [
+          nuevosNombres,
+          nuevoApellido1,
+          nuevoApellido2
+        ]
+          .filter(Boolean)
+          .join(" ")
+          .trim();
+    }
+
+    patch[
+      "auditoriaNomina.actualizadoAt"
+    ] =
+      serverTimestamp();
+
+    patch[
+      "auditoriaNomina.actualizadoPor"
+    ] =
+      nombreUsuario;
+
+    patch[
+      "auditoriaNomina.actualizadoPorCorreo"
+    ] =
+      email;
+
+    patch[
+      "auditoriaNomina.motivoUltimoCambio"
+    ] =
+      motivoLimpio;
+
+    patch[
+      "auditoriaNomina.version"
+    ] =
+      Number(
+        item?.auditoriaNomina
+          ?.version ||
+        0
+      ) + 1;
+
+    patch.actualizadoAt =
+      serverTimestamp();
+
+    patch.actualizadoPor =
+      nombreUsuario;
+
+    patch.actualizadoPorCorreo =
+      email;
+
+    const inscripcionRef =
+      doc(
+        db,
+        "ventas_cotizaciones",
+        String(
+          grupoCtx.docId
+        ),
+        "inscripciones",
+        String(
+          inscripcionId
+        )
+      );
+
+    /*
+      ESTE ES EL GUARDADO SEGURO.
+
+      patch contiene exclusivamente rutas
+      específicas que realmente cambiaron.
+    */
+    await updateDoc(
+      inscripcionRef,
+      patch
+    );
+
+    await registrarHistorialNominaPasajero(
+      grupoCtx,
+      item,
+      {
+        motivo:
+          motivoLimpio,
+
+        cambios,
+
+        origen:
+          "gestion_nomina",
+
+        tipoMovimiento:
+          "edicion_nomina_inscripcion",
+
+        titulo:
+          "Edición de nómina"
+      }
+    );
+
+    await guardarAlertaCambioDatosCriticos(
+      grupoCtx,
+      item,
+      cambios,
+      {
+        origen:
+          "gestion_nomina",
+
+        motivo:
+          motivoLimpio
+      }
+    );
+
+    cacheDetalle.delete(
+      `${grupoCtx.docId}:${inscripcionId}`
+    );
+
+    await notificarCambio(
+      grupoCtx,
+      "edicion_nomina_inscripcion",
+      {
+        inscripcionId:
+          String(
+            inscripcionId
+          ),
+
+        motivo:
+          motivoLimpio,
+
+        campos:
+          cambios.map(
+            (item) =>
+              item.campo
+          )
+      }
+    );
+
+    return {
+      ok:
+        true,
+
+      sinCambios:
+        false,
+
+      cambios
+    };
+  }
+
+  async function archivarPasajero(
+    grupoCtx,
+    inscripcionId,
+    motivo = ""
+  ) {
+    if (!puedeAdministrarNomina()) {
+      throw new Error(
+        "No tienes permisos para archivar pasajeros."
+      );
+    }
+
+    const motivoLimpio =
+      texto(
+        motivo
+      );
+
+    if (!motivoLimpio) {
+      throw new Error(
+        "Debes indicar por qué se archivará al pasajero."
+      );
+    }
+
+    const item =
+      await cargarInscripcionCompleta(
+        grupoCtx,
+        inscripcionId
+      );
+
+    if (!item) {
+      throw new Error(
+        "No se encontró la inscripción seleccionada."
+      );
+    }
+
+    const estadoAnterior =
+      texto(
+        item?.privacidad?.estado
+      );
+
+    const inscripcionRef =
+      doc(
+        db,
+        "ventas_cotizaciones",
+        String(
+          grupoCtx.docId
+        ),
+        "inscripciones",
+        String(
+          inscripcionId
+        )
+      );
+
+    /*
+      Archivo lógico:
+      NO borra el documento.
+    */
+    await updateDoc(
+      inscripcionRef,
+      {
+        "privacidad.estado":
+          "archivada",
+
+        "privacidad.archivadaAt":
+          serverTimestamp(),
+
+        "privacidad.archivadaPor":
+          nombreUsuario,
+
+        "privacidad.archivadaPorCorreo":
+          email,
+
+        "privacidad.motivoArchivo":
+          motivoLimpio,
+
+        actualizadoAt:
+          serverTimestamp(),
+
+        actualizadoPor:
+          nombreUsuario,
+
+        actualizadoPorCorreo:
+          email
+      }
+    );
+
+    const cambios = [
+      {
+        campo:
+          "privacidad.estado",
+
+        anterior:
+          estadoAnterior,
+
+        nuevo:
+          "archivada"
+      }
+    ];
+
+    await registrarHistorialNominaPasajero(
+      grupoCtx,
+      item,
+      {
+        motivo:
+          motivoLimpio,
+
+        cambios,
+
+        origen:
+          "gestion_nomina",
+
+        tipoMovimiento:
+          "pasajero_archivado",
+
+        titulo:
+          "Pasajero archivado"
+      }
+    );
+
+    cacheDetalle.delete(
+      `${grupoCtx.docId}:${inscripcionId}`
+    );
+
+    await notificarCambio(
+      grupoCtx,
+      "pasajero_archivado",
+      {
+        inscripcionId:
+          String(
+            inscripcionId
+          ),
+
+        motivo:
+          motivoLimpio
+      }
+    );
+
+    return {
+      ok:
+        true
+    };
+  }
+
 
   function getAlertaInscripcionId(grupoCtx, inscripcionId) {
     return `${String(grupoCtx?.docId || grupoCtx?.groupId || "").trim()}_${String(inscripcionId || "").trim()}`;
@@ -1186,13 +2022,36 @@ export function crearInscripcionesManager({ db, usuario = {}, onChange = null } 
   }
 
   return {
-    resolverGrupo, recargarGrupo, detectarOrigenNomina, cargarNomina,
-    cargarInscripcionCompleta, obtenerEstadoFases, abrirFase, cerrarFase,
-    marcarCargadoPagos, actualizarPasajero,
-    marcarListaEsperaPagada, confirmarCupoListaEspera, confirmarNuevoIngreso,
-    resetearCiclo, archivarNomina,
-    puedeGestionarLinks, puedeAdministrarNomina,
-    puedeMarcarListaEsperaPagada, puedeConfirmarIngresoOCupo,
+    resolverGrupo,
+    recargarGrupo,
+    detectarOrigenNomina,
+    cargarNomina,
+    cargarInscripcionCompleta,
+
+    obtenerEstadoFases,
+    abrirFase,
+    cerrarFase,
+
+    marcarCargadoPagos,
+    actualizarPasajero,
+
+    /*
+      NUEVO EDITOR SEGURO
+    */
+    actualizarDatosNomina,
+    archivarPasajero,
+
+    marcarListaEsperaPagada,
+    confirmarCupoListaEspera,
+    confirmarNuevoIngreso,
+
+    resetearCiclo,
+    archivarNomina,
+
+    puedeGestionarLinks,
+    puedeAdministrarNomina,
+    puedeMarcarListaEsperaPagada,
+    puedeConfirmarIngresoOCupo,
     esAdminOSupervision
   };
 }
