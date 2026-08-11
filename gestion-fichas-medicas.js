@@ -620,6 +620,10 @@ function tieneAntecedentesRelevantes(
 }
 
 function renderKpis() {
+  /*
+    En Gestión de Fichas Médicas
+    solo interesan pasajeros que VIAJAN.
+  */
   const activos =
     state.items.filter(
       (item) =>
@@ -629,7 +633,7 @@ function renderKpis() {
     );
 
   $("kpiTotal").textContent =
-    state.items.length;
+    activos.length;
 
   $("kpiCompletas").textContent =
     activos.filter(
@@ -650,11 +654,6 @@ function renderKpis() {
         medicalAlerts(
           item
         ).length > 0
-    ).length;
-
-  $("kpiAnulados").textContent =
-    state.items.filter(
-      isCancelled
     ).length;
 
   $("kpiMedicamentos").textContent =
@@ -711,31 +710,117 @@ function renderTypeOptions() {
 }
 
 function getFilteredItems() {
-  const search = normalize($("searchInput")?.value);
-  const status = normalize($("statusFilter")?.value);
-  const type = clean($("typeFilter")?.value);
+  const search =
+    normalize(
+      $("searchInput")
+        ?.value
+    );
 
-  return state.items.filter((item) => {
-    const searchable = normalize([
-      passengerName(item),
-      passengerDocument(item),
-      item?.contactoPrincipal?.nombre,
-      item?.contactoPrincipal?.correo,
-      item?.contactoPrincipal?.telefono,
-      item?.identificacion?.correoViajante,
-      item?.identificacion?.telefonoViajante
-    ].join(" "));
+  const status =
+    normalize(
+      $("statusFilter")
+        ?.value
+    );
 
-    if (search && !searchable.includes(search)) return false;
-    if (type && clean(item.tipoInscripcion || item.tipoViajante) !== type) return false;
+  const type =
+    clean(
+      $("typeFilter")
+        ?.value
+    );
 
-    if (status === "completa" && !fichaCompleta(item)) return false;
-    if (status === "pendiente" && (fichaCompleta(item) || isCancelled(item))) return false;
-    if (status === "alerta" && !medicalAlerts(item).length) return false;
-    if (status === "anulado" && !isCancelled(item)) return false;
+  return state.items.filter(
+    (item) => {
+      /*
+        ANULADOS NO APLICAN
+        A GESTIÓN DE FICHAS MÉDICAS.
+      */
+      if (
+        isCancelled(
+          item
+        )
+      ) {
+        return false;
+      }
 
-    return true;
-  });
+      const searchable =
+        normalize(
+          [
+            passengerName(
+              item
+            ),
+            passengerDocument(
+              item
+            ),
+            item
+              ?.contactoPrincipal
+              ?.nombre,
+            item
+              ?.contactoPrincipal
+              ?.correo,
+            item
+              ?.contactoPrincipal
+              ?.telefono,
+            item
+              ?.identificacion
+              ?.correoViajante,
+            item
+              ?.identificacion
+              ?.telefonoViajante
+          ].join(" ")
+        );
+
+      if (
+        search &&
+        !searchable.includes(
+          search
+        )
+      ) {
+        return false;
+      }
+
+      if (
+        type &&
+        clean(
+          item.tipoInscripcion ||
+          item.tipoViajante
+        ) !== type
+      ) {
+        return false;
+      }
+
+      if (
+        status ===
+          "completa" &&
+        !fichaCompleta(
+          item
+        )
+      ) {
+        return false;
+      }
+
+      if (
+        status ===
+          "pendiente" &&
+        fichaCompleta(
+          item
+        )
+      ) {
+        return false;
+      }
+
+      if (
+        status ===
+          "alerta" &&
+        !medicalAlerts(
+          item
+        ).length
+      ) {
+        return false;
+      }
+
+      return true;
+    }
+  );
 }
 
 function ordenarFichasMedicas(
@@ -752,21 +837,13 @@ function ordenarFichasMedicas(
         item
       ) => {
         if (
-          isCancelled(
-            item
-          )
-        ) {
-          return 30;
-        }
-
-        if (
           fichaCompleta(
             item
           )
         ) {
           return 10;
         }
-
+      
         return 20;
       };
 
