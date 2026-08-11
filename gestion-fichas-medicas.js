@@ -296,15 +296,41 @@ function getMedicamentosDetalle(
 function tieneDieta(
   item = {}
 ) {
-  return normalizedFlag(
-    valueByPaths(
-      item,
-      [
-        "salud.dietaFlag",
-        "alimentacion.dietaFlag",
-        "dieta.dietaFlag",
-        "dietaFlag"
-      ]
+  const salud =
+    item.salud ||
+    {};
+
+  return (
+    normalize(
+      salud.dietaFlag
+    ) === "si" ||
+
+    clean(
+      salud.dietaDetalle
+    ) !== "" ||
+
+    (
+      Array.isArray(
+        salud.dietaTipos
+      ) &&
+      salud.dietaTipos.length >
+        0
+    ) ||
+
+    (
+      Array.isArray(
+        salud.dietaRestricciones
+      ) &&
+      salud.dietaRestricciones.length >
+        0
+    ) ||
+
+    (
+      Array.isArray(
+        salud.alergiasAlimentarias
+      ) &&
+      salud.alergiasAlimentarias.length >
+        0
     )
   );
 }
@@ -312,50 +338,77 @@ function tieneDieta(
 function getDietaPrincipal(
   item = {}
 ) {
+  const salud =
+    item.salud ||
+    {};
+
+  if (
+    Array.isArray(
+      salud.dietaTipos
+    ) &&
+    salud.dietaTipos.length
+  ) {
+    return salud.dietaTipos.join(
+      ", "
+    );
+  }
+
   return clean(
-    valueByPaths(
-      item,
-      [
-        "salud.dietaPrincipal",
-        "alimentacion.dietaPrincipal",
-        "dieta.dietaPrincipal",
-        "dietaPrincipal"
-      ]
-    )
+    salud.dietaDetalle
   );
 }
 
 function getDietaRestricciones(
   item = {}
 ) {
-  const value =
-    valueByPaths(
-      item,
-      [
-        "salud.dietaRestricciones",
-        "alimentacion.dietaRestricciones",
-        "dieta.restricciones",
-        "dietaRestricciones"
-      ]
-    );
+  const salud =
+    item.salud ||
+    {};
+
+  const resultado =
+    [];
 
   if (
     Array.isArray(
-      value
+      salud.dietaRestricciones
     )
   ) {
-    return value;
+    resultado.push(
+      ...salud.dietaRestricciones
+    );
   }
 
-  return clean(
-    value
-  )
-    ? [
-        clean(
-          value
-        )
-      ]
-    : [];
+  if (
+    Array.isArray(
+      salud.alergiasAlimentarias
+    )
+  ) {
+    salud.alergiasAlimentarias
+      .forEach(
+        (alergia) => {
+          const detalle =
+            clean(
+              alergia?.alimento ||
+              alergia?.detalle ||
+              ""
+            );
+
+          if (detalle) {
+            resultado.push(
+              `Alergia alimentaria: ${detalle}`
+            );
+          }
+        }
+      );
+  }
+
+  return [
+    ...new Set(
+      resultado
+        .map(clean)
+        .filter(Boolean)
+    )
+  ];
 }
 
 function tieneAlergias(
@@ -441,24 +494,29 @@ function getNeuroTipos(
 function requiereApoyos(
   item = {}
 ) {
-  return normalizedFlag(
-    valueByPaths(
-      item,
-      [
-        "salud.neuroApoyosFlag",
-        "neurodivergencia.apoyosFlag",
-        "neuroApoyosFlag"
-      ]
-    )
-  ) ||
-  normalizedFlag(
-    valueByPaths(
-      item,
-      [
-        "salud.discapacidadApoyosFlag",
-        "discapacidad.apoyosFlag",
-        "discapacidadApoyosFlag"
-      ]
+  const salud =
+    item.salud ||
+    {};
+
+  return !!(
+    clean(
+      salud.neuroApoyosDetalle
+    ) ||
+
+    clean(
+      salud.discapacidadApoyoTipo
+    ) ||
+
+    clean(
+      salud.discapacidadRecomendaciones
+    ) ||
+
+    clean(
+      salud.discapacidadAyudaTecnica
+    ) ||
+
+    clean(
+      salud.discapacidadAyudaIndicaciones
     )
   );
 }
@@ -512,23 +570,52 @@ function grupoSanguineoDesconocido(
 function tieneAntecedentesRelevantes(
   item = {}
 ) {
-  const flags = [
-    "salud.enfermedadBaseFlag",
-    "salud.saludGeneralFlag",
-    "salud.cirugiasPreviasFlag",
-    "salud.emergenciaMedicaFlag",
-    "salud.saludMentalFlag",
-    "salud.otrosAntecedentesFlag"
-  ];
+  const salud =
+    item.salud ||
+    {};
 
-  return flags.some(
-    (path) =>
-      normalizedFlag(
-        getByPath(
-          item,
-          path
-        )
-      )
+  return (
+    normalize(
+      salud.enfermedadBaseFlag
+    ) === "si" ||
+    !!clean(
+      salud.enfermedadBaseDetalle
+    ) ||
+
+    normalize(
+      salud.saludGeneralFlag
+    ) === "si" ||
+    !!clean(
+      salud.saludGeneralDetalle
+    ) ||
+
+    normalize(
+      salud.cirugiasPreviasFlag
+    ) === "si" ||
+    !!clean(
+      salud.cirugiasPreviasDetalle
+    ) ||
+
+    normalize(
+      salud.emergenciaMedicaFlag
+    ) === "si" ||
+    !!clean(
+      salud.emergenciaMedicaDetalle
+    ) ||
+
+    normalize(
+      salud.saludMentalFlag
+    ) === "si" ||
+    !!clean(
+      salud.saludMentalDetalle
+    ) ||
+
+    normalize(
+      salud.otrosAntecedentesFlag
+    ) === "si" ||
+    !!clean(
+      salud.otrosAntecedentesDetalle
+    )
   );
 }
 
@@ -597,7 +684,13 @@ function renderKpis() {
 
   $("kpiGrupoSanguineo").textContent =
     activos.filter(
-      grupoSanguineoDesconocido
+      (item) =>
+        fichaCompleta(
+          item
+        ) &&
+        grupoSanguineoDesconocido(
+          item
+        )
     ).length;
 
   $("kpiAntecedentes").textContent =
@@ -1319,7 +1412,13 @@ function abrirDetalleMedicoTipo(
 
     rows =
       activos.filter(
-        grupoSanguineoDesconocido
+        (item) =>
+          fichaCompleta(
+            item
+          ) &&
+          grupoSanguineoDesconocido(
+            item
+          )
       );
 
     detalleFn =
@@ -1425,48 +1524,584 @@ function abrirDetalleAlertaIndividual(
     return;
   }
 
+  const salud =
+    item.salud ||
+    {};
+
   const tipo =
     normalize(
       alerta
     );
 
+  let titulo =
+    alerta ||
+    "Detalle médico";
+
+  let detalle =
+    "";
+
+  /*
+    MEDICAMENTOS
+  */
   if (
     tipo.includes(
       "medicamento"
     )
   ) {
-    abrirModalDetalleMedico(
-      `Medicamentos · ${passengerName(
-        item
-      )}`,
-      passengerDocument(
-        item
-      ),
-      renderPersonaDetalleMedico(
-        item,
-        escapeHtml(
-          getMedicamentosDetalle(
-            item
-          ) ||
-          "Sin detalle informado."
-        )
-      )
-    );
+    titulo =
+      "Medicamentos";
 
-    return;
+    detalle = `
+      <strong>
+        Medicamentos informados:
+      </strong>
+
+      <br>
+
+      ${escapeHtml(
+        clean(
+          salud.medicamentosDetalle
+        ) ||
+        "Sin detalle informado."
+      )}
+
+      ${
+        normalize(
+          salud.medicamentosProhibidosFlag
+        ) === "si" ||
+        clean(
+          salud.medicamentosProhibidosDetalle
+        )
+          ? `
+            <br><br>
+
+            <strong>
+              Medicamentos prohibidos / contraindicados:
+            </strong>
+
+            <br>
+
+            ${escapeHtml(
+              clean(
+                salud.medicamentosProhibidosDetalle
+              ) ||
+              "Informado sin detalle."
+            )}
+          `
+          : ""
+      }
+    `;
   }
 
   /*
-    Para cualquier otra alerta abrimos la ficha.
-    Después podemos profundizar cada tipo
-    de alerta de la misma forma.
+    SALUD MENTAL
   */
-  location.href =
-    `ficha-medica.html?grupo=${encodeURIComponent(
-      state.groupDocId
-    )}&id=${encodeURIComponent(
-      item.id
-    )}`;
+  else if (
+    tipo.includes(
+      "salud mental"
+    )
+  ) {
+    titulo =
+      "Salud mental";
+
+    detalle = `
+      <strong>
+        Antecedente informado:
+      </strong>
+
+      <br>
+
+      ${escapeHtml(
+        clean(
+          salud.saludMentalDetalle
+        ) ||
+        "Antecedente de salud mental informado sin detalle."
+      )}
+    `;
+  }
+
+  /*
+    EMERGENCIA MÉDICA
+  */
+  else if (
+    tipo.includes(
+      "emergencia"
+    )
+  ) {
+    titulo =
+      "Antecedente de emergencia médica";
+
+    detalle = `
+      <strong>
+        Antecedente informado:
+      </strong>
+
+      <br>
+
+      ${escapeHtml(
+        clean(
+          salud.emergenciaMedicaDetalle
+        ) ||
+        "Antecedente de emergencia médica informado sin detalle."
+      )}
+    `;
+  }
+
+  /*
+    ALERGIAS
+  */
+  else if (
+    tipo.includes(
+      "alerg"
+    )
+  ) {
+    titulo =
+      "Alergias";
+
+    const alimentarias =
+      Array.isArray(
+        salud.alergiasAlimentarias
+      )
+        ? salud.alergiasAlimentarias
+            .map(
+              (alergia) =>
+                clean(
+                  alergia?.alimento ||
+                  alergia?.detalle ||
+                  ""
+                )
+            )
+            .filter(Boolean)
+        : [];
+
+    detalle = `
+      <strong>
+        Alergias informadas:
+      </strong>
+
+      <br>
+
+      ${escapeHtml(
+        clean(
+          salud.alergiasDetalle
+        ) ||
+        (
+          alimentarias.length
+            ? alimentarias.join(
+                " · "
+              )
+            : "Alergia informada sin detalle."
+        )
+      )}
+    `;
+  }
+
+  /*
+    ALIMENTACIÓN
+  */
+  else if (
+    tipo.includes(
+      "aliment"
+    )
+  ) {
+    titulo =
+      "Alimentación";
+
+    const tipos =
+      Array.isArray(
+        salud.dietaTipos
+      )
+        ? salud.dietaTipos
+        : [];
+
+    const restricciones =
+      Array.isArray(
+        salud.dietaRestricciones
+      )
+        ? salud.dietaRestricciones
+        : [];
+
+    const alergiasAlimentarias =
+      Array.isArray(
+        salud.alergiasAlimentarias
+      )
+        ? salud.alergiasAlimentarias
+            .map(
+              (alergia) =>
+                clean(
+                  alergia?.alimento ||
+                  alergia?.detalle ||
+                  ""
+                )
+            )
+            .filter(Boolean)
+        : [];
+
+    detalle = `
+      ${
+        clean(
+          salud.dietaDetalle
+        )
+          ? `
+            <strong>
+              Detalle:
+            </strong>
+
+            <br>
+
+            ${escapeHtml(
+              salud.dietaDetalle
+            )}
+
+            <br><br>
+          `
+          : ""
+      }
+
+      ${
+        tipos.length
+          ? `
+            <strong>
+              Tipos de dieta:
+            </strong>
+
+            <br>
+
+            ${escapeHtml(
+              tipos.join(
+                ", "
+              )
+            )}
+
+            <br><br>
+          `
+          : ""
+      }
+
+      ${
+        restricciones.length
+          ? `
+            <strong>
+              Restricciones:
+            </strong>
+
+            <br>
+
+            ${escapeHtml(
+              restricciones.join(
+                ", "
+              )
+            )}
+
+            <br><br>
+          `
+          : ""
+      }
+
+      ${
+        alergiasAlimentarias.length
+          ? `
+            <strong>
+              Alergias alimentarias:
+            </strong>
+
+            <br>
+
+            ${escapeHtml(
+              alergiasAlimentarias.join(
+                " · "
+              )
+            )}
+          `
+          : ""
+      }
+
+      ${
+        !clean(
+          salud.dietaDetalle
+        ) &&
+        !tipos.length &&
+        !restricciones.length &&
+        !alergiasAlimentarias.length
+          ? "Información alimentaria registrada sin detalle visible."
+          : ""
+      }
+    `;
+  }
+
+  /*
+    ENFERMEDAD DE BASE
+  */
+  else if (
+    tipo.includes(
+      "enfermedad"
+    )
+  ) {
+    titulo =
+      "Enfermedad de base";
+
+    detalle = `
+      <strong>
+        Enfermedad / condición:
+      </strong>
+
+      <br>
+
+      ${escapeHtml(
+        clean(
+          salud.enfermedadBaseDetalle
+        ) ||
+        "Enfermedad de base informada sin detalle."
+      )}
+    `;
+  }
+
+  /*
+    NEURODIVERGENCIA
+  */
+  else if (
+    tipo.includes(
+      "neuro"
+    )
+  ) {
+    titulo =
+      "Neurodivergencia";
+
+    const tipos =
+      Array.isArray(
+        salud.neurodivergenciaTipos
+      )
+        ? salud.neurodivergenciaTipos
+        : [];
+
+    detalle = `
+      ${
+        tipos.length
+          ? `
+            <strong>
+              Tipo:
+            </strong>
+
+            <br>
+
+            ${escapeHtml(
+              tipos.join(
+                ", "
+              )
+            )}
+
+            <br><br>
+          `
+          : ""
+      }
+
+      ${
+        clean(
+          salud.neurodivergenciaDescripcion
+        )
+          ? `
+            <strong>
+              Descripción:
+            </strong>
+
+            <br>
+
+            ${escapeHtml(
+              salud.neurodivergenciaDescripcion
+            )}
+
+            <br><br>
+          `
+          : ""
+      }
+
+      ${
+        clean(
+          salud.neuroFactores
+        )
+          ? `
+            <strong>
+              Factores de sobrecarga:
+            </strong>
+
+            <br>
+
+            ${escapeHtml(
+              salud.neuroFactores
+            )}
+
+            <br><br>
+          `
+          : ""
+      }
+
+      ${
+        clean(
+          salud.neuroEstrategias
+        )
+          ? `
+            <strong>
+              Estrategias:
+            </strong>
+
+            <br>
+
+            ${escapeHtml(
+              salud.neuroEstrategias
+            )}
+
+            <br><br>
+          `
+          : ""
+      }
+
+      <strong>
+        Apoyos / consideraciones:
+      </strong>
+
+      <br>
+
+      ${escapeHtml(
+        clean(
+          salud.neuroApoyosDetalle
+        ) ||
+        "No se informaron apoyos específicos."
+      )}
+    `;
+  }
+
+  /*
+    APOYOS / DISCAPACIDAD
+  */
+  else if (
+    tipo.includes(
+      "apoyo"
+    ) ||
+    tipo.includes(
+      "discap"
+    )
+  ) {
+    titulo =
+      "Apoyos y consideraciones";
+
+    const tipos =
+      Array.isArray(
+        salud.discapacidadTipos
+      )
+        ? salud.discapacidadTipos
+        : [];
+
+    detalle = `
+      ${
+        tipos.length
+          ? `
+            <strong>
+              Tipo:
+            </strong>
+
+            <br>
+
+            ${escapeHtml(
+              tipos.join(
+                ", "
+              )
+            )}
+
+            <br><br>
+          `
+          : ""
+      }
+
+      ${
+        clean(
+          salud.discapacidadDescripcion
+        )
+          ? `
+            <strong>
+              Descripción:
+            </strong>
+
+            <br>
+
+            ${escapeHtml(
+              salud.discapacidadDescripcion
+            )}
+
+            <br><br>
+          `
+          : ""
+      }
+
+      ${
+        clean(
+          salud.discapacidadApoyoTipo
+        )
+          ? `
+            <strong>
+              Apoyo requerido:
+            </strong>
+
+            <br>
+
+            ${escapeHtml(
+              salud.discapacidadApoyoTipo
+            )}
+
+            <br><br>
+          `
+          : ""
+      }
+
+      ${
+        clean(
+          salud.discapacidadRecomendaciones
+        )
+          ? `
+            <strong>
+              Recomendaciones:
+            </strong>
+
+            <br>
+
+            ${escapeHtml(
+              salud.discapacidadRecomendaciones
+            )}
+          `
+          : ""
+      }
+    `;
+  }
+
+  /*
+    CUALQUIER ALERTA FUTURA
+  */
+  else {
+    titulo =
+      alerta ||
+      "Información médica";
+
+    detalle = `
+      Existe información médica asociada a esta alerta.
+
+      <br><br>
+
+      Presiona <strong>Ver ficha</strong>
+      para revisar el antecedente completo.
+    `;
+  }
+
+  abrirModalDetalleMedico(
+    `${titulo} · ${passengerName(
+      item
+    )}`,
+    passengerDocument(
+      item
+    ),
+    renderPersonaDetalleMedico(
+      item,
+      detalle
+    )
+  );
 }
 
 function openEdit(id) {
