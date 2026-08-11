@@ -119,6 +119,67 @@ function bindEvents() {
   $("editModal")?.addEventListener("click", (event) => {
     if (event.target?.id === "editModal") closeModal();
   });
+  document
+    .querySelectorAll(
+      "[data-medical-filter]"
+    )
+    .forEach(
+      (button) => {
+        button.addEventListener(
+          "click",
+          () => {
+            const value =
+              button.dataset
+                .medicalFilter ||
+              "";
+  
+            $("statusFilter").value =
+              value === "todos"
+                ? ""
+                : value;
+  
+            renderTable();
+          }
+        );
+      }
+    );
+  
+  document
+    .querySelectorAll(
+      "[data-medical-detail]"
+    )
+    .forEach(
+      (button) => {
+        button.addEventListener(
+          "click",
+          () => {
+            abrirDetalleMedicoTipo(
+              button.dataset
+                .medicalDetail
+            );
+          }
+        );
+      }
+    );
+  
+  $("btnCloseMedicalDetail")
+    ?.addEventListener(
+      "click",
+      cerrarModalDetalleMedico
+    );
+  
+  $("medicalDetailModal")
+    ?.addEventListener(
+      "click",
+      (event) => {
+        if (
+          event.target?.id ===
+          "medicalDetailModal"
+        ) {
+          cerrarModalDetalleMedico();
+        }
+      }
+    );
 }
 
 async function loadPage() {
@@ -161,12 +222,388 @@ async function loadPage() {
   }
 }
 
+function valueByPaths(
+  item = {},
+  paths = []
+) {
+  for (
+    const path of paths
+  ) {
+    const value =
+      getByPath(
+        item,
+        path
+      );
+
+    if (
+      value !== undefined &&
+      value !== null &&
+      value !== ""
+    ) {
+      return value;
+    }
+  }
+
+  return "";
+}
+
+function normalizedFlag(
+  value
+) {
+  const normalized =
+    normalize(
+      value
+    );
+
+  return (
+    value === true ||
+    normalized === "si" ||
+    normalized === "sí" ||
+    normalized === "true"
+  );
+}
+
+function tieneMedicamentos(
+  item = {}
+) {
+  return normalizedFlag(
+    valueByPaths(
+      item,
+      [
+        "salud.medicamentosFlag",
+        "antecedentesMedicos.medicamentosFlag",
+        "medicamentosFlag"
+      ]
+    )
+  );
+}
+
+function getMedicamentosDetalle(
+  item = {}
+) {
+  return clean(
+    valueByPaths(
+      item,
+      [
+        "salud.medicamentosDetalle",
+        "antecedentesMedicos.medicamentosDetalle",
+        "medicamentosDetalle"
+      ]
+    )
+  );
+}
+
+function tieneDieta(
+  item = {}
+) {
+  return normalizedFlag(
+    valueByPaths(
+      item,
+      [
+        "salud.dietaFlag",
+        "alimentacion.dietaFlag",
+        "dieta.dietaFlag",
+        "dietaFlag"
+      ]
+    )
+  );
+}
+
+function getDietaPrincipal(
+  item = {}
+) {
+  return clean(
+    valueByPaths(
+      item,
+      [
+        "salud.dietaPrincipal",
+        "alimentacion.dietaPrincipal",
+        "dieta.dietaPrincipal",
+        "dietaPrincipal"
+      ]
+    )
+  );
+}
+
+function getDietaRestricciones(
+  item = {}
+) {
+  const value =
+    valueByPaths(
+      item,
+      [
+        "salud.dietaRestricciones",
+        "alimentacion.dietaRestricciones",
+        "dieta.restricciones",
+        "dietaRestricciones"
+      ]
+    );
+
+  if (
+    Array.isArray(
+      value
+    )
+  ) {
+    return value;
+  }
+
+  return clean(
+    value
+  )
+    ? [
+        clean(
+          value
+        )
+      ]
+    : [];
+}
+
+function tieneAlergias(
+  item = {}
+) {
+  return normalizedFlag(
+    valueByPaths(
+      item,
+      [
+        "salud.alergiasFlag",
+        "antecedentesMedicos.alergiasFlag",
+        "alergiasFlag"
+      ]
+    )
+  ) ||
+  getDietaRestricciones(
+    item
+  ).includes(
+    "alergia_alimentaria"
+  );
+}
+
+function getAlergiasDetalle(
+  item = {}
+) {
+  return clean(
+    valueByPaths(
+      item,
+      [
+        "salud.alergiasDetalle",
+        "antecedentesMedicos.alergiasDetalle",
+        "alergiasDetalle"
+      ]
+    )
+  );
+}
+
+function tieneNeurodivergencia(
+  item = {}
+) {
+  return normalizedFlag(
+    valueByPaths(
+      item,
+      [
+        "salud.neurodivergenciaFlag",
+        "neurodivergencia.flag",
+        "neurodivergenciaFlag"
+      ]
+    )
+  );
+}
+
+function getNeuroTipos(
+  item = {}
+) {
+  const value =
+    valueByPaths(
+      item,
+      [
+        "salud.neurodivergenciaTipos",
+        "neurodivergencia.tipos",
+        "neurodivergenciaTipos"
+      ]
+    );
+
+  return Array.isArray(
+    value
+  )
+    ? value
+    : (
+        clean(
+          value
+        )
+          ? [
+              clean(
+                value
+              )
+            ]
+          : []
+      );
+}
+
+function requiereApoyos(
+  item = {}
+) {
+  return normalizedFlag(
+    valueByPaths(
+      item,
+      [
+        "salud.neuroApoyosFlag",
+        "neurodivergencia.apoyosFlag",
+        "neuroApoyosFlag"
+      ]
+    )
+  ) ||
+  normalizedFlag(
+    valueByPaths(
+      item,
+      [
+        "salud.discapacidadApoyosFlag",
+        "discapacidad.apoyosFlag",
+        "discapacidadApoyosFlag"
+      ]
+    )
+  );
+}
+
+function getApoyosDetalle(
+  item = {}
+) {
+  return clean(
+    valueByPaths(
+      item,
+      [
+        "salud.neuroApoyosDetalle",
+        "neurodivergencia.apoyosDetalle",
+        "salud.discapacidadRecomendaciones",
+        "neuroApoyosDetalle"
+      ]
+    )
+  );
+}
+
+function grupoSanguineoDesconocido(
+  item = {}
+) {
+  const value =
+    normalize(
+      valueByPaths(
+        item,
+        [
+          "salud.grupoSanguineo",
+          "grupoSanguineo",
+          "antecedentesMedicos.grupoSanguineo"
+        ]
+      )
+    )
+      .replace(
+        /\s+/g,
+        "_"
+      );
+
+  return (
+    !value ||
+    value ===
+      "no_informado" ||
+    value ===
+      "no_lo_se" ||
+    value ===
+      "desconocido"
+  );
+}
+
+function tieneAntecedentesRelevantes(
+  item = {}
+) {
+  const flags = [
+    "salud.enfermedadBaseFlag",
+    "salud.saludGeneralFlag",
+    "salud.cirugiasPreviasFlag",
+    "salud.emergenciaMedicaFlag",
+    "salud.saludMentalFlag",
+    "salud.otrosAntecedentesFlag"
+  ];
+
+  return flags.some(
+    (path) =>
+      normalizedFlag(
+        getByPath(
+          item,
+          path
+        )
+      )
+  );
+}
+
 function renderKpis() {
-  $("kpiTotal").textContent = state.items.length;
-  $("kpiCompletas").textContent = state.items.filter(fichaCompleta).length;
-  $("kpiPendientes").textContent = state.items.filter((item) => !fichaCompleta(item) && !isCancelled(item)).length;
-  $("kpiAlertas").textContent = state.items.filter((item) => medicalAlerts(item).length > 0 && !isCancelled(item)).length;
-  $("kpiAnulados").textContent = state.items.filter(isCancelled).length;
+  const activos =
+    state.items.filter(
+      (item) =>
+        !isCancelled(
+          item
+        )
+    );
+
+  $("kpiTotal").textContent =
+    state.items.length;
+
+  $("kpiCompletas").textContent =
+    activos.filter(
+      fichaCompleta
+    ).length;
+
+  $("kpiPendientes").textContent =
+    activos.filter(
+      (item) =>
+        !fichaCompleta(
+          item
+        )
+    ).length;
+
+  $("kpiAlertas").textContent =
+    activos.filter(
+      (item) =>
+        medicalAlerts(
+          item
+        ).length > 0
+    ).length;
+
+  $("kpiAnulados").textContent =
+    state.items.filter(
+      isCancelled
+    ).length;
+
+  $("kpiMedicamentos").textContent =
+    activos.filter(
+      tieneMedicamentos
+    ).length;
+
+  $("kpiDietas").textContent =
+    activos.filter(
+      tieneDieta
+    ).length;
+
+  $("kpiAlergias").textContent =
+    activos.filter(
+      tieneAlergias
+    ).length;
+
+  $("kpiNeurodivergencia").textContent =
+    activos.filter(
+      tieneNeurodivergencia
+    ).length;
+
+  $("kpiApoyos").textContent =
+    activos.filter(
+      requiereApoyos
+    ).length;
+
+  $("kpiGrupoSanguineo").textContent =
+    activos.filter(
+      grupoSanguineoDesconocido
+    ).length;
+
+  $("kpiAntecedentes").textContent =
+    activos.filter(
+      tieneAntecedentesRelevantes
+    ).length;
 }
 
 function renderTypeOptions() {
@@ -208,76 +645,828 @@ function getFilteredItems() {
   });
 }
 
-function renderTable() {
-  const rows = getFilteredItems();
+function ordenarFichasMedicas(
+  items = []
+) {
+  return [
+    ...items
+  ].sort(
+    (
+      a,
+      b
+    ) => {
+      const ordenEstado = (
+        item
+      ) => {
+        if (
+          isCancelled(
+            item
+          )
+        ) {
+          return 30;
+        }
 
-  $("tableBody").innerHTML = rows.length
-    ? rows.map((item, index) => {
-        const alerts = medicalAlerts(item);
-        const statusClass = isCancelled(item)
-          ? "status-cancelled"
-          : fichaCompleta(item)
-            ? "status-complete"
-            : "status-pending";
+        if (
+          fichaCompleta(
+            item
+          )
+        ) {
+          return 10;
+        }
 
-        const statusText = isCancelled(item)
-          ? "Anulado"
-          : fichaCompleta(item)
-            ? "Completa"
-            : "Pendiente";
+        return 20;
+      };
 
-        return `
-          <tr>
-            <td>${index + 1}</td>
-            <td><strong>${escapeHtml(passengerName(item))}</strong></td>
-            <td>${escapeHtml(passengerDocument(item))}</td>
-            <td>${escapeHtml(item.tipoInscripcion || item.tipoViajante || "—")}</td>
-            <td><span class="status ${statusClass}">${statusText}</span></td>
-            <td>
-              ${alerts.length
-                ? alerts.map((alert) => `<span class="alert-chip">${escapeHtml(alert)}</span>`).join("")
-                : `<span class="no-alerts">Sin alertas</span>`}
-            </td>
-            <td>
-              ${escapeHtml(item?.contactoPrincipal?.nombre || "—")}<br>
-              <small>${escapeHtml(item?.contactoPrincipal?.correo || "")}</small>
-            </td>
-            <td>${escapeHtml(formatDate(
-              item?.auditoriaFichaMedica?.actualizadoAt ||
-              item?.meta?.fechaFormularioCliente ||
-              item?.meta?.fechaInscripcion
-            ))}</td>
-            <td>
-              <div class="actions">
-                <button class="btn-light" type="button" data-view="${escapeHtml(item.id)}">Ver</button>
-                <button class="btn-yellow" type="button" data-print="${escapeHtml(item.id)}">PDF</button>
-                ${canEditMedicalData(state.user)
-                  ? `<button class="btn-primary" type="button" data-edit="${escapeHtml(item.id)}">Editar</button>`
-                  : ""}
-              </div>
-            </td>
-          </tr>
-        `;
-      }).join("")
-    : `<tr><td colspan="9">No hay pasajeros que coincidan con los filtros.</td></tr>`;
+      const estadoA =
+        ordenEstado(
+          a
+        );
+
+      const estadoB =
+        ordenEstado(
+          b
+        );
+
+      if (
+        estadoA !==
+        estadoB
+      ) {
+        return (
+          estadoA -
+          estadoB
+        );
+      }
+
+      return passengerName(
+        a
+      ).localeCompare(
+        passengerName(
+          b
+        ),
+        "es",
+        {
+          sensitivity:
+            "base",
+          numeric:
+            true
+        }
+      );
+    }
+  );
 }
 
-function onTableClick(event) {
-  const viewId = event.target.closest("[data-view]")?.dataset.view;
-  const printId = event.target.closest("[data-print]")?.dataset.print;
-  const editId = event.target.closest("[data-edit]")?.dataset.edit;
+function renderTable() {
+  const rows =
+    ordenarFichasMedicas(
+      getFilteredItems()
+    );
+
+  $("tableBody").innerHTML =
+    rows.length
+      ? rows
+          .map(
+            (
+              item,
+              index
+            ) => {
+              const alerts =
+                medicalAlerts(
+                  item
+                );
+
+              const statusClass =
+                isCancelled(
+                  item
+                )
+                  ? "status-cancelled"
+                  : fichaCompleta(
+                      item
+                    )
+                    ? "status-complete"
+                    : "status-pending";
+
+              const statusText =
+                isCancelled(
+                  item
+                )
+                  ? "Anulado"
+                  : fichaCompleta(
+                      item
+                    )
+                    ? "Completa"
+                    : "Pendiente";
+
+              return `
+                <tr>
+                  <td>
+                    ${index + 1}
+                  </td>
+
+                  <td>
+                    <strong>
+                      ${escapeHtml(
+                        passengerName(
+                          item
+                        )
+                      )}
+                    </strong>
+                  </td>
+
+                  <td>
+                    ${escapeHtml(
+                      passengerDocument(
+                        item
+                      )
+                    )}
+                  </td>
+
+                  <td>
+                    ${escapeHtml(
+                      item.tipoInscripcion ||
+                      item.tipoViajante ||
+                      "—"
+                    )}
+                  </td>
+
+                  <td>
+                    <span
+                      class="status ${statusClass}"
+                    >
+                      ${statusText}
+                    </span>
+                  </td>
+
+                  <td>
+                    ${
+                      alerts.length
+                        ? alerts
+                            .map(
+                              (
+                                alert
+                              ) => `
+                                <button
+                                  type="button"
+                                  class="alert-chip alert-chip-button"
+                                  data-medical-alert="${escapeHtml(
+                                    alert
+                                  )}"
+                                  data-inscripcion-id="${escapeHtml(
+                                    item.id
+                                  )}"
+                                >
+                                  ${escapeHtml(
+                                    alert
+                                  )}
+                                </button>
+                              `
+                            )
+                            .join("")
+                        : `
+                          <span class="no-alerts">
+                            Sin alertas
+                          </span>
+                        `
+                    }
+                  </td>
+
+                  <td>
+                    ${escapeHtml(
+                      item
+                        ?.contactoPrincipal
+                        ?.nombre ||
+                      "—"
+                    )}
+
+                    <br>
+
+                    <small>
+                      ${escapeHtml(
+                        item
+                          ?.contactoPrincipal
+                          ?.correo ||
+                        ""
+                      )}
+                    </small>
+                  </td>
+
+                  <td>
+                    ${escapeHtml(
+                      formatDate(
+                        item
+                          ?.auditoriaFichaMedica
+                          ?.actualizadoAt ||
+                        item
+                          ?.meta
+                          ?.fechaFormularioCliente ||
+                        item
+                          ?.meta
+                          ?.fechaInscripcion
+                      )
+                    )}
+                  </td>
+
+                  <td>
+                    <div class="actions">
+                      <button
+                        class="btn-light"
+                        type="button"
+                        data-view="${escapeHtml(
+                          item.id
+                        )}"
+                      >
+                        Ver
+                      </button>
+
+                      <button
+                        class="btn-yellow"
+                        type="button"
+                        data-print="${escapeHtml(
+                          item.id
+                        )}"
+                      >
+                        PDF
+                      </button>
+
+                      ${
+                        canEditMedicalData(
+                          state.user
+                        )
+                          ? `
+                            <button
+                              class="btn-primary"
+                              type="button"
+                              data-edit="${escapeHtml(
+                                item.id
+                              )}"
+                            >
+                              Editar
+                            </button>
+                          `
+                          : ""
+                      }
+                    </div>
+                  </td>
+                </tr>
+              `;
+            }
+          )
+          .join("")
+      : `
+        <tr>
+          <td colspan="9">
+            No hay pasajeros que coincidan con los filtros.
+          </td>
+        </tr>
+      `;
+}
+
+function onTableClick(
+  event
+) {
+  const alertButton =
+    event.target.closest(
+      "[data-medical-alert]"
+    );
+
+  if (alertButton) {
+    abrirDetalleAlertaIndividual(
+      alertButton.dataset
+        .inscripcionId,
+      alertButton.dataset
+        .medicalAlert
+    );
+
+    return;
+  }
+
+  const viewId =
+    event.target.closest(
+      "[data-view]"
+    )?.dataset.view;
+
+  const printId =
+    event.target.closest(
+      "[data-print]"
+    )?.dataset.print;
+
+  const editId =
+    event.target.closest(
+      "[data-edit]"
+    )?.dataset.edit;
 
   if (viewId) {
-    location.href = `ficha-medica.html?grupo=${encodeURIComponent(state.groupDocId)}&id=${encodeURIComponent(viewId)}`;
+    location.href =
+      `ficha-medica.html?grupo=${encodeURIComponent(
+        state.groupDocId
+      )}&id=${encodeURIComponent(
+        viewId
+      )}`;
+
     return;
   }
 
   if (printId) {
-    location.href = `ficha-medica.html?grupo=${encodeURIComponent(state.groupDocId)}&id=${encodeURIComponent(printId)}&print=1`;
+    location.href =
+      `ficha-medica.html?grupo=${encodeURIComponent(
+        state.groupDocId
+      )}&id=${encodeURIComponent(
+        printId
+      )}&print=1`;
+
     return;
   }
 
-  if (editId) openEdit(editId);
+  if (editId) {
+    openEdit(
+      editId
+    );
+  }
+}
+
+function abrirModalDetalleMedico(
+  titulo,
+  subtitulo,
+  html
+) {
+  $("medicalDetailTitle").textContent =
+    titulo;
+
+  $("medicalDetailSubtitle").textContent =
+    subtitulo ||
+    "";
+
+  $("medicalDetailContent").innerHTML =
+    html ||
+    `
+      <p>
+        No hay información para mostrar.
+      </p>
+    `;
+
+  $("medicalDetailModal")
+    .classList
+    .remove(
+      "hidden"
+    );
+}
+
+function cerrarModalDetalleMedico() {
+  $("medicalDetailModal")
+    ?.classList
+    .add(
+      "hidden"
+    );
+}
+
+function renderPersonaDetalleMedico(
+  item,
+  detalle = ""
+) {
+  return `
+    <article class="medical-detail-person">
+      <div class="medical-detail-person-head">
+        <div>
+          <strong>
+            ${escapeHtml(
+              passengerName(
+                item
+              )
+            )}
+          </strong>
+
+          <small>
+            ${escapeHtml(
+              passengerDocument(
+                item
+              )
+            )}
+          </small>
+        </div>
+
+        <a
+          class="button-link btn-light"
+          href="ficha-medica.html?grupo=${encodeURIComponent(
+            state.groupDocId
+          )}&id=${encodeURIComponent(
+            item.id
+          )}"
+        >
+          Ver ficha
+        </a>
+      </div>
+
+      ${
+        detalle
+          ? `
+            <div class="medical-detail-text">
+              ${detalle}
+            </div>
+          `
+          : ""
+      }
+    </article>
+  `;
+}
+
+function abrirDetalleMedicoTipo(
+  tipo
+) {
+  const activos =
+    state.items.filter(
+      (item) =>
+        !isCancelled(
+          item
+        )
+    );
+
+  let titulo =
+    "Detalle médico";
+
+  let rows =
+    [];
+
+  let detalleFn =
+    () =>
+      "";
+
+  if (
+    tipo ===
+    "medicamentos"
+  ) {
+    titulo =
+      "Medicamentos";
+
+    rows =
+      activos.filter(
+        tieneMedicamentos
+      );
+
+    detalleFn =
+      (item) => `
+        <strong>Medicamentos informados:</strong>
+        <br>
+        ${escapeHtml(
+          getMedicamentosDetalle(
+            item
+          ) ||
+          "Sin detalle informado."
+        )}
+      `;
+  }
+
+  if (
+    tipo ===
+    "dietas"
+  ) {
+    titulo =
+      "Dietas y restricciones alimentarias";
+
+    rows =
+      activos.filter(
+        tieneDieta
+      );
+
+    detalleFn =
+      (item) => {
+        const principal =
+          getDietaPrincipal(
+            item
+          );
+
+        const restricciones =
+          getDietaRestricciones(
+            item
+          );
+
+        return `
+          ${
+            principal
+              ? `
+                <strong>
+                  Dieta principal:
+                </strong>
+                ${escapeHtml(
+                  principal
+                )}
+                <br>
+              `
+              : ""
+          }
+
+          ${
+            restricciones.length
+              ? `
+                <strong>
+                  Restricciones:
+                </strong>
+                ${escapeHtml(
+                  restricciones.join(
+                    ", "
+                  )
+                )}
+              `
+              : ""
+          }
+        `;
+      };
+  }
+
+  if (
+    tipo ===
+    "alergias"
+  ) {
+    titulo =
+      "Alergias";
+
+    rows =
+      activos.filter(
+        tieneAlergias
+      );
+
+    detalleFn =
+      (item) => `
+        ${escapeHtml(
+          getAlergiasDetalle(
+            item
+          ) ||
+          getDietaRestricciones(
+            item
+          ).join(", ") ||
+          "Alergia informada sin detalle visible."
+        )}
+      `;
+  }
+
+  if (
+    tipo ===
+    "neurodivergencia"
+  ) {
+    titulo =
+      "Neurodivergencia";
+
+    rows =
+      activos.filter(
+        tieneNeurodivergencia
+      );
+
+    detalleFn =
+      (item) => {
+        const tipos =
+          getNeuroTipos(
+            item
+          );
+
+        const descripcion =
+          clean(
+            valueByPaths(
+              item,
+              [
+                "salud.neurodivergenciaDescripcion",
+                "neurodivergencia.descripcion"
+              ]
+            )
+          );
+
+        return `
+          <strong>
+            Tipo:
+          </strong>
+          ${escapeHtml(
+            tipos.join(", ") ||
+            "No especificado"
+          )}
+
+          ${
+            descripcion
+              ? `
+                <br>
+                <strong>
+                  Descripción:
+                </strong>
+                ${escapeHtml(
+                  descripcion
+                )}
+              `
+              : ""
+          }
+
+          ${
+            requiereApoyos(
+              item
+            )
+              ? `
+                <br>
+                <strong>
+                  Requiere apoyo:
+                </strong>
+                Sí
+
+                ${
+                  getApoyosDetalle(
+                    item
+                  )
+                    ? `
+                      <br>
+                      ${escapeHtml(
+                        getApoyosDetalle(
+                          item
+                        )
+                      )}
+                    `
+                    : ""
+                }
+              `
+              : `
+                <br>
+                <strong>
+                  Requiere apoyo:
+                </strong>
+                No informado
+              `
+          }
+        `;
+      };
+  }
+
+  if (
+    tipo ===
+    "apoyos"
+  ) {
+    titulo =
+      "Personas que requieren apoyo";
+
+    rows =
+      activos.filter(
+        requiereApoyos
+      );
+
+    detalleFn =
+      (item) =>
+        escapeHtml(
+          getApoyosDetalle(
+            item
+          ) ||
+          "Apoyo informado sin detalle visible."
+        );
+  }
+
+  if (
+    tipo ===
+    "grupo_sanguineo"
+  ) {
+    titulo =
+      "Grupo sanguíneo no informado";
+
+    rows =
+      activos.filter(
+        grupoSanguineoDesconocido
+      );
+
+    detalleFn =
+      () =>
+        "Grupo sanguíneo desconocido o no informado.";
+  }
+
+  if (
+    tipo ===
+    "antecedentes"
+  ) {
+    titulo =
+      "Antecedentes médicos relevantes";
+
+    rows =
+      activos.filter(
+        tieneAntecedentesRelevantes
+      );
+
+    detalleFn =
+      (item) => {
+        const detalles = [
+          valueByPaths(
+            item,
+            [
+              "salud.enfermedadBaseDetalle"
+            ]
+          ),
+          valueByPaths(
+            item,
+            [
+              "salud.saludGeneralDetalle"
+            ]
+          ),
+          valueByPaths(
+            item,
+            [
+              "salud.cirugiasPreviasDetalle"
+            ]
+          ),
+          valueByPaths(
+            item,
+            [
+              "salud.emergenciaMedicaDetalle"
+            ]
+          ),
+          valueByPaths(
+            item,
+            [
+              "salud.saludMentalDetalle"
+            ]
+          )
+        ]
+          .map(clean)
+          .filter(Boolean);
+
+        return escapeHtml(
+          detalles.join(" · ") ||
+          "Antecedente médico informado."
+        );
+      };
+  }
+
+  abrirModalDetalleMedico(
+    `${titulo} · ${rows.length}`,
+    "Personas del grupo que cumplen este criterio.",
+    rows.length
+      ? rows
+          .map(
+            (item) =>
+              renderPersonaDetalleMedico(
+                item,
+                detalleFn(
+                  item
+                )
+              )
+          )
+          .join("")
+      : `
+        <p class="no-alerts">
+          No hay pasajeros en esta categoría.
+        </p>
+      `
+  );
+}
+
+function abrirDetalleAlertaIndividual(
+  id,
+  alerta
+) {
+  const item =
+    state.items.find(
+      (row) =>
+        String(
+          row.id
+        ) ===
+        String(
+          id
+        )
+    );
+
+  if (!item) {
+    return;
+  }
+
+  const tipo =
+    normalize(
+      alerta
+    );
+
+  if (
+    tipo.includes(
+      "medicamento"
+    )
+  ) {
+    abrirModalDetalleMedico(
+      `Medicamentos · ${passengerName(
+        item
+      )}`,
+      passengerDocument(
+        item
+      ),
+      renderPersonaDetalleMedico(
+        item,
+        escapeHtml(
+          getMedicamentosDetalle(
+            item
+          ) ||
+          "Sin detalle informado."
+        )
+      )
+    );
+
+    return;
+  }
+
+  /*
+    Para cualquier otra alerta abrimos la ficha.
+    Después podemos profundizar cada tipo
+    de alerta de la misma forma.
+  */
+  location.href =
+    `ficha-medica.html?grupo=${encodeURIComponent(
+      state.groupDocId
+    )}&id=${encodeURIComponent(
+      item.id
+    )}`;
 }
 
 function openEdit(id) {
