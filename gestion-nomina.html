@@ -1019,6 +1019,50 @@
       background: #d97706;
     }
 
+    .passenger-action-btn.action-edit {
+      background: #facc15;
+      color: #3b2b00;
+    }
+    
+    .passenger-action-btn.action-edit:hover,
+    .passenger-action-btn.action-edit:focus-visible {
+      background: #eab308;
+    }
+    
+    .gn-responsables {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      min-width: 210px;
+    }
+    
+    .gn-responsable {
+      line-height: 1.35;
+    }
+    
+    .gn-responsable + .gn-responsable {
+      padding-top: 7px;
+      border-top: 1px solid rgba(43, 25, 64, .12);
+    }
+    
+    .gn-responsable strong {
+      display: block;
+      color: #2b1940;
+      font-size: 12px;
+    }
+    
+    .gn-responsable small {
+      display: block;
+      margin-top: 2px;
+      color: #6f6578;
+      font-size: 11px;
+    }
+    
+    .gn-fecha-ingreso {
+      white-space: nowrap;
+      font-size: 12px;
+    }
+
     .passenger-action-btn:disabled {
       opacity: .48;
       cursor: wait;
@@ -1377,13 +1421,14 @@
             <thead>
               <tr>
                 <th>Grupo</th>
+                <th>ID Grupo</th>
                 <th>Negocio</th>
                 <th>Vendedor</th>
                 <th>Destino</th>
                 <th>Pax</th>
                 <th>Ficha médica</th>
                 <th>Carnet</th>
-                <th>Estado</th>
+                <th>Fase / link</th>
                 <th>Acción</th>
               </tr>
             </thead>
@@ -1391,7 +1436,7 @@
             <tbody id="gnTbody">
               <tr>
                 <td
-                  colspan="9"
+                  colspan="10"
                   class="gn-empty"
                 >
                   Cargando grupos...
@@ -1873,8 +1918,8 @@
                   <th>Estado</th>
                   <th>Ficha médica</th>
                   <th>Anulado</th>
-                  <th>Correo</th>
-                  <th>Teléfono</th>
+                  <th>Responsables</th>
+                  <th>Fecha ingreso</th>
                   <th>Carnet</th>
                   <th>Gestión</th>
                 </tr>
