@@ -3826,6 +3826,15 @@ function getOrdenNominaOperativa(
     return 60;
   }
 
+  /*
+    3º Nómina que viaja.
+
+    Primero quienes YA tienen
+    ficha médica completa.
+
+    Después quienes todavía
+    tienen ficha pendiente.
+  */
   if (
     [
       "nomina_inicial",
@@ -3837,7 +3846,20 @@ function getOrdenNominaOperativa(
       tipo
     )
   ) {
-    return 70;
+    const fichaCompleta =
+      item.fichaMedicaCompleta ===
+        true ||
+      item.fichaCompleta ===
+        true ||
+      normalizar(
+        item.fichaMedicaEstado ||
+        ""
+      ) ===
+        "completa";
+
+    return fichaCompleta
+      ? 70
+      : 80;
   }
 
   return 500;
