@@ -440,12 +440,6 @@ export function crearInscripcionesManager({ db, usuario = {}, onChange = null } 
     };
   }
 
-    Object.assign(patch, auditoria);
-    await updateDoc(doc(db, "ventas_cotizaciones", grupoCtx.docId), patch);
-    await notificarCambio(grupoCtx, "fase_abierta", { fase: clave, link });
-    return { token, link };
-  }
-
   async function cerrarFase(
     grupoCtx,
     fase
