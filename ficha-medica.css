@@ -245,3 +245,142 @@ th { color: var(--navy); background: var(--soft); position: sticky; top: 0; }
   .sheet-section { margin: 10px 0; }
   .sheet-row { min-height: 42px; padding: 6px 8px; }
 }
+
+/* =========================================================
+   KPI Y DETALLE MÉDICO
+========================================================= */
+
+.medical-kpi-section + .medical-kpi-section {
+  margin-top: 22px;
+}
+
+.medical-kpi-head {
+  margin-bottom: 14px;
+}
+
+.medical-kpi-head h2 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.medical-kpi-head p {
+  margin: 4px 0 0;
+  color: #64748b;
+  font-size: 13px;
+}
+
+.kpi-button {
+  border: 0;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+}
+
+.kpi-button:hover,
+.medical-kpi-card:hover {
+  transform: translateY(-1px);
+}
+
+.medical-kpis-detail {
+  display: grid;
+  grid-template-columns:
+    repeat(
+      auto-fit,
+      minmax(180px, 1fr)
+    );
+  gap: 12px;
+}
+
+.medical-kpi-card {
+  appearance: none;
+  border: 1px solid #d6dce8;
+  border-radius: 12px;
+  padding: 15px;
+  background: #fff;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    transform .15s ease,
+    box-shadow .15s ease;
+}
+
+.medical-kpi-card:hover {
+  box-shadow:
+    0 8px 20px
+    rgba(15, 23, 42, .08);
+}
+
+.medical-kpi-card span {
+  display: block;
+  color: #475569;
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.medical-kpi-card strong {
+  display: block;
+  margin-top: 7px;
+  color: #111827;
+  font-size: 28px;
+}
+
+.medical-kpi-card small {
+  display: block;
+  margin-top: 5px;
+  color: #64748b;
+  line-height: 1.3;
+}
+
+.alert-chip-button {
+  border: 0;
+  cursor: pointer;
+  font: inherit;
+}
+
+.alert-chip-button:hover {
+  filter: brightness(.94);
+}
+
+.medical-detail-card {
+  width: min(900px, calc(100vw - 30px));
+  max-height: calc(100vh - 40px);
+  overflow: auto;
+}
+
+.medical-detail-content {
+  display: grid;
+  gap: 12px;
+  padding: 18px;
+}
+
+.medical-detail-person {
+  border: 1px solid #dbe1ea;
+  border-radius: 12px;
+  padding: 14px;
+  background: #fff;
+}
+
+.medical-detail-person-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 15px;
+}
+
+.medical-detail-person-head strong {
+  display: block;
+  color: #111827;
+}
+
+.medical-detail-person-head small {
+  display: block;
+  margin-top: 3px;
+  color: #64748b;
+}
+
+.medical-detail-text {
+  margin-top: 10px;
+  line-height: 1.5;
+  color: #334155;
+}
