@@ -2307,6 +2307,152 @@ function renderInput(field, value) {
   `;
 }
 
+async function registrarEventoHistorialMedico(
+  inscriptionRef,
+  item,
+  {
+    motivo = "",
+    cambios = []
+  } = {}
+) {
+  const nombre =
+    passengerName(
+      item
+    );
+
+  const documentoPersona =
+    passengerDocument(
+      item
+    );
+
+  const cambiosSeguros =
+    Array.isArray(
+      cambios
+    )
+      ? cambios
+      : [];
+
+  const eventoGeneral = {
+    idGrupo:
+      state.groupId,
+
+    groupDocId:
+      state.groupDocId,
+
+    aliasGrupo:
+      clean(
+        state.group?.aliasGrupo ||
+        state.group?.nombreGrupo ||
+        state.group?.colegio ||
+        state.groupId
+      ),
+
+    tipoMovimiento:
+      "edicion_ficha_medica",
+
+    modulo:
+      "ficha_medica",
+
+    titulo:
+      "Edición de ficha médica",
+
+    mensaje:
+      `${state.user.nombre} modificó la ficha médica de ${nombre}.`,
+
+    motivo:
+      motivo,
+
+    cambios:
+      cambiosSeguros,
+
+    metadata: {
+      inscripcionId:
+        state.editingId,
+
+      documento:
+        documentoPersona,
+
+      nombreCompleto:
+        nombre,
+
+      motivo,
+
+      origen:
+        "gestion_fichas_medicas",
+
+      cambios:
+        cambiosSeguros
+    },
+
+    fecha:
+      serverTimestamp(),
+
+    creadoPor:
+      state.user.nombre,
+
+    creadoPorCorreo:
+      state.user.email
+  };
+
+  /*
+    1. HISTORIAL INDIVIDUAL
+  */
+  await addDoc(
+    collection(
+      inscriptionRef,
+      "historial_ficha"
+    ),
+    {
+      tipoMovimiento:
+        "edicion_ficha_medica",
+
+      titulo:
+        "Edición de ficha médica",
+
+      fecha:
+        serverTimestamp(),
+
+      usuarioNombre:
+        state.user.nombre,
+
+      usuarioCorreo:
+        state.user.email,
+
+      motivo,
+
+      cambios:
+        cambiosSeguros,
+
+      origen:
+        "gestion_fichas_medicas"
+    }
+  );
+
+  /*
+    2. HISTORIAL MÉDICO DEL GRUPO
+  */
+  await addDoc(
+    collection(
+      db,
+      "ventas_cotizaciones",
+      state.groupDocId,
+      "historial_ficha_medica"
+    ),
+    eventoGeneral
+  );
+
+  /*
+    3. HISTORIAL GENERAL DEL GRUPO
+  */
+  await addDoc(
+    collection(
+      db,
+      "ventas_historial"
+    ),
+    eventoGeneral
+  );
+}
+
 async function saveEdit(event) {
   event.preventDefault();
 
@@ -2423,9 +2569,12 @@ async function saveEdit(event) {
             GUARDADO QUIRÚRGICO.
 
             patch utiliza la ruta exacta:
-            antecedentesMedicos.x
+            salud.x
             dieta.x
+            antecedentesMedicos.x
             etc.
+
+            NO reemplazamos objetos completos.
           */
           patch[path] =
             newValue;
@@ -2453,6 +2602,15 @@ async function saveEdit(event) {
     return;
   }
 
+  /*
+    AUDITORÍA MÉDICA DEL DOCUMENTO.
+
+    Esto permite saber:
+    - cuándo fue modificado,
+    - quién lo hizo,
+    - por qué,
+    - y cuántas versiones administrativas lleva.
+  */
   patch[
     "auditoriaFichaMedica.actualizadoAt"
   ] =
@@ -2503,16 +2661,120 @@ async function saveEdit(event) {
       );
 
     /*
-      MODIFICA SOLAMENTE LAS RUTAS
-      QUE REALMENTE CAMBIARON.
+      =====================================================
+      1. ACTUALIZACIÓN SEGURA DE LA INSCRIPCIÓN
+      =====================================================
+
+      Modificamos solamente las rutas que realmente
+      cambiaron.
+
+      Este punto es importante para NO repetir el
+      problema que ocurrió antiguamente al reemplazar
+      objetos completos y borrar otros datos.
     */
     await updateDoc(
       inscriptionRef,
       patch
     );
 
+    const nombrePasajero =
+      passengerName(
+        item
+      );
+
+    const documentoPasajero =
+      passengerDocument(
+        item
+      );
+
+    const aliasGrupo =
+      clean(
+        state.group
+          ?.aliasGrupo ||
+        state.group
+          ?.nombreGrupo ||
+        state.group
+          ?.colegio ||
+        state.groupId ||
+        state.groupDocId
+      );
+
     /*
-      HISTORIAL INDIVIDUAL DE LA FICHA MÉDICA.
+      Evento común que utilizaremos para
+      el historial médico del grupo y
+      ventas_historial.
+
+      De esta manera ambos registros tienen
+      exactamente la misma información.
+    */
+    const eventoGeneral = {
+      idGrupo:
+        state.groupId,
+
+      groupDocId:
+        state.groupDocId,
+
+      aliasGrupo,
+
+      tipoMovimiento:
+        "edicion_ficha_medica",
+
+      modulo:
+        "ficha_medica",
+
+      titulo:
+        "Edición de ficha médica",
+
+      mensaje:
+        `${state.user.nombre} modificó la ficha médica de ${nombrePasajero}.`,
+
+      motivo:
+        reason,
+
+      cambios,
+
+      metadata: {
+        inscripcionId:
+          state.editingId,
+
+        documento:
+          documentoPasajero,
+
+        nombreCompleto:
+          nombrePasajero,
+
+        motivo:
+          reason,
+
+        origen:
+          "gestion_fichas_medicas",
+
+        cambios
+      },
+
+      fecha:
+        serverTimestamp(),
+
+      creadoPor:
+        state.user.nombre,
+
+      creadoPorCorreo:
+        state.user.email
+    };
+
+    /*
+      =====================================================
+      2. HISTORIAL INDIVIDUAL DEL PASAJERO
+      =====================================================
+
+      Ruta:
+
+      ventas_cotizaciones/{grupo}
+        /inscripciones/{pasajero}
+        /historial_ficha/{evento}
+
+      Sirve para revisar exclusivamente
+      las modificaciones médicas de esa persona.
     */
     await addDoc(
       collection(
@@ -2520,6 +2782,12 @@ async function saveEdit(event) {
         "historial_ficha"
       ),
       {
+        tipoMovimiento:
+          "edicion_ficha_medica",
+
+        titulo:
+          "Edición de ficha médica",
+
         fecha:
           serverTimestamp(),
 
@@ -2540,69 +2808,56 @@ async function saveEdit(event) {
     );
 
     /*
-      HISTORIAL GENERAL DEL GRUPO.
+      =====================================================
+      3. HISTORIAL MÉDICO DEL GRUPO
+      =====================================================
 
-      grupo.js ya consulta ventas_historial
-      mediante idGrupo.
+      Ruta:
+
+      ventas_cotizaciones/{grupo}
+        /historial_ficha_medica/{evento}
+
+      Este será el que después mostraremos dentro de:
+
+      Gestión Fichas Médicas
+      → Historial médico
+
+      Aquí NO aparecerán movimientos administrativos
+      como listas de espera o nuevos ingresos.
+    */
+    await addDoc(
+      collection(
+        db,
+        "ventas_cotizaciones",
+        state.groupDocId,
+        "historial_ficha_medica"
+      ),
+      eventoGeneral
+    );
+
+    /*
+      =====================================================
+      4. HISTORIAL GENERAL DEL GRUPO
+      =====================================================
+
+      Ruta:
+
+      ventas_historial/{evento}
+
+      grupo.js ya trabaja con esta colección.
+
+      Por lo tanto la modificación médica también
+      quedará como parte de la historia general
+      del grupo, diferenciada mediante:
+
+      modulo: "ficha_medica"
     */
     await addDoc(
       collection(
         db,
         "ventas_historial"
       ),
-      {
-        idGrupo:
-          state.groupId,
-
-        groupDocId:
-          state.groupDocId,
-
-        tipoMovimiento:
-          "edicion_ficha_medica",
-
-        modulo:
-          "ficha_medica",
-
-        titulo:
-          "Edición de ficha médica",
-
-        mensaje:
-          `${state.user.nombre} modificó la ficha médica de ${passengerName(
-            item
-          )}. Motivo: ${reason}`,
-
-        cambios,
-
-        metadata: {
-          inscripcionId:
-            state.editingId,
-
-          documento:
-            passengerDocument(
-              item
-            ),
-
-          nombreCompleto:
-            passengerName(
-              item
-            ),
-
-          motivo:
-            reason,
-
-          origen:
-            "gestion_fichas_medicas"
-        },
-
-        fecha:
-          serverTimestamp(),
-
-        creadoPor:
-          state.user.nombre,
-
-        creadoPorCorreo:
-          state.user.email
-      }
+      eventoGeneral
     );
 
     closeModal();
@@ -2614,6 +2869,7 @@ async function saveEdit(event) {
     );
   } catch (error) {
     console.error(
+      "[gestion-fichas-medicas] saveEdit",
       error
     );
 
