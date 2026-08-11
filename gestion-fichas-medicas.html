@@ -27,12 +27,144 @@
 
     <section id="content" class="hidden">
       <div class="panel">
-        <div class="kpis">
-          <div class="kpi"><div class="kpi-label">Pasajeros</div><div id="kpiTotal" class="kpi-value">0</div></div>
-          <div class="kpi"><div class="kpi-label">Fichas completas</div><div id="kpiCompletas" class="kpi-value">0</div></div>
-          <div class="kpi"><div class="kpi-label">Pendientes</div><div id="kpiPendientes" class="kpi-value">0</div></div>
-          <div class="kpi"><div class="kpi-label">Con alertas</div><div id="kpiAlertas" class="kpi-value">0</div></div>
-          <div class="kpi"><div class="kpi-label">Anulados</div><div id="kpiAnulados" class="kpi-value">0</div></div>
+        <div class="medical-kpi-section">
+          <div class="medical-kpi-head">
+            <div>
+              <h2>Resumen general</h2>
+              <p>Estado general de las fichas médicas del grupo.</p>
+            </div>
+          </div>
+      
+          <div class="kpis">
+            <button
+              class="kpi kpi-button"
+              type="button"
+              data-medical-filter="todos"
+            >
+              <div class="kpi-label">Pasajeros</div>
+              <div id="kpiTotal" class="kpi-value">0</div>
+            </button>
+      
+            <button
+              class="kpi kpi-button"
+              type="button"
+              data-medical-filter="completa"
+            >
+              <div class="kpi-label">Fichas completas</div>
+              <div id="kpiCompletas" class="kpi-value">0</div>
+            </button>
+      
+            <button
+              class="kpi kpi-button"
+              type="button"
+              data-medical-filter="pendiente"
+            >
+              <div class="kpi-label">Pendientes</div>
+              <div id="kpiPendientes" class="kpi-value">0</div>
+            </button>
+      
+            <button
+              class="kpi kpi-button"
+              type="button"
+              data-medical-filter="alerta"
+            >
+              <div class="kpi-label">Con alertas</div>
+              <div id="kpiAlertas" class="kpi-value">0</div>
+            </button>
+      
+            <button
+              class="kpi kpi-button"
+              type="button"
+              data-medical-filter="anulado"
+            >
+              <div class="kpi-label">Anulados</div>
+              <div id="kpiAnulados" class="kpi-value">0</div>
+            </button>
+          </div>
+        </div>
+      
+        <div class="medical-kpi-section medical-kpi-section-alerts">
+          <div class="medical-kpi-head">
+            <div>
+              <h2>Información médica relevante</h2>
+              <p>
+                Selecciona un indicador para revisar las personas
+                y el detalle informado.
+              </p>
+            </div>
+          </div>
+      
+          <div class="medical-kpis-detail">
+            <button
+              class="medical-kpi-card"
+              type="button"
+              data-medical-detail="medicamentos"
+            >
+              <span>Medicamentos</span>
+              <strong id="kpiMedicamentos">0</strong>
+              <small>Personas que informan medicamentos</small>
+            </button>
+      
+            <button
+              class="medical-kpi-card"
+              type="button"
+              data-medical-detail="dietas"
+            >
+              <span>Dietas / restricciones</span>
+              <strong id="kpiDietas">0</strong>
+              <small>Dietas, restricciones y alergias alimentarias</small>
+            </button>
+      
+            <button
+              class="medical-kpi-card"
+              type="button"
+              data-medical-detail="alergias"
+            >
+              <span>Alergias</span>
+              <strong id="kpiAlergias">0</strong>
+              <small>Alergias médicas o generales informadas</small>
+            </button>
+      
+            <button
+              class="medical-kpi-card"
+              type="button"
+              data-medical-detail="neurodivergencia"
+            >
+              <span>Neurodivergencia</span>
+              <strong id="kpiNeurodivergencia">0</strong>
+              <small>Condiciones de neurodesarrollo informadas</small>
+            </button>
+      
+            <button
+              class="medical-kpi-card"
+              type="button"
+              data-medical-detail="apoyos"
+            >
+              <span>Requieren apoyo</span>
+              <strong id="kpiApoyos">0</strong>
+              <small>Apoyos o consideraciones durante el viaje</small>
+            </button>
+      
+            <button
+              class="medical-kpi-card"
+              type="button"
+              data-medical-detail="grupo_sanguineo"
+            >
+              <span>Grupo sanguíneo desconocido</span>
+              <strong id="kpiGrupoSanguineo">0</strong>
+              <small>Personas con grupo sanguíneo no informado</small>
+            </button>
+      
+            <button
+              class="medical-kpi-card"
+              type="button"
+              data-medical-detail="antecedentes"
+            >
+              <span>Antecedentes relevantes</span>
+              <strong id="kpiAntecedentes">0</strong>
+              <small>Enfermedades, cirugías u otros antecedentes</small>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -72,6 +204,36 @@
       </section>
     </section>
   </main>
+
+  <div id="medicalDetailModal" class="modal hidden">
+    <div class="modal-card medical-detail-card">
+      <div class="modal-head">
+        <div>
+          <h2 id="medicalDetailTitle">
+            Detalle médico
+          </h2>
+  
+          <p id="medicalDetailSubtitle">
+            Información relevante del grupo.
+          </p>
+        </div>
+  
+        <button
+          id="btnCloseMedicalDetail"
+          class="btn-light"
+          type="button"
+        >
+          Cerrar
+        </button>
+      </div>
+  
+      <div
+        id="medicalDetailContent"
+        class="medical-detail-content"
+      >
+      </div>
+    </div>
+  </div>
 
   <div id="editModal" class="modal hidden">
     <div class="modal-card">
