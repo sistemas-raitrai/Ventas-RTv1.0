@@ -89,7 +89,15 @@ const state = {
     Pasajero actualmente abierto
     en el editor administrativo.
   */
-  editingNominaId: ""
+  editingNominaId: "",
+  
+  historialNomina: [],
+  
+  historialFiltro:
+    "todos",
+  
+  vistaModalNomina:
+    "pasajeros"
 };
 
 init();
@@ -2389,7 +2397,8 @@ async function abrirGrupo(
 
     const [
       origen,
-      nomina
+      nomina,
+      historial
     ] =
       await Promise.all([
         state.manager
@@ -2400,11 +2409,25 @@ async function abrirGrupo(
         state.manager
           .cargarNomina(
             state.current
+          ),
+
+        state.manager
+          .cargarHistorialNomina(
+            state.current
           )
       ]);
 
     state.nomina =
       nomina;
+
+    state.historialNomina =
+      historial;
+
+    state.historialFiltro =
+      "todos";
+
+    state.vistaModalNomina =
+      "pasajeros";
 
     const fases =
       state.manager
@@ -2514,8 +2537,429 @@ function renderModal(
     ?.classList.remove(
       "hidden"
     );
+  renderHistorialNomina();
+
+  cambiarVistaModalNomina(
+    state.vistaModalNomina ||
+    "pasajeros"
+  );
 
   enfocarPasajeroPendiente();
+}
+
+function cambiarVistaModalNomina(
+  vista = "pasajeros"
+) {
+  const vistaSegura =
+    vista ===
+      "historial"
+      ? "historial"
+      : "pasajeros";
+
+  state.vistaModalNomina =
+    vistaSegura;
+
+  $("panelNominaPasajeros")
+    ?.classList.toggle(
+      "hidden",
+      vistaSegura !==
+        "pasajeros"
+    );
+
+  $("panelNominaHistorial")
+    ?.classList.toggle(
+      "hidden",
+      vistaSegura !==
+        "historial"
+    );
+
+  document
+    .querySelectorAll(
+      "[data-nomina-tab]"
+    )
+    .forEach(
+      (button) => {
+        button.classList.toggle(
+          "active",
+          button.dataset
+            .nominaTab ===
+            vistaSegura
+        );
+      }
+    );
+
+  if (
+    vistaSegura ===
+    "historial"
+  ) {
+    renderHistorialNomina();
+  }
+}
+
+
+function getCategoriaHistorialNomina(
+  item = {}
+) {
+  const tipo =
+    String(
+      item.tipoMovimiento ||
+      ""
+    );
+
+  if (
+    tipo.includes(
+      "edicion_nomina"
+    )
+  ) {
+    return "edicion";
+  }
+
+  if (
+    tipo.includes(
+      "nuevo_ingreso"
+    )
+  ) {
+    return "ingresos";
+  }
+
+  if (
+    tipo.includes(
+      "lista_espera"
+    )
+  ) {
+    return "lista_espera";
+  }
+
+  if (
+    tipo.includes(
+      "fase_"
+    )
+  ) {
+    return "fases";
+  }
+
+  if (
+    tipo.includes(
+      "archivad"
+    )
+  ) {
+    return "archivos";
+  }
+
+  if (
+    tipo ===
+    "nota_nomina"
+  ) {
+    return "notas";
+  }
+
+  return "otros";
+}
+
+
+function renderCambioHistorial(
+  cambio = {}
+) {
+  const anterior =
+    cambio.anterior ===
+      undefined ||
+    cambio.anterior ===
+      null ||
+    cambio.anterior ===
+      ""
+      ? "—"
+      : String(
+          cambio.anterior
+        );
+
+  const nuevo =
+    cambio.nuevo ===
+      undefined ||
+    cambio.nuevo ===
+      null ||
+    cambio.nuevo ===
+      ""
+      ? "—"
+      : String(
+          cambio.nuevo
+        );
+
+  return `
+    <div class="historial-cambio">
+      <strong>
+        ${esc(
+          cambio.campo ||
+          "Campo"
+        )}
+      </strong>
+
+      <div>
+        ${esc(
+          anterior
+        )}
+        →
+        ${esc(
+          nuevo
+        )}
+      </div>
+    </div>
+  `;
+}
+
+
+function renderHistorialNomina() {
+  const container =
+    $("historialNominaLista");
+
+  if (!container) {
+    return;
+  }
+
+  const filtro =
+    state.historialFiltro ||
+    "todos";
+
+  const items =
+    state.historialNomina
+      .filter(
+        (item) =>
+          filtro ===
+            "todos" ||
+          getCategoriaHistorialNomina(
+            item
+          ) ===
+            filtro
+      );
+
+  set(
+    "historialNominaResumen",
+    `${items.length} movimiento${
+      items.length === 1
+        ? ""
+        : "s"
+    }`
+  );
+
+  if (!items.length) {
+    container.innerHTML = `
+      <div class="gn-empty">
+        No hay movimientos registrados para este filtro.
+      </div>
+    `;
+
+    return;
+  }
+
+  container.innerHTML =
+    items
+      .map(
+        (item) => {
+          const cambios =
+            Array.isArray(
+              item.cambios
+            )
+              ? item.cambios
+              : (
+                  Array.isArray(
+                    item?.metadata
+                      ?.cambios
+                  )
+                    ? item.metadata
+                        .cambios
+                    : []
+                );
+
+          const motivo =
+            String(
+              item.motivo ||
+              item?.metadata
+                ?.motivo ||
+              ""
+            ).trim();
+
+          const pasajero =
+            String(
+              item?.metadata
+                ?.nombreCompleto ||
+              ""
+            ).trim();
+
+          return `
+            <article class="historial-item">
+              <div class="historial-item-head">
+                <div>
+                  <div class="historial-item-title">
+                    ${esc(
+                      item.titulo ||
+                      "Movimiento de nómina"
+                    )}
+                  </div>
+
+                  ${
+                    pasajero
+                      ? `
+                        <div class="gn-sub">
+                          ${esc(
+                            pasajero
+                          )}
+                        </div>
+                      `
+                      : ""
+                  }
+                </div>
+
+                <div class="historial-item-date">
+                  ${esc(
+                    formatFecha(
+                      item.fecha
+                    )
+                  )}
+                </div>
+              </div>
+
+              ${
+                item.mensaje
+                  ? `
+                    <div class="historial-item-message">
+                      ${esc(
+                        item.mensaje
+                      )}
+                    </div>
+                  `
+                  : ""
+              }
+
+              ${
+                cambios.length
+                  ? `
+                    <div class="historial-cambios">
+                      ${cambios
+                        .map(
+                          renderCambioHistorial
+                        )
+                        .join("")}
+                    </div>
+                  `
+                  : ""
+              }
+
+              ${
+                motivo
+                  ? `
+                    <div class="historial-motivo">
+                      <strong>
+                        Motivo / justificación:
+                      </strong>
+
+                      ${esc(
+                        motivo
+                      )}
+                    </div>
+                  `
+                  : ""
+              }
+
+              <div class="historial-item-meta">
+                Registrado por
+                ${esc(
+                  item.creadoPor ||
+                  item.usuarioNombre ||
+                  "—"
+                )}
+
+                ${
+                  item.creadoPorCorreo ||
+                  item.usuarioCorreo
+                    ? `
+                      · ${esc(
+                        item.creadoPorCorreo ||
+                        item.usuarioCorreo
+                      )}
+                    `
+                    : ""
+                }
+              </div>
+            </article>
+          `;
+        }
+      )
+      .join("");
+}
+
+
+async function guardarNotaHistorialNomina() {
+  if (!state.current) {
+    return;
+  }
+
+  const textarea =
+    $("historialNominaNota");
+
+  const nota =
+    String(
+      textarea?.value ||
+      ""
+    ).trim();
+
+  if (!nota) {
+    alert(
+      "Escribe una nota antes de agregarla al historial."
+    );
+
+    textarea?.focus();
+
+    return;
+  }
+
+  const button =
+    $("btnAgregarNotaNomina");
+
+  try {
+    if (button) {
+      button.disabled =
+        true;
+
+      button.textContent =
+        "Guardando...";
+    }
+
+    await state.manager
+      .agregarNotaHistorialNomina(
+        state.current,
+        nota
+      );
+
+    if (textarea) {
+      textarea.value =
+        "";
+    }
+
+    state.historialNomina =
+      await state.manager
+        .cargarHistorialNomina(
+          state.current
+        );
+
+    renderHistorialNomina();
+  } catch (error) {
+    console.error(
+      "[gestion-nomina] guardarNotaHistorialNomina",
+      error
+    );
+
+    alert(
+      error.message ||
+      "No se pudo guardar la nota."
+    );
+  } finally {
+    if (button) {
+      button.disabled =
+        false;
+
+      button.textContent =
+        "Agregar nota";
+    }
+  }
 }
 
 function renderFase(
@@ -3102,6 +3546,43 @@ function renderKpisModal() {
       "hidden",
       state.nominaFiltro ===
         "todos"
+    );
+  document
+    .querySelectorAll(
+      "[data-nomina-tab]"
+    )
+    .forEach(
+      (button) => {
+        button.addEventListener(
+          "click",
+          () => {
+            cambiarVistaModalNomina(
+              button.dataset
+                .nominaTab ||
+              "pasajeros"
+            );
+          }
+        );
+      }
+    );
+  
+  $("historialNominaFiltro")
+    ?.addEventListener(
+      "change",
+      () => {
+        state.historialFiltro =
+          $("historialNominaFiltro")
+            ?.value ||
+          "todos";
+  
+        renderHistorialNomina();
+      }
+    );
+  
+  $("btnAgregarNotaNomina")
+    ?.addEventListener(
+      "click",
+      guardarNotaHistorialNomina
     );
 }
 
@@ -5877,11 +6358,27 @@ async function refrescarModal() {
         state.current
       );
 
+  const [
+    nomina,
+    historial
+  ] =
+    await Promise.all([
+      state.manager
+        .cargarNomina(
+          state.current
+        ),
+
+      state.manager
+        .cargarHistorialNomina(
+          state.current
+        )
+    ]);
+
   state.nomina =
-    await state.manager
-      .cargarNomina(
-        state.current
-      );
+    nomina;
+
+  state.historialNomina =
+    historial;
 
   renderModal(
     state.manager
@@ -5903,6 +6400,15 @@ function cerrarModal() {
 
   state.nomina =
     [];
+  
+  state.historialNomina =
+    [];
+  
+  state.historialFiltro =
+    "todos";
+  
+  state.vistaModalNomina =
+    "pasajeros";
 
   state.pasajeroFocoId =
     "";
