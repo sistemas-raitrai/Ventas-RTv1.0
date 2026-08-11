@@ -41,34 +41,36 @@ const MEDICAL_EDIT_FIELDS =
   EDIT_FIELDS.filter(
     (field) => {
       const path =
-        clean(
-          field?.path
+        String(
+          field?.path ||
+          ""
         );
 
-      if (!path) {
-        return false;
-      }
-
-      const camposNomina =
+      const esDatoAdministrativo =
+        path.startsWith(
+          "identificacion."
+        ) ||
+        path.startsWith(
+          "contactoPrincipal."
+        ) ||
+        path.startsWith(
+          "contactoSecundario."
+        ) ||
+        path.startsWith(
+          "documentoIdentidad."
+        ) ||
         [
-          "identificacion.",
-          "contactoPrincipal.",
-          "documentoIdentidad.",
           "tipoViajante",
           "tipoParticipacion",
           "tipoInscripcion",
+          "estadoInscripcion",
           "faseInscripcion",
           "estadoCupo"
-        ];
+        ].includes(
+          path
+        );
 
-      return !camposNomina.some(
-        (prefix) =>
-          path ===
-            prefix ||
-          path.startsWith(
-            prefix
-          )
-      );
+      return !esDatoAdministrativo;
     }
   );
 
