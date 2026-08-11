@@ -193,53 +193,252 @@ export function crearInscripcionesManager({ db, usuario = {}, onChange = null } 
     };
   }
 
-  async function abrirFase(grupoCtx, fase, { tienePolera = null } = {}) {
-    if (!puedeGestionarLinks(grupoCtx.data)) throw new Error("No tienes permisos para gestionar links de este grupo.");
-    const clave = normalizar(fase).replace(/\s+/g, "_");
-    const token = generarToken();
-    const link = `${PUBLIC_FORM_URL}?token=${encodeURIComponent(token)}`;
-    const auditoria = {
-      actualizadoPor: nombreUsuario,
-      actualizadoPorCorreo: email,
-      actualizadoAt: serverTimestamp()
+  function getLabelFaseHistorial(
+    clave = ""
+  ) {
+    const labels = {
+      inscripcion_inicial:
+        "Inscripción inicial",
+  
+      nomina_final:
+        "Nómina final / ficha médica",
+  
+      nuevo_ingreso:
+        "Nuevo ingreso",
+  
+      lista_espera:
+        "Lista de espera",
+  
+      liberados:
+        "Cupos liberados"
     };
-    const patch = {};
+  
+    return (
+      labels[
+        String(
+          clave ||
+          ""
+        )
+      ] ||
+      String(
+        clave ||
+        ""
+      )
+        .replaceAll(
+          "_",
+          " "
+        )
+    );
+  }
 
-    if (tienePolera !== null) {
-      patch["elementosIncluidos.polera"] = tienePolera === true;
-      patch["elementosIncluidos.actualizadoPor"] = nombreUsuario;
-      patch["elementosIncluidos.actualizadoPorCorreo"] = email;
-      patch["elementosIncluidos.actualizadoAt"] = serverTimestamp();
+  async function abrirFase(
+    grupoCtx,
+    fase,
+    {
+      tienePolera =
+        null
+    } = {}
+  ) {
+    if (
+      !puedeGestionarLinks(
+        grupoCtx.data
+      )
+    ) {
+      throw new Error(
+        "No tienes permisos para gestionar links de este grupo."
+      );
     }
-
-    if (clave === "inscripcion_inicial" || clave === "nomina_final") {
-      Object.assign(patch, {
-        inscripcionHabilitada: true,
-        tokenInscripcion: token,
-        linkInscripcion: link,
-        inscripcionEstado: clave,
-        "inscripcion.faseActual": clave,
-        "inscripcion.tokenActual": token,
-        "inscripcion.linkActual": link,
-        "inscripcion.abiertaAt": serverTimestamp(),
-        "inscripcion.abiertaPor": nombreUsuario,
-        "inscripcion.abiertaPorCorreo": email
-      });
+  
+    const clave =
+      normalizar(
+        fase
+      ).replace(
+        /\s+/g,
+        "_"
+      );
+  
+    const token =
+      generarToken();
+  
+    const link =
+      `${PUBLIC_FORM_URL}?token=${encodeURIComponent(
+        token
+      )}`;
+  
+    const auditoria = {
+      actualizadoPor:
+        nombreUsuario,
+  
+      actualizadoPorCorreo:
+        email,
+  
+      actualizadoAt:
+        serverTimestamp()
+    };
+  
+    const patch =
+      {};
+  
+    if (
+      tienePolera !==
+      null
+    ) {
+      patch[
+        "elementosIncluidos.polera"
+      ] =
+        tienePolera ===
+        true;
+  
+      patch[
+        "elementosIncluidos.actualizadoPor"
+      ] =
+        nombreUsuario;
+  
+      patch[
+        "elementosIncluidos.actualizadoPorCorreo"
+      ] =
+        email;
+  
+      patch[
+        "elementosIncluidos.actualizadoAt"
+      ] =
+        serverTimestamp();
+    }
+  
+    if (
+      clave ===
+        "inscripcion_inicial" ||
+      clave ===
+        "nomina_final"
+    ) {
+      Object.assign(
+        patch,
+        {
+          inscripcionHabilitada:
+            true,
+  
+          tokenInscripcion:
+            token,
+  
+          linkInscripcion:
+            link,
+  
+          inscripcionEstado:
+            clave,
+  
+          "inscripcion.faseActual":
+            clave,
+  
+          "inscripcion.tokenActual":
+            token,
+  
+          "inscripcion.linkActual":
+            link,
+  
+          "inscripcion.abiertaAt":
+            serverTimestamp(),
+  
+          "inscripcion.abiertaPor":
+            nombreUsuario,
+  
+          "inscripcion.abiertaPorCorreo":
+            email
+        }
+      );
     } else {
-      const campo = campoFase(clave);
-      Object.assign(patch, {
-        [`${campo}.activo`]: true,
-        [`${campo}.tokenActual`]: token,
-        [`${campo}.linkActual`]: link,
-        [`${campo}.abiertoAt`]: serverTimestamp(),
-        [`${campo}.abiertoPor`]: nombreUsuario,
-        [`${campo}.abiertoPorCorreo`]: email
-      });
-      if (clave === "liberados") {
-        patch.linkLiberadosActivo = true;
-        patch.tokenInscripcionLiberados = token;
+      const campo =
+        campoFase(
+          clave
+        );
+  
+      Object.assign(
+        patch,
+        {
+          [`${campo}.activo`]:
+            true,
+  
+          [`${campo}.tokenActual`]:
+            token,
+  
+          [`${campo}.linkActual`]:
+            link,
+  
+          [`${campo}.abiertoAt`]:
+            serverTimestamp(),
+  
+          [`${campo}.abiertoPor`]:
+            nombreUsuario,
+  
+          [`${campo}.abiertoPorCorreo`]:
+            email
+        }
+      );
+  
+      if (
+        clave ===
+        "liberados"
+      ) {
+        patch.linkLiberadosActivo =
+          true;
+  
+        patch.tokenInscripcionLiberados =
+          token;
       }
     }
+  
+    Object.assign(
+      patch,
+      auditoria
+    );
+  
+    await updateDoc(
+      doc(
+        db,
+        "ventas_cotizaciones",
+        grupoCtx.docId
+      ),
+      patch
+    );
+  
+    await registrarEventoNomina(
+      grupoCtx,
+      {
+        tipoMovimiento:
+          "fase_abierta",
+  
+        titulo:
+          "Link de inscripción abierto",
+  
+        mensaje:
+          `${nombreUsuario} abrió ${getLabelFaseHistorial(
+            clave
+          )}.`,
+  
+        metadata: {
+          fase:
+            clave
+        },
+  
+        registrarIndividual:
+          false
+      }
+    );
+  
+    await notificarCambio(
+      grupoCtx,
+      "fase_abierta",
+      {
+        fase:
+          clave,
+        link
+      }
+    );
+  
+    return {
+      token,
+      link
+    };
+  }
 
     Object.assign(patch, auditoria);
     await updateDoc(doc(db, "ventas_cotizaciones", grupoCtx.docId), patch);
@@ -247,38 +446,143 @@ export function crearInscripcionesManager({ db, usuario = {}, onChange = null } 
     return { token, link };
   }
 
-  async function cerrarFase(grupoCtx, fase) {
-    if (!puedeGestionarLinks(grupoCtx.data)) throw new Error("No tienes permisos para gestionar links de este grupo.");
-    const clave = normalizar(fase).replace(/\s+/g, "_");
-    const patch = {
-      actualizadoPor: nombreUsuario,
-      actualizadoPorCorreo: email,
-      actualizadoAt: serverTimestamp()
-    };
-
-    if (clave === "inscripcion_inicial" || clave === "nomina_final") {
-      Object.assign(patch, {
-        inscripcionHabilitada: false,
-        inscripcionEstado: "cerrada",
-        "inscripcion.faseActual": "cerrada",
-        "inscripcion.cerradaAt": serverTimestamp(),
-        "inscripcion.cerradaPor": nombreUsuario,
-        "inscripcion.cerradaPorCorreo": email,
-        [`inscripcion.fasesCerradas.${clave}`]: true
-      });
-    } else {
-      const campo = campoFase(clave);
-      Object.assign(patch, {
-        [`${campo}.activo`]: false,
-        [`${campo}.cerradoAt`]: serverTimestamp(),
-        [`${campo}.cerradoPor`]: nombreUsuario,
-        [`${campo}.cerradoPorCorreo`]: email
-      });
-      if (clave === "liberados") patch.linkLiberadosActivo = false;
+  async function cerrarFase(
+    grupoCtx,
+    fase
+  ) {
+    if (
+      !puedeGestionarLinks(
+        grupoCtx.data
+      )
+    ) {
+      throw new Error(
+        "No tienes permisos para gestionar links de este grupo."
+      );
     }
-
-    await updateDoc(doc(db, "ventas_cotizaciones", grupoCtx.docId), patch);
-    await notificarCambio(grupoCtx, "fase_cerrada", { fase: clave });
+  
+    const clave =
+      normalizar(
+        fase
+      ).replace(
+        /\s+/g,
+        "_"
+      );
+  
+    const patch = {
+      actualizadoPor:
+        nombreUsuario,
+  
+      actualizadoPorCorreo:
+        email,
+  
+      actualizadoAt:
+        serverTimestamp()
+    };
+  
+    if (
+      clave ===
+        "inscripcion_inicial" ||
+      clave ===
+        "nomina_final"
+    ) {
+      Object.assign(
+        patch,
+        {
+          inscripcionHabilitada:
+            false,
+  
+          inscripcionEstado:
+            "cerrada",
+  
+          "inscripcion.faseActual":
+            "cerrada",
+  
+          "inscripcion.cerradaAt":
+            serverTimestamp(),
+  
+          "inscripcion.cerradaPor":
+            nombreUsuario,
+  
+          "inscripcion.cerradaPorCorreo":
+            email,
+  
+          [`inscripcion.fasesCerradas.${clave}`]:
+            true
+        }
+      );
+    } else {
+      const campo =
+        campoFase(
+          clave
+        );
+  
+      Object.assign(
+        patch,
+        {
+          [`${campo}.activo`]:
+            false,
+  
+          [`${campo}.cerradoAt`]:
+            serverTimestamp(),
+  
+          [`${campo}.cerradoPor`]:
+            nombreUsuario,
+  
+          [`${campo}.cerradoPorCorreo`]:
+            email
+        }
+      );
+  
+      if (
+        clave ===
+        "liberados"
+      ) {
+        patch.linkLiberadosActivo =
+          false;
+      }
+    }
+  
+    await updateDoc(
+      doc(
+        db,
+        "ventas_cotizaciones",
+        grupoCtx.docId
+      ),
+      patch
+    );
+  
+    await registrarEventoNomina(
+      grupoCtx,
+      {
+        tipoMovimiento:
+          "fase_cerrada",
+  
+        titulo:
+          "Link de inscripción cerrado",
+  
+        mensaje:
+          `${nombreUsuario} cerró ${getLabelFaseHistorial(
+            clave
+          )}.`,
+  
+        metadata: {
+          fase:
+            clave
+        },
+  
+        registrarIndividual:
+          false
+      }
+    );
+  
+    await notificarCambio(
+      grupoCtx,
+      "fase_cerrada",
+      {
+        fase:
+          clave
+      }
+    );
   }
 
   async function marcarCargadoPagos(grupoCtx, valor = true) {
@@ -418,6 +722,307 @@ export function crearInscripcionesManager({ db, usuario = {}, onChange = null } 
       "Pasajero";
   }
 
+  function getFechaHistorialMs(
+    value
+  ) {
+    if (!value) {
+      return 0;
+    }
+  
+    if (
+      typeof value?.toDate ===
+      "function"
+    ) {
+      return value
+        .toDate()
+        .getTime();
+    }
+  
+    if (
+      typeof value ===
+        "object" &&
+      typeof value.seconds ===
+        "number"
+    ) {
+      return value.seconds *
+        1000;
+    }
+  
+    const date =
+      new Date(
+        value
+      );
+  
+    return Number.isNaN(
+      date.getTime()
+    )
+      ? 0
+      : date.getTime();
+  }
+  
+  
+  function getAliasGrupoManager(
+    grupoCtx = {}
+  ) {
+    return texto(
+      grupoCtx?.data?.aliasGrupo ||
+      grupoCtx?.data?.nombreGrupo ||
+      grupoCtx?.data?.colegio ||
+      grupoCtx?.groupId ||
+      grupoCtx?.docId ||
+      ""
+    );
+  }
+  
+  
+  async function registrarEventoNomina(
+    grupoCtx,
+    {
+      inscripcion = null,
+  
+      tipoMovimiento =
+        "movimiento_nomina",
+  
+      titulo =
+        "Movimiento de nómina",
+  
+      mensaje =
+        "",
+  
+      motivo =
+        "",
+  
+      cambios =
+        [],
+  
+      origen =
+        "gestion_nomina",
+  
+      metadata =
+        {},
+  
+      registrarIndividual =
+        true
+    } = {}
+  ) {
+    if (
+      !grupoCtx?.docId
+    ) {
+      throw new Error(
+        "No se pudo determinar el grupo para registrar el historial."
+      );
+    }
+  
+    const inscripcionId =
+      String(
+        inscripcion?.id ||
+        ""
+      ).trim();
+  
+    const nombreCompleto =
+      inscripcion
+        ? getNombrePasajeroManager(
+            inscripcion
+          )
+        : "";
+  
+    const documentoPasajero =
+      inscripcion
+        ? documento(
+            inscripcion
+          )
+        : "";
+  
+    const cambiosSeguros =
+      Array.isArray(
+        cambios
+      )
+        ? cambios
+        : [];
+  
+    const metadataBase = {
+      inscripcionId,
+      documento:
+        documentoPasajero,
+      nombreCompleto,
+      motivo:
+        texto(
+          motivo
+        ),
+      origen:
+        texto(
+          origen
+        ),
+      cambios:
+        cambiosSeguros,
+      ...(
+        metadata ||
+        {}
+      )
+    };
+  
+    const eventoBase = {
+      idGrupo:
+        String(
+          grupoCtx.groupId ||
+          grupoCtx.docId ||
+          ""
+        ),
+  
+      groupDocId:
+        String(
+          grupoCtx.docId ||
+          ""
+        ),
+  
+      aliasGrupo:
+        getAliasGrupoManager(
+          grupoCtx
+        ),
+  
+      tipoMovimiento:
+        texto(
+          tipoMovimiento
+        ),
+  
+      modulo:
+        "nomina",
+  
+      titulo:
+        texto(
+          titulo
+        ),
+  
+      mensaje:
+        texto(
+          mensaje
+        ),
+  
+      motivo:
+        texto(
+          motivo
+        ),
+  
+      cambios:
+        cambiosSeguros,
+  
+      metadata:
+        metadataBase,
+  
+      fecha:
+        serverTimestamp(),
+  
+      creadoPor:
+        nombreUsuario,
+  
+      creadoPorCorreo:
+        email
+    };
+  
+    /*
+      1. HISTORIAL DE NÓMINA DEL GRUPO
+    */
+    await setDoc(
+      doc(
+        collection(
+          db,
+          "ventas_cotizaciones",
+          String(
+            grupoCtx.docId
+          ),
+          "historial_nomina"
+        )
+      ),
+      eventoBase
+    );
+  
+    /*
+      2. HISTORIAL INDIVIDUAL DEL PASAJERO
+  
+      Solo se crea cuando el movimiento pertenece
+      concretamente a una inscripción.
+    */
+    if (
+      registrarIndividual ===
+        true &&
+      inscripcionId
+    ) {
+      await setDoc(
+        doc(
+          collection(
+            db,
+            "ventas_cotizaciones",
+            String(
+              grupoCtx.docId
+            ),
+            "inscripciones",
+            inscripcionId,
+            "historial_nomina"
+          )
+        ),
+        {
+          tipoMovimiento:
+            texto(
+              tipoMovimiento
+            ),
+  
+          titulo:
+            texto(
+              titulo
+            ),
+  
+          mensaje:
+            texto(
+              mensaje
+            ),
+  
+          motivo:
+            texto(
+              motivo
+            ),
+  
+          cambios:
+            cambiosSeguros,
+  
+          metadata:
+            metadataBase,
+  
+          origen:
+            texto(
+              origen
+            ),
+  
+          fecha:
+            serverTimestamp(),
+  
+          usuarioNombre:
+            nombreUsuario,
+  
+          usuarioCorreo:
+            email
+        }
+      );
+    }
+  
+    /*
+      3. HISTORIAL GENERAL DEL GRUPO
+  
+      grupo.js ya trabaja con ventas_historial.
+    */
+    await setDoc(
+      doc(
+        collection(
+          db,
+          "ventas_historial"
+        )
+      ),
+      eventoBase
+    );
+  
+    return true;
+  }
+  
+  
   async function registrarHistorialNominaPasajero(
     grupoCtx,
     inscripcion,
@@ -432,119 +1037,28 @@ export function crearInscripcionesManager({ db, usuario = {}, onChange = null } 
         "gestion_nomina"
     } = {}
   ) {
-    const inscripcionRef =
-      doc(
-        db,
-        "ventas_cotizaciones",
-        String(grupoCtx.docId),
-        "inscripciones",
-        String(inscripcion.id)
+    const nombre =
+      getNombrePasajeroManager(
+        inscripcion
       );
-
-    /*
-      HISTORIAL INDIVIDUAL DEL PASAJERO
-    */
-    await setDoc(
-      doc(
-        collection(
-          inscripcionRef,
-          "historial_nomina"
-        )
-      ),
+  
+    return registrarEventoNomina(
+      grupoCtx,
       {
-        fecha:
-          serverTimestamp(),
-
-        usuarioNombre:
-          nombreUsuario,
-
-        usuarioCorreo:
-          email,
-
-        motivo:
-          texto(motivo),
-
-        cambios:
-          Array.isArray(cambios)
-            ? cambios
-            : [],
-
-        origen:
-          texto(origen),
-
-        tipoMovimiento
-      }
-    );
-
-    /*
-      HISTORIAL GENERAL DEL GRUPO.
-
-      grupo.js ya consulta ventas_historial,
-      por lo tanto aparecerá automáticamente allí.
-    */
-    await setDoc(
-      doc(
-        collection(
-          db,
-          "ventas_historial"
-        )
-      ),
-      {
-        idGrupo:
-          grupoCtx.groupId,
-
-        groupDocId:
-          grupoCtx.docId,
-
+        inscripcion,
+  
         tipoMovimiento,
-
-        modulo:
-          "inscripcion",
-
+  
         titulo,
-
+  
         mensaje:
-          `${nombreUsuario} modificó la nómina de ${getNombrePasajeroManager(
-            inscripcion
-          )}. Motivo: ${texto(motivo)}`,
-
-        cambios:
-          Array.isArray(cambios)
-            ? cambios
-            : [],
-
-        metadata: {
-          inscripcionId:
-            String(
-              inscripcion.id ||
-              ""
-            ),
-
-          documento:
-            documento(
-              inscripcion
-            ),
-
-          nombreCompleto:
-            getNombrePasajeroManager(
-              inscripcion
-            ),
-
-          motivo:
-            texto(motivo),
-
-          origen:
-            texto(origen)
-        },
-
-        fecha:
-          serverTimestamp(),
-
-        creadoPor:
-          nombreUsuario,
-
-        creadoPorCorreo:
-          email
+          `${nombreUsuario} modificó la nómina de ${nombre}.`,
+  
+        motivo,
+  
+        cambios,
+  
+        origen
       }
     );
   }
@@ -1390,61 +1904,34 @@ export function crearInscripcionesManager({ db, usuario = {}, onChange = null } 
       tipoMovimiento,
       titulo,
       mensaje,
-      inscripcion
+      inscripcion,
+      motivo = "",
+      cambios = [],
+      metadata = {}
     }
   ) {
-    try {
-      await setDoc(
-        doc(
-          collection(
-            db,
-            "ventas_historial"
-          )
-        ),
-        {
-          idGrupo: grupoCtx.groupId,
-          groupDocId: grupoCtx.docId,
-
-          tipoMovimiento,
-          modulo: "inscripcion",
-          titulo,
-          mensaje,
-
-          metadata: {
-            inscripcionId:
-              String(
-                inscripcion?.id ||
-                ""
-              ),
-
-            documento:
-              documento(
-                inscripcion
-              ),
-
-            nombreCompleto:
-              [
-                nombres(inscripcion),
-                apellidos(inscripcion)
-              ]
-                .filter(Boolean)
-                .join(" ")
-                .trim()
-          },
-
-          fecha: serverTimestamp(),
-          creadoPor: nombreUsuario,
-          creadoPorCorreo: email
-        }
-      );
-    } catch (error) {
-      console.warn(
-        "[inscripciones-manager] registrarHistorialOperacion",
-        error
-      );
-    }
+    return registrarEventoNomina(
+      grupoCtx,
+      {
+        inscripcion,
+  
+        tipoMovimiento,
+  
+        titulo,
+  
+        mensaje,
+  
+        motivo,
+  
+        cambios,
+  
+        origen:
+          "gestion_nomina",
+  
+        metadata
+      }
+    );
   }
-
   async function esperarActualizacionResumen(
     grupoCtx,
     inscripcionId,
@@ -2092,38 +2579,148 @@ export function crearInscripcionesManager({ db, usuario = {}, onChange = null } 
     await notificarCambio(grupoCtx, "nomina_archivada", { valor: valor === true });
   }
 
+  async function cargarHistorialNomina(
+    grupoCtx
+  ) {
+    if (
+      !grupoCtx?.docId
+    ) {
+      return [];
+    }
+  
+    const snap =
+      await getDocs(
+        collection(
+          db,
+          "ventas_cotizaciones",
+          String(
+            grupoCtx.docId
+          ),
+          "historial_nomina"
+        )
+      );
+  
+    return snap.docs
+      .map(
+        (documentoSnap) => ({
+          id:
+            documentoSnap.id,
+  
+          ...(
+            documentoSnap.data() ||
+            {}
+          )
+        })
+      )
+      .sort(
+        (a, b) =>
+          getFechaHistorialMs(
+            b.fecha
+          ) -
+          getFechaHistorialMs(
+            a.fecha
+          )
+      );
+  }
+  
+  
+  async function agregarNotaHistorialNomina(
+    grupoCtx,
+    textoNota
+  ) {
+    if (
+      !puedeAdministrarNomina()
+    ) {
+      throw new Error(
+        "No tienes permisos para agregar notas a la nómina."
+      );
+    }
+  
+    const nota =
+      texto(
+        textoNota
+      );
+  
+    if (!nota) {
+      throw new Error(
+        "Debes escribir una nota."
+      );
+    }
+  
+    await registrarEventoNomina(
+      grupoCtx,
+      {
+        tipoMovimiento:
+          "nota_nomina",
+  
+        titulo:
+          "Nota administrativa",
+  
+        mensaje:
+          nota,
+  
+        motivo:
+          nota,
+  
+        origen:
+          "gestion_nomina",
+  
+        registrarIndividual:
+          false
+      }
+    );
+  
+    return {
+      ok:
+        true
+    };
+  }
+
   async function recargarGrupo(grupoCtx) {
     const snap = await getDoc(doc(db, "ventas_cotizaciones", grupoCtx.docId));
     if (!snap.exists()) return null;
     return mapGrupo(snap);
   }
 
-  async function notificarCambio(grupoCtx, tipo, metadata) {
-    try {
-      await setDoc(doc(collection(db, "ventas_historial")), {
-        idGrupo: grupoCtx.groupId,
-        groupDocId: grupoCtx.docId,
-        tipoMovimiento: tipo,
-        modulo: "gestion_nomina",
-        titulo: tipo.replaceAll("_", " "),
-        mensaje: `${nombreUsuario} realizó una acción en gestión de nómina.`,
-        metadata: metadata || {},
-        fecha: serverTimestamp(),
-        creadoPor: nombreUsuario,
-        creadoPorCorreo: email
+  async function notificarCambio(
+    grupoCtx,
+    tipo,
+    metadata
+  ) {
+    /*
+      IMPORTANTE:
+  
+      Esta función YA NO escribe historial.
+  
+      El historial se registra mediante
+      registrarEventoNomina().
+  
+      De esta forma evitamos crear dos registros
+      por una misma acción.
+    */
+  
+    if (
+      typeof onChange ===
+      "function"
+    ) {
+      await onChange({
+        grupoCtx,
+        tipo,
+        metadata
       });
-    } catch (error) {
-      console.warn("[inscripciones-manager] historial", error);
     }
-    if (typeof onChange === "function") await onChange({ grupoCtx, tipo, metadata });
   }
 
   return {
     resolverGrupo,
     recargarGrupo,
     detectarOrigenNomina,
+
     cargarNomina,
     cargarInscripcionCompleta,
+    
+    cargarHistorialNomina,
+    agregarNotaHistorialNomina,
 
     obtenerEstadoFases,
     abrirFase,
