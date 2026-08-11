@@ -309,39 +309,76 @@ export function crearInscripcionesManager({ db, usuario = {}, onChange = null } 
   const CAMPOS_EDITABLES_NOMINA = new Set([
     "identificacion.documento",
     "identificacion.rutCompleto",
-
+  
     "identificacion.nombres",
     "identificacion.primerApellido",
     "identificacion.segundoApellido",
     "identificacion.fechaNacimiento",
     "identificacion.nacionalidad",
     "identificacion.genero",
-
+  
     "tipoViajante",
     "tipoParticipacion",
-
+  
+    /*
+      RESPONSABLE PRINCIPAL
+    */
     "contactoPrincipal.nombre",
+    "contactoPrincipal.relacion",
+    "contactoPrincipal.relacionBase",
     "contactoPrincipal.correo",
-    "contactoPrincipal.celular"
+    "contactoPrincipal.celular",
+    "contactoPrincipal.telefono",
+  
+    /*
+      RESPONSABLE SECUNDARIO
+    */
+    "contactoSecundario.aplica",
+    "contactoSecundario.nombre",
+    "contactoSecundario.relacion",
+    "contactoSecundario.relacionBase",
+    "contactoSecundario.correo",
+    "contactoSecundario.celular",
+    "contactoSecundario.telefono"
   ]);
 
   const CAMPOS_CRITICOS_SISTEMA_PAGOS = new Set([
+    /*
+      IDENTIDAD DEL PASAJERO
+    */
     "identificacion.documento",
     "identificacion.rutCompleto",
-
+  
     "identificacion.nombres",
     "identificacion.primerApellido",
     "identificacion.segundoApellido",
     "identificacion.fechaNacimiento",
     "identificacion.nacionalidad",
     "identificacion.genero",
-
+  
     "tipoViajante",
     "tipoParticipacion",
-
+  
+    /*
+      RESPONSABLE PRINCIPAL
+    */
     "contactoPrincipal.nombre",
+    "contactoPrincipal.relacion",
+    "contactoPrincipal.relacionBase",
     "contactoPrincipal.correo",
-    "contactoPrincipal.celular"
+    "contactoPrincipal.celular",
+    "contactoPrincipal.telefono",
+  
+    /*
+      RESPONSABLE SECUNDARIO
+    */
+    "contactoSecundario.aplica",
+    "contactoSecundario.nombre",
+    "contactoSecundario.relacion",
+    "contactoSecundario.relacionBase",
+    "contactoSecundario.correo",
+    "contactoSecundario.celular",
+    "contactoSecundario.telefono"
   ]);
 
   function getByPathManager(
@@ -932,9 +969,69 @@ export function crearInscripcionesManager({ db, usuario = {}, onChange = null } 
       patch
     );
 
+    const itemActualizado = {
+      ...item
+    };
+    
+    for (
+      const [
+        path,
+        value
+      ]
+      of Object.entries(
+        patch
+      )
+    ) {
+      /*
+        Solo reconstruimos localmente rutas simples
+        para que historial y alerta utilicen los
+        valores nuevos.
+    
+        Esto NO escribe nuevamente en Firestore.
+      */
+      if (
+        path.includes(".") &&
+        typeof value !==
+          "object"
+      ) {
+        const partes =
+          path.split(".");
+    
+        let destino =
+          itemActualizado;
+    
+        for (
+          let i = 0;
+          i <
+          partes.length - 1;
+          i += 1
+        ) {
+          const key =
+            partes[i];
+    
+          destino[key] = {
+            ...(
+              destino[key] ||
+              {}
+            )
+          };
+    
+          destino =
+            destino[key];
+        }
+    
+        destino[
+          partes[
+            partes.length - 1
+          ]
+        ] =
+          value;
+      }
+    }
+
     await registrarHistorialNominaPasajero(
       grupoCtx,
-      item,
+      itemActualizado,
       {
         motivo:
           motivoLimpio,
@@ -954,7 +1051,7 @@ export function crearInscripcionesManager({ db, usuario = {}, onChange = null } 
 
     await guardarAlertaCambioDatosCriticos(
       grupoCtx,
-      item,
+      itemActualizado,
       cambios,
       {
         origen:
