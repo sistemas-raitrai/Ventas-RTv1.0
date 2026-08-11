@@ -1062,6 +1062,149 @@
       white-space: nowrap;
       font-size: 12px;
     }
+    .nomina-tabs {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-bottom: 14px;
+      border-bottom: 1px solid #e3dce8;
+    }
+    
+    .nomina-tab {
+      border: 0;
+      border-bottom: 3px solid transparent;
+      padding: 10px 14px;
+      background: transparent;
+      color: #6b6178;
+      font-weight: 900;
+      cursor: pointer;
+    }
+    
+    .nomina-tab.active {
+      border-bottom-color: #4a2570;
+      color: #2b1940;
+    }
+    
+    .nomina-tab-panel {
+      min-width: 0;
+    }
+    
+    .historial-toolbar {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: center;
+      flex-wrap: wrap;
+      margin-bottom: 12px;
+    }
+    
+    .historial-toolbar select {
+      min-width: 230px;
+      min-height: 40px;
+      border: 1px solid #d7cde0;
+      border-radius: 9px;
+      padding: 0 10px;
+      background: #fff;
+    }
+    
+    .historial-nota-box {
+      margin-bottom: 14px;
+      padding: 14px;
+      border: 1px solid #ddd4e5;
+      border-radius: 14px;
+      background: #faf8fc;
+    }
+    
+    .historial-nota-box label {
+      display: block;
+      margin-bottom: 7px;
+      color: #2b1940;
+      font-weight: 900;
+    }
+    
+    .historial-nota-box textarea {
+      width: 100%;
+      box-sizing: border-box;
+      min-height: 78px;
+      border: 1px solid #d2c8db;
+      border-radius: 10px;
+      padding: 10px;
+      resize: vertical;
+      font: inherit;
+    }
+    
+    .historial-nota-box > div {
+      margin-top: 9px;
+    }
+    
+    .historial-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    
+    .historial-item {
+      border: 1px solid #e0d9e6;
+      border-radius: 14px;
+      background: #fff;
+      padding: 14px;
+    }
+    
+    .historial-item-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: flex-start;
+    }
+    
+    .historial-item-title {
+      color: #2b1940;
+      font-size: 14px;
+      font-weight: 900;
+    }
+    
+    .historial-item-date {
+      color: #81758a;
+      font-size: 11px;
+      white-space: nowrap;
+    }
+    
+    .historial-item-message {
+      margin-top: 6px;
+      color: #4f4558;
+      line-height: 1.45;
+    }
+    
+    .historial-item-meta {
+      margin-top: 7px;
+      color: #7b7086;
+      font-size: 11px;
+    }
+    
+    .historial-cambios {
+      display: grid;
+      gap: 7px;
+      margin-top: 10px;
+    }
+    
+    .historial-cambio {
+      padding: 8px 10px;
+      border-radius: 9px;
+      background: #f5f1f8;
+      font-size: 12px;
+    }
+    
+    .historial-cambio strong {
+      color: #2b1940;
+    }
+    
+    .historial-motivo {
+      margin-top: 10px;
+      padding: 9px 10px;
+      border-left: 4px solid #eab308;
+      background: #fff8dc;
+      font-size: 12px;
+    }
 
     .passenger-action-btn:disabled {
       opacity: .48;
@@ -1891,51 +2034,156 @@
         </section>
 
         <section class="modal-section">
-          <h3>Pasajeros</h3>
-
-          <div class="nomina-filter-bar">
-            <span id="nominaFiltroActual">
-              Mostrando toda la nómina
-            </span>
-
+          <div class="nomina-tabs">
             <button
-              id="btnMostrarTodaNomina"
-              class="btn-secondary hidden"
+              class="nomina-tab active"
               type="button"
+              data-nomina-tab="pasajeros"
             >
-              Mostrar todos
+              Pasajeros
+            </button>
+        
+            <button
+              class="nomina-tab"
+              type="button"
+              data-nomina-tab="historial"
+            >
+              Historial de nómina
             </button>
           </div>
-
-          <div class="passenger-table-wrap">
-            <table class="passenger-table">
-              <thead>
-                <tr>
-                  <th>RUT</th>
-                  <th>Nombre</th>
-                  <th>Apellido</th>
-                  <th>Tipo</th>
-                  <th>Estado</th>
-                  <th>Ficha médica</th>
-                  <th>Anulado</th>
-                  <th>Responsables</th>
-                  <th>Fecha ingreso</th>
-                  <th>Carnet</th>
-                  <th>Gestión</th>
-                </tr>
-              </thead>
-
-              <tbody id="pasajerosTbody">
-                <tr>
-                  <td
-                    colspan="11"
-                    class="gn-empty"
-                  >
-                    No hay pasajeros cargados.
-                  </td>
-                </tr>
-              </tbody>
-            </table>
+        
+          <!-- =========================================
+               VISTA PASAJEROS
+          ========================================== -->
+          <div
+            id="panelNominaPasajeros"
+            class="nomina-tab-panel"
+          >
+            <div class="nomina-filter-bar">
+              <span id="nominaFiltroActual">
+                Mostrando toda la nómina
+              </span>
+        
+              <button
+                id="btnMostrarTodaNomina"
+                class="btn-secondary hidden"
+                type="button"
+              >
+                Mostrar todos
+              </button>
+            </div>
+        
+            <div class="passenger-table-wrap">
+              <table class="passenger-table">
+                <thead>
+                  <tr>
+                    <th>RUT</th>
+                    <th>Nombre</th>
+                    <th>Apellido</th>
+                    <th>Tipo</th>
+                    <th>Estado</th>
+                    <th>Ficha médica</th>
+                    <th>Anulado</th>
+                    <th>Responsables</th>
+                    <th>Fecha ingreso</th>
+                    <th>Carnet</th>
+                    <th>Gestión</th>
+                  </tr>
+                </thead>
+        
+                <tbody id="pasajerosTbody">
+                  <tr>
+                    <td
+                      colspan="11"
+                      class="gn-empty"
+                    >
+                      No hay pasajeros cargados.
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        
+          <!-- =========================================
+               VISTA HISTORIAL NÓMINA
+          ========================================== -->
+          <div
+            id="panelNominaHistorial"
+            class="nomina-tab-panel hidden"
+          >
+            <div class="historial-toolbar">
+              <select
+                id="historialNominaFiltro"
+                aria-label="Filtrar historial"
+              >
+                <option value="todos">
+                  Todos los movimientos
+                </option>
+        
+                <option value="edicion">
+                  Ediciones
+                </option>
+        
+                <option value="ingresos">
+                  Nuevos ingresos
+                </option>
+        
+                <option value="lista_espera">
+                  Lista de espera
+                </option>
+        
+                <option value="fases">
+                  Links / fases
+                </option>
+        
+                <option value="archivos">
+                  Archivados
+                </option>
+        
+                <option value="notas">
+                  Notas
+                </option>
+              </select>
+        
+              <span
+                id="historialNominaResumen"
+                class="gn-sub"
+              >
+                0 movimientos
+              </span>
+            </div>
+        
+            <div class="historial-nota-box">
+              <label for="historialNominaNota">
+                Agregar nota al historial
+              </label>
+        
+              <textarea
+                id="historialNominaNota"
+                rows="3"
+                placeholder="Ej.: Apoderada informa que enviará documentación corregida mañana."
+              ></textarea>
+        
+              <div>
+                <button
+                  id="btnAgregarNotaNomina"
+                  class="btn-primary"
+                  type="button"
+                >
+                  Agregar nota
+                </button>
+              </div>
+            </div>
+        
+            <div
+              id="historialNominaLista"
+              class="historial-list"
+            >
+              <div class="gn-empty">
+                No hay movimientos registrados.
+              </div>
+            </div>
           </div>
         </section>
       </div>
