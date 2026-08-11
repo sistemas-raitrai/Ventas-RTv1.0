@@ -251,7 +251,9 @@ th { color: var(--navy); background: var(--soft); position: sticky; top: 0; }
 ========================================================= */
 
 .medical-kpi-section + .medical-kpi-section {
-  margin-top: 22px;
+  margin-top: 24px;
+  padding-top: 22px;
+  border-top: 1px solid var(--line);
 }
 
 .medical-kpi-head {
@@ -260,127 +262,330 @@ th { color: var(--navy); background: var(--soft); position: sticky; top: 0; }
 
 .medical-kpi-head h2 {
   margin: 0;
-  font-size: 18px;
+  color: var(--navy);
+  font-size: 17px;
+  font-weight: 900;
 }
 
 .medical-kpi-head p {
   margin: 4px 0 0;
-  color: #64748b;
-  font-size: 13px;
+  color: var(--muted);
+  font-size: 12px;
 }
+
+/* =========================================================
+   KPI GENERALES
+========================================================= */
 
 .kpi-button {
-  border: 0;
-  cursor: pointer;
-  font: inherit;
+  /*
+    IMPORTANTE:
+    anulamos el display:inline-flex
+    del estilo global de button.
+  */
+  display: block;
+  width: 100%;
+  min-height: 86px;
+
+  padding: 15px 16px;
+
+  background: var(--soft);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+
   text-align: left;
+
+  cursor: pointer;
+
+  transition:
+    transform .15s ease,
+    border-color .15s ease,
+    box-shadow .15s ease;
 }
 
-.kpi-button:hover,
-.medical-kpi-card:hover {
+.kpi-button:hover {
   transform: translateY(-1px);
+  border-color: #bfc7d8;
+  box-shadow:
+    0 6px 16px
+    rgba(23, 32, 82, .07);
 }
+
+.kpi-button .kpi-label {
+  display: block;
+
+  color: var(--muted);
+
+  font-size: 11px;
+  font-weight: 900;
+
+  text-transform: uppercase;
+  letter-spacing: .02em;
+}
+
+.kpi-button .kpi-value {
+  display: block;
+
+  margin-top: 7px;
+
+  color: var(--navy);
+
+  font-size: 28px;
+  line-height: 1;
+  font-weight: 900;
+}
+
+/* =========================================================
+   KPI MÉDICOS
+========================================================= */
 
 .medical-kpis-detail {
   display: grid;
+
   grid-template-columns:
     repeat(
-      auto-fit,
-      minmax(180px, 1fr)
+      4,
+      minmax(0, 1fr)
     );
+
   gap: 12px;
 }
 
 .medical-kpi-card {
+  /*
+    IMPORTANTE:
+    anulamos inline-flex heredado de button.
+  */
+  display: block;
+
+  width: 100%;
+  min-width: 0;
+  min-height: 128px;
+
+  padding: 15px 16px;
+
   appearance: none;
-  border: 1px solid #d6dce8;
-  border-radius: 12px;
-  padding: 15px;
-  background: #fff;
+
+  background: white;
+
+  border: 1px solid var(--line);
+  border-radius: 14px;
+
   text-align: left;
+
   cursor: pointer;
+
   transition:
     transform .15s ease,
+    border-color .15s ease,
     box-shadow .15s ease;
 }
 
 .medical-kpi-card:hover {
+  transform: translateY(-2px);
+
+  border-color: #bcc5d8;
+
   box-shadow:
     0 8px 20px
-    rgba(15, 23, 42, .08);
+    rgba(23, 32, 82, .08);
 }
 
 .medical-kpi-card span {
   display: block;
-  color: #475569;
+
+  color: var(--navy);
+
   font-size: 12px;
-  font-weight: 800;
+  line-height: 1.25;
+  font-weight: 900;
+
   text-transform: uppercase;
 }
 
 .medical-kpi-card strong {
   display: block;
-  margin-top: 7px;
-  color: #111827;
-  font-size: 28px;
+
+  margin-top: 8px;
+
+  color: var(--navy);
+
+  font-size: 30px;
+  line-height: 1;
+  font-weight: 900;
 }
 
 .medical-kpi-card small {
   display: block;
-  margin-top: 5px;
-  color: #64748b;
-  line-height: 1.3;
+
+  margin-top: 8px;
+
+  color: var(--muted);
+
+  font-size: 11px;
+  line-height: 1.35;
+  font-weight: 500;
+
+  text-transform: none;
 }
 
+/* Tarjetas especialmente relevantes */
+
+.medical-kpi-card[data-medical-detail="medicamentos"],
+.medical-kpi-card[data-medical-detail="alergias"],
+.medical-kpi-card[data-medical-detail="antecedentes"] {
+  background: #fffafa;
+}
+
+.medical-kpi-card[data-medical-detail="dietas"] {
+  background: #fffdf5;
+}
+
+.medical-kpi-card[data-medical-detail="neurodivergencia"],
+.medical-kpi-card[data-medical-detail="apoyos"] {
+  background: #f8f9ff;
+}
+
+.medical-kpi-card[data-medical-detail="grupo_sanguineo"] {
+  background: #f9fafb;
+}
+
+/* =========================================================
+   CHIPS DE ALERTAS
+========================================================= */
+
 .alert-chip-button {
+  display: inline-flex;
+
+  width: auto;
+
+  padding: 5px 8px;
+
   border: 0;
-  cursor: pointer;
+  border-radius: 999px;
+
+  background: #fee2e2;
+  color: #991b1b;
+
   font: inherit;
+  font-size: 12px;
+  font-weight: 800;
+
+  cursor: pointer;
+
+  margin: 2px;
 }
 
 .alert-chip-button:hover {
-  filter: brightness(.94);
+  background: #fecaca;
 }
 
+/* =========================================================
+   MODAL DE DETALLE
+========================================================= */
+
 .medical-detail-card {
-  width: min(900px, calc(100vw - 30px));
-  max-height: calc(100vh - 40px);
+  width:
+    min(
+      900px,
+      calc(100vw - 30px)
+    );
+
+  max-height:
+    calc(
+      100vh - 40px
+    );
+
   overflow: auto;
 }
 
 .medical-detail-content {
   display: grid;
+
   gap: 12px;
-  padding: 18px;
+
+  padding-top: 16px;
 }
 
 .medical-detail-person {
-  border: 1px solid #dbe1ea;
+  border: 1px solid var(--line);
+
   border-radius: 12px;
+
   padding: 14px;
-  background: #fff;
+
+  background: white;
 }
 
 .medical-detail-person-head {
   display: flex;
+
   justify-content: space-between;
   align-items: flex-start;
+
   gap: 15px;
 }
 
 .medical-detail-person-head strong {
   display: block;
-  color: #111827;
+
+  color: var(--navy);
+
+  font-size: 14px;
 }
 
 .medical-detail-person-head small {
   display: block;
+
   margin-top: 3px;
-  color: #64748b;
+
+  color: var(--muted);
+
+  font-size: 11px;
 }
 
 .medical-detail-text {
-  margin-top: 10px;
-  line-height: 1.5;
+  margin-top: 11px;
+
+  padding-top: 11px;
+
+  border-top: 1px solid var(--line);
+
   color: #334155;
+
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.medical-detail-text strong {
+  color: var(--navy);
+}
+
+/* =========================================================
+   RESPONSIVE
+========================================================= */
+
+@media (
+  max-width: 1100px
+) {
+  .medical-kpis-detail {
+    grid-template-columns:
+      repeat(
+        2,
+        minmax(0, 1fr)
+      );
+  }
+}
+
+@media (
+  max-width: 650px
+) {
+  .medical-kpis-detail {
+    grid-template-columns:
+      1fr;
+  }
+
+  .medical-detail-person-head {
+    flex-direction: column;
+  }
 }
