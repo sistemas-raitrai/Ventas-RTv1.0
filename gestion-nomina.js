@@ -83,7 +83,13 @@ const state = {
   pasajeroFocoId: "",
 
   // Filtro aplicado dentro del modal de nómina.
-  nominaFiltro: "todos"
+  nominaFiltro: "todos",
+
+  /*
+    Pasajero actualmente abierto
+    en el editor administrativo.
+  */
+  editingNominaId: ""
 };
 
 init();
@@ -3375,11 +3381,42 @@ async function manejarAccionPasajero(
     return;
   }
 
+  /*
+    NUEVO:
+    Editor administrativo de nómina.
+  */
+  if (
+    accion ===
+    "editar_nomina"
+  ) {
+    try {
+      await abrirEditorNomina(
+        inscripcionId
+      );
+    } catch (error) {
+      console.error(
+        "[gestion-nomina] abrirEditorNomina",
+        error
+      );
+
+      alert(
+        error.message ||
+        "No se pudo abrir el editor."
+      );
+    }
+
+    return;
+  }
+
   const item =
     state.nomina.find(
       (row) =>
-        String(row.id) ===
-        String(inscripcionId)
+        String(
+          row.id
+        ) ===
+        String(
+          inscripcionId
+        )
     );
 
   const nombre =
@@ -3427,7 +3464,9 @@ async function manejarAccionPasajero(
 
   if (
     !mensaje ||
-    !confirm(mensaje)
+    !confirm(
+      mensaje
+    )
   ) {
     return;
   }
@@ -3475,10 +3514,6 @@ async function manejarAccionPasajero(
         );
     }
 
-    /*
-      Volvemos a consultar el resumen actualizado.
-      También refrescamos las alertas superiores.
-    */
     await refrescarModal();
     await cargarAlertasInscripciones();
 
@@ -3512,11 +3547,18 @@ function getAccionOperativaHtml(
       item
     );
 
+  let accionPendiente =
+    `
+      <span class="gn-sub">
+        Sin acción pendiente
+      </span>
+    `;
+
   if (
     categoria ===
     "nuevo_pendiente"
   ) {
-    return `
+    accionPendiente = `
       <button
         class="passenger-action-btn action-confirm"
         type="button"
@@ -3535,7 +3577,7 @@ function getAccionOperativaHtml(
     categoria ===
     "lista_pendiente"
   ) {
-    return `
+    accionPendiente = `
       <button
         class="passenger-action-btn action-paid"
         type="button"
@@ -3554,7 +3596,7 @@ function getAccionOperativaHtml(
     categoria ===
     "lista_pagada"
   ) {
-    return `
+    accionPendiente = `
       <button
         class="passenger-action-btn action-confirm"
         type="button"
@@ -3569,11 +3611,811 @@ function getAccionOperativaHtml(
     `;
   }
 
+  const tieneAlertaCambio =
+    state.alertasInscripciones
+      .some(
+        (alerta) =>
+          alerta.tipoAlerta ===
+            "cambio_datos_criticos" &&
+          alerta.activa !==
+            false &&
+          alerta.resuelta !==
+            true &&
+          String(
+            alerta.inscripcionId ||
+            ""
+          ) ===
+            String(
+              item.id ||
+              ""
+            )
+      );
+
   return `
-    <span class="gn-sub">
-      Sin acción pendiente
-    </span>
+    ${accionPendiente}
+
+    ${
+      tieneAlertaCambio
+        ? `
+          <span
+            class="badge warn"
+            title="Hay datos modificados que deben revisarse en Sistema de Pagos"
+          >
+            ⚠ Revisar pagos
+          </span>
+        `
+        : ""
+    }
+
+    <button
+      class="passenger-action-btn"
+      type="button"
+      data-pasajero-action="editar_nomina"
+      data-inscripcion-id="${esc(
+        item.id ||
+        ""
+      )}"
+    >
+      Editar
+    </button>
   `;
+}
+
+function getByPathNomina(
+  object = {},
+  path = ""
+) {
+  return String(
+    path ||
+    ""
+  )
+    .split(".")
+    .reduce(
+      (current, key) =>
+        current?.[key],
+      object
+    );
+}
+
+function asegurarModalEditorNomina() {
+  if (
+    $("modalEditarNominaPasajero")
+  ) {
+    return;
+  }
+
+  const modal =
+    document.createElement(
+      "div"
+    );
+
+  modal.id =
+    "modalEditarNominaPasajero";
+
+  modal.style.cssText = `
+    display:none;
+    position:fixed;
+    inset:0;
+    z-index:10050;
+    background:rgba(0,0,0,.48);
+    padding:24px;
+    overflow:auto;
+  `;
+
+  modal.innerHTML = `
+    <div
+      style="
+        width:min(920px,100%);
+        margin:30px auto;
+        background:#fff;
+        border-radius:16px;
+        padding:24px;
+        box-shadow:0 24px 70px rgba(0,0,0,.25);
+      "
+    >
+      <div
+        style="
+          display:flex;
+          justify-content:space-between;
+          gap:20px;
+          align-items:flex-start;
+          margin-bottom:20px;
+        "
+      >
+        <div>
+          <h2
+            id="editarNominaTitulo"
+            style="margin:0 0 5px"
+          >
+            Editar pasajero
+          </h2>
+
+          <div
+            class="gn-sub"
+            id="editarNominaSubtitulo"
+          ></div>
+        </div>
+
+        <button
+          type="button"
+          class="btn-secondary"
+          id="btnCerrarEditorNomina"
+        >
+          Cerrar
+        </button>
+      </div>
+
+      <div
+        style="
+          background:#fff8dc;
+          border:1px solid #eadca6;
+          border-radius:10px;
+          padding:12px 14px;
+          margin-bottom:18px;
+        "
+      >
+        Este editor modifica únicamente datos administrativos
+        del pasajero y del apoderado. No modifica la ficha médica.
+      </div>
+
+      <div
+        id="editarNominaCampos"
+        style="
+          display:grid;
+          grid-template-columns:
+            repeat(
+              auto-fit,
+              minmax(220px,1fr)
+            );
+          gap:14px;
+        "
+      ></div>
+
+      <div
+        style="
+          margin-top:20px;
+        "
+      >
+        <label
+          style="
+            display:block;
+            font-weight:700;
+            margin-bottom:6px;
+          "
+        >
+          Motivo / justificación de la modificación
+        </label>
+
+        <textarea
+          id="editarNominaMotivo"
+          rows="4"
+          style="
+            width:100%;
+            box-sizing:border-box;
+            padding:10px;
+            border:1px solid #ccc;
+            border-radius:8px;
+          "
+          placeholder="Explica por qué se realiza la corrección..."
+        ></textarea>
+      </div>
+
+      <div
+        style="
+          display:flex;
+          justify-content:space-between;
+          flex-wrap:wrap;
+          gap:12px;
+          margin-top:22px;
+        "
+      >
+        <button
+          type="button"
+          class="gn-btn danger"
+          id="btnArchivarPasajeroEditor"
+        >
+          Archivar pasajero
+        </button>
+
+        <div
+          style="
+            display:flex;
+            gap:10px;
+            flex-wrap:wrap;
+          "
+        >
+          <button
+            type="button"
+            class="btn-secondary"
+            id="btnCancelarEditorNomina"
+          >
+            Cancelar
+          </button>
+
+          <button
+            type="button"
+            class="gn-btn"
+            id="btnGuardarEditorNomina"
+          >
+            Guardar cambios
+          </button>
+        </div>
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(
+    modal
+  );
+
+  $("btnCerrarEditorNomina")
+    ?.addEventListener(
+      "click",
+      cerrarEditorNomina
+    );
+
+  $("btnCancelarEditorNomina")
+    ?.addEventListener(
+      "click",
+      cerrarEditorNomina
+    );
+
+  $("btnGuardarEditorNomina")
+    ?.addEventListener(
+      "click",
+      guardarEditorNomina
+    );
+
+  $("btnArchivarPasajeroEditor")
+    ?.addEventListener(
+      "click",
+      archivarDesdeEditorNomina
+    );
+
+  modal.addEventListener(
+    "click",
+    (event) => {
+      if (
+        event.target ===
+        modal
+      ) {
+        cerrarEditorNomina();
+      }
+    }
+  );
+}
+
+function renderCampoEditorNomina({
+  label,
+  path,
+  value = "",
+  type = "text"
+}) {
+  return `
+    <label
+      style="
+        display:flex;
+        flex-direction:column;
+        gap:6px;
+        font-weight:700;
+      "
+    >
+      ${esc(
+        label
+      )}
+
+      <input
+        type="${esc(
+          type
+        )}"
+        value="${esc(
+          value ??
+          ""
+        )}"
+        data-nomina-edit-path="${esc(
+          path
+        )}"
+        style="
+          width:100%;
+          box-sizing:border-box;
+          padding:10px;
+          border:1px solid #ccc;
+          border-radius:8px;
+          font-weight:400;
+        "
+      >
+    </label>
+  `;
+}
+
+async function abrirEditorNomina(
+  inscripcionId
+) {
+  asegurarModalEditorNomina();
+
+  const item =
+    await state.manager
+      .cargarInscripcionCompleta(
+        state.current,
+        inscripcionId
+      );
+
+  if (!item) {
+    throw new Error(
+      "No se pudo cargar la inscripción completa."
+    );
+  }
+
+  state.editingNominaId =
+    String(
+      inscripcionId
+    );
+
+  const nombreCompleto =
+    [
+      getByPathNomina(
+        item,
+        "identificacion.nombres"
+      ),
+      getByPathNomina(
+        item,
+        "identificacion.primerApellido"
+      ),
+      getByPathNomina(
+        item,
+        "identificacion.segundoApellido"
+      )
+    ]
+      .filter(Boolean)
+      .join(" ")
+      .trim();
+
+  set(
+    "editarNominaTitulo",
+    `Editar · ${
+      nombreCompleto ||
+      "Pasajero"
+    }`
+  );
+
+  set(
+    "editarNominaSubtitulo",
+    camposPasajero.documento(
+      item
+    ) ||
+    ""
+  );
+
+  $("editarNominaMotivo").value =
+    "";
+
+  const campos = [
+    {
+      label:
+        "RUT / Documento",
+      path:
+        "identificacion.documento",
+      value:
+        camposPasajero.documento(
+          item
+        )
+    },
+    {
+      label:
+        "Nombres",
+      path:
+        "identificacion.nombres",
+      value:
+        getByPathNomina(
+          item,
+          "identificacion.nombres"
+        )
+    },
+    {
+      label:
+        "Primer apellido",
+      path:
+        "identificacion.primerApellido",
+      value:
+        getByPathNomina(
+          item,
+          "identificacion.primerApellido"
+        )
+    },
+    {
+      label:
+        "Segundo apellido",
+      path:
+        "identificacion.segundoApellido",
+      value:
+        getByPathNomina(
+          item,
+          "identificacion.segundoApellido"
+        )
+    },
+    {
+      label:
+        "Fecha de nacimiento",
+      path:
+        "identificacion.fechaNacimiento",
+      value:
+        getByPathNomina(
+          item,
+          "identificacion.fechaNacimiento"
+        ),
+      type:
+        "date"
+    },
+    {
+      label:
+        "Tipo de viajante",
+      path:
+        "tipoViajante",
+      value:
+        item.tipoViajante ||
+        item.tipoParticipacion ||
+        ""
+    },
+    {
+      label:
+        "Nacionalidad",
+      path:
+        "identificacion.nacionalidad",
+      value:
+        getByPathNomina(
+          item,
+          "identificacion.nacionalidad"
+        )
+    },
+    {
+      label:
+        "Género / Sexo",
+      path:
+        "identificacion.genero",
+      value:
+        getByPathNomina(
+          item,
+          "identificacion.genero"
+        )
+    },
+
+    /*
+      DATOS DEL APODERADO / RESPONSABLE
+    */
+    {
+      label:
+        "Nombre apoderado / responsable",
+      path:
+        "contactoPrincipal.nombre",
+      value:
+        getByPathNomina(
+          item,
+          "contactoPrincipal.nombre"
+        )
+    },
+    {
+      label:
+        "Correo apoderado / responsable",
+      path:
+        "contactoPrincipal.correo",
+      value:
+        getByPathNomina(
+          item,
+          "contactoPrincipal.correo"
+        ),
+      type:
+        "email"
+    },
+    {
+      label:
+        "Celular apoderado / responsable",
+      path:
+        "contactoPrincipal.celular",
+      value:
+        getByPathNomina(
+          item,
+          "contactoPrincipal.celular"
+        ) ||
+        getByPathNomina(
+          item,
+          "contactoPrincipal.telefono"
+        )
+    }
+  ];
+
+  $("editarNominaCampos").innerHTML =
+    campos
+      .map(
+        renderCampoEditorNomina
+      )
+      .join("");
+
+  $("modalEditarNominaPasajero")
+    .style.display =
+      "block";
+
+  document.body.classList.add(
+    "modal-open"
+  );
+}
+
+function cerrarEditorNomina() {
+  const modal =
+    $("modalEditarNominaPasajero");
+
+  if (modal) {
+    modal.style.display =
+      "none";
+  }
+
+  state.editingNominaId =
+    "";
+
+  /*
+    El modal principal de Gestión Nómina
+    continúa abierto.
+  */
+  document.body.classList.add(
+    "modal-open"
+  );
+}
+
+function leerValoresEditorNomina() {
+  const valores =
+    {};
+
+  document
+    .querySelectorAll(
+      "#modalEditarNominaPasajero [data-nomina-edit-path]"
+    )
+    .forEach(
+      (input) => {
+        const path =
+          input.dataset
+            .nominaEditPath;
+
+        let value =
+          String(
+            input.value ||
+            ""
+          ).trim();
+
+        /*
+          Mantiene la convención de nombres en mayúsculas
+          que ya usa el sistema.
+        */
+        if (
+          [
+            "identificacion.nombres",
+            "identificacion.primerApellido",
+            "identificacion.segundoApellido",
+            "identificacion.nacionalidad",
+            "contactoPrincipal.nombre"
+          ].includes(
+            path
+          )
+        ) {
+          value =
+            value.toLocaleUpperCase(
+              "es-CL"
+            );
+        }
+
+        if (
+          path ===
+          "contactoPrincipal.correo"
+        ) {
+          value =
+            value.toLowerCase();
+        }
+
+        valores[path] =
+          value;
+
+        /*
+          Estas dos rutas deben mantenerse iguales.
+        */
+        if (
+          path ===
+          "identificacion.documento"
+        ) {
+          valores[
+            "identificacion.rutCompleto"
+          ] =
+            value;
+        }
+
+        if (
+          path ===
+          "tipoViajante"
+        ) {
+          valores[
+            "tipoParticipacion"
+          ] =
+            value;
+        }
+      }
+    );
+
+  return valores;
+}
+
+async function guardarEditorNomina() {
+  if (
+    !state.editingNominaId ||
+    !state.current
+  ) {
+    return;
+  }
+
+  const motivo =
+    String(
+      $("editarNominaMotivo")
+        ?.value ||
+      ""
+    ).trim();
+
+  if (!motivo) {
+    alert(
+      "Debes explicar el motivo de la modificación."
+    );
+
+    $("editarNominaMotivo")
+      ?.focus();
+
+    return;
+  }
+
+  const button =
+    $("btnGuardarEditorNomina");
+
+  const textoOriginal =
+    button?.textContent ||
+    "Guardar cambios";
+
+  try {
+    if (button) {
+      button.disabled =
+        true;
+
+      button.textContent =
+        "Guardando...";
+    }
+
+    const resultado =
+      await state.manager
+        .actualizarDatosNomina(
+          state.current,
+          state.editingNominaId,
+          leerValoresEditorNomina(),
+          motivo
+        );
+
+    if (
+      resultado?.sinCambios
+    ) {
+      alert(
+        "No hay cambios para guardar."
+      );
+
+      return;
+    }
+
+    cerrarEditorNomina();
+
+    await refrescarModal();
+    await cargarAlertasInscripciones();
+
+    /*
+      Vuelve a renderizar para que pueda aparecer
+      la advertencia "Revisar pagos".
+    */
+    renderPasajeros();
+
+    alert(
+      "Datos de nómina actualizados correctamente."
+    );
+  } catch (error) {
+    console.error(
+      "[gestion-nomina] guardarEditorNomina",
+      error
+    );
+
+    alert(
+      error.message ||
+      "No se pudieron guardar los cambios."
+    );
+  } finally {
+    if (button) {
+      button.disabled =
+        false;
+
+      button.textContent =
+        textoOriginal;
+    }
+  }
+}
+
+async function archivarDesdeEditorNomina() {
+  if (
+    !state.editingNominaId ||
+    !state.current
+  ) {
+    return;
+  }
+
+  const motivo =
+    String(
+      $("editarNominaMotivo")
+        ?.value ||
+      ""
+    ).trim();
+
+  if (!motivo) {
+    alert(
+      "Antes de archivar debes explicar el motivo."
+    );
+
+    $("editarNominaMotivo")
+      ?.focus();
+
+    return;
+  }
+
+  if (
+    !confirm(
+      "¿Archivar este pasajero?\n\nEl registro no será eliminado; quedará archivado."
+    )
+  ) {
+    return;
+  }
+
+  const button =
+    $("btnArchivarPasajeroEditor");
+
+  try {
+    if (button) {
+      button.disabled =
+        true;
+
+      button.textContent =
+        "Archivando...";
+    }
+
+    await state.manager
+      .archivarPasajero(
+        state.current,
+        state.editingNominaId,
+        motivo
+      );
+
+    cerrarEditorNomina();
+
+    await refrescarModal();
+    await cargarPantalla();
+
+    alert(
+      "Pasajero archivado correctamente."
+    );
+  } catch (error) {
+    console.error(
+      "[gestion-nomina] archivarDesdeEditorNomina",
+      error
+    );
+
+    alert(
+      error.message ||
+      "No se pudo archivar al pasajero."
+    );
+  } finally {
+    if (button) {
+      button.disabled =
+        false;
+
+      button.textContent =
+        "Archivar pasajero";
+    }
+  }
 }
 
 function enfocarPasajeroPendiente() {
