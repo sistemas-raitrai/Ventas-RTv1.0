@@ -1730,7 +1730,7 @@ function getFaseGrupoHtml(
   if (abierta) {
     return `
       <span class="badge ok">
-        ${escapeHtml(fase)}
+        ${esc(fase)}
       </span>
       <div class="gn-sub">
         Link abierto
@@ -1740,7 +1740,7 @@ function getFaseGrupoHtml(
 
   return `
     <span class="badge muted">
-      ${escapeHtml(fase)}
+      ${esc(fase)}
     </span>
     <div class="gn-sub">
       Cerrado
@@ -2116,13 +2116,13 @@ function renderRows() {
       .map(
         (row) => `
           <tr
-            data-id="${escapeHtml(
+            data-id="${esc(
               row.id
             )}"
           >
             <td>
               <div class="gn-group">
-                ${escapeHtml(
+                ${esc(
                   row.titulo ||
                   "—"
                 )}
@@ -2145,7 +2145,7 @@ function renderRows() {
 
             <td>
               <strong>
-                ${escapeHtml(
+                ${esc(
                   row.groupId ||
                   row.docId ||
                   "—"
@@ -2154,21 +2154,21 @@ function renderRows() {
             </td>
 
             <td>
-              ${escapeHtml(
+              ${esc(
                 row.negocio ||
                 "—"
               )}
             </td>
 
             <td>
-              ${escapeHtml(
+              ${esc(
                 row.vendedora ||
                 "—"
               )}
             </td>
 
             <td>
-              ${escapeHtml(
+              ${esc(
                 row.destino ||
                 "—"
               )}
@@ -2228,7 +2228,7 @@ function renderMensaje(
   tbody.innerHTML = `
     <tr>
       <td
-        colspan="9"
+        colspan="10"
         class="gn-empty"
       >
         ${esc(
@@ -3636,14 +3636,14 @@ function getResponsablesNominaHtml(
     bloques.push(`
       <div class="gn-responsable">
         <strong>
-          ${escapeHtml(
+          ${esc(
             principal.nombre ||
             "Responsable principal"
           )}
         </strong>
 
         <small>
-          ${escapeHtml(
+          ${esc(
             [
               principal.relacion,
               principal.telefono
@@ -3657,7 +3657,7 @@ function getResponsablesNominaHtml(
           principal.correo
             ? `
               <small>
-                ${escapeHtml(
+                ${esc(
                   principal.correo
                 )}
               </small>
@@ -3674,14 +3674,14 @@ function getResponsablesNominaHtml(
     bloques.push(`
       <div class="gn-responsable">
         <strong>
-          ${escapeHtml(
+          ${esc(
             secundario.nombre ||
             "Responsable secundario"
           )}
         </strong>
 
         <small>
-          ${escapeHtml(
+          ${esc(
             [
               secundario.relacion,
               secundario.telefono
@@ -3695,7 +3695,7 @@ function getResponsablesNominaHtml(
           secundario.correo
             ? `
               <small>
-                ${escapeHtml(
+                ${esc(
                   secundario.correo
                 )}
               </small>
@@ -3720,12 +3720,11 @@ function getResponsablesNominaHtml(
 function getOrdenNominaOperativa(
   item = {}
 ) {
-  const anulado =
-    item.anulado === true ||
-    item.anulada === true ||
-    item.viaja === false;
-
-  if (anulado) {
+  if (
+    estaAnuladoNomina(
+      item
+    )
+  ) {
     return 1000;
   }
 
@@ -3850,10 +3849,7 @@ function ordenarNominaOperativa(
   return [
     ...items
   ].sort(
-    (
-      a,
-      b
-    ) => {
+    (a, b) => {
       const ordenA =
         getOrdenNominaOperativa(
           a
@@ -3875,8 +3871,8 @@ function ordenarNominaOperativa(
       }
 
       /*
-        Pendientes:
-        el más antiguo primero.
+        Para los pendientes de gestión:
+        el que ingresó primero aparece primero.
       */
       if (
         ordenA <= 30
@@ -3909,23 +3905,21 @@ function ordenarNominaOperativa(
       }
 
       /*
-        Nómina estable:
-        orden alfabético.
+        Para pasajeros ya confirmados:
+        orden alfabético por apellido y luego nombre.
       */
       const apellidoA =
-        String(
-          camposPasajero(
+        normalizar(
+          camposPasajero.apellidos(
             a
-          ).apellidos ||
-          ""
+          )
         );
 
       const apellidoB =
-        String(
-          camposPasajero(
+        normalizar(
+          camposPasajero.apellidos(
             b
-          ).apellidos ||
-          ""
+          )
         );
 
       const compareApellido =
@@ -3934,30 +3928,35 @@ function ordenarNominaOperativa(
           "es",
           {
             sensitivity:
-              "base"
+              "base",
+            numeric:
+              true
           }
         );
 
-      if (compareApellido) {
+      if (
+        compareApellido !==
+        0
+      ) {
         return compareApellido;
       }
 
-      return String(
-        camposPasajero(
+      return normalizar(
+        camposPasajero.nombres(
           a
-        ).nombres ||
-        ""
+        )
       ).localeCompare(
-        String(
-          camposPasajero(
+        normalizar(
+          camposPasajero.nombres(
             b
-          ).nombres ||
-          ""
+          )
         ),
         "es",
         {
           sensitivity:
-            "base"
+            "base",
+          numeric:
+            true
         }
       );
     }
@@ -3972,27 +3971,35 @@ function renderPasajeros() {
     return;
   }
 
-  const itemsFiltrados =
-    getNominaFiltradaActual
-      ? getNominaFiltradaActual()
-      : state.nomina;
+  /*
+    ESTE ES EL FILTRO CORRECTO QUE YA EXISTE
+    EN TU gestion-nomina.js.
 
-  const items =
-    ordenarNominaOperativa(
-      itemsFiltrados ||
-      []
+    Los KPI modifican state.nominaFiltro
+    y filtrarNominaModal() aplica ese filtro.
+  */
+  const filtrados =
+    filtrarNominaModal(
+      state.nomina
     );
 
-  actualizarBarraFiltroNomina?.();
+  /*
+    Después del filtro aplicamos
+    el nuevo orden operativo.
+  */
+  const visibles =
+    ordenarNominaOperativa(
+      filtrados
+    );
 
-  if (!items.length) {
+  if (!visibles.length) {
     tbody.innerHTML = `
       <tr>
         <td
           colspan="11"
           class="gn-empty"
         >
-          No hay pasajeros para mostrar.
+          No hay pasajeros para este filtro.
         </td>
       </tr>
     `;
@@ -4000,231 +4007,199 @@ function renderPasajeros() {
     return;
   }
 
-  let ultimaSeccion =
+  let seccionAnterior =
     "";
 
-  const html =
-    [];
+  tbody.innerHTML =
+    visibles
+      .map(
+        (item) => {
+          const seccion =
+            getSeccionNomina(
+              item
+            );
 
-  items.forEach(
-    (item) => {
-      const campos =
-        camposPasajero(
-          item
-        );
+          const separador =
+            seccion !==
+            seccionAnterior
+              ? `
+                <tr class="nomina-section-row">
+                  <td colspan="11">
+                    ${esc(
+                      getSeccionNominaLabel(
+                        seccion
+                      )
+                    )}
+                  </td>
+                </tr>
+              `
+              : "";
 
-      const info =
-        clasificarPasajeroNomina(
-          item
-        );
+          seccionAnterior =
+            seccion;
 
-      if (
-        info.seccion !==
-        ultimaSeccion
-      ) {
-        ultimaSeccion =
-          info.seccion;
-
-        html.push(`
-          <tr class="nomina-section-row">
-            <td colspan="11">
-              ${escapeHtml(
-                info.seccion
-              )}
-            </td>
-          </tr>
-        `);
-      }
-
-      const estaAnulado =
-        item.anulado ===
-          true ||
-        item.anulada ===
-          true ||
-        item.viaja ===
-          false;
-
-      const fichaCompleta =
-        item.fichaMedicaCompleta ===
-          true ||
-        item.fichaCompleta ===
-          true ||
-        normalizar(
-          item.fichaMedicaEstado ||
-          ""
-        ) ===
-          "completa";
-
-      const tieneCarnet =
-        item.tieneCarnetIdentidad ===
-          true ||
-        item?.carnet
-          ?.tieneCarnetIdentidad ===
-          true ||
-        item
-          ?.tieneCredencialSistemaPagos ===
-          true;
-
-      const foco =
-        state.pasajeroFocoId &&
-        String(
-          item.id ||
-          item.inscripcionId ||
-          ""
-        ) ===
-          String(
-            state.pasajeroFocoId
-          );
-
-      html.push(`
-        <tr
-          class="
-            ${escapeHtml(
-              info.clase ||
+          const esFoco =
+            state.pasajeroFocoId &&
+            String(
+              item.id ||
               ""
-            )}
-            ${
-              foco
-                ? "is-focus"
-                : ""
-            }
-          "
-          data-pasajero-id="${escapeHtml(
-            item.id ||
-            item.inscripcionId ||
-            ""
-          )}"
-        >
-          <td>
-            <button
-              type="button"
-              class="passenger-rut-link"
-              data-action="ver-ficha"
-              data-id="${escapeHtml(
+            ) ===
+            String(
+              state.pasajeroFocoId
+            );
+
+          const anulada =
+            estaAnuladoNomina(
+              item
+            );
+
+          return `
+            ${separador}
+
+            <tr
+              data-inscripcion-row="${esc(
                 item.id ||
-                item.inscripcionId ||
                 ""
               )}"
+              class="${esc(
+                [
+                  getClaseFilaNomina(
+                    item
+                  ),
+                  esFoco
+                    ? "is-focus"
+                    : "",
+                  anulada
+                    ? "is-anulado"
+                    : ""
+                ]
+                  .filter(Boolean)
+                  .join(" ")
+              )}"
             >
-              ${escapeHtml(
-                campos.rut ||
-                campos.documento ||
-                "—"
-              )}
-            </button>
-          </td>
+              <td>
+                <button
+                  type="button"
+                  class="rut-viewer-link"
+                  data-ver-ficha-inscripcion="${esc(
+                    item.id ||
+                    ""
+                  )}"
+                  title="Abrir ficha individual"
+                >
+                  ${esc(
+                    camposPasajero.documento(
+                      item
+                    ) ||
+                    "—"
+                  )}
+                </button>
+              </td>
 
-          <td>
-            ${escapeHtml(
-              campos.nombres ||
-              "—"
-            )}
-          </td>
+              <td>
+                ${esc(
+                  camposPasajero.nombres(
+                    item
+                  ) ||
+                  "—"
+                )}
+              </td>
 
-          <td>
-            ${escapeHtml(
-              campos.apellidos ||
-              "—"
-            )}
-          </td>
+              <td>
+                ${esc(
+                  camposPasajero.apellidos(
+                    item
+                  ) ||
+                  "—"
+                )}
+              </td>
 
-          <td>
-            <span class="nomina-type-pill">
-              ${escapeHtml(
-                info.tipoLabel ||
-                campos.tipo ||
-                "—"
-              )}
-            </span>
-          </td>
+              <td>
+                <span class="nomina-type-pill">
+                  ${esc(
+                    getTipoVisibleNomina(
+                      item
+                    )
+                  )}
+                </span>
+              </td>
 
-          <td>
-            ${escapeHtml(
-              info.estadoLabel ||
-              "—"
-            )}
-          </td>
+              <td>
+                <strong>
+                  ${esc(
+                    getEstadoOperativoLabel(
+                      item
+                    )
+                  )}
+                </strong>
+              </td>
 
-          <td>
-            <span
-              class="badge ${
-                fichaCompleta
-                  ? "ok"
-                  : "warn"
-              }"
-            >
-              ${
-                fichaCompleta
-                  ? "Completa"
-                  : "Pendiente"
-              }
-            </span>
-          </td>
+              <td>
+                <span
+                  class="badge ${
+                    fichaCompletaNomina(
+                      item
+                    )
+                      ? "ok"
+                      : "warn"
+                  }"
+                >
+                  ${
+                    fichaCompletaNomina(
+                      item
+                    )
+                      ? "Completa"
+                      : "Pendiente"
+                  }
+                </span>
+              </td>
 
-          <td>
-            ${
-              estaAnulado
-                ? "Sí"
-                : "No"
-            }
-          </td>
+              <td>
+                ${
+                  anulada
+                    ? "Sí"
+                    : "No"
+                }
+              </td>
 
-          <td>
-            ${getResponsablesNominaHtml(
-              item
-            )}
-          </td>
-
-          <td>
-            <span class="gn-fecha-ingreso">
-              ${escapeHtml(
-                formatFechaIngresoNomina(
+              <td>
+                ${getResponsablesNominaHtml(
                   item
-                )
-              )}
-            </span>
-          </td>
+                )}
+              </td>
 
-          <td>
-            ${
-              tieneCarnet
-                ? "Sí"
-                : "No"
-            }
-          </td>
+              <td>
+                <span class="gn-fecha-ingreso">
+                  ${esc(
+                    formatFechaIngresoNomina(
+                      item
+                    )
+                  )}
+                </span>
+              </td>
 
-          <td>
-            ${getAccionOperativaHtml(
-              item,
-              info
-            )}
+              <td>
+                ${
+                  camposPasajero.tieneCarnet(
+                    item
+                  )
+                    ? "Sí"
+                    : "No"
+                }
+              </td>
 
-            <div
-              style="
-                margin-top:6px;
-              "
-            >
-              <button
-                class="gn-btn edit"
-                type="button"
-                data-action="editar-pasajero"
-                data-id="${escapeHtml(
-                  item.id ||
-                  item.inscripcionId ||
-                  ""
-                )}"
-              >
-                Editar
-              </button>
-            </div>
-          </td>
-        </tr>
-      `);
-    }
-  );
-
-  tbody.innerHTML =
-    html.join("");
+              <td>
+                <div class="passenger-row-actions">
+                  ${getAccionOperativaHtml(
+                    item
+                  )}
+                </div>
+              </td>
+            </tr>
+          `;
+        }
+      )
+      .join("");
 }
 
 async function manejarAccionPasajero(
@@ -4544,7 +4519,7 @@ function getAccionOperativaHtml(
     }
 
     <button
-      class="passenger-action-btn"
+      class="passenger-action-btn action-edit"
       type="button"
       data-pasajero-action="editar_nomina"
       data-inscripcion-id="${esc(
