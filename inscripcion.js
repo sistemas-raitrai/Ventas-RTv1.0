@@ -150,6 +150,15 @@ let correoCambios = CORREO_ADMIN;
 let pasajeroSistemaPagosValidado = null;
 let pasajeroSistemaPagosDocId = "";
 let nominaFinalRutValidado = false;
+
+// -----------------------------------------------------------------------------
+// LISTA DE ESPERA · VALIDACIÓN PREVIA POR RUT
+// -----------------------------------------------------------------------------
+let listaEsperaRutValidado = false;
+let listaEsperaReingreso = false;
+let listaEsperaInscripcionAnterior = null;
+let listaEsperaInscripcionAnteriorDocId = "";
+
 let sesionInscripcionRef = null;
 let sesionInscripcionId = "";
 let ultimoPctTracking = -1;
@@ -315,15 +324,26 @@ async function cargarGrupo() {
 function conectarEventos() {
   btnComenzar?.addEventListener("click", () => {
     registrarSesionFormulario("formulario_comenzado");
+  
     pantallaBienvenida?.classList.add("hidden");
   
-    if (faseUrl === "nomina_final") {
+    const requiereValidacionPreviaRut =
+      faseUrl === "nomina_final" ||
+      faseUrl === "lista_espera";
+  
+    if (requiereValidacionPreviaRut) {
+      prepararCardValidacionRut();
       cardValidacionNominaFinal?.classList.remove("hidden");
+      form?.classList.add("hidden");
     } else {
       form?.classList.remove("hidden");
     }
   
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    window.scrollTo({
+      top: 0,
+      behavior: "smooth"
+    });
+  
     actualizarProgreso();
   });
   
@@ -894,6 +914,114 @@ function getRutValidacionNormalizado() {
   return normalizarRutDocumento(numero, dv);
 }
 
+function prepararCardValidacionRut() {
+  if (!cardValidacionNominaFinal) return;
+
+  let aviso = $("avisoValidacionRutContexto");
+
+  if (!aviso) {
+    aviso = document.createElement("div");
+
+    aviso.id = "avisoValidacionRutContexto";
+    aviso.className = "notice time";
+    aviso.style.marginBottom = "18px";
+
+    cardValidacionNominaFinal.prepend(aviso);
+  }
+
+  if (faseUrl === "lista_espera") {
+    aviso.innerHTML = `
+      <div style="
+        font-size:20px;
+        line-height:1.3;
+        font-weight:900;
+        margin-bottom:8px;
+      ">
+        🟡 IDENTIFICACIÓN DE LA PERSONA QUE VIAJA
+      </div>
+
+      <div style="
+        font-size:15px;
+        line-height:1.55;
+      ">
+        Ingresa el RUT de la persona que desea incorporarse a la
+        <strong>Lista de Espera</strong>.
+        <br><br>
+
+        Si esta persona ya estuvo registrada anteriormente en este grupo
+        y actualmente se encuentra anulada, recuperaremos los datos que
+        ya tenemos para facilitar el formulario.
+        <br><br>
+
+        <strong>Debe ingresar el RUT de la persona que viaja.</strong>
+        Si usted es padre, madre o apoderado(a), no ingrese su propio RUT.
+      </div>
+    `;
+
+    if (btnValidarRutNominaFinal) {
+      btnValidarRutNominaFinal.textContent =
+        "Continuar con este RUT";
+    }
+
+    return;
+  }
+
+  aviso.innerHTML = `
+    <div style="
+      font-size:20px;
+      line-height:1.3;
+      font-weight:900;
+      margin-bottom:8px;
+    ">
+      ⚠️ RUT DE LA PERSONA QUE VIAJA
+    </div>
+
+    <div style="
+      font-size:15px;
+      line-height:1.55;
+    ">
+      Ingresa el RUT de la persona que viaja para validar que se
+      encuentre en la nómina base del grupo.
+      <br><br>
+
+      Si usted es padre, madre o apoderado(a),
+      <strong>NO ingrese su propio RUT.</strong>
+    </div>
+  `;
+
+  if (btnValidarRutNominaFinal) {
+    btnValidarRutNominaFinal.textContent =
+      "Validar RUT";
+  }
+}
+
+
+function estaInscripcionAnuladaPublica(item = {}) {
+  const estadoViaje = normalizarTexto(
+    item.estadoViaje ||
+    item.estado ||
+    item?.sistemaPagos?.estadoViaje ||
+    item?.sistemaPagos?.estado ||
+    ""
+  );
+
+  const privacidadEstado = normalizarTexto(
+    item?.privacidad?.estado || ""
+  );
+
+  return (
+    item.anulado === true ||
+    item.anulada === true ||
+    item.viaja === false ||
+    estadoViaje === "anulado" ||
+    estadoViaje === "anulada" ||
+    estadoViaje === "no_viaja" ||
+    estadoViaje === "eliminado_en_sp" ||
+    privacidadEstado === "archivada" ||
+    privacidadEstado === "eliminada_logica"
+  );
+}
+
 function fichaMedicaYaCompletaPublica(item = {}) {
   return (
     item.fichaMedicaCompleta === true ||
@@ -906,15 +1034,20 @@ function fichaMedicaYaCompletaPublica(item = {}) {
 async function validarRutNominaFinal() {
   ocultarMensaje();
 
-  const documentoNormalizado = getRutValidacionNormalizado();
+  const documentoNormalizado =
+    getRutValidacionNormalizado();
 
   if (!documentoNormalizado) {
-    mostrarMensaje("error", "Debe ingresar un RUT válido.");
+    mostrarMensaje(
+      "error",
+      "Debe ingresar un RUT válido."
+    );
     return;
   }
 
   btnValidarRutNominaFinal.disabled = true;
-  btnValidarRutNominaFinal.textContent = "Validando...";
+  btnValidarRutNominaFinal.textContent =
+    "Validando...";
 
   try {
     const ref = doc(
@@ -926,6 +1059,151 @@ async function validarRutNominaFinal() {
     );
 
     const snap = await getDoc(ref);
+
+    // =====================================================================
+    // LISTA DE ESPERA
+    // =====================================================================
+    if (faseUrl === "lista_espera") {
+      listaEsperaRutValidado = false;
+      listaEsperaReingreso = false;
+      listaEsperaInscripcionAnterior = null;
+      listaEsperaInscripcionAnteriorDocId = "";
+
+      // -------------------------------------------------------------------
+      // CASO 1
+      // RUT NO EXISTE → inscripción completamente nueva
+      // -------------------------------------------------------------------
+      if (!snap.exists()) {
+        listaEsperaRutValidado = true;
+
+        if ($("tipoIdentificacion")) {
+          $("tipoIdentificacion").value = "rut";
+        }
+
+        if ($("rutNumero")) {
+          $("rutNumero").value =
+            limpiarRutNumero(
+              rutValidacionNumero?.value || ""
+            );
+        }
+
+        if ($("rutDv")) {
+          $("rutDv").value =
+            limpiarTexto(
+              rutValidacionDv?.value || ""
+            ).toUpperCase();
+        }
+
+        cardValidacionNominaFinal?.classList.add(
+          "hidden"
+        );
+
+        form?.classList.remove("hidden");
+
+        mostrarMensaje(
+          "ok",
+          `
+            RUT validado correctamente.
+            <br><br>
+            Esta persona no tiene una inscripción previa activa
+            dentro del grupo.
+            <br><br>
+            Puede continuar completando la solicitud de
+            <strong>Lista de Espera</strong>.
+          `
+        );
+
+        window.scrollTo({
+          top: 0,
+          behavior: "smooth"
+        });
+
+        aplicarEstadoUI();
+        actualizarProgreso();
+
+        return;
+      }
+
+      const data = snap.data() || {};
+
+      // -------------------------------------------------------------------
+      // CASO 2
+      // RUT EXISTE Y ESTÁ ACTIVO → bloquear duplicado real
+      // -------------------------------------------------------------------
+      if (!estaInscripcionAnuladaPublica(data)) {
+        mostrarMensaje(
+          "error",
+          `
+            Este RUT ya tiene una inscripción activa dentro del grupo.
+            <br><br>
+            No corresponde generar una nueva solicitud de
+            <strong>Lista de Espera</strong>.
+            <br><br>
+            Si considera que esto es incorrecto, comuníquese con
+            Administración.
+          `
+        );
+
+        return;
+      }
+
+      // -------------------------------------------------------------------
+      // CASO 3
+      // RUT EXISTE PERO ESTÁ ANULADO → permitir reingreso
+      // -------------------------------------------------------------------
+      listaEsperaRutValidado = true;
+      listaEsperaReingreso = true;
+      listaEsperaInscripcionAnterior = data;
+      listaEsperaInscripcionAnteriorDocId =
+        snap.id;
+
+      precargarFormularioDesdeSistemaPagos(data);
+
+      cardValidacionNominaFinal?.classList.add(
+        "hidden"
+      );
+
+      form?.classList.remove("hidden");
+
+      mostrarMensaje(
+        "ok",
+        `
+          Encontramos un registro anterior para
+          <strong>${
+            escapeHtml(
+              data?.identificacion?.nombreCompleto ||
+              "esta persona"
+            )
+          }</strong>.
+          <br><br>
+
+          El registro anterior se encuentra
+          <strong>anulado</strong>, por lo que puede ingresar
+          nuevamente mediante
+          <strong>Lista de Espera</strong>.
+          <br><br>
+
+          Hemos recuperado los datos disponibles.
+          Revise la información y complete o actualice
+          los antecedentes faltantes antes de enviar.
+        `
+      );
+
+      window.scrollTo({
+        top: 0,
+        behavior: "smooth"
+      });
+
+      aplicarEstadoUI();
+      actualizarProgreso();
+
+      return;
+    }
+
+    // =====================================================================
+    // NÓMINA FINAL / FICHA MÉDICA
+    // MANTIENE EL FUNCIONAMIENTO ACTUAL
+    // =====================================================================
 
     if (!snap.exists()) {
       mostrarMensaje(
@@ -959,62 +1237,284 @@ async function validarRutNominaFinal() {
 
     precargarFormularioDesdeSistemaPagos(data);
 
-    cardValidacionNominaFinal?.classList.add("hidden");
+    cardValidacionNominaFinal?.classList.add(
+      "hidden"
+    );
+
     form?.classList.remove("hidden");
 
     mostrarMensaje(
       "ok",
-      `Pasajero validado correctamente: <strong>${escapeHtml(data?.identificacion?.nombreCompleto || "RUT encontrado")}</strong>. Ahora puede completar la ficha médica.`
+      `
+        Pasajero validado correctamente:
+        <strong>${
+          escapeHtml(
+            data?.identificacion?.nombreCompleto ||
+            "RUT encontrado"
+          )
+        }</strong>.
+        Ahora puede completar la ficha médica.
+      `
     );
 
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    window.scrollTo({
+      top: 0,
+      behavior: "smooth"
+    });
+
     aplicarEstadoUI();
     actualizarProgreso();
+
   } catch (error) {
-    console.error("Error validando RUT nómina final:", error);
-    mostrarMensaje("error", "No fue posible validar el RUT. Intente nuevamente.");
+    console.error(
+      "Error validando RUT:",
+      error
+    );
+
+    mostrarMensaje(
+      "error",
+      "No fue posible validar el RUT. Intente nuevamente."
+    );
+
   } finally {
     btnValidarRutNominaFinal.disabled = false;
-    btnValidarRutNominaFinal.textContent = "Validar RUT";
+
+    btnValidarRutNominaFinal.textContent =
+      faseUrl === "lista_espera"
+        ? "Continuar con este RUT"
+        : "Validar RUT";
   }
 }
 
 function precargarFormularioDesdeSistemaPagos(item = {}) {
-  const id = item.identificacion || {};
-  const contacto = item.contactoPrincipal || {};
+  const id =
+    item.identificacion || {};
 
-  if ($("tipoIdentificacion")) $("tipoIdentificacion").value = "rut";
-  if ($("rutNumero")) $("rutNumero").value = id.rutNumero || "";
-  if ($("rutDv")) $("rutDv").value = id.rutDv || "";
+  const contacto =
+    item.contactoPrincipal || {};
 
-  if ($("nombres")) $("nombres").value = id.nombres || "";
-  if ($("primerApellido")) $("primerApellido").value = id.primerApellido || "";
-  if ($("segundoApellido")) $("segundoApellido").value = id.segundoApellido || "";
+  const contacto2 =
+    item.contactoSecundario || {};
 
-  if ($("fechaNacimiento")) $("fechaNacimiento").value = id.fechaNacimiento || "";
-  if ($("genero")) $("genero").value = id.genero || id.generoFinal || "";
+  const emergencia =
+    item.emergencia || {};
+
+  // -----------------------------------------------------------------------
+  // IDENTIFICACIÓN
+  // -----------------------------------------------------------------------
+
+  if ($("tipoIdentificacion")) {
+    $("tipoIdentificacion").value = "rut";
+  }
+
+  if ($("rutNumero")) {
+    $("rutNumero").value =
+      id.rutNumero ||
+      limpiarRutNumero(
+        rutValidacionNumero?.value || ""
+      );
+  }
+
+  if ($("rutDv")) {
+    $("rutDv").value =
+      id.rutDv ||
+      limpiarTexto(
+        rutValidacionDv?.value || ""
+      ).toUpperCase();
+  }
+
+  if ($("nombres")) {
+    $("nombres").value =
+      id.nombres || "";
+  }
+
+  if ($("primerApellido")) {
+    $("primerApellido").value =
+      id.primerApellido || "";
+  }
+
+  if ($("segundoApellido")) {
+    $("segundoApellido").value =
+      id.segundoApellido || "";
+  }
+
+  if ($("fechaNacimiento")) {
+    $("fechaNacimiento").value =
+      id.fechaNacimiento || "";
+  }
+
+  if ($("genero")) {
+    $("genero").value =
+      id.genero ||
+      id.generoFinal ||
+      "";
+  }
+
+  if ($("nacionalidadBase")) {
+    $("nacionalidadBase").value =
+      id.nacionalidadBase || "";
+  }
+
+  if ($("nacionalidadDetalle")) {
+    $("nacionalidadDetalle").value =
+      id.nacionalidadDetalle || "";
+  }
 
   if ($("correoViajante") && id.correoViajante) {
-    $("correoViajante").value = id.correoViajante;
+    $("correoViajante").value =
+      id.correoViajante;
   }
 
-  if ($("contactoPrincipalCorreo") && contacto.correo) {
-    $("contactoPrincipalCorreo").value = contacto.correo;
+  if ($("telefonoViajante") && id.telefonoViajante) {
+    $("telefonoViajante").value =
+      id.telefonoViajante;
   }
 
-  if ($("contactoPrincipalTelefono") && contacto.telefono) {
-    $("contactoPrincipalTelefono").value = contacto.telefono;
+  if ($("tallaPolera") && id.tallaPolera) {
+    $("tallaPolera").value =
+      id.tallaPolera;
   }
 
-  const tipo = item.tipoViajante || item.tipoParticipacion || "";
+  // -----------------------------------------------------------------------
+  // TIPO DE VIAJANTE
+  // -----------------------------------------------------------------------
+
+  const tipo =
+    item.tipoViajante ||
+    item.tipoParticipacion ||
+    "";
 
   if (tipo) {
-    const radio = document.querySelector(`input[name="tipoViajante"][value="${tipo}"]`);
-    if (radio) radio.checked = true;
+    const radio =
+      document.querySelector(
+        `input[name="tipoViajante"][value="${tipo}"]`
+      );
+
+    if (radio) {
+      radio.checked = true;
+    }
   }
 
-  const coincide = document.querySelector(`input[name="nombreCoincideDocumento"][value="si"]`);
-  if (coincide) coincide.checked = true;
+  // -----------------------------------------------------------------------
+  // CONTACTO PRINCIPAL
+  // -----------------------------------------------------------------------
+
+  if (
+    $("contactoPrincipalNombre") &&
+    contacto.nombre
+  ) {
+    $("contactoPrincipalNombre").value =
+      contacto.nombre;
+  }
+
+  if (
+    $("contactoPrincipalRelacion") &&
+    contacto.relacionBase
+  ) {
+    $("contactoPrincipalRelacion").value =
+      contacto.relacionBase;
+  }
+
+  if (
+    $("contactoPrincipalTelefono") &&
+    contacto.telefono
+  ) {
+    $("contactoPrincipalTelefono").value =
+      contacto.telefono;
+  }
+
+  if (
+    $("contactoPrincipalCorreo") &&
+    contacto.correo
+  ) {
+    $("contactoPrincipalCorreo").value =
+      contacto.correo;
+  }
+
+  // -----------------------------------------------------------------------
+  // SEGUNDO CONTACTO
+  // -----------------------------------------------------------------------
+
+  if (contacto2?.aplica === true) {
+    mostrar(
+      bloqueApoderado2,
+      true
+    );
+
+    btnAgregarApoderado2?.classList.add(
+      "hidden"
+    );
+
+    if ($("contactoSecundarioNombre")) {
+      $("contactoSecundarioNombre").value =
+        contacto2.nombre || "";
+    }
+
+    if ($("contactoSecundarioRelacion")) {
+      $("contactoSecundarioRelacion").value =
+        contacto2.relacionBase ||
+        contacto2.relacion ||
+        "";
+    }
+
+    if ($("contactoSecundarioTelefono")) {
+      $("contactoSecundarioTelefono").value =
+        contacto2.telefono || "";
+    }
+
+    if ($("contactoSecundarioCorreo")) {
+      $("contactoSecundarioCorreo").value =
+        contacto2.correo || "";
+    }
+  }
+
+  // -----------------------------------------------------------------------
+  // CONTACTO DE EMERGENCIA
+  // -----------------------------------------------------------------------
+
+  if (
+    $("emergenciaNombre") &&
+    emergencia.nombre
+  ) {
+    $("emergenciaNombre").value =
+      emergencia.nombre;
+  }
+
+  if (
+    $("emergenciaRelacion") &&
+    emergencia.relacionBase
+  ) {
+    $("emergenciaRelacion").value =
+      emergencia.relacionBase;
+  }
+
+  if (
+    $("emergenciaTelefono") &&
+    emergencia.telefono
+  ) {
+    $("emergenciaTelefono").value =
+      emergencia.telefono;
+  }
+
+  // -----------------------------------------------------------------------
+  // DOCUMENTO
+  // -----------------------------------------------------------------------
+
+  const coincide =
+    document.querySelector(
+      'input[name="nombreCoincideDocumento"][value="si"]'
+    );
+
+  if (coincide) {
+    coincide.checked = true;
+  }
+
+  // IMPORTANTE:
+  // No precargamos consentimientos ni comprobante de pago.
+  // Lista de Espera debe declararlos nuevamente.
+
+  aplicarEstadoUI();
+  actualizarProgreso();
 }
 
 // -----------------------------------------------------------------------------
@@ -1030,10 +1530,38 @@ async function onSubmit(event) {
   }
 
   aplicarEstadoUI();
+
+  if (
+    faseUrl === "nomina_final" &&
+    !nominaFinalRutValidado
+  ) {
+    mostrarMensaje(
+      "error",
+      "Primero debe validar el RUT del pasajero en la nómina base del grupo."
+    );
   
-  if (faseUrl === "nomina_final" && !nominaFinalRutValidado) {
-    mostrarMensaje("error", "Primero debe validar el RUT del pasajero en la nómina base del grupo.");
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    window.scrollTo({
+      top: 0,
+      behavior: "smooth"
+    });
+  
+    return;
+  }
+  
+  if (
+    faseUrl === "lista_espera" &&
+    !listaEsperaRutValidado
+  ) {
+    mostrarMensaje(
+      "error",
+      "Primero debe validar el RUT de la persona que desea ingresar a Lista de Espera."
+    );
+  
+    window.scrollTo({
+      top: 0,
+      behavior: "smooth"
+    });
+  
     return;
   }
   
