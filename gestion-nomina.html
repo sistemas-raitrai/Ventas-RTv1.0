@@ -421,10 +421,49 @@
     }
 
     .modal-toolbar {
+      display: grid;
+      grid-template-columns:
+        minmax(0, 2fr)
+        minmax(0, 1fr)
+        minmax(0, .9fr);
+      gap: 12px;
+      margin-bottom: 18px;
+    }
+    
+    .modal-toolbar-groups {
+      align-items: stretch;
+    }
+    
+    .modal-action-group {
+      min-width: 0;
+      padding: 12px;
+      border: 1px solid #ded6e5;
+      border-radius: 14px;
+      background: #faf8fc;
+    }
+    
+    .modal-action-group-title {
+      margin-bottom: 9px;
+      color: #6d6278;
+      font-size: 10px;
+      font-weight: 900;
+      text-transform: uppercase;
+      letter-spacing: .04em;
+    }
+    
+    .modal-action-group-buttons {
       display: flex;
       gap: 8px;
       flex-wrap: wrap;
-      margin-bottom: 18px;
+    }
+    
+    .modal-action-group-buttons button {
+      min-height: 38px;
+    }
+    
+    .modal-action-group.danger-zone {
+      background: #fff8f8;
+      border-color: #ead1d1;
     }
 
     .kpi-blocks {
@@ -1252,6 +1291,10 @@
         grid-template-columns: 1fr 1fr;
       }
 
+      .modal-toolbar {
+        grid-template-columns: 1fr;
+      }
+
       .phase-grid {
         grid-template-columns: 1fr 1fr;
       }
@@ -1700,70 +1743,105 @@
         class="modal-content hidden"
       >
 
-        <div class="modal-toolbar">
-          <button
-            id="btnAbrirGrupo"
-            class="btn-secondary"
-            type="button"
-          >
-            Abrir grupo
-          </button>
+        <div class="modal-toolbar modal-toolbar-groups">
         
-          <button
-            id="btnGestionarFichasMedicas"
-            class="btn-primary"
-            type="button"
-          >
-            Gestionar fichas médicas
-          </button>
+          <!-- =========================================
+               BLOQUE 1 · NAVEGACIÓN / CONSULTA
+          ========================================== -->
+          <div class="modal-action-group">
+            <div class="modal-action-group-title">
+              Consulta y gestión
+            </div>
         
-          <button
-            id="btnVerFichasGrupo"
-            class="btn-secondary"
-            type="button"
-          >
-            Ver fichas del grupo
-          </button>
+            <div class="modal-action-group-buttons">
+              <button
+                id="btnAbrirGrupo"
+                class="btn-secondary"
+                type="button"
+              >
+                Abrir grupo
+              </button>
         
-          <button
-            id="btnGestionarPulseras"
-            class="btn-primary"
-            type="button"
-          >
-            Gestionar pulseras NFC
-          </button>
+              <button
+                id="btnGestionarFichasMedicas"
+                class="btn-primary"
+                type="button"
+              >
+                Gestionar fichas médicas
+              </button>
         
-          <button
-            id="btnExportarCsv"
-            class="btn-secondary"
-            type="button"
-          >
-            Exportar CSV
-          </button>
+              <button
+                id="btnVerFichasGrupo"
+                class="btn-secondary"
+                type="button"
+              >
+                Ver fichas del grupo
+              </button>
         
-          <button
-            id="btnCargadoPagos"
-            class="btn-primary"
-            type="button"
-          >
-            Marcar cargado a pagos
-          </button>
+              <button
+                id="btnGestionarPulseras"
+                class="btn-primary"
+                type="button"
+              >
+                Gestionar pulseras NFC
+              </button>
+            </div>
+          </div>
         
-          <button
-            id="btnArchivar"
-            class="btn-secondary"
-            type="button"
-          >
-            Archivar nómina
-          </button>
+          <!-- =========================================
+               BLOQUE 2 · HERRAMIENTAS / ADMINISTRACIÓN
+          ========================================== -->
+          <div class="modal-action-group">
+            <div class="modal-action-group-title">
+              Herramientas administrativas
+            </div>
         
-          <button
-            id="btnResetear"
-            class="btn-danger"
-            type="button"
-          >
-            Resetear ciclo
-          </button>
+            <div class="modal-action-group-buttons">
+              <button
+                id="btnExportarCsv"
+                class="btn-secondary"
+                type="button"
+              >
+                Exportar CSV
+              </button>
+        
+              <button
+                id="btnCargadoPagos"
+                class="btn-primary"
+                type="button"
+              >
+                Marcar cargado a pagos
+              </button>
+            </div>
+          </div>
+        
+          <!-- =========================================
+               BLOQUE 3 · ACCIONES SENSIBLES
+          ========================================== -->
+          <div class="modal-action-group danger-zone">
+            <div class="modal-action-group-title">
+              Acciones sensibles
+            </div>
+        
+            <div class="modal-action-group-buttons">
+              <button
+                id="btnArchivar"
+                class="btn-secondary"
+                type="button"
+              >
+                Archivar nómina
+              </button>
+        
+              <button
+                id="btnResetear"
+                class="btn-danger"
+                type="button"
+              >
+                Resetear ciclo
+              </button>
+            </div>
+          </div>
+        
         </div>
 
         <section
