@@ -5512,14 +5512,15 @@ function renderSeccionEditorNomina(
 function renderCheckboxEditorNomina({
   label,
   path,
-  checked = false
+  checked = false,
+  help = ""
 }) {
   return `
     <label
       style="
         grid-column:1 / -1;
         display:flex;
-        align-items:center;
+        align-items:flex-start;
         gap:9px;
         font-weight:700;
         padding:9px 0;
@@ -5530,25 +5531,151 @@ function renderCheckboxEditorNomina({
         data-nomina-edit-path="${esc(
           path
         )}"
+        data-nomina-edit-type="boolean"
         ${
           checked
             ? "checked"
             : ""
         }
+        style="
+          margin-top:3px;
+        "
       >
 
-      ${esc(
-        label
-      )}
+      <span>
+        ${esc(
+          label
+        )}
+
+        ${
+          help
+            ? `
+              <small
+                style="
+                  display:block;
+                  margin-top:3px;
+                  color:#776b83;
+                  font-weight:500;
+                "
+              >
+                ${esc(
+                  help
+                )}
+              </small>
+            `
+            : ""
+        }
+      </span>
     </label>
   `;
 }
+
+
+function renderSelectEditorNomina({
+  label,
+  path,
+  value = "",
+  options = [],
+  help = ""
+}) {
+  const current =
+    String(
+      value ??
+      ""
+    );
+
+  return `
+    <label
+      style="
+        display:flex;
+        flex-direction:column;
+        gap:6px;
+        font-weight:700;
+      "
+    >
+      ${esc(
+        label
+      )}
+
+      <select
+        data-nomina-edit-path="${esc(
+          path
+        )}"
+        data-nomina-edit-type="select"
+        style="
+          width:100%;
+          box-sizing:border-box;
+          padding:10px;
+          border:1px solid #ccc;
+          border-radius:8px;
+          background:#fff;
+          font-weight:400;
+        "
+      >
+        <option value="">
+          Seleccione...
+        </option>
+
+        ${
+          options
+            .map(
+              (option) => {
+                const optionValue =
+                  String(
+                    option.value ??
+                    ""
+                  );
+
+                return `
+                  <option
+                    value="${esc(
+                      optionValue
+                    )}"
+                    ${
+                      optionValue ===
+                      current
+                        ? "selected"
+                        : ""
+                    }
+                  >
+                    ${esc(
+                      option.label
+                    )}
+                  </option>
+                `;
+              }
+            )
+            .join("")
+        }
+      </select>
+
+      ${
+        help
+          ? `
+            <small
+              style="
+                color:#776b83;
+                font-weight:500;
+              "
+            >
+              ${esc(
+                help
+              )}
+            </small>
+          `
+          : ""
+      }
+    </label>
+  `;
+}
+
 
 function renderCampoEditorNomina({
   label,
   path,
   value = "",
-  type = "text"
+  type = "text",
+  help = ""
 }) {
   return `
     <label
@@ -5574,6 +5701,9 @@ function renderCampoEditorNomina({
         data-nomina-edit-path="${esc(
           path
         )}"
+        data-nomina-edit-type="${esc(
+          type
+        )}"
         style="
           width:100%;
           box-sizing:border-box;
@@ -5583,6 +5713,23 @@ function renderCampoEditorNomina({
           font-weight:400;
         "
       >
+
+      ${
+        help
+          ? `
+            <small
+              style="
+                color:#776b83;
+                font-weight:500;
+              "
+            >
+              ${esc(
+                help
+              )}
+            </small>
+          `
+          : ""
+      }
     </label>
   `;
 }
@@ -5610,18 +5757,33 @@ async function abrirEditorNomina(
       inscripcionId
     );
 
+  const get =
+    (path, fallback = "") => {
+      const value =
+        getByPathNomina(
+          item,
+          path
+        );
+
+      return (
+        value !==
+          undefined &&
+        value !==
+          null
+      )
+        ? value
+        : fallback;
+    };
+
   const nombreCompleto =
     [
-      getByPathNomina(
-        item,
+      get(
         "identificacion.nombres"
       ),
-      getByPathNomina(
-        item,
+      get(
         "identificacion.primerApellido"
       ),
-      getByPathNomina(
-        item,
+      get(
         "identificacion.segundoApellido"
       )
     ]
@@ -5669,22 +5831,307 @@ async function abrirEditorNomina(
         ""
       ).trim() ||
       String(
-        secundario.celular ||
         secundario.telefono ||
+        secundario.celular ||
         ""
       ).trim()
     );
 
+  const opcionesTipoViajante = [
+    {
+      value:
+        "estudiante",
+      label:
+        "Estudiante"
+    },
+    {
+      value:
+        "profesor",
+      label:
+        "Profesor(a)"
+    },
+    {
+      value:
+        "adulto_acompanante",
+      label:
+        "Adulto(a) acompañante"
+    }
+  ];
+
+  const opcionesGenero = [
+    {
+      value:
+        "masculino",
+      label:
+        "Masculino"
+    },
+    {
+      value:
+        "femenino",
+      label:
+        "Femenino"
+    },
+    {
+      value:
+        "otro",
+      label:
+        "Otro"
+    }
+  ];
+
+  const opcionesIdentificacion = [
+    {
+      value:
+        "rut",
+      label:
+        "RUT"
+    },
+    {
+      value:
+        "sin_rut",
+      label:
+        "No tiene RUT"
+    }
+  ];
+
+  const opcionesNacionalidad = [
+    {
+      value:
+        "chilena",
+      label:
+        "Chilena"
+    },
+    {
+      value:
+        "extranjera",
+      label:
+        "Extranjera"
+    },
+    {
+      value:
+        "doble",
+      label:
+        "Doble nacionalidad"
+    }
+  ];
+
+  const opcionesRelacionResponsable = [
+    {
+      value:
+        "padre",
+      label:
+        "Padre"
+    },
+    {
+      value:
+        "madre",
+      label:
+        "Madre"
+    },
+    {
+      value:
+        "tutor",
+      label:
+        "Tutor(a)"
+    },
+    {
+      value:
+        "otro",
+      label:
+        "Otro"
+    }
+  ];
+
+  const opcionesTipoProfesor = [
+    {
+      value:
+        "profesor_jefe",
+      label:
+        "Profesor jefe"
+    },
+    {
+      value:
+        "profesor",
+      label:
+        "Profesor"
+    },
+    {
+      value:
+        "otro",
+      label:
+        "Otro"
+    }
+  ];
+
+  const opcionesRelacionCurso = [
+    {
+      value:
+        "padre_madre",
+      label:
+        "Padre o madre de un estudiante"
+    },
+    {
+      value:
+        "apoderado",
+      label:
+        "Apoderado"
+    },
+    {
+      value:
+        "otro",
+      label:
+        "Otro"
+    }
+  ];
+
+  const opcionesHijosViaje = [
+    {
+      value:
+        "si",
+      label:
+        "Sí"
+    },
+    {
+      value:
+        "no",
+      label:
+        "No"
+    },
+    {
+      value:
+        "prefiere_no",
+      label:
+        "Prefiero no responder"
+    }
+  ];
+
+  const opcionesCoincideDocumento = [
+    {
+      value:
+        "si",
+      label:
+        "Sí"
+    },
+    {
+      value:
+        "no",
+      label:
+        "No"
+    }
+  ];
+
+  const opcionesSexoDocumento = [
+    {
+      value:
+        "masculino",
+      label:
+        "Masculino"
+    },
+    {
+      value:
+        "femenino",
+      label:
+        "Femenino"
+    }
+  ];
+
+  const opcionesPaisDestino = [
+    {
+      value:
+        "no",
+      label:
+        "No"
+    },
+    {
+      value:
+        "si",
+      label:
+        "Sí"
+    },
+    {
+      value:
+        "no_informado",
+      label:
+        "No informado"
+    }
+  ];
+
+  const opcionesAutorizaApoderado = [
+    {
+      value:
+        "true",
+      label:
+        "Sí, autoriza"
+    },
+    {
+      value:
+        "false",
+      label:
+        "No autoriza"
+    }
+  ];
+
+  const valorAutorizaApoderado =
+    get(
+      "consentimiento.autorizaApoderadoCoordinador",
+      null
+    );
+
   /*
-    IMPORTANTE:
-    no reconstruimos objetos completos.
-    Cada input representa una ruta Firestore exacta.
+    =====================================================
+    EDITOR ADMINISTRATIVO / ESTRUCTURAL
+    =====================================================
+
+    NO contiene:
+    - talla
+    - contacto emergencia
+    - salud
+    - medicamentos
+    - dietas
+    - alergias
+    - neurodivergencia
+
+    Esos pertenecen a Gestión Fichas Médicas.
   */
+
   $("editarNominaCampos").innerHTML = `
+
     ${renderSeccionEditorNomina(
-      "Datos del pasajero",
-      "Identificación y datos administrativos de quien viaja."
+      "Tipo de participación",
+      "Define administrativamente quién viaja y su rol dentro del grupo."
     )}
+
+    ${renderSelectEditorNomina({
+      label:
+        "Tipo de viajante",
+      path:
+        "tipoViajante",
+      value:
+        item.tipoViajante ||
+        item.tipoParticipacion ||
+        "",
+      options:
+        opcionesTipoViajante
+    })}
+
+
+    ${renderSeccionEditorNomina(
+      "Identificación del pasajero",
+      "Datos estructurales utilizados para identificar al pasajero en el sistema."
+    )}
+
+    ${renderSelectEditorNomina({
+      label:
+        "Tipo de identificación",
+      path:
+        "identificacion.tipoIdentificacion",
+      value:
+        get(
+          "identificacion.tipoIdentificacion"
+        ),
+      options:
+        opcionesIdentificacion
+    })}
 
     ${renderCampoEditorNomina({
       label:
@@ -5703,8 +6150,7 @@ async function abrirEditorNomina(
       path:
         "identificacion.nombres",
       value:
-        getByPathNomina(
-          item,
+        get(
           "identificacion.nombres"
         )
     })}
@@ -5715,8 +6161,7 @@ async function abrirEditorNomina(
       path:
         "identificacion.primerApellido",
       value:
-        getByPathNomina(
-          item,
+        get(
           "identificacion.primerApellido"
         )
     })}
@@ -5727,8 +6172,7 @@ async function abrirEditorNomina(
       path:
         "identificacion.segundoApellido",
       value:
-        getByPathNomina(
-          item,
+        get(
           "identificacion.segundoApellido"
         )
     })}
@@ -5739,52 +6183,191 @@ async function abrirEditorNomina(
       path:
         "identificacion.fechaNacimiento",
       value:
-        getByPathNomina(
-          item,
+        get(
           "identificacion.fechaNacimiento"
         ),
       type:
         "date"
     })}
 
-    ${renderCampoEditorNomina({
+    ${renderSelectEditorNomina({
       label:
-        "Tipo de viajante",
-      path:
-        "tipoViajante",
-      value:
-        item.tipoViajante ||
-        item.tipoParticipacion ||
-        ""
-    })}
-
-    ${renderCampoEditorNomina({
-      label:
-        "Nacionalidad",
-      path:
-        "identificacion.nacionalidad",
-      value:
-        getByPathNomina(
-          item,
-          "identificacion.nacionalidad"
-        )
-    })}
-
-    ${renderCampoEditorNomina({
-      label:
-        "Género / Sexo",
+        "Género",
       path:
         "identificacion.genero",
       value:
-        getByPathNomina(
-          item,
+        get(
           "identificacion.genero"
+        ),
+      options:
+        opcionesGenero
+    })}
+
+    ${renderCampoEditorNomina({
+      label:
+        "Especifique género",
+      path:
+        "identificacion.generoOtro",
+      value:
+        get(
+          "identificacion.generoOtro"
+        ),
+      help:
+        "Solo corresponde cuando Género = Otro."
+    })}
+
+    ${renderSelectEditorNomina({
+      label:
+        "Nacionalidad",
+      path:
+        "identificacion.nacionalidadBase",
+      value:
+        get(
+          "identificacion.nacionalidadBase",
+          get(
+            "identificacion.nacionalidad"
+          )
+        ),
+      options:
+        opcionesNacionalidad
+    })}
+
+    ${renderCampoEditorNomina({
+      label:
+        "Detalle nacionalidad",
+      path:
+        "identificacion.nacionalidadDetalle",
+      value:
+        get(
+          "identificacion.nacionalidadDetalle"
+        ),
+      help:
+        "Se utiliza para nacionalidad extranjera o doble."
+    })}
+
+
+    ${renderSeccionEditorNomina(
+      "Contacto de la persona que viaja",
+      "Datos de contacto propios del pasajero."
+    )}
+
+    ${renderCampoEditorNomina({
+      label:
+        "Correo electrónico del pasajero",
+      path:
+        "identificacion.correoViajante",
+      value:
+        get(
+          "identificacion.correoViajante"
+        ),
+      type:
+        "email"
+    })}
+
+    ${renderCampoEditorNomina({
+      label:
+        "WhatsApp / teléfono del pasajero",
+      path:
+        "identificacion.telefonoViajante",
+      value:
+        get(
+          "identificacion.telefonoViajante"
         )
     })}
 
+    ${renderCheckboxEditorNomina({
+      label:
+        "Autoriza comunicaciones al correo de la persona que viaja",
+      path:
+        "identificacion.autorizaCorreosPreviosPersonaQueViaja",
+      checked:
+        get(
+          "identificacion.autorizaCorreosPreviosPersonaQueViaja"
+        ) === true,
+      help:
+        "Corresponde especialmente cuando se informa correo de un estudiante."
+    })}
+
+
+    ${renderSeccionEditorNomina(
+      "Datos según documento",
+      "Información estructurada declarada respecto del documento de identidad."
+    )}
+
+    ${renderSelectEditorNomina({
+      label:
+        "¿Nombre coincide con documento?",
+      path:
+        "documentoIdentidad.nombreCoincideDocumento",
+      value:
+        get(
+          "documentoIdentidad.nombreCoincideDocumento"
+        ),
+      options:
+        opcionesCoincideDocumento
+    })}
+
+    ${renderCampoEditorNomina({
+      label:
+        "Nombres según documento",
+      path:
+        "documentoIdentidad.nombresDocumento",
+      value:
+        get(
+          "documentoIdentidad.nombresDocumento"
+        )
+    })}
+
+    ${renderCampoEditorNomina({
+      label:
+        "Primer apellido según documento",
+      path:
+        "documentoIdentidad.primerApellidoDocumento",
+      value:
+        get(
+          "documentoIdentidad.primerApellidoDocumento"
+        )
+    })}
+
+    ${renderCampoEditorNomina({
+      label:
+        "Segundo apellido según documento",
+      path:
+        "documentoIdentidad.segundoApellidoDocumento",
+      value:
+        get(
+          "documentoIdentidad.segundoApellidoDocumento"
+        )
+    })}
+
+    ${renderSelectEditorNomina({
+      label:
+        "Sexo indicado en documento",
+      path:
+        "documentoIdentidad.sexoDocumento",
+      value:
+        get(
+          "documentoIdentidad.sexoDocumento"
+        ),
+      options:
+        opcionesSexoDocumento
+    })}
+
+    ${renderCheckboxEditorNomina({
+      label:
+        "Declara que comunicará actualización del documento",
+      path:
+        "documentoIdentidad.declaraActualizacionDocumento",
+      checked:
+        get(
+          "documentoIdentidad.declaraActualizacionDocumento"
+        ) === true
+    })}
+
+
     ${renderSeccionEditorNomina(
       "Responsable principal",
-      "Adulto principal registrado para este pasajero."
+      "Responsable administrativo y contractual principal del estudiante."
     )}
 
     ${renderCampoEditorNomina({
@@ -5797,15 +6380,29 @@ async function abrirEditorNomina(
         ""
     })}
 
-    ${renderCampoEditorNomina({
+    ${renderSelectEditorNomina({
       label:
         "Relación",
+      path:
+        "contactoPrincipal.relacionBase",
+      value:
+        principal.relacionBase ||
+        principal.relacion ||
+        "",
+      options:
+        opcionesRelacionResponsable
+    })}
+
+    ${renderCampoEditorNomina({
+      label:
+        "Relación — Otro",
       path:
         "contactoPrincipal.relacion",
       value:
         principal.relacion ||
-        principal.relacionBase ||
-        ""
+        "",
+      help:
+        "Solo modificar manualmente cuando la relación base sea Otro."
     })}
 
     ${renderCampoEditorNomina({
@@ -5822,18 +6419,19 @@ async function abrirEditorNomina(
 
     ${renderCampoEditorNomina({
       label:
-        "Teléfono",
+        "Teléfono / WhatsApp",
       path:
-        "contactoPrincipal.celular",
+        "contactoPrincipal.telefono",
       value:
-        principal.celular ||
         principal.telefono ||
+        principal.celular ||
         ""
     })}
 
+
     ${renderSeccionEditorNomina(
       "Responsable secundario",
-      "Segundo adulto responsable. Es un dato de nómina, no de ficha médica."
+      "Segundo responsable administrativo del estudiante."
     )}
 
     ${renderCheckboxEditorNomina({
@@ -5855,14 +6453,26 @@ async function abrirEditorNomina(
         ""
     })}
 
-    ${renderCampoEditorNomina({
+    ${renderSelectEditorNomina({
       label:
         "Relación",
+      path:
+        "contactoSecundario.relacionBase",
+      value:
+        secundario.relacionBase ||
+        secundario.relacion ||
+        "",
+      options:
+        opcionesRelacionResponsable
+    })}
+
+    ${renderCampoEditorNomina({
+      label:
+        "Relación — Otro",
       path:
         "contactoSecundario.relacion",
       value:
         secundario.relacion ||
-        secundario.relacionBase ||
         ""
     })}
 
@@ -5880,13 +6490,256 @@ async function abrirEditorNomina(
 
     ${renderCampoEditorNomina({
       label:
-        "Teléfono",
+        "Teléfono / WhatsApp",
       path:
-        "contactoSecundario.celular",
+        "contactoSecundario.telefono",
       value:
-        secundario.celular ||
         secundario.telefono ||
+        secundario.celular ||
         ""
+    })}
+
+
+    ${renderSeccionEditorNomina(
+      "Profesor(a)",
+      "Solo aplica cuando el tipo de viajante corresponde a profesor."
+    )}
+
+    ${renderSelectEditorNomina({
+      label:
+        "Tipo de profesor",
+      path:
+        "profesor.tipoProfesorBase",
+      value:
+        get(
+          "profesor.tipoProfesorBase",
+          get(
+            "profesor.tipoProfesor"
+          )
+        ),
+      options:
+        opcionesTipoProfesor
+    })}
+
+    ${renderCampoEditorNomina({
+      label:
+        "Tipo de profesor — Otro",
+      path:
+        "profesor.tipoProfesorOtro",
+      value:
+        get(
+          "profesor.tipoProfesorOtro"
+        )
+    })}
+
+    ${renderCheckboxEditorNomina({
+      label:
+        "Interés en programa Conoce Rai Trai",
+      path:
+        "profesor.interesConoceRaitrai",
+      checked:
+        get(
+          "profesor.interesConoceRaitrai"
+        ) === true
+    })}
+
+
+    ${renderSeccionEditorNomina(
+      "Adulto acompañante",
+      "Solo aplica cuando el pasajero viaja como adulto acompañante."
+    )}
+
+    ${renderSelectEditorNomina({
+      label:
+        "Relación con el curso",
+      path:
+        "adultoAcompanante.relacionCursoBase",
+      value:
+        get(
+          "adultoAcompanante.relacionCursoBase",
+          get(
+            "adultoAcompanante.relacionCurso"
+          )
+        ),
+      options:
+        opcionesRelacionCurso
+    })}
+
+    ${renderCampoEditorNomina({
+      label:
+        "Relación con el curso — Otro",
+      path:
+        "adultoAcompanante.relacionCursoOtro",
+      value:
+        get(
+          "adultoAcompanante.relacionCursoOtro"
+        )
+    })}
+
+    ${renderCampoEditorNomina({
+      label:
+        "Nombres del estudiante relacionado",
+      path:
+        "adultoAcompanante.estudianteRelacionadoNombres",
+      value:
+        get(
+          "adultoAcompanante.estudianteRelacionadoNombres"
+        )
+    })}
+
+    ${renderCampoEditorNomina({
+      label:
+        "Primer apellido estudiante relacionado",
+      path:
+        "adultoAcompanante.estudianteRelacionadoPrimerApellido",
+      value:
+        get(
+          "adultoAcompanante.estudianteRelacionadoPrimerApellido"
+        )
+    })}
+
+    ${renderCampoEditorNomina({
+      label:
+        "Segundo apellido estudiante relacionado",
+      path:
+        "adultoAcompanante.estudianteRelacionadoSegundoApellido",
+      value:
+        get(
+          "adultoAcompanante.estudianteRelacionadoSegundoApellido"
+        )
+    })}
+
+    ${renderSelectEditorNomina({
+      label:
+        "¿Tiene hijos/as u otros estudiantes cercanos que podrían viajar?",
+      path:
+        "adultoAcompanante.acompananteTieneHijosViaje",
+      value:
+        get(
+          "adultoAcompanante.acompananteTieneHijosViaje"
+        ),
+      options:
+        opcionesHijosViaje
+    })}
+
+    ${renderCheckboxEditorNomina({
+      label:
+        "Interés en programa Conoce Rai Trai",
+      path:
+        "adultoAcompanante.interesConoceRaitrai",
+      checked:
+        get(
+          "adultoAcompanante.interesConoceRaitrai"
+        ) === true
+    })}
+
+
+    ${renderSeccionEditorNomina(
+      "Documentación internacional",
+      "Declaraciones estructurales relativas a documentación y nacionalidad."
+    )}
+
+    ${renderCheckboxEditorNomina({
+      label:
+        "Declara que contará con documentación y autorizaciones necesarias",
+      path:
+        "documentacion.declaraDocumentacionViaje",
+      checked:
+        get(
+          "documentacion.declaraDocumentacionViaje"
+        ) === true
+    })}
+
+    ${renderSelectEditorNomina({
+      label:
+        "¿Tiene nacionalidad del país de destino?",
+      path:
+        "documentacion.nacionalidadPaisDestino",
+      value:
+        get(
+          "documentacion.nacionalidadPaisDestino"
+        ),
+      options:
+        opcionesPaisDestino
+    })}
+
+    ${renderCheckboxEditorNomina({
+      label:
+        "Declara revisión consular cuando corresponde",
+      path:
+        "documentacion.declaraRevisionConsulado",
+      checked:
+        get(
+          "documentacion.declaraRevisionConsulado"
+        ) === true
+    })}
+
+
+    ${renderSeccionEditorNomina(
+      "Consentimientos y declaraciones",
+      "Registro de las autorizaciones entregadas en el formulario."
+    )}
+
+    ${renderSelectEditorNomina({
+      label:
+        "Compartir información con apoderado encargado",
+      path:
+        "consentimiento.autorizaApoderadoCoordinador",
+      value:
+        valorAutorizaApoderado ===
+          null
+          ? ""
+          : String(
+              valorAutorizaApoderado
+            ),
+      options:
+        opcionesAutorizaApoderado,
+      help:
+        "Sí y No son respuestas válidas. Vacío significa que no existe respuesta registrada."
+    })}
+
+    ${renderCheckboxEditorNomina({
+      label:
+        "Declaración de veracidad",
+      path:
+        "consentimiento.aceptaVeracidad",
+      checked:
+        get(
+          "consentimiento.aceptaVeracidad"
+        ) === true
+    })}
+
+    ${renderCheckboxEditorNomina({
+      label:
+        "Autoriza uso interno de la información",
+      path:
+        "consentimiento.aceptaUsoInterno",
+      checked:
+        get(
+          "consentimiento.aceptaUsoInterno"
+        ) === true
+    })}
+
+    ${renderCheckboxEditorNomina({
+      label:
+        "Acepta condición de modificaciones posteriores",
+      path:
+        "consentimiento.aceptaCambiosCorreo",
+      checked:
+        get(
+          "consentimiento.aceptaCambiosCorreo"
+        ) === true
+    })}
+
+    ${renderCheckboxEditorNomina({
+      label:
+        "Acepta condiciones de Lista de Espera",
+      path:
+        "consentimiento.aceptaCondicionesListaEspera",
+      checked:
+        get(
+          "consentimiento.aceptaCondicionesListaEspera"
+        ) === true
     })}
   `;
 
@@ -5934,11 +6787,18 @@ function leerValoresEditorNomina() {
           input.dataset
             .nominaEditPath;
 
+        const editType =
+          input.dataset
+            .nominaEditType ||
+          input.type ||
+          "text";
+
         let value;
 
         /*
-          contactoSecundario.aplica
-          debe guardarse como boolean real.
+          ==================================================
+          1. BOOLEANOS REALES
+          ==================================================
         */
         if (
           input.type ===
@@ -5947,7 +6807,42 @@ function leerValoresEditorNomina() {
           value =
             input.checked ===
             true;
-        } else {
+        }
+
+        /*
+          consentimiento.autorizaApoderadoCoordinador
+          utiliza un SELECT porque:
+          - true = Sí
+          - false = No
+          - vacío = no existe respuesta
+
+          No podemos convertir false en vacío.
+        */
+        else if (
+          path ===
+          "consentimiento.autorizaApoderadoCoordinador"
+        ) {
+          if (
+            input.value ===
+            "true"
+          ) {
+            value = true;
+          } else if (
+            input.value ===
+            "false"
+          ) {
+            value = false;
+          } else {
+            value = null;
+          }
+        }
+
+        /*
+          ==================================================
+          2. RESTO DE CAMPOS
+          ==================================================
+        */
+        else {
           value =
             String(
               input.value ||
@@ -5956,9 +6851,9 @@ function leerValoresEditorNomina() {
         }
 
         /*
-          Convención actual del sistema:
-          nombres y relaciones normalizados
-          para evitar diferencias visuales.
+          ==================================================
+          3. NORMALIZACIÓN DE NOMBRES
+          ==================================================
         */
         if (
           typeof value ===
@@ -5967,13 +6862,17 @@ function leerValoresEditorNomina() {
             "identificacion.nombres",
             "identificacion.primerApellido",
             "identificacion.segundoApellido",
-            "identificacion.nacionalidad",
+
+            "documentoIdentidad.nombresDocumento",
+            "documentoIdentidad.primerApellidoDocumento",
+            "documentoIdentidad.segundoApellidoDocumento",
 
             "contactoPrincipal.nombre",
-            "contactoPrincipal.relacion",
-
             "contactoSecundario.nombre",
-            "contactoSecundario.relacion"
+
+            "adultoAcompanante.estudianteRelacionadoNombres",
+            "adultoAcompanante.estudianteRelacionadoPrimerApellido",
+            "adultoAcompanante.estudianteRelacionadoSegundoApellido"
           ].includes(
             path
           )
@@ -5984,10 +6883,16 @@ function leerValoresEditorNomina() {
             );
         }
 
+        /*
+          ==================================================
+          4. NORMALIZACIÓN DE CORREOS
+          ==================================================
+        */
         if (
           typeof value ===
             "string" &&
           [
+            "identificacion.correoViajante",
             "contactoPrincipal.correo",
             "contactoSecundario.correo"
           ].includes(
@@ -6002,8 +6907,29 @@ function leerValoresEditorNomina() {
           value;
 
         /*
-          El documento se mantiene sincronizado
-          con rutCompleto sin reemplazar identificacion.
+          ==================================================
+          5. CAMPOS ESPEJO NECESARIOS
+          ==================================================
+        */
+
+        /*
+          El tipo se conserva también en tipoParticipacion
+          para registros antiguos.
+        */
+        if (
+          path ===
+          "tipoViajante"
+        ) {
+          valores[
+            "tipoParticipacion"
+          ] =
+            value;
+        }
+
+        /*
+          Documento / RUT:
+          mantenemos las rutas de compatibilidad
+          que ya utiliza el sistema actual.
         */
         if (
           path ===
@@ -6013,18 +6939,80 @@ function leerValoresEditorNomina() {
             "identificacion.rutCompleto"
           ] =
             value;
+
+          valores[
+            "identificacion.rut"
+          ] =
+            value;
         }
 
         /*
-          Conservamos compatibilidad con registros
-          que usan tipoParticipacion.
+          Género final.
         */
         if (
           path ===
-          "tipoViajante"
+          "identificacion.genero"
         ) {
           valores[
-            "tipoParticipacion"
+            "identificacion.generoFinal"
+          ] =
+            value;
+        }
+
+        /*
+          Relación principal:
+          si NO es otro, relación final = relación base.
+        */
+        if (
+          path ===
+          "contactoPrincipal.relacionBase" &&
+          value !==
+            "otro"
+        ) {
+          valores[
+            "contactoPrincipal.relacion"
+          ] =
+            value;
+        }
+
+        if (
+          path ===
+          "contactoSecundario.relacionBase" &&
+          value !==
+            "otro"
+        ) {
+          valores[
+            "contactoSecundario.relacion"
+          ] =
+            value;
+        }
+
+        /*
+          Profesor.
+        */
+        if (
+          path ===
+          "profesor.tipoProfesorBase" &&
+          value !==
+            "otro"
+        ) {
+          valores[
+            "profesor.tipoProfesor"
+          ] =
+            value;
+        }
+
+        /*
+          Adulto acompañante.
+        */
+        if (
+          path ===
+          "adultoAcompanante.relacionCursoBase" &&
+          value !==
+            "otro"
+        ) {
+          valores[
+            "adultoAcompanante.relacionCurso"
           ] =
             value;
         }
