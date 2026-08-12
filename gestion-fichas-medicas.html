@@ -180,7 +180,66 @@
         </div>
       </section>
 
-      <section class="panel table-wrap">
+      <section class="panel">
+        <div class="medical-tabs">
+          <button
+            id="btnVistaFichas"
+            class="medical-tab active"
+            type="button"
+            data-medical-view="fichas"
+          >
+            Pasajeros
+          </button>
+      
+          <button
+            id="btnVistaHistorial"
+            class="medical-tab"
+            type="button"
+            data-medical-view="historial"
+          >
+            Historial de cambios
+          </button>
+        </div>
+      </section>
+      
+      <section
+        id="medicalHistoryPanel"
+        class="panel hidden"
+      >
+        <div class="medical-history-head">
+          <div>
+            <h2>
+              Historial de fichas y datos operativos
+            </h2>
+      
+            <p>
+              Modificaciones realizadas desde Gestión de Fichas Médicas.
+            </p>
+          </div>
+      
+          <div
+            id="medicalHistoryCount"
+            class="medical-history-count"
+          >
+            0 movimientos
+          </div>
+        </div>
+      
+        <div
+          id="medicalHistoryList"
+          class="medical-history-list"
+        >
+          <div class="loading">
+            Cargando historial...
+          </div>
+        </div>
+      </section>
+      
+
+      <section
+        id="medicalPassengersPanel"
+        class="panel table-wrap"
+      >
         <table>
           <thead>
             <tr>
