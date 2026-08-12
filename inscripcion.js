@@ -157,6 +157,14 @@ let nominaFinalRutValidado = false;
 let identidadOriginalPrecargada = null;
 
 // -----------------------------------------------------------------------------
+// NUEVO INGRESO · VALIDACIÓN PREVIA POR RUT
+// -----------------------------------------------------------------------------
+let nuevoIngresoRutValidado = false;
+let nuevoIngresoReingreso = false;
+let nuevoIngresoInscripcionAnterior = null;
+let nuevoIngresoInscripcionAnteriorDocId = "";
+
+// -----------------------------------------------------------------------------
 // LISTA DE ESPERA · VALIDACIÓN PREVIA POR RUT
 // -----------------------------------------------------------------------------
 let listaEsperaRutValidado = false;
@@ -329,13 +337,14 @@ async function cargarGrupo() {
 function conectarEventos() {
   btnComenzar?.addEventListener("click", () => {
     registrarSesionFormulario("formulario_comenzado");
-  
+
     pantallaBienvenida?.classList.add("hidden");
-  
+
     const requiereValidacionPreviaRut =
       faseUrl === "nomina_final" ||
-      faseUrl === "lista_espera";
-  
+      faseUrl === "lista_espera" ||
+      faseUrl === "nuevos";
+
     if (requiereValidacionPreviaRut) {
       prepararCardValidacionRut();
       cardValidacionNominaFinal?.classList.remove("hidden");
@@ -343,19 +352,29 @@ function conectarEventos() {
     } else {
       form?.classList.remove("hidden");
     }
-  
+
     window.scrollTo({
       top: 0,
       behavior: "smooth"
     });
-  
+
     actualizarProgreso();
   });
-  
-  btnValidarRutNominaFinal?.addEventListener("click", validarRutNominaFinal);
-  
-  rutValidacionNumero?.addEventListener("input", normalizarRutValidacion);
-  rutValidacionDv?.addEventListener("input", normalizarRutValidacion);
+
+  btnValidarRutNominaFinal?.addEventListener(
+    "click",
+    validarRutNominaFinal
+  );
+
+  rutValidacionNumero?.addEventListener(
+    "input",
+    normalizarRutValidacion
+  );
+
+  rutValidacionDv?.addEventListener(
+    "input",
+    normalizarRutValidacion
+  );
 
   form?.addEventListener("submit", onSubmit);
   btnLimpiar?.addEventListener("click", onLimpiar);
@@ -363,15 +382,15 @@ function conectarEventos() {
   $("btnInfoConoceRaitrai")?.addEventListener("click", () => {
     $("modalConoceRaitrai")?.classList.remove("hidden");
   });
-  
+
   $("btnInfoConoceRaitraiAcompanante")?.addEventListener("click", () => {
     $("modalConoceRaitrai")?.classList.remove("hidden");
   });
-  
+
   $("btnCerrarConoceRaitrai")?.addEventListener("click", () => {
     $("modalConoceRaitrai")?.classList.add("hidden");
   });
-  
+
   $("modalConoceRaitrai")?.addEventListener("click", (event) => {
     if (event.target?.id === "modalConoceRaitrai") {
       $("modalConoceRaitrai")?.classList.add("hidden");
@@ -380,14 +399,14 @@ function conectarEventos() {
 
   $("btnAbrirTallas")?.addEventListener("click", () => {
     if (!grupoIncluyePolera()) return;
-  
+
     $("modalTallasPolera")?.classList.remove("hidden");
   });
-  
+
   $("btnCerrarTallas")?.addEventListener("click", () => {
     $("modalTallasPolera")?.classList.add("hidden");
   });
-  
+
   $("modalTallasPolera")?.addEventListener("click", (event) => {
     if (event.target?.id === "modalTallasPolera") {
       $("modalTallasPolera")?.classList.add("hidden");
@@ -395,40 +414,52 @@ function conectarEventos() {
   });
 
   form?.addEventListener("input", actualizarProgreso);
+
   form?.addEventListener("change", () => {
     aplicarEstadoUI();
     actualizarProgreso();
   });
 
-  document.querySelectorAll('input[name="tipoViajante"]').forEach((el) => {
-    el.addEventListener("change", aplicarEstadoUI);
-  });
+  document
+    .querySelectorAll('input[name="tipoViajante"]')
+    .forEach((el) => {
+      el.addEventListener("change", aplicarEstadoUI);
+    });
 
   $("rutNumero")?.addEventListener("input", onRutInput);
   $("rutDv")?.addEventListener("input", onRutInput);
 
-  document.querySelectorAll('input[name="nombreCoincideDocumento"]').forEach((el) => {
-    el.addEventListener("change", aplicarEstadoUI);
-  });
-  
-  $("correoViajante")?.addEventListener("input", aplicarEstadoUI);
-  
-  document.querySelectorAll('input[name="emergenciaMismoResponsable"]').forEach((el) => {
-    el.addEventListener("change", () => {
-      aplicarEmergenciaDesdeResponsable(1);
-      aplicarEstadoUI();
-      actualizarProgreso();
+  document
+    .querySelectorAll('input[name="nombreCoincideDocumento"]')
+    .forEach((el) => {
+      el.addEventListener("change", aplicarEstadoUI);
     });
-  });
-  
-  document.querySelectorAll('input[name="emergencia2MismoResponsable"]').forEach((el) => {
-    el.addEventListener("change", () => {
-      aplicarEmergenciaDesdeResponsable(2);
-      aplicarEstadoUI();
-      actualizarProgreso();
+
+  $("correoViajante")?.addEventListener(
+    "input",
+    aplicarEstadoUI
+  );
+
+  document
+    .querySelectorAll('input[name="emergenciaMismoResponsable"]')
+    .forEach((el) => {
+      el.addEventListener("change", () => {
+        aplicarEmergenciaDesdeResponsable(1);
+        aplicarEstadoUI();
+        actualizarProgreso();
+      });
     });
-  });
-  
+
+  document
+    .querySelectorAll('input[name="emergencia2MismoResponsable"]')
+    .forEach((el) => {
+      el.addEventListener("change", () => {
+        aplicarEmergenciaDesdeResponsable(2);
+        aplicarEstadoUI();
+        actualizarProgreso();
+      });
+    });
+
   [
     "contactoPrincipalNombre",
     "contactoPrincipalRelacion",
@@ -441,7 +472,7 @@ function conectarEventos() {
       aplicarEmergenciaDesdeResponsable(1);
       aplicarEmergenciaDesdeResponsable(2);
     });
-  
+
     $(id)?.addEventListener("change", () => {
       aplicarEmergenciaDesdeResponsable(1);
       aplicarEmergenciaDesdeResponsable(2);
@@ -464,39 +495,145 @@ function conectarEventos() {
     actualizarProgreso();
   });
 
-  $("contactoSecundarioRelacion")?.addEventListener("change", aplicarEstadoUI);
+  $("contactoSecundarioRelacion")?.addEventListener(
+    "change",
+    aplicarEstadoUI
+  );
 
-  $("emergencia2Relacion")?.addEventListener("change", aplicarEstadoUI);
+  $("emergencia2Relacion")?.addEventListener(
+    "change",
+    aplicarEstadoUI
+  );
 
-  enlazarFlagDetalle("discapacidadFlag", discapacidadWrap, ["si"]);
-  enlazarFlagDetalle("discapacidadApoyosFlag", discapacidadApoyosWrap, ["si"]);
-  enlazarFlagDetalle("discapacidadAyudasTecnicasFlag", discapacidadAyudasTecnicasWrap, ["si"]);
-  
-  enlazarFlagDetalle("neurodivergenciaFlag", neurodivergenciaWrap, ["si"]);
-  enlazarFlagDetalle("neuroSobrecargaFlag", neuroSobrecargaWrap, ["si"]);
-  enlazarFlagDetalle("neuroApoyosFlag", neuroApoyosWrap, ["si"]);
-  
-  enlazarFlagDetalle("saludMentalFlag", saludMentalWrap, ["si"]);
-  document.querySelectorAll('input[name="dietaRestricciones"]').forEach((el) => {
-    el.addEventListener("change", aplicarEstadoUI);
-  });
-  $("grupoSanguineo")?.addEventListener("change", aplicarEstadoUI);
-  
-  enlazarFlagDetalle("alergiaAlimentaria1ProtocoloFlag", $("alergiaAlimentaria1ProtocoloWrap"), ["si"]);
-  enlazarFlagDetalle("alergiaAlimentaria2ProtocoloFlag", $("alergiaAlimentaria2ProtocoloWrap"), ["si"]);
-  enlazarFlagDetalle("alergiaAlimentaria3ProtocoloFlag", $("alergiaAlimentaria3ProtocoloWrap"), ["si"]);
-  
-  $("btnAgregarAlergiaAlimentaria")?.addEventListener("click", agregarAlergiaAlimentaria);
+  enlazarFlagDetalle(
+    "discapacidadFlag",
+    discapacidadWrap,
+    ["si"]
+  );
 
-  enlazarFlagDetalle("enfermedadBaseFlag", enfermedadBaseDetalleWrap, ["si"]);
-  enlazarFlagDetalle("saludGeneralFlag", saludGeneralDetalleWrap, ["si"]);
-  enlazarFlagDetalle("cirugiasPreviasFlag", cirugiasPreviasDetalleWrap, ["si"]);
-  enlazarFlagDetalle("emergenciaMedicaFlag", emergenciaMedicaDetalleWrap, ["si"]);
-  enlazarFlagDetalle("medicamentosFlag", medicamentosWrap, ["si"]);
-  enlazarFlagDetalle("medicamentosProhibidosFlag", medicamentosProhibidosDetalleWrap, ["si"]);
-  enlazarFlagDetalle("alergiasFlag", alergiasWrap, ["si"]);
-  enlazarFlagDetalle("dietaFlag", dietaWrap, ["si"]);
-  enlazarFlagDetalle("otrosAntecedentesFlag", otrosAntecedentesDetalleWrap, ["si"]);
+  enlazarFlagDetalle(
+    "discapacidadApoyosFlag",
+    discapacidadApoyosWrap,
+    ["si"]
+  );
+
+  enlazarFlagDetalle(
+    "discapacidadAyudasTecnicasFlag",
+    discapacidadAyudasTecnicasWrap,
+    ["si"]
+  );
+
+  enlazarFlagDetalle(
+    "neurodivergenciaFlag",
+    neurodivergenciaWrap,
+    ["si"]
+  );
+
+  enlazarFlagDetalle(
+    "neuroSobrecargaFlag",
+    neuroSobrecargaWrap,
+    ["si"]
+  );
+
+  enlazarFlagDetalle(
+    "neuroApoyosFlag",
+    neuroApoyosWrap,
+    ["si"]
+  );
+
+  enlazarFlagDetalle(
+    "saludMentalFlag",
+    saludMentalWrap,
+    ["si"]
+  );
+
+  document
+    .querySelectorAll('input[name="dietaRestricciones"]')
+    .forEach((el) => {
+      el.addEventListener("change", aplicarEstadoUI);
+    });
+
+  $("grupoSanguineo")?.addEventListener(
+    "change",
+    aplicarEstadoUI
+  );
+
+  enlazarFlagDetalle(
+    "alergiaAlimentaria1ProtocoloFlag",
+    $("alergiaAlimentaria1ProtocoloWrap"),
+    ["si"]
+  );
+
+  enlazarFlagDetalle(
+    "alergiaAlimentaria2ProtocoloFlag",
+    $("alergiaAlimentaria2ProtocoloWrap"),
+    ["si"]
+  );
+
+  enlazarFlagDetalle(
+    "alergiaAlimentaria3ProtocoloFlag",
+    $("alergiaAlimentaria3ProtocoloWrap"),
+    ["si"]
+  );
+
+  $("btnAgregarAlergiaAlimentaria")?.addEventListener(
+    "click",
+    agregarAlergiaAlimentaria
+  );
+
+  enlazarFlagDetalle(
+    "enfermedadBaseFlag",
+    enfermedadBaseDetalleWrap,
+    ["si"]
+  );
+
+  enlazarFlagDetalle(
+    "saludGeneralFlag",
+    saludGeneralDetalleWrap,
+    ["si"]
+  );
+
+  enlazarFlagDetalle(
+    "cirugiasPreviasFlag",
+    cirugiasPreviasDetalleWrap,
+    ["si"]
+  );
+
+  enlazarFlagDetalle(
+    "emergenciaMedicaFlag",
+    emergenciaMedicaDetalleWrap,
+    ["si"]
+  );
+
+  enlazarFlagDetalle(
+    "medicamentosFlag",
+    medicamentosWrap,
+    ["si"]
+  );
+
+  enlazarFlagDetalle(
+    "medicamentosProhibidosFlag",
+    medicamentosProhibidosDetalleWrap,
+    ["si"]
+  );
+
+  enlazarFlagDetalle(
+    "alergiasFlag",
+    alergiasWrap,
+    ["si"]
+  );
+
+  enlazarFlagDetalle(
+    "dietaFlag",
+    dietaWrap,
+    ["si"]
+  );
+
+  enlazarFlagDetalle(
+    "otrosAntecedentesFlag",
+    otrosAntecedentesDetalleWrap,
+    ["si"]
+  );
 
   [
     "telefonoViajante",
@@ -506,9 +643,11 @@ function conectarEventos() {
     "emergencia2Telefono"
   ].forEach(bindPhoneInput);
 
-  document.querySelectorAll('input[name="neurodivergenciaTipos"]').forEach((el) => {
-    el.addEventListener("change", aplicarEstadoUI);
-  });
+  document
+    .querySelectorAll('input[name="neurodivergenciaTipos"]')
+    .forEach((el) => {
+      el.addEventListener("change", aplicarEstadoUI);
+    });
 
   setPhoneDefault("telefonoViajante");
   setPhoneDefault("contactoPrincipalTelefono");
@@ -934,6 +1073,51 @@ function prepararCardValidacionRut() {
     cardValidacionNominaFinal.prepend(aviso);
   }
 
+  // ===========================================================================
+  // NUEVO INGRESO
+  // ===========================================================================
+
+  if (faseUrl === "nuevos") {
+    aviso.innerHTML = `
+      <div style="
+        font-size:20px;
+        line-height:1.3;
+        font-weight:900;
+        margin-bottom:8px;
+      ">
+        🟣 IDENTIFICACIÓN DE LA PERSONA QUE VIAJA
+      </div>
+
+      <div style="
+        font-size:15px;
+        line-height:1.55;
+      ">
+        Ingresa el RUT de la persona que desea incorporarse mediante
+        <strong>Nuevo Ingreso</strong>.
+        <br><br>
+
+        Si esta persona estuvo registrada anteriormente en este grupo
+        y actualmente se encuentra anulada, recuperaremos los datos
+        disponibles para facilitar el formulario.
+        <br><br>
+
+        <strong>Debe ingresar el RUT de la persona que viaja.</strong>
+        Si usted es padre, madre o apoderado(a), no ingrese su propio RUT.
+      </div>
+    `;
+
+    if (btnValidarRutNominaFinal) {
+      btnValidarRutNominaFinal.textContent =
+        "Continuar con este RUT";
+    }
+
+    return;
+  }
+
+  // ===========================================================================
+  // LISTA DE ESPERA
+  // ===========================================================================
+
   if (faseUrl === "lista_espera") {
     aviso.innerHTML = `
       <div style="
@@ -971,6 +1155,10 @@ function prepararCardValidacionRut() {
     return;
   }
 
+  // ===========================================================================
+  // NÓMINA FINAL
+  // ===========================================================================
+
   aviso.innerHTML = `
     <div style="
       font-size:20px;
@@ -999,7 +1187,6 @@ function prepararCardValidacionRut() {
       "Validar RUT";
   }
 }
-
 
 function estaInscripcionAnuladaPublica(item = {}) {
   const estadoViaje = normalizarTexto(
@@ -1066,23 +1253,175 @@ async function validarRutNominaFinal() {
     const snap = await getDoc(ref);
 
     // =====================================================================
+    // NUEVO INGRESO
+    // =====================================================================
+
+    if (faseUrl === "nuevos") {
+      nuevoIngresoRutValidado = false;
+      nuevoIngresoReingreso = false;
+      nuevoIngresoInscripcionAnterior = null;
+      nuevoIngresoInscripcionAnteriorDocId = "";
+
+      // -------------------------------------------------------------------
+      // CASO 1
+      // RUT NO EXISTE → Nuevo Ingreso completamente nuevo
+      // -------------------------------------------------------------------
+
+      if (!snap.exists()) {
+        nuevoIngresoRutValidado = true;
+
+        identidadOriginalPrecargada = null;
+
+        if ($("tipoIdentificacion")) {
+          $("tipoIdentificacion").value = "rut";
+        }
+
+        if ($("rutNumero")) {
+          $("rutNumero").value =
+            limpiarRutNumero(
+              rutValidacionNumero?.value || ""
+            );
+        }
+
+        if ($("rutDv")) {
+          $("rutDv").value =
+            limpiarTexto(
+              rutValidacionDv?.value || ""
+            ).toUpperCase();
+        }
+
+        cardValidacionNominaFinal?.classList.add(
+          "hidden"
+        );
+
+        form?.classList.remove("hidden");
+
+        mostrarMensaje(
+          "ok",
+          `
+            RUT validado correctamente.
+            <br><br>
+
+            Esta persona no tiene una inscripción previa activa
+            dentro del grupo.
+            <br><br>
+
+            Puede continuar completando la solicitud de
+            <strong>Nuevo Ingreso</strong>.
+          `
+        );
+
+        window.scrollTo({
+          top: 0,
+          behavior: "smooth"
+        });
+
+        aplicarEstadoUI();
+        actualizarProgreso();
+
+        return;
+      }
+
+      const data = snap.data() || {};
+
+      // -------------------------------------------------------------------
+      // CASO 2
+      // RUT EXISTE Y ESTÁ ACTIVO → bloquear duplicado
+      // -------------------------------------------------------------------
+
+      if (!estaInscripcionAnuladaPublica(data)) {
+        mostrarMensaje(
+          "error",
+          `
+            Este RUT ya tiene una inscripción activa dentro del grupo.
+            <br><br>
+
+            No corresponde generar una nueva solicitud de
+            <strong>Nuevo Ingreso</strong>.
+            <br><br>
+
+            Si considera que esto es incorrecto, comuníquese con
+            Administración.
+          `
+        );
+
+        return;
+      }
+
+      // -------------------------------------------------------------------
+      // CASO 3
+      // RUT EXISTE Y ESTÁ ANULADO → recuperar
+      // -------------------------------------------------------------------
+
+      nuevoIngresoRutValidado = true;
+      nuevoIngresoReingreso = true;
+      nuevoIngresoInscripcionAnterior = data;
+      nuevoIngresoInscripcionAnteriorDocId =
+        snap.id;
+
+      guardarIdentidadOriginalPrecargada(
+        data,
+        snap.id
+      );
+
+      precargarFormularioDesdeSistemaPagos(
+        data
+      );
+
+      cardValidacionNominaFinal?.classList.add(
+        "hidden"
+      );
+
+      form?.classList.remove("hidden");
+
+      mostrarMensaje(
+        "ok",
+        `
+          Encontramos un registro anterior para
+          <strong>${
+            escapeHtml(
+              data?.identificacion?.nombreCompleto ||
+              "esta persona"
+            )
+          }</strong>.
+          <br><br>
+
+          El registro anterior se encuentra
+          <strong>anulado</strong>, por lo que puede solicitar
+          nuevamente su incorporación mediante
+          <strong>Nuevo Ingreso</strong>.
+          <br><br>
+
+          Hemos recuperado los datos disponibles.
+          Revise cuidadosamente la información y complete o actualice
+          los antecedentes faltantes antes de enviar.
+        `
+      );
+
+      window.scrollTo({
+        top: 0,
+        behavior: "smooth"
+      });
+
+      aplicarEstadoUI();
+      actualizarProgreso();
+
+      return;
+    }
+
+    // =====================================================================
     // LISTA DE ESPERA
     // =====================================================================
+
     if (faseUrl === "lista_espera") {
       listaEsperaRutValidado = false;
       listaEsperaReingreso = false;
       listaEsperaInscripcionAnterior = null;
       listaEsperaInscripcionAnteriorDocId = "";
 
-      // -------------------------------------------------------------------
-      // CASO 1
-      // RUT NO EXISTE → inscripción completamente nueva
-      // -------------------------------------------------------------------
       if (!snap.exists()) {
         listaEsperaRutValidado = true;
 
-        // Es una persona completamente nueva.
-        // No existe identidad anterior contra la cual comparar.
         identidadOriginalPrecargada = null;
 
         if ($("tipoIdentificacion")) {
@@ -1135,10 +1474,6 @@ async function validarRutNominaFinal() {
 
       const data = snap.data() || {};
 
-      // -------------------------------------------------------------------
-      // CASO 2
-      // RUT EXISTE Y ESTÁ ACTIVO → bloquear duplicado real
-      // -------------------------------------------------------------------
       if (!estaInscripcionAnuladaPublica(data)) {
         mostrarMensaje(
           "error",
@@ -1156,24 +1491,20 @@ async function validarRutNominaFinal() {
         return;
       }
 
-      // -------------------------------------------------------------------
-      // CASO 3
-      // RUT EXISTE PERO ESTÁ ANULADO → permitir reingreso
-      // -------------------------------------------------------------------
       listaEsperaRutValidado = true;
       listaEsperaReingreso = true;
       listaEsperaInscripcionAnterior = data;
       listaEsperaInscripcionAnteriorDocId =
         snap.id;
 
-      // Esta persona ya existía anteriormente.
-      // Guardamos su identidad original antes de precargar el formulario.
       guardarIdentidadOriginalPrecargada(
         data,
         snap.id
       );
 
-      precargarFormularioDesdeSistemaPagos(data);
+      precargarFormularioDesdeSistemaPagos(
+        data
+      );
 
       cardValidacionNominaFinal?.classList.add(
         "hidden"
@@ -1230,7 +1561,10 @@ async function validarRutNominaFinal() {
 
     const data = snap.data() || {};
 
-    if (data.tipoInscripcion !== "sistema_pagos") {
+    if (
+      data.tipoInscripcion !==
+      "sistema_pagos"
+    ) {
       mostrarMensaje(
         "error",
         "Este RUT no corresponde a un pasajero importado desde Sistema de Pagos para este grupo."
@@ -1238,7 +1572,9 @@ async function validarRutNominaFinal() {
       return;
     }
 
-    if (fichaMedicaYaCompletaPublica(data)) {
+    if (
+      fichaMedicaYaCompletaPublica(data)
+    ) {
       mostrarMensaje(
         "error",
         "La ficha médica de este pasajero ya fue completada. Si necesita corregir información, comuníquese con Administración."
@@ -1250,14 +1586,14 @@ async function validarRutNominaFinal() {
     pasajeroSistemaPagosDocId = snap.id;
     nominaFinalRutValidado = true;
 
-    // Guardamos una fotografía de la identidad original
-    // antes de precargar el formulario.
     guardarIdentidadOriginalPrecargada(
       data,
       snap.id
     );
 
-    precargarFormularioDesdeSistemaPagos(data);
+    precargarFormularioDesdeSistemaPagos(
+      data
+    );
 
     cardValidacionNominaFinal?.classList.add(
       "hidden"
@@ -1302,7 +1638,10 @@ async function validarRutNominaFinal() {
     btnValidarRutNominaFinal.disabled = false;
 
     btnValidarRutNominaFinal.textContent =
-      faseUrl === "lista_espera"
+      (
+        faseUrl === "lista_espera" ||
+        faseUrl === "nuevos"
+      )
         ? "Continuar con este RUT"
         : "Validar RUT";
   }
@@ -1434,13 +1773,22 @@ function detectarCambiosIdentidadPrecargada() {
         actual?.[campo]
       );
 
-    // Si originalmente no teníamos información,
-    // permitimos que el usuario la complete normalmente.
+    // Si originalmente no había dato,
+    // permitimos completarlo normalmente.
     if (!antes) {
       return;
     }
 
-    if (antes === despues) {
+    const antesComparacion =
+      normalizarTexto(antes);
+
+    const despuesComparacion =
+      normalizarTexto(despues);
+
+    if (
+      antesComparacion ===
+      despuesComparacion
+    ) {
       return;
     }
 
@@ -1508,20 +1856,29 @@ function confirmarCambiosIdentidadPrecargada() {
     cambios
   );
 
-  const detalle = cambios
-    .map((cambio) => {
-      return (
-        `${cambio.label}:\n` +
-        `ANTES: ${cambio.antes || "(vacío)"}\n` +
-        `AHORA: ${cambio.despues || "(vacío)"}`
-      );
-    })
-    .join("\n\n");
+  const detalle =
+    cambios
+      .map((cambio) => {
+        return (
+          `${cambio.label}:\n` +
+          `ANTES: ${cambio.antes || "(vacío)"}\n` +
+          `AHORA: ${cambio.despues || "(vacío)"}`
+        );
+      })
+      .join("\n\n");
 
-  const contexto =
-    faseUrl === "lista_espera"
-      ? "Lista de Espera"
-      : "Nómina Final / Ficha Médica";
+  let contexto =
+    "Nómina Final / Ficha Médica";
+
+  if (faseUrl === "lista_espera") {
+    contexto =
+      "Lista de Espera";
+  }
+
+  if (faseUrl === "nuevos") {
+    contexto =
+      "Nuevo Ingreso";
+  }
 
   return window.confirm(
     `⚠️ ATENCIÓN — DATOS DE LA PERSONA QUE VIAJA\n\n` +
@@ -1814,6 +2171,23 @@ async function onSubmit(event) {
     return;
   }
 
+  if (
+    faseUrl === "nuevos" &&
+    !nuevoIngresoRutValidado
+  ) {
+    mostrarMensaje(
+      "error",
+      "Primero debe validar el RUT de la persona que desea ingresar mediante Nuevo Ingreso."
+    );
+
+    window.scrollTo({
+      top: 0,
+      behavior: "smooth"
+    });
+
+    return;
+  }
+
   const errores =
     validarFormulario();
 
@@ -1852,17 +2226,9 @@ async function onSubmit(event) {
     }
   }
 
-  // =======================================================================
-  // PROTECCIÓN DE IDENTIDAD PRECARGADA
-  // =======================================================================
-  //
-  // Solo tendrá efecto cuando exista una identidad anterior:
-  //
-  // - Nómina Final / Ficha Médica
-  // - Lista de Espera con reingreso
-  //
-  // Una inscripción nueva continúa sin ninguna interrupción.
-  // =======================================================================
+  // -----------------------------------------------------------------------
+  // PROTECCIÓN DE DATOS PRECARGADOS
+  // -----------------------------------------------------------------------
 
   const confirmaIdentidad =
     confirmarCambiosIdentidadPrecargada();
@@ -1873,11 +2239,17 @@ async function onSubmit(event) {
       `
         <strong>El formulario NO fue enviado todavía.</strong>
         <br><br>
-        Detectamos cambios en los datos previamente registrados de la persona que viaja.
+
+        Detectamos cambios en los datos previamente registrados
+        de la persona que viaja.
         <br><br>
-        Revise especialmente nombres, apellidos, fecha de nacimiento, género y nacionalidad.
+
+        Revise especialmente nombres, apellidos, fecha de nacimiento,
+        género y nacionalidad.
         <br><br>
-        Cuando confirme que la información es correcta, puede volver a presionar
+
+        Cuando confirme que la información es correcta,
+        puede volver a presionar
         <strong>Enviar formulario</strong>.
       `
     );
@@ -1890,9 +2262,9 @@ async function onSubmit(event) {
     return;
   }
 
-  // =======================================================================
-  // DESDE AQUÍ CONTINÚA EL ENVÍO NORMAL
-  // =======================================================================
+  // -----------------------------------------------------------------------
+  // ENVÍO NORMAL
+  // -----------------------------------------------------------------------
 
   btnEnviar.disabled = true;
   btnEnviar.textContent =
