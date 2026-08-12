@@ -152,6 +152,11 @@ let pasajeroSistemaPagosDocId = "";
 let nominaFinalRutValidado = false;
 
 // -----------------------------------------------------------------------------
+// PROTECCIÓN DE IDENTIDAD PRECARGADA
+// -----------------------------------------------------------------------------
+let identidadOriginalPrecargada = null;
+
+// -----------------------------------------------------------------------------
 // LISTA DE ESPERA · VALIDACIÓN PREVIA POR RUT
 // -----------------------------------------------------------------------------
 let listaEsperaRutValidado = false;
@@ -1076,6 +1081,10 @@ async function validarRutNominaFinal() {
       if (!snap.exists()) {
         listaEsperaRutValidado = true;
 
+        // Es una persona completamente nueva.
+        // No existe identidad anterior contra la cual comparar.
+        identidadOriginalPrecargada = null;
+
         if ($("tipoIdentificacion")) {
           $("tipoIdentificacion").value = "rut";
         }
@@ -1157,6 +1166,13 @@ async function validarRutNominaFinal() {
       listaEsperaInscripcionAnteriorDocId =
         snap.id;
 
+      // Esta persona ya existía anteriormente.
+      // Guardamos su identidad original antes de precargar el formulario.
+      guardarIdentidadOriginalPrecargada(
+        data,
+        snap.id
+      );
+
       precargarFormularioDesdeSistemaPagos(data);
 
       cardValidacionNominaFinal?.classList.add(
@@ -1202,7 +1218,6 @@ async function validarRutNominaFinal() {
 
     // =====================================================================
     // NÓMINA FINAL / FICHA MÉDICA
-    // MANTIENE EL FUNCIONAMIENTO ACTUAL
     // =====================================================================
 
     if (!snap.exists()) {
@@ -1234,6 +1249,13 @@ async function validarRutNominaFinal() {
     pasajeroSistemaPagosValidado = data;
     pasajeroSistemaPagosDocId = snap.id;
     nominaFinalRutValidado = true;
+
+    // Guardamos una fotografía de la identidad original
+    // antes de precargar el formulario.
+    guardarIdentidadOriginalPrecargada(
+      data,
+      snap.id
+    );
 
     precargarFormularioDesdeSistemaPagos(data);
 
@@ -1284,6 +1306,230 @@ async function validarRutNominaFinal() {
         ? "Continuar con este RUT"
         : "Validar RUT";
   }
+}
+
+function guardarIdentidadOriginalPrecargada(item = {}, documentoId = "") {
+  const id = item?.identificacion || {};
+
+  identidadOriginalPrecargada = {
+    documentoNormalizado:
+      limpiarTexto(
+        id.documentoNormalizado ||
+        documentoId ||
+        ""
+      ),
+
+    nombres:
+      limpiarTexto(id.nombres),
+
+    primerApellido:
+      limpiarTexto(id.primerApellido),
+
+    segundoApellido:
+      limpiarTexto(id.segundoApellido),
+
+    fechaNacimiento:
+      limpiarTexto(id.fechaNacimiento),
+
+    genero:
+      limpiarTexto(
+        id.genero ||
+        id.generoFinal ||
+        ""
+      ),
+
+    nacionalidadBase:
+      limpiarTexto(id.nacionalidadBase),
+
+    nacionalidadDetalle:
+      limpiarTexto(id.nacionalidadDetalle)
+  };
+
+  console.log(
+    "[IDENTIDAD] Datos originales precargados:",
+    identidadOriginalPrecargada
+  );
+}
+
+function obtenerIdentidadActualFormulario() {
+  const rutNumero =
+    limpiarRutNumero(
+      $("rutNumero")?.value || ""
+    );
+
+  const rutDv =
+    limpiarTexto(
+      $("rutDv")?.value || ""
+    ).toUpperCase();
+
+  const documentoNormalizado =
+    rutNumero && rutDv
+      ? normalizarRutDocumento(
+          rutNumero,
+          rutDv
+        )
+      : "";
+
+  return {
+    documentoNormalizado,
+
+    nombres:
+      limpiarTexto(
+        $("nombres")?.value
+      ),
+
+    primerApellido:
+      limpiarTexto(
+        $("primerApellido")?.value
+      ),
+
+    segundoApellido:
+      limpiarTexto(
+        $("segundoApellido")?.value
+      ),
+
+    fechaNacimiento:
+      limpiarTexto(
+        $("fechaNacimiento")?.value
+      ),
+
+    genero:
+      limpiarTexto(
+        $("genero")?.value
+      ),
+
+    nacionalidadBase:
+      limpiarTexto(
+        $("nacionalidadBase")?.value
+      ),
+
+    nacionalidadDetalle:
+      limpiarTexto(
+        $("nacionalidadDetalle")?.value
+      )
+  };
+}
+
+function detectarCambiosIdentidadPrecargada() {
+  if (!identidadOriginalPrecargada) {
+    return [];
+  }
+
+  const actual =
+    obtenerIdentidadActualFormulario();
+
+  const cambios = [];
+
+  const revisar = (
+    campo,
+    label
+  ) => {
+    const antes =
+      limpiarTexto(
+        identidadOriginalPrecargada?.[campo]
+      );
+
+    const despues =
+      limpiarTexto(
+        actual?.[campo]
+      );
+
+    // Si originalmente no teníamos información,
+    // permitimos que el usuario la complete normalmente.
+    if (!antes) {
+      return;
+    }
+
+    if (antes === despues) {
+      return;
+    }
+
+    cambios.push({
+      campo,
+      label,
+      antes,
+      despues
+    });
+  };
+
+  revisar(
+    "documentoNormalizado",
+    "RUT"
+  );
+
+  revisar(
+    "nombres",
+    "Nombres"
+  );
+
+  revisar(
+    "primerApellido",
+    "Primer apellido"
+  );
+
+  revisar(
+    "segundoApellido",
+    "Segundo apellido"
+  );
+
+  revisar(
+    "fechaNacimiento",
+    "Fecha de nacimiento"
+  );
+
+  revisar(
+    "genero",
+    "Género"
+  );
+
+  revisar(
+    "nacionalidadBase",
+    "Nacionalidad"
+  );
+
+  revisar(
+    "nacionalidadDetalle",
+    "Detalle de nacionalidad"
+  );
+
+  return cambios;
+}
+
+function confirmarCambiosIdentidadPrecargada() {
+  const cambios =
+    detectarCambiosIdentidadPrecargada();
+
+  if (!cambios.length) {
+    return true;
+  }
+
+  console.warn(
+    "[IDENTIDAD] Se detectaron cambios respecto de los datos precargados:",
+    cambios
+  );
+
+  const detalle = cambios
+    .map((cambio) => {
+      return (
+        `${cambio.label}:\n` +
+        `ANTES: ${cambio.antes || "(vacío)"}\n` +
+        `AHORA: ${cambio.despues || "(vacío)"}`
+      );
+    })
+    .join("\n\n");
+
+  const contexto =
+    faseUrl === "lista_espera"
+      ? "Lista de Espera"
+      : "Nómina Final / Ficha Médica";
+
+  return window.confirm(
+    `⚠️ ATENCIÓN — DATOS DE LA PERSONA QUE VIAJA\n\n` +
+    `Detectamos que algunos datos precargados fueron modificados durante el formulario de ${contexto}.\n\n` +
+    `${detalle}\n\n` +
+    `¿CONFIRMA que realmente desea modificar estos datos?\n\n` +
+    `Si usted NO realizó estos cambios intencionalmente, presione CANCELAR y revise la información de la persona que viaja.`
+  );
 }
 
 function precargarFormularioDesdeSistemaPagos(item = {}) {
@@ -1525,7 +1771,10 @@ async function onSubmit(event) {
   ocultarMensaje();
 
   if (!grupoData) {
-    mostrarMensaje("error", "No fue posible validar el grupo.");
+    mostrarMensaje(
+      "error",
+      "No fue posible validar el grupo."
+    );
     return;
   }
 
@@ -1565,64 +1814,156 @@ async function onSubmit(event) {
     return;
   }
 
-  const errores = validarFormulario();
+  const errores =
+    validarFormulario();
 
   if (errores.length) {
-    mostrarMensaje("error", errores.join("<br>"));
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    mostrarMensaje(
+      "error",
+      errores.join("<br>")
+    );
+
+    window.scrollTo({
+      top: 0,
+      behavior: "smooth"
+    });
+
     return;
   }
 
-  const segundoApellido = limpiarTexto($("segundoApellido")?.value);
-
-  if (!segundoApellido) {
-    const ok = window.confirm(
-      "El campo segundo apellido está en blanco. ¿Es correcto que el viajante no tiene segundo apellido?"
+  const segundoApellido =
+    limpiarTexto(
+      $("segundoApellido")?.value
     );
 
+  if (!segundoApellido) {
+    const ok =
+      window.confirm(
+        "El campo segundo apellido está en blanco. ¿Es correcto que el viajante no tiene segundo apellido?"
+      );
+
     if (!ok) {
-      mostrarMensaje("error", "Complete el segundo apellido antes de enviar.");
+      mostrarMensaje(
+        "error",
+        "Complete el segundo apellido antes de enviar."
+      );
+
       return;
     }
   }
 
-  btnEnviar.disabled = true;
-  btnEnviar.textContent = "Enviando formulario...";
+  // =======================================================================
+  // PROTECCIÓN DE IDENTIDAD PRECARGADA
+  // =======================================================================
+  //
+  // Solo tendrá efecto cuando exista una identidad anterior:
+  //
+  // - Nómina Final / Ficha Médica
+  // - Lista de Espera con reingreso
+  //
+  // Una inscripción nueva continúa sin ninguna interrupción.
+  // =======================================================================
 
-  try {
-    const payloadBase = construirPayloadBase();
+  const confirmaIdentidad =
+    confirmarCambiosIdentidadPrecargada();
 
-    if (requiereCarnetIdentidad() || requiereComprobantePago()) {
-      btnEnviar.textContent = "Subiendo archivos...";
-      payloadBase.archivosEspeciales = await subirArchivosEspeciales(payloadBase);
-    }
+  if (!confirmaIdentidad) {
+    mostrarMensaje(
+      "error",
+      `
+        <strong>El formulario NO fue enviado todavía.</strong>
+        <br><br>
+        Detectamos cambios en los datos previamente registrados de la persona que viaja.
+        <br><br>
+        Revise especialmente nombres, apellidos, fecha de nacimiento, género y nacionalidad.
+        <br><br>
+        Cuando confirme que la información es correcta, puede volver a presionar
+        <strong>Enviar formulario</strong>.
+      `
+    );
 
-    btnEnviar.textContent = "Enviando formulario...";
-    await enviarInscripcionPendiente(payloadBase);
-
-    registrarFormularioEnviado(payloadBase);
-
-    mostrarPantallaFinal(payloadBase);
-  } catch (error) {
-    console.error("ERROR INSCRIPCION:", {
-      message: error?.message,
-      code: error?.code,
-      name: error?.name,
-      stack: error?.stack
+    window.scrollTo({
+      top: 0,
+      behavior: "smooth"
     });
 
-    if (error.message === "duplicate_document") {
+    return;
+  }
+
+  // =======================================================================
+  // DESDE AQUÍ CONTINÚA EL ENVÍO NORMAL
+  // =======================================================================
+
+  btnEnviar.disabled = true;
+  btnEnviar.textContent =
+    "Enviando formulario...";
+
+  try {
+    const payloadBase =
+      construirPayloadBase();
+
+    if (
+      requiereCarnetIdentidad() ||
+      requiereComprobantePago()
+    ) {
+      btnEnviar.textContent =
+        "Subiendo archivos...";
+
+      payloadBase.archivosEspeciales =
+        await subirArchivosEspeciales(
+          payloadBase
+        );
+    }
+
+    btnEnviar.textContent =
+      "Enviando formulario...";
+
+    await enviarInscripcionPendiente(
+      payloadBase
+    );
+
+    registrarFormularioEnviado(
+      payloadBase
+    );
+
+    mostrarPantallaFinal(
+      payloadBase
+    );
+
+  } catch (error) {
+    console.error(
+      "ERROR INSCRIPCION:",
+      {
+        message: error?.message,
+        code: error?.code,
+        name: error?.name,
+        stack: error?.stack
+      }
+    );
+
+    if (
+      error.message ===
+      "duplicate_document"
+    ) {
       mostrarMensaje(
         "error",
         `Ya existe una inscripción para este documento dentro del grupo. Comuníquese con <strong>${CORREO_ADMIN}</strong>, al <strong>${TELEFONO_ADMIN}</strong> o al WhatsApp <strong>${WHATSAPP_ADMIN}</strong>.`
       );
-    } else if (error.message === "duplicate_no_rut_name") {
+
+    } else if (
+      error.message ===
+      "duplicate_no_rut_name"
+    ) {
       mostrarMensaje(
         "error",
         `Ya existe una inscripción con esos nombres y apellidos en este grupo. Comuníquese con <strong>${CORREO_ADMIN}</strong>, al <strong>${TELEFONO_ADMIN}</strong> o al WhatsApp <strong>${WHATSAPP_ADMIN}</strong>.`
       );
+
     } else {
-      const codigoError = error?.code || error?.message || "error_desconocido";
+      const codigoError =
+        error?.code ||
+        error?.message ||
+        "error_desconocido";
 
       mostrarMensaje(
         "error",
@@ -1638,12 +1979,18 @@ async function onSubmit(event) {
       );
     }
 
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    window.scrollTo({
+      top: 0,
+      behavior: "smooth"
+    });
+
   } finally {
     btnEnviar.disabled = false;
-    btnEnviar.textContent = "Enviar inscripción";
+    btnEnviar.textContent =
+      "Enviar inscripción";
   }
 }
+
 // -----------------------------------------------------------------------------
 // GUARDADO EN BACKEND
 // -----------------------------------------------------------------------------
