@@ -28,6 +28,12 @@ import {
   EDIT_FIELDS
 } from "./ficha-medica-common.js";
 
+import {
+  getDocs,
+  query,
+  orderBy
+} from "https://www.gstatic.com/firebasejs/11.7.3/firebase-firestore.js";
+
 /*
   CAMPOS DEL EDITOR MÉDICO
 
@@ -37,41 +43,626 @@ import {
 
   Estos campos quedan exclusivamente en Gestión Nómina.
 */
-const MEDICAL_EDIT_FIELDS =
-  EDIT_FIELDS.filter(
+const EMERGENCY_RELATION_OPTIONS = [
+  {
+    value:
+      "padre",
+    label:
+      "Padre"
+  },
+  {
+    value:
+      "madre",
+    label:
+      "Madre"
+  },
+  {
+    value:
+      "tutor",
+    label:
+      "Tutor(a)"
+  },
+  {
+    value:
+      "hermano_a",
+    label:
+      "Hermano(a)"
+  },
+  {
+    value:
+      "tio_a",
+    label:
+      "Tío(a)"
+  },
+  {
+    value:
+      "abuelo_a",
+    label:
+      "Abuelo(a)"
+  },
+  {
+    value:
+      "esposo_a",
+    label:
+      "Esposo(a)"
+  },
+  {
+    value:
+      "pareja",
+    label:
+      "Pareja"
+  },
+  {
+    value:
+      "hijo_a",
+    label:
+      "Hijo(a)"
+  },
+  {
+    value:
+      "amigo_a",
+    label:
+      "Amigo(a)"
+  },
+  {
+    value:
+      "otro",
+    label:
+      "Otro"
+  }
+];
+
+const YES_NO_OPTIONS = [
+  {
+    value:
+      "no",
+    label:
+      "No"
+  },
+  {
+    value:
+      "si",
+    label:
+      "Sí"
+  }
+];
+
+const MEDICAL_FIELD_OVERRIDES = {
+  /*
+    =====================================================
+    OPERACIÓN DEL PASAJERO
+    =====================================================
+  */
+
+  "identificacion.tallaPolera": {
+    section:
+      "Datos operativos",
+    label:
+      "Talla de polera",
+    type:
+      "select",
+    options: [
+      {
+        value:
+          "S",
+        label:
+          "S"
+      },
+      {
+        value:
+          "M",
+        label:
+          "M"
+      },
+      {
+        value:
+          "L",
+        label:
+          "L"
+      },
+      {
+        value:
+          "XL",
+        label:
+          "XL"
+      },
+      {
+        value:
+          "2XL",
+        label:
+          "2XL"
+      }
+    ]
+  },
+
+  /*
+    =====================================================
+    CONTACTO DE EMERGENCIA 1
+    =====================================================
+  */
+
+  "emergencia.nombre": {
+    section:
+      "Contactos de emergencia",
+    label:
+      "Nombre contacto de emergencia 1",
+    type:
+      "text"
+  },
+
+  "emergencia.relacionBase": {
+    section:
+      "Contactos de emergencia",
+    label:
+      "Relación contacto de emergencia 1",
+    type:
+      "select",
+    options:
+      EMERGENCY_RELATION_OPTIONS
+  },
+
+  "emergencia.relacion": {
+    section:
+      "Contactos de emergencia",
+    label:
+      "Relación — Otro",
+    type:
+      "text"
+  },
+
+  "emergencia.telefono": {
+    section:
+      "Contactos de emergencia",
+    label:
+      "WhatsApp contacto de emergencia 1",
+    type:
+      "text"
+  },
+
+  /*
+    =====================================================
+    CONTACTO DE EMERGENCIA 2
+    =====================================================
+  */
+
+  "emergenciaSecundaria.aplica": {
+    section:
+      "Contactos de emergencia",
+    label:
+      "Tiene segundo contacto de emergencia",
+    type:
+      "boolean"
+  },
+
+  "emergenciaSecundaria.nombre": {
+    section:
+      "Contactos de emergencia",
+    label:
+      "Nombre contacto de emergencia 2",
+    type:
+      "text"
+  },
+
+  "emergenciaSecundaria.relacionBase": {
+    section:
+      "Contactos de emergencia",
+    label:
+      "Relación contacto de emergencia 2",
+    type:
+      "select",
+    options:
+      EMERGENCY_RELATION_OPTIONS
+  },
+
+  "emergenciaSecundaria.relacion": {
+    section:
+      "Contactos de emergencia",
+    label:
+      "Relación contacto emergencia 2 — Otro",
+    type:
+      "text"
+  },
+
+  "emergenciaSecundaria.telefono": {
+    section:
+      "Contactos de emergencia",
+    label:
+      "WhatsApp contacto de emergencia 2",
+    type:
+      "text"
+  },
+
+  /*
+    =====================================================
+    CAMPOS MÉDICOS CERRADOS
+    =====================================================
+  */
+
+  "salud.discapacidadFlag": {
+    type:
+      "select",
+    options:
+      YES_NO_OPTIONS
+  },
+
+  "salud.discapacidadApoyosFlag": {
+    type:
+      "select",
+    options:
+      YES_NO_OPTIONS
+  },
+
+  "salud.discapacidadAyudasTecnicasFlag": {
+    type:
+      "select",
+    options:
+      YES_NO_OPTIONS
+  },
+
+  "salud.neurodivergenciaFlag": {
+    type:
+      "select",
+    options:
+      YES_NO_OPTIONS
+  },
+
+  "salud.neuroSobrecargaFlag": {
+    type:
+      "select",
+    options:
+      YES_NO_OPTIONS
+  },
+
+  "salud.neuroApoyosFlag": {
+    type:
+      "select",
+    options:
+      YES_NO_OPTIONS
+  },
+
+  "salud.saludMentalFlag": {
+    type:
+      "select",
+    options:
+      YES_NO_OPTIONS
+  },
+
+  "salud.dietaFlag": {
+    type:
+      "select",
+    options:
+      YES_NO_OPTIONS
+  },
+
+  "salud.enfermedadBaseFlag": {
+    type:
+      "select",
+    options:
+      YES_NO_OPTIONS
+  },
+
+  "salud.saludGeneralFlag": {
+    type:
+      "select",
+    options:
+      YES_NO_OPTIONS
+  },
+
+  "salud.cirugiasPreviasFlag": {
+    type:
+      "select",
+    options:
+      YES_NO_OPTIONS
+  },
+
+  "salud.emergenciaMedicaFlag": {
+    type:
+      "select",
+    options:
+      YES_NO_OPTIONS
+  },
+
+  "salud.medicamentosFlag": {
+    type:
+      "select",
+    options:
+      YES_NO_OPTIONS
+  },
+
+  "salud.medicamentosProhibidosFlag": {
+    type:
+      "select",
+    options:
+      YES_NO_OPTIONS
+  },
+
+  "salud.alergiasFlag": {
+    type:
+      "select",
+    options:
+      YES_NO_OPTIONS
+  },
+
+  "salud.otrosAntecedentesFlag": {
+    type:
+      "select",
+    options:
+      YES_NO_OPTIONS
+  },
+
+  "salud.grupoSanguineo": {
+    type:
+      "select",
+    options: [
+      {
+        value:
+          "no_informado",
+        label:
+          "Desconozco"
+      },
+      {
+        value:
+          "A+",
+        label:
+          "A Rh+"
+      },
+      {
+        value:
+          "A-",
+        label:
+          "A Rh-"
+      },
+      {
+        value:
+          "B+",
+        label:
+          "B Rh+"
+      },
+      {
+        value:
+          "B-",
+        label:
+          "B Rh-"
+      },
+      {
+        value:
+          "AB+",
+        label:
+          "AB Rh+"
+      },
+      {
+        value:
+          "AB-",
+        label:
+          "AB Rh-"
+      },
+      {
+        value:
+          "O+",
+        label:
+          "O Rh+"
+      },
+      {
+        value:
+          "O-",
+        label:
+          "O Rh-"
+      }
+    ]
+  },
+
+  "salud.discapacidadTipos": {
+    type:
+      "multicheck",
+    options: [
+      {
+        value:
+          "fisica",
+        label:
+          "Discapacidad física"
+      },
+      {
+        value:
+          "visual",
+        label:
+          "Discapacidad visual"
+      },
+      {
+        value:
+          "auditiva",
+        label:
+          "Discapacidad auditiva"
+      },
+      {
+        value:
+          "cognitiva",
+        label:
+          "Discapacidad cognitiva"
+      }
+    ]
+  },
+
+  "salud.neurodivergenciaTipos": {
+    type:
+      "multicheck",
+    options: [
+      {
+        value:
+          "cea_tea",
+        label:
+          "CEA / TEA"
+      },
+      {
+        value:
+          "tdah",
+        label:
+          "TDAH"
+      },
+      {
+        value:
+          "dea",
+        label:
+          "DEA"
+      },
+      {
+        value:
+          "otra",
+        label:
+          "Otra"
+      }
+    ]
+  }
+};
+
+
+/*
+  =========================================================
+  CAMPOS OPERATIVOS EXTRA
+  =========================================================
+*/
+const OPERATIONAL_EXTRA_FIELDS = [
+  {
+    path:
+      "identificacion.tallaPolera"
+  },
+
+  {
+    path:
+      "emergencia.nombre"
+  },
+  {
+    path:
+      "emergencia.relacionBase"
+  },
+  {
+    path:
+      "emergencia.relacion"
+  },
+  {
+    path:
+      "emergencia.telefono"
+  },
+
+  {
+    path:
+      "emergenciaSecundaria.aplica"
+  },
+  {
+    path:
+      "emergenciaSecundaria.nombre"
+  },
+  {
+    path:
+      "emergenciaSecundaria.relacionBase"
+  },
+  {
+    path:
+      "emergenciaSecundaria.relacion"
+  },
+  {
+    path:
+      "emergenciaSecundaria.telefono"
+  }
+];
+
+
+const MEDICAL_EDIT_FIELDS = [
+  /*
+    Primero conservamos los campos médicos
+    que ya existían.
+  */
+  ...EDIT_FIELDS
+    .filter(
+      (field) => {
+        const path =
+          String(
+            field?.path ||
+            ""
+          );
+
+        /*
+          Ficha Médica NO puede tocar
+          datos administrativos estructurales.
+        */
+        const esAdministrativo =
+          (
+            path.startsWith(
+              "identificacion."
+            ) &&
+            path !==
+              "identificacion.tallaPolera"
+          ) ||
+          path.startsWith(
+            "contactoPrincipal."
+          ) ||
+          path.startsWith(
+            "contactoSecundario."
+          ) ||
+          path.startsWith(
+            "documentoIdentidad."
+          ) ||
+          path.startsWith(
+            "profesor."
+          ) ||
+          path.startsWith(
+            "adultoAcompanante."
+          ) ||
+          path.startsWith(
+            "documentacion."
+          ) ||
+          path.startsWith(
+            "consentimiento."
+          ) ||
+          [
+            "tipoViajante",
+            "tipoParticipacion",
+            "tipoInscripcion",
+            "estadoInscripcion",
+            "faseInscripcion",
+            "estadoCupo"
+          ].includes(
+            path
+          );
+
+        return !esAdministrativo;
+      }
+    ),
+
+  /*
+    Después agregamos específicamente
+    talla + contactos de emergencia.
+  */
+  ...OPERATIONAL_EXTRA_FIELDS
+]
+  .map(
     (field) => {
-      const path =
-        String(
-          field?.path ||
-          ""
-        );
+      const override =
+        MEDICAL_FIELD_OVERRIDES[
+          field.path
+        ] ||
+        {};
 
-      const esDatoAdministrativo =
-        path.startsWith(
-          "identificacion."
-        ) ||
-        path.startsWith(
-          "contactoPrincipal."
-        ) ||
-        path.startsWith(
-          "contactoSecundario."
-        ) ||
-        path.startsWith(
-          "documentoIdentidad."
-        ) ||
-        [
-          "tipoViajante",
-          "tipoParticipacion",
-          "tipoInscripcion",
-          "estadoInscripcion",
-          "faseInscripcion",
-          "estadoCupo"
-        ].includes(
-          path
-        );
-
-      return !esDatoAdministrativo;
+      return {
+        ...field,
+        ...override
+      };
     }
+  )
+  /*
+    Evita campos repetidos si EDIT_FIELDS
+    ya contenía alguno de ellos.
+  */
+  .filter(
+    (
+      field,
+      index,
+      array
+    ) =>
+      array.findIndex(
+        (candidate) =>
+          candidate.path ===
+          field.path
+      ) === index
   );
 
 const state = {
@@ -80,7 +671,10 @@ const state = {
   group: null,
   items: [],
   user: null,
-  editingId: ""
+  editingId: "",
+
+  medicalHistory: [],
+  currentView: "fichas"
 };
 
 init();
@@ -180,6 +774,455 @@ function bindEvents() {
         }
       }
     );
+    document
+      .querySelectorAll(
+        "[data-medical-view]"
+      )
+      .forEach(
+        (button) => {
+          button.addEventListener(
+            "click",
+            () => {
+              changeMedicalView(
+                button.dataset
+                  .medicalView ||
+                "fichas"
+              );
+            }
+          );
+        }
+      );
+}
+
+async function loadMedicalHistory() {
+  if (
+    !state.groupDocId
+  ) {
+    state.medicalHistory =
+      [];
+
+    return;
+  }
+
+  try {
+    const ref =
+      collection(
+        db,
+        "ventas_cotizaciones",
+        state.groupDocId,
+        "historial_ficha_medica"
+      );
+
+    const snap =
+      await getDocs(
+        query(
+          ref,
+          orderBy(
+            "fecha",
+            "desc"
+          )
+        )
+      );
+
+    state.medicalHistory =
+      snap.docs.map(
+        (documento) => ({
+          id:
+            documento.id,
+
+          ...documento.data()
+        })
+      );
+  } catch (error) {
+    console.error(
+      "[gestion-fichas-medicas] loadMedicalHistory",
+      error
+    );
+
+    state.medicalHistory =
+      [];
+  }
+}
+
+
+function renderMedicalHistoryValue(
+  value
+) {
+  if (
+    value === true
+  ) {
+    return "Sí";
+  }
+
+  if (
+    value === false
+  ) {
+    return "No";
+  }
+
+  if (
+    Array.isArray(
+      value
+    )
+  ) {
+    return (
+      value.join(
+        ", "
+      ) ||
+      "—"
+    );
+  }
+
+  if (
+    value ===
+      undefined ||
+    value ===
+      null ||
+    value ===
+      ""
+  ) {
+    return "—";
+  }
+
+  return String(
+    value
+  );
+}
+
+
+function getMedicalHistoryFieldLabel(
+  path = ""
+) {
+  const labels = {
+    "identificacion.tallaPolera":
+      "Talla de polera",
+
+    "emergencia.nombre":
+      "Contacto de emergencia 1",
+
+    "emergencia.relacionBase":
+      "Relación emergencia 1",
+
+    "emergencia.relacion":
+      "Relación emergencia 1",
+
+    "emergencia.telefono":
+      "WhatsApp emergencia 1",
+
+    "emergenciaSecundaria.aplica":
+      "Segundo contacto de emergencia",
+
+    "emergenciaSecundaria.nombre":
+      "Contacto de emergencia 2",
+
+    "emergenciaSecundaria.relacionBase":
+      "Relación emergencia 2",
+
+    "emergenciaSecundaria.relacion":
+      "Relación emergencia 2",
+
+    "emergenciaSecundaria.telefono":
+      "WhatsApp emergencia 2",
+
+    "salud.discapacidadFlag":
+      "Discapacidad",
+
+    "salud.neurodivergenciaFlag":
+      "Neurodivergencia",
+
+    "salud.saludMentalFlag":
+      "Salud mental",
+
+    "salud.dietaFlag":
+      "Dieta / restricción alimentaria",
+
+    "salud.grupoSanguineo":
+      "Grupo sanguíneo",
+
+    "salud.enfermedadBaseFlag":
+      "Enfermedad de base",
+
+    "salud.medicamentosFlag":
+      "Medicamentos",
+
+    "salud.medicamentosDetalle":
+      "Detalle de medicamentos",
+
+    "salud.medicamentosProhibidosFlag":
+      "Medicamentos contraindicados",
+
+    "salud.medicamentosProhibidosDetalle":
+      "Detalle medicamentos contraindicados",
+
+    "salud.alergiasFlag":
+      "Alergias",
+
+    "salud.alergiasDetalle":
+      "Detalle de alergias",
+
+    "salud.otrosAntecedentesFlag":
+      "Otros antecedentes",
+
+    "salud.otrosAntecedentesDetalle":
+      "Detalle otros antecedentes"
+  };
+
+  return (
+    labels[path] ||
+    String(
+      path ||
+      "Campo"
+    )
+  );
+}
+
+
+function renderMedicalHistory() {
+  const container =
+    $("medicalHistoryList");
+
+  if (!container) {
+    return;
+  }
+
+  const items =
+    state.medicalHistory ||
+    [];
+
+  $("medicalHistoryCount").textContent =
+    `${items.length} movimiento${
+      items.length === 1
+        ? ""
+        : "s"
+    }`;
+
+  if (!items.length) {
+    container.innerHTML = `
+      <div class="loading">
+        No hay modificaciones registradas.
+      </div>
+    `;
+
+    return;
+  }
+
+  container.innerHTML =
+    items
+      .map(
+        (item) => {
+          const cambios =
+            Array.isArray(
+              item.cambios
+            )
+              ? item.cambios
+              : (
+                  Array.isArray(
+                    item
+                      ?.metadata
+                      ?.cambios
+                  )
+                    ? item.metadata
+                        .cambios
+                    : []
+                );
+
+          const nombre =
+            clean(
+              item
+                ?.metadata
+                ?.nombreCompleto ||
+              ""
+            );
+
+          const documento =
+            clean(
+              item
+                ?.metadata
+                ?.documento ||
+              ""
+            );
+
+          const motivo =
+            clean(
+              item.motivo ||
+              item
+                ?.metadata
+                ?.motivo ||
+              ""
+            );
+
+          return `
+            <article class="medical-history-item">
+              <div class="medical-history-item-head">
+                <div>
+                  <div class="medical-history-title">
+                    ${escapeHtml(
+                      item.titulo ||
+                      "Edición de ficha / datos operativos"
+                    )}
+                  </div>
+
+                  ${
+                    nombre
+                      ? `
+                        <div class="medical-history-passenger">
+                          ${escapeHtml(
+                            nombre
+                          )}
+
+                          ${
+                            documento
+                              ? ` · ${escapeHtml(
+                                  documento
+                                )}`
+                              : ""
+                          }
+                        </div>
+                      `
+                      : ""
+                  }
+                </div>
+
+                <div class="medical-history-date">
+                  ${escapeHtml(
+                    formatDate(
+                      item.fecha
+                    )
+                  )}
+                </div>
+              </div>
+
+              ${
+                cambios.length
+                  ? `
+                    <div class="medical-history-changes">
+                      ${
+                        cambios
+                          .map(
+                            (cambio) => `
+                              <div class="medical-history-change">
+                                <strong>
+                                  ${escapeHtml(
+                                    getMedicalHistoryFieldLabel(
+                                      cambio.campo
+                                    )
+                                  )}
+                                </strong>
+
+                                <div>
+                                  ${escapeHtml(
+                                    renderMedicalHistoryValue(
+                                      cambio.anterior
+                                    )
+                                  )}
+                                  →
+                                  ${escapeHtml(
+                                    renderMedicalHistoryValue(
+                                      cambio.nuevo
+                                    )
+                                  )}
+                                </div>
+                              </div>
+                            `
+                          )
+                          .join("")
+                      }
+                    </div>
+                  `
+                  : ""
+              }
+
+              ${
+                motivo
+                  ? `
+                    <div class="medical-history-reason">
+                      <strong>
+                        Motivo:
+                      </strong>
+
+                      ${escapeHtml(
+                        motivo
+                      )}
+                    </div>
+                  `
+                  : ""
+              }
+
+              <div class="medical-history-author">
+                Modificado por
+                ${escapeHtml(
+                  item.creadoPor ||
+                  item.usuarioNombre ||
+                  "—"
+                )}
+
+                ${
+                  item.creadoPorCorreo ||
+                  item.usuarioCorreo
+                    ? `
+                      · ${escapeHtml(
+                        item.creadoPorCorreo ||
+                        item.usuarioCorreo
+                      )}
+                    `
+                    : ""
+                }
+              </div>
+            </article>
+          `;
+        }
+      )
+      .join("");
+}
+
+
+function changeMedicalView(
+  view = "fichas"
+) {
+  const safeView =
+    view ===
+      "historial"
+      ? "historial"
+      : "fichas";
+
+  state.currentView =
+    safeView;
+
+  $("medicalPassengersPanel")
+    ?.classList.toggle(
+      "hidden",
+      safeView !==
+        "fichas"
+    );
+
+  $("medicalHistoryPanel")
+    ?.classList.toggle(
+      "hidden",
+      safeView !==
+        "historial"
+    );
+
+  document
+    .querySelectorAll(
+      "[data-medical-view]"
+    )
+    .forEach(
+      (button) => {
+        button.classList.toggle(
+          "active",
+          button.dataset
+            .medicalView ===
+            safeView
+        );
+      }
+    );
+
+  if (
+    safeView ===
+    "historial"
+  ) {
+    renderMedicalHistory();
+  }
 }
 
 async function loadPage() {
@@ -199,6 +1242,8 @@ async function loadPage() {
     state.group = resolved.data;
     state.items = await loadGroupInscriptions(state.groupDocId);
 
+    await loadMedicalHistory();
+
     $("groupSubtitle").textContent = [
       state.group.aliasGrupo || state.group.nombreGrupo || state.groupId,
       state.group.colegio,
@@ -212,6 +1257,12 @@ async function loadPage() {
     renderKpis();
     renderTypeOptions();
     renderTable();
+    renderMedicalHistory();
+    
+    changeMedicalView(
+      state.currentView ||
+      "fichas"
+    );
 
     $("content").classList.remove("hidden");
   } catch (error) {
@@ -2278,30 +3329,285 @@ function openEdit(id) {
     );
 }
 
-function renderInput(field, value) {
-  const serialized = field.type === "array"
-    ? (Array.isArray(value) ? value.join(", ") : clean(value))
-    : clean(value);
+function renderInput(
+  field,
+  value
+) {
+  const type =
+    field.type ||
+    "text";
 
-  const wideClass = field.type === "textarea" ? "is-wide" : "";
+  const options =
+    Array.isArray(
+      field.options
+    )
+      ? field.options
+      : [];
 
-  if (field.type === "textarea") {
+  const serialized =
+    type ===
+      "array"
+      ? (
+          Array.isArray(
+            value
+          )
+            ? value.join(
+                ", "
+              )
+            : clean(
+                value
+              )
+        )
+      : clean(
+          value
+        );
+
+  const wideClass =
+    type ===
+      "textarea" ||
+    type ===
+      "multicheck"
+      ? "is-wide"
+      : "";
+
+  /*
+    =====================================================
+    TEXTAREA
+    =====================================================
+  */
+  if (
+    type ===
+    "textarea"
+  ) {
     return `
       <div class="field ${wideClass}">
-        <label>${escapeHtml(field.label)}</label>
-        <textarea data-edit-path="${escapeHtml(field.path)}" data-edit-type="text">${escapeHtml(serialized)}</textarea>
+        <label>
+          ${escapeHtml(
+            field.label
+          )}
+        </label>
+
+        <textarea
+          data-edit-path="${escapeHtml(
+            field.path
+          )}"
+          data-edit-type="text"
+        >${escapeHtml(
+          serialized
+        )}</textarea>
       </div>
     `;
   }
 
+  /*
+    =====================================================
+    SELECT
+    =====================================================
+  */
+  if (
+    type ===
+    "select"
+  ) {
+    return `
+      <div class="field">
+        <label>
+          ${escapeHtml(
+            field.label
+          )}
+        </label>
+
+        <select
+          data-edit-path="${escapeHtml(
+            field.path
+          )}"
+          data-edit-type="select"
+        >
+          <option value="">
+            Seleccione...
+          </option>
+
+          ${
+            options
+              .map(
+                (option) => `
+                  <option
+                    value="${escapeHtml(
+                      option.value
+                    )}"
+                    ${
+                      String(
+                        option.value
+                      ) ===
+                      String(
+                        value ??
+                        ""
+                      )
+                        ? "selected"
+                        : ""
+                    }
+                  >
+                    ${escapeHtml(
+                      option.label
+                    )}
+                  </option>
+                `
+              )
+              .join("")
+          }
+        </select>
+      </div>
+    `;
+  }
+
+  /*
+    =====================================================
+    BOOLEAN
+    =====================================================
+  */
+  if (
+    type ===
+    "boolean"
+  ) {
+    return `
+      <div class="field is-wide">
+        <label
+          style="
+            display:flex;
+            align-items:center;
+            gap:9px;
+          "
+        >
+          <input
+            type="checkbox"
+            data-edit-path="${escapeHtml(
+              field.path
+            )}"
+            data-edit-type="boolean"
+            ${
+              value === true
+                ? "checked"
+                : ""
+            }
+          >
+
+          ${escapeHtml(
+            field.label
+          )}
+        </label>
+      </div>
+    `;
+  }
+
+  /*
+    =====================================================
+    MULTI CHECKBOX
+    =====================================================
+  */
+  if (
+    type ===
+    "multicheck"
+  ) {
+    const selectedValues =
+      Array.isArray(
+        value
+      )
+        ? value.map(
+            String
+          )
+        : [];
+
+    return `
+      <div class="field is-wide">
+        <label>
+          ${escapeHtml(
+            field.label
+          )}
+        </label>
+
+        <div
+          style="
+            display:flex;
+            flex-wrap:wrap;
+            gap:8px;
+          "
+          data-edit-path="${escapeHtml(
+            field.path
+          )}"
+          data-edit-type="multicheck"
+        >
+          ${
+            options
+              .map(
+                (option) => `
+                  <label
+                    style="
+                      display:inline-flex;
+                      align-items:center;
+                      gap:6px;
+                      padding:8px 10px;
+                      border:1px solid #dbe4f0;
+                      border-radius:999px;
+                      background:#fff;
+                    "
+                  >
+                    <input
+                      type="checkbox"
+                      value="${escapeHtml(
+                        option.value
+                      )}"
+                      ${
+                        selectedValues.includes(
+                          String(
+                            option.value
+                          )
+                        )
+                          ? "checked"
+                          : ""
+                      }
+                    >
+
+                    ${escapeHtml(
+                      option.label
+                    )}
+                  </label>
+                `
+              )
+              .join("")
+          }
+        </div>
+      </div>
+    `;
+  }
+
+  /*
+    =====================================================
+    INPUT NORMAL
+    =====================================================
+  */
   return `
     <div class="field ${wideClass}">
-      <label>${escapeHtml(field.label)}</label>
+      <label>
+        ${escapeHtml(
+          field.label
+        )}
+      </label>
+
       <input
-        type="${escapeHtml(field.type === "array" ? "text" : field.type || "text")}"
-        value="${escapeHtml(serialized)}"
-        data-edit-path="${escapeHtml(field.path)}"
-        data-edit-type="${escapeHtml(field.type || "text")}"
+        type="${escapeHtml(
+          type ===
+            "array"
+            ? "text"
+            : type
+        )}"
+        value="${escapeHtml(
+          serialized
+        )}"
+        data-edit-path="${escapeHtml(
+          field.path
+        )}"
+        data-edit-type="${escapeHtml(
+          type
+        )}"
       >
     </div>
   `;
@@ -2543,18 +3849,67 @@ async function saveEdit(event) {
             path
           );
 
-        const newValue =
+        let newValue;
+        
+        /*
+          BOOLEAN
+        */
+        if (
+          type ===
+          "boolean"
+        ) {
+          newValue =
+            input.checked ===
+            true;
+        }
+        
+        /*
+          MULTICHECK
+        */
+        else if (
+          type ===
+          "multicheck"
+        ) {
+          newValue =
+            Array.from(
+              input.querySelectorAll(
+                'input[type="checkbox"]:checked'
+              )
+            )
+              .map(
+                (checkbox) =>
+                  clean(
+                    checkbox.value
+                  )
+              )
+              .filter(Boolean);
+        }
+        
+        /*
+          ARRAY ANTIGUO
+        */
+        else if (
           type ===
           "array"
-            ? clean(
-                input.value
-              )
-                .split(",")
-                .map(clean)
-                .filter(Boolean)
-            : clean(
-                input.value
-              );
+        ) {
+          newValue =
+            clean(
+              input.value
+            )
+              .split(",")
+              .map(clean)
+              .filter(Boolean);
+        }
+        
+        /*
+          TEXTO / SELECT
+        */
+        else {
+          newValue =
+            clean(
+              input.value
+            );
+        }
 
         if (
           JSON.stringify(
@@ -2593,6 +3948,53 @@ async function saveEdit(event) {
         }
       }
     );
+
+  /*
+    =====================================================
+    CAMPOS DERIVADOS / ESPEJO
+    =====================================================
+  */
+  
+  /*
+    Emergencia 1.
+    Cuando la relación NO es "otro",
+    relación final debe quedar igual
+    a relaciónBase.
+  */
+  if (
+    patch[
+      "emergencia.relacionBase"
+    ] !== undefined &&
+    patch[
+      "emergencia.relacionBase"
+    ] !== "otro"
+  ) {
+    patch[
+      "emergencia.relacion"
+    ] =
+      patch[
+        "emergencia.relacionBase"
+      ];
+  }
+  
+  /*
+    Emergencia 2.
+  */
+  if (
+    patch[
+      "emergenciaSecundaria.relacionBase"
+    ] !== undefined &&
+    patch[
+      "emergenciaSecundaria.relacionBase"
+    ] !== "otro"
+  ) {
+    patch[
+      "emergenciaSecundaria.relacion"
+    ] =
+      patch[
+        "emergenciaSecundaria.relacionBase"
+      ];
+  }
 
   if (!cambios.length) {
     alert(
