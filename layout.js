@@ -20,15 +20,15 @@ const menuItems = [
     roles: ["admin", "supervision", "registro", "vendedor"]
   },
   {
-    key: "nomina",
-    href: "gestion-nomina.html",
-    label: "Nómina y Fichas Médicas",
-    roles: ["admin", "supervision", "registro", "vendedor"]
-  }
-  {
     key: "cartera",
     href: "cartera.html",
     label: "Cartera",
+    roles: ["admin", "supervision", "registro", "vendedor"]
+  },
+  {
+    key: "gestion-nomina",
+    href: "gestion-nomina.html",
+    label: "Gestión Nómina",
     roles: ["admin", "supervision", "registro", "vendedor"]
   },
   {
@@ -95,6 +95,7 @@ function getInicioHref(user) {
 function getVisibleMenuItems(user) {
   const rol = user?.rol || "";
   if (!rol) return [];
+
   return menuItems.filter(item => item.roles.includes(rol));
 }
 
@@ -113,21 +114,26 @@ function renderMenuLinks(user) {
     </a>
   `;
 
-  const otherLinks = getVisibleMenuItems(user).map(item => {
-    const classes = ["menu-link", "menu-pill"];
-    if (page === item.key) classes.push("active");
+  const otherLinks = getVisibleMenuItems(user)
+    .map(item => {
+      const classes = ["menu-link", "menu-pill"];
 
-    return `
-      <a
-        href="${item.href}"
-        class="${classes.join(" ")}"
-        data-menu-key="${item.key}"
-        aria-current="${page === item.key ? "page" : "false"}"
-      >
-        <span class="menu-link-text">${item.label}</span>
-      </a>
-    `;
-  }).join("");
+      if (page === item.key) {
+        classes.push("active");
+      }
+
+      return `
+        <a
+          href="${item.href}"
+          class="${classes.join(" ")}"
+          data-menu-key="${item.key}"
+          aria-current="${page === item.key ? "page" : "false"}"
+        >
+          <span class="menu-link-text">${item.label}</span>
+        </a>
+      `;
+    })
+    .join("");
 
   return homeLink + otherLinks;
 }
@@ -145,9 +151,11 @@ function renderLayoutTop(user) {
 
           <div class="saludo-wrap header-user-block">
             <div class="header-kicker">Sistema Ventas RT</div>
+
             <h1 id="saludo-usuario" class="header-greeting">
               ${user ? `Hola, ${user.nombre || "Usuario(a)"}` : "Cargando..."}
             </h1>
+
             <div id="usuario-conectado" class="usuario-conectado">
               ${user?.email || ""}
             </div>
@@ -192,7 +200,9 @@ function renderLayoutTop(user) {
               <option value="">Elegir usuario</option>
             </select>
 
-            <button id="btn-acting-user" class="btn-primary">Entrar como</button>
+            <button id="btn-acting-user" class="btn-primary">
+              Entrar como
+            </button>
 
             <button id="btn-reset-acting-user" class="btn-secundario">
               Volver a mi usuario
@@ -210,7 +220,9 @@ function updateLayoutUser(user) {
   const menuLinks = document.getElementById("layout-menu-links");
 
   if (saludo) {
-    saludo.textContent = user ? `Hola, ${user.nombre || "Usuario(a)"}` : "Cargando...";
+    saludo.textContent = user
+      ? `Hola, ${user.nombre || "Usuario(a)"}`
+      : "Cargando...";
   }
 
   if (usuarioConectado) {
@@ -224,54 +236,73 @@ function updateLayoutUser(user) {
   const inicioHref = getInicioHref(user);
 
   const brandLink = document.querySelector(".brand-link");
-  if (brandLink) brandLink.href = inicioHref;
+
+  if (brandLink) {
+    brandLink.href = inicioHref;
+  }
 
   const btnHome = document.getElementById("btn-home");
+
   if (btnHome) {
     btnHome.setAttribute("href", inicioHref);
-  
-    btnHome.onclick = (e) => {
-      e.preventDefault();
+
+    btnHome.onclick = event => {
+      event.preventDefault();
       window.location.href = inicioHref;
     };
   }
 
-  window.dispatchEvent(new CustomEvent("ventas-layout-ready", {
-    detail: { user }
-  }));
+  window.dispatchEvent(
+    new CustomEvent("ventas-layout-ready", {
+      detail: { user }
+    })
+  );
 }
 
 function resolveLayoutUser() {
   const effectiveUser = getEffectiveUser();
-  if (effectiveUser) return effectiveUser;
+
+  if (effectiveUser) {
+    return effectiveUser;
+  }
 
   const firebaseUser = auth.currentUser;
-  if (!firebaseUser?.email) return null;
+
+  if (!firebaseUser?.email) {
+    return null;
+  }
 
   return getVentasUser(firebaseUser.email || "") || null;
 }
 
 function mountLayoutTop() {
   const slot = document.getElementById("layout-top");
-  if (!slot) return;
+
+  if (!slot) {
+    return;
+  }
 
   slot.innerHTML = renderLayoutTop(null);
 
-  window.dispatchEvent(new CustomEvent("ventas-layout-ready", {
-    detail: { user: null }
-  }));
+  window.dispatchEvent(
+    new CustomEvent("ventas-layout-ready", {
+      detail: { user: null }
+    })
+  );
 
   onAuthStateChanged(auth, () => {
     updateLayoutUser(resolveLayoutUser());
   });
-  
+
   window.addEventListener("ventas-acting-user-changed", () => {
     updateLayoutUser(resolveLayoutUser());
   });
 }
 
 if (document.readyState === "loading") {
-  document.addEventListener("DOMContentLoaded", mountLayoutTop, { once: true });
+  document.addEventListener("DOMContentLoaded", mountLayoutTop, {
+    once: true
+  });
 } else {
   mountLayoutTop();
 }
