@@ -1590,86 +1590,19 @@ async function onSubmit(event) {
   btnEnviar.textContent = "Enviando formulario...";
 
   try {
-    // ============================================================
-    // DIAGNÓSTICO TEMPORAL
-    // ============================================================
-
-    console.log("==============================================");
-    console.log("🔎 DIAGNÓSTICO ANTES DE CONSTRUIR PAYLOAD");
-    console.log("==============================================");
-
-    console.table({
-      nombresInput: $("nombres")?.value,
-      primerApellidoInput: $("primerApellido")?.value,
-      segundoApellidoInput: $("segundoApellido")?.value,
-
-      correoViajanteInput: $("correoViajante")?.value,
-
-      contactoPrincipalNombreInput:
-        $("contactoPrincipalNombre")?.value,
-
-      contactoPrincipalRelacionInput:
-        $("contactoPrincipalRelacion")?.value,
-
-      contactoPrincipalTelefonoInput:
-        $("contactoPrincipalTelefono")?.value,
-
-      contactoPrincipalCorreoInput:
-        $("contactoPrincipalCorreo")?.value,
-
-      emergenciaNombreInput:
-        $("emergenciaNombre")?.value
-    });
-
     const payloadBase = construirPayloadBase();
 
-    console.log("==============================================");
-    console.log("📦 IDENTIFICACIÓN CONSTRUIDA");
-    console.log("==============================================");
+    if (requiereCarnetIdentidad() || requiereComprobantePago()) {
+      btnEnviar.textContent = "Subiendo archivos...";
+      payloadBase.archivosEspeciales = await subirArchivosEspeciales(payloadBase);
+    }
 
-    console.table(payloadBase.identificacion);
+    btnEnviar.textContent = "Enviando formulario...";
+    await enviarInscripcionPendiente(payloadBase);
 
-    console.log("==============================================");
-    console.log("👤 CONTACTO PRINCIPAL CONSTRUIDO");
-    console.log("==============================================");
+    registrarFormularioEnviado(payloadBase);
 
-    console.table(payloadBase.contactoPrincipal);
-
-    console.log("==============================================");
-    console.log("🚨 EMERGENCIA CONSTRUIDA");
-    console.log("==============================================");
-
-    console.table(payloadBase.emergencia);
-
-    console.log("==============================================");
-    console.log("📦 PAYLOAD COMPLETO QUE SE ENVIARÁ");
-    console.log("==============================================");
-
-    console.log(payloadBase);
-
-    // IMPORTANTE:
-    // detenemos intencionalmente el proceso.
-    // NO se guarda nada en Firestore durante esta prueba.
-
-    console.warn(
-      "🛑 ENVÍO DETENIDO INTENCIONALMENTE PARA DIAGNÓSTICO"
-    );
-
-    mostrarMensaje(
-      "error",
-      `
-        PRUEBA DE DIAGNÓSTICO ACTIVA.<br><br>
-        El formulario <strong>NO fue enviado</strong>.<br>
-        Revise la consola del navegador.
-      `
-    );
-
-    return;
-
-    // ============================================================
-    // FIN DIAGNÓSTICO TEMPORAL
-    // ============================================================
-
+    mostrarPantallaFinal(payloadBase);
   } catch (error) {
     console.error("ERROR INSCRIPCION:", {
       message: error?.message,
@@ -1678,31 +1611,39 @@ async function onSubmit(event) {
       stack: error?.stack
     });
 
-    const codigoError =
-      error?.code ||
-      error?.message ||
-      "error_desconocido";
+    if (error.message === "duplicate_document") {
+      mostrarMensaje(
+        "error",
+        `Ya existe una inscripción para este documento dentro del grupo. Comuníquese con <strong>${CORREO_ADMIN}</strong>, al <strong>${TELEFONO_ADMIN}</strong> o al WhatsApp <strong>${WHATSAPP_ADMIN}</strong>.`
+      );
+    } else if (error.message === "duplicate_no_rut_name") {
+      mostrarMensaje(
+        "error",
+        `Ya existe una inscripción con esos nombres y apellidos en este grupo. Comuníquese con <strong>${CORREO_ADMIN}</strong>, al <strong>${TELEFONO_ADMIN}</strong> o al WhatsApp <strong>${WHATSAPP_ADMIN}</strong>.`
+      );
+    } else {
+      const codigoError = error?.code || error?.message || "error_desconocido";
 
-    mostrarMensaje(
-      "error",
-      `
-        Error durante la prueba.<br><br>
-        Código:
-        <strong>${escapeHtml(codigoError)}</strong>
-      `
-    );
+      mostrarMensaje(
+        "error",
+        `
+          No fue posible completar la inscripción en este momento.
+          <br><br>
+          Por favor, intente nuevamente. Si el problema continúa, comuníquese con
+          <strong>${CORREO_ADMIN}</strong> o al WhatsApp <strong>${WHATSAPP_ADMIN}</strong>
+          e indique este código:
+          <br>
+          <strong>${escapeHtml(codigoError)}</strong>
+        `
+      );
+    }
 
-    window.scrollTo({
-      top: 0,
-      behavior: "smooth"
-    });
-
+    window.scrollTo({ top: 0, behavior: "smooth" });
   } finally {
     btnEnviar.disabled = false;
     btnEnviar.textContent = "Enviar inscripción";
   }
 }
-
 // -----------------------------------------------------------------------------
 // GUARDADO EN BACKEND
 // -----------------------------------------------------------------------------
