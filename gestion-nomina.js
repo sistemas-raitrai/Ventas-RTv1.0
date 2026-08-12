@@ -2535,6 +2535,18 @@ function renderModal(
     true;
 
   /*
+  Gestión NFC también forma parte
+  de la administración operativa.
+
+  El vendedor no debe verla.
+*/
+$("btnGestionarPulseras")
+  ?.classList.toggle(
+    "hidden",
+    !puedeAdministrar
+  );
+
+  /*
     CARGADO A PAGOS
   */
   $("btnCargadoPagos").textContent =
@@ -6478,6 +6490,26 @@ function abrirFichasMedicasGrupo() {
 }
 
 function abrirGestionPulseras() {
+  /*
+    SEGUNDO BLINDAJE.
+
+    Aunque alguien intentara ejecutar
+    esta función manualmente desde consola,
+    solo usuarios administrativos pueden
+    entrar desde Gestión Nómina.
+  */
+  if (
+    state.manager
+      ?.puedeAdministrarNomina() !==
+    true
+  ) {
+    alert(
+      "No tienes permisos para gestionar pulseras NFC."
+    );
+
+    return;
+  }
+
   const {
     docId,
     groupId
