@@ -589,3 +589,120 @@ th { color: var(--navy); background: var(--soft); position: sticky; top: 0; }
     flex-direction: column;
   }
 }
+
+/* =========================================================
+   GESTIÓN FICHA MÉDICA · TABS / HISTORIAL
+========================================================= */
+
+.medical-tabs {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.medical-tab {
+  border: 0;
+  border-bottom: 3px solid transparent;
+  padding: 10px 14px;
+  background: transparent;
+  color: #64748b;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.medical-tab.active {
+  border-bottom-color: #1e2559;
+  color: #1e2559;
+}
+
+.medical-history-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 15px;
+  margin-bottom: 16px;
+}
+
+.medical-history-head h2 {
+  margin: 0;
+}
+
+.medical-history-head p {
+  margin: 4px 0 0;
+  color: #64748b;
+}
+
+.medical-history-count {
+  color: #64748b;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.medical-history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.medical-history-item {
+  padding: 14px;
+  border: 1px solid #dbe4f0;
+  border-radius: 14px;
+  background: #fff;
+}
+
+.medical-history-item-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  align-items: flex-start;
+}
+
+.medical-history-title {
+  color: #1e2559;
+  font-weight: 900;
+}
+
+.medical-history-date {
+  color: #64748b;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.medical-history-passenger {
+  margin-top: 4px;
+  color: #475569;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.medical-history-changes {
+  display: grid;
+  gap: 7px;
+  margin-top: 12px;
+}
+
+.medical-history-change {
+  padding: 8px 10px;
+  background: #f7f9fd;
+  border-radius: 9px;
+  font-size: 12px;
+}
+
+.medical-history-change strong {
+  color: #1e2559;
+}
+
+.medical-history-reason {
+  margin-top: 10px;
+  padding: 9px 10px;
+  background: #fff8df;
+  border-left: 4px solid #eebf00;
+  font-size: 12px;
+}
+
+.medical-history-author {
+  margin-top: 9px;
+  color: #64748b;
+  font-size: 11px;
+}
