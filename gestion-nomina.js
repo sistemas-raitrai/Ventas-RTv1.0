@@ -2489,14 +2489,21 @@ function renderModal(
     }`;
 
   /*
-    Al abrir un grupo mostramos la nómina completa.
-    Después el usuario puede filtrar presionando un KPI.
+    Al abrir un grupo mostramos
+    inicialmente toda la nómina.
   */
   state.nominaFiltro =
     "todos";
 
   renderKpisModal();
 
+  /*
+    Las fases siempre se muestran.
+
+    renderFase() decidirá si muestra
+    controles o solamente el estado
+    según los permisos del usuario.
+  */
   $("fasesContenedor").innerHTML =
     [
       fases.principal,
@@ -2511,22 +2518,105 @@ function renderModal(
 
   renderPasajeros();
 
+  /*
+    =====================================================
+    PERMISOS ADMINISTRATIVOS
+    =====================================================
+  */
+
+  const puedeAdministrar =
+    state.manager
+      ?.puedeAdministrarNomina() ===
+    true;
+
+  const esAdminOSupervision =
+    state.manager
+      ?.esAdminOSupervision() ===
+    true;
+
+  /*
+    CARGADO A PAGOS
+  */
   $("btnCargadoPagos").textContent =
     grupo.nominaCargadaPagos
       ? "Quitar cargado a pagos"
       : "Marcar cargado a pagos";
 
+  $("btnCargadoPagos")
+    ?.classList.toggle(
+      "hidden",
+      !puedeAdministrar
+    );
+
+  /*
+    ARCHIVAR NÓMINA
+  */
   $("btnArchivar").textContent =
     grupo.nominaArchivada
       ? "Desarchivar nómina"
       : "Archivar nómina";
 
+  $("btnArchivar")
+    ?.classList.toggle(
+      "hidden",
+      !puedeAdministrar
+    );
+
+  /*
+    RESETEAR CICLO
+
+    Continúa siendo una operación
+    todavía más restringida:
+    admin o supervisión.
+  */
   $("btnResetear")
     ?.classList.toggle(
       "hidden",
-      !state.manager
-        .esAdminOSupervision()
+      !esAdminOSupervision
     );
+
+  /*
+    =====================================================
+    HISTORIAL
+    =====================================================
+
+    El vendedor puede VER el historial,
+    pero no agregar notas administrativas.
+  */
+
+  const textareaNota =
+    $("historialNominaNota");
+
+  if (textareaNota) {
+    textareaNota.disabled =
+      !puedeAdministrar;
+
+    textareaNota.placeholder =
+      puedeAdministrar
+        ? "Agregar nota administrativa..."
+        : "Historial disponible en modo solo lectura.";
+  }
+
+  $("btnAgregarNotaNomina")
+    ?.classList.toggle(
+      "hidden",
+      !puedeAdministrar
+    );
+
+  /*
+    IMPORTANTE:
+
+    NO ocultamos:
+    - KPI
+    - Gestión fichas médicas
+    - Ver fichas del grupo
+    - Abrir grupo
+    - Gestión pulseras
+    - Exportar CSV
+
+    porque esas funciones no modifican
+    directamente la nómina administrativa.
+  */
 
   $("modalCargando")
     ?.classList.add(
@@ -2537,6 +2627,7 @@ function renderModal(
     ?.classList.remove(
       "hidden"
     );
+
   renderHistorialNomina();
 
   cambiarVistaModalNomina(
@@ -2965,6 +3056,21 @@ async function guardarNotaHistorialNomina() {
 function renderFase(
   fase
 ) {
+  /*
+    Gestión de links solamente para
+    usuarios con permiso administrativo.
+
+    El vendedor puede VER el estado
+    de cada fase, pero no modificarla
+    ni copiar el link.
+  */
+  const puedeGestionar =
+    state.manager
+      ?.puedeGestionarLinks(
+        state.current?.data ||
+        {}
+      ) === true;
+
   return `
     <div class="gn-fase">
       <h4>
@@ -2981,43 +3087,53 @@ function renderFase(
         }
       </div>
 
-      <div class="gn-actions">
-        ${
-          fase.activo
-            ? `
-              <button
-                class="gn-btn ok"
-                data-action="copiar"
-                data-fase="${fase.clave}"
-                data-link="${esc(
-                  fase.link
-                )}"
-                type="button"
-              >
-                Copiar link
-              </button>
+      ${
+        puedeGestionar
+          ? `
+            <div class="gn-actions">
+              ${
+                fase.activo
+                  ? `
+                    <button
+                      class="gn-btn ok"
+                      data-action="copiar"
+                      data-fase="${fase.clave}"
+                      data-link="${esc(
+                        fase.link
+                      )}"
+                      type="button"
+                    >
+                      Copiar link
+                    </button>
 
-              <button
-                class="gn-btn danger"
-                data-action="cerrar"
-                data-fase="${fase.clave}"
-                type="button"
-              >
-                Cerrar
-              </button>
-            `
-            : `
-              <button
-                class="gn-btn"
-                data-action="abrir"
-                data-fase="${fase.clave}"
-                type="button"
-              >
-                Abrir
-              </button>
-            `
-        }
-      </div>
+                    <button
+                      class="gn-btn danger"
+                      data-action="cerrar"
+                      data-fase="${fase.clave}"
+                      type="button"
+                    >
+                      Cerrar
+                    </button>
+                  `
+                  : `
+                    <button
+                      class="gn-btn"
+                      data-action="abrir"
+                      data-fase="${fase.clave}"
+                      type="button"
+                    >
+                      Abrir
+                    </button>
+                  `
+              }
+            </div>
+          `
+          : `
+            <div class="gn-sub">
+              Solo lectura
+            </div>
+          `
+      }
     </div>
   `;
 }
@@ -4921,16 +5037,46 @@ function getAccionOperativaHtml(
       item
     );
 
-  let accionPendiente =
-    `
-      <span class="gn-sub">
-        Sin acción pendiente
-      </span>
-    `;
+  /*
+    =====================================================
+    PERMISOS
+    =====================================================
 
+    Estos permisos vienen directamente desde
+    inscripciones-manager.js.
+
+    De esta forma la interfaz refleja exactamente
+    lo que el backend lógico permite hacer.
+  */
+
+  const puedeAdministrar =
+    state.manager
+      ?.puedeAdministrarNomina() ===
+    true;
+
+  const puedeConfirmar =
+    state.manager
+      ?.puedeConfirmarIngresoOCupo() ===
+    true;
+
+  const puedeMarcarPagado =
+    state.manager
+      ?.puedeMarcarListaEsperaPagada() ===
+    true;
+
+  let accionPendiente =
+    "";
+
+  /*
+    NUEVO INGRESO
+
+    El vendedor ve que está pendiente mediante
+    el estado/KPI, pero no tiene botón.
+  */
   if (
     categoria ===
-    "nuevo_pendiente"
+      "nuevo_pendiente" &&
+    puedeConfirmar
   ) {
     accionPendiente = `
       <button
@@ -4947,9 +5093,13 @@ function getAccionOperativaHtml(
     `;
   }
 
+  /*
+    LISTA DE ESPERA PENDIENTE
+  */
   if (
     categoria ===
-    "lista_pendiente"
+      "lista_pendiente" &&
+    puedeMarcarPagado
   ) {
     accionPendiente = `
       <button
@@ -4966,9 +5116,13 @@ function getAccionOperativaHtml(
     `;
   }
 
+  /*
+    LISTA DE ESPERA PAGADA
+  */
   if (
     categoria ===
-    "lista_pagada"
+      "lista_pagada" &&
+    puedeConfirmar
   ) {
     accionPendiente = `
       <button
@@ -4985,6 +5139,12 @@ function getAccionOperativaHtml(
     `;
   }
 
+  /*
+    ALERTA DE CAMBIOS PARA SISTEMA DE PAGOS.
+
+    Esto es información, por lo tanto
+    el vendedor SÍ puede verla.
+  */
   const tieneAlertaCambio =
     state.alertasInscripciones
       .some(
@@ -5005,6 +5165,40 @@ function getAccionOperativaHtml(
             )
       );
 
+  /*
+    Editor administrativo.
+
+    Únicamente usuarios autorizados
+    pueden modificar datos de nómina.
+  */
+  const botonEditar =
+    puedeAdministrar
+      ? `
+        <button
+          class="passenger-action-btn action-edit"
+          type="button"
+          data-pasajero-action="editar_nomina"
+          data-inscripcion-id="${esc(
+            item.id ||
+            ""
+          )}"
+        >
+          Editar
+        </button>
+      `
+      : "";
+
+  /*
+    Si el usuario no tiene ninguna acción
+    disponible mostramos solamente el estado
+    informativo.
+
+    Esto evita dejar una columna vacía.
+  */
+  const sinAcciones =
+    !accionPendiente &&
+    !botonEditar;
+
   return `
     ${accionPendiente}
 
@@ -5021,17 +5215,18 @@ function getAccionOperativaHtml(
         : ""
     }
 
-    <button
-      class="passenger-action-btn action-edit"
-      type="button"
-      data-pasajero-action="editar_nomina"
-      data-inscripcion-id="${esc(
-        item.id ||
-        ""
-      )}"
-    >
-      Editar
-    </button>
+    ${botonEditar}
+
+    ${
+      sinAcciones &&
+      !tieneAlertaCambio
+        ? `
+          <span class="gn-sub">
+            Solo lectura
+          </span>
+        `
+        : ""
+    }
   `;
 }
 
@@ -6049,6 +6244,29 @@ async function manejarFase(
     return;
   }
 
+  /*
+    SEGUNDO BLINDAJE.
+
+    Aunque alguien intentara agregar manualmente
+    un botón desde las herramientas del navegador,
+    Gestión Nómina no ejecutará la acción si
+    el usuario no tiene permiso.
+  */
+  const puedeGestionar =
+    state.manager
+      ?.puedeGestionarLinks(
+        state.current?.data ||
+        {}
+      ) === true;
+
+  if (!puedeGestionar) {
+    alert(
+      "No tienes permisos para administrar los links de esta nómina."
+    );
+
+    return;
+  }
+
   try {
     button.disabled =
       true;
@@ -6290,6 +6508,50 @@ function abrirGestionPulseras() {
 async function accionSimple(
   tipo
 ) {
+  if (!state.current) {
+    return;
+  }
+
+  /*
+    Cargado a pagos y archivar nómina
+    requieren administración.
+  */
+  if (
+    [
+      "cargado",
+      "archivar"
+    ].includes(
+      tipo
+    ) &&
+    state.manager
+      ?.puedeAdministrarNomina() !==
+      true
+  ) {
+    alert(
+      "No tienes permisos para modificar la nómina."
+    );
+
+    return;
+  }
+
+  /*
+    Resetear ciclo queda limitado
+    exclusivamente a admin/supervisión.
+  */
+  if (
+    tipo ===
+      "resetear" &&
+    state.manager
+      ?.esAdminOSupervision() !==
+      true
+  ) {
+    alert(
+      "No tienes permisos para resetear el ciclo."
+    );
+
+    return;
+  }
+
   try {
     if (
       tipo ===
