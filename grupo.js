@@ -15759,6 +15759,315 @@ window.importarNominaPagosPorNumeroNegocio = async function (numeroNegocio, opti
   return resultado;
 };
 
+window.importarNominasPagosCompuestasEnGrupoActual = async function (
+  numerosNegocio = [],
+  options = {}
+) {
+  const dryRun = options.dryRun !== false;
+
+  if (!state.groupDocId) {
+    throw new Error(
+      "No hay un grupo abierto. Ejecuta esta función desde grupo.html con el grupo correspondiente abierto."
+    );
+  }
+
+  const numeros = [
+    ...new Set(
+      (Array.isArray(numerosNegocio)
+        ? numerosNegocio
+        : [numerosNegocio]
+      )
+        .map((n) => String(n || "").trim())
+        .filter(Boolean)
+    )
+  ];
+
+  if (!numeros.length) {
+    throw new Error(
+      "Debes indicar al menos un número de negocio."
+    );
+  }
+
+  console.log(
+    "===================================================="
+  );
+  console.log(
+    dryRun
+      ? "🧪 IMPORTACIÓN COMPUESTA · SIMULACIÓN"
+      : "🚀 IMPORTACIÓN COMPUESTA · EJECUCIÓN REAL"
+  );
+  console.log(
+    "===================================================="
+  );
+
+  console.log("Grupo destino:", {
+    groupDocId: state.groupDocId,
+    idGrupo: state.groupId,
+    numeroNegocioGuardado:
+      state.group?.numeroNegocio ||
+      state.group?.ficha?.numeroNegocio ||
+      ""
+  });
+
+  console.log(
+    "Números Sistema de Pagos:",
+    numeros
+  );
+
+  const resultadoGeneral = {
+    groupDocId: String(state.groupDocId),
+    groupId: String(state.groupId || ""),
+    numerosNegocio: numeros,
+    dryRun,
+
+    totalPagos: 0,
+    creados: 0,
+    existentes: 0,
+    omitidosSinRut: 0,
+
+    negocios: [],
+    detalle: []
+  };
+
+  for (
+    let index = 0;
+    index < numeros.length;
+    index += 1
+  ) {
+    const numeroNegocio =
+      numeros[index];
+
+    console.log(
+      `▶️ ${index + 1}/${numeros.length} · Consultando nómina ${numeroNegocio}`
+    );
+
+    try {
+      /*
+        IMPORTANTE:
+        aquí NO buscamos el grupo por numeroNegocio.
+
+        El grupo destino es SIEMPRE el grupo
+        actualmente abierto en grupo.html.
+      */
+      const pasajeros =
+        await consultarNominaPagos(
+          numeroNegocio
+        );
+
+      const resultadoNegocio = {
+        numeroNegocio,
+        estado: "OK",
+        totalPagos: pasajeros.length,
+        creados: 0,
+        existentes: 0,
+        omitidosSinRut: 0
+      };
+
+      resultadoGeneral.totalPagos +=
+        pasajeros.length;
+
+      for (const p of pasajeros) {
+        const rutInfo =
+          formatearRutDesdePagos(
+            p.rut || ""
+          );
+
+        if (!rutInfo.rut) {
+          resultadoNegocio.omitidosSinRut +=
+            1;
+
+          resultadoGeneral.omitidosSinRut +=
+            1;
+
+          resultadoGeneral.detalle.push({
+            numeroNegocio,
+            accion: "omitido_sin_rut",
+            nombre:
+              capitalizarNombrePagos(
+                `${p.nombres || ""} ${p.apellidos || ""}`
+              )
+          });
+
+          continue;
+        }
+
+        const docId =
+          rutInfo.documentoNormalizado;
+
+        const ref =
+          doc(
+            db,
+            "ventas_cotizaciones",
+            String(state.groupDocId),
+            "inscripciones",
+            docId
+          );
+
+        const snap =
+          await getDoc(ref);
+
+        const payload =
+          buildPayloadInscripcionDesdePagos(
+            p,
+            state.group,
+            state.groupDocId
+          );
+
+        /*
+          Dejamos además registrado desde cuál
+          número del Sistema de Pagos llegó
+          específicamente esta persona.
+        */
+        payload.sistemaPagos = {
+          ...(payload.sistemaPagos || {}),
+
+          numeroNegocioOrigen:
+            String(numeroNegocio),
+
+          importacionCompuesta:
+            true
+        };
+
+        if (snap.exists()) {
+          resultadoNegocio.existentes +=
+            1;
+
+          resultadoGeneral.existentes +=
+            1;
+
+          resultadoGeneral.detalle.push({
+            numeroNegocio,
+            accion: "ya_existia",
+            docId,
+            rut: rutInfo.rut,
+            nombre:
+              payload.identificacion
+                ?.nombreCompleto || ""
+          });
+
+          continue;
+        }
+
+        resultadoGeneral.detalle.push({
+          numeroNegocio,
+
+          accion:
+            dryRun
+              ? "simular_creacion"
+              : "creado",
+
+          docId,
+          rut: rutInfo.rut,
+
+          nombre:
+            payload.identificacion
+              ?.nombreCompleto || "",
+
+          tipoViajante:
+            payload.tipoViajante,
+
+          viaja:
+            payload.sistemaPagos?.viaja
+        });
+
+        if (!dryRun) {
+          await setDoc(
+            ref,
+            {
+              ...payload,
+
+              creadoPor:
+                getDisplayName(
+                  state.effectiveUser
+                ),
+
+              creadoPorCorreo:
+                state.effectiveEmail,
+
+              creadoAt:
+                serverTimestamp(),
+
+              actualizadoPor:
+                getDisplayName(
+                  state.effectiveUser
+                ),
+
+              actualizadoPorCorreo:
+                state.effectiveEmail,
+
+              actualizadoAt:
+                serverTimestamp()
+            }
+          );
+        }
+
+        resultadoNegocio.creados +=
+          1;
+
+        resultadoGeneral.creados +=
+          1;
+      }
+
+      resultadoGeneral.negocios.push(
+        resultadoNegocio
+      );
+
+      console.log(
+        `✅ Nómina ${numeroNegocio} terminada`,
+        resultadoNegocio
+      );
+
+    } catch (error) {
+      console.error(
+        `❌ Error consultando negocio ${numeroNegocio}`,
+        error
+      );
+
+      resultadoGeneral.negocios.push({
+        numeroNegocio,
+        estado: "ERROR",
+        error:
+          error?.message ||
+          String(error)
+      });
+    }
+  }
+
+  console.log(
+    "===================================================="
+  );
+  console.log(
+    "🏁 IMPORTACIÓN COMPUESTA TERMINADA"
+  );
+  console.log(
+    "===================================================="
+  );
+
+  console.table(
+    resultadoGeneral.negocios
+  );
+
+  console.log(
+    "RESULTADO GENERAL:",
+    resultadoGeneral
+  );
+
+  if (!dryRun) {
+    await loadInscripciones();
+
+    state.nominaVisible = true;
+
+    renderInscripcionPasajerosPanel();
+    syncButtons();
+
+    showSaveNotice(
+      `Importación compuesta lista: ${resultadoGeneral.creados} creados, ${resultadoGeneral.existentes} ya existían.`
+    );
+  }
+
+  return resultadoGeneral;
+};
+
 window.importarTodasNominasPagos = async function (options = {}) {
   const {
     dryRun = true
