@@ -192,16 +192,28 @@ export function getCurrentSystemUser(firebaseUser) {
   };
 }
 
-export function canViewMedicalData(user = {}) {
-  if (!user?.email) return false;
+export function canViewMedicalData(
+  user = {}
+) {
+  if (!user?.email) {
+    return false;
+  }
 
+  /*
+    Los vendedores necesitan acceso
+    a la ficha médica para poder gestionar
+    correctamente sus propios grupos.
+  */
   return [
     "admin",
     "supervision",
     "registro",
     "operaciones",
-    "administracion"
-  ].includes(user.rol) || [
+    "administracion",
+    "vendedor"
+  ].includes(
+    user.rol
+  ) || [
     "sistemas@raitrai.cl",
     "operaciones@raitrai.cl",
     "aleoperaciones@raitrai.cl",
@@ -210,18 +222,40 @@ export function canViewMedicalData(user = {}) {
     "yenny@raitrai.cl",
     "raitrai@raitrai.cl",
     "chernandez@raitrai.cl"
-  ].includes(user.email);
+  ].includes(
+    user.email
+  );
 }
+export function canEditMedicalData(
+  user = {}
+) {
+  if (!user?.email) {
+    return false;
+  }
 
-export function canEditMedicalData(user = {}) {
-  if (!user?.email) return false;
+  /*
+    IMPORTANTE:
 
+    El vendedor puede editar la FICHA MÉDICA.
+
+    Esto NO le da acceso al editor administrativo
+    de Gestión Nómina.
+
+    gestion-fichas-medicas.js utiliza
+    MEDICAL_EDIT_FIELDS, por lo que identidad,
+    nómina, responsables administrativos,
+    documento, estado de inscripción, etc.
+    continúan excluidos del editor médico.
+  */
   return [
     "admin",
     "registro",
     "operaciones",
-    "administracion"
-  ].includes(user.rol) || [
+    "administracion",
+    "vendedor"
+  ].includes(
+    user.rol
+  ) || [
     "sistemas@raitrai.cl",
     "operaciones@raitrai.cl",
     "aleoperaciones@raitrai.cl",
@@ -229,7 +263,9 @@ export function canEditMedicalData(user = {}) {
     "administracion@raitrai.cl",
     "yenny@raitrai.cl",
     "raitrai@raitrai.cl"
-  ].includes(user.email);
+  ].includes(
+    user.email
+  );
 }
 
 export async function resolveGroup(groupParam = "") {
