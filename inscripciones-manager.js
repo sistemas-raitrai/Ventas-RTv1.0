@@ -44,12 +44,46 @@ export function crearInscripcionesManager({ db, usuario = {}, onChange = null } 
     ].includes(email);
   }
 
-  function puedeGestionarLinks(grupo = {}) {
-    if (normalizar(grupo.estado) !== "ganada") return false;
-    if (esAdminOSupervision()) return true;
-    if (rol !== "vendedor") return false;
-    const correoGrupo = normalizarEmail(grupo.vendedoraCorreo || "");
-    return !correoGrupo || correoGrupo === email;
+  function puedeGestionarLinks(
+    grupo = {}
+  ) {
+    /*
+      Los links de inscripción forman parte
+      de la administración de la nómina.
+  
+      IMPORTANTE:
+      los vendedores NO pueden:
+      - abrir links,
+      - cerrar links,
+      - regenerarlos,
+      - administrar las fases.
+  
+      Aunque el grupo sea de ese vendedor,
+      Gestión Nómina queda en modo consulta.
+    */
+  
+    if (
+      normalizar(
+        grupo.estado
+      ) !==
+      "ganada"
+    ) {
+      return false;
+    }
+  
+    /*
+      Reutilizamos exactamente el mismo
+      criterio administrativo de la nómina.
+  
+      Esto permite:
+      - admin
+      - supervisión
+      - registro
+      - usuarios administrativos autorizados
+  
+      y deja fuera al vendedor.
+    */
+    return puedeAdministrarNomina();
   }
 
   async function resolverGrupo(id) {
