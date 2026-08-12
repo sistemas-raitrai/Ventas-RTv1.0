@@ -20,6 +20,12 @@ const menuItems = [
     roles: ["admin", "supervision", "registro", "vendedor"]
   },
   {
+    key: "nomina",
+    href: "gestion-nomina.html",
+    label: "Nómina y Fichas Médicas",
+    roles: ["admin", "supervision", "registro", "vendedor"]
+  }
+  {
     key: "cartera",
     href: "cartera.html",
     label: "Cartera",
