@@ -1690,6 +1690,290 @@ function guardarIdentidadOriginalPrecargada(item = {}, documentoId = "") {
   );
 }
 
+// -----------------------------------------------------------------------------
+// BLOQUEO DE DATOS RECUPERADOS DESDE EL SISTEMA
+// -----------------------------------------------------------------------------
+//
+// Regla:
+// - Si un dato ya existe en el registro recuperado, no puede modificarse.
+// - Si el dato anterior está vacío, el usuario sí puede completarlo.
+// - Teléfonos y correos NO se bloquean.
+// -----------------------------------------------------------------------------
+
+function tieneDatoExistente(valor) {
+  return (
+    valor !== undefined &&
+    valor !== null &&
+    limpiarTexto(valor) !== ""
+  );
+}
+
+function bloquearCampoExistente(
+  idCampo,
+  valorExistente
+) {
+  if (!tieneDatoExistente(valorExistente)) {
+    return;
+  }
+
+  const campo =
+    $(idCampo);
+
+  if (!campo) {
+    return;
+  }
+
+  campo.dataset.datoSistema =
+    "true";
+
+  campo.title =
+    "Dato existente en el sistema. No puede modificarse desde este formulario.";
+
+  campo.style.background =
+    "#f1f5f9";
+
+  campo.style.color =
+    "#475569";
+
+  campo.style.cursor =
+    "not-allowed";
+
+  if (
+    campo.tagName === "SELECT"
+  ) {
+    campo.disabled =
+      true;
+
+    return;
+  }
+
+  campo.readOnly =
+    true;
+}
+
+function bloquearGrupoRadioExistente(
+  nombre,
+  valorExistente
+) {
+  if (!tieneDatoExistente(valorExistente)) {
+    return;
+  }
+
+  document
+    .querySelectorAll(
+      `input[name="${nombre}"]`
+    )
+    .forEach((radio) => {
+      radio.disabled =
+        true;
+
+      radio.dataset.datoSistema =
+        "true";
+
+      radio.title =
+        "Dato existente en el sistema. No puede modificarse desde este formulario.";
+    });
+}
+
+function bloquearDatosRecuperadosSistema(
+  item = {}
+) {
+  const identificacion =
+    item.identificacion || {};
+
+  const contacto =
+    item.contactoPrincipal || {};
+
+  const contacto2 =
+    item.contactoSecundario || {};
+
+  const emergencia =
+    item.emergencia || {};
+
+  const tipoViajante =
+    item.tipoViajante ||
+    item.tipoParticipacion ||
+    "";
+
+  // ===========================================================================
+  // RUT
+  // ===========================================================================
+
+  // Si llegamos hasta aquí es porque encontramos el RUT.
+  // Por lo tanto, siempre queda protegido.
+
+  bloquearCampoExistente(
+    "tipoIdentificacion",
+    "rut"
+  );
+
+  bloquearCampoExistente(
+    "rutNumero",
+    identificacion.rutNumero ||
+    rutValidacionNumero?.value
+  );
+
+  bloquearCampoExistente(
+    "rutDv",
+    identificacion.rutDv ||
+    rutValidacionDv?.value
+  );
+
+  // ===========================================================================
+  // IDENTIDAD
+  // ===========================================================================
+
+  bloquearCampoExistente(
+    "nombres",
+    identificacion.nombres
+  );
+
+  bloquearCampoExistente(
+    "primerApellido",
+    identificacion.primerApellido
+  );
+
+  bloquearCampoExistente(
+    "segundoApellido",
+    identificacion.segundoApellido
+  );
+
+  bloquearCampoExistente(
+    "fechaNacimiento",
+    identificacion.fechaNacimiento
+  );
+
+  bloquearCampoExistente(
+    "genero",
+    identificacion.genero ||
+    identificacion.generoFinal
+  );
+
+  bloquearCampoExistente(
+    "generoOtro",
+    identificacion.generoOtro
+  );
+
+  bloquearCampoExistente(
+    "nacionalidadBase",
+    identificacion.nacionalidadBase
+  );
+
+  bloquearCampoExistente(
+    "nacionalidadDetalle",
+    identificacion.nacionalidadDetalle
+  );
+
+  // ===========================================================================
+  // TIPO DE VIAJANTE
+  // ===========================================================================
+
+  bloquearGrupoRadioExistente(
+    "tipoViajante",
+    tipoViajante
+  );
+
+  // ===========================================================================
+  // TALLA
+  // ===========================================================================
+
+  bloquearCampoExistente(
+    "tallaPolera",
+    identificacion.tallaPolera
+  );
+
+  // ===========================================================================
+  // APODERADO PRINCIPAL
+  //
+  // Nombre y parentesco quedan protegidos.
+  // Teléfono y correo permanecen editables.
+  // ===========================================================================
+
+  bloquearCampoExistente(
+    "contactoPrincipalNombre",
+    contacto.nombre ||
+    contacto.nombreCompleto
+  );
+
+  bloquearCampoExistente(
+    "contactoPrincipalRelacion",
+    contacto.relacionBase ||
+    contacto.relacion
+  );
+
+  bloquearCampoExistente(
+    "contactoPrincipalRelacionOtro",
+    contacto.relacionOtro
+  );
+
+  // NO bloquear:
+  //
+  // contactoPrincipalTelefono
+  // contactoPrincipalCorreo
+
+  // ===========================================================================
+  // SEGUNDO APODERADO
+  // ===========================================================================
+
+  bloquearCampoExistente(
+    "contactoSecundarioNombre",
+    contacto2.nombre ||
+    contacto2.nombreCompleto
+  );
+
+  bloquearCampoExistente(
+    "contactoSecundarioRelacion",
+    contacto2.relacionBase ||
+    contacto2.relacion
+  );
+
+  bloquearCampoExistente(
+    "contactoSecundarioRelacionOtro",
+    contacto2.relacionOtro
+  );
+
+  // NO bloquear:
+  //
+  // contactoSecundarioTelefono
+  // contactoSecundarioCorreo
+
+  // ===========================================================================
+  // CONTACTO DE EMERGENCIA
+  //
+  // Nombre y relación quedan protegidos.
+  // Teléfono permanece editable.
+  // ===========================================================================
+
+  bloquearCampoExistente(
+    "emergenciaNombre",
+    emergencia.nombre
+  );
+
+  bloquearCampoExistente(
+    "emergenciaRelacion",
+    emergencia.relacionBase ||
+    emergencia.relacion
+  );
+
+  bloquearCampoExistente(
+    "emergenciaRelacionOtro",
+    emergencia.relacionOtro
+  );
+
+  // NO bloquear:
+  //
+  // emergenciaTelefono
+
+  // ===========================================================================
+  // TELÉFONO Y CORREO DE LA PERSONA QUE VIAJA
+  // ===========================================================================
+
+  // Deliberadamente NO se bloquean:
+  //
+  // correoViajante
+  // telefonoViajante
+}
+
 function obtenerIdentidadActualFormulario() {
   const rutNumero =
     limpiarRutNumero(
@@ -1907,14 +2191,16 @@ function precargarFormularioDesdeSistemaPagos(item = {}) {
   // -----------------------------------------------------------------------
 
   if ($("tipoIdentificacion")) {
-    $("tipoIdentificacion").value = "rut";
+    $("tipoIdentificacion").value =
+      "rut";
   }
 
   if ($("rutNumero")) {
     $("rutNumero").value =
       id.rutNumero ||
       limpiarRutNumero(
-        rutValidacionNumero?.value || ""
+        rutValidacionNumero?.value ||
+        ""
       );
   }
 
@@ -1922,28 +2208,33 @@ function precargarFormularioDesdeSistemaPagos(item = {}) {
     $("rutDv").value =
       id.rutDv ||
       limpiarTexto(
-        rutValidacionDv?.value || ""
+        rutValidacionDv?.value ||
+        ""
       ).toUpperCase();
   }
 
   if ($("nombres")) {
     $("nombres").value =
-      id.nombres || "";
+      id.nombres ||
+      "";
   }
 
   if ($("primerApellido")) {
     $("primerApellido").value =
-      id.primerApellido || "";
+      id.primerApellido ||
+      "";
   }
 
   if ($("segundoApellido")) {
     $("segundoApellido").value =
-      id.segundoApellido || "";
+      id.segundoApellido ||
+      "";
   }
 
   if ($("fechaNacimiento")) {
     $("fechaNacimiento").value =
-      id.fechaNacimiento || "";
+      id.fechaNacimiento ||
+      "";
   }
 
   if ($("genero")) {
@@ -1953,27 +2244,54 @@ function precargarFormularioDesdeSistemaPagos(item = {}) {
       "";
   }
 
+  if ($("generoOtro")) {
+    $("generoOtro").value =
+      id.generoOtro ||
+      "";
+  }
+
   if ($("nacionalidadBase")) {
     $("nacionalidadBase").value =
-      id.nacionalidadBase || "";
+      id.nacionalidadBase ||
+      "";
   }
 
   if ($("nacionalidadDetalle")) {
     $("nacionalidadDetalle").value =
-      id.nacionalidadDetalle || "";
+      id.nacionalidadDetalle ||
+      "";
   }
 
-  if ($("correoViajante") && id.correoViajante) {
+  // -----------------------------------------------------------------------
+  // CORREO / TELÉFONO VIAJANTE
+  //
+  // Se recuperan, pero permanecen EDITABLES.
+  // -----------------------------------------------------------------------
+
+  if (
+    $("correoViajante") &&
+    id.correoViajante
+  ) {
     $("correoViajante").value =
       id.correoViajante;
   }
 
-  if ($("telefonoViajante") && id.telefonoViajante) {
+  if (
+    $("telefonoViajante") &&
+    id.telefonoViajante
+  ) {
     $("telefonoViajante").value =
       id.telefonoViajante;
   }
 
-  if ($("tallaPolera") && id.tallaPolera) {
+  // -----------------------------------------------------------------------
+  // TALLA
+  // -----------------------------------------------------------------------
+
+  if (
+    $("tallaPolera") &&
+    id.tallaPolera
+  ) {
     $("tallaPolera").value =
       id.tallaPolera;
   }
@@ -1994,7 +2312,8 @@ function precargarFormularioDesdeSistemaPagos(item = {}) {
       );
 
     if (radio) {
-      radio.checked = true;
+      radio.checked =
+        true;
     }
   }
 
@@ -2012,11 +2331,25 @@ function precargarFormularioDesdeSistemaPagos(item = {}) {
 
   if (
     $("contactoPrincipalRelacion") &&
-    contacto.relacionBase
+    (
+      contacto.relacionBase ||
+      contacto.relacion
+    )
   ) {
     $("contactoPrincipalRelacion").value =
-      contacto.relacionBase;
+      contacto.relacionBase ||
+      contacto.relacion;
   }
+
+  if (
+    $("contactoPrincipalRelacionOtro") &&
+    contacto.relacionOtro
+  ) {
+    $("contactoPrincipalRelacionOtro").value =
+      contacto.relacionOtro;
+  }
+
+  // Teléfono editable.
 
   if (
     $("contactoPrincipalTelefono") &&
@@ -2025,6 +2358,8 @@ function precargarFormularioDesdeSistemaPagos(item = {}) {
     $("contactoPrincipalTelefono").value =
       contacto.telefono;
   }
+
+  // Correo editable.
 
   if (
     $("contactoPrincipalCorreo") &&
@@ -2038,36 +2373,62 @@ function precargarFormularioDesdeSistemaPagos(item = {}) {
   // SEGUNDO CONTACTO
   // -----------------------------------------------------------------------
 
-  if (contacto2?.aplica === true) {
+  if (
+    contacto2?.aplica === true
+  ) {
     mostrar(
       bloqueApoderado2,
       true
     );
 
-    btnAgregarApoderado2?.classList.add(
-      "hidden"
-    );
+    btnAgregarApoderado2
+      ?.classList.add(
+        "hidden"
+      );
 
-    if ($("contactoSecundarioNombre")) {
+    if (
+      $("contactoSecundarioNombre")
+    ) {
       $("contactoSecundarioNombre").value =
-        contacto2.nombre || "";
+        contacto2.nombre ||
+        "";
     }
 
-    if ($("contactoSecundarioRelacion")) {
+    if (
+      $("contactoSecundarioRelacion")
+    ) {
       $("contactoSecundarioRelacion").value =
         contacto2.relacionBase ||
         contacto2.relacion ||
         "";
     }
 
-    if ($("contactoSecundarioTelefono")) {
-      $("contactoSecundarioTelefono").value =
-        contacto2.telefono || "";
+    if (
+      $("contactoSecundarioRelacionOtro")
+    ) {
+      $("contactoSecundarioRelacionOtro").value =
+        contacto2.relacionOtro ||
+        "";
     }
 
-    if ($("contactoSecundarioCorreo")) {
+    // Teléfono editable.
+
+    if (
+      $("contactoSecundarioTelefono")
+    ) {
+      $("contactoSecundarioTelefono").value =
+        contacto2.telefono ||
+        "";
+    }
+
+    // Correo editable.
+
+    if (
+      $("contactoSecundarioCorreo")
+    ) {
       $("contactoSecundarioCorreo").value =
-        contacto2.correo || "";
+        contacto2.correo ||
+        "";
     }
   }
 
@@ -2085,11 +2446,25 @@ function precargarFormularioDesdeSistemaPagos(item = {}) {
 
   if (
     $("emergenciaRelacion") &&
-    emergencia.relacionBase
+    (
+      emergencia.relacionBase ||
+      emergencia.relacion
+    )
   ) {
     $("emergenciaRelacion").value =
-      emergencia.relacionBase;
+      emergencia.relacionBase ||
+      emergencia.relacion;
   }
+
+  if (
+    $("emergenciaRelacionOtro") &&
+    emergencia.relacionOtro
+  ) {
+    $("emergenciaRelacionOtro").value =
+      emergencia.relacionOtro;
+  }
+
+  // Teléfono editable.
 
   if (
     $("emergenciaTelefono") &&
@@ -2102,21 +2477,32 @@ function precargarFormularioDesdeSistemaPagos(item = {}) {
   // -----------------------------------------------------------------------
   // DOCUMENTO
   // -----------------------------------------------------------------------
-
-  const coincide =
-    document.querySelector(
-      'input[name="nombreCoincideDocumento"][value="si"]'
-    );
-
-  if (coincide) {
-    coincide.checked = true;
-  }
-
+  //
   // IMPORTANTE:
-  // No precargamos consentimientos ni comprobante de pago.
-  // Lista de Espera debe declararlos nuevamente.
+  // NO marcamos automáticamente que el nombre coincide.
+  //
+  // Aunque los datos estén bloqueados, queremos conservar esta comprobación
+  // humana: la persona debe mirar el documento y responder.
+  // -----------------------------------------------------------------------
+
+  limpiarRadios(
+    "nombreCoincideDocumento"
+  );
+
+  // -----------------------------------------------------------------------
+  // APLICAR ESTADO VISUAL PRIMERO
+  // -----------------------------------------------------------------------
 
   aplicarEstadoUI();
+
+  // -----------------------------------------------------------------------
+  // BLOQUEAR DATOS QUE VENÍAN DEL SISTEMA
+  // -----------------------------------------------------------------------
+
+  bloquearDatosRecuperadosSistema(
+    item
+  );
+
   actualizarProgreso();
 }
 
