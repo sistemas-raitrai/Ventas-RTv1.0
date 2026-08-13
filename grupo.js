@@ -16487,6 +16487,514 @@ async function (
   };
 };
 
+/* =========================================================
+   SINCRONIZACIÓN MASIVA DE NOMBRES DESDE SISTEMA DE PAGOS
+   SOLO:
+   - estado = "Ganada"
+   - anoViaje = 2026
+
+   IMPORTANTE:
+   - Reutiliza sincronizarNombresGrupoDesdeSistemaPagos()
+   - El match de pasajeros es por RUT.
+   - Corrige oficial + pública.
+   - NO crea pasajeros.
+   - NO toca fechas.
+   - NO toca RUT.
+========================================================= */
+
+window.sincronizarNombresGanadas2026DesdeSistemaPagos =
+async function ({
+  dryRun = true
+} = {}) {
+  console.log(
+    dryRun
+      ? "🔎 [NOMBRES SP MASIVO] SIMULACIÓN · GANADAS 2026"
+      : "🛠️ [NOMBRES SP MASIVO] EJECUCIÓN REAL · GANADAS 2026"
+  );
+
+  /*
+    =====================================================
+    1. BUSCAMOS LOS GRUPOS QUE CORRESPONDEN
+    =====================================================
+  */
+
+  const gruposSnap =
+    await getDocs(
+      query(
+        collection(
+          db,
+          "ventas_cotizaciones"
+        ),
+        where(
+          "estado",
+          "==",
+          "Ganada"
+        ),
+        where(
+          "anoViaje",
+          "==",
+          2026
+        )
+      )
+    );
+
+  console.log(
+    `📦 Grupos Ganada 2026 encontrados: ${gruposSnap.docs.length}`
+  );
+
+  const resultadosGrupos =
+    [];
+
+  let totalGruposProcesados = 0;
+  let totalGruposConError = 0;
+
+  let totalPasajerosRevisados = 0;
+  let totalIguales = 0;
+  let totalDiferentes = 0;
+
+  let totalOficialesCorregidos = 0;
+  let totalPublicosCorregidos = 0;
+
+  let totalSinOficial = 0;
+  let totalAmbiguosOficial = 0;
+  let totalSinRut = 0;
+  let totalSinPublica = 0;
+  let totalPublicaAmbigua = 0;
+
+  /*
+    =====================================================
+    2. PROCESAMOS GRUPO POR GRUPO
+    =====================================================
+  */
+
+  for (
+    let index = 0;
+    index < gruposSnap.docs.length;
+    index += 1
+  ) {
+    const grupoDoc =
+      gruposSnap.docs[index];
+
+    const grupo =
+      grupoDoc.data() ||
+      {};
+
+    const groupDocId =
+      grupoDoc.id;
+
+    const numeroNegocio =
+      String(
+        grupo.numeroNegocio ||
+        grupo?.ficha?.numeroNegocio ||
+        ""
+      ).trim();
+
+    const nombreGrupo =
+      grupo.aliasGrupo ||
+      grupo.nombreGrupo ||
+      grupo.colegio ||
+      groupDocId;
+
+    console.log(
+      `\n📋 [${index + 1}/${gruposSnap.docs.length}]`,
+      {
+        groupDocId,
+        numeroNegocio,
+        grupo:
+          nombreGrupo
+      }
+    );
+
+    /*
+      Si no tiene número de negocio,
+      no podemos consultar Sistema de Pagos.
+    */
+    if (!numeroNegocio) {
+      console.warn(
+        "⚠️ Grupo sin numeroNegocio",
+        {
+          groupDocId,
+          grupo:
+            nombreGrupo
+        }
+      );
+
+      resultadosGrupos.push({
+        groupDocId,
+        numeroNegocio:
+          "",
+
+        grupo:
+          nombreGrupo,
+
+        estado:
+          "SIN_NUMERO_NEGOCIO",
+
+        revisados:
+          0,
+
+        iguales:
+          0,
+
+        diferentes:
+          0,
+
+        oficialesCorregidos:
+          0,
+
+        publicosCorregidos:
+          0,
+
+        sinOficial:
+          0,
+
+        ambiguosOficial:
+          0,
+
+        sinRut:
+          0,
+
+        sinPublica:
+          0,
+
+        publicaAmbigua:
+          0
+      });
+
+      continue;
+    }
+
+    try {
+      const resultado =
+        await window
+          .sincronizarNombresGrupoDesdeSistemaPagos(
+            groupDocId,
+            {
+              dryRun
+            }
+          );
+
+      const resumen =
+        resultado?.resumen ||
+        {};
+
+      totalGruposProcesados++;
+
+      totalPasajerosRevisados +=
+        Number(
+          resumen.revisados ||
+          0
+        );
+
+      totalIguales +=
+        Number(
+          resumen.iguales ||
+          0
+        );
+
+      totalDiferentes +=
+        Number(
+          resumen.diferentes ||
+          0
+        );
+
+      totalOficialesCorregidos +=
+        Number(
+          resumen.oficialesCorregidos ||
+          0
+        );
+
+      totalPublicosCorregidos +=
+        Number(
+          resumen.publicosCorregidos ||
+          0
+        );
+
+      totalSinOficial +=
+        Number(
+          resumen.sinOficial ||
+          0
+        );
+
+      totalAmbiguosOficial +=
+        Number(
+          resumen.ambiguosOficial ||
+          0
+        );
+
+      totalSinRut +=
+        Number(
+          resumen.sinRut ||
+          0
+        );
+
+      totalSinPublica +=
+        Number(
+          resumen.sinPublica ||
+          0
+        );
+
+      totalPublicaAmbigua +=
+        Number(
+          resumen.publicaAmbigua ||
+          0
+        );
+
+      resultadosGrupos.push({
+        groupDocId,
+
+        numeroNegocio,
+
+        grupo:
+          nombreGrupo,
+
+        estado:
+          "OK",
+
+        revisados:
+          Number(
+            resumen.revisados ||
+            0
+          ),
+
+        iguales:
+          Number(
+            resumen.iguales ||
+            0
+          ),
+
+        diferentes:
+          Number(
+            resumen.diferentes ||
+            0
+          ),
+
+        oficialesCorregidos:
+          Number(
+            resumen.oficialesCorregidos ||
+            0
+          ),
+
+        publicosCorregidos:
+          Number(
+            resumen.publicosCorregidos ||
+            0
+          ),
+
+        sinOficial:
+          Number(
+            resumen.sinOficial ||
+            0
+          ),
+
+        ambiguosOficial:
+          Number(
+            resumen.ambiguosOficial ||
+            0
+          ),
+
+        sinRut:
+          Number(
+            resumen.sinRut ||
+            0
+          ),
+
+        sinPublica:
+          Number(
+            resumen.sinPublica ||
+            0
+          ),
+
+        publicaAmbigua:
+          Number(
+            resumen.publicaAmbigua ||
+            0
+          )
+      });
+    } catch (error) {
+      totalGruposConError++;
+
+      console.error(
+        "❌ [NOMBRES SP MASIVO] Error en grupo",
+        {
+          groupDocId,
+          numeroNegocio,
+          grupo:
+            nombreGrupo,
+          error
+        }
+      );
+
+      resultadosGrupos.push({
+        groupDocId,
+
+        numeroNegocio,
+
+        grupo:
+          nombreGrupo,
+
+        estado:
+          "ERROR",
+
+        revisados:
+          0,
+
+        iguales:
+          0,
+
+        diferentes:
+          0,
+
+        oficialesCorregidos:
+          0,
+
+        publicosCorregidos:
+          0,
+
+        sinOficial:
+          0,
+
+        ambiguosOficial:
+          0,
+
+        sinRut:
+          0,
+
+        sinPublica:
+          0,
+
+        publicaAmbigua:
+          0,
+
+        error:
+          error?.message ||
+          "Error desconocido"
+      });
+    }
+  }
+
+  /*
+    =====================================================
+    3. RESUMEN GENERAL
+    =====================================================
+  */
+
+  const resumenGeneral = {
+    dryRun,
+
+    gruposEncontrados:
+      gruposSnap.docs.length,
+
+    gruposProcesados:
+      totalGruposProcesados,
+
+    gruposConError:
+      totalGruposConError,
+
+    pasajerosRevisados:
+      totalPasajerosRevisados,
+
+    nombresIguales:
+      totalIguales,
+
+    nombresDiferentes:
+      totalDiferentes,
+
+    oficialesCorregidos:
+      totalOficialesCorregidos,
+
+    publicosCorregidos:
+      totalPublicosCorregidos,
+
+    sinOficial:
+      totalSinOficial,
+
+    ambiguosOficial:
+      totalAmbiguosOficial,
+
+    sinRut:
+      totalSinRut,
+
+    sinPublica:
+      totalSinPublica,
+
+    publicaAmbigua:
+      totalPublicaAmbigua
+  };
+
+  console.log(
+    "\n🏁 [NOMBRES SP MASIVO] PROCESO TERMINADO"
+  );
+
+  console.log(
+    "\n📋 RESULTADO POR GRUPO"
+  );
+
+  console.table(
+    resultadosGrupos
+  );
+
+  console.log(
+    "\n📊 RESUMEN GENERAL"
+  );
+
+  console.table([
+    resumenGeneral
+  ]);
+
+  /*
+    Grupos donde ocurrió algo relevante.
+  */
+  const gruposConNovedades =
+    resultadosGrupos.filter(
+      (item) =>
+        item.estado !==
+          "OK" ||
+        Number(
+          item.diferentes ||
+          0
+        ) > 0 ||
+        Number(
+          item.sinOficial ||
+          0
+        ) > 0 ||
+        Number(
+          item.ambiguosOficial ||
+          0
+        ) > 0 ||
+        Number(
+          item.sinRut ||
+          0
+        ) > 0 ||
+        Number(
+          item.sinPublica ||
+          0
+        ) > 0 ||
+        Number(
+          item.publicaAmbigua ||
+          0
+        ) > 0
+    );
+
+  console.log(
+    "\n⚠️ GRUPOS CON NOVEDADES"
+  );
+
+  console.table(
+    gruposConNovedades
+  );
+
+  return {
+    resumen:
+      resumenGeneral,
+
+    grupos:
+      resultadosGrupos,
+
+    gruposConNovedades
+  };
+};
+
 window.importarNominaPagosPorNumeroNegocio = async function (numeroNegocio, options = {}) {
   const dryRun = options.dryRun !== false;
 
