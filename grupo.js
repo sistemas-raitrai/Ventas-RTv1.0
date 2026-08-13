@@ -17074,6 +17074,997 @@ async function ({
   };
 };
 
+/* =========================================================
+   DIAGNÓSTICO DE PASAJEROS QUE ESTÁN EN SISTEMA DE PAGOS
+   PERO NO APARECEN POR RUT EN LA NÓMINA OFICIAL
+
+   SOLO LECTURA.
+   NO MODIFICA FIREBASE.
+
+   CLASIFICACIONES:
+   - MISMO_RUT_NO_ACTIVO
+   - MISMO_NOMBRE_RUT_DISTINTO
+   - POSIBLE_NOMBRE_RUT_DISTINTO
+   - FALTANTE_PROBABLE
+========================================================= */
+
+function normalizarNombreDiagnosticoPagos(value = "") {
+  return String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[\u200B-\u200D\uFEFF]/g, "")
+    .replace(/[^\p{L}\p{N}]+/gu, " ")
+    .toUpperCase()
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function getNombreCompletoDiagnosticoOficial(item = {}) {
+  const identificacion =
+    item.identificacion ||
+    {};
+
+  const nombres =
+    cleanText(
+      identificacion.nombres ||
+      getInscripcionNombres(item) ||
+      ""
+    );
+
+  const primerApellido =
+    cleanText(
+      identificacion.primerApellido ||
+      ""
+    );
+
+  const segundoApellido =
+    cleanText(
+      identificacion.segundoApellido ||
+      ""
+    );
+
+  const directo =
+    [
+      nombres,
+      primerApellido,
+      segundoApellido
+    ]
+      .filter(Boolean)
+      .join(" ")
+      .trim();
+
+  if (directo) {
+    return directo;
+  }
+
+  return [
+    getInscripcionNombres(item),
+    getInscripcionApellidos(item)
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .trim();
+}
+
+function getEstadoDiagnosticoOficial(item = {}) {
+  const privacidad =
+    normalizeSearchLocal(
+      item?.privacidad?.estado ||
+      ""
+    );
+
+  if (
+    privacidad === "archivada"
+  ) {
+    return "ARCHIVADA";
+  }
+
+  if (
+    privacidad ===
+    "eliminada_logica"
+  ) {
+    return "ELIMINADA_LOGICA";
+  }
+
+  if (
+    typeof estaInscripcionAnulada ===
+      "function" &&
+    estaInscripcionAnulada(item)
+  ) {
+    return "ANULADA";
+  }
+
+  if (item.viaja === false) {
+    return "NO_VIAJA";
+  }
+
+  return "ACTIVA";
+}
+
+function calcularSimilitudNombreDiagnostico(
+  nombreA = "",
+  nombreB = ""
+) {
+  const a =
+    normalizarNombreDiagnosticoPagos(
+      nombreA
+    );
+
+  const b =
+    normalizarNombreDiagnosticoPagos(
+      nombreB
+    );
+
+  if (!a || !b) {
+    return {
+      score: 0,
+      tokensComunes: 0
+    };
+  }
+
+  if (a === b) {
+    return {
+      score: 1,
+      tokensComunes:
+        a.split(/\s+/).length
+    };
+  }
+
+  const tokensA =
+    new Set(
+      a.split(/\s+/)
+        .filter(Boolean)
+    );
+
+  const tokensB =
+    new Set(
+      b.split(/\s+/)
+        .filter(Boolean)
+    );
+
+  const comunes =
+    [...tokensA]
+      .filter(
+        (token) =>
+          tokensB.has(token)
+      );
+
+  const union =
+    new Set([
+      ...tokensA,
+      ...tokensB
+    ]);
+
+  return {
+    score:
+      union.size
+        ? comunes.length /
+          union.size
+        : 0,
+
+    tokensComunes:
+      comunes.length
+  };
+}
+
+window.diagnosticarSinOficialGrupoDesdeSistemaPagos =
+async function (
+  groupDocIdParam = ""
+) {
+  const groupDocId =
+    String(
+      groupDocIdParam ||
+      state.groupDocId ||
+      ""
+    ).trim();
+
+  if (!groupDocId) {
+    throw new Error(
+      "Falta idGrupo / groupDocId."
+    );
+  }
+
+  /*
+    =====================================================
+    1. GRUPO
+    =====================================================
+  */
+
+  const grupoSnap =
+    await getDoc(
+      doc(
+        db,
+        "ventas_cotizaciones",
+        groupDocId
+      )
+    );
+
+  if (!grupoSnap.exists()) {
+    throw new Error(
+      `No existe ventas_cotizaciones/${groupDocId}`
+    );
+  }
+
+  const grupo =
+    grupoSnap.data() ||
+    {};
+
+  const numeroNegocio =
+    String(
+      grupo.numeroNegocio ||
+      grupo?.ficha?.numeroNegocio ||
+      ""
+    ).trim();
+
+  if (!numeroNegocio) {
+    throw new Error(
+      `El grupo ${groupDocId} no tiene numeroNegocio.`
+    );
+  }
+
+  console.log(
+    "🔎 [SIN OFICIAL] DIAGNÓSTICO",
+    {
+      groupDocId,
+      numeroNegocio,
+      grupo:
+        grupo.aliasGrupo ||
+        grupo.nombreGrupo ||
+        grupo.colegio ||
+        ""
+    }
+  );
+
+  /*
+    =====================================================
+    2. SISTEMA DE PAGOS
+    =====================================================
+  */
+
+  const pasajerosPagos =
+    await consultarNominaPagos(
+      numeroNegocio
+    );
+
+  /*
+    =====================================================
+    3. TODA LA NÓMINA OFICIAL
+
+    IMPORTANTE:
+    aquí NO excluimos archivados, anulados ni no-viaja,
+    porque queremos saber si la persona existe ahí.
+    =====================================================
+  */
+
+  const oficialSnap =
+    await getDocs(
+      collection(
+        db,
+        "ventas_cotizaciones",
+        groupDocId,
+        "inscripciones"
+      )
+    );
+
+  const oficiales =
+    oficialSnap.docs.map(
+      (inscDoc) => {
+        const item = {
+          id: inscDoc.id,
+          ...inscDoc.data()
+        };
+
+        const rut =
+          getInscripcionDocumento(
+            item
+          );
+
+        const nombre =
+          getNombreCompletoDiagnosticoOficial(
+            item
+          );
+
+        return {
+          id:
+            inscDoc.id,
+
+          item,
+
+          rut,
+
+          rutKey:
+            normalizarRutKeyGrupo(
+              rut ||
+              inscDoc.id ||
+              ""
+            ),
+
+          nombre,
+
+          nombreKey:
+            normalizarNombreDiagnosticoPagos(
+              nombre
+            ),
+
+          estado:
+            getEstadoDiagnosticoOficial(
+              item
+            )
+        };
+      }
+    );
+
+  /*
+    =====================================================
+    4. RUTS ACTIVOS
+    =====================================================
+  */
+
+  const rutsActivos =
+    new Set(
+      oficiales
+        .filter(
+          (item) =>
+            item.estado ===
+            "ACTIVA"
+        )
+        .map(
+          (item) =>
+            item.rutKey
+        )
+        .filter(Boolean)
+    );
+
+  const resultados =
+    [];
+
+  /*
+    =====================================================
+    5. REVISAMOS SOLO LOS QUE NO ESTÁN POR RUT ACTIVO
+    =====================================================
+  */
+
+  for (
+    const pasajeroPagos
+    of pasajerosPagos
+  ) {
+    const rutInfo =
+      formatearRutDesdePagos(
+        pasajeroPagos.rut ||
+        ""
+      );
+
+    const rutKey =
+      normalizarRutKeyGrupo(
+        rutInfo.rut ||
+        rutInfo.documentoNormalizado ||
+        ""
+      );
+
+    /*
+      Sin RUT no podemos decidir nada.
+    */
+    if (!rutKey) {
+      continue;
+    }
+
+    /*
+      Ya está correctamente encontrado
+      por RUT en la oficial activa.
+    */
+    if (
+      rutsActivos.has(
+        rutKey
+      )
+    ) {
+      continue;
+    }
+
+    const nombrePagosObj =
+      construirNombreDesdePagos(
+        pasajeroPagos
+      );
+
+    const nombreSistemaPagos =
+      nombrePagosObj
+        .nombreCompleto;
+
+    const nombrePagosKey =
+      normalizarNombreDiagnosticoPagos(
+        nombreSistemaPagos
+      );
+
+    /*
+      ===================================================
+      A. MISMO RUT, PERO ESTÁ NO ACTIVO
+      ===================================================
+    */
+
+    const mismoRutNoActivo =
+      oficiales.filter(
+        (oficial) =>
+          oficial.rutKey ===
+            rutKey &&
+          oficial.estado !==
+            "ACTIVA"
+      );
+
+    if (
+      mismoRutNoActivo.length
+    ) {
+      resultados.push({
+        clasificacion:
+          "MISMO_RUT_NO_ACTIVO",
+
+        groupDocId,
+
+        numeroNegocio,
+
+        rutSistemaPagos:
+          rutInfo.rut ||
+          rutKey,
+
+        nombreSistemaPagos,
+
+        rutOficial:
+          mismoRutNoActivo
+            .map(
+              (x) => x.rut
+            )
+            .join(" | "),
+
+        nombreOficial:
+          mismoRutNoActivo
+            .map(
+              (x) => x.nombre
+            )
+            .join(" | "),
+
+        estadoOficial:
+          mismoRutNoActivo
+            .map(
+              (x) => x.estado
+            )
+            .join(" | "),
+
+        similitud:
+          100,
+
+        detalle:
+          "El mismo RUT existe en la nómina, pero no está activo."
+      });
+
+      continue;
+    }
+
+    /*
+      ===================================================
+      B. MISMO NOMBRE EXACTO, RUT DIFERENTE
+      ===================================================
+    */
+
+    const mismoNombre =
+      oficiales.filter(
+        (oficial) =>
+          oficial.nombreKey &&
+          oficial.nombreKey ===
+            nombrePagosKey
+      );
+
+    if (
+      mismoNombre.length
+    ) {
+      resultados.push({
+        clasificacion:
+          "MISMO_NOMBRE_RUT_DISTINTO",
+
+        groupDocId,
+
+        numeroNegocio,
+
+        rutSistemaPagos:
+          rutInfo.rut ||
+          rutKey,
+
+        nombreSistemaPagos,
+
+        rutOficial:
+          mismoNombre
+            .map(
+              (x) => x.rut
+            )
+            .join(" | "),
+
+        nombreOficial:
+          mismoNombre
+            .map(
+              (x) => x.nombre
+            )
+            .join(" | "),
+
+        estadoOficial:
+          mismoNombre
+            .map(
+              (x) => x.estado
+            )
+            .join(" | "),
+
+        similitud:
+          100,
+
+        detalle:
+          "Existe el mismo nombre completo en la oficial, pero con otro RUT."
+      });
+
+      continue;
+    }
+
+    /*
+      ===================================================
+      C. NOMBRE PARECIDO, RUT DIFERENTE
+      ===================================================
+    */
+
+    const candidatosParecidos =
+      oficiales
+        .map(
+          (oficial) => {
+            const sim =
+              calcularSimilitudNombreDiagnostico(
+                nombreSistemaPagos,
+                oficial.nombre
+              );
+
+            return {
+              ...oficial,
+
+              score:
+                sim.score,
+
+              tokensComunes:
+                sim.tokensComunes
+            };
+          }
+        )
+        .filter(
+          (oficial) =>
+            oficial.score >=
+              0.5 &&
+            oficial.tokensComunes >=
+              2
+        )
+        .sort(
+          (a, b) =>
+            b.score -
+            a.score
+        );
+
+    const mejor =
+      candidatosParecidos[0] ||
+      null;
+
+    if (mejor) {
+      resultados.push({
+        clasificacion:
+          "POSIBLE_NOMBRE_RUT_DISTINTO",
+
+        groupDocId,
+
+        numeroNegocio,
+
+        rutSistemaPagos:
+          rutInfo.rut ||
+          rutKey,
+
+        nombreSistemaPagos,
+
+        rutOficial:
+          mejor.rut,
+
+        nombreOficial:
+          mejor.nombre,
+
+        estadoOficial:
+          mejor.estado,
+
+        similitud:
+          Math.round(
+            mejor.score *
+            100
+          ),
+
+        detalle:
+          "Hay una inscripción con nombre parecido. Revisar antes de importar como persona nueva."
+      });
+
+      continue;
+    }
+
+    /*
+      ===================================================
+      D. NO APARECE POR RUT NI POR NOMBRE
+
+      ESTE ES EL CANDIDATO REAL A INCORPORAR.
+      ===================================================
+    */
+
+    resultados.push({
+      clasificacion:
+        "FALTANTE_PROBABLE",
+
+      groupDocId,
+
+      numeroNegocio,
+
+      rutSistemaPagos:
+        rutInfo.rut ||
+        rutKey,
+
+      nombreSistemaPagos,
+
+      rutOficial:
+        "",
+
+      nombreOficial:
+        "",
+
+      estadoOficial:
+        "",
+
+      similitud:
+        0,
+
+      detalle:
+        "No aparece por RUT ni encontramos un nombre equivalente en la nómina oficial. Candidato a importar desde Sistema de Pagos."
+    });
+  }
+
+  /*
+    =====================================================
+    6. RESUMEN
+    =====================================================
+  */
+
+  const resumen = {
+    groupDocId,
+    numeroNegocio,
+
+    totalSistemaPagos:
+      pasajerosPagos.length,
+
+    totalOficial:
+      oficiales.length,
+
+    totalSinOficial:
+      resultados.length,
+
+    mismoRutNoActivo:
+      resultados.filter(
+        (x) =>
+          x.clasificacion ===
+          "MISMO_RUT_NO_ACTIVO"
+      ).length,
+
+    mismoNombreRutDistinto:
+      resultados.filter(
+        (x) =>
+          x.clasificacion ===
+          "MISMO_NOMBRE_RUT_DISTINTO"
+      ).length,
+
+    posibleNombreRutDistinto:
+      resultados.filter(
+        (x) =>
+          x.clasificacion ===
+          "POSIBLE_NOMBRE_RUT_DISTINTO"
+      ).length,
+
+    faltanteProbable:
+      resultados.filter(
+        (x) =>
+          x.clasificacion ===
+          "FALTANTE_PROBABLE"
+      ).length
+  };
+
+  console.log(
+    "🏁 [SIN OFICIAL] DIAGNÓSTICO TERMINADO"
+  );
+
+  console.table(
+    resultados
+  );
+
+  console.table([
+    resumen
+  ]);
+
+  return {
+    resumen,
+    resultados
+  };
+};
+
+
+/* =========================================================
+   DIAGNÓSTICO MASIVO SIN OFICIAL
+   GANADA + AÑO VIAJE 2026
+
+   SOLO LECTURA.
+========================================================= */
+
+window.diagnosticarSinOficialGanadas2026 =
+async function () {
+  console.log(
+    "🔎 [SIN OFICIAL MASIVO] GANADAS 2026"
+  );
+
+  const gruposSnap =
+    await getDocs(
+      query(
+        collection(
+          db,
+          "ventas_cotizaciones"
+        ),
+        where(
+          "estado",
+          "==",
+          "Ganada"
+        ),
+        where(
+          "anoViaje",
+          "==",
+          2026
+        )
+      )
+    );
+
+  const casos =
+    [];
+
+  const resumenGrupos =
+    [];
+
+  for (
+    let index = 0;
+    index <
+      gruposSnap.docs.length;
+    index += 1
+  ) {
+    const grupoDoc =
+      gruposSnap.docs[index];
+
+    const grupo =
+      grupoDoc.data() ||
+      {};
+
+    const numeroNegocio =
+      String(
+        grupo.numeroNegocio ||
+        grupo?.ficha
+          ?.numeroNegocio ||
+        ""
+      ).trim();
+
+    console.log(
+      `📋 ${index + 1}/${gruposSnap.docs.length}`,
+      {
+        groupDocId:
+          grupoDoc.id,
+
+        numeroNegocio,
+
+        grupo:
+          grupo.aliasGrupo ||
+          grupo.nombreGrupo ||
+          grupo.colegio ||
+          ""
+      }
+    );
+
+    if (!numeroNegocio) {
+      resumenGrupos.push({
+        groupDocId:
+          grupoDoc.id,
+
+        numeroNegocio:
+          "",
+
+        grupo:
+          grupo.aliasGrupo ||
+          grupo.nombreGrupo ||
+          grupo.colegio ||
+          "",
+
+        estado:
+          "SIN_NUMERO_NEGOCIO",
+
+        sinOficial:
+          0
+      });
+
+      continue;
+    }
+
+    try {
+      const resultado =
+        await window
+          .diagnosticarSinOficialGrupoDesdeSistemaPagos(
+            grupoDoc.id
+          );
+
+      const detalle =
+        resultado?.resultados ||
+        [];
+
+      casos.push(
+        ...detalle.map(
+          (item) => ({
+            grupo:
+              grupo.aliasGrupo ||
+              grupo.nombreGrupo ||
+              grupo.colegio ||
+              "",
+
+            ...item
+          })
+        )
+      );
+
+      resumenGrupos.push({
+        groupDocId:
+          grupoDoc.id,
+
+        numeroNegocio,
+
+        grupo:
+          grupo.aliasGrupo ||
+          grupo.nombreGrupo ||
+          grupo.colegio ||
+          "",
+
+        estado:
+          "OK",
+
+        sinOficial:
+          detalle.length,
+
+        mismoRutNoActivo:
+          resultado
+            ?.resumen
+            ?.mismoRutNoActivo ||
+          0,
+
+        mismoNombreRutDistinto:
+          resultado
+            ?.resumen
+            ?.mismoNombreRutDistinto ||
+          0,
+
+        posibleNombreRutDistinto:
+          resultado
+            ?.resumen
+            ?.posibleNombreRutDistinto ||
+          0,
+
+        faltanteProbable:
+          resultado
+            ?.resumen
+            ?.faltanteProbable ||
+          0
+      });
+    } catch (error) {
+      console.error(
+        "❌ [SIN OFICIAL] Error en grupo",
+        grupoDoc.id,
+        error
+      );
+
+      resumenGrupos.push({
+        groupDocId:
+          grupoDoc.id,
+
+        numeroNegocio,
+
+        grupo:
+          grupo.aliasGrupo ||
+          grupo.nombreGrupo ||
+          grupo.colegio ||
+          "",
+
+        estado:
+          "ERROR",
+
+        error:
+          error?.message ||
+          "Error desconocido"
+      });
+    }
+  }
+
+  const resumenGeneral = {
+    gruposRevisados:
+      gruposSnap.docs.length,
+
+    casosSinOficial:
+      casos.length,
+
+    mismoRutNoActivo:
+      casos.filter(
+        (x) =>
+          x.clasificacion ===
+          "MISMO_RUT_NO_ACTIVO"
+      ).length,
+
+    mismoNombreRutDistinto:
+      casos.filter(
+        (x) =>
+          x.clasificacion ===
+          "MISMO_NOMBRE_RUT_DISTINTO"
+      ).length,
+
+    posibleNombreRutDistinto:
+      casos.filter(
+        (x) =>
+          x.clasificacion ===
+          "POSIBLE_NOMBRE_RUT_DISTINTO"
+      ).length,
+
+    faltanteProbable:
+      casos.filter(
+        (x) =>
+          x.clasificacion ===
+          "FALTANTE_PROBABLE"
+      ).length
+  };
+
+  console.log(
+    "\n🏁 [SIN OFICIAL MASIVO] TERMINADO"
+  );
+
+  console.log(
+    "\n📊 RESUMEN GENERAL"
+  );
+
+  console.table([
+    resumenGeneral
+  ]);
+
+  console.log(
+    "\n📋 CASOS SIN OFICIAL"
+  );
+
+  console.table(
+    casos
+  );
+
+  console.log(
+    "\n📦 GRUPOS CON CASOS"
+  );
+
+  console.table(
+    resumenGrupos.filter(
+      (item) =>
+        Number(
+          item.sinOficial ||
+          0
+        ) > 0 ||
+        item.estado !==
+          "OK"
+    )
+  );
+
+  return {
+    resumen:
+      resumenGeneral,
+
+    casos,
+
+    grupos:
+      resumenGrupos
+  };
+};
+
 window.importarNominaPagosPorNumeroNegocio = async function (numeroNegocio, options = {}) {
   const dryRun = options.dryRun !== false;
 
