@@ -15675,6 +15675,818 @@ async function consultarNominaPagos(numeroNegocio) {
   return pasajeros.map((x) => x.pasajero || {}).filter((p) => p && Object.keys(p).length);
 }
 
+/* =========================================================
+   RECONCILIAR NOMBRES DESDE SISTEMA DE PAGOS
+
+   FUENTE DE VERDAD PARA EL NOMBRE:
+   Sistema de Pagos.
+
+   MATCH:
+   exclusivamente por RUT.
+
+   CORRIGE:
+   - nómina oficial
+   - nómina pública
+
+   NO MODIFICA:
+   - RUT
+   - fecha inscripción
+   - fecha nacimiento
+   - correo
+   - teléfono
+   - ficha médica
+   - estado
+========================================================= */
+
+function normalizarNombreComparacionPagos(
+  value = ""
+) {
+  return String(
+    value || ""
+  )
+    .normalize("NFD")
+    .replace(
+      /[\u0300-\u036f]/g,
+      ""
+    )
+    .replace(
+      /[\u200B-\u200D\uFEFF]/g,
+      ""
+    )
+    .replace(
+      /[^\p{L}\p{N}]+/gu,
+      " "
+    )
+    .toUpperCase()
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function construirNombreDesdePagos(
+  pasajeroPagos = {}
+) {
+  const nombres =
+    capitalizarNombrePagos(
+      pasajeroPagos.nombres ||
+      ""
+    );
+
+  const apellidos =
+    separarApellidosPagos(
+      pasajeroPagos.apellidos ||
+      ""
+    );
+
+  const primerApellido =
+    cleanText(
+      apellidos.primerApellido ||
+      ""
+    );
+
+  const segundoApellido =
+    cleanText(
+      apellidos.segundoApellido ||
+      ""
+    );
+
+  const nombreCompleto =
+    [
+      nombres,
+      primerApellido,
+      segundoApellido
+    ]
+      .filter(Boolean)
+      .join(" ")
+      .trim();
+
+  return {
+    nombres,
+    primerApellido,
+    segundoApellido,
+    nombreCompleto
+  };
+}
+
+function construirNombreOficialActual(
+  item = {}
+) {
+  const identificacion =
+    item.identificacion ||
+    {};
+
+  const nombres =
+    cleanText(
+      identificacion.nombres ||
+      ""
+    );
+
+  const primerApellido =
+    cleanText(
+      identificacion.primerApellido ||
+      ""
+    );
+
+  const segundoApellido =
+    cleanText(
+      identificacion.segundoApellido ||
+      ""
+    );
+
+  const nombreCompleto =
+    [
+      nombres,
+      primerApellido,
+      segundoApellido
+    ]
+      .filter(Boolean)
+      .join(" ")
+      .trim();
+
+  return {
+    nombres,
+    primerApellido,
+    segundoApellido,
+    nombreCompleto
+  };
+}
+
+async function corregirNombrePublicoPorRutDesdePagos({
+  groupDocId = "",
+  rutKey = "",
+  nombrePagos = {},
+  dryRun = true
+} = {}) {
+  if (
+    !groupDocId ||
+    !rutKey
+  ) {
+    return {
+      estado:
+        "sin_datos"
+    };
+  }
+
+  const publicaSnap =
+    await getDocs(
+      query(
+        collection(
+          db,
+          "inscripciones_pendientes_publicas"
+        ),
+        where(
+          "idGrupo",
+          "==",
+          String(
+            groupDocId
+          )
+        )
+      )
+    );
+
+  const candidatos =
+    publicaSnap.docs
+      .map(
+        (docPub) => {
+          const data =
+            docPub.data() ||
+            {};
+
+          const payload =
+            data.payload ||
+            {};
+
+          const rutPayload =
+            normalizarRutKeyGrupo(
+              getRutKeyInscripcionPublicaGrupo(
+                payload
+              )
+            );
+
+          const rutDoc =
+            normalizarRutKeyGrupo(
+              docPub.id
+            );
+
+          return {
+            docPub,
+            data,
+            payload,
+            ruts:
+              new Set(
+                [
+                  rutPayload,
+                  rutDoc
+                ]
+                  .filter(Boolean)
+              )
+          };
+        }
+      )
+      .filter(
+        (item) =>
+          item.ruts.has(
+            rutKey
+          )
+      );
+
+  if (
+    candidatos.length ===
+    0
+  ) {
+    return {
+      estado:
+        "sin_publica"
+    };
+  }
+
+  if (
+    candidatos.length >
+    1
+  ) {
+    return {
+      estado:
+        "publica_ambigua",
+
+      cantidad:
+        candidatos.length
+    };
+  }
+
+  const candidato =
+    candidatos[0];
+
+  const nombrePublicoActual =
+    getNombrePublicoInscripcionGrupo(
+      candidato.payload
+    );
+
+  const nombreNuevo =
+    nombrePagos.nombreCompleto;
+
+  if (
+    normalizarNombreComparacionPagos(
+      nombrePublicoActual
+    ) ===
+    normalizarNombreComparacionPagos(
+      nombreNuevo
+    )
+  ) {
+    return {
+      estado:
+        "publica_ok",
+
+      nombrePublicoActual
+    };
+  }
+
+  if (!dryRun) {
+    await updateDoc(
+      candidato.docPub.ref,
+      {
+        "payload.identificacion.nombres":
+          nombrePagos.nombres,
+
+        "payload.identificacion.primerApellido":
+          nombrePagos.primerApellido,
+
+        "payload.identificacion.segundoApellido":
+          nombrePagos.segundoApellido,
+
+        "payload.identificacion.nombreCompleto":
+          nombrePagos.nombreCompleto
+      }
+    );
+  }
+
+  return {
+    estado:
+      dryRun
+        ? "repararia_publica"
+        : "publica_reparada",
+
+    idPublico:
+      candidato.docPub.id,
+
+    nombrePublicoActual,
+
+    nombreNuevo
+  };
+}
+
+window.sincronizarNombresGrupoDesdeSistemaPagos =
+async function (
+  groupDocIdParam = "",
+  {
+    dryRun = true
+  } = {}
+) {
+  const groupDocId =
+    String(
+      groupDocIdParam ||
+      state.groupDocId ||
+      ""
+    ).trim();
+
+  if (!groupDocId) {
+    throw new Error(
+      "Falta idGrupo / groupDocId."
+    );
+  }
+
+  /*
+    =====================================================
+    1. LEEMOS EL GRUPO
+    =====================================================
+  */
+
+  const grupoRef =
+    doc(
+      db,
+      "ventas_cotizaciones",
+      groupDocId
+    );
+
+  const grupoSnap =
+    await getDoc(
+      grupoRef
+    );
+
+  if (!grupoSnap.exists()) {
+    throw new Error(
+      `No existe ventas_cotizaciones/${groupDocId}`
+    );
+  }
+
+  const grupo =
+    grupoSnap.data() ||
+    {};
+
+  const numeroNegocio =
+    String(
+      grupo.numeroNegocio ||
+      grupo?.ficha?.numeroNegocio ||
+      ""
+    ).trim();
+
+  if (!numeroNegocio) {
+    throw new Error(
+      `El grupo ${groupDocId} no tiene numeroNegocio.`
+    );
+  }
+
+  console.log(
+    dryRun
+      ? "🔎 [NOMBRES SP] SIMULACIÓN"
+      : "🛠️ [NOMBRES SP] EJECUCIÓN REAL",
+    {
+      groupDocId,
+      numeroNegocio,
+      grupo:
+        grupo.aliasGrupo ||
+        grupo.nombreGrupo ||
+        grupo.colegio ||
+        ""
+    }
+  );
+
+  /*
+    =====================================================
+    2. CONSULTAMOS SISTEMA DE PAGOS
+    usando numeroNegocio
+    =====================================================
+  */
+
+  const pasajerosPagos =
+    await consultarNominaPagos(
+      numeroNegocio
+    );
+
+  /*
+    =====================================================
+    3. CARGAMOS NÓMINA OFICIAL
+    usando idGrupo / groupDocId
+    =====================================================
+  */
+
+  const oficialSnap =
+    await getDocs(
+      collection(
+        db,
+        "ventas_cotizaciones",
+        groupDocId,
+        "inscripciones"
+      )
+    );
+
+  const oficialesPorRut =
+    new Map();
+
+  oficialSnap.docs.forEach(
+    (inscDoc) => {
+      const item = {
+        id:
+          inscDoc.id,
+
+        ...inscDoc.data()
+      };
+
+      const estadoPrivacidad =
+        normalizeSearchLocal(
+          item?.privacidad?.estado ||
+          ""
+        );
+
+      if (
+        estadoPrivacidad ===
+          "archivada" ||
+        estadoPrivacidad ===
+          "eliminada_logica"
+      ) {
+        return;
+      }
+
+      const rutKey =
+        normalizarRutKeyGrupo(
+          getInscripcionDocumento(
+            item
+          ) ||
+          item.id ||
+          ""
+        );
+
+      if (!rutKey) {
+        return;
+      }
+
+      if (
+        !oficialesPorRut.has(
+          rutKey
+        )
+      ) {
+        oficialesPorRut.set(
+          rutKey,
+          []
+        );
+      }
+
+      oficialesPorRut
+        .get(
+          rutKey
+        )
+        .push({
+          ref:
+            inscDoc.ref,
+
+          item
+        });
+    }
+  );
+
+  const resultados =
+    [];
+
+  let revisados =
+    0;
+
+  let iguales =
+    0;
+
+  let diferentes =
+    0;
+
+  let oficialesCorregidos =
+    0;
+
+  let publicosCorregidos =
+    0;
+
+  let sinOficial =
+    0;
+
+  let ambiguosOficial =
+    0;
+
+  let sinRut =
+    0;
+
+  let sinPublica =
+    0;
+
+  let publicaAmbigua =
+    0;
+
+  /*
+    =====================================================
+    4. CRUZAMOS PASAJEROS POR RUT
+    =====================================================
+  */
+
+  for (
+    const pasajeroPagos
+    of pasajerosPagos
+  ) {
+    revisados++;
+
+    const rutInfo =
+      formatearRutDesdePagos(
+        pasajeroPagos.rut ||
+        ""
+      );
+
+    const rutKey =
+      normalizarRutKeyGrupo(
+        rutInfo.rut ||
+        rutInfo.documentoNormalizado ||
+        ""
+      );
+
+    const nombrePagos =
+      construirNombreDesdePagos(
+        pasajeroPagos
+      );
+
+    if (!rutKey) {
+      sinRut++;
+
+      resultados.push({
+        accion:
+          "SIN_RUT_SP",
+
+        rut:
+          "",
+
+        nombreSistemaPagos:
+          nombrePagos.nombreCompleto,
+
+        nombreOficial:
+          "",
+
+        publica:
+          ""
+      });
+
+      continue;
+    }
+
+    const candidatosOficiales =
+      oficialesPorRut.get(
+        rutKey
+      ) ||
+      [];
+
+    /*
+      El objetivo de ESTA función es corregir nombres.
+      No crea pasajeros nuevos.
+    */
+    if (
+      candidatosOficiales.length ===
+      0
+    ) {
+      sinOficial++;
+
+      resultados.push({
+        accion:
+          "NO_EXISTE_EN_OFICIAL",
+
+        rut:
+          rutInfo.rut ||
+          rutKey,
+
+        nombreSistemaPagos:
+          nombrePagos.nombreCompleto,
+
+        nombreOficial:
+          "",
+
+        publica:
+          ""
+      });
+
+      continue;
+    }
+
+    if (
+      candidatosOficiales.length >
+      1
+    ) {
+      ambiguosOficial++;
+
+      resultados.push({
+        accion:
+          "RUT_DUPLICADO_OFICIAL",
+
+        rut:
+          rutInfo.rut ||
+          rutKey,
+
+        nombreSistemaPagos:
+          nombrePagos.nombreCompleto,
+
+        nombreOficial:
+          candidatosOficiales
+            .map(
+              (x) =>
+                construirNombreOficialActual(
+                  x.item
+                )
+                  .nombreCompleto
+            )
+            .join(" | "),
+
+        publica:
+          ""
+      });
+
+      continue;
+    }
+
+    const oficial =
+      candidatosOficiales[0];
+
+    const nombreOficial =
+      construirNombreOficialActual(
+        oficial.item
+      );
+
+    const coincideNombre =
+      normalizarNombreComparacionPagos(
+        nombrePagos.nombreCompleto
+      ) ===
+      normalizarNombreComparacionPagos(
+        nombreOficial.nombreCompleto
+      );
+
+    if (coincideNombre) {
+      iguales++;
+
+      resultados.push({
+        accion:
+          "OK",
+
+        rut:
+          rutInfo.rut ||
+          rutKey,
+
+        nombreSistemaPagos:
+          nombrePagos.nombreCompleto,
+
+        nombreOficial:
+          nombreOficial.nombreCompleto,
+
+        publica:
+          "NO_REQUIERE"
+      });
+
+      continue;
+    }
+
+    diferentes++;
+
+    /*
+      ===================================================
+      5. CORREGIMOS OFICIAL
+
+      SOLO NOMBRE/APELLIDOS.
+      ===================================================
+    */
+
+    if (!dryRun) {
+      await updateDoc(
+        oficial.ref,
+        {
+          "identificacion.nombres":
+            nombrePagos.nombres,
+
+          "identificacion.primerApellido":
+            nombrePagos.primerApellido,
+
+          "identificacion.segundoApellido":
+            nombrePagos.segundoApellido,
+
+          "identificacion.nombreCompleto":
+            nombrePagos.nombreCompleto,
+
+          "auditoriaCorreccionNombrePagos.actualizadoAt":
+            serverTimestamp(),
+
+          "auditoriaCorreccionNombrePagos.origen":
+            "sistema_pagos",
+
+          "auditoriaCorreccionNombrePagos.numeroNegocio":
+            numeroNegocio
+        }
+      );
+
+      oficialesCorregidos++;
+    }
+
+    /*
+      ===================================================
+      6. CORREGIMOS PÚBLICA POR EL MISMO RUT
+      ===================================================
+    */
+
+    const resultadoPublica =
+      await corregirNombrePublicoPorRutDesdePagos({
+        groupDocId,
+        rutKey,
+        nombrePagos,
+        dryRun
+      });
+
+    if (
+      resultadoPublica.estado ===
+      "publica_reparada"
+    ) {
+      publicosCorregidos++;
+    }
+
+    if (
+      resultadoPublica.estado ===
+      "sin_publica"
+    ) {
+      sinPublica++;
+    }
+
+    if (
+      resultadoPublica.estado ===
+      "publica_ambigua"
+    ) {
+      publicaAmbigua++;
+    }
+
+    resultados.push({
+      accion:
+        dryRun
+          ? "REPARARIA_NOMBRE"
+          : "NOMBRE_REPARADO",
+
+      rut:
+        rutInfo.rut ||
+        rutKey,
+
+      nombreSistemaPagos:
+        nombrePagos.nombreCompleto,
+
+      nombreOficial:
+        nombreOficial.nombreCompleto,
+
+      publica:
+        resultadoPublica.estado
+    });
+  }
+
+  const resumen = {
+    groupDocId,
+    numeroNegocio,
+    dryRun,
+
+    totalSistemaPagos:
+      pasajerosPagos.length,
+
+    revisados,
+
+    iguales,
+
+    diferentes,
+
+    oficialesCorregidos,
+
+    publicosCorregidos,
+
+    sinOficial,
+
+    ambiguosOficial,
+
+    sinRut,
+
+    sinPublica,
+
+    publicaAmbigua
+  };
+
+  console.log(
+    "🏁 [NOMBRES SP] GRUPO TERMINADO",
+    {
+      groupDocId,
+      numeroNegocio
+    }
+  );
+
+  console.table(
+    resultados
+  );
+
+  console.table([
+    resumen
+  ]);
+
+  return {
+    resumen,
+    resultados
+  };
+};
+
 window.importarNominaPagosPorNumeroNegocio = async function (numeroNegocio, options = {}) {
   const dryRun = options.dryRun !== false;
 
