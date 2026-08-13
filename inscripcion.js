@@ -1059,133 +1059,22 @@ function getRutValidacionNormalizado() {
 }
 
 function prepararCardValidacionRut() {
-  if (!cardValidacionNominaFinal) return;
-
-  let aviso = $("avisoValidacionRutContexto");
-
-  if (!aviso) {
-    aviso = document.createElement("div");
-
-    aviso.id = "avisoValidacionRutContexto";
-    aviso.className = "notice time";
-    aviso.style.marginBottom = "18px";
-
-    cardValidacionNominaFinal.prepend(aviso);
-  }
-
-  // ===========================================================================
-  // NUEVO INGRESO
-  // ===========================================================================
-
-  if (faseUrl === "nuevos") {
-    aviso.innerHTML = `
-      <div style="
-        font-size:20px;
-        line-height:1.3;
-        font-weight:900;
-        margin-bottom:8px;
-      ">
-        🟣 IDENTIFICACIÓN DE LA PERSONA QUE VIAJA
-      </div>
-
-      <div style="
-        font-size:15px;
-        line-height:1.55;
-      ">
-        Ingresa el RUT de la persona que desea incorporarse mediante
-        <strong>Nuevo Ingreso</strong>.
-        <br><br>
-
-        Si esta persona estuvo registrada anteriormente en este grupo
-        y actualmente se encuentra anulada, recuperaremos los datos
-        disponibles para facilitar el formulario.
-        <br><br>
-
-        <strong>Debe ingresar el RUT de la persona que viaja.</strong>
-        Si usted es padre, madre o apoderado(a), no ingrese su propio RUT.
-      </div>
-    `;
-
-    if (btnValidarRutNominaFinal) {
-      btnValidarRutNominaFinal.textContent =
-        "Continuar con este RUT";
-    }
-
+  if (!btnValidarRutNominaFinal) {
     return;
   }
 
-  // ===========================================================================
-  // LISTA DE ESPERA
-  // ===========================================================================
-
-  if (faseUrl === "lista_espera") {
-    aviso.innerHTML = `
-      <div style="
-        font-size:20px;
-        line-height:1.3;
-        font-weight:900;
-        margin-bottom:8px;
-      ">
-        🟡 IDENTIFICACIÓN DE LA PERSONA QUE VIAJA
-      </div>
-
-      <div style="
-        font-size:15px;
-        line-height:1.55;
-      ">
-        Ingresa el RUT de la persona que desea incorporarse a la
-        <strong>Lista de Espera</strong>.
-        <br><br>
-
-        Si esta persona ya estuvo registrada anteriormente en este grupo
-        y actualmente se encuentra anulada, recuperaremos los datos que
-        ya tenemos para facilitar el formulario.
-        <br><br>
-
-        <strong>Debe ingresar el RUT de la persona que viaja.</strong>
-        Si usted es padre, madre o apoderado(a), no ingrese su propio RUT.
-      </div>
-    `;
-
-    if (btnValidarRutNominaFinal) {
-      btnValidarRutNominaFinal.textContent =
-        "Continuar con este RUT";
-    }
-
-    return;
-  }
-
-  // ===========================================================================
-  // NÓMINA FINAL
-  // ===========================================================================
-
-  aviso.innerHTML = `
-    <div style="
-      font-size:20px;
-      line-height:1.3;
-      font-weight:900;
-      margin-bottom:8px;
-    ">
-      ⚠️ RUT DE LA PERSONA QUE VIAJA
-    </div>
-
-    <div style="
-      font-size:15px;
-      line-height:1.55;
-    ">
-      Ingresa el RUT de la persona que viaja para validar que se
-      encuentre en la nómina base del grupo.
-      <br><br>
-
-      Si usted es padre, madre o apoderado(a),
-      <strong>NO ingrese su propio RUT.</strong>
-    </div>
-  `;
-
-  if (btnValidarRutNominaFinal) {
+  if (
+    faseUrl === "nuevos" ||
+    faseUrl === "lista_espera"
+  ) {
     btnValidarRutNominaFinal.textContent =
-      "Validar RUT";
+      "Continuar con este RUT";
+
+    return;
   }
+
+  btnValidarRutNominaFinal.textContent =
+    "Validar RUT";
 }
 
 function estaInscripcionAnuladaPublica(item = {}) {
