@@ -16052,7 +16052,6 @@ async function (
   /*
     =====================================================
     2. CONSULTAMOS SISTEMA DE PAGOS
-    usando numeroNegocio
     =====================================================
   */
 
@@ -16064,7 +16063,6 @@ async function (
   /*
     =====================================================
     3. CARGAMOS NÓMINA OFICIAL
-    usando idGrupo / groupDocId
     =====================================================
   */
 
@@ -16160,6 +16158,12 @@ async function (
   let publicosCorregidos =
     0;
 
+  let publicosYaCorrectos =
+    0;
+
+  let publicosRepararian =
+    0;
+
   let sinOficial =
     0;
 
@@ -16235,9 +16239,11 @@ async function (
       [];
 
     /*
-      El objetivo de ESTA función es corregir nombres.
-      No crea pasajeros nuevos.
+      ===================================================
+      NO EXISTE EN OFICIAL
+      ===================================================
     */
+
     if (
       candidatosOficiales.length ===
       0
@@ -16264,6 +16270,12 @@ async function (
 
       continue;
     }
+
+    /*
+      ===================================================
+      RUT DUPLICADO EN OFICIAL
+      ===================================================
+    */
 
     if (
       candidatosOficiales.length >
@@ -16308,7 +16320,7 @@ async function (
         oficial.item
       );
 
-    const coincideNombre =
+    const coincideNombreOficial =
       normalizarNombreComparacionPagos(
         nombrePagos.nombreCompleto
       ) ===
@@ -16316,73 +16328,62 @@ async function (
         nombreOficial.nombreCompleto
       );
 
-    if (coincideNombre) {
-      iguales++;
-
-      resultados.push({
-        accion:
-          "OK",
-
-        rut:
-          rutInfo.rut ||
-          rutKey,
-
-        nombreSistemaPagos:
-          nombrePagos.nombreCompleto,
-
-        nombreOficial:
-          nombreOficial.nombreCompleto,
-
-        publica:
-          "NO_REQUIERE"
-      });
-
-      continue;
-    }
-
-    diferentes++;
-
     /*
       ===================================================
-      5. CORREGIMOS OFICIAL
-
-      SOLO NOMBRE/APELLIDOS.
+      5. REVISAMOS / CORREGIMOS OFICIAL
       ===================================================
     */
 
-    if (!dryRun) {
-      await updateDoc(
-        oficial.ref,
-        {
-          "identificacion.nombres":
-            nombrePagos.nombres,
+    if (coincideNombreOficial) {
+      iguales++;
+    } else {
+      diferentes++;
 
-          "identificacion.primerApellido":
-            nombrePagos.primerApellido,
+      if (!dryRun) {
+        await updateDoc(
+          oficial.ref,
+          {
+            "identificacion.nombres":
+              nombrePagos.nombres,
 
-          "identificacion.segundoApellido":
-            nombrePagos.segundoApellido,
+            "identificacion.primerApellido":
+              nombrePagos.primerApellido,
 
-          "identificacion.nombreCompleto":
-            nombrePagos.nombreCompleto,
+            "identificacion.segundoApellido":
+              nombrePagos.segundoApellido,
 
-          "auditoriaCorreccionNombrePagos.actualizadoAt":
-            serverTimestamp(),
+            "identificacion.nombreCompleto":
+              nombrePagos.nombreCompleto,
 
-          "auditoriaCorreccionNombrePagos.origen":
-            "sistema_pagos",
+            "auditoriaCorreccionNombrePagos.actualizadoAt":
+              serverTimestamp(),
 
-          "auditoriaCorreccionNombrePagos.numeroNegocio":
-            numeroNegocio
-        }
-      );
+            "auditoriaCorreccionNombrePagos.origen":
+              "sistema_pagos",
 
-      oficialesCorregidos++;
+            "auditoriaCorreccionNombrePagos.numeroNegocio":
+              numeroNegocio
+          }
+        );
+
+        oficialesCorregidos++;
+      }
     }
 
     /*
       ===================================================
-      6. CORREGIMOS PÚBLICA POR EL MISMO RUT
+      6. SIEMPRE REVISAMOS LA PÚBLICA
+
+      ESTE ES EL CAMBIO IMPORTANTE.
+
+      Aunque:
+      SP == OFICIAL
+
+      igualmente buscamos:
+      SP vs PÚBLICA
+
+      Si la pública existe y está mal,
+      se corrige.
       ===================================================
     */
 
@@ -16403,6 +16404,29 @@ async function (
 
     if (
       resultadoPublica.estado ===
+      "repararia_publica"
+    ) {
+      publicosRepararian++;
+    }
+
+    if (
+      resultadoPublica.estado ===
+      "publica_ok"
+    ) {
+      publicosYaCorrectos++;
+    }
+
+    /*
+      Que no exista pública NO significa necesariamente
+      un error.
+
+      Puede ser que esa persona todavía no haya
+      completado la ficha médica.
+
+      Lo seguimos informando, pero NO creamos nada.
+    */
+    if (
+      resultadoPublica.estado ===
       "sin_publica"
     ) {
       sinPublica++;
@@ -16415,11 +16439,46 @@ async function (
       publicaAmbigua++;
     }
 
-    resultados.push({
-      accion:
+    /*
+      ===================================================
+      7. RESULTADO DE ESA PERSONA
+      ===================================================
+    */
+
+    let accion =
+      "OK";
+
+    if (
+      !coincideNombreOficial
+    ) {
+      accion =
         dryRun
-          ? "REPARARIA_NOMBRE"
-          : "NOMBRE_REPARADO",
+          ? "REPARARIA_OFICIAL"
+          : "OFICIAL_REPARADA";
+    }
+
+    if (
+      resultadoPublica.estado ===
+      "repararia_publica"
+    ) {
+      accion =
+        !coincideNombreOficial
+          ? "REPARARIA_OFICIAL_Y_PUBLICA"
+          : "REPARARIA_PUBLICA";
+    }
+
+    if (
+      resultadoPublica.estado ===
+      "publica_reparada"
+    ) {
+      accion =
+        !coincideNombreOficial
+          ? "OFICIAL_Y_PUBLICA_REPARADAS"
+          : "PUBLICA_REPARADA";
+    }
+
+    resultados.push({
+      accion,
 
       rut:
         rutInfo.rut ||
@@ -16432,9 +16491,25 @@ async function (
         nombreOficial.nombreCompleto,
 
       publica:
-        resultadoPublica.estado
+        resultadoPublica.estado,
+
+      nombrePublicoActual:
+        resultadoPublica
+          ?.nombrePublicoActual ||
+        "",
+
+      nombrePublicoNuevo:
+        resultadoPublica
+          ?.nombreNuevo ||
+        ""
     });
   }
+
+  /*
+    =====================================================
+    8. RESUMEN
+    =====================================================
+  */
 
   const resumen = {
     groupDocId,
@@ -16453,6 +16528,10 @@ async function (
     oficialesCorregidos,
 
     publicosCorregidos,
+
+    publicosRepararian,
+
+    publicosYaCorrectos,
 
     sinOficial,
 
