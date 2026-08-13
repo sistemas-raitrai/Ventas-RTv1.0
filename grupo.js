@@ -16356,92 +16356,579 @@ window.importarNominasPagosAno = async function ({
   return resumen;
 };
 
-window.sincronizarNominaPublicaConOficial = async function (groupDocIdParam = "") {
-  const groupDocId = String(groupDocIdParam || state.groupDocId || "").trim();
+window.sincronizarNominaPublicaConOficial =
+async function (
+  groupDocIdParam = "",
+  {
+    dryRun = true
+  } = {}
+) {
+  const groupDocId =
+    String(
+      groupDocIdParam ||
+      state.groupDocId ||
+      ""
+    ).trim();
 
   if (!groupDocId) {
-    console.error("Falta groupDocId.");
-    return;
+    console.error(
+      "Falta groupDocId."
+    );
+
+    return null;
   }
 
-  const oficialSnap = await getDocs(
-    collection(db, "ventas_cotizaciones", groupDocId, "inscripciones")
+  console.log(
+    dryRun
+      ? "🔎 [SYNC NÓMINA PÚBLICA] SIMULACIÓN"
+      : "🛠️ [SYNC NÓMINA PÚBLICA] EJECUCIÓN REAL",
+    {
+      groupDocId
+    }
   );
 
-  const oficialesActivos = new Set();
+  /*
+    =====================================================
+    1. CARGAMOS NÓMINA OFICIAL
+    =====================================================
+  */
 
-  oficialSnap.docs.forEach((d) => {
-    const item = { id: d.id, ...d.data() };
-
-    const estadoPrivacidad = normalizeSearchLocal(item?.privacidad?.estado || "");
-    if (estadoPrivacidad === "archivada" || estadoPrivacidad === "eliminada_logica") return;
-
-    const rutKey = normalizarRutKeyGrupo(
-      getInscripcionDocumento(item) || item.id || ""
+  const oficialSnap =
+    await getDocs(
+      collection(
+        db,
+        "ventas_cotizaciones",
+        groupDocId,
+        "inscripciones"
+      )
     );
 
-    const nombreKey = normalizeSearchLocal(
-      `${getInscripcionNombres(item)} ${getInscripcionApellidos(item)}`
+  const oficialesActivos =
+    [];
+
+  for (
+    const documentoOficial
+    of oficialSnap.docs
+  ) {
+    const item = {
+      id:
+        documentoOficial.id,
+
+      ...documentoOficial.data()
+    };
+
+    const estadoPrivacidad =
+      normalizeSearchLocal(
+        item?.privacidad?.estado ||
+        ""
+      );
+
+    if (
+      estadoPrivacidad ===
+        "archivada" ||
+      estadoPrivacidad ===
+        "eliminada_logica"
+    ) {
+      continue;
+    }
+
+    const rutKey =
+      normalizarRutKeyGrupo(
+        getInscripcionDocumento(
+          item
+        ) ||
+        item.id ||
+        ""
+      );
+
+    const nombres =
+      cleanText(
+        getInscripcionNombres(
+          item
+        )
+      );
+
+    const identificacion =
+      item.identificacion ||
+      {};
+
+    const primerApellido =
+      cleanText(
+        identificacion.primerApellido ||
+        ""
+      );
+
+    const segundoApellido =
+      cleanText(
+        identificacion.segundoApellido ||
+        ""
+      );
+
+    /*
+      Respaldo para registros antiguos
+      que no tengan los apellidos separados.
+    */
+    const apellidosCompletos =
+      cleanText(
+        getInscripcionApellidos(
+          item
+        )
+      );
+
+    const nombreCompleto =
+      [
+        nombres,
+        primerApellido,
+        segundoApellido
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .trim() ||
+      [
+        nombres,
+        apellidosCompletos
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .trim();
+
+    oficialesActivos.push({
+      id:
+        item.id,
+
+      item,
+
+      rutKey,
+
+      nombres,
+
+      primerApellido,
+
+      segundoApellido,
+
+      apellidosCompletos,
+
+      nombreCompleto,
+
+      nombreKey:
+        normalizeSearchLocal(
+          nombreCompleto
+        )
+    });
+  }
+
+  /*
+    =====================================================
+    2. CARGAMOS NÓMINA PÚBLICA
+    =====================================================
+  */
+
+  const publicaSnap =
+    await getDocs(
+      query(
+        collection(
+          db,
+          "inscripciones_pendientes_publicas"
+        ),
+        where(
+          "idGrupo",
+          "==",
+          groupDocId
+        )
+      )
     );
 
-    if (rutKey) oficialesActivos.add(`rut:${rutKey}`);
-    if (nombreKey) oficialesActivos.add(`nombre:${nombreKey}`);
-  });
+  const resultados =
+    [];
 
-  const publicaSnap = await getDocs(
-    query(
-      collection(db, "inscripciones_pendientes_publicas"),
-      where("idGrupo", "==", groupDocId)
-    )
-  );
+  let revisados =
+    0;
 
-  let revisados = 0;
-  let eliminados = 0;
+  let nombresDiferentes =
+    0;
 
-  for (const docPub of publicaSnap.docs) {
+  let nombresActualizados =
+    0;
+
+  let eliminados =
+    0;
+
+  let sinCoincidencia =
+    0;
+
+  let ambiguos =
+    0;
+
+  for (
+    const docPub
+    of publicaSnap.docs
+  ) {
     revisados++;
 
-    const item = { id: docPub.id, ...docPub.data() };
-    const payload = item.payload || {};
+    const itemPublico = {
+      id:
+        docPub.id,
 
-    const rutKey = normalizarRutKeyGrupo(
-      getRutKeyInscripcionPublicaGrupo(payload) || item.id || ""
-    );
+      ...docPub.data()
+    };
 
-    const nombreKey = normalizeSearchLocal(
-      getNombrePublicoInscripcionGrupo(payload)
-    );
+    const payload =
+      itemPublico.payload ||
+      {};
 
-    const existeEnOficial =
-      (rutKey && oficialesActivos.has(`rut:${rutKey}`)) ||
-      (nombreKey && oficialesActivos.has(`nombre:${nombreKey}`));
+    const estadoPublico =
+      normalizeSearchLocal(
+        itemPublico.estado ||
+        ""
+      );
 
-    if (existeEnOficial) continue;
+    const privacidadPublica =
+      normalizeSearchLocal(
+        payload
+          ?.privacidad
+          ?.estado ||
+        ""
+      );
 
-    await updateDoc(doc(db, "inscripciones_pendientes_publicas", docPub.id), {
-      estado: "eliminada_logica",
-      "payload.privacidad.estado": "eliminada_logica",
-      eliminadaPorSyncNomina: true,
-      eliminadaPorSyncAt: serverTimestamp(),
-      eliminadaPorSyncGrupo: groupDocId
+    /*
+      Si ya está archivado/eliminado públicamente,
+      no necesitamos tocar su nombre.
+    */
+    if (
+      estadoPublico ===
+        "eliminada_logica" ||
+      privacidadPublica ===
+        "eliminada_logica" ||
+      privacidadPublica ===
+        "archivada"
+    ) {
+      continue;
+    }
+
+    const rutPublico =
+      normalizarRutKeyGrupo(
+        getRutKeyInscripcionPublicaGrupo(
+          payload
+        ) ||
+        itemPublico.id ||
+        ""
+      );
+
+    const nombrePublico =
+      getNombrePublicoInscripcionGrupo(
+        payload
+      );
+
+    const nombrePublicoKey =
+      normalizeSearchLocal(
+        nombrePublico
+      );
+
+    /*
+      ===================================================
+      MATCH PRINCIPAL: RUT
+      ===================================================
+    */
+    let candidatos =
+      oficialesActivos.filter(
+        (oficial) =>
+          rutPublico &&
+          oficial.rutKey &&
+          rutPublico ===
+            oficial.rutKey
+      );
+
+    /*
+      Si el RUT no permitió encontrarlo,
+      usamos nombre como respaldo únicamente
+      para saber si sigue existiendo.
+    */
+    if (
+      candidatos.length ===
+        0 &&
+      nombrePublicoKey
+    ) {
+      candidatos =
+        oficialesActivos.filter(
+          (oficial) =>
+            oficial.nombreKey ===
+            nombrePublicoKey
+        );
+    }
+
+    /*
+      ===================================================
+      NO EXISTE EN OFICIAL
+      ===================================================
+    */
+    if (
+      candidatos.length ===
+      0
+    ) {
+      sinCoincidencia++;
+
+      resultados.push({
+        accion:
+          "SIN_COINCIDENCIA",
+
+        idPublico:
+          docPub.id,
+
+        rut:
+          rutPublico,
+
+        nombrePublico,
+
+        nombreOficial:
+          "",
+
+        detalle:
+          "No se encontró coincidencia oficial"
+      });
+
+      /*
+        Mantenemos el comportamiento histórico:
+        si realmente no existe en oficial, en ejecución
+        real se elimina lógicamente.
+
+        PERO en dryRun NO escribe nada.
+      */
+      if (!dryRun) {
+        await updateDoc(
+          doc(
+            db,
+            "inscripciones_pendientes_publicas",
+            docPub.id
+          ),
+          {
+            estado:
+              "eliminada_logica",
+
+            "payload.privacidad.estado":
+              "eliminada_logica",
+
+            eliminadaPorSyncNomina:
+              true,
+
+            eliminadaPorSyncAt:
+              serverTimestamp(),
+
+            eliminadaPorSyncGrupo:
+              groupDocId
+          }
+        );
+
+        eliminados++;
+      }
+
+      continue;
+    }
+
+    /*
+      Si aparecen varios oficiales posibles,
+      NO tocamos nada.
+    */
+    if (
+      candidatos.length >
+      1
+    ) {
+      ambiguos++;
+
+      resultados.push({
+        accion:
+          "AMBIGUO",
+
+        idPublico:
+          docPub.id,
+
+        rut:
+          rutPublico,
+
+        nombrePublico,
+
+        nombreOficial:
+          candidatos
+            .map(
+              (x) =>
+                x.nombreCompleto
+            )
+            .join(" | "),
+
+        detalle:
+          `${candidatos.length} coincidencias`
+      });
+
+      continue;
+    }
+
+    const oficial =
+      candidatos[0];
+
+    const nombreOficial =
+      oficial.nombreCompleto;
+
+    /*
+      ===================================================
+      MISMO NOMBRE
+      ===================================================
+    */
+    if (
+      normalizeSearchLocal(
+        nombrePublico
+      ) ===
+      normalizeSearchLocal(
+        nombreOficial
+      )
+    ) {
+      resultados.push({
+        accion:
+          "OK",
+
+        idPublico:
+          docPub.id,
+
+        rut:
+          rutPublico,
+
+        nombrePublico,
+
+        nombreOficial,
+
+        detalle:
+          "Sin cambios"
+      });
+
+      continue;
+    }
+
+    /*
+      ===================================================
+      NOMBRE DIFERENTE
+      ===================================================
+    */
+
+    nombresDiferentes++;
+
+    resultados.push({
+      accion:
+        dryRun
+          ? "REPARARÍA_NOMBRE"
+          : "NOMBRE_REPARADO",
+
+      idPublico:
+        docPub.id,
+
+      rut:
+        rutPublico,
+
+      nombrePublico,
+
+      nombreOficial,
+
+      detalle:
+        "Solo se corrige nombre/apellidos"
     });
 
-    eliminados++;
-    console.log("Eliminada de nómina pública:", {
-      id: docPub.id,
-      nombre: getNombrePublicoInscripcionGrupo(payload),
-      rutKey
-    });
+    if (dryRun) {
+      continue;
+    }
+
+    /*
+      ===================================================
+      ÚNICA REPARACIÓN
+
+      NO TOCAMOS:
+      - fecha
+      - RUT
+      - contacto
+      - ficha
+      - estados
+      - documentos
+      - archivos
+      ===================================================
+    */
+
+    await updateDoc(
+      doc(
+        db,
+        "inscripciones_pendientes_publicas",
+        docPub.id
+      ),
+      {
+        "payload.identificacion.nombres":
+          oficial.nombres,
+
+        "payload.identificacion.primerApellido":
+          oficial.primerApellido,
+
+        "payload.identificacion.segundoApellido":
+          oficial.segundoApellido,
+
+        "payload.identificacion.nombreCompleto":
+          nombreOficial
+      }
+    );
+
+    nombresActualizados++;
   }
 
-  console.log("Sync nómina pública terminado:", {
+  const resumen = {
     groupDocId,
-    revisados,
-    eliminados,
-    oficialesActivos: oficialesActivos.size
-  });
 
-  alert(`Sync terminado. Revisados: ${revisados}. Eliminados de pública: ${eliminados}.`);
+    dryRun,
+
+    oficialesActivos:
+      oficialesActivos.length,
+
+    publicosRevisados:
+      revisados,
+
+    nombresDiferentes,
+
+    nombresActualizados,
+
+    sinCoincidencia,
+
+    ambiguos,
+
+    eliminados
+  };
+
+  console.log(
+    "🏁 [SYNC NÓMINA PÚBLICA] TERMINADO"
+  );
+
+  console.table(
+    resultados
+  );
+
+  console.table([
+    resumen
+  ]);
+
+  if (dryRun) {
+    alert(
+      `SIMULACIÓN TERMINADA\n\n` +
+      `Públicos revisados: ${revisados}\n` +
+      `Nombres distintos: ${nombresDiferentes}\n` +
+      `Sin coincidencia: ${sinCoincidencia}\n` +
+      `Ambiguos: ${ambiguos}\n\n` +
+      `NO se modificó Firebase.`
+    );
+  } else {
+    alert(
+      `SINCRONIZACIÓN TERMINADA\n\n` +
+      `Públicos revisados: ${revisados}\n` +
+      `Nombres reparados: ${nombresActualizados}\n` +
+      `Eliminados lógicos: ${eliminados}\n` +
+      `Ambiguos: ${ambiguos}`
+    );
+  }
+
+  return {
+    resumen,
+    resultados
+  };
 };
 
 function normalizarRutKeyGrupo(value = "") {
