@@ -1275,6 +1275,498 @@ export function crearInscripcionesManager({ db, usuario = {}, onChange = null } 
     return true;
   }
 
+    /* =========================================================
+     SINCRONIZACIÓN NOMBRE NÓMINA PÚBLICA
+     
+     IMPORTANTE:
+     - SOLO corrige nombres y apellidos.
+     - NO modifica fecha de inscripción.
+     - NO modifica RUT.
+     - NO modifica correos.
+     - NO modifica teléfonos.
+     - NO modifica ficha médica.
+     - NO modifica estados.
+  ========================================================= */
+
+  function normalizarRutPublicoManager(
+    value = ""
+  ) {
+    return String(
+      value ||
+      ""
+    )
+      .toUpperCase()
+      .replace(/\./g, "")
+      .replace(/-/g, "")
+      .replace(/\s+/g, "")
+      .trim();
+  }
+
+  function normalizarNombrePublicoManager(
+    value = ""
+  ) {
+    return String(
+      value ||
+      ""
+    )
+      .normalize("NFD")
+      .replace(
+        /[\u0300-\u036f]/g,
+        ""
+      )
+      .replace(
+        /[\u200B-\u200D\uFEFF]/g,
+        ""
+      )
+      .replace(
+        /[^\p{L}\p{N}]+/gu,
+        " "
+      )
+      .toUpperCase()
+      .replace(/\s+/g, " ")
+      .trim();
+  }
+
+  function getRutPublicoManager(
+    item = {}
+  ) {
+    const identificacion =
+      item.identificacion ||
+      {};
+
+    const documentoPublico =
+      identificacion.documentoNormalizado ||
+      identificacion.rut ||
+      identificacion.rutCompleto ||
+      identificacion.documento ||
+      [
+        identificacion.rutNumero,
+        identificacion.rutDv
+      ]
+        .filter(Boolean)
+        .join("-") ||
+      item.documentoNormalizado ||
+      item.rut ||
+      item.documento ||
+      "";
+
+    return normalizarRutPublicoManager(
+      documentoPublico
+    );
+  }
+
+  function getPartesNombreManager(
+    item = {}
+  ) {
+    const identificacion =
+      item.identificacion ||
+      {};
+
+    const nombres =
+      texto(
+        identificacion.nombres ||
+        item.nombres ||
+        ""
+      );
+
+    const primerApellido =
+      texto(
+        identificacion.primerApellido ||
+        item.primerApellido ||
+        ""
+      );
+
+    const segundoApellido =
+      texto(
+        identificacion.segundoApellido ||
+        item.segundoApellido ||
+        ""
+      );
+
+    const nombreCompleto =
+      [
+        nombres,
+        primerApellido,
+        segundoApellido
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .trim();
+
+    return {
+      nombres,
+      primerApellido,
+      segundoApellido,
+      nombreCompleto
+    };
+  }
+
+  function getNombrePublicoManager(
+    item = {}
+  ) {
+    const identificacion =
+      item.identificacion ||
+      {};
+
+    return texto(
+      [
+        identificacion.nombres ||
+          item.nombres,
+        identificacion.primerApellido ||
+          item.primerApellido,
+        identificacion.segundoApellido ||
+          item.segundoApellido
+      ]
+        .filter(Boolean)
+        .join(" ") ||
+      identificacion.nombreCompleto ||
+      item.nombreCompleto ||
+      item.nombre ||
+      item.pasajero ||
+      ""
+    );
+  }
+
+  async function sincronizarNombreNominaPublica(
+    grupoCtx,
+    itemAnterior,
+    itemActualizado,
+    cambios = []
+  ) {
+    const cambioNombre =
+      cambios.some(
+        (cambio) =>
+          [
+            "identificacion.nombres",
+            "identificacion.primerApellido",
+            "identificacion.segundoApellido"
+          ].includes(
+            String(
+              cambio?.campo ||
+              ""
+            )
+          )
+      );
+
+    /*
+      Si no cambiaron nombres o apellidos,
+      NO consultamos ni tocamos la colección pública.
+    */
+    if (!cambioNombre) {
+      return {
+        estado:
+          "no_aplica"
+      };
+    }
+
+    const groupDocId =
+      String(
+        grupoCtx?.docId ||
+        ""
+      ).trim();
+
+    if (!groupDocId) {
+      return {
+        estado:
+          "sin_grupo"
+      };
+    }
+
+    const rutAnterior =
+      normalizarRutPublicoManager(
+        documento(
+          itemAnterior
+        )
+      );
+
+    const rutActual =
+      normalizarRutPublicoManager(
+        documento(
+          itemActualizado
+        )
+      );
+
+    const nombreAnterior =
+      normalizarNombrePublicoManager(
+        getNombrePasajeroManager(
+          itemAnterior
+        )
+      );
+
+    const partesNuevas =
+      getPartesNombreManager(
+        itemActualizado
+      );
+
+    const publicaSnap =
+      await getDocs(
+        query(
+          collection(
+            db,
+            "inscripciones_pendientes_publicas"
+          ),
+          where(
+            "idGrupo",
+            "==",
+            groupDocId
+          )
+        )
+      );
+
+    const candidatosActivos =
+      publicaSnap.docs
+        .map(
+          (documentoPublico) => ({
+            ref:
+              documentoPublico.ref,
+
+            id:
+              documentoPublico.id,
+
+            data:
+              documentoPublico.data() ||
+              {}
+          })
+        )
+        .filter(
+          (registro) => {
+            const estado =
+              normalizar(
+                registro.data?.estado ||
+                ""
+              );
+
+            const privacidad =
+              normalizar(
+                registro.data
+                  ?.payload
+                  ?.privacidad
+                  ?.estado ||
+                ""
+              );
+
+            return (
+              estado !==
+                "eliminada_logica" &&
+              privacidad !==
+                "eliminada_logica" &&
+              privacidad !==
+                "archivada"
+            );
+          }
+        );
+
+    /*
+      =====================================================
+      PRIMER CRITERIO: RUT
+
+      Usamos RUT solo para ENCONTRAR.
+      NO lo escribimos ni modificamos.
+      =====================================================
+    */
+    let coincidencias =
+      candidatosActivos.filter(
+        (registro) => {
+          const payload =
+            registro.data
+              ?.payload ||
+            {};
+
+          const rutPayload =
+            getRutPublicoManager(
+              payload
+            );
+          
+          const rutDocumentoPublico =
+            normalizarRutPublicoManager(
+              registro.id
+            );
+          
+          const rutsPublicos =
+            new Set(
+              [
+                rutPayload,
+                rutDocumentoPublico
+              ]
+                .filter(Boolean)
+            );
+          
+          return (
+            (
+              rutAnterior &&
+              rutsPublicos.has(
+                rutAnterior
+              )
+            ) ||
+            (
+              rutActual &&
+              rutsPublicos.has(
+                rutActual
+              )
+            )
+          );
+        }
+      );
+
+    /*
+      =====================================================
+      RESPALDO: NOMBRE ANTERIOR
+
+      Solo se usa cuando por RUT no encontramos nada.
+      =====================================================
+    */
+    if (
+      coincidencias.length ===
+        0 &&
+      nombreAnterior
+    ) {
+      coincidencias =
+        candidatosActivos.filter(
+          (registro) => {
+            const payload =
+              registro.data
+                ?.payload ||
+              {};
+
+            const nombrePublico =
+              normalizarNombrePublicoManager(
+                getNombrePublicoManager(
+                  payload
+                )
+              );
+
+            return (
+              nombrePublico &&
+              nombrePublico ===
+                nombreAnterior
+            );
+          }
+        );
+    }
+
+    /*
+      CERO candidatos:
+      no hacemos una actualización peligrosa.
+    */
+    if (
+      coincidencias.length ===
+      0
+    ) {
+      console.warn(
+        "[inscripciones-manager] No se encontró registro público para sincronizar nombre.",
+        {
+          groupDocId,
+          inscripcionId:
+            itemActualizado?.id ||
+            "",
+          rutAnterior,
+          rutActual,
+          nombreAnterior,
+          nombreNuevo:
+            partesNuevas
+              .nombreCompleto
+        }
+      );
+
+      return {
+        estado:
+          "no_encontrado"
+      };
+    }
+
+    /*
+      MÁS DE UNO:
+      tampoco modificamos automáticamente.
+    */
+    if (
+      coincidencias.length >
+      1
+    ) {
+      console.warn(
+        "[inscripciones-manager] Coincidencia pública ambigua. No se modificó nada.",
+        {
+          groupDocId,
+          inscripcionId:
+            itemActualizado?.id ||
+            "",
+          candidatos:
+            coincidencias.map(
+              (registro) =>
+                registro.id
+            )
+        }
+      );
+
+      return {
+        estado:
+          "ambiguo",
+
+        candidatos:
+          coincidencias.length
+      };
+    }
+
+    const registroPublico =
+      coincidencias[0];
+
+    /*
+      =====================================================
+      ÚNICA ESCRITURA PERMITIDA
+
+      SOLO:
+      - nombres
+      - primer apellido
+      - segundo apellido
+      - nombreCompleto
+
+      NO SE TOCA NADA MÁS.
+      =====================================================
+    */
+    await updateDoc(
+      registroPublico.ref,
+      {
+        "payload.identificacion.nombres":
+          partesNuevas.nombres,
+
+        "payload.identificacion.primerApellido":
+          partesNuevas.primerApellido,
+
+        "payload.identificacion.segundoApellido":
+          partesNuevas.segundoApellido,
+
+        "payload.identificacion.nombreCompleto":
+          partesNuevas.nombreCompleto
+      }
+    );
+
+    console.log(
+      "✅ [NÓMINA PÚBLICA] Nombre sincronizado",
+      {
+        groupDocId,
+        inscripcionId:
+          itemActualizado?.id ||
+          "",
+        idPublico:
+          registroPublico.id,
+        anterior:
+          getNombrePasajeroManager(
+            itemAnterior
+          ),
+        nuevo:
+          partesNuevas
+            .nombreCompleto
+      }
+    );
+
+    return {
+      estado:
+        "actualizado",
+
+      idPublico:
+        registroPublico.id
+    };
+  }
+
   async function actualizarDatosNomina(
     grupoCtx,
     inscripcionId,
@@ -1378,7 +1870,12 @@ export function crearInscripcionesManager({ db, usuario = {}, onChange = null } 
           true,
 
         cambios:
-          []
+          [],
+
+        sincronizacionPublica: {
+          estado:
+            "no_aplica"
+        }
       };
     }
 
@@ -1501,20 +1998,21 @@ export function crearInscripcionesManager({ db, usuario = {}, onChange = null } 
       );
 
     /*
-      ESTE ES EL GUARDADO SEGURO.
-
-      patch contiene exclusivamente rutas
-      específicas que realmente cambiaron.
+      1. GUARDAMOS PRIMERO LA FUENTE OFICIAL.
     */
     await updateDoc(
       inscripcionRef,
       patch
     );
 
+    /*
+      Reconstruimos localmente el objeto nuevo
+      para historial, alertas y sincronización pública.
+    */
     const itemActualizado = {
       ...item
     };
-    
+
     for (
       const [
         path,
@@ -1524,13 +2022,6 @@ export function crearInscripcionesManager({ db, usuario = {}, onChange = null } 
         patch
       )
     ) {
-      /*
-        Solo reconstruimos localmente rutas simples
-        para que historial y alerta utilicen los
-        valores nuevos.
-    
-        Esto NO escribe nuevamente en Firestore.
-      */
       if (
         path.includes(".") &&
         typeof value !==
@@ -1538,10 +2029,10 @@ export function crearInscripcionesManager({ db, usuario = {}, onChange = null } 
       ) {
         const partes =
           path.split(".");
-    
+
         let destino =
           itemActualizado;
-    
+
         for (
           let i = 0;
           i <
@@ -1550,24 +2041,64 @@ export function crearInscripcionesManager({ db, usuario = {}, onChange = null } 
         ) {
           const key =
             partes[i];
-    
+
           destino[key] = {
             ...(
               destino[key] ||
               {}
             )
           };
-    
+
           destino =
             destino[key];
         }
-    
+
         destino[
           partes[
             partes.length - 1
           ]
         ] =
           value;
+      }
+    }
+
+    /*
+      2. SI CAMBIÓ NOMBRE/APELLIDOS,
+         SINCRONIZAMOS SOLO EL NOMBRE PÚBLICO.
+
+      Si existe un problema de coincidencia,
+      la inscripción oficial YA quedó correctamente
+      guardada y devolvemos el estado para advertir
+      al usuario.
+    */
+    let sincronizacionPublica = {
+      estado:
+        "no_aplica"
+    };
+
+    if (cambiaNombre) {
+      try {
+        sincronizacionPublica =
+          await sincronizarNombreNominaPublica(
+            grupoCtx,
+            item,
+            itemActualizado,
+            cambios
+          );
+      } catch (error) {
+        console.error(
+          "[inscripciones-manager] Error sincronizando nombre público",
+          error
+        );
+
+        sincronizacionPublica = {
+          estado:
+            "error",
+
+          mensaje:
+            error?.message ||
+            "Error desconocido"
+        };
       }
     }
 
@@ -1624,7 +2155,12 @@ export function crearInscripcionesManager({ db, usuario = {}, onChange = null } 
           cambios.map(
             (item) =>
               item.campo
-          )
+          ),
+
+        sincronizacionPublica:
+          sincronizacionPublica
+            ?.estado ||
+          "no_aplica"
       }
     );
 
@@ -1635,7 +2171,9 @@ export function crearInscripcionesManager({ db, usuario = {}, onChange = null } 
       sinCambios:
         false,
 
-      cambios
+      cambios,
+
+      sincronizacionPublica
     };
   }
 
