@@ -16464,10 +16464,6 @@ async function (
         ""
       );
 
-    /*
-      Respaldo para registros antiguos
-      que no tengan los apellidos separados.
-    */
     const apellidosCompletos =
       cleanText(
         getInscripcionApellidos(
@@ -16592,7 +16588,7 @@ async function (
 
     /*
       Si ya está archivado/eliminado públicamente,
-      no necesitamos tocar su nombre.
+      no tocamos su nombre.
     */
     if (
       estadoPublico ===
@@ -16640,8 +16636,7 @@ async function (
 
     /*
       Si el RUT no permitió encontrarlo,
-      usamos nombre como respaldo únicamente
-      para saber si sigue existiendo.
+      usamos nombre como respaldo.
     */
     if (
       candidatos.length ===
@@ -16687,11 +16682,11 @@ async function (
       });
 
       /*
-        Mantenemos el comportamiento histórico:
-        si realmente no existe en oficial, en ejecución
-        real se elimina lógicamente.
+        En dryRun NO se modifica nada.
 
-        PERO en dryRun NO escribe nada.
+        En ejecución real conserva el comportamiento
+        anterior y marca el registro público como
+        eliminado lógico.
       */
       if (!dryRun) {
         await updateDoc(
@@ -16725,8 +16720,8 @@ async function (
     }
 
     /*
-      Si aparecen varios oficiales posibles,
-      NO tocamos nada.
+      Si aparecen varios candidatos,
+      no modificamos nada.
     */
     if (
       candidatos.length >
@@ -16906,24 +16901,11 @@ async function (
     resumen
   ]);
 
-  if (dryRun) {
-    alert(
-      `SIMULACIÓN TERMINADA\n\n` +
-      `Públicos revisados: ${revisados}\n` +
-      `Nombres distintos: ${nombresDiferentes}\n` +
-      `Sin coincidencia: ${sinCoincidencia}\n` +
-      `Ambiguos: ${ambiguos}\n\n` +
-      `NO se modificó Firebase.`
-    );
-  } else {
-    alert(
-      `SINCRONIZACIÓN TERMINADA\n\n` +
-      `Públicos revisados: ${revisados}\n` +
-      `Nombres reparados: ${nombresActualizados}\n` +
-      `Eliminados lógicos: ${eliminados}\n` +
-      `Ambiguos: ${ambiguos}`
-    );
-  }
+  /*
+    IMPORTANTE:
+    SIN ALERT().
+    Todo el resultado queda en consola.
+  */
 
   return {
     resumen,
