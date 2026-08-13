@@ -16931,6 +16931,297 @@ async function (
   };
 };
 
+/* =========================================================
+   REVISIÓN MASIVA NÓMINAS PÚBLICAS
+   GRUPOS GANADOS · AÑO VIAJE 2026
+
+   IMPORTANTE:
+   - dryRun:true NO modifica Firebase.
+   - Reutiliza sincronizarNominaPublicaConOficial().
+========================================================= */
+
+window.sincronizarNominasPublicasGanadas2026 =
+async function ({
+  dryRun = true
+} = {}) {
+  console.log(
+    dryRun
+      ? "🔎 [SYNC MASIVO] SIMULACIÓN · GANADAS 2026"
+      : "🛠️ [SYNC MASIVO] EJECUCIÓN REAL · GANADAS 2026"
+  );
+
+  /*
+    Buscamos exclusivamente:
+
+    estado = "Ganada"
+    anoViaje = 2026
+
+    anoViaje es número, NO string.
+  */
+  const gruposSnap =
+    await getDocs(
+      query(
+        collection(
+          db,
+          "ventas_cotizaciones"
+        ),
+        where(
+          "estado",
+          "==",
+          "Ganada"
+        ),
+        where(
+          "anoViaje",
+          "==",
+          2026
+        )
+      )
+    );
+
+  console.log(
+    `📦 Grupos encontrados: ${gruposSnap.docs.length}`
+  );
+
+  const resultados =
+    [];
+
+  for (
+    let index = 0;
+    index < gruposSnap.docs.length;
+    index += 1
+  ) {
+    const grupoDoc =
+      gruposSnap.docs[index];
+
+    const data =
+      grupoDoc.data() ||
+      {};
+
+    const nombreGrupo =
+      data.aliasGrupo ||
+      data.nombreGrupo ||
+      data.colegio ||
+      grupoDoc.id;
+
+    console.log(
+      `\n📋 [${index + 1}/${gruposSnap.docs.length}]`,
+      {
+        groupDocId:
+          grupoDoc.id,
+
+        idGrupo:
+          data.idGrupo ||
+          "",
+
+        numeroNegocio:
+          data.numeroNegocio ||
+          "",
+
+        grupo:
+          nombreGrupo
+      }
+    );
+
+    try {
+      const resultado =
+        await window
+          .sincronizarNominaPublicaConOficial(
+            grupoDoc.id,
+            {
+              dryRun
+            }
+          );
+
+      resultados.push({
+        groupDocId:
+          grupoDoc.id,
+
+        idGrupo:
+          data.idGrupo ||
+          "",
+
+        numeroNegocio:
+          data.numeroNegocio ||
+          "",
+
+        grupo:
+          nombreGrupo,
+
+        estado:
+          "OK",
+
+        publicosRevisados:
+          resultado
+            ?.resumen
+            ?.publicosRevisados ||
+          0,
+
+        nombresDiferentes:
+          resultado
+            ?.resumen
+            ?.nombresDiferentes ||
+          0,
+
+        nombresActualizados:
+          resultado
+            ?.resumen
+            ?.nombresActualizados ||
+          0,
+
+        sinCoincidencia:
+          resultado
+            ?.resumen
+            ?.sinCoincidencia ||
+          0,
+
+        ambiguos:
+          resultado
+            ?.resumen
+            ?.ambiguos ||
+          0
+      });
+    } catch (error) {
+      console.error(
+        "❌ [SYNC MASIVO] Error en grupo",
+        grupoDoc.id,
+        error
+      );
+
+      resultados.push({
+        groupDocId:
+          grupoDoc.id,
+
+        idGrupo:
+          data.idGrupo ||
+          "",
+
+        numeroNegocio:
+          data.numeroNegocio ||
+          "",
+
+        grupo:
+          nombreGrupo,
+
+        estado:
+          "ERROR",
+
+        error:
+          error?.message ||
+          "Error desconocido"
+      });
+    }
+  }
+
+  /*
+    =====================================================
+    RESUMEN GENERAL
+    =====================================================
+  */
+
+  const resumenGeneral = {
+    gruposRevisados:
+      resultados.length,
+
+    gruposConDiferencias:
+      resultados.filter(
+        (item) =>
+          Number(
+            item.nombresDiferentes ||
+            0
+          ) > 0
+      ).length,
+
+    totalNombresDiferentes:
+      resultados.reduce(
+        (total, item) =>
+          total +
+          Number(
+            item.nombresDiferentes ||
+            0
+          ),
+        0
+      ),
+
+    totalNombresActualizados:
+      resultados.reduce(
+        (total, item) =>
+          total +
+          Number(
+            item.nombresActualizados ||
+            0
+          ),
+        0
+      ),
+
+    totalSinCoincidencia:
+      resultados.reduce(
+        (total, item) =>
+          total +
+          Number(
+            item.sinCoincidencia ||
+            0
+          ),
+        0
+      ),
+
+    totalAmbiguos:
+      resultados.reduce(
+        (total, item) =>
+          total +
+          Number(
+            item.ambiguos ||
+            0
+          ),
+        0
+      ),
+
+    errores:
+      resultados.filter(
+        (item) =>
+          item.estado ===
+          "ERROR"
+      ).length
+  };
+
+  console.log(
+    "\n🏁 [SYNC MASIVO 2026] PROCESO TERMINADO"
+  );
+
+  console.log(
+    "\n📋 RESULTADO POR GRUPO"
+  );
+
+  console.table(
+    resultados
+  );
+
+  console.log(
+    "\n📊 RESUMEN GENERAL"
+  );
+
+  console.table([
+    resumenGeneral
+  ]);
+
+  if (dryRun) {
+    console.warn(
+      "⚠️ SIMULACIÓN: NO SE MODIFICÓ FIREBASE."
+    );
+  } else {
+    console.warn(
+      "✅ EJECUCIÓN REAL: se aplicaron las reparaciones detectadas."
+    );
+  }
+
+  return {
+    resumen:
+      resumenGeneral,
+
+    grupos:
+      resultados
+  };
+};
+
 function normalizarRutKeyGrupo(value = "") {
   return String(value || "")
     .toUpperCase()
