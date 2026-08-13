@@ -7094,6 +7094,31 @@ async function guardarEditorNomina() {
     */
     renderPasajeros();
 
+    const estadoPublico =
+      resultado
+        ?.sincronizacionPublica
+        ?.estado ||
+      "no_aplica";
+
+    if (
+      [
+        "error",
+        "no_encontrado",
+        "ambiguo"
+      ].includes(
+        estadoPublico
+      )
+    ) {
+      alert(
+        "Los datos oficiales fueron actualizados correctamente.\n\n" +
+        "ATENCIÓN: no fue posible sincronizar automáticamente el nombre de la nómina pública.\n\n" +
+        `Estado: ${estadoPublico}\n\n` +
+        "La inscripción oficial está guardada. Revisa la sincronización pública del grupo."
+      );
+
+      return;
+    }
+
     alert(
       "Datos de nómina actualizados correctamente."
     );
