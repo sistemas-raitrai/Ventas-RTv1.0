@@ -18019,6 +18019,19 @@ async function ({
 function normalizarRutKeyGrupo(value = "") {
   return String(value || "")
     .toUpperCase()
+    .trim()
+
+    /*
+      Compatibilidad con IDs/documentos públicos:
+      RUT_23008922-1
+      RUT-23008922-1
+      RUT 23008922-1
+    */
+    .replace(/^RUT[_\-\s]*/i, "")
+
+    /*
+      Dejamos solamente cuerpo + DV.
+    */
     .replace(/\./g, "")
     .replace(/-/g, "")
     .replace(/\s+/g, "")
