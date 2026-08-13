@@ -1839,11 +1839,6 @@ function bloquearDatosRecuperadosSistema(
   );
 
   bloquearCampoExistente(
-    "fechaNacimiento",
-    identificacion.fechaNacimiento
-  );
-
-  bloquearCampoExistente(
     "genero",
     identificacion.genero ||
     identificacion.generoFinal
@@ -2102,11 +2097,6 @@ function detectarCambiosIdentidadPrecargada() {
   revisar(
     "segundoApellido",
     "Segundo apellido"
-  );
-
-  revisar(
-    "fechaNacimiento",
-    "Fecha de nacimiento"
   );
 
   revisar(
@@ -2630,8 +2620,7 @@ async function onSubmit(event) {
         de la persona que viaja.
         <br><br>
 
-        Revise especialmente nombres, apellidos, fecha de nacimiento,
-        género y nacionalidad.
+        Revise especialmente nombres, apellidos, género y nacionalidad.
         <br><br>
 
         Cuando confirme que la información es correcta,
