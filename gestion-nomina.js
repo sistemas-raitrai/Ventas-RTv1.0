@@ -1519,6 +1519,13 @@ function mapRow(
     total:
       totalViajan,
 
+    cuposReservados:
+      Number(
+        data.totalCuposReservadosPendientes ??
+        data.totalCuposReservados ??
+        0
+      ),
+
     totalRegistros:
       Number(
         data.totalRegistros ??
@@ -2187,8 +2194,35 @@ function renderRows() {
                 ${Number(
                   row.total ||
                   0
-                )}
+                )} viajan
               </strong>
+            
+              ${
+                Number(
+                  row.cuposReservados ||
+                  0
+                ) > 0
+                  ? `
+                    <div class="gn-sub">
+                      ${Number(
+                        row.cuposReservados
+                      )} cupo${
+                        Number(
+                          row.cuposReservados
+                        ) === 1
+                          ? ""
+                          : "s"
+                      } reservado${
+                        Number(
+                          row.cuposReservados
+                        ) === 1
+                          ? ""
+                          : "s"
+                      }
+                    </div>
+                  `
+                  : ""
+              }
             </td>
 
             <td>
@@ -3153,6 +3187,18 @@ function renderFase(
 function getTipoRealNomina(
   item = {}
 ) {
+  /*
+    El cupo reservado tiene prioridad
+    sobre cualquier tipo heredado.
+  */
+  if (
+    esCupoReservadoNomina(
+      item
+    )
+  ) {
+    return "cupo_reservado";
+  }
+
   const raw =
     item.tipoInscripcion ||
     item.estadoInscripcion ||
@@ -3160,7 +3206,9 @@ function getTipoRealNomina(
     "";
 
   const key =
-    normalizar(raw)
+    normalizar(
+      raw
+    )
       .replace(
         /\s+/g,
         "_"
@@ -3194,8 +3242,10 @@ function getTipoRealNomina(
     return "liberado";
   }
 
-  return key ||
-    "nomina_inicial";
+  return (
+    key ||
+    "nomina_inicial"
+  );
 }
 
 function getEstadoCupoNomina(
@@ -3229,9 +3279,130 @@ function fichaCompletaNomina(
     );
 }
 
+/* =========================================================
+   CUPOS RESERVADOS
+
+   REGLAS:
+
+   - Representan un lugar que VIAJA.
+   - Todavía NO representan una persona individualizada.
+   - NO tienen ficha médica pendiente.
+   - NO tienen carnet pendiente.
+   - NO deben abrir ficha individual.
+========================================================= */
+
+function esCupoReservadoNomina(
+  item = {}
+) {
+  const tipoRegistro =
+    normalizar(
+      item.tipoRegistro ||
+      ""
+    )
+      .replace(
+        /\s+/g,
+        "_"
+      );
+
+  const tipoInscripcion =
+    normalizar(
+      item.tipoInscripcion ||
+      item.estadoInscripcion ||
+      ""
+    )
+      .replace(
+        /\s+/g,
+        "_"
+      );
+
+  return (
+    item.esCupoReservado ===
+      true ||
+    tipoRegistro ===
+      "cupo_reservado" ||
+    tipoInscripcion ===
+      "cupo_reservado"
+  );
+}
+
+
+function esCupoReservadoPendienteNomina(
+  item = {}
+) {
+  if (
+    !esCupoReservadoNomina(
+      item
+    )
+  ) {
+    return false;
+  }
+
+  const estado =
+    normalizar(
+      item.estadoCupoReservado ||
+      item.cupoReservado?.estado ||
+      item.estadoCupo ||
+      ""
+    )
+      .replace(
+        /\s+/g,
+        "_"
+      );
+
+  /*
+    Mientras los primeros documentos no tengan
+    estado explícito, se consideran pendientes.
+  */
+  if (!estado) {
+    return true;
+  }
+
+  return ![
+    "consumido",
+    "anulado",
+    "eliminado",
+    "cerrado"
+  ].includes(
+    estado
+  );
+}
+
 function getCategoriaOperativa(
   item = {}
 ) {
+  /*
+    =====================================================
+    1. CUPOS RESERVADOS
+    =====================================================
+  */
+
+  if (
+    esCupoReservadoPendienteNomina(
+      item
+    )
+  ) {
+    return "cupo_reservado";
+  }
+
+  /*
+    Un cupo ya consumido no vuelve a contar
+    como viajero. El pasajero liberado será
+    quien ocupe ese lugar.
+  */
+  if (
+    esCupoReservadoNomina(
+      item
+    )
+  ) {
+    return "cupo_reservado_consumido";
+  }
+
+  /*
+    =====================================================
+    2. ANULADOS
+    =====================================================
+  */
+
   if (
     estaAnuladoNomina(
       item
@@ -3347,29 +3518,43 @@ const ORDEN_CATEGORIAS_NOMINA = {
   liberado:
     3,
 
-  nomina_base_completa:
+  /*
+    Cupos reservados que todavía esperan
+    a un liberado real.
+  */
+  cupo_reservado:
     4,
 
-  nomina_base_pendiente:
+  nomina_base_completa:
     5,
 
-  sistema_completo:
+  nomina_base_pendiente:
     6,
 
-  sistema_pendiente:
+  sistema_completo:
     7,
 
-  nuevo_pendiente:
+  sistema_pendiente:
     8,
 
-  lista_pagada:
+  nuevo_pendiente:
     9,
 
-  lista_pendiente:
+  lista_pagada:
     10,
+
+  lista_pendiente:
+    11,
 
   otro:
     90,
+
+  /*
+    Conservamos los consumidos abajo
+    por trazabilidad.
+  */
+  cupo_reservado_consumido:
+    900,
 
   anulado:
     1000
@@ -3462,6 +3647,14 @@ function esViajaConfirmado(
     "lista_confirmada",
     "nuevo_confirmado",
     "liberado",
+
+    /*
+      IMPORTANTE:
+      el cupo todavía no tiene persona,
+      pero físicamente ese lugar VIAJA.
+    */
+    "cupo_reservado",
+
     "nomina_base_completa",
     "nomina_base_pendiente",
     "sistema_completo",
@@ -3491,10 +3684,19 @@ function getResumenOperativoNomina() {
   const items =
     state.nomina;
 
-  const activos =
+  /*
+    PERSONAS REALES ACTIVAS.
+
+    Excluimos los placeholders
+    de cupos reservados.
+  */
+  const activosPersonas =
     items.filter(
       (item) =>
         !estaAnuladoNomina(
+          item
+        ) &&
+        !esCupoReservadoNomina(
           item
         )
     );
@@ -3509,14 +3711,30 @@ function getResumenOperativoNomina() {
           categoria
       ).length;
 
+  const cuposReservados =
+    countCategoria(
+      "cupo_reservado"
+    );
+
   return {
+    /*
+      Documentos existentes.
+    */
     total:
       items.length,
 
+    /*
+      EL NÚMERO PRINCIPAL.
+
+      Incluye personas que viajan
+      + cupos todavía reservados.
+    */
     viajan:
       items.filter(
         esViajaConfirmado
       ).length,
+
+    cuposReservados,
 
     gestion:
       items.filter(
@@ -3528,16 +3746,24 @@ function getResumenOperativoNomina() {
         "anulado"
       ),
 
+    /*
+      Un cupo reservado NO puede tener
+      ficha médica pendiente.
+    */
     fichaPendiente:
-      activos.filter(
+      activosPersonas.filter(
         (item) =>
           !fichaCompletaNomina(
             item
           )
       ).length,
 
+    /*
+      Tampoco puede contarse como
+      pasajero sin carnet.
+    */
     sinCarnet:
-      activos.filter(
+      activosPersonas.filter(
         (item) =>
           !camposPasajero
             .tieneCarnet(
@@ -3597,6 +3823,9 @@ function renderKpisModal() {
 
     kViajan:
       resumen.viajan,
+
+    kCuposReservados:
+      resumen.cuposReservados,
 
     kGestion:
       resumen.gestion,
@@ -3724,6 +3953,9 @@ function getFiltroNominaLabel(
     viajan:
       "Mostrando pasajeros que viajan",
 
+    cupos_reservados:
+      "Mostrando cupos reservados pendientes de liberado",
+
     gestion:
       "Mostrando pendientes de gestión",
 
@@ -3790,6 +4022,15 @@ function filtrarNominaModal(
 
   if (
     filtro ===
+    "cupos_reservados"
+  ) {
+    return items.filter(
+      esCupoReservadoPendienteNomina
+    );
+  }
+
+  if (
+    filtro ===
     "gestion"
   ) {
     return items.filter(
@@ -3849,6 +4090,31 @@ function filtrarNominaModal(
 function getSeccionNomina(
   item = {}
 ) {
+  /*
+    Cupo reservado pendiente forma parte
+    de la nómina que VIAJA.
+  */
+  if (
+    esCupoReservadoPendienteNomina(
+      item
+    )
+  ) {
+    return "viajan";
+  }
+
+  /*
+    Los consumidos quedan solo como
+    trazabilidad y no representan
+    viajeros adicionales.
+  */
+  if (
+    esCupoReservadoNomina(
+      item
+    )
+  ) {
+    return "otros";
+  }
+
   if (
     estaAnuladoNomina(
       item
@@ -3885,6 +4151,13 @@ function getSeccionNominaLabel(
     return "PENDIENTES DE GESTIÓN";
   }
 
+  if (
+    seccion ===
+    "otros"
+  ) {
+    return "REGISTROS DE TRAZABILIDAD";
+  }
+
   return "ANULADOS / NO VIAJAN";
 }
 
@@ -3897,6 +4170,12 @@ function getEstadoOperativoLabel(
     );
 
   const labels = {
+    cupo_reservado:
+      "Cupo reservado · Liberado pendiente",
+    
+    cupo_reservado_consumido:
+      "Cupo reservado · Consumido",
+    
     lista_confirmada:
       "Lista de espera confirmada",
 
@@ -3956,6 +4235,12 @@ function getTipoVisibleNomina(
   }
 
   const labels = {
+    cupo_reservado:
+      "Cupo reservado",
+    
+    cupo_reservado_consumido:
+      "Cupo reservado",
+    
     lista_confirmada:
       "Lista de espera",
 
@@ -4337,6 +4622,30 @@ function getOrdenNominaOperativa(
     return 1000;
   }
 
+  /*
+    Cupo reservado pendiente:
+    está dentro de quienes VIAJAN.
+  */
+  if (
+    esCupoReservadoPendienteNomina(
+      item
+    )
+  ) {
+    return 60;
+  }
+
+  /*
+    Cupo ya consumido:
+    solo trazabilidad.
+  */
+  if (
+    esCupoReservadoNomina(
+      item
+    )
+  ) {
+    return 900;
+  }
+
   const tipo =
     normalizar(
       item.tipoInscripcion ||
@@ -4398,7 +4707,7 @@ function getOrdenNominaOperativa(
   }
 
   /*
-    2º Personas ya confirmadas que viajan.
+    2º Personas confirmadas.
   */
   if (
     tipo ===
@@ -4432,17 +4741,11 @@ function getOrdenNominaOperativa(
     tipo ===
       "cupo_liberado"
   ) {
-    return 60;
+    return 55;
   }
 
   /*
-    3º Nómina que viaja.
-
-    Primero quienes YA tienen
-    ficha médica completa.
-
-    Después quienes todavía
-    tienen ficha pendiente.
+    3º Nómina base que viaja.
   */
   if (
     [
@@ -4684,6 +4987,16 @@ function renderPasajeros() {
               item
             );
 
+          const esReserva =
+            esCupoReservadoNomina(
+              item
+            );
+
+          const esReservaPendiente =
+            esCupoReservadoPendienteNomina(
+              item
+            );
+
           return `
             ${separador}
 
@@ -4709,41 +5022,63 @@ function renderPasajeros() {
               )}"
             >
               <td>
-                <button
-                  type="button"
-                  class="rut-viewer-link"
-                  data-ver-ficha-inscripcion="${esc(
-                    item.id ||
-                    ""
-                  )}"
-                  title="Abrir ficha individual"
-                >
-                  ${esc(
-                    camposPasajero.documento(
-                      item
-                    ) ||
-                    "—"
-                  )}
-                </button>
+                ${
+                  esReserva
+                    ? `
+                      <strong>
+                        — SIN RUT —
+                      </strong>
+                    `
+                    : `
+                      <button
+                        type="button"
+                        class="rut-viewer-link"
+                        data-ver-ficha-inscripcion="${esc(
+                          item.id ||
+                          ""
+                        )}"
+                        title="Abrir ficha individual"
+                      >
+                        ${esc(
+                          camposPasajero.documento(
+                            item
+                          ) ||
+                          "—"
+                        )}
+                      </button>
+                    `
+                }
               </td>
 
               <td>
                 ${esc(
-                  camposPasajero.nombres(
-                    item
-                  ) ||
-                  "—"
+                  esReserva
+                    ? "CUPO RESERVADO"
+                    : (
+                        camposPasajero.nombres(
+                          item
+                        ) ||
+                        "—"
+                      )
                 )}
               </td>
 
               <td>
                 ${esc(
-                  camposPasajero.apellidos(
-                    item
-                  ) ||
-                  "—"
+                  esReservaPendiente
+                    ? "LIBERADO PENDIENTE"
+                    : (
+                        esReserva
+                          ? "CONSUMIDO"
+                          : (
+                              camposPasajero.apellidos(
+                                item
+                              ) ||
+                              "—"
+                            )
+                      )
                 )}
-              </td>
+</td>
 
               <td>
                 <span class="nomina-type-pill">
@@ -4766,23 +5101,33 @@ function renderPasajeros() {
               </td>
 
               <td>
-                <span
-                  class="badge ${
-                    fichaCompletaNomina(
-                      item
-                    )
-                      ? "ok"
-                      : "warn"
-                  }"
-                >
-                  ${
-                    fichaCompletaNomina(
-                      item
-                    )
-                      ? "Completa"
-                      : "Pendiente"
-                  }
-                </span>
+                ${
+                  esReserva
+                    ? `
+                      <span class="badge muted">
+                        No aplica
+                      </span>
+                    `
+                    : `
+                      <span
+                        class="badge ${
+                          fichaCompletaNomina(
+                            item
+                          )
+                            ? "ok"
+                            : "warn"
+                        }"
+                      >
+                        ${
+                          fichaCompletaNomina(
+                            item
+                          )
+                            ? "Completa"
+                            : "Pendiente"
+                        }
+                      </span>
+                    `
+                }
               </td>
 
               <td>
@@ -4811,11 +5156,15 @@ function renderPasajeros() {
 
               <td>
                 ${
-                  camposPasajero.tieneCarnet(
-                    item
-                  )
-                    ? "Sí"
-                    : "No"
+                  esReserva
+                    ? "No aplica"
+                    : (
+                        camposPasajero.tieneCarnet(
+                          item
+                        )
+                          ? "Sí"
+                          : "No"
+                      )
                 }
               </td>
 
@@ -5048,6 +5397,27 @@ function getAccionOperativaHtml(
     getCategoriaOperativa(
       item
     );
+  /*
+    Un cupo reservado todavía no es una persona.
+    No puede editarse como pasajero.
+  */
+  if (
+    esCupoReservadoNomina(
+      item
+    )
+  ) {
+    return `
+      <span class="badge muted">
+        ${
+          esCupoReservadoPendienteNomina(
+            item
+          )
+            ? "Esperando liberado"
+            : "Cupo consumido"
+        }
+      </span>
+    `;
+  }
 
   /*
     =====================================================
