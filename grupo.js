@@ -8152,7 +8152,7 @@ window.recuperarInscripcionPublicaFallida = async function ({
     }
 
     // =====================================================================
-    // 4. OBTENER DOCUMENTO NORMALIZADO
+    // 4. OBTENER IDENTIFICADOR DE LA INSCRIPCIÓN
     // =====================================================================
 
     const inscripcionId =
@@ -8190,7 +8190,7 @@ window.recuperarInscripcionPublicaFallida = async function ({
     }
 
     // =====================================================================
-    // 5. VERIFICAR QUE NO EXISTA YA LA INSCRIPCIÓN FINAL
+    // 5. REVISAR SI LA INSCRIPCIÓN YA EXISTE
     // =====================================================================
 
     const inscripcionRef = doc(
@@ -8206,32 +8206,95 @@ window.recuperarInscripcionPublicaFallida = async function ({
         inscripcionRef
       );
 
+    let inscripcionActual = null;
+    let existeInscripcion = false;
+    let estaAnulada = false;
+
     if (inscripcionSnap.exists()) {
+      existeInscripcion = true;
+
+      inscripcionActual = {
+        id: inscripcionSnap.id,
+        ...inscripcionSnap.data()
+      };
+
+      estaAnulada =
+        estaInscripcionAnulada(
+          inscripcionActual
+        );
+    }
+
+    // =====================================================================
+    // 6. DETERMINAR SI EL CASO PUEDE SER REPROCESADO
+    // =====================================================================
+
+    const faseNormalizada =
+      normalizeSearchLocal(
+        fase
+      );
+
+    const esFaseReingreso =
+      faseNormalizada === "lista_espera" ||
+      faseNormalizada === "nuevos";
+
+    /*
+      REGLA:
+
+      - Si NO existe inscripción → se puede reprocesar.
+      - Si existe y está ANULADA + es Lista de Espera/Nuevos → se puede reprocesar.
+      - Si existe y está ACTIVA → bloquear.
+    */
+
+    const puedeReprocesar =
+      !existeInscripcion ||
+      (
+        existeInscripcion &&
+        estaAnulada &&
+        esFaseReingreso
+      );
+
+    if (!puedeReprocesar) {
       console.warn(
-        "[RECUPERACIÓN INSCRIPCIÓN] La inscripción ya existe. No se crea un nuevo pendiente.",
+        "[RECUPERACIÓN INSCRIPCIÓN] La inscripción ya existe y está activa. No se crea un nuevo pendiente.",
         {
           idGrupo:
             idGrupoPendiente,
+
           inscripcionId,
+
           nombre,
-          documento
+
+          documento,
+
+          fase,
+
+          estaAnulada
         }
       );
 
       return {
         ok: false,
+
         motivo:
-          "inscripcion_ya_existe",
+          "inscripcion_ya_existe_activa",
+
         idGrupo:
           idGrupoPendiente,
+
         inscripcionId,
+
         nombre,
-        documento
+
+        documento,
+
+        fase,
+
+        estaAnulada
       };
     }
 
     // =====================================================================
-    // 6. MOSTRAR RESUMEN ANTES DE REPROCESAR
+    // 7. MOSTRAR DIAGNÓSTICO
     // =====================================================================
 
     console.table([
@@ -8250,21 +8313,71 @@ window.recuperarInscripcionPublicaFallida = async function ({
 
         nombre,
 
+        existeAnterior:
+          existeInscripcion,
+
+        anuladaAnterior:
+          estaAnulada,
+
+        tipoAnterior:
+          inscripcionActual
+            ?.tipoInscripcion ||
+          "",
+
+        estadoViajeAnterior:
+          inscripcionActual
+            ?.estadoViaje ||
+          inscripcionActual
+            ?.sistemaPagos
+            ?.estadoViaje ||
+          "",
+
         errorAnterior:
           pendiente.error || ""
       }
     ]);
 
+    // =====================================================================
+    // 8. CONFIRMACIÓN
+    // =====================================================================
+
     if (confirmar) {
+      const detalleAnterior =
+        existeInscripcion
+          ? (
+              `\nREGISTRO ANTERIOR ENCONTRADO\n` +
+              `Tipo anterior: ${
+                inscripcionActual?.tipoInscripcion ||
+                "(sin tipo)"
+              }\n` +
+              `Estado anterior: ${
+                inscripcionActual?.estadoViaje ||
+                inscripcionActual?.sistemaPagos?.estadoViaje ||
+                "(sin estado)"
+              }\n` +
+              `Anulada: ${
+                estaAnulada ? "SÍ" : "NO"
+              }\n`
+            )
+          : (
+              "\nNo existe una inscripción anterior.\n"
+            );
+
       const ok = window.confirm(
         `RECUPERAR INSCRIPCIÓN FALLIDA\n\n` +
         `Grupo: ${idGrupoPendiente}\n` +
         `Fase: ${fase}\n` +
         `Pasajero: ${nombre || "(sin nombre)"}\n` +
-        `Documento: ${documento || inscripcionId}\n\n` +
+        `Documento: ${documento || inscripcionId}\n` +
+        `${detalleAnterior}\n` +
         `Error anterior:\n${pendiente.error || "(sin detalle)"}\n\n` +
-        `Se creará un NUEVO documento pendiente para que la Cloud Function procese nuevamente la inscripción.\n\n` +
-        `El documento original NO será eliminado ni modificado.\n\n` +
+        `Se creará un NUEVO documento pendiente para que la Cloud Function procese nuevamente el formulario original.\n\n` +
+        (
+          existeInscripcion && estaAnulada
+            ? `El registro anterior está ANULADO y será recuperado por el flujo normal de ${fase === "lista_espera" ? "Lista de Espera" : "Nuevo Ingreso"}.\n\n`
+            : ""
+        ) +
+        `El documento pendiente original NO será eliminado.\n\n` +
         `¿Continuar?`
       );
 
@@ -8278,11 +8391,10 @@ window.recuperarInscripcionPublicaFallida = async function ({
     }
 
     // =====================================================================
-    // 7. CREAR NUEVO PENDIENTE
+    // 9. CREAR NUEVO PENDIENTE
     //
-    // IMPORTANTE:
-    // guardarInscripcionPublica usa onDocumentCreated.
-    // Por eso hay que crear un documento NUEVO.
+    // guardarInscripcionPublica utiliza onDocumentCreated.
+    // Debe crearse un documento NUEVO.
     // =====================================================================
 
     const nuevoRef =
@@ -8324,6 +8436,29 @@ window.recuperarInscripcionPublicaFallida = async function ({
             errorOriginalEn:
               pendiente.errorEn || null,
 
+            existiaInscripcionAnterior:
+              existeInscripcion,
+
+            inscripcionAnteriorAnulada:
+              estaAnulada,
+
+            tipoInscripcionAnterior:
+              cleanText(
+                inscripcionActual
+                  ?.tipoInscripcion ||
+                ""
+              ),
+
+            estadoViajeAnterior:
+              cleanText(
+                inscripcionActual
+                  ?.estadoViaje ||
+                inscripcionActual
+                  ?.sistemaPagos
+                  ?.estadoViaje ||
+                ""
+              ),
+
             recuperadoPor:
               getDisplayName(
                 state.effectiveUser
@@ -8339,7 +8474,7 @@ window.recuperarInscripcionPublicaFallida = async function ({
       );
 
     // =====================================================================
-    // 8. HISTORIAL DEL GRUPO
+    // 10. HISTORIAL
     // =====================================================================
 
     await createHistoryEntry({
@@ -8353,7 +8488,9 @@ window.recuperarInscripcionPublicaFallida = async function ({
         "Inscripción pública recuperada",
 
       mensaje:
-        `${getDisplayName(state.effectiveUser)} reenvió para procesamiento una inscripción pública que había quedado con error: ${nombre || documento || inscripcionId}.`,
+        existeInscripcion && estaAnulada
+          ? `${getDisplayName(state.effectiveUser)} reenvió para procesamiento una inscripción pública fallida de ${nombre || documento || inscripcionId}. El pasajero tenía un registro anterior anulado y será procesado nuevamente mediante ${fase === "lista_espera" ? "Lista de Espera" : "Nuevo Ingreso"}.`
+          : `${getDisplayName(state.effectiveUser)} reenvió para procesamiento una inscripción pública que había quedado con error: ${nombre || documento || inscripcionId}.`,
 
       metadata: {
         pendienteOriginalId:
@@ -8374,7 +8511,26 @@ window.recuperarInscripcionPublicaFallida = async function ({
         nombre,
 
         errorOriginal:
-          pendiente.error || ""
+          pendiente.error || "",
+
+        existiaInscripcionAnterior:
+          existeInscripcion,
+
+        inscripcionAnteriorAnulada:
+          estaAnulada,
+
+        tipoInscripcionAnterior:
+          inscripcionActual
+            ?.tipoInscripcion ||
+          "",
+
+        estadoViajeAnterior:
+          inscripcionActual
+            ?.estadoViaje ||
+          inscripcionActual
+            ?.sistemaPagos
+            ?.estadoViaje ||
+          ""
       }
     });
 
@@ -8396,12 +8552,18 @@ window.recuperarInscripcionPublicaFallida = async function ({
 
         documento,
 
-        nombre
+        nombre,
+
+        existiaInscripcionAnterior:
+          existeInscripcion,
+
+        inscripcionAnteriorAnulada:
+          estaAnulada
       }
     );
 
     console.log(
-      "⏳ La Cloud Function guardarInscripcionPublica debe procesar ahora el nuevo documento."
+      "⏳ La Cloud Function guardarInscripcionPublica procesará ahora el nuevo documento."
     );
 
     return {
@@ -8422,7 +8584,13 @@ window.recuperarInscripcionPublicaFallida = async function ({
 
       documento,
 
-      nombre
+      nombre,
+
+      existiaInscripcionAnterior:
+        existeInscripcion,
+
+      inscripcionAnteriorAnulada:
+        estaAnulada
     };
 
   } catch (error) {
