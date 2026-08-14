@@ -520,7 +520,7 @@
     .kpi-grid.general {
       grid-template-columns:
         repeat(
-          6,
+          7,
           minmax(0, 1fr)
         );
     }
@@ -753,6 +753,17 @@
 
     .nomina-row-liberado td {
       background: #eafaf0;
+    }
+
+    .nomina-row-cupo_reservado td {
+      background: #eee8f7;
+    }
+    
+    .nomina-row-cupo_reservado .nomina-type-pill {
+      background: #e2d5ef;
+      border-color: #bda6d2;
+      color: #4a2570;
+      font-weight: 900;
     }
 
     .nomina-row-nomina_base_completa td {
@@ -1431,15 +1442,15 @@
       
         <div class="summary-card">
           <span>
-            Pasajeros
+            Viajan
           </span>
-      
+          
           <strong id="sumPax">
             0
           </strong>
-      
+          
           <small>
-            Total visible
+            Total que viaja
           </small>
         </div>
       
@@ -1889,6 +1900,24 @@
                 <strong id="kViajan">
                   0
                 </strong>
+              </button>
+
+              <button
+                class="kpi"
+                type="button"
+                data-nomina-filtro="cupos_reservados"
+              >
+                <span>
+                  Cupos reservados
+                </span>
+              
+                <strong id="kCuposReservados">
+                  0
+                </strong>
+              
+                <small class="kpi-help">
+                  Viajan, pero aún no tienen pasajero individualizado.
+                </small>
               </button>
         
               <button
