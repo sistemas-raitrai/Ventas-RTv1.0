@@ -8676,6 +8676,226 @@ window.reenviarCorreoTransferenciaListaEspera = async function ({ rut = "", insc
   return ref.id;
 };
 
+window.reenviarCorreoNuevoIngresoRaiTrai = async function ({
+  rut = "",
+  inscripcionId = ""
+} = {}) {
+  const textoRut =
+    normalizeSearchLocal(
+      rut || ""
+    );
+
+  const textoId =
+    cleanText(
+      inscripcionId || ""
+    );
+
+  // =========================================================
+  // BUSCAR INSCRIPCIÓN
+  // =========================================================
+
+  const item =
+    state.inscripciones.find(
+      (x) => {
+        if (
+          textoId &&
+          x.id === textoId
+        ) {
+          return true;
+        }
+
+        const docu =
+          normalizeSearchLocal(
+            getInscripcionDocumento(x)
+          );
+
+        return (
+          textoRut &&
+          docu.includes(
+            textoRut
+              .replace(/\./g, "")
+              .replace(/-/g, "")
+          )
+        );
+      }
+    );
+
+  if (!item) {
+    console.warn(
+      "No se encontró inscripción para reenviar Nuevo Ingreso."
+    );
+
+    return null;
+  }
+
+  // =========================================================
+  // CARGAR FICHA COMPLETA
+  //
+  // Necesitamos archivosEspeciales para adjuntar los carnets.
+  // =========================================================
+
+  const itemCompleto =
+    await obtenerInscripcionCompleta(
+      item.id
+    );
+
+  if (!itemCompleto) {
+    console.warn(
+      "No se pudo cargar la inscripción completa de Nuevo Ingreso."
+    );
+
+    return null;
+  }
+
+  // =========================================================
+  // VALIDAR TIPO
+  // =========================================================
+
+  const tipo =
+    normalizeSearchLocal(
+      getInscripcionTipoReal(
+        itemCompleto
+      )
+    );
+
+  if (
+    tipo !== "nuevo_ingreso"
+  ) {
+    console.warn(
+      "Esta función solo aplica a inscripciones de Nuevo Ingreso.",
+      {
+        tipoEncontrado:
+          tipo
+      }
+    );
+
+    return null;
+  }
+
+  // =========================================================
+  // CREAR CORREO PENDIENTE
+  // =========================================================
+
+  const ref =
+    await addDoc(
+      collection(
+        db,
+        "correos_inscripcion_pendientes"
+      ),
+      {
+        tipoEnvio:
+          "solo_raitrai_nuevo_ingreso",
+
+        origen:
+          "consola_grupo_js",
+
+        estado:
+          "pendiente",
+
+        destinatario:
+          "raitrai@raitrai.cl",
+
+        payload:
+          itemCompleto,
+
+        idGrupo:
+          String(
+            state.groupId || ""
+          ),
+
+        groupDocId:
+          String(
+            state.groupDocId || ""
+          ),
+
+        inscripcionId:
+          String(
+            item.id || ""
+          ),
+
+        documento:
+          getInscripcionDocumento(
+            itemCompleto
+          ),
+
+        nombreParticipante:
+          buildNombreCompletoInscripcion(
+            itemCompleto
+          ),
+
+        creadoPor:
+          getDisplayName(
+            state.effectiveUser
+          ),
+
+        creadoPorCorreo:
+          state.effectiveEmail,
+
+        creadoAt:
+          serverTimestamp()
+      }
+    );
+
+  // =========================================================
+  // HISTORIAL
+  // =========================================================
+
+  await createHistoryEntry({
+    tipoMovimiento:
+      "reenvio_interno_nuevo_ingreso",
+
+    modulo:
+      "inscripcion",
+
+    titulo:
+      "Reenvío interno Nuevo Ingreso",
+
+    mensaje:
+      `${getDisplayName(state.effectiveUser)} reenvió a raitrai@raitrai.cl el correo interno de Nuevo Ingreso de ${
+        buildNombreCompletoInscripcion(
+          itemCompleto
+        ) ||
+        "una inscripción"
+      }.`,
+
+    metadata: {
+      inscripcionId:
+        item.id,
+
+      documento:
+        getInscripcionDocumento(
+          itemCompleto
+        ),
+
+      correoDestino:
+        "raitrai@raitrai.cl"
+    }
+  });
+
+  console.log(
+    "✅ Reenvío Nuevo Ingreso generado:",
+    {
+      correoId:
+        ref.id,
+
+      destino:
+        "raitrai@raitrai.cl",
+
+      pasajero:
+        buildNombreCompletoInscripcion(
+          itemCompleto
+        ),
+
+      documento:
+        getInscripcionDocumento(
+          itemCompleto
+        )
+    }
+  );
+
+  return ref.id;
+};
+
 async function copyGroupInscripcionLink() {
   /*
     No permitimos copiar links antiguos que figuran
