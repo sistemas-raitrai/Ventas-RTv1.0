@@ -3104,13 +3104,80 @@ async function saveFicha({ silent = false, reloadAfterSave = true } = {}) {
   
     patch.ficha = {
       ...patch.ficha,
+    
       flujoModo: nextFlowMode,
-      estado: reopenFlowByCarolaCorrection ? "correccion_pendiente_jefa" : "lista_vendedor",
+    
+      estado:
+        reopenFlowByCarolaCorrection
+          ? "correccion_pendiente_jefa"
+          : "lista_vendedor",
+    
+      /*
+       * La ficha deja de estar confirmada como versión vigente,
+       * porque deberá generarse un nuevo PDF.
+       */
       confirmada: false,
       pdfPendienteGeneracion: true,
+    
+      /*
+       * Se invalida solamente el PDF ACTIVO.
+       *
+       * NO eliminamos la información histórica que permite saber
+       * que anteriormente existió una versión oficial.
+       */
       pdfUrl: "",
       pdfNombre: "",
-      camposAdministracionModificados: adminImportantChanges
+    
+      /*
+       * =========================================================
+       * CONSERVAR IDENTIDAD DE LA ÚLTIMA VERSIÓN
+       * =========================================================
+       *
+       * Estos campos permiten que ficha-pdf.js sepa desde qué
+       * versión debe continuar cuando vuelva a generarse el PDF.
+       */
+    
+      tipoVersion:
+        oldFicha?.tipoVersion ||
+        state.group?.tipoVersionFicha ||
+        "original",
+    
+      version:
+        oldFicha?.version ||
+        state.group?.versionFicha ||
+        values.version ||
+        "ORIGINAL",
+    
+      versionNumero:
+        Number(
+          oldFicha?.versionNumero ??
+          state.group?.versionFichaNumero ??
+          1
+        ) || 1,
+    
+      /*
+       * Estas huellas de la generación anterior también
+       * deben conservarse.
+       */
+      confirmadaEl:
+        oldFicha?.confirmadaEl || null,
+    
+      confirmadaPor:
+        oldFicha?.confirmadaPor || "",
+    
+      confirmadaPorCorreo:
+        oldFicha?.confirmadaPorCorreo || "",
+    
+      storagePathPdf:
+        oldFicha?.storagePathPdf || "",
+    
+      pdfHistorial:
+        Array.isArray(oldFicha?.pdfHistorial)
+          ? oldFicha.pdfHistorial
+          : [],
+    
+      camposAdministracionModificados:
+        adminImportantChanges
     };
   
     patch.flowFicha = {
