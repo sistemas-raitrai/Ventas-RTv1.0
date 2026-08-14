@@ -3316,16 +3316,321 @@ export function crearInscripcionesManager({ db, usuario = {}, onChange = null } 
   };
 }
 
-export function resumirNomina(items = []) {
-  const activos = items.filter(i => !estaAnulada(i));
+/* =========================================================
+   CUPOS RESERVADOS / VIAJEROS OPERATIVOS
+
+   Un cupo reservado pendiente:
+   - cuenta como VIAJA
+   - NO es una persona individualizada
+   - NO cuenta como ficha médica pendiente
+   - NO cuenta como sin carnet
+
+   Será creado/sincronizado por backend desde
+   los registros SIN RUT de Sistema de Pagos.
+========================================================= */
+
+export function esCupoReservado(
+  item = {}
+) {
+  const tipoRegistro =
+    normalizar(
+      item.tipoRegistro ||
+      ""
+    )
+      .replace(
+        /\s+/g,
+        "_"
+      );
+
+  const tipoInscripcion =
+    normalizar(
+      item.tipoInscripcion ||
+      item.estadoInscripcion ||
+      ""
+    )
+      .replace(
+        /\s+/g,
+        "_"
+      );
+
+  return (
+    item.esCupoReservado === true ||
+    tipoRegistro ===
+      "cupo_reservado" ||
+    tipoInscripcion ===
+      "cupo_reservado"
+  );
+}
+
+
+export function esCupoReservadoPendiente(
+  item = {}
+) {
+  if (
+    !esCupoReservado(
+      item
+    )
+  ) {
+    return false;
+  }
+
+  const estado =
+    normalizar(
+      item.estadoCupoReservado ||
+      item.cupoReservado?.estado ||
+      item.estadoCupo ||
+      ""
+    )
+      .replace(
+        /\s+/g,
+        "_"
+      );
+
+  return ![
+    "consumido",
+    "anulado",
+    "eliminado",
+    "cerrado"
+  ].includes(
+    estado
+  );
+}
+
+
+function getTipoOperativoResumen(
+  item = {}
+) {
+  const raw =
+    item.tipoInscripcion ||
+    item.estadoInscripcion ||
+    item.faseInscripcion ||
+    "";
+
+  const tipo =
+    normalizar(
+      raw
+    )
+      .replace(
+        /\s+/g,
+        "_"
+      );
+
+  if (
+    tipo ===
+    "inscripcion_inicial"
+  ) {
+    return "nomina_inicial";
+  }
+
+  if (
+    tipo ===
+    "nomina_final_ficha_medica"
+  ) {
+    return "nomina_final";
+  }
+
+  if (
+    tipo ===
+    "sistema_de_pagos"
+  ) {
+    return "sistema_pagos";
+  }
+
+  if (
+    tipo ===
+    "cupo_liberado"
+  ) {
+    return "liberado";
+  }
+
+  return tipo;
+}
+
+
+export function esViajaOperativo(
+  item = {}
+) {
+  /*
+    Cupo reservado pendiente:
+    ocupa físicamente un lugar en el viaje.
+  */
+  if (
+    esCupoReservadoPendiente(
+      item
+    )
+  ) {
+    return true;
+  }
+
+  /*
+    Un cupo consumido ya NO se suma.
+    La persona que lo consumió es la que contará.
+  */
+  if (
+    esCupoReservado(
+      item
+    )
+  ) {
+    return false;
+  }
+
+  if (
+    estaAnulada(
+      item
+    )
+  ) {
+    return false;
+  }
+
+  const tipo =
+    getTipoOperativoResumen(
+      item
+    );
+
+  const estadoCupo =
+    normalizar(
+      item.estadoCupo ||
+      ""
+    )
+      .replace(
+        /\s+/g,
+        "_"
+      );
+
+  /*
+    Nuevo ingreso solo viaja cuando está confirmado.
+  */
+  if (
+    tipo ===
+    "nuevo_ingreso"
+  ) {
+    return estadoCupo ===
+      "confirmado";
+  }
+
+  /*
+    Lista de espera solo viaja cuando está confirmada.
+  */
+  if (
+    tipo ===
+    "lista_espera"
+  ) {
+    return estadoCupo ===
+      "confirmado";
+  }
+
+  if (
+    tipo ===
+    "lista_espera_pagada"
+  ) {
+    return false;
+  }
+
+  return [
+    "nomina_inicial",
+    "nomina_final",
+    "sistema_pagos",
+    "nuevo_ingreso_confirmado",
+    "lista_espera_confirmada",
+    "liberado"
+  ].includes(
+    tipo
+  );
+}
+
+
+export function resumirNomina(
+  items = []
+) {
+  const lista =
+    Array.isArray(
+      items
+    )
+      ? items
+      : [];
+
+  const cuposReservados =
+    lista.filter(
+      esCupoReservadoPendiente
+    );
+
+  const personas =
+    lista.filter(
+      (item) =>
+        !esCupoReservado(
+          item
+        )
+    );
+
+  const viajerosIdentificados =
+    personas.filter(
+      esViajaOperativo
+    );
+
+  const anulados =
+    personas.filter(
+      estaAnulada
+    );
+
+  /*
+    Ficha médica y carnet solo tienen sentido
+    para PERSONAS REALES que efectivamente viajan.
+  */
+  const fichaCompletaViajeros =
+    viajerosIdentificados.filter(
+      fichaCompleta
+    );
+
   return {
-    total: items.length,
-    activos: activos.length,
-    anulados: items.length - activos.length,
-    fichaCompleta: activos.filter(fichaCompleta).length,
-    fichaPendiente: activos.filter(i => !fichaCompleta(i)).length,
-    conCarnet: activos.filter(tieneCarnet).length,
-    sinCarnet: activos.filter(i => !tieneCarnet(i)).length
+    /*
+      SIEMPRE EL NÚMERO PRINCIPAL.
+    */
+    viajan:
+      viajerosIdentificados.length +
+      cuposReservados.length,
+
+    viajanIdentificados:
+      viajerosIdentificados.length,
+
+    cuposReservados:
+      cuposReservados.length,
+
+    anulados:
+      anulados.length,
+
+    /*
+      Total físico de documentos visibles.
+      Incluye cupos reservados.
+    */
+    total:
+      lista.length,
+
+    /*
+      Total de personas reales.
+      No incluye placeholders de cupo.
+    */
+    personas:
+      personas.length,
+
+    fichaCompleta:
+      fichaCompletaViajeros.length,
+
+    fichaPendiente:
+      viajerosIdentificados.length -
+      fichaCompletaViajeros.length,
+
+    conCarnet:
+      viajerosIdentificados.filter(
+        tieneCarnet
+      ).length,
+
+    sinCarnet:
+      viajerosIdentificados.filter(
+        (item) =>
+          !tieneCarnet(
+            item
+          )
+      ).length
   };
 }
 
@@ -3342,7 +3647,22 @@ export function exportarNominaCsv(items = [], nombre = "nomina.csv") {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
-export const camposPasajero = { documento, nombres, apellidos, tipo, estado, correo, telefono, fichaCompleta, tieneCarnet, estaAnulada };
+export const camposPasajero = {
+  documento,
+  nombres,
+  apellidos,
+  tipo,
+  estado,
+  correo,
+  telefono,
+  fichaCompleta,
+  tieneCarnet,
+  estaAnulada,
+
+  esCupoReservado,
+  esCupoReservadoPendiente,
+  esViajaOperativo
+};
 
 function mapGrupo(snap) { return { docId: snap.id, groupId: String(snap.data()?.idGrupo || snap.id), data: snap.data() || {} }; }
 function estadoSecundario(data = {}, clave, label) { return { clave, label, activo: data?.activo === true, token: texto(data?.tokenActual), link: texto(data?.linkActual) }; }
