@@ -1065,25 +1065,77 @@ function resolveNextFichaVersion() {
     getByPath(state.group, "ficha") || {};
 
   /*
-   * La existencia de una versión final anterior se define
-   * exclusivamente por la URL del PDF final unido.
+   * =========================================================
+   * ¿EXISTIÓ REALMENTE UNA VERSIÓN FINAL ANTERIOR?
+   * =========================================================
+   *
+   * IMPORTANTE:
+   * No podemos depender solamente de ficha.pdfUrl / fichaPdfUrl.
+   *
+   * Cuando una ficha se reabre para actualizarla,
+   * esos campos se limpian intencionalmente para invalidar
+   * el PDF vigente.
+   *
+   * Sin embargo, siguen quedando huellas de que anteriormente
+   * existió un PDF oficial:
+   *
+   * - ficha.confirmadaEl
+   * - ficha.confirmadaPor
+   * - ficha.storagePathPdf
+   * - ficha.pdfHistorial
+   * - ficha.pdfUrl / fichaPdfUrl si todavía están presentes
    */
-  const pdfFinalAnterior = cleanText(
+
+  const pdfActual = cleanText(
     fichaActual.pdfUrl ||
     state.group?.fichaPdfUrl ||
     ""
   );
 
+  const storagePathPdfAnterior = cleanText(
+    fichaActual.storagePathPdf ||
+    ""
+  );
+
+  const tieneConfirmacionAnterior =
+    !!fichaActual.confirmadaEl ||
+    !!cleanText(fichaActual.confirmadaPor || "") ||
+    !!cleanText(fichaActual.confirmadaPorCorreo || "");
+
+  const pdfHistorial = Array.isArray(
+    fichaActual.pdfHistorial
+  )
+    ? fichaActual.pdfHistorial
+    : [];
+
+  const tuvoVersionFinalAnterior =
+    !!pdfActual ||
+    !!storagePathPdfAnterior ||
+    tieneConfirmacionAnterior ||
+    pdfHistorial.length > 0;
+
   /*
-   * Nunca se ha generado una unión final.
+   * =========================================================
+   * PRIMER PDF REAL DEL GRUPO
+   * =========================================================
+   *
+   * Aunque en la ficha editable aparezca por defecto ORIGINAL,
+   * si nunca existió una generación final real,
+   * esta sigue siendo la primera versión.
    */
-  if (!pdfFinalAnterior) {
+  if (!tuvoVersionFinalAnterior) {
     return {
       tipoVersion: "original",
       version: "ORIGINAL",
       versionNumero: 1
     };
   }
+
+  /*
+   * =========================================================
+   * LEER LA ÚLTIMA VERSIÓN CONOCIDA
+   * =========================================================
+   */
 
   const tipoAnterior = normalizeSearchLocal(
     fichaActual.tipoVersion ||
@@ -1107,15 +1159,25 @@ function resolveNextFichaVersion() {
 
   const anteriorYaEraActualizacion =
     tipoAnterior === "actualizacion" ||
-    versionAnterior === "ACTUALIZACIÓN";
+    versionAnterior === "ACTUALIZACIÓN" ||
+    versionAnterior.startsWith("ACTUALIZACIÓN ");
 
   /*
-   * Si el PDF anterior era ORIGINAL:
-   * la nueva versión será ACTUALIZACIÓN 1.
+   * =========================================================
+   * SIGUIENTE VERSIÓN
+   * =========================================================
    *
-   * Si ya era una actualización:
-   * aumenta el número.
+   * ORIGINAL anterior
+   *    -> ACTUALIZACIÓN 1
+   *
+   * ACTUALIZACIÓN 1
+   *    -> ACTUALIZACIÓN 2
+   *
+   * ACTUALIZACIÓN 2
+   *    -> ACTUALIZACIÓN 3
+   * etc.
    */
+
   return {
     tipoVersion: "actualizacion",
     version: "ACTUALIZACIÓN",
