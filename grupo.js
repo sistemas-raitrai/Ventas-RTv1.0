@@ -3166,6 +3166,14 @@ function getEstadoOperativoInscripcionLabel(item = {}) {
   const tipo = normalizeSearchLocal(getInscripcionTipoReal(item));
   const estadoCupo = normalizeSearchLocal(item.estadoCupo || "");
 
+  if (
+    esCupoReservado(item)
+  ) {
+    return esCupoReservadoPendiente(item)
+      ? "Cupo reservado · Liberado pendiente"
+      : "Cupo reservado · Consumido";
+  }
+
   if (tipo === "nuevo_ingreso_confirmado") {
     return "Nuevo ingreso confirmado";
   }
@@ -3207,6 +3215,23 @@ function getOrdenOperativoInscripcion(item = {}) {
   */
   if (estaInscripcionAnulada(item)) {
     return 1000;
+  }
+
+  /*
+    Los cupos reservados pendientes quedan
+    visibles junto a la nómina operativa,
+    antes de los registros menos relevantes.
+  */
+  if (
+    esCupoReservadoPendiente(item)
+  ) {
+    return 8;
+  }
+
+  if (
+    esCupoReservado(item)
+  ) {
+    return 900;
   }
 
   const tipo =
@@ -3300,16 +3325,58 @@ function formatFechaFormularioTabla(value) {
 }
 
 function getTipoInscripcionLabel(value = "") {
-  const key = normalizeSearchLocal(value);
+  const key =
+    normalizeSearchLocal(value)
+      .replace(/\s+/g, "_");
   
-  if (key === "sistema_pagos") return "Sistema de Pagos";
-  if (key === "nomina_inicial") return "Inscripción inicial";
-  if (key === "nomina_final") return "Nómina final / ficha médica";
+  if (
+    key === "cupo_reservado"
+  ) {
+    return "Cupo reservado";
+  }
 
-  if (key === "nuevo_ingreso") return "Nuevo ingreso";
-  if (key === "lista_espera") return "Lista de espera";
-  if (key === "lista_espera_confirmada") return "Lista de espera confirmada";
-  if (key === "liberado") return "Cupo liberado";
+  if (
+    key === "sistema_pagos" ||
+    key === "sistema_de_pagos"
+  ) {
+    return "Sistema de Pagos";
+  }
+
+  if (
+    key === "nomina_inicial" ||
+    key === "inscripcion_inicial"
+  ) {
+    return "Inscripción inicial";
+  }
+
+  if (
+    key === "nomina_final" ||
+    key === "nomina_final_ficha_medica"
+  ) {
+    return "Nómina final / ficha médica";
+  }
+
+  if (key === "nuevo_ingreso") {
+    return "Nuevo ingreso";
+  }
+
+  if (key === "lista_espera") {
+    return "Lista de espera";
+  }
+
+  if (
+    key ===
+    "lista_espera_confirmada"
+  ) {
+    return "Lista de espera confirmada";
+  }
+
+  if (
+    key === "liberado" ||
+    key === "cupo_liberado"
+  ) {
+    return "Cupo liberado";
+  }
 
   return "Inscripción inicial";
 }
@@ -3333,23 +3400,104 @@ function getTipoInscripcionClass(item = {}) {
 }
 
 function getInscripcionTipoReal(item = {}) {
-  const raw = item.tipoInscripcion || "";
-  const key = normalizeSearchLocal(raw).replace(/\s+/g, "_");
+  /*
+    Cupo reservado tiene prioridad,
+    porque todavía no representa a una persona.
+  */
+  if (esCupoReservado(item)) {
+    return "cupo_reservado";
+  }
 
-  if (key === "inscripcion_inicial") return "nomina_inicial";
-  if (key === "nomina_inicial") return "nomina_inicial";
-  if (key === "nomina_final") return "nomina_final";
-  if (key === "nomina_final_ficha_medica") return "nomina_final";
-  if (key === "sistema_de_pagos") return "sistema_pagos";
-  if (key === "sistema_pagos") return "sistema_pagos";
-  if (key === "nuevo_ingreso") return "nuevo_ingreso";
-  if (key === "nuevo_ingreso_confirmado") return "nuevo_ingreso_confirmado";
-  if (key === "lista_espera") return "lista_espera";
-  if (key === "lista_espera_pagada") return "lista_espera_pagada";
-  if (key === "lista_espera_confirmada") return "lista_espera_confirmada";
-  if (key === "liberado" || key === "cupo_liberado") return "liberado";
+  const raw =
+    item.tipoInscripcion ||
+    "";
 
-  return getTipoInscripcionFromFase(item.faseInscripcion || item.estadoInscripcion || "normal");
+  const key =
+    normalizeSearchLocal(raw)
+      .replace(/\s+/g, "_");
+
+  if (
+    key === "inscripcion_inicial"
+  ) {
+    return "nomina_inicial";
+  }
+
+  if (
+    key === "nomina_inicial"
+  ) {
+    return "nomina_inicial";
+  }
+
+  if (
+    key === "nomina_final"
+  ) {
+    return "nomina_final";
+  }
+
+  if (
+    key ===
+    "nomina_final_ficha_medica"
+  ) {
+    return "nomina_final";
+  }
+
+  if (
+    key === "sistema_de_pagos"
+  ) {
+    return "sistema_pagos";
+  }
+
+  if (
+    key === "sistema_pagos"
+  ) {
+    return "sistema_pagos";
+  }
+
+  if (
+    key === "nuevo_ingreso"
+  ) {
+    return "nuevo_ingreso";
+  }
+
+  if (
+    key ===
+    "nuevo_ingreso_confirmado"
+  ) {
+    return "nuevo_ingreso_confirmado";
+  }
+
+  if (
+    key === "lista_espera"
+  ) {
+    return "lista_espera";
+  }
+
+  if (
+    key ===
+    "lista_espera_pagada"
+  ) {
+    return "lista_espera_pagada";
+  }
+
+  if (
+    key ===
+    "lista_espera_confirmada"
+  ) {
+    return "lista_espera_confirmada";
+  }
+
+  if (
+    key === "liberado" ||
+    key === "cupo_liberado"
+  ) {
+    return "liberado";
+  }
+
+  return getTipoInscripcionFromFase(
+    item.faseInscripcion ||
+    item.estadoInscripcion ||
+    "normal"
+  );
 }
 
 function esNominaFinalOperativa(item = {}) {
@@ -3385,6 +3533,15 @@ function getInscripcionesSistemaPagos() {
 }
 
 function fichaMedicaPendiente(item = {}) {
+  /*
+    Un cupo reservado todavía no es una persona.
+    Nunca puede considerarse ficha médica pendiente.
+  */
+  if (
+    esCupoReservado(item)
+  ) {
+    return false;
+  }
   /*
     Una persona anulada no debe seguir apareciendo
     como ficha médica pendiente.
@@ -3504,6 +3661,93 @@ function getLiberadosUsados() {
   ).length;
 }
 
+/* =========================================================
+   CUPOS RESERVADOS PARA LIBERADOS
+
+   Estos registros serán creados/sincronizados
+   posteriormente desde Sistema de Pagos.
+
+   REGLA:
+   - un cupo reservado pendiente CUENTA COMO VIAJERO;
+   - no es todavía una persona individualizada;
+   - no cuenta como ficha médica pendiente;
+   - cuando un liberado lo consume, deja de sumar como cupo.
+========================================================= */
+
+function esCupoReservado(item = {}) {
+  const tipoRegistro =
+    normalizeSearchLocal(
+      item.tipoRegistro ||
+      ""
+    ).replace(/\s+/g, "_");
+
+  const tipoInscripcion =
+    normalizeSearchLocal(
+      item.tipoInscripcion ||
+      item.estadoInscripcion ||
+      ""
+    ).replace(/\s+/g, "_");
+
+  return (
+    item.esCupoReservado === true ||
+    tipoRegistro === "cupo_reservado" ||
+    tipoInscripcion === "cupo_reservado"
+  );
+}
+
+function esCupoReservadoPendiente(item = {}) {
+  if (!esCupoReservado(item)) {
+    return false;
+  }
+
+  const estado =
+    normalizeSearchLocal(
+      item.estadoCupoReservado ||
+      item.cupoReservado?.estado ||
+      item.estadoCupo ||
+      ""
+    ).replace(/\s+/g, "_");
+
+  /*
+    Compatibilidad:
+    si todavía no trae estado explícito,
+    un documento marcado como cupo reservado
+    se considera pendiente.
+  */
+  if (!estado) {
+    return true;
+  }
+
+  return ![
+    "consumido",
+    "anulado",
+    "eliminado",
+    "cerrado"
+  ].includes(estado);
+}
+
+function getCuposReservadosPendientes() {
+  return state.inscripciones.filter(
+    esCupoReservadoPendiente
+  );
+}
+
+function getViajerosIdentificados() {
+  return state.inscripciones.filter(
+    (item) =>
+      estaInscripcionActiva(item) &&
+      !esCupoReservado(item) &&
+      esNominaFinalOperativa(item)
+  );
+}
+
+function getTotalViajanOperativo() {
+  return (
+    getViajerosIdentificados().length +
+    getCuposReservadosPendientes().length
+  );
+}
+
 function renderInscripcionPasajerosPanel() {
   const panel = $("panelInscripcionPasajeros");
   const box = $("panelInscripcionPasajerosBody");
@@ -3598,21 +3842,58 @@ function renderInscripcionPasajerosPanel() {
     return;
   }
 
+  /*
+    =====================================================
+    RESUMEN OPERATIVO
+
+    VIAJAN SIEMPRE ES EL DATO PRINCIPAL.
+
+    VIAJAN =
+    personas identificadas que realmente viajan
+    +
+    cupos reservados pendientes
+    =====================================================
+  */
+
   const totalBruto =
     state.inscripciones.length;
-  
+
   const totalAnulados =
     state.inscripciones.filter(
-      estaInscripcionAnulada
+      (item) =>
+        !esCupoReservado(item) &&
+        estaInscripcionAnulada(item)
     ).length;
-  
+
+  /*
+    Dejamos aquí solamente personas reales.
+    Los cupos reservados se manejan aparte.
+  */
   const inscripcionesActivas =
     state.inscripciones.filter(
-      estaInscripcionActiva
+      (item) =>
+        estaInscripcionActiva(item) &&
+        !esCupoReservado(item)
     );
-  
+
+  const viajerosIdentificados =
+    getViajerosIdentificados();
+
+  const cuposReservados =
+    getCuposReservadosPendientes();
+
+  /*
+    ESTE ES EL NÚMERO IMPORTANTE.
+  */
   const totalViajan =
-    inscripcionesActivas.length;
+    viajerosIdentificados.length +
+    cuposReservados.length;
+
+  const totalViajerosIdentificados =
+    viajerosIdentificados.length;
+
+  const totalCuposReservados =
+    cuposReservados.length;
   
   const capacidad =
     Number(
@@ -3787,6 +4068,9 @@ function renderInscripcionPasajerosPanel() {
               const tipoReal = getInscripcionTipoReal(item);
               const tipoRealKey = normalizeSearchLocal(tipoReal);
               const estadoCupoKey = normalizeSearchLocal(item.estadoCupo || "");
+
+              const esReservaLiberado =
+                esCupoReservado(item);
               
               const esListaEsperaPendiente =
                 tipoRealKey === "lista_espera" &&
@@ -3820,14 +4104,20 @@ function renderInscripcionPasajerosPanel() {
                   </td>
                   <td>${escapeHtml(formatFechaFormularioTabla(getFechaFormularioInscripcion(item)))}</td>
                   <td>
-                    <button
-                      class="inscripcion-doc-link"
-                      type="button"
-                      title="Descargar ficha individual"
-                      data-descargar-ficha-inscripcion="${escapeHtml(item.id)}"
-                    >
-                      ${escapeHtml(getInscripcionDocumento(item))}
-                    </button>
+                    ${
+                      esReservaLiberado
+                        ? `<strong>— SIN RUT —</strong>`
+                        : `
+                          <button
+                            class="inscripcion-doc-link"
+                            type="button"
+                            title="Descargar ficha individual"
+                            data-descargar-ficha-inscripcion="${escapeHtml(item.id)}"
+                          >
+                            ${escapeHtml(getInscripcionDocumento(item))}
+                          </button>
+                        `
+                    }
                   </td>
                   <td>${escapeHtml(getInscripcionApellidos(item))}</td>
                   <td>${escapeHtml(getInscripcionNombres(item))}</td>
@@ -3899,7 +4189,7 @@ function renderInscripcionPasajerosPanel() {
       
         <div class="info-value">
           ${escapeHtml(
-            `${totalViajan} viajan / ${totalAnulados} anulados / ${totalBruto} inscritos`
+            `${totalViajan} viajan / ${totalCuposReservados} cupos reservados / ${totalAnulados} anulados / ${totalBruto} registros`
           )}
         </div>
       </div>
@@ -3926,7 +4216,16 @@ function renderInscripcionPasajerosPanel() {
 
       <div class="grupo-kpi">
         <div class="info-label">Liberados</div>
-        <div class="info-value">${escapeHtml(`${liberadosUsados} confirmados${liberadosPermitidos ? ` de ${liberadosPermitidos} cupos liberados` : ""}`)}</div>
+
+        <div class="info-value">
+          ${escapeHtml(
+            `${liberadosUsados} confirmados / ${totalCuposReservados} cupos reservados pendientes${
+              liberadosPermitidos
+                ? ` / ${liberadosPermitidos} configurados`
+                : ""
+            }`
+          )}
+        </div>
       </div>
     </div>
 
