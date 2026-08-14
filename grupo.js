@@ -8010,6 +8010,431 @@ await limpiarAlertasInscripcionesEliminadas({
   };
 };
 
+window.recuperarInscripcionPublicaFallida = async function ({
+  pendienteId = "",
+  confirmar = true
+} = {}) {
+  const id = cleanText(pendienteId || "");
+
+  if (!id) {
+    console.error(
+      "[RECUPERACIÓN INSCRIPCIÓN] Debes indicar pendienteId."
+    );
+
+    return null;
+  }
+
+  console.log(
+    "[RECUPERACIÓN INSCRIPCIÓN] Revisando documento fallido...",
+    {
+      pendienteId: id
+    }
+  );
+
+  try {
+    // =====================================================================
+    // 1. CARGAR DOCUMENTO FALLIDO
+    // =====================================================================
+
+    const pendienteRef = doc(
+      db,
+      "inscripciones_pendientes_publicas",
+      id
+    );
+
+    const pendienteSnap = await getDoc(
+      pendienteRef
+    );
+
+    if (!pendienteSnap.exists()) {
+      console.error(
+        "[RECUPERACIÓN INSCRIPCIÓN] No existe el documento indicado.",
+        {
+          pendienteId: id
+        }
+      );
+
+      return null;
+    }
+
+    const pendiente =
+      pendienteSnap.data() || {};
+
+    // =====================================================================
+    // 2. VALIDAR QUE REALMENTE SEA UN ERROR
+    // =====================================================================
+
+    if (
+      normalizeSearchLocal(
+        pendiente.estado || ""
+      ) !== "error"
+    ) {
+      console.error(
+        "[RECUPERACIÓN INSCRIPCIÓN] El documento no está en estado error.",
+        {
+          pendienteId: id,
+          estado: pendiente.estado || ""
+        }
+      );
+
+      return null;
+    }
+
+    const idGrupoPendiente =
+      cleanText(
+        pendiente.idGrupo || ""
+      );
+
+    const fase =
+      cleanText(
+        pendiente.fase ||
+        pendiente.payload?.faseInscripcion ||
+        ""
+      );
+
+    const payload =
+      pendiente.payload || null;
+
+    const token =
+      cleanText(
+        pendiente.token || ""
+      );
+
+    if (
+      !idGrupoPendiente ||
+      !fase ||
+      !payload ||
+      !token
+    ) {
+      console.error(
+        "[RECUPERACIÓN INSCRIPCIÓN] El documento fallido no tiene toda la información necesaria.",
+        {
+          pendienteId: id,
+          idGrupo: idGrupoPendiente,
+          fase,
+          tienePayload: !!payload,
+          tieneToken: !!token
+        }
+      );
+
+      return null;
+    }
+
+    // =====================================================================
+    // 3. SEGURIDAD: DEBE CORRESPONDER AL GRUPO ABIERTO
+    // =====================================================================
+
+    const grupoActual =
+      cleanText(
+        state.groupDocId ||
+        state.groupId ||
+        ""
+      );
+
+    if (
+      grupoActual &&
+      idGrupoPendiente !== grupoActual &&
+      idGrupoPendiente !==
+        cleanText(state.groupId || "")
+    ) {
+      console.error(
+        "[RECUPERACIÓN INSCRIPCIÓN] El documento pertenece a otro grupo.",
+        {
+          pendienteId: id,
+          grupoDocumento:
+            idGrupoPendiente,
+          grupoAbierto:
+            grupoActual
+        }
+      );
+
+      return null;
+    }
+
+    // =====================================================================
+    // 4. OBTENER DOCUMENTO NORMALIZADO
+    // =====================================================================
+
+    const inscripcionId =
+      cleanText(
+        payload?.identificacion
+          ?.documentoNormalizado ||
+        ""
+      );
+
+    const nombre =
+      cleanText(
+        payload?.identificacion
+          ?.nombreCompleto ||
+        ""
+      );
+
+    const documento =
+      cleanText(
+        payload?.identificacion
+          ?.documento ||
+        ""
+      );
+
+    if (!inscripcionId) {
+      console.error(
+        "[RECUPERACIÓN INSCRIPCIÓN] El payload no tiene documentoNormalizado.",
+        {
+          pendienteId: id,
+          documento,
+          nombre
+        }
+      );
+
+      return null;
+    }
+
+    // =====================================================================
+    // 5. VERIFICAR QUE NO EXISTA YA LA INSCRIPCIÓN FINAL
+    // =====================================================================
+
+    const inscripcionRef = doc(
+      db,
+      "ventas_cotizaciones",
+      idGrupoPendiente,
+      "inscripciones",
+      inscripcionId
+    );
+
+    const inscripcionSnap =
+      await getDoc(
+        inscripcionRef
+      );
+
+    if (inscripcionSnap.exists()) {
+      console.warn(
+        "[RECUPERACIÓN INSCRIPCIÓN] La inscripción ya existe. No se crea un nuevo pendiente.",
+        {
+          idGrupo:
+            idGrupoPendiente,
+          inscripcionId,
+          nombre,
+          documento
+        }
+      );
+
+      return {
+        ok: false,
+        motivo:
+          "inscripcion_ya_existe",
+        idGrupo:
+          idGrupoPendiente,
+        inscripcionId,
+        nombre,
+        documento
+      };
+    }
+
+    // =====================================================================
+    // 6. MOSTRAR RESUMEN ANTES DE REPROCESAR
+    // =====================================================================
+
+    console.table([
+      {
+        pendienteOriginal:
+          id,
+
+        idGrupo:
+          idGrupoPendiente,
+
+        fase,
+
+        inscripcionId,
+
+        documento,
+
+        nombre,
+
+        errorAnterior:
+          pendiente.error || ""
+      }
+    ]);
+
+    if (confirmar) {
+      const ok = window.confirm(
+        `RECUPERAR INSCRIPCIÓN FALLIDA\n\n` +
+        `Grupo: ${idGrupoPendiente}\n` +
+        `Fase: ${fase}\n` +
+        `Pasajero: ${nombre || "(sin nombre)"}\n` +
+        `Documento: ${documento || inscripcionId}\n\n` +
+        `Error anterior:\n${pendiente.error || "(sin detalle)"}\n\n` +
+        `Se creará un NUEVO documento pendiente para que la Cloud Function procese nuevamente la inscripción.\n\n` +
+        `El documento original NO será eliminado ni modificado.\n\n` +
+        `¿Continuar?`
+      );
+
+      if (!ok) {
+        console.log(
+          "[RECUPERACIÓN INSCRIPCIÓN] Cancelada por el usuario."
+        );
+
+        return null;
+      }
+    }
+
+    // =====================================================================
+    // 7. CREAR NUEVO PENDIENTE
+    //
+    // IMPORTANTE:
+    // guardarInscripcionPublica usa onDocumentCreated.
+    // Por eso hay que crear un documento NUEVO.
+    // =====================================================================
+
+    const nuevoRef =
+      await addDoc(
+        collection(
+          db,
+          "inscripciones_pendientes_publicas"
+        ),
+        {
+          idGrupo:
+            idGrupoPendiente,
+
+          token,
+
+          fase,
+
+          payload,
+
+          estado:
+            "pendiente",
+
+          creadoEn:
+            serverTimestamp(),
+
+          origen:
+            "recuperacion_manual_grupo_js",
+
+          recuperacion: {
+            activo: true,
+
+            pendienteOriginalId:
+              id,
+
+            errorOriginal:
+              cleanText(
+                pendiente.error || ""
+              ),
+
+            errorOriginalEn:
+              pendiente.errorEn || null,
+
+            recuperadoPor:
+              getDisplayName(
+                state.effectiveUser
+              ),
+
+            recuperadoPorCorreo:
+              state.effectiveEmail || "",
+
+            recuperadoEn:
+              serverTimestamp()
+          }
+        }
+      );
+
+    // =====================================================================
+    // 8. HISTORIAL DEL GRUPO
+    // =====================================================================
+
+    await createHistoryEntry({
+      tipoMovimiento:
+        "recuperacion_inscripcion_publica",
+
+      modulo:
+        "inscripcion",
+
+      titulo:
+        "Inscripción pública recuperada",
+
+      mensaje:
+        `${getDisplayName(state.effectiveUser)} reenvió para procesamiento una inscripción pública que había quedado con error: ${nombre || documento || inscripcionId}.`,
+
+      metadata: {
+        pendienteOriginalId:
+          id,
+
+        nuevoPendienteId:
+          nuevoRef.id,
+
+        idGrupo:
+          idGrupoPendiente,
+
+        fase,
+
+        inscripcionId,
+
+        documento,
+
+        nombre,
+
+        errorOriginal:
+          pendiente.error || ""
+      }
+    });
+
+    console.log(
+      "✅ [RECUPERACIÓN INSCRIPCIÓN] Nuevo pendiente creado.",
+      {
+        pendienteOriginalId:
+          id,
+
+        nuevoPendienteId:
+          nuevoRef.id,
+
+        idGrupo:
+          idGrupoPendiente,
+
+        fase,
+
+        inscripcionId,
+
+        documento,
+
+        nombre
+      }
+    );
+
+    console.log(
+      "⏳ La Cloud Function guardarInscripcionPublica debe procesar ahora el nuevo documento."
+    );
+
+    return {
+      ok: true,
+
+      pendienteOriginalId:
+        id,
+
+      nuevoPendienteId:
+        nuevoRef.id,
+
+      idGrupo:
+        idGrupoPendiente,
+
+      fase,
+
+      inscripcionId,
+
+      documento,
+
+      nombre
+    };
+
+  } catch (error) {
+    console.error(
+      "❌ [RECUPERACIÓN INSCRIPCIÓN] Error inesperado:",
+      error
+    );
+
+    return null;
+  }
+};
+
 window.reenviarCorreoTransferenciaListaEspera = async function ({ rut = "", inscripcionId = "" } = {}) {
   const textoRut = normalizeSearchLocal(rut || "");
   const textoId = cleanText(inscripcionId || "");
