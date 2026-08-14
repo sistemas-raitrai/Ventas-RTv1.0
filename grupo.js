@@ -21061,3 +21061,815 @@ window.marcarNuevoIngresoPendiente = async function ({ rut = "", inscripcionId =
 
   return item.id;
 };
+
+window.catastroConsentimientos2026 = async function () {
+  console.log(
+    "🔎 Buscando grupos GANADOS 2026..."
+  );
+
+  const gruposSnap =
+    await getDocs(
+      query(
+        collection(
+          db,
+          "ventas_cotizaciones"
+        ),
+        where(
+          "anoViaje",
+          "==",
+          2026
+        )
+      )
+    );
+
+  const grupos =
+    gruposSnap.docs
+      .map((d) => ({
+        docId: d.id,
+        ...d.data()
+      }))
+      .filter((grupo) => {
+        return (
+          normalizeSearchLocal(
+            grupo.estado || ""
+          ) === "ganada"
+        );
+      })
+      .sort((a, b) => {
+        return Number(
+          a.numeroNegocio || 0
+        ) -
+        Number(
+          b.numeroNegocio || 0
+        );
+      });
+
+  console.log(
+    `✅ Grupos ganados 2026 encontrados: ${grupos.length}`
+  );
+
+  const resumen =
+    [];
+
+  const detalleSi =
+    [];
+
+  const detalleNo =
+    [];
+
+  const detalleSinRespuesta =
+    [];
+
+  let totalInscripciones =
+    0;
+
+  let totalActivos =
+    0;
+
+  let totalRespondieron =
+    0;
+
+  let totalSi =
+    0;
+
+  let totalNo =
+    0;
+
+  let totalSinRespuesta =
+    0;
+
+  for (
+    let i = 0;
+    i < grupos.length;
+    i += 1
+  ) {
+    const grupo =
+      grupos[i];
+
+    const numeroNegocio =
+      String(
+        grupo.numeroNegocio ||
+        ""
+      ).trim();
+
+    console.log(
+      `📋 ${i + 1}/${grupos.length} · Negocio ${numeroNegocio || "SIN N°"}`
+    );
+
+    const inscripcionesSnap =
+      await getDocs(
+        collection(
+          db,
+          "ventas_cotizaciones",
+          grupo.docId,
+          "inscripciones"
+        )
+      );
+
+    const inscripciones =
+      inscripcionesSnap.docs
+        .map((d) => ({
+          id: d.id,
+          ...d.data()
+        }));
+
+    totalInscripciones +=
+      inscripciones.length;
+
+    const activos =
+      inscripciones.filter(
+        (item) =>
+          !estaInscripcionAnulada(
+            item
+          )
+      );
+
+    totalActivos +=
+      activos.length;
+
+    let si =
+      0;
+
+    let no =
+      0;
+
+    let sinRespuesta =
+      0;
+
+    activos.forEach(
+      (item) => {
+        const respuesta =
+          item?.consentimiento
+            ?.autorizaApoderadoCoordinador;
+
+        const nombre =
+          buildNombreCompletoInscripcion(
+            item
+          ) ||
+          item?.identificacion
+            ?.nombreCompleto ||
+          "SIN NOMBRE";
+
+        const documento =
+          getInscripcionDocumento(
+            item
+          ) ||
+          item?.identificacion
+            ?.documento ||
+          item.id;
+
+        const base = {
+          numeroNegocio,
+          idGrupo:
+            grupo.idGrupo ||
+            grupo.docId,
+
+          colegio:
+            grupo.colegio ||
+            "",
+
+          curso:
+            grupo.curso ||
+            "",
+
+          nombre,
+
+          documento,
+
+          tipoInscripcion:
+            item.tipoInscripcion ||
+            "",
+
+          fichaMedica:
+            item.fichaMedicaEstado ||
+            (
+              item.fichaMedicaCompleta ===
+              true
+                ? "completa"
+                : ""
+            )
+        };
+
+        if (
+          respuesta === true
+        ) {
+          si += 1;
+          totalSi += 1;
+          totalRespondieron += 1;
+
+          detalleSi.push({
+            ...base,
+            respuesta: "SÍ"
+          });
+
+          return;
+        }
+
+        if (
+          respuesta === false
+        ) {
+          no += 1;
+          totalNo += 1;
+          totalRespondieron += 1;
+
+          detalleNo.push({
+            ...base,
+            respuesta: "NO"
+          });
+
+          return;
+        }
+
+        sinRespuesta += 1;
+        totalSinRespuesta += 1;
+
+        detalleSinRespuesta.push({
+          ...base,
+          respuesta:
+            "SIN RESPUESTA"
+        });
+      }
+    );
+
+    resumen.push({
+      numeroNegocio,
+
+      idGrupo:
+        grupo.idGrupo ||
+        grupo.docId,
+
+      colegio:
+        grupo.colegio ||
+        "",
+
+      curso:
+        grupo.curso ||
+        "",
+
+      activos:
+        activos.length,
+
+      respondieron:
+        si + no,
+
+      si,
+
+      no,
+
+      sinRespuesta
+    });
+  }
+
+  console.log(
+    "======================================"
+  );
+
+  console.log(
+    "📊 RESUMEN CONSENTIMIENTOS 2026"
+  );
+
+  console.log(
+    "======================================"
+  );
+
+  console.table(
+    resumen
+  );
+
+  console.log(
+    "📌 TOTALES GENERALES",
+    {
+      gruposGanados:
+        grupos.length,
+
+      documentosInscripcion:
+        totalInscripciones,
+
+      pasajerosActivos:
+        totalActivos,
+
+      respondieron:
+        totalRespondieron,
+
+      si:
+        totalSi,
+
+      no:
+        totalNo,
+
+      sinRespuesta:
+        totalSinRespuesta
+    }
+  );
+
+  console.log(
+    `✅ SÍ AUTORIZAN (${detalleSi.length})`
+  );
+
+  console.table(
+    detalleSi
+  );
+
+  console.log(
+    `🚨 NO AUTORIZAN (${detalleNo.length})`
+  );
+
+  console.table(
+    detalleNo
+  );
+
+  console.log(
+    `⚪ SIN RESPUESTA (${detalleSinRespuesta.length})`
+  );
+
+  console.table(
+    detalleSinRespuesta
+  );
+
+  console.log(
+    "======================================"
+  );
+
+  console.log(
+    "🚨 PERSONAS QUE RESPONDIERON NO"
+  );
+
+  console.log(
+    "======================================"
+  );
+
+  detalleNo.forEach(
+    (item) => {
+      console.log(
+        `Negocio ${item.numeroNegocio} · ${item.nombre} · ${item.documento}`
+      );
+    }
+  );
+
+  const resultado = {
+    totales: {
+      gruposGanados:
+        grupos.length,
+
+      totalInscripciones,
+
+      totalActivos,
+
+      respondieron:
+        totalRespondieron,
+
+      si:
+        totalSi,
+
+      no:
+        totalNo,
+
+      sinRespuesta:
+        totalSinRespuesta
+    },
+
+    resumenPorGrupo:
+      resumen,
+
+    si:
+      detalleSi,
+
+    no:
+      detalleNo,
+
+    sinRespuesta:
+      detalleSinRespuesta
+  };
+
+  window.__catastroConsentimientos2026 =
+    resultado;
+
+  console.log(
+    "✅ Resultado completo guardado en:"
+  );
+
+  console.log(
+    "window.__catastroConsentimientos2026"
+  );
+
+  return resultado;
+};
+
+window.catastroTallasPolera2026 = async function () {
+  console.log(
+    "👕 Buscando tallas de grupos GANADOS 2026..."
+  );
+
+  const gruposSnap =
+    await getDocs(
+      query(
+        collection(
+          db,
+          "ventas_cotizaciones"
+        ),
+        where(
+          "anoViaje",
+          "==",
+          2026
+        )
+      )
+    );
+
+  const grupos =
+    gruposSnap.docs
+      .map((d) => ({
+        docId: d.id,
+        ...d.data()
+      }))
+      .filter((grupo) => {
+        return (
+          normalizeSearchLocal(
+            grupo.estado || ""
+          ) === "ganada"
+        );
+      })
+      .sort((a, b) => {
+        return Number(
+          a.numeroNegocio || 0
+        ) -
+        Number(
+          b.numeroNegocio || 0
+        );
+      });
+
+  const resumenGrupo =
+    [];
+
+  const detalle =
+    [];
+
+  const totalPorTalla =
+    {};
+
+  let totalActivos =
+    0;
+
+  let totalConTalla =
+    0;
+
+  let totalSinTalla =
+    0;
+
+  for (
+    let i = 0;
+    i < grupos.length;
+    i += 1
+  ) {
+    const grupo =
+      grupos[i];
+
+    const numeroNegocio =
+      String(
+        grupo.numeroNegocio ||
+        ""
+      ).trim();
+
+    console.log(
+      `👕 ${i + 1}/${grupos.length} · Negocio ${numeroNegocio || "SIN N°"}`
+    );
+
+    const incluyePolera =
+      grupo?.elementosIncluidos
+        ?.polera !== false;
+
+    const snap =
+      await getDocs(
+        collection(
+          db,
+          "ventas_cotizaciones",
+          grupo.docId,
+          "inscripciones"
+        )
+      );
+
+    const activos =
+      snap.docs
+        .map((d) => ({
+          id: d.id,
+          ...d.data()
+        }))
+        .filter(
+          (item) =>
+            !estaInscripcionAnulada(
+              item
+            )
+        );
+
+    totalActivos +=
+      activos.length;
+
+    const tallasGrupo =
+      {};
+
+    let conTalla =
+      0;
+
+    let sinTalla =
+      0;
+
+    activos.forEach(
+      (item) => {
+        const tallaRaw =
+          item?.identificacion
+            ?.tallaPolera ||
+          item?.elementos
+            ?.tallaPolera ||
+          item?.tallaPolera ||
+          item?.talla ||
+          "";
+
+        const talla =
+          String(
+            tallaRaw ||
+            ""
+          )
+            .trim()
+            .toUpperCase();
+
+        const nombre =
+          buildNombreCompletoInscripcion(
+            item
+          ) ||
+          item?.identificacion
+            ?.nombreCompleto ||
+          "SIN NOMBRE";
+
+        const documento =
+          getInscripcionDocumento(
+            item
+          ) ||
+          item?.identificacion
+            ?.documento ||
+          item.id;
+
+        if (talla) {
+          conTalla += 1;
+          totalConTalla += 1;
+
+          tallasGrupo[talla] =
+            (
+              tallasGrupo[talla] ||
+              0
+            ) + 1;
+
+          totalPorTalla[talla] =
+            (
+              totalPorTalla[talla] ||
+              0
+            ) + 1;
+        } else {
+          sinTalla += 1;
+          totalSinTalla += 1;
+        }
+
+        detalle.push({
+          numeroNegocio,
+
+          idGrupo:
+            grupo.idGrupo ||
+            grupo.docId,
+
+          colegio:
+            grupo.colegio ||
+            "",
+
+          curso:
+            grupo.curso ||
+            "",
+
+          incluyePolera:
+            incluyePolera
+              ? "SÍ"
+              : "NO",
+
+          nombre,
+
+          documento,
+
+          talla:
+            talla ||
+            "SIN TALLA"
+        });
+      }
+    );
+
+    resumenGrupo.push({
+      numeroNegocio,
+
+      idGrupo:
+        grupo.idGrupo ||
+        grupo.docId,
+
+      colegio:
+        grupo.colegio ||
+        "",
+
+      curso:
+        grupo.curso ||
+        "",
+
+      incluyePolera:
+        incluyePolera
+          ? "SÍ"
+          : "NO",
+
+      pasajerosActivos:
+        activos.length,
+
+      conTalla,
+
+      sinTalla,
+
+      XS:
+        tallasGrupo.XS ||
+        0,
+
+      S:
+        tallasGrupo.S ||
+        0,
+
+      M:
+        tallasGrupo.M ||
+        0,
+
+      L:
+        tallasGrupo.L ||
+        0,
+
+      XL:
+        tallasGrupo.XL ||
+        0,
+
+      XXL:
+        tallasGrupo.XXL ||
+        0,
+
+      otras:
+        Object.entries(
+          tallasGrupo
+        )
+          .filter(
+            ([talla]) =>
+              ![
+                "XS",
+                "S",
+                "M",
+                "L",
+                "XL",
+                "XXL"
+              ].includes(
+                talla
+              )
+          )
+          .reduce(
+            (
+              suma,
+              [, cantidad]
+            ) =>
+              suma +
+              cantidad,
+            0
+          )
+    });
+  }
+
+  console.log(
+    "======================================"
+  );
+
+  console.log(
+    "👕 RESUMEN TALLAS POR GRUPO"
+  );
+
+  console.log(
+    "======================================"
+  );
+
+  console.table(
+    resumenGrupo
+  );
+
+  console.log(
+    "======================================"
+  );
+
+  console.log(
+    "👕 TOTAL GENERAL POR TALLA"
+  );
+
+  console.log(
+    "======================================"
+  );
+
+  const tablaTotalTallas =
+    Object.entries(
+      totalPorTalla
+    )
+      .map(
+        ([talla, cantidad]) => ({
+          talla,
+          cantidad
+        })
+      )
+      .sort(
+        (a, b) =>
+          b.cantidad -
+          a.cantidad
+      );
+
+  console.table(
+    tablaTotalTallas
+  );
+
+  console.log(
+    "📌 TOTALES",
+    {
+      gruposGanados:
+        grupos.length,
+
+      pasajerosActivos:
+        totalActivos,
+
+      conTalla:
+        totalConTalla,
+
+      sinTalla:
+        totalSinTalla
+    }
+  );
+
+  console.log(
+    "======================================"
+  );
+
+  console.log(
+    "👤 DETALLE DE PERSONAS Y TALLAS"
+  );
+
+  console.log(
+    "======================================"
+  );
+
+  console.table(
+    detalle
+  );
+
+  const sinTalla =
+    detalle.filter(
+      (item) =>
+        item.talla ===
+        "SIN TALLA"
+    );
+
+  console.log(
+    `⚠️ PERSONAS SIN TALLA (${sinTalla.length})`
+  );
+
+  console.table(
+    sinTalla
+  );
+
+  const resultado = {
+    totales: {
+      gruposGanados:
+        grupos.length,
+
+      pasajerosActivos:
+        totalActivos,
+
+      conTalla:
+        totalConTalla,
+
+      sinTalla:
+        totalSinTalla,
+
+      porTalla:
+        totalPorTalla
+    },
+
+    resumenPorGrupo:
+      resumenGrupo,
+
+    detalle,
+
+    sinTalla
+  };
+
+  window.__catastroTallasPolera2026 =
+    resultado;
+
+  console.log(
+    "✅ Resultado completo guardado en:"
+  );
+
+  console.log(
+    "window.__catastroTallasPolera2026"
+  );
+
+  return resultado;
+};
