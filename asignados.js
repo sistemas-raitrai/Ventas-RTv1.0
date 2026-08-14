@@ -2053,18 +2053,85 @@ async function persistAssignment({
     progress: confirmedAfterReview ? 70 : 40
   });
 
+  const grupoRef =
+    doc(
+      db,
+      "ventas_cotizaciones",
+      String(idGrupo)
+    );
+  
+  const grupoSnap =
+    await getDoc(
+      grupoRef
+    );
+  
+  const grupoActual =
+    grupoSnap.exists()
+      ? grupoSnap.data() || {}
+      : {};
+  
   const patch = {
-    vendedora: nuevaVendedora,
-    vendedoraCorreo: nuevaVendedoraCorreo,
-    requiereAsignacion: false,
-    estado: "A contactar",
-    fechaUltimoCambioEstado: serverTimestamp(),
-    actualizadoPor: getNombreUsuario(state.effectiveUser),
-    actualizadoPorCorreo: normalizeEmail(state.realUser?.email || ""),
-    fechaActualizacion: serverTimestamp()
+    vendedora:
+      nuevaVendedora,
+  
+    vendedoraCorreo:
+      nuevaVendedoraCorreo,
+  
+    requiereAsignacion:
+      false,
+  
+    estado:
+      "A contactar",
+  
+    fechaUltimoCambioEstado:
+      serverTimestamp(),
+  
+    actualizadoPor:
+      getNombreUsuario(
+        state.effectiveUser
+      ),
+  
+    actualizadoPorCorreo:
+      normalizeEmail(
+        state.realUser?.email || ""
+      ),
+  
+    fechaActualizacion:
+      serverTimestamp()
   };
-
-  await setDoc(doc(db, "ventas_cotizaciones", String(idGrupo)), patch, { merge: true });
+  
+  
+  /*
+    Si todavía no tenemos registrada
+    la asignación inicial, la dejamos
+    guardada ahora.
+  
+    Este flujo corresponde a un grupo
+    que llegó SIN ASIGNAR y fue tomado
+    desde asignados.js.
+  */
+  if (!grupoActual.fechaAsignacion) {
+    patch.ingresoSinAsignar =
+      true;
+  
+    patch.fechaAsignacion =
+      serverTimestamp();
+  
+    patch.vendedorAsignadoInicial =
+      nuevaVendedora;
+  
+    patch.vendedorAsignadoInicialCorreo =
+      nuevaVendedoraCorreo;
+  }
+  
+  
+  await setDoc(
+    grupoRef,
+    patch,
+    {
+      merge: true
+    }
+  );
 
   await writeAssignmentHistory({
     idGrupo,
