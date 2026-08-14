@@ -10,6 +10,8 @@ import {
 
 import {
   collection,
+  doc,
+  getDoc,
   getDocs,
   query,
   where
@@ -235,6 +237,21 @@ async function bootstrapFromSession() {
     "is-vendedor-view",
     String(state.currentUser?.rol || "").toLowerCase() === "vendedor"
   );
+
+  const btnAnalisisLeads =
+  $("btnExportarAnalisisLeads");
+
+  if (btnAnalisisLeads) {
+    const esVendedor =
+      String(
+        state.currentUser?.rol || ""
+      ).toLowerCase() === "vendedor";
+  
+    btnAnalisisLeads.style.display =
+      esVendedor
+        ? "none"
+        : "";
+  }
 }
 
 function bindHeaderActions() {
@@ -345,6 +362,11 @@ function bindEvents() {
   );
   
   $("btnExportarSeguimiento")?.addEventListener("click", exportVisibleRowsToXlsx);
+
+  $("btnExportarAnalisisLeads")?.addEventListener(
+    "click",
+    exportAnalisisLeadsToXlsx
+  );
 
   document.querySelectorAll(".summary-filter").forEach((btn) => {
     btn.addEventListener("click", () => {
@@ -1389,6 +1411,1213 @@ function renderEmpty(message) {
       <td colspan="${colspan}" class="seg-empty">${escapeHtml(message)}</td>
     </tr>
   `;
+}
+
+async function exportAnalisisLeadsToXlsx() {
+  const boton =
+    $("btnExportarAnalisisLeads");
+
+  try {
+    /* =====================================================
+       SEGURIDAD POR ROL
+    ===================================================== */
+
+    const esVendedor =
+      String(
+        state.currentUser?.rol || ""
+      ).toLowerCase() === "vendedor";
+
+    if (esVendedor) {
+      alert(
+        "Tu perfil no tiene permisos para exportar el análisis de leads."
+      );
+      return;
+    }
+
+    if (typeof XLSX === "undefined") {
+      alert(
+        "No se encontró la librería XLSX."
+      );
+      return;
+    }
+
+    /*
+      IMPORTANTE:
+      usamos los grupos VISIBLES.
+
+      Por lo tanto se respetan:
+      - año
+      - vendedor
+      - estado
+      - búsqueda
+      - filtros del dashboard
+      - botones de resumen
+    */
+    const gruposVisibles =
+      [...state.visibleRows];
+
+    if (!gruposVisibles.length) {
+      alert(
+        "No hay grupos visibles para generar el análisis."
+      );
+      return;
+    }
+
+    if (boton) {
+      boton.disabled = true;
+      boton.dataset.textoOriginal =
+        boton.textContent || "";
+
+      boton.textContent =
+        "Generando análisis...";
+    }
+
+    /* =====================================================
+       TRAER DOCUMENTOS ORIGINALES
+       SOLO AL MOMENTO DE EXPORTAR
+    ===================================================== */
+
+    const registros =
+      await Promise.all(
+        gruposVisibles.map(
+          async (row) => {
+            const idGrupo =
+              String(
+                row.idGrupo ||
+                row.id ||
+                ""
+              ).trim();
+
+            if (!idGrupo) {
+              return construirRegistroLead(
+                row,
+                {}
+              );
+            }
+
+            try {
+              const snap =
+                await getDoc(
+                  doc(
+                    db,
+                    "ventas_cotizaciones",
+                    idGrupo
+                  )
+                );
+
+              const data =
+                snap.exists()
+                  ? snap.data() || {}
+                  : {};
+
+              return construirRegistroLead(
+                row,
+                data
+              );
+            } catch (error) {
+              console.warn(
+                `[seguimiento] no se pudo cargar cotización ${idGrupo}`,
+                error
+              );
+
+              /*
+                No abortamos todo el informe
+                porque falle un documento.
+              */
+              return construirRegistroLead(
+                row,
+                {}
+              );
+            }
+          }
+        )
+      );
+
+    /* =====================================================
+       ORDEN CRONOLÓGICO REAL
+    ===================================================== */
+
+    registros.sort(
+      (a, b) => {
+        const fechaA =
+          a._fechaCreacion
+            ? a._fechaCreacion.getTime()
+            : Number.MAX_SAFE_INTEGER;
+
+        const fechaB =
+          b._fechaCreacion
+            ? b._fechaCreacion.getTime()
+            : Number.MAX_SAFE_INTEGER;
+
+        return fechaA - fechaB;
+      }
+    );
+
+    /* =====================================================
+       HOJA 1: LEADS
+    ===================================================== */
+
+    const detalle =
+      registros.map(
+        registroLeadParaExcel
+      );
+
+    /* =====================================================
+       HOJAS DE ANÁLISIS
+    ===================================================== */
+
+    const resumenMensual =
+      construirResumenMensualLeads(
+        registros
+      );
+
+    const resumenVendedores =
+      construirResumenVendedoresLeads(
+        registros
+      );
+
+    const resumenOrigen =
+      construirResumenOrigenLeads(
+        registros
+      );
+
+    const resumenCalidad =
+      construirResumenCalidadLeads(
+        registros
+      );
+
+    /* =====================================================
+       CREAR XLSX
+    ===================================================== */
+
+    const wb =
+      XLSX.utils.book_new();
+
+    const wsDetalle =
+      XLSX.utils.json_to_sheet(
+        detalle
+      );
+
+    const wsMensual =
+      XLSX.utils.json_to_sheet(
+        resumenMensual
+      );
+
+    const wsVendedores =
+      XLSX.utils.json_to_sheet(
+        resumenVendedores
+      );
+
+    const wsOrigen =
+      XLSX.utils.json_to_sheet(
+        resumenOrigen
+      );
+
+    const wsCalidad =
+      XLSX.utils.json_to_sheet(
+        resumenCalidad
+      );
+
+    /* =====================================================
+       ANCHOS DE COLUMNAS
+    ===================================================== */
+
+    wsDetalle["!cols"] = [
+      { wch: 12 }, // fecha
+      { wch: 8 },  // hora
+      { wch: 10 }, // mes
+      { wch: 10 }, // año
+      { wch: 12 }, // id
+      { wch: 18 }, // código
+      { wch: 38 }, // grupo
+      { wch: 32 }, // colegio
+      { wch: 12 }, // comuna
+      { wch: 10 }, // curso
+      { wch: 12 }, // curso viaje
+      { wch: 10 }, // año viaje
+      { wch: 10 }, // pax
+      { wch: 24 }, // vendedor
+      { wch: 30 }, // correo vendedor
+      { wch: 22 }, // creado por
+      { wch: 30 }, // creado correo
+      { wch: 18 }, // origen cliente
+      { wch: 18 }, // origen colegio
+      { wch: 18 }, // medio
+      { wch: 30 }, // detalle
+      { wch: 22 }, // estado
+      { wch: 20 }, // fecha cambio
+      { wch: 14 }, // reunión
+      { wch: 20 }, // fecha reunión
+      { wch: 20 }, // última gestión
+      { wch: 18 }, // tipo gestión
+      { wch: 18 }, // resultado
+      { wch: 18 }, // calidad
+      { wch: 30 }, // calidad detalle
+      { wch: 20 }, // destino
+      { wch: 24 }, // programa
+      { wch: 18 }, // mes viaje
+      { wch: 18 }  // tramo
+    ];
+
+    wsMensual["!cols"] = [
+      { wch: 12 },
+      { wch: 10 },
+      { wch: 15 },
+      { wch: 14 },
+      { wch: 12 },
+      { wch: 12 },
+      { wch: 14 },
+      { wch: 14 },
+      { wch: 16 }
+    ];
+
+    wsVendedores["!cols"] = [
+      { wch: 12 },
+      { wch: 26 },
+      { wch: 10 },
+      { wch: 15 },
+      { wch: 14 },
+      { wch: 12 },
+      { wch: 12 },
+      { wch: 14 },
+      { wch: 16 }
+    ];
+
+    wsOrigen["!cols"] = [
+      { wch: 18 },
+      { wch: 18 },
+      { wch: 20 },
+      { wch: 10 },
+      { wch: 15 },
+      { wch: 14 },
+      { wch: 12 },
+      { wch: 12 },
+      { wch: 16 }
+    ];
+
+    wsCalidad["!cols"] = [
+      { wch: 18 },
+      { wch: 10 },
+      { wch: 15 },
+      { wch: 14 },
+      { wch: 12 },
+      { wch: 12 },
+      { wch: 16 }
+    ];
+
+    XLSX.utils.book_append_sheet(
+      wb,
+      wsDetalle,
+      "LEADS"
+    );
+
+    XLSX.utils.book_append_sheet(
+      wb,
+      wsMensual,
+      "POR MES"
+    );
+
+    XLSX.utils.book_append_sheet(
+      wb,
+      wsVendedores,
+      "POR VENDEDOR"
+    );
+
+    XLSX.utils.book_append_sheet(
+      wb,
+      wsOrigen,
+      "POR ORIGEN"
+    );
+
+    XLSX.utils.book_append_sheet(
+      wb,
+      wsCalidad,
+      "CALIDAD"
+    );
+
+    XLSX.writeFile(
+      wb,
+      `analisis_leads_${fileStamp()}.xlsx`
+    );
+
+  } catch (error) {
+    console.error(
+      "[seguimiento] error exportando análisis de leads:",
+      error
+    );
+
+    alert(
+      "No se pudo generar el análisis de leads."
+    );
+  } finally {
+    if (boton) {
+      boton.disabled = false;
+
+      boton.textContent =
+        boton.dataset.textoOriginal ||
+        "📊 Análisis de Leads XLSX";
+    }
+  }
+}
+
+
+/* =========================================================
+   CONSTRUIR REGISTRO ANALÍTICO
+========================================================= */
+
+function construirRegistroLead(
+  row,
+  data = {}
+) {
+  const fechaCreacion =
+    toDate(
+      data.fechaCreacion ||
+      null
+    );
+
+  const fechaUltimoCambioEstado =
+    toDate(
+      data.fechaUltimoCambioEstado ||
+      data?.situacion?.fechaUltimoCambioEstado ||
+      null
+    );
+
+  const ultimaGestionAt =
+    toDate(
+      data.ultimaGestionAt ||
+      row.ultimaGestionAt ||
+      null
+    );
+
+  const fechaUltimaReunion =
+    toDate(
+      data.fechaUltimaReunion ||
+      data.ultimaReunion ||
+      data.fechaReunion ||
+      row.fechaUltimaReunion ||
+      null
+    );
+
+  const estado =
+    normalizeEstado(
+      data.estado ||
+      row.estado ||
+      ""
+    );
+
+  const ultimaGestionTipo =
+    cleanText(
+      data.ultimaGestionTipo ||
+      ""
+    );
+
+  /*
+    Marcamos reunión cuando existe
+    evidencia concreta disponible.
+
+    No asumimos reunión solamente
+    porque el lead terminó ganado.
+  */
+  const pasoPorReunion =
+    !!fechaUltimaReunion ||
+    estado === "reunion_confirmada" ||
+    normalizeText(
+      ultimaGestionTipo
+    ).includes("reunion");
+
+  const cantidadGrupo =
+    Number(
+      data.cantidadGrupo ||
+      data.numeroPaxTotal ||
+      data?.ficha?.numeroPaxTotal ||
+      0
+    ) || 0;
+
+  const calidadLead =
+    normalizarCalidadLead(
+      data.calidadLead
+    );
+
+  return {
+    _fechaCreacion:
+      fechaCreacion,
+
+    _fechaUltimoCambioEstado:
+      fechaUltimoCambioEstado,
+
+    _fechaUltimaReunion:
+      fechaUltimaReunion,
+
+    _ultimaGestionAt:
+      ultimaGestionAt,
+
+    idGrupo:
+      cleanText(
+        data.idGrupo ||
+        row.idGrupo ||
+        row.id ||
+        ""
+      ),
+
+    codigoRegistro:
+      cleanText(
+        data.codigoRegistro
+      ),
+
+    grupo:
+      cleanText(
+        row.displayTitle ||
+        data.aliasGrupo ||
+        data.colegio ||
+        ""
+      ),
+
+    colegio:
+      cleanText(
+        data.colegio ||
+        row.colegio ||
+        ""
+      ),
+
+    comunaCiudad:
+      cleanText(
+        data.comunaCiudad
+      ),
+
+    curso:
+      cleanText(
+        data.curso ||
+        row.curso ||
+        ""
+      ),
+
+    cursoViaje:
+      cleanText(
+        data.cursoViaje
+      ),
+
+    anoViaje:
+      Number(
+        data.anoViaje ||
+        row.anoViaje ||
+        0
+      ) || "",
+
+    cantidadGrupo,
+
+    vendedora:
+      cleanText(
+        data.vendedora ||
+        row.vendedora ||
+        ""
+      ),
+
+    vendedoraCorreo:
+      normalizeEmail(
+        data.vendedoraCorreo ||
+        row.vendedoraCorreo ||
+        ""
+      ),
+
+    creadoPor:
+      cleanText(
+        data.creadoPor
+      ),
+
+    creadoPorCorreo:
+      normalizeEmail(
+        data.creadoPorCorreo ||
+        ""
+      ),
+
+    origenCliente:
+      cleanText(
+        data.origenCliente
+      ),
+
+    origenColegio:
+      cleanText(
+        data.origenColegio
+      ),
+
+    origenEspecificacion:
+      cleanText(
+        data.origenEspecificacion
+      ),
+
+    origenEspecificacionOtro:
+      cleanText(
+        data.origenEspecificacionOtro
+      ),
+
+    estado,
+
+    pasoPorReunion,
+
+    ultimaGestionTipo,
+
+    calidadLead,
+
+    calidadLeadComentario:
+      cleanText(
+        data.calidadLeadComentario ||
+        data.calidadLeadDetalle ||
+        ""
+      ),
+
+    destino:
+      cleanText(
+        data.destinoPrincipal ||
+        data.destino ||
+        row.destino ||
+        ""
+      ),
+
+    programa:
+      cleanText(
+        data.programa ||
+        data.nombrePrograma ||
+        data?.ficha?.nombrePrograma ||
+        ""
+      ),
+
+    mesViaje:
+      cleanText(
+        data.mesViaje ||
+        data.semanaViaje ||
+        ""
+      ),
+
+    tramo:
+      cleanText(
+        data.tramo ||
+        data?.ficha?.tramo ||
+        ""
+      )
+  };
+}
+
+
+/* =========================================================
+   FILA DETALLE XLSX
+========================================================= */
+
+function registroLeadParaExcel(
+  registro
+) {
+  const fecha =
+    registro._fechaCreacion;
+
+  return {
+    "FECHA INGRESO":
+      formatDateOnlyText(fecha),
+
+    "HORA INGRESO":
+      formatTimeOnlyText(fecha),
+
+    "MES INGRESO":
+      getMonthKey(fecha),
+
+    "AÑO INGRESO":
+      fecha
+        ? fecha.getFullYear()
+        : "",
+
+    "ID GRUPO":
+      registro.idGrupo,
+
+    "CÓDIGO":
+      registro.codigoRegistro,
+
+    "GRUPO":
+      registro.grupo,
+
+    "COLEGIO":
+      registro.colegio,
+
+    "COMUNA":
+      registro.comunaCiudad,
+
+    "CURSO":
+      registro.curso,
+
+    "CURSO VIAJE":
+      registro.cursoViaje,
+
+    "AÑO VIAJE":
+      registro.anoViaje,
+
+    "PAX POTENCIALES":
+      registro.cantidadGrupo,
+
+    "VENDEDOR(A)":
+      registro.vendedora,
+
+    "CORREO VENDEDOR(A)":
+      registro.vendedoraCorreo,
+
+    "CREADO POR":
+      registro.creadoPor,
+
+    "CORREO CREADOR":
+      registro.creadoPorCorreo,
+
+    "ORIGEN CLIENTE":
+      registro.origenCliente,
+
+    "ORIGEN COLEGIO":
+      registro.origenColegio,
+
+    "MEDIO / CONTACTO":
+      registro.origenEspecificacion,
+
+    "DETALLE ORIGEN":
+      registro.origenEspecificacionOtro,
+
+    "ESTADO ACTUAL":
+      STAGE_META[
+        registro.estado
+      ]?.label ||
+      registro.estado,
+
+    "FECHA ÚLTIMO CAMBIO ESTADO":
+      formatDateTimeText(
+        registro._fechaUltimoCambioEstado
+      ),
+
+    "PASÓ POR REUNIÓN":
+      registro.pasoPorReunion
+        ? "SI"
+        : "NO",
+
+    "FECHA ÚLTIMA REUNIÓN":
+      formatDateTimeText(
+        registro._fechaUltimaReunion
+      ),
+
+    "ÚLTIMA GESTIÓN":
+      formatDateTimeText(
+        registro._ultimaGestionAt
+      ),
+
+    "TIPO ÚLTIMA GESTIÓN":
+      registro.ultimaGestionTipo,
+
+    "RESULTADO":
+      getResultadoLead(
+        registro.estado
+      ),
+
+    "CALIDAD LEAD":
+      registro.calidadLead,
+
+    "DETALLE CALIDAD":
+      registro.calidadLeadComentario,
+
+    "DESTINO":
+      registro.destino,
+
+    "PROGRAMA":
+      registro.programa,
+
+    "MES VIAJE":
+      registro.mesViaje,
+
+    "TRAMO":
+      registro.tramo
+  };
+}
+
+
+/* =========================================================
+   RESUMEN MENSUAL
+========================================================= */
+
+function construirResumenMensualLeads(
+  registros
+) {
+  const mapa =
+    new Map();
+
+  for (const registro of registros) {
+    const mes =
+      getMonthKey(
+        registro._fechaCreacion
+      );
+
+    if (!mes) continue;
+
+    if (!mapa.has(mes)) {
+      mapa.set(
+        mes,
+        crearAcumuladorLeads()
+      );
+    }
+
+    acumularLead(
+      mapa.get(mes),
+      registro
+    );
+  }
+
+  return [...mapa.entries()]
+    .sort(
+      ([a], [b]) =>
+        a.localeCompare(b)
+    )
+    .map(
+      ([mes, total]) => ({
+        "MES INGRESO":
+          mes,
+
+        "LEADS":
+          total.leads,
+
+        "PAX POTENCIALES":
+          total.pax,
+
+        "PASARON POR REUNIÓN":
+          total.reuniones,
+
+        "GANADOS":
+          total.ganados,
+
+        "PERDIDOS":
+          total.perdidos,
+
+        "EN PROCESO":
+          total.enProceso,
+
+        "% REUNIÓN":
+          porcentaje(
+            total.reuniones,
+            total.leads
+          ),
+
+        "% CONVERSIÓN":
+          porcentaje(
+            total.ganados,
+            total.leads
+          )
+      })
+    );
+}
+
+
+/* =========================================================
+   RESUMEN POR VENDEDOR
+========================================================= */
+
+function construirResumenVendedoresLeads(
+  registros
+) {
+  const mapa =
+    new Map();
+
+  for (const registro of registros) {
+    const mes =
+      getMonthKey(
+        registro._fechaCreacion
+      );
+
+    const vendedor =
+      registro.vendedora ||
+      registro.vendedoraCorreo ||
+      "Sin vendedor";
+
+    const key =
+      `${mes}__${vendedor}`;
+
+    if (!mapa.has(key)) {
+      mapa.set(
+        key,
+        {
+          mes,
+          vendedor,
+          ...crearAcumuladorLeads()
+        }
+      );
+    }
+
+    acumularLead(
+      mapa.get(key),
+      registro
+    );
+  }
+
+  return [...mapa.values()]
+    .sort(
+      (a, b) =>
+        compareText(
+          `${a.mes} ${a.vendedor}`,
+          `${b.mes} ${b.vendedor}`
+        )
+    )
+    .map(
+      (total) => ({
+        "MES INGRESO":
+          total.mes,
+
+        "VENDEDOR(A)":
+          total.vendedor,
+
+        "LEADS":
+          total.leads,
+
+        "PAX POTENCIALES":
+          total.pax,
+
+        "REUNIÓN":
+          total.reuniones,
+
+        "GANADOS":
+          total.ganados,
+
+        "PERDIDOS":
+          total.perdidos,
+
+        "EN PROCESO":
+          total.enProceso,
+
+        "% CONVERSIÓN":
+          porcentaje(
+            total.ganados,
+            total.leads
+          )
+      })
+    );
+}
+
+
+/* =========================================================
+   RESUMEN POR ORIGEN
+========================================================= */
+
+function construirResumenOrigenLeads(
+  registros
+) {
+  const mapa =
+    new Map();
+
+  for (const registro of registros) {
+    const origen =
+      registro.origenColegio ||
+      registro.origenCliente ||
+      "Sin definir";
+
+    const medio =
+      registro.origenEspecificacion ||
+      "Sin especificar";
+
+    const detalle =
+      registro.origenEspecificacionOtro ||
+      "";
+
+    const key =
+      `${origen}__${medio}__${detalle}`;
+
+    if (!mapa.has(key)) {
+      mapa.set(
+        key,
+        {
+          origen,
+          medio,
+          detalle,
+          ...crearAcumuladorLeads()
+        }
+      );
+    }
+
+    acumularLead(
+      mapa.get(key),
+      registro
+    );
+  }
+
+  return [...mapa.values()]
+    .sort(
+      (a, b) =>
+        compareText(
+          `${a.origen} ${a.medio} ${a.detalle}`,
+          `${b.origen} ${b.medio} ${b.detalle}`
+        )
+    )
+    .map(
+      (total) => ({
+        "ORIGEN":
+          total.origen,
+
+        "MEDIO / CONTACTO":
+          total.medio,
+
+        "DETALLE":
+          total.detalle,
+
+        "LEADS":
+          total.leads,
+
+        "PAX POTENCIALES":
+          total.pax,
+
+        "REUNIÓN":
+          total.reuniones,
+
+        "GANADOS":
+          total.ganados,
+
+        "PERDIDOS":
+          total.perdidos,
+
+        "% CONVERSIÓN":
+          porcentaje(
+            total.ganados,
+            total.leads
+          )
+      })
+    );
+}
+
+
+/* =========================================================
+   RESUMEN CALIDAD
+========================================================= */
+
+function construirResumenCalidadLeads(
+  registros
+) {
+  const mapa =
+    new Map();
+
+  for (const registro of registros) {
+    const calidad =
+      registro.calidadLead ||
+      "SIN EVALUAR";
+
+    if (!mapa.has(calidad)) {
+      mapa.set(
+        calidad,
+        crearAcumuladorLeads()
+      );
+    }
+
+    acumularLead(
+      mapa.get(calidad),
+      registro
+    );
+  }
+
+  return [...mapa.entries()]
+    .map(
+      ([calidad, total]) => ({
+        "CALIDAD":
+          calidad,
+
+        "LEADS":
+          total.leads,
+
+        "PAX POTENCIALES":
+          total.pax,
+
+        "REUNIÓN":
+          total.reuniones,
+
+        "GANADOS":
+          total.ganados,
+
+        "PERDIDOS":
+          total.perdidos,
+
+        "% CONVERSIÓN":
+          porcentaje(
+            total.ganados,
+            total.leads
+          )
+      })
+    );
+}
+
+
+/* =========================================================
+   ACUMULADORES
+========================================================= */
+
+function crearAcumuladorLeads() {
+  return {
+    leads: 0,
+    pax: 0,
+    reuniones: 0,
+    ganados: 0,
+    perdidos: 0,
+    enProceso: 0
+  };
+}
+
+
+function acumularLead(
+  total,
+  registro
+) {
+  total.leads++;
+
+  total.pax +=
+    Number(
+      registro.cantidadGrupo || 0
+    );
+
+  if (registro.pasoPorReunion) {
+    total.reuniones++;
+  }
+
+  if (registro.estado === "ganada") {
+    total.ganados++;
+  } else if (
+    registro.estado === "perdida"
+  ) {
+    total.perdidos++;
+  } else {
+    total.enProceso++;
+  }
+}
+
+
+/* =========================================================
+   HELPERS INFORME
+========================================================= */
+
+function getResultadoLead(
+  estado
+) {
+  if (estado === "ganada") {
+    return "GANADA";
+  }
+
+  if (estado === "perdida") {
+    return "PERDIDA";
+  }
+
+  return "EN PROCESO";
+}
+
+
+function normalizarCalidadLead(
+  value
+) {
+  const v =
+    normalizeText(value);
+
+  if (!v) {
+    return "SIN EVALUAR";
+  }
+
+  if (
+    v === "a" ||
+    v.includes("muy bueno") ||
+    v.includes("muy alta")
+  ) {
+    return "A";
+  }
+
+  if (
+    v === "b" ||
+    v === "bueno" ||
+    v === "alta"
+  ) {
+    return "B";
+  }
+
+  if (
+    v === "c" ||
+    v === "regular" ||
+    v === "media"
+  ) {
+    return "C";
+  }
+
+  if (
+    v === "d" ||
+    v.includes("bajo")
+  ) {
+    return "D";
+  }
+
+  return String(value)
+    .trim()
+    .toUpperCase();
+}
+
+
+function getMonthKey(
+  date
+) {
+  if (!date) {
+    return "";
+  }
+
+  const yyyy =
+    date.getFullYear();
+
+  const mm =
+    String(
+      date.getMonth() + 1
+    ).padStart(
+      2,
+      "0"
+    );
+
+  return `${yyyy}-${mm}`;
+}
+
+
+function porcentaje(
+  cantidad,
+  total
+) {
+  if (!total) {
+    return "0,0%";
+  }
+
+  return (
+    (
+      Number(cantidad || 0) /
+      Number(total)
+    ) * 100
+  ).toLocaleString(
+    "es-CL",
+    {
+      minimumFractionDigits: 1,
+      maximumFractionDigits: 1
+    }
+  ) + "%";
+}
+
+
+function formatDateOnlyText(
+  date
+) {
+  if (!date) {
+    return "";
+  }
+
+  return date.toLocaleDateString(
+    "es-CL"
+  );
+}
+
+
+function formatTimeOnlyText(
+  date
+) {
+  if (!date) {
+    return "";
+  }
+
+  return date.toLocaleTimeString(
+    "es-CL",
+    {
+      hour: "2-digit",
+      minute: "2-digit"
+    }
+  );
 }
 
 /* =========================================================
