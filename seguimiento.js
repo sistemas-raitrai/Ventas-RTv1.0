@@ -1413,6 +1413,102 @@ function renderEmpty(message) {
   `;
 }
 
+async function obtenerPrimeraAsignacionHistorica(
+  idGrupo
+) {
+  try {
+    const snap =
+      await getDocs(
+        collection(
+          db,
+          "ventas_cotizaciones",
+          String(idGrupo),
+          "historialAsignaciones"
+        )
+      );
+
+    if (snap.empty) {
+      return null;
+    }
+
+    const movimientos =
+      snap.docs
+        .map(
+          (docSnap) => {
+            const data =
+              docSnap.data() || {};
+
+            return {
+              ...data,
+              _fecha:
+                toDate(
+                  data.fecha
+                )
+            };
+          }
+        )
+        .filter(
+          (item) => {
+            const tipo =
+              normalizeText(
+                item.tipo || ""
+              );
+
+            /*
+              Queremos una ASIGNACIÓN real,
+              no recomendación,
+              reasignación o desasignación.
+            */
+            return (
+              tipo === "asignacion" ||
+              tipo === "asignación"
+            );
+          }
+        )
+        .filter(
+          (item) =>
+            !!item._fecha
+        )
+        .sort(
+          (a, b) =>
+            a._fecha.getTime() -
+            b._fecha.getTime()
+        );
+
+    if (!movimientos.length) {
+      return null;
+    }
+
+    const primera =
+      movimientos[0];
+
+    return {
+      fechaAsignacion:
+        primera._fecha,
+
+      vendedorAsignadoInicial:
+        cleanText(
+          primera.nuevaVendedora ||
+          ""
+        ),
+
+      vendedorAsignadoInicialCorreo:
+        normalizeEmail(
+          primera.nuevaVendedoraCorreo ||
+          ""
+        )
+    };
+
+  } catch (error) {
+    console.warn(
+      `[seguimiento] no se pudo recuperar historial de asignación ${idGrupo}`,
+      error
+    );
+
+    return null;
+  }
+}
+
 async function exportAnalisisLeadsToXlsx() {
   const boton =
     $("btnExportarAnalisisLeads");
@@ -1509,10 +1605,31 @@ async function exportAnalisisLeadsToXlsx() {
                 snap.exists()
                   ? snap.data() || {}
                   : {};
-
+              
+              
+              /*
+                Para los registros nuevos,
+                fechaAsignacion estará directamente
+                en ventas_cotizaciones.
+              
+                Para los antiguos, intentamos
+                reconstruirla desde historialAsignaciones.
+              */
+              let asignacionHistorica =
+                null;
+              
+              if (!data.fechaAsignacion) {
+                asignacionHistorica =
+                  await obtenerPrimeraAsignacionHistorica(
+                    idGrupo
+                  );
+              }
+              
+              
               return construirRegistroLead(
                 row,
-                data
+                data,
+                asignacionHistorica
               );
             } catch (error) {
               console.warn(
@@ -1660,15 +1777,22 @@ async function exportAnalisisLeadsToXlsx() {
     ];
 
     wsMensual["!cols"] = [
-      { wch: 12 },
-      { wch: 10 },
-      { wch: 15 },
-      { wch: 14 },
-      { wch: 12 },
-      { wch: 12 },
-      { wch: 14 },
-      { wch: 14 },
-      { wch: 16 }
+      { wch: 12 }, // mes
+      { wch: 10 }, // leads
+      { wch: 15 }, // pax
+      { wch: 22 }, // sin asignar
+      { wch: 22 }, // % sin asignar
+      { wch: 24 }, // no registrado
+      { wch: 28 }, // promedio horas
+      { wch: 18 }, // ≤4
+      { wch: 18 }, // ≤24
+      { wch: 18 }, // >24
+      { wch: 22 }, // reunión
+      { wch: 12 }, // ganados
+      { wch: 12 }, // perdidos
+      { wch: 14 }, // proceso
+      { wch: 14 }, // % reunión
+      { wch: 16 }  // conversión
     ];
 
     wsVendedores["!cols"] = [
@@ -1767,13 +1891,109 @@ async function exportAnalisisLeadsToXlsx() {
 
 function construirRegistroLead(
   row,
-  data = {}
+  data = {},
+  asignacionHistorica = null
 ) {
   const fechaCreacion =
     toDate(
       data.fechaCreacion ||
       null
     );
+
+
+  /*
+    Primero usamos el dato nuevo
+    guardado directamente en el grupo.
+
+    Si no existe, usamos el dato
+    reconstruido desde historialAsignaciones.
+  */
+  const fechaAsignacion =
+    toDate(
+      data.fechaAsignacion ||
+      asignacionHistorica?.fechaAsignacion ||
+      null
+    );
+
+
+  const vendedorAsignadoInicial =
+    cleanText(
+      data.vendedorAsignadoInicial ||
+      asignacionHistorica?.vendedorAsignadoInicial ||
+      ""
+    );
+
+
+  const vendedorAsignadoInicialCorreo =
+    normalizeEmail(
+      data.vendedorAsignadoInicialCorreo ||
+      asignacionHistorica?.vendedorAsignadoInicialCorreo ||
+      ""
+    );
+
+
+  /*
+    Determinación del origen de asignación.
+
+    TRUE:
+    tenemos constancia de que pasó
+    por asignados.js / historialAsignaciones.
+
+    FALSE:
+    en el futuro puede venir expresamente
+    guardado como ingresoSinAsignar:false.
+
+    NULL:
+    registro antiguo sin evidencia suficiente.
+  */
+  let ingresoSinAsignar =
+    null;
+
+  if (
+    data.ingresoSinAsignar === true
+  ) {
+    ingresoSinAsignar =
+      true;
+
+  } else if (
+    data.ingresoSinAsignar === false
+  ) {
+    ingresoSinAsignar =
+      false;
+
+  } else if (
+    asignacionHistorica
+  ) {
+    ingresoSinAsignar =
+      true;
+  }
+
+
+  /*
+    Solo calculamos demora cuando sabemos
+    que efectivamente estuvo sin asignar.
+  */
+  const horasHastaAsignacion =
+    ingresoSinAsignar === true &&
+    fechaCreacion &&
+    fechaAsignacion
+      ? Math.max(
+          0,
+          (
+            fechaAsignacion.getTime() -
+            fechaCreacion.getTime()
+          ) /
+          (
+            1000 *
+            60 *
+            60
+          )
+        )
+      : (
+          ingresoSinAsignar === false
+            ? 0
+            : null
+        );
 
   const fechaUltimoCambioEstado =
     toDate(
@@ -1841,7 +2061,18 @@ function construirRegistroLead(
   return {
     _fechaCreacion:
       fechaCreacion,
-
+    
+    _fechaAsignacion:
+      fechaAsignacion,
+    
+    ingresoSinAsignar,
+    
+    horasHastaAsignacion,
+    
+    vendedorAsignadoInicial,
+    
+    vendedorAsignadoInicialCorreo,
+    
     _fechaUltimoCambioEstado:
       fechaUltimoCambioEstado,
 
@@ -2049,8 +2280,34 @@ function registroLeadParaExcel(
 
     "PAX POTENCIALES":
       registro.cantidadGrupo,
-
-    "VENDEDOR(A)":
+    
+    "INGRESÓ SIN ASIGNAR":
+      registro.ingresoSinAsignar === true
+        ? "SI"
+        : registro.ingresoSinAsignar === false
+          ? "NO"
+          : "NO REGISTRADO",
+    
+    "FECHA ASIGNACIÓN":
+      formatDateTimeText(
+        registro._fechaAsignacion
+      ),
+    
+    "HORAS HASTA ASIGNACIÓN":
+      registro.horasHastaAsignacion === null
+        ? ""
+        : Number(
+            registro.horasHastaAsignacion
+              .toFixed(2)
+          ),
+    
+    "VENDEDOR ASIGNADO INICIAL":
+      registro.vendedorAsignadoInicial,
+    
+    "CORREO VENDEDOR INICIAL":
+      registro.vendedorAsignadoInicialCorreo,
+    
+    "VENDEDOR(A) ACTUAL":
       registro.vendedora,
 
     "CORREO VENDEDOR(A)":
@@ -2169,31 +2426,62 @@ function construirResumenMensualLeads(
       ([mes, total]) => ({
         "MES INGRESO":
           mes,
-
+      
         "LEADS":
           total.leads,
-
+      
         "PAX POTENCIALES":
           total.pax,
-
+      
+        "INGRESARON SIN ASIGNAR":
+          total.sinAsignarIngreso,
+      
+        "% INGRESO SIN ASIGNAR":
+          porcentaje(
+            total.sinAsignarIngreso,
+            total.leads
+          ),
+      
+        "ASIGNACIÓN NO REGISTRADA":
+          total.asignacionNoRegistrada,
+      
+        "PROMEDIO HORAS HASTA ASIGNACIÓN":
+          total.asignacionConTiempo
+            ? Number(
+                (
+                  total.totalHorasAsignacion /
+                  total.asignacionConTiempo
+                ).toFixed(2)
+              )
+            : "",
+      
+        "ASIGNADOS ≤ 4 H":
+          total.asignadosHasta4Horas,
+      
+        "ASIGNADOS ≤ 24 H":
+          total.asignadosHasta24Horas,
+      
+        "ASIGNADOS > 24 H":
+          total.asignadosMas24Horas,
+      
         "PASARON POR REUNIÓN":
           total.reuniones,
-
+      
         "GANADOS":
           total.ganados,
-
+      
         "PERDIDOS":
           total.perdidos,
-
+      
         "EN PROCESO":
           total.enProceso,
-
+      
         "% REUNIÓN":
           porcentaje(
             total.reuniones,
             total.leads
           ),
-
+      
         "% CONVERSIÓN":
           porcentaje(
             total.ganados,
@@ -2448,7 +2736,24 @@ function crearAcumuladorLeads() {
     reuniones: 0,
     ganados: 0,
     perdidos: 0,
-    enProceso: 0
+    enProceso: 0,
+
+    /*
+      Métricas asignación
+    */
+    sinAsignarIngreso: 0,
+
+    asignacionConTiempo: 0,
+
+    totalHorasAsignacion: 0,
+
+    asignadosHasta4Horas: 0,
+
+    asignadosHasta24Horas: 0,
+
+    asignadosMas24Horas: 0,
+
+    asignacionNoRegistrada: 0
   };
 }
 
@@ -2464,16 +2769,76 @@ function acumularLead(
       registro.cantidadGrupo || 0
     );
 
-  if (registro.pasoPorReunion) {
+
+  /* =====================================================
+     ASIGNACIÓN
+  ===================================================== */
+
+  if (
+    registro.ingresoSinAsignar === true
+  ) {
+    total.sinAsignarIngreso++;
+  }
+
+
+  if (
+    registro.ingresoSinAsignar === null
+  ) {
+    total.asignacionNoRegistrada++;
+  }
+
+
+  if (
+    registro.horasHastaAsignacion !== null &&
+    Number.isFinite(
+      registro.horasHastaAsignacion
+    )
+  ) {
+    const horas =
+      Number(
+        registro.horasHastaAsignacion
+      );
+
+    total.asignacionConTiempo++;
+
+    total.totalHorasAsignacion +=
+      horas;
+
+
+    if (horas <= 4) {
+      total.asignadosHasta4Horas++;
+    }
+
+
+    if (horas <= 24) {
+      total.asignadosHasta24Horas++;
+    } else {
+      total.asignadosMas24Horas++;
+    }
+  }
+
+
+  /* =====================================================
+     FUNNEL
+  ===================================================== */
+
+  if (
+    registro.pasoPorReunion
+  ) {
     total.reuniones++;
   }
 
-  if (registro.estado === "ganada") {
+
+  if (
+    registro.estado === "ganada"
+  ) {
     total.ganados++;
+
   } else if (
     registro.estado === "perdida"
   ) {
     total.perdidos++;
+
   } else {
     total.enProceso++;
   }
