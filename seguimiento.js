@@ -1698,6 +1698,11 @@ async function exportAnalisisLeadsToXlsx() {
         registros
       );
 
+    const resumenRolContacto =
+      construirResumenRolContactos(
+        registros
+      );
+
     const resumenCalidad =
       construirResumenCalidadLeads(
         registros
@@ -1730,6 +1735,11 @@ async function exportAnalisisLeadsToXlsx() {
         resumenOrigen
       );
 
+    const wsRolContacto =
+      XLSX.utils.json_to_sheet(
+        resumenRolContacto
+      );
+
     const wsCalidad =
       XLSX.utils.json_to_sheet(
         resumenCalidad
@@ -1740,42 +1750,67 @@ async function exportAnalisisLeadsToXlsx() {
     ===================================================== */
 
     wsDetalle["!cols"] = [
-      { wch: 12 }, // fecha
-      { wch: 8 },  // hora
-      { wch: 10 }, // mes
-      { wch: 10 }, // año
-      { wch: 12 }, // id
-      { wch: 18 }, // código
-      { wch: 38 }, // grupo
-      { wch: 32 }, // colegio
-      { wch: 12 }, // comuna
-      { wch: 10 }, // curso
-      { wch: 12 }, // curso viaje
-      { wch: 10 }, // año viaje
-      { wch: 10 }, // pax
-      { wch: 24 }, // vendedor
-      { wch: 30 }, // correo vendedor
-      { wch: 22 }, // creado por
-      { wch: 30 }, // creado correo
-      { wch: 18 }, // origen cliente
-      { wch: 18 }, // origen colegio
-      { wch: 18 }, // medio
-      { wch: 30 }, // detalle
-      { wch: 22 }, // estado
-      { wch: 20 }, // fecha cambio
-      { wch: 14 }, // reunión
-      { wch: 20 }, // fecha reunión
-      { wch: 20 }, // última gestión
-      { wch: 18 }, // tipo gestión
-      { wch: 18 }, // resultado
-      { wch: 18 }, // calidad
-      { wch: 30 }, // calidad detalle
-      { wch: 20 }, // destino
-      { wch: 24 }, // programa
-      { wch: 18 }, // mes viaje
-      { wch: 18 }  // tramo
+      { wch: 12 }, // FECHA INGRESO
+      { wch: 10 }, // HORA INGRESO
+      { wch: 12 }, // MES INGRESO
+      { wch: 12 }, // AÑO INGRESO
+    
+      { wch: 12 }, // ID GRUPO
+      { wch: 18 }, // CÓDIGO
+      { wch: 42 }, // GRUPO
+      { wch: 35 }, // COLEGIO
+      { wch: 22 }, // COMUNA
+      { wch: 14 }, // CURSO
+      { wch: 14 }, // CURSO VIAJE
+      { wch: 12 }, // AÑO VIAJE
+      { wch: 16 }, // PAX POTENCIALES
+    
+      { wch: 28 }, // CONTACTO 1
+      { wch: 22 }, // ROL CONTACTO 1
+      { wch: 32 }, // CORREO CONTACTO 1
+      { wch: 18 }, // CELULAR CONTACTO 1
+    
+      { wch: 28 }, // CONTACTO 2
+      { wch: 22 }, // ROL CONTACTO 2
+      { wch: 32 }, // CORREO CONTACTO 2
+      { wch: 18 }, // CELULAR CONTACTO 2
+    
+      { wch: 22 }, // INGRESÓ SIN ASIGNAR
+      { wch: 22 }, // FECHA ASIGNACIÓN
+      { wch: 24 }, // HORAS HASTA ASIGNACIÓN
+      { wch: 28 }, // VENDEDOR ASIGNADO INICIAL
+      { wch: 32 }, // CORREO VENDEDOR INICIAL
+    
+      { wch: 28 }, // VENDEDOR(A) ACTUAL
+      { wch: 32 }, // CORREO VENDEDOR(A)
+    
+      { wch: 22 }, // CREADO POR
+      { wch: 32 }, // CORREO CREADOR
+      { wch: 22 }, // ACTUALIZADO POR
+      { wch: 32 }, // CORREO ÚLTIMA ACTUALIZACIÓN
+    
+      { wch: 20 }, // ORIGEN CLIENTE
+      { wch: 20 }, // ORIGEN COLEGIO
+      { wch: 22 }, // MEDIO / CONTACTO
+      { wch: 30 }, // DETALLE ORIGEN
+    
+      { wch: 22 }, // ESTADO ACTUAL
+      { wch: 26 }, // FECHA ÚLTIMO CAMBIO ESTADO
+      { wch: 18 }, // PASÓ POR REUNIÓN
+      { wch: 24 }, // FECHA ÚLTIMA REUNIÓN
+      { wch: 24 }, // ÚLTIMA GESTIÓN
+      { wch: 24 }, // TIPO ÚLTIMA GESTIÓN
+      { wch: 16 }, // RESULTADO
+    
+      { wch: 18 }, // CALIDAD LEAD
+      { wch: 35 }, // DETALLE CALIDAD
+    
+      { wch: 22 }, // DESTINO
+      { wch: 28 }, // PROGRAMA
+      { wch: 18 }, // MES VIAJE
+      { wch: 18 }  // TRAMO
     ];
-
+    
     wsMensual["!cols"] = [
       { wch: 12 }, // mes
       { wch: 10 }, // leads
@@ -1819,6 +1854,18 @@ async function exportAnalisisLeadsToXlsx() {
       { wch: 16 }
     ];
 
+    wsRolContacto["!cols"] = [
+      { wch: 28 }, // ROL CONTACTO
+      { wch: 12 }, // LEADS
+      { wch: 18 }, // PAX
+      { wch: 14 }, // REUNIÓN
+      { wch: 14 }, // GANADOS
+      { wch: 14 }, // PERDIDOS
+      { wch: 16 }, // EN PROCESO
+      { wch: 16 }, // % REUNIÓN
+      { wch: 18 }  // % CONVERSIÓN
+    ];
+
     wsCalidad["!cols"] = [
       { wch: 18 },
       { wch: 10 },
@@ -1851,6 +1898,12 @@ async function exportAnalisisLeadsToXlsx() {
       wb,
       wsOrigen,
       "POR ORIGEN"
+    );
+
+    XLSX.utils.book_append_sheet(
+      wb,
+      wsRolContacto,
+      "POR ROL CONTACTO"
     );
 
     XLSX.utils.book_append_sheet(
@@ -1940,8 +1993,7 @@ function construirRegistroLead(
     por asignados.js / historialAsignaciones.
 
     FALSE:
-    en el futuro puede venir expresamente
-    guardado como ingresoSinAsignar:false.
+    ingresó directamente asignado.
 
     NULL:
     registro antiguo sin evidencia suficiente.
@@ -1995,6 +2047,7 @@ function construirRegistroLead(
             : null
         );
 
+
   const fechaUltimoCambioEstado =
     toDate(
       data.fechaUltimoCambioEstado ||
@@ -2002,12 +2055,14 @@ function construirRegistroLead(
       null
     );
 
+
   const ultimaGestionAt =
     toDate(
       data.ultimaGestionAt ||
       row.ultimaGestionAt ||
       null
     );
+
 
   const fechaUltimaReunion =
     toDate(
@@ -2018,6 +2073,7 @@ function construirRegistroLead(
       null
     );
 
+
   const estado =
     normalizeEstado(
       data.estado ||
@@ -2025,18 +2081,17 @@ function construirRegistroLead(
       ""
     );
 
+
   const ultimaGestionTipo =
     cleanText(
       data.ultimaGestionTipo ||
       ""
     );
 
+
   /*
     Marcamos reunión cuando existe
     evidencia concreta disponible.
-
-    No asumimos reunión solamente
-    porque el lead terminó ganado.
   */
   const pasoPorReunion =
     !!fechaUltimaReunion ||
@@ -2044,6 +2099,7 @@ function construirRegistroLead(
     normalizeText(
       ultimaGestionTipo
     ).includes("reunion");
+
 
   const cantidadGrupo =
     Number(
@@ -2053,26 +2109,28 @@ function construirRegistroLead(
       0
     ) || 0;
 
+
   const calidadLead =
     normalizarCalidadLead(
       data.calidadLead
     );
 
+
   return {
     _fechaCreacion:
       fechaCreacion,
-    
+
     _fechaAsignacion:
       fechaAsignacion,
-    
+
     ingresoSinAsignar,
-    
+
     horasHastaAsignacion,
-    
+
     vendedorAsignadoInicial,
-    
+
     vendedorAsignadoInicialCorreo,
-    
+
     _fechaUltimoCambioEstado:
       fechaUltimoCambioEstado,
 
@@ -2081,6 +2139,11 @@ function construirRegistroLead(
 
     _ultimaGestionAt:
       ultimaGestionAt,
+
+
+    /* =====================================================
+       IDENTIFICACIÓN DEL GRUPO
+    ===================================================== */
 
     idGrupo:
       cleanText(
@@ -2136,6 +2199,72 @@ function construirRegistroLead(
 
     cantidadGrupo,
 
+
+    /* =====================================================
+       CONTACTO PRINCIPAL
+    ===================================================== */
+
+    nombreCliente:
+      cleanText(
+        data.nombreCliente ||
+        data?.ficha?.apoderadoEncargado ||
+        ""
+      ),
+
+    rolCliente:
+      cleanText(
+        data.rolCliente ||
+        ""
+      ),
+
+    correoCliente:
+      cleanText(
+        data.correoCliente ||
+        data?.ficha?.correo ||
+        ""
+      ),
+
+    celularCliente:
+      cleanText(
+        data.celularCliente ||
+        data?.ficha?.telefono ||
+        ""
+      ),
+
+
+    /* =====================================================
+       SEGUNDO CONTACTO
+    ===================================================== */
+
+    nombreCliente2:
+      cleanText(
+        data.nombreCliente2 ||
+        ""
+      ),
+
+    rolCliente2:
+      cleanText(
+        data.rolCliente2 ||
+        ""
+      ),
+
+    correoCliente2:
+      cleanText(
+        data.correoCliente2 ||
+        ""
+      ),
+
+    celularCliente2:
+      cleanText(
+        data.celularCliente2 ||
+        ""
+      ),
+
+
+    /* =====================================================
+       VENDEDOR
+    ===================================================== */
+
     vendedora:
       cleanText(
         data.vendedora ||
@@ -2150,6 +2279,11 @@ function construirRegistroLead(
         ""
       ),
 
+
+    /* =====================================================
+       QUIÉN CREÓ EL LEAD
+    ===================================================== */
+
     creadoPor:
       cleanText(
         data.creadoPor
@@ -2160,6 +2294,28 @@ function construirRegistroLead(
         data.creadoPorCorreo ||
         ""
       ),
+
+
+    /* =====================================================
+       QUIÉN HIZO LA ÚLTIMA ACTUALIZACIÓN
+    ===================================================== */
+
+    actualizadoPor:
+      cleanText(
+        data.actualizadoPor ||
+        ""
+      ),
+
+    actualizadoPorCorreo:
+      normalizeEmail(
+        data.actualizadoPorCorreo ||
+        ""
+      ),
+
+
+    /* =====================================================
+       ORIGEN
+    ===================================================== */
 
     origenCliente:
       cleanText(
@@ -2181,6 +2337,11 @@ function construirRegistroLead(
         data.origenEspecificacionOtro
       ),
 
+
+    /* =====================================================
+       ESTADO / SEGUIMIENTO
+    ===================================================== */
+
     estado,
 
     pasoPorReunion,
@@ -2195,6 +2356,11 @@ function construirRegistroLead(
         data.calidadLeadDetalle ||
         ""
       ),
+
+
+    /* =====================================================
+       VIAJE
+    ===================================================== */
 
     destino:
       cleanText(
@@ -2228,7 +2394,6 @@ function construirRegistroLead(
   };
 }
 
-
 /* =========================================================
    FILA DETALLE XLSX
 ========================================================= */
@@ -2253,6 +2418,11 @@ function registroLeadParaExcel(
       fecha
         ? fecha.getFullYear()
         : "",
+
+
+    /* =====================================================
+       GRUPO
+    ===================================================== */
 
     "ID GRUPO":
       registro.idGrupo,
@@ -2280,19 +2450,58 @@ function registroLeadParaExcel(
 
     "PAX POTENCIALES":
       registro.cantidadGrupo,
-    
+
+
+    /* =====================================================
+       CONTACTO PRINCIPAL
+    ===================================================== */
+
+    "CONTACTO 1":
+      registro.nombreCliente,
+
+    "ROL CONTACTO 1":
+      registro.rolCliente,
+
+    "CORREO CONTACTO 1":
+      registro.correoCliente,
+
+    "CELULAR CONTACTO 1":
+      registro.celularCliente,
+
+
+    /* =====================================================
+       SEGUNDO CONTACTO
+    ===================================================== */
+
+    "CONTACTO 2":
+      registro.nombreCliente2,
+
+    "ROL CONTACTO 2":
+      registro.rolCliente2,
+
+    "CORREO CONTACTO 2":
+      registro.correoCliente2,
+
+    "CELULAR CONTACTO 2":
+      registro.celularCliente2,
+
+
+    /* =====================================================
+       ASIGNACIÓN
+    ===================================================== */
+
     "INGRESÓ SIN ASIGNAR":
       registro.ingresoSinAsignar === true
         ? "SI"
         : registro.ingresoSinAsignar === false
           ? "NO"
           : "NO REGISTRADO",
-    
+
     "FECHA ASIGNACIÓN":
       formatDateTimeText(
         registro._fechaAsignacion
       ),
-    
+
     "HORAS HASTA ASIGNACIÓN":
       registro.horasHastaAsignacion === null
         ? ""
@@ -2300,24 +2509,45 @@ function registroLeadParaExcel(
             registro.horasHastaAsignacion
               .toFixed(2)
           ),
-    
+
     "VENDEDOR ASIGNADO INICIAL":
       registro.vendedorAsignadoInicial,
-    
+
     "CORREO VENDEDOR INICIAL":
       registro.vendedorAsignadoInicialCorreo,
-    
+
+
+    /* =====================================================
+       VENDEDOR ACTUAL
+    ===================================================== */
+
     "VENDEDOR(A) ACTUAL":
       registro.vendedora,
 
     "CORREO VENDEDOR(A)":
       registro.vendedoraCorreo,
 
+
+    /* =====================================================
+       AUDITORÍA
+    ===================================================== */
+
     "CREADO POR":
       registro.creadoPor,
 
     "CORREO CREADOR":
       registro.creadoPorCorreo,
+
+    "ACTUALIZADO POR":
+      registro.actualizadoPor,
+
+    "CORREO ÚLTIMA ACTUALIZACIÓN":
+      registro.actualizadoPorCorreo,
+
+
+    /* =====================================================
+       ORIGEN
+    ===================================================== */
 
     "ORIGEN CLIENTE":
       registro.origenCliente,
@@ -2330,6 +2560,11 @@ function registroLeadParaExcel(
 
     "DETALLE ORIGEN":
       registro.origenEspecificacionOtro,
+
+
+    /* =====================================================
+       SEGUIMIENTO
+    ===================================================== */
 
     "ESTADO ACTUAL":
       STAGE_META[
@@ -2370,6 +2605,11 @@ function registroLeadParaExcel(
 
     "DETALLE CALIDAD":
       registro.calidadLeadComentario,
+
+
+    /* =====================================================
+       VIAJE
+    ===================================================== */
 
     "DESTINO":
       registro.destino,
@@ -2576,6 +2816,88 @@ function construirResumenVendedoresLeads(
     );
 }
 
+/* =========================================================
+   RESUMEN POR ROL DEL CONTACTO
+========================================================= */
+
+function construirResumenRolContactos(
+  registros
+) {
+  const mapa =
+    new Map();
+
+  for (const registro of registros) {
+    /*
+      El análisis se realiza sobre el
+      CONTACTO PRINCIPAL que originó el lead.
+    */
+    const rol =
+      cleanText(
+        registro.rolCliente
+      ) ||
+      "Sin definir";
+
+    if (!mapa.has(rol)) {
+      mapa.set(
+        rol,
+        {
+          rol,
+          ...crearAcumuladorLeads()
+        }
+      );
+    }
+
+    acumularLead(
+      mapa.get(rol),
+      registro
+    );
+  }
+
+  return [...mapa.values()]
+    .sort(
+      (a, b) =>
+        compareText(
+          a.rol,
+          b.rol
+        )
+    )
+    .map(
+      (total) => ({
+        "ROL CONTACTO":
+          total.rol,
+
+        "LEADS":
+          total.leads,
+
+        "PAX POTENCIALES":
+          total.pax,
+
+        "REUNIÓN":
+          total.reuniones,
+
+        "GANADOS":
+          total.ganados,
+
+        "PERDIDOS":
+          total.perdidos,
+
+        "EN PROCESO":
+          total.enProceso,
+
+        "% REUNIÓN":
+          porcentaje(
+            total.reuniones,
+            total.leads
+          ),
+
+        "% CONVERSIÓN":
+          porcentaje(
+            total.ganados,
+            total.leads
+          )
+      })
+    );
+}
 
 /* =========================================================
    RESUMEN POR ORIGEN
