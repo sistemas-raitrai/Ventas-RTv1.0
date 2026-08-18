@@ -32,6 +32,9 @@ const $ = (id) =>
 const LOTES_COLLECTION =
   "ventas_pulseras_nfc_lotes";
 
+const NFC_PORTAL_URL =
+  "https://comunicaciones-raitrai.vercel.app/";
+
 const state = {
   loteId: "",
   lote: null,
@@ -447,20 +450,22 @@ async function grabarActual() {
     const ndef =
       new NDEFReader();
 
+    const urlPulsera =
+      `${NFC_PORTAL_URL}?nfc=${encodeURIComponent(
+        String(
+          item.codigo ||
+          ""
+        )
+      )}`;
+    
     await ndef.write({
       records: [
         {
           recordType:
-            "text",
-
+            "url",
+    
           data:
-            String(
-              item.codigo ||
-              ""
-            ),
-
-          lang:
-            "es"
+            urlPulsera
         }
       ]
     });
