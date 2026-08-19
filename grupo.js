@@ -5355,16 +5355,27 @@ function normalizeCursoInput(value = "") {
 
 function hasValidCursoFormat(value = "") {
   const curso = normalizeCursoInput(value);
+
+  if (curso === "0") return true;
+
   return /^(?:11|10|[1-9])[A-Z]*$/.test(curso);
 }
 
 function extractCursoNumber(value = "") {
-  const match = normalizeCursoInput(value).match(/^(11|10|[1-9])/);
+  const curso = normalizeCursoInput(value);
+
+  if (curso === "0") return 0;
+
+  const match = curso.match(/^(11|10|[1-9])/);
   return match ? Number(match[1]) : null;
 }
 
 function extractCursoSuffix(value = "") {
-  const match = normalizeCursoInput(value).match(/^(?:11|10|[1-9])(.*)$/);
+  const curso = normalizeCursoInput(value);
+
+  if (curso === "0") return "";
+
+  const match = curso.match(/^(?:11|10|[1-9])(.*)$/);
   return match ? match[1] : "";
 }
 
@@ -5377,22 +5388,46 @@ function getNextCursoNumber(currentNumber) {
   return null;
 }
 
-function projectCursoToYear(cursoBase = "", anoBase = getCurrentYear(), anoViaje = getCurrentYear()) {
+function projectCursoToYear(
+  cursoBase = "",
+  anoBase = getCurrentYear(),
+  anoViaje = getCurrentYear()
+) {
   const baseCurso = normalizeCursoInput(cursoBase);
+
+  // 0 significa curso desconocido.
+  // No intentamos proyectarlo.
+  if (baseCurso === "0") {
+    return "0";
+  }
+
   const baseNumber = extractCursoNumber(baseCurso);
   const suffix = extractCursoSuffix(baseCurso);
   const fromYear = Number(anoBase);
   const toYear = Number(anoViaje);
 
-  if (!baseCurso || baseNumber === null) return "";
-  if (!Number.isFinite(fromYear) || !Number.isFinite(toYear) || toYear < fromYear) return "";
+  if (!baseCurso || baseNumber === null) {
+    return "";
+  }
+
+  if (
+    !Number.isFinite(fromYear) ||
+    !Number.isFinite(toYear) ||
+    toYear < fromYear
+  ) {
+    return "";
+  }
 
   let projectedNumber = baseNumber;
   const diff = toYear - fromYear;
 
   for (let i = 0; i < diff; i += 1) {
     const nextNumber = getNextCursoNumber(projectedNumber);
-    if (nextNumber === null) return "";
+
+    if (nextNumber === null) {
+      return "";
+    }
+
     projectedNumber = nextNumber;
   }
 
@@ -12221,6 +12256,32 @@ function buildAutomaticAlerts() {
     }
   }
 
+  if (state.group?.anoViajePorConfirmar === true) {
+    list.push({
+      id: `auto-ano-viaje-confirmar-${state.groupId}`,
+      nivel: "critica",
+      titulo: "AÑO DE VIAJE PENDIENTE DE CONFIRMAR",
+      mensaje:
+        `El año de viaje no era conocido al registrar este grupo. ` +
+        `Se utilizó ${state.group?.anoViaje || getCurrentYear()} provisionalmente. ` +
+        `Debe revisarse y corregirse desde Editar datos.`
+    });
+  }
+  
+  if (
+    state.group?.cursoPorConfirmar === true ||
+    normalizeCursoInput(state.group?.curso || "") === "0"
+  ) {
+    list.push({
+      id: `auto-curso-confirmar-${state.groupId}`,
+      nivel: "critica",
+      titulo: "CURSO PENDIENTE DE CONFIRMAR",
+      mensaje:
+        "El curso no era conocido al registrar este grupo. " +
+        "Debe revisarse y corregirse desde Editar datos."
+    });
+  }
+
   return list;
 }
 
@@ -14467,6 +14528,44 @@ async function saveDatos() {
       setNestedValue(patch, path, nuevo);
       cambios.push({ campo: path, anterior, nuevo });
     }
+  }
+
+  // =========================================================
+  // CONFIRMACIÓN DE DATOS PROVISIONALES
+  // =========================================================
+  
+  // Si el curso estaba pendiente y ahora existe un curso real,
+  // consideramos que fue revisado aunque el resto no haya cambiado.
+  if (
+    state.group?.cursoPorConfirmar === true &&
+    values.curso &&
+    values.curso !== "0"
+  ) {
+    patch.cursoPorConfirmar = false;
+  
+    cambios.push({
+      campo: "cursoPorConfirmar",
+      anterior: true,
+      nuevo: false
+    });
+  }
+  
+  // Si el año estaba pendiente, guardar Editar datos confirma
+  // expresamente el valor actualmente informado.
+  //
+  // Esto también cubre el caso:
+  // provisional 2026 -> confirmado 2026.
+  if (
+    state.group?.anoViajePorConfirmar === true &&
+    values.anoViaje
+  ) {
+    patch.anoViajePorConfirmar = false;
+  
+    cambios.push({
+      campo: "anoViajePorConfirmar",
+      anterior: true,
+      nuevo: false
+    });
   }
 
   // Si no cambió nada, no forzar validaciones ni guardado
