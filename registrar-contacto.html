@@ -562,14 +562,25 @@
       <form id="registroForm" class="registro-form">
         <div class="field col-2">
           <label for="inputCurso">Curso actual *</label>
+        
           <input
             id="inputCurso"
             type="text"
             placeholder="Ej: 4C, 3DAVINCI, 2A"
             autocomplete="off"
           />
+        
+          <label class="check-item">
+            <input
+              id="desconoceCurso"
+              type="checkbox"
+            />
+            DESCONOZCO EL CURSO
+          </label>
+        
           <div class="helper">
-            Debe llevar números y letras, sin espacios. Ejemplo: 4C, 3DAVINCI.
+            Si no conoces el curso, marca “Desconozco”.
+            El grupo quedará con una alerta crítica hasta confirmar el dato.
           </div>
         </div>
 
@@ -588,14 +599,73 @@
           </div>
         </div>
 
-        <div class="field col-1">
+        <div class="field col-2">
           <label for="anoViaje">Año del viaje *</label>
-          <input id="anoViaje" type="number" min="2026" max="2100" step="1" />
+        
+          <input
+            id="anoViaje"
+            type="number"
+            min="2026"
+            max="2100"
+            step="1"
+          />
+        
+          <label class="check-item">
+            <input
+              id="desconoceAnoViaje"
+              type="checkbox"
+            />
+            DESCONOZCO EL AÑO
+          </label>
+        
+          <div class="helper">
+            Si no conoces el año, se utilizará 2026 provisionalmente
+            y quedará una alerta crítica para revisarlo.
+          </div>
         </div>
 
         <div class="field col-3">
           <label for="comunaCiudad">Comuna o Ciudad</label>
           <input id="comunaCiudad" type="text" placeholder="Comuna o ciudad del grupo / cliente" />
+        </div>
+
+        <div
+          id="gruposExistentesWrap"
+          class="field col-12 hidden"
+        >
+          <div
+            style="
+              border:2px solid #d8c9ef;
+              border-radius:12px;
+              background:#faf8fd;
+              padding:14px;
+            "
+          >
+            <div
+              style="
+                font-weight:800;
+                color:var(--header);
+                margin-bottom:6px;
+              "
+            >
+              GRUPOS YA REGISTRADOS PARA ESTE COLEGIO / AÑO
+            </div>
+        
+            <div
+              id="gruposExistentesSummary"
+              class="helper"
+              style="margin-bottom:12px;"
+            ></div>
+        
+            <div
+              id="gruposExistentesList"
+              style="
+                display:flex;
+                flex-direction:column;
+                gap:10px;
+              "
+            ></div>
+          </div>
         </div>
 
         <div class="field col-1">
