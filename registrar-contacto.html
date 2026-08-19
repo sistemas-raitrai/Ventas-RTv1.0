@@ -539,7 +539,7 @@
     }
   </style>
 </head>
-<!--<body class="ventas-body" data-page="registrar-contacto">
+<body class="ventas-body" data-page="registrar-contacto">
   <div id="layout-top"></div>
 
   <main class="page-shell registro-page">
@@ -560,32 +560,13 @@
       </div>
 
       <form id="registroForm" class="registro-form">
-        <div class="field col-2">
-          <label for="inputCurso">Curso actual *</label>
+        <!-- =========================================================
+             IDENTIFICACIÓN PREVIA DEL GRUPO
+        ========================================================= -->
         
-          <input
-            id="inputCurso"
-            type="text"
-            placeholder="Ej: 4C, 3DAVINCI, 2A"
-            autocomplete="off"
-          />
-        
-          <label class="check-item">
-            <input
-              id="desconoceCurso"
-              type="checkbox"
-            />
-            DESCONOZCO EL CURSO
-          </label>
-        
-          <div class="helper">
-            Si no conoces el curso, marca “Desconozco”.
-            El grupo quedará con una alerta crítica hasta confirmar el dato.
-          </div>
-        </div>
-
         <div class="field col-4">
           <label for="inputColegio">Colegio *</label>
+        
           <input
             id="inputColegio"
             type="text"
@@ -593,12 +574,27 @@
             placeholder="Escribe o selecciona un colegio"
             autocomplete="off"
           />
+        
           <datalist id="listaColegios"></datalist>
+        
           <div class="helper">
-            Si coincide con la cartera, se asigna automáticamente al vendedor/a. Si no coincide, quedará sin asignar.
+            Si coincide con la cartera, se asigna automáticamente al vendedor/a.
+            Si no coincide, quedará sin asignar.
           </div>
         </div>
-
+        
+        
+        <div class="field col-3">
+          <label for="comunaCiudad">Comuna o Ciudad</label>
+        
+          <input
+            id="comunaCiudad"
+            type="text"
+            placeholder="Comuna o ciudad del grupo / cliente"
+          />
+        </div>
+        
+        
         <div class="field col-2">
           <label for="anoViaje">Año del viaje *</label>
         
@@ -623,12 +619,12 @@
             y quedará una alerta crítica para revisarlo.
           </div>
         </div>
-
-        <div class="field col-3">
-          <label for="comunaCiudad">Comuna o Ciudad</label>
-          <input id="comunaCiudad" type="text" placeholder="Comuna o ciudad del grupo / cliente" />
-        </div>
-
+        
+        
+        <!-- =========================================================
+             GRUPOS EXISTENTES DEL MISMO COLEGIO / AÑO
+        ========================================================= -->
+        
         <div
           id="gruposExistentesWrap"
           class="field col-12 hidden"
@@ -665,6 +661,35 @@
                 gap:10px;
               "
             ></div>
+          </div>
+        </div>
+        
+        
+        <!-- =========================================================
+             CURSO DEL NUEVO CONTACTO
+        ========================================================= -->
+        
+        <div class="field col-2">
+          <label for="inputCurso">Curso actual *</label>
+        
+          <input
+            id="inputCurso"
+            type="text"
+            placeholder="Ej: 4C, 3DAVINCI, 2A"
+            autocomplete="off"
+          />
+        
+          <label class="check-item">
+            <input
+              id="desconoceCurso"
+              type="checkbox"
+            />
+            DESCONOZCO EL CURSO
+          </label>
+        
+          <div class="helper">
+            Si no conoces el curso, marca “Desconozco”.
+            El grupo quedará con una alerta crítica hasta confirmar el dato.
           </div>
         </div>
 
