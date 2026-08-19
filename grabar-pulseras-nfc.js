@@ -601,39 +601,61 @@ async function marcarGrabada(
       const yaGrabada =
         pulseraData.grabada === true;
 
+      const urlPulsera =
+        `${NFC_PORTAL_URL}?nfc=${encodeURIComponent(
+          String(
+            pulseraData.codigo ||
+            item.codigo ||
+            ""
+          )
+        )}`;
+      
       transaction.update(
         pulseraRef,
         {
           estado:
             "GRABADA",
-
+      
           grabada:
             true,
-
+      
           error:
             false,
-
+      
           mensajeError:
             "",
-
+      
           verificada:
             true,
-
+      
+          formatoNfc:
+            "URL",
+      
+          urlNfc:
+            urlPulsera,
+      
+          codigoNfc:
+            String(
+              pulseraData.codigo ||
+              item.codigo ||
+              ""
+            ),
+      
           intentos:
             Number(
               pulseraData.intentos ||
               0
             ) + 1,
-
+      
           grabadaAt:
             serverTimestamp(),
-
+      
           grabadaPor:
             nombreUsuario(),
-
+      
           grabadaPorCorreo:
             state.email,
-
+      
           actualizadoAt:
             serverTimestamp()
         }
