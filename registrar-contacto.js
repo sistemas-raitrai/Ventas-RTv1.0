@@ -467,38 +467,60 @@ function updateAliasPreview() {
   const aliasPreview = $("aliasPreview");
   if (!aliasPreview) return;
 
-  const colegio = normalizeText($("inputColegio")?.value || "");
+  const colegio =
+    normalizeText(
+      $("inputColegio")?.value || ""
+    );
+
   const desconoceCurso =
     $("desconoceCurso")?.checked === true;
-  
+
   const desconoceAnoViaje =
     $("desconoceAnoViaje")?.checked === true;
-  
+
   const curso = desconoceCurso
     ? "0"
-    : normalizeCursoInput($("inputCurso")?.value || "");
-  
-  const anoBaseCurso = getCurrentYear();
-  
+    : normalizeCursoInput(
+        $("inputCurso")?.value || ""
+      );
+
+  const anoBaseCurso =
+    getCurrentYear();
+
   const anoViaje = desconoceAnoViaje
     ? String(getCurrentYear())
-    : normalizeText($("anoViaje")?.value || "");
+    : normalizeText(
+        $("anoViaje")?.value || ""
+      );
 
-  if (!colegio || !curso || !anoViaje || !hasValidCursoFormat(curso)) {
+  if (
+    !colegio ||
+    !curso ||
+    !anoViaje ||
+    !hasValidCursoFormat(curso)
+  ) {
     aliasPreview.textContent = "—";
     return;
   }
 
-  const cursoViaje = projectCursoToYear(curso, anoBase, anoViaje);
-  const alias = buildAliasGrupo({
-    cursoBase: curso,
-    anoBase,
-    cursoViaje,
-    anoViaje,
-    colegio
-  });
+  const cursoViaje =
+    projectCursoToYear(
+      curso,
+      anoBaseCurso,
+      anoViaje
+    );
 
-  aliasPreview.textContent = alias || "—";
+  const alias =
+    buildAliasGrupo({
+      cursoBase: curso,
+      anoBase: anoBaseCurso,
+      cursoViaje,
+      anoViaje,
+      colegio
+    });
+
+  aliasPreview.textContent =
+    alias || "—";
 }
 
 const GENERIC_SCHOOL_TOKENS = new Set([
