@@ -1464,17 +1464,65 @@ function closeSuccessModal() {
 
 function resetForm() {
   $("registroForm")?.reset();
-  $("anoViaje").value = getCurrentYear();
+
+  const anoViaje =
+    $("anoViaje");
+
+  const inputCurso =
+    $("inputCurso");
+
+  const desconoceCurso =
+    $("desconoceCurso");
+
+  const desconoceAnoViaje =
+    $("desconoceAnoViaje");
+
+  if (anoViaje) {
+    anoViaje.disabled = false;
+    anoViaje.value =
+      String(getCurrentYear());
+  }
+
+  if (inputCurso) {
+    inputCurso.disabled = false;
+    inputCurso.value = "";
+  }
+
+  if (desconoceCurso) {
+    desconoceCurso.checked = false;
+  }
+
+  if (desconoceAnoViaje) {
+    desconoceAnoViaje.checked = false;
+  }
+
+  state.coincidenciasTempranas = [];
+  state.registroResumenRows = [];
+
+  renderEarlyExistingGroups([]);
+
   clearAlertReviewState();
 
-  const btn = $("btnGuardarRegistro");
-  if (btn) btn.disabled = false;
+  const btn =
+    $("btnGuardarRegistro");
 
-  const tel1 = $("celularCliente");
-  const tel2 = $("celularCliente2");
+  if (btn) {
+    btn.disabled = false;
+  }
 
-  if (tel1) tel1.value = "+569";
-  if (tel2) tel2.value = "+569";
+  const tel1 =
+    $("celularCliente");
+
+  const tel2 =
+    $("celularCliente2");
+
+  if (tel1) {
+    tel1.value = "+569";
+  }
+
+  if (tel2) {
+    tel2.value = "+569";
+  }
 
   updateSchoolModeUI();
   updateConditionalFields();
@@ -2040,6 +2088,11 @@ function bindPageEvents() {
   const inputColegio = $("inputColegio");
   const inputCurso = $("inputCurso");
   const anoViaje = $("anoViaje");
+  const desconoceCurso =
+    $("desconoceCurso");
+  
+  const desconoceAnoViaje =
+    $("desconoceAnoViaje");
   const cantidadGrupo = $("cantidadGrupo");
   const comunaCiudad = $("comunaCiudad");
   const nombreCliente = $("nombreCliente");
@@ -2096,6 +2149,29 @@ function bindPageEvents() {
     });
   }
 
+  if (
+    desconoceCurso &&
+    !desconoceCurso.dataset.bound
+  ) {
+    desconoceCurso.dataset.bound = "1";
+  
+    desconoceCurso.addEventListener(
+      "change",
+      () => {
+        if (inputCurso) {
+          inputCurso.disabled =
+            desconoceCurso.checked;
+  
+          if (desconoceCurso.checked) {
+            inputCurso.value = "";
+          }
+        }
+  
+        updateAliasPreview();
+      }
+    );
+  }
+
   if (anoViaje && !anoViaje.dataset.bound) {
     anoViaje.dataset.bound = "1";
   
@@ -2112,6 +2188,32 @@ function bindPageEvents() {
     anoViaje.addEventListener(
       "change",
       handleAnoViajeChange
+    );
+  }
+
+  if (
+    desconoceAnoViaje &&
+    !desconoceAnoViaje.dataset.bound
+  ) {
+    desconoceAnoViaje.dataset.bound = "1";
+  
+    desconoceAnoViaje.addEventListener(
+      "change",
+      async () => {
+        if (anoViaje) {
+          anoViaje.disabled =
+            desconoceAnoViaje.checked;
+  
+          if (desconoceAnoViaje.checked) {
+            anoViaje.value =
+              String(getCurrentYear());
+          }
+        }
+  
+        updateAliasPreview();
+  
+        await refreshEarlyExistingGroups();
+      }
     );
   }
 
