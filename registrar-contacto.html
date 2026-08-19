@@ -13,9 +13,10 @@
     }
 
     .registro-panel{
-      background:#efefef;
-      border:3px dashed var(--line);
-      padding:20px 22px;
+      background:#f2f0f5;
+      border:1px solid #d8d1df;
+      border-radius:22px;
+      padding:22px;
     }
 
     .registro-title h2{
@@ -147,15 +148,23 @@
     .field select,
     .field textarea{
       width:100%;
-      min-height:46px;
-      border:2px solid var(--line);
-      border-radius:8px;
+      min-height:44px;
+      border:1px solid #cfc6d8;
+      border-radius:10px;
       background:#fff;
       padding:10px 12px;
       font-size:14px;
       color:var(--header);
       box-sizing:border-box;
       text-transform:uppercase;
+      outline:none;
+    }
+    
+    .field input:focus,
+    .field select:focus,
+    .field textarea:focus{
+      border-color:#8b6ca4;
+      box-shadow:0 0 0 3px rgba(74,37,112,.10);
     }
     
     /* El correo electrónico debe mantenerse tal cual */
@@ -216,6 +225,169 @@
       margin:0;
       padding:0;
       border:none;
+    }
+
+    /* =========================================================
+       GRUPOS EXISTENTES
+    ========================================================= */
+    
+    .existing-groups-block{
+      background:#f7f3fa;
+      border:1px solid #e2d9e8;
+      border-radius:16px;
+      padding:16px;
+    }
+    
+    .existing-groups-head{
+      display:flex;
+      justify-content:space-between;
+      align-items:flex-start;
+      gap:14px;
+      flex-wrap:wrap;
+      margin-bottom:14px;
+    }
+    
+    .existing-groups-title{
+      margin:0;
+      color:#2b1940;
+      font-size:16px;
+      font-weight:900;
+    }
+    
+    .existing-groups-summary{
+      margin-top:4px;
+      color:#776b83;
+      font-size:12px;
+    }
+    
+    .existing-groups-grid{
+      display:grid;
+      grid-template-columns:repeat(3, minmax(0, 1fr));
+      gap:12px;
+    }
+    
+    .existing-group-card{
+      background:#fff;
+      border:1px solid #ddd5e4;
+      border-radius:14px;
+      padding:14px;
+      min-width:0;
+      transition:
+        transform .15s ease,
+        border-color .15s ease,
+        box-shadow .15s ease;
+    }
+    
+    .existing-group-card:hover{
+      transform:translateY(-1px);
+      border-color:#8b6ca4;
+      box-shadow:0 7px 18px rgba(43,25,64,.09);
+    }
+    
+    .existing-group-main{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+      margin-bottom:10px;
+    }
+    
+    .existing-group-course{
+      color:#2b1940;
+      font-size:22px;
+      font-weight:900;
+      line-height:1;
+    }
+    
+    .existing-group-status{
+      display:inline-flex;
+      align-items:center;
+      min-height:26px;
+      padding:0 9px;
+      border-radius:999px;
+      background:#ece7f0;
+      color:#6b6178;
+      font-size:10px;
+      font-weight:900;
+      text-transform:uppercase;
+    }
+    
+    .existing-group-status.estado-ganada{
+      background:#dcfce7;
+      color:#166534;
+    }
+    
+    .existing-group-status.estado-perdida{
+      background:#fee2e2;
+      color:#991b1b;
+    }
+    
+    .existing-group-status.estado-reunion_confirmada{
+      background:#dcfce7;
+      color:#166534;
+    }
+    
+    .existing-group-status.estado-cotizando,
+    .existing-group-status.estado-recotizando{
+      background:#fef3c7;
+      color:#a16207;
+    }
+    
+    .existing-group-status.estado-contactado{
+      background:#ffedd5;
+      color:#9a3412;
+    }
+    
+    .existing-group-info{
+      display:flex;
+      flex-direction:column;
+      gap:5px;
+      margin-bottom:12px;
+    }
+    
+    .existing-group-row{
+      color:#6f647a;
+      font-size:12px;
+      line-height:1.35;
+    }
+    
+    .existing-group-row strong{
+      color:#382747;
+    }
+    
+    .existing-group-actions{
+      margin-top:12px;
+    }
+    
+    .existing-group-actions .btn-secondary{
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      min-height:38px;
+      padding:0 13px;
+      border:0;
+      border-radius:10px;
+      background:#6b6178;
+      color:#fff;
+      font-size:12px;
+      font-weight:800;
+      text-decoration:none;
+    }
+    
+    .existing-group-actions .btn-secondary:hover{
+      background:#554a61;
+    }
+    
+    @media (max-width:980px){
+      .existing-groups-grid{
+        grid-template-columns:repeat(2, minmax(0, 1fr));
+      }
+    }
+    
+    @media (max-width:720px){
+      .existing-groups-grid{
+        grid-template-columns:1fr;
+      }
     }
 
     .form-actions{
@@ -624,44 +796,32 @@
         <!-- =========================================================
              GRUPOS EXISTENTES DEL MISMO COLEGIO / AÑO
         ========================================================= -->
-        
+
         <div
           id="gruposExistentesWrap"
           class="field col-12 hidden"
         >
-          <div
-            style="
-              border:2px solid #d8c9ef;
-              border-radius:12px;
-              background:#faf8fd;
-              padding:14px;
-            "
-          >
-            <div
-              style="
-                font-weight:800;
-                color:var(--header);
-                margin-bottom:6px;
-              "
-            >
-              GRUPOS YA REGISTRADOS PARA ESTE COLEGIO / AÑO
+          <section class="existing-groups-block">
+        
+            <div class="existing-groups-head">
+              <div>
+                <h3 class="existing-groups-title">
+                  Grupos ya registrados
+                </h3>
+        
+                <div
+                  id="gruposExistentesSummary"
+                  class="existing-groups-summary"
+                ></div>
+              </div>
             </div>
         
             <div
-              id="gruposExistentesSummary"
-              class="helper"
-              style="margin-bottom:12px;"
+              id="gruposExistentesList"
+              class="existing-groups-grid"
             ></div>
         
-            <div
-              id="gruposExistentesList"
-              style="
-                display:flex;
-                flex-direction:column;
-                gap:10px;
-              "
-            ></div>
-          </div>
+          </section>
         </div>
         
         
