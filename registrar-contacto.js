@@ -5,7 +5,9 @@ import {
   getDocs,
   setDoc,
   addDoc,
-  serverTimestamp
+  serverTimestamp,
+  query,
+  where
 } from "https://www.gstatic.com/firebasejs/11.7.3/firebase-firestore.js";
 
 import { auth, db, VENTAS_USERS, getVentasUserEmails } from "./firebase-init.js";
@@ -49,8 +51,13 @@ const state = {
   realUser: null,
   effectiveUser: null,
   carteraOptions: [],
+
+  registroResumenRows: [],
+  coincidenciasTempranas: [],
+
   lastCreated: null,
-  pendingAlertReview: null
+  pendingAlertReview: null,
+  pendingRegistroResumenDocs: null
 };
 
 /* =========================================================
@@ -101,20 +108,27 @@ function normalizeCursoInput(value = "") {
 function hasValidCursoFormat(value = "") {
   const curso = normalizeCursoInput(value);
 
-  // Reglas válidas:
-  // 1 a 8  -> pueden llevar letras: 4, 4A, 8DAVINCI
-  // 9 a 11 -> para colegios con sistema americano: 9, 10, 11, 10A, 11DAVINCI
-  // Siempre todo junto y sin espacios
+  // 0 = curso todavía desconocido
+  if (curso === "0") return true;
+
   return /^(?:11|10|[1-9])[A-Z]*$/.test(curso);
 }
 
 function extractCursoNumber(value = "") {
-  const match = normalizeCursoInput(value).match(/^(11|10|[1-9])/);
+  const curso = normalizeCursoInput(value);
+
+  if (curso === "0") return 0;
+
+  const match = curso.match(/^(11|10|[1-9])/);
   return match ? Number(match[1]) : null;
 }
 
 function extractCursoSuffix(value = "") {
-  const match = normalizeCursoInput(value).match(/^(?:11|10|[1-9])(.*)$/);
+  const curso = normalizeCursoInput(value);
+
+  if (curso === "0") return "";
+
+  const match = curso.match(/^(?:11|10|[1-9])(.*)$/);
   return match ? match[1] : "";
 }
 
@@ -133,15 +147,25 @@ function getNextCursoNumber(currentNumber) {
   return null;
 }
 
-function projectCursoToYear(cursoBase = "", anoBase = getCurrentYear(), anoViaje = getCurrentYear()) {
+function projectCursoToYear(
+  cursoBase = "",
+  anoBase = getCurrentYear(),
+  anoViaje = getCurrentYear()
+) {
   const baseCurso = normalizeCursoInput(cursoBase);
+
+  // Curso desconocido continúa siendo desconocido.
+  if (baseCurso === "0") return "0";
+
   const baseNumber = extractCursoNumber(baseCurso);
   const suffix = extractCursoSuffix(baseCurso);
   const fromYear = Number(anoBase);
   const toYear = Number(anoViaje);
 
   if (!baseCurso || baseNumber === null) return "";
-  if (!Number.isFinite(fromYear) || !Number.isFinite(toYear) || toYear < fromYear) return "";
+  if (!Number.isFinite(fromYear) || !Number.isFinite(toYear) || toYear < fromYear) {
+    return "";
+  }
 
   let projectedNumber = baseNumber;
   const diff = toYear - fromYear;
@@ -225,8 +249,191 @@ function buildTripKeyFromExistingDoc(data = {}) {
   return buildAliasTripKey({ colegio, comuna, cursoViaje, anoViaje });
 }
 
-async function loadCotizacionesDocsForReview() {
-  const snap = await getDocs(collection(db, "ventas_cotizaciones"));
+async function loadRegistroResumenByYear(anoViaje = "") {
+  const year = normalizeText(anoViaje || "");
+
+  if (!year) return [];
+
+  const snap = await getDocs(
+    query(
+      collection(db, "ventas_registro_resumen"),
+      where("anoViaje", "==", year)
+    )
+  );
+
+  return snap.docs.map((row) => ({
+    id: row.id,
+    ...row.data()
+  }));
+}
+
+function getEarlySchoolMatches(rows = [], colegio = "", comuna = "") {
+  const colegioInput = normalizeText(colegio || "");
+  const comunaInput = normalizeSearch(comuna || "");
+
+  if (!colegioInput) return [];
+
+  return rows
+    .map((row) => {
+      const schoolSimilarity = getSchoolSimilarity(
+        colegioInput,
+        row.colegio || row.colegioBase || ""
+      );
+
+      const rowComuna = normalizeSearch(
+        row.comunaCiudad || row.comuna || ""
+      );
+
+      const sameComuna =
+        comunaInput &&
+        rowComuna &&
+        comunaInput === rowComuna;
+
+      return {
+        ...row,
+        schoolSimilarity,
+        sameComuna
+      };
+    })
+    .filter((row) => {
+      // Nombre casi exacto
+      if (row.schoolSimilarity >= 0.90) return true;
+
+      // Nombre razonablemente parecido + misma comuna
+      if (row.schoolSimilarity >= 0.72 && row.sameComuna) return true;
+
+      return false;
+    })
+    .sort((a, b) => {
+      if (a.sameComuna !== b.sameComuna) {
+        return a.sameComuna ? -1 : 1;
+      }
+
+      return b.schoolSimilarity - a.schoolSimilarity;
+    });
+}
+
+function renderEarlyExistingGroups(matches = []) {
+  const wrap = $("gruposExistentesWrap");
+  const list = $("gruposExistentesList");
+  const summary = $("gruposExistentesSummary");
+
+  if (!wrap || !list || !summary) return;
+
+  if (!matches.length) {
+    wrap.classList.add("hidden");
+    list.innerHTML = "";
+    summary.textContent = "";
+    return;
+  }
+
+  wrap.classList.remove("hidden");
+
+  summary.textContent =
+    `Encontramos ${matches.length} grupo(s) que podrían corresponder a este colegio y año. Revisa antes de registrar un curso nuevo.`;
+
+  list.innerHTML = matches.map((item) => {
+    const curso =
+      normalizeText(item.cursoViaje || item.curso || "") ||
+      "CURSO SIN INFORMAR";
+
+    const contacto1 =
+      normalizeText(item.nombreCliente || "");
+
+    const contacto2 =
+      normalizeText(item.nombreCliente2 || "");
+
+    const contactos = [contacto1, contacto2]
+      .filter(Boolean)
+      .join(" · ");
+
+    return `
+      <article class="existing-group-card">
+        <div class="existing-group-main">
+          <strong>${curso}</strong>
+
+          <span>
+            ${normalizeText(item.estado || "A contactar")}
+          </span>
+        </div>
+
+        <div class="helper">
+          ${normalizeText(item.aliasGrupo || item.colegio || "")}
+        </div>
+
+        ${
+          contactos
+            ? `<div class="helper">Responsables: ${contactos}</div>`
+            : ""
+        }
+
+        <div class="existing-group-actions">
+          <a
+            class="btn-secondary"
+            href="${DETALLE_GRUPO_URL}?id=${encodeURIComponent(item.idGrupo || item.id)}"
+            target="_blank"
+            rel="noopener"
+          >
+            Abrir grupo
+          </a>
+        </div>
+      </article>
+    `;
+  }).join("");
+}
+
+async function refreshEarlyExistingGroups() {
+  const colegio =
+    normalizeText($("inputColegio")?.value || "");
+
+  const comuna =
+    normalizeText($("comunaCiudad")?.value || "");
+
+  const desconoceAno =
+    $("desconoceAnoViaje")?.checked === true;
+
+  const anoViaje = desconoceAno
+    ? ""
+    : normalizeText($("anoViaje")?.value || "");
+
+  if (!colegio || !anoViaje) {
+    state.coincidenciasTempranas = [];
+    renderEarlyExistingGroups([]);
+    return;
+  }
+
+  try {
+    const rows =
+      await loadRegistroResumenByYear(anoViaje);
+
+    state.registroResumenRows = rows;
+
+    const matches =
+      getEarlySchoolMatches(
+        rows,
+        colegio,
+        comuna
+      );
+
+    state.coincidenciasTempranas = matches;
+
+    renderEarlyExistingGroups(matches);
+  } catch (error) {
+    console.error(
+      "[registro] refreshEarlyExistingGroups",
+      error
+    );
+
+    state.coincidenciasTempranas = [];
+    renderEarlyExistingGroups([]);
+  }
+}
+
+async function loadRegistroResumenDocsForReview() {
+  const snap = await getDocs(
+    collection(db, "ventas_registro_resumen")
+  );
+
   return snap.docs;
 }
 
@@ -235,7 +442,11 @@ async function findExistingAliasConflict(targetTripKey = "", docs = null) {
 
   const rows = Array.isArray(docs)
     ? docs
-    : (await getDocs(collection(db, "ventas_cotizaciones"))).docs;
+    : (
+        await getDocs(
+          collection(db, "ventas_registro_resumen")
+        )
+      ).docs;
 
   for (const row of rows) {
     const data = row.data() || {};
@@ -257,9 +468,21 @@ function updateAliasPreview() {
   if (!aliasPreview) return;
 
   const colegio = normalizeText($("inputColegio")?.value || "");
-  const curso = normalizeCursoInput($("inputCurso")?.value || "");
-  const anoBase = getCurrentYear();
-  const anoViaje = normalizeText($("anoViaje")?.value || "");
+  const desconoceCurso =
+    $("desconoceCurso")?.checked === true;
+  
+  const desconoceAnoViaje =
+    $("desconoceAnoViaje")?.checked === true;
+  
+  const curso = desconoceCurso
+    ? "0"
+    : normalizeCursoInput($("inputCurso")?.value || "");
+  
+  const anoBaseCurso = getCurrentYear();
+  
+  const anoViaje = desconoceAnoViaje
+    ? String(getCurrentYear())
+    : normalizeText($("anoViaje")?.value || "");
 
   if (!colegio || !curso || !anoViaje || !hasValidCursoFormat(curso)) {
     aliasPreview.textContent = "—";
@@ -518,7 +741,11 @@ function buildAlertReviewCardsHtml(matches = []) {
 async function findPotentialDuplicateAlerts(data = {}, docs = null) {
   const rows = Array.isArray(docs)
     ? docs
-    : (await getDocs(collection(db, "ventas_cotizaciones"))).docs;
+    : (
+        await getDocs(
+          collection(db, "ventas_registro_resumen")
+        )
+      ).docs;
 
   const currentYear = getCurrentYear();
   const inputYear = Number(data.anoViaje || "");
@@ -1172,6 +1399,14 @@ function updateSchoolModeUI() {
   }
 
   updateAliasPreview();
+  
+  refreshEarlyExistingGroups()
+    .catch((error) => {
+      console.error(
+        "[registro] revisión temprana",
+        error
+      );
+    });
 }
 
 function updateConditionalFields() {
@@ -1351,9 +1586,25 @@ function readFormData() {
     ? normalizeText(carteraOpt?.comuna || comunaInput)
     : comunaInput;
 
-  const curso = normalizeCursoInput($("inputCurso")?.value || "");
+  const desconoceCurso =
+    $("desconoceCurso")?.checked === true;
+  
+  const desconoceAnoViaje =
+    $("desconoceAnoViaje")?.checked === true;
+  
+  const curso = desconoceCurso
+    ? "0"
+    : normalizeCursoInput(
+        $("inputCurso")?.value || ""
+      );
+  
   const anoBaseCurso = getCurrentYear();
-  const anoViaje = normalizeText($("anoViaje")?.value || "");
+  
+  const anoViaje = desconoceAnoViaje
+    ? String(getCurrentYear())
+    : normalizeText(
+        $("anoViaje")?.value || ""
+      );
   const cantidadGrupoRaw = normalizeText($("cantidadGrupo")?.value || "");
   const cantidadGrupoNum = Number(cantidadGrupoRaw);
   const cantidadGrupo = Number.isFinite(cantidadGrupoNum) ? cantidadGrupoNum : "";
@@ -1394,6 +1645,8 @@ function readFormData() {
     curso,
     anoBaseCurso: String(anoBaseCurso),
     cursoViaje,
+    cursoPorConfirmar: desconoceCurso,
+    anoViajePorConfirmar: desconoceAnoViaje,
     aliasGrupo,
     aliasTripKey,
     cantidadGrupo,
@@ -1524,10 +1777,17 @@ async function saveRegistro(e) {
       progress: 35
     });
 
-    const cotizacionesDocs = await loadCotizacionesDocsForReview();
-    state.pendingCotizacionesDocs = cotizacionesDocs;
-
-    const conflict = await findExistingAliasConflict(data.aliasTripKey, cotizacionesDocs);
+    const registroResumenDocs =
+      await loadRegistroResumenDocsForReview();
+    
+    state.pendingRegistroResumenDocs =
+      registroResumenDocs;
+    
+    const conflict =
+      await findExistingAliasConflict(
+        data.aliasTripKey,
+        registroResumenDocs
+      );
 
     if (conflict) {
       const conflictCode = normalizeText(conflict.data?.codigoRegistro || conflict.id || "");
@@ -1552,7 +1812,11 @@ async function saveRegistro(e) {
       progress: 62
     });
 
-    const alerts = await findPotentialDuplicateAlerts(data, cotizacionesDocs);
+    const alerts =
+      await findPotentialDuplicateAlerts(
+        data,
+        registroResumenDocs
+      );
 
     if (alerts.length) {
       state.pendingAlertReview = { data, alerts };
@@ -1576,9 +1840,8 @@ async function saveRegistro(e) {
     });
   } finally {
     if (!state.pendingAlertReview) {
-      state.pendingCotizacionesDocs = null;
+      state.pendingRegistroResumenDocs = null;
     }
-  
     if (btn && !state.pendingAlertReview) {
       btn.disabled = false;
     }
@@ -1601,7 +1864,7 @@ async function persistRegistro({
       progress: 78
     });
 
-    const idGrupo = await getNextSequentialIdGrupo(state.pendingCotizacionesDocs || null);
+    const idGrupo = await getNextSequentialIdGrupo();
     const newRef = doc(db, "ventas_cotizaciones", idGrupo);
     const codigoRegistro = buildCodigoRegistro(idGrupo);
 
@@ -1626,6 +1889,10 @@ async function persistRegistro({
       curso: data.curso,
       anoBaseCurso: data.anoBaseCurso,
       cursoViaje: data.cursoViaje,
+      
+      cursoPorConfirmar: data.cursoPorConfirmar === true,
+      anoViajePorConfirmar: data.anoViajePorConfirmar === true,
+      
       aliasGrupo: data.aliasGrupo,
       aliasTripKey: data.aliasTripKey,
       cantidadGrupo: data.cantidadGrupo,
@@ -1718,7 +1985,7 @@ async function persistRegistro({
       type: "error"
     });
   } finally {
-    state.pendingCotizacionesDocs = null;
+    state.pendingRegistroResumenDocs = null;
   
     if (btn) btn.disabled = false;
   }
@@ -1809,8 +2076,21 @@ function bindPageEvents() {
 
   if (anoViaje && !anoViaje.dataset.bound) {
     anoViaje.dataset.bound = "1";
-    anoViaje.addEventListener("input", updateAliasPreview);
-    anoViaje.addEventListener("change", updateAliasPreview);
+  
+    const handleAnoViajeChange = async () => {
+      updateAliasPreview();
+      await refreshEarlyExistingGroups();
+    };
+  
+    anoViaje.addEventListener(
+      "input",
+      handleAnoViajeChange
+    );
+  
+    anoViaje.addEventListener(
+      "change",
+      handleAnoViajeChange
+    );
   }
 
   if (cantidadGrupo && !cantidadGrupo.dataset.bound) {
