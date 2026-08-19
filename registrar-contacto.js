@@ -314,11 +314,22 @@ function getEarlySchoolMatches(rows = [], colegio = "", comuna = "") {
 }
 
 function renderEarlyExistingGroups(matches = []) {
-  const wrap = $("gruposExistentesWrap");
-  const list = $("gruposExistentesList");
-  const summary = $("gruposExistentesSummary");
+  const wrap =
+    $("gruposExistentesWrap");
 
-  if (!wrap || !list || !summary) return;
+  const list =
+    $("gruposExistentesList");
+
+  const summary =
+    $("gruposExistentesSummary");
+
+  if (
+    !wrap ||
+    !list ||
+    !summary
+  ) {
+    return;
+  }
 
   if (!matches.length) {
     wrap.classList.add("hidden");
@@ -329,57 +340,147 @@ function renderEarlyExistingGroups(matches = []) {
 
   wrap.classList.remove("hidden");
 
+  const anoViaje =
+    normalizeText(
+      $("anoViaje")?.value || ""
+    );
+
   summary.textContent =
-    `Encontramos ${matches.length} grupo(s) que podrían corresponder a este colegio y año. Revisa antes de registrar un curso nuevo.`;
+    `${matches.length} grupo(s) encontrado(s)` +
+    `${anoViaje ? ` · viaje ${anoViaje}` : ""}. ` +
+    `Revisa si el contacto corresponde a alguno antes de registrar uno nuevo.`;
 
-  list.innerHTML = matches.map((item) => {
-    const curso =
-      normalizeText(item.cursoViaje || item.curso || "") ||
-      "CURSO SIN INFORMAR";
+  list.innerHTML =
+    matches
+      .map((item) => {
+        const cursoViaje =
+          normalizeText(
+            item.cursoViaje ||
+            item.curso ||
+            ""
+          ) ||
+          "SIN CURSO";
 
-    const contacto1 =
-      normalizeText(item.nombreCliente || "");
+        const cursoActual =
+          normalizeText(
+            item.curso || ""
+          );
 
-    const contacto2 =
-      normalizeText(item.nombreCliente2 || "");
+        const estado =
+          normalizeText(
+            item.estado ||
+            "A CONTACTAR"
+          );
 
-    const contactos = [contacto1, contacto2]
-      .filter(Boolean)
-      .join(" · ");
+        const estadoKey =
+          normalizeSearch(estado)
+            .replace(/\s+/g, "_");
 
-    return `
-      <article class="existing-group-card">
-        <div class="existing-group-main">
-          <strong>${curso}</strong>
+        const contacto1 =
+          normalizeText(
+            item.nombreCliente || ""
+          );
 
-          <span>
-            ${normalizeText(item.estado || "A contactar")}
-          </span>
-        </div>
+        const contacto2 =
+          normalizeText(
+            item.nombreCliente2 || ""
+          );
 
-        <div class="helper">
-          ${normalizeText(item.aliasGrupo || item.colegio || "")}
-        </div>
+        const contactos =
+          [
+            contacto1,
+            contacto2
+          ]
+            .filter(Boolean)
+            .join(" · ");
 
-        ${
-          contactos
-            ? `<div class="helper">Responsables: ${contactos}</div>`
-            : ""
+        const anoBase =
+          normalizeText(
+            item.anoBaseCurso || ""
+          );
+
+        const ano =
+          normalizeText(
+            item.anoViaje || ""
+          );
+
+        let cursoDetalle = "";
+
+        if (
+          cursoActual &&
+          cursoActual !== cursoViaje
+        ) {
+          cursoDetalle =
+            `${cursoActual}` +
+            `${anoBase ? ` (${anoBase})` : ""}` +
+            ` → ${cursoViaje}` +
+            `${ano ? ` (${ano})` : ""}`;
+        } else {
+          cursoDetalle =
+            `${cursoViaje}` +
+            `${ano ? ` · ${ano}` : ""}`;
         }
 
-        <div class="existing-group-actions">
-          <a
-            class="btn-secondary"
-            href="${DETALLE_GRUPO_URL}?id=${encodeURIComponent(item.idGrupo || item.id)}"
-            target="_blank"
-            rel="noopener"
-          >
-            Abrir grupo
-          </a>
-        </div>
-      </article>
-    `;
-  }).join("");
+        return `
+          <article class="existing-group-card">
+
+            <div class="existing-group-main">
+
+              <div class="existing-group-course">
+                ${cursoViaje}
+              </div>
+
+              <span
+                class="
+                  existing-group-status
+                  estado-${estadoKey}
+                "
+              >
+                ${estado}
+              </span>
+
+            </div>
+
+            <div class="existing-group-info">
+
+              <div class="existing-group-row">
+                <strong>Curso:</strong>
+                ${cursoDetalle}
+              </div>
+
+              ${
+                contactos
+                  ? `
+                    <div class="existing-group-row">
+                      <strong>Responsables:</strong>
+                      ${contactos}
+                    </div>
+                  `
+                  : ""
+              }
+
+            </div>
+
+            <div class="existing-group-actions">
+
+              <a
+                class="btn-secondary"
+                href="${DETALLE_GRUPO_URL}?id=${encodeURIComponent(
+                  item.idGrupo ||
+                  item.id
+                )}"
+                target="_blank"
+                rel="noopener"
+              >
+                Abrir grupo
+              </a>
+
+            </div>
+
+          </article>
+        `;
+      })
+      .join("");
 }
 
 async function refreshEarlyExistingGroups() {
