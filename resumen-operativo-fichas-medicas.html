@@ -1,31 +1,49 @@
-<!DOCTYPE html>
+<!doctype html>
+
 <html lang="es">
 <head>
-  <meta charset="UTF-8">
+  <meta charset="utf-8">
 
   <meta
     name="viewport"
-    content="width=device-width, initial-scale=1.0"
+    content="width=device-width, initial-scale=1"
   >
 
   <title>
-    Resumen operativo de salud
+    Resumen operativo de salud | Sistema Ventas RT
   </title>
 
+  <link
+    rel="icon"
+    type="image/png"
+    href="IMG/logo-raitrai.png"
+  >
+
   <style>
+    /*
+      =====================================================
+      BASE
+      =====================================================
+    */
+
     * {
       box-sizing: border-box;
     }
 
+    html {
+      background: #eef2f6;
+    }
+
     body {
       margin: 0;
-      padding: 24px;
+      padding: 22px;
       font-family:
         Arial,
         Helvetica,
         sans-serif;
-      color: #172033;
-      background: #f5f7fb;
+      color: #152033;
+      background: #eef2f6;
+      font-size: 13px;
     }
 
     .hidden {
@@ -33,260 +51,579 @@
     }
 
     .page {
-      max-width: 1500px;
+      width: 100%;
+      max-width: 1180px;
       margin: 0 auto;
     }
+
+
+    /*
+      =====================================================
+      TOOLBAR
+      =====================================================
+    */
 
     .toolbar {
       display: flex;
       flex-wrap: wrap;
-      gap: 10px;
       align-items: center;
-      margin-bottom: 20px;
+      gap: 10px;
+      margin-bottom: 16px;
     }
 
-    .toolbar button,
-    .toolbar a {
-      border: 0;
+    .toolbar a,
+    .toolbar button {
       border-radius: 8px;
-      padding: 10px 15px;
-      font-size: 14px;
+      border: 1px solid #d5dde7;
+      padding: 9px 13px;
+      font-family: inherit;
+      font-size: 13px;
       font-weight: 700;
-      cursor: pointer;
       text-decoration: none;
-    }
-
-    .btn-primary {
-      background: #233876;
-      color: #fff;
+      cursor: pointer;
     }
 
     .btn-light {
-      background: #fff;
-      color: #233876;
-      border: 1px solid #cfd7e6 !important;
+      background: #ffffff;
+      color: #263a70;
     }
 
     .btn-green {
-      background: #1e7a4b;
-      color: #fff;
+      background: #24704a;
+      border-color: #24704a !important;
+      color: #ffffff;
     }
 
-    .view-selector {
-      display: flex;
-      gap: 6px;
+    .mode-group {
+      display: inline-flex;
+      gap: 4px;
       padding: 4px;
-      background: #e8edf6;
-      border-radius: 10px;
+      border-radius: 9px;
+      background: #dfe6ef;
     }
 
-    .view-selector button {
+    .mode-group button {
+      border: 0;
       background: transparent;
-      color: #475569;
+      color: #596579;
+      box-shadow: none;
     }
 
-    .view-selector button.active {
-      background: #fff;
+    .mode-group button.active {
       color: #172033;
+      background: #ffffff;
       box-shadow:
-        0 1px 4px rgba(0, 0, 0, .12);
+        0 1px 4px rgba(
+          0,
+          0,
+          0,
+          .12
+        );
     }
 
-    .sheet {
-      background: #fff;
-      border-radius: 12px;
-      padding: 28px;
+
+    /*
+      =====================================================
+      DOCUMENTO
+      =====================================================
+    */
+
+    .document {
+      background: #ffffff;
+      border-radius: 10px;
       box-shadow:
-        0 5px 20px rgba(23, 32, 51, .08);
+        0 4px 18px rgba(
+          25,
+          39,
+          61,
+          .09
+        );
+      overflow: hidden;
     }
 
-    .sheet-header {
-      border-bottom: 2px solid #172033;
-      padding-bottom: 18px;
-      margin-bottom: 20px;
+    .document-page {
+      padding: 28px 30px 24px;
     }
 
-    .sheet-header h1 {
-      margin: 0 0 8px;
-      font-size: 25px;
+    .document-page + .document-page {
+      border-top: 12px solid #eef2f6;
     }
 
-    .sheet-subtitle {
-      font-size: 15px;
-      color: #526075;
-      line-height: 1.5;
+
+    /*
+      =====================================================
+      ENCABEZADO
+      =====================================================
+    */
+
+    .document-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 20px;
+
+      padding-bottom: 14px;
+      border-bottom: 1.5px solid #1c2940;
     }
 
-    .document-type {
-      display: inline-block;
-      margin-top: 10px;
-      padding: 6px 10px;
+    .document-title {
+      margin: 0;
+      font-size: 22px;
+      line-height: 1.15;
+      letter-spacing: -.2px;
+    }
+
+    .document-subtitle {
+      margin-top: 6px;
+      color: #526077;
+      line-height: 1.45;
+      font-size: 12px;
+    }
+
+    .document-badge {
+      flex: 0 0 auto;
+      padding: 6px 9px;
       border-radius: 999px;
-      background: #e8edf6;
-      font-size: 12px;
-      font-weight: 700;
+      background: #edf1f6;
+      color: #2f3d54;
+      font-size: 10px;
+      font-weight: 800;
       text-transform: uppercase;
+      white-space: nowrap;
     }
 
-    .privacy-notice {
-      margin: 18px 0;
-      padding: 12px 14px;
-      border: 1px solid #d9e0ea;
-      border-radius: 8px;
-      background: #f8fafc;
-      font-size: 12px;
-      line-height: 1.5;
-    }
 
-    .kpis {
+    /*
+      =====================================================
+      RESUMEN KPI
+      =====================================================
+    */
+
+    .summary-strip {
       display: grid;
       grid-template-columns:
-        repeat(5, minmax(130px, 1fr));
-      gap: 10px;
-      margin: 20px 0;
+        repeat(
+          5,
+          minmax(
+            0,
+            1fr
+          )
+        );
+      gap: 8px;
+      margin-top: 15px;
     }
 
-    .kpi {
-      padding: 13px;
-      border: 1px solid #dde4ee;
-      border-radius: 9px;
-      background: #fbfcfe;
+    .summary-item {
+      min-width: 0;
+      padding: 9px 10px;
+      border: 1px solid #dfe5ed;
+      border-radius: 7px;
+      background: #fafbfd;
     }
 
-    .kpi-label {
-      font-size: 11px;
+    .summary-label {
+      display: block;
+      color: #687489;
+      font-size: 9px;
+      font-weight: 800;
+      line-height: 1.2;
       text-transform: uppercase;
-      color: #64748b;
-      font-weight: 700;
     }
 
-    .kpi-value {
+    .summary-value {
       display: block;
       margin-top: 4px;
-      font-size: 24px;
-      font-weight: 800;
+      color: #172033;
+      font-size: 19px;
+      font-weight: 900;
+      line-height: 1;
     }
 
-    .table-wrap {
-      overflow-x: auto;
+
+    /*
+      =====================================================
+      NOTA PRIVACIDAD
+      =====================================================
+    */
+
+    .privacy-note {
+      margin-top: 13px;
+      padding: 9px 11px;
+      border-left: 3px solid #657994;
+      background: #f7f9fc;
+      color: #4d5a6f;
+      font-size: 10px;
+      line-height: 1.45;
     }
 
-    table {
+    .privacy-note strong {
+      color: #28364d;
+    }
+
+
+    /*
+      =====================================================
+      TITULOS DE SECCION
+      =====================================================
+    */
+
+    .section-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      gap: 15px;
+      margin-top: 20px;
+      margin-bottom: 8px;
+    }
+
+    .section-head h2 {
+      margin: 0;
+      font-size: 15px;
+      line-height: 1.2;
+    }
+
+    .section-head p {
+      margin: 3px 0 0;
+      color: #687489;
+      font-size: 10px;
+      line-height: 1.35;
+    }
+
+
+    /*
+      =====================================================
+      TABLA PRINCIPAL
+      =====================================================
+    */
+
+    .summary-table {
       width: 100%;
       border-collapse: collapse;
-      font-size: 11px;
+      table-layout: fixed;
+      font-size: 10px;
     }
 
-    th {
-      background: #eef2f7;
-      color: #172033;
-      font-weight: 700;
+    .summary-table th {
+      padding: 6px 6px;
+      border-bottom: 1.5px solid #34435b;
+      background: #f2f5f8;
+      color: #27354b;
+      font-size: 9px;
+      font-weight: 800;
       text-align: left;
-      vertical-align: bottom;
+      text-transform: uppercase;
     }
 
-    th,
-    td {
-      padding: 8px 7px;
-      border: 1px solid #d7dee8;
-      vertical-align: top;
+    .summary-table td {
+      padding: 5px 6px;
+      border-bottom: 1px solid #e2e7ed;
+      vertical-align: middle;
+      line-height: 1.3;
     }
 
-    tbody tr {
-      break-inside: avoid;
+    .summary-table tbody tr:last-child td {
+      border-bottom: 0;
+    }
+
+    .col-number {
+      width: 34px;
+      text-align: center !important;
+    }
+
+    .col-passenger {
+      width: 34%;
+    }
+
+    .col-sheet {
+      width: 15%;
+    }
+
+    .col-assistance {
+      width: 17%;
+    }
+
+    .col-considerations {
+      width: auto;
     }
 
     .passenger-name {
       font-weight: 700;
-      min-width: 160px;
+      color: #172033;
     }
 
-    .status-ok {
-      font-weight: 700;
-      color: #167245;
+    .muted {
+      color: #7a8698;
     }
 
-    .status-warning {
-      font-weight: 700;
-      color: #9b5b00;
-    }
-
-    .status-danger {
+    .status-complete {
+      color: #23714a;
       font-weight: 800;
-      color: #9e2424;
     }
 
-    .status-restricted {
+    .status-pending {
+      color: #a2660a;
+      font-weight: 800;
+    }
+
+    .assistance-no {
+      color: #23714a;
+      font-weight: 800;
+    }
+
+    .assistance-yes {
+      color: #aa3131;
+      font-weight: 900;
+    }
+
+    .assistance-pending {
+      color: #a2660a;
+      font-weight: 800;
+    }
+
+    .assistance-restricted {
+      color: #6d5197;
+      font-weight: 800;
+    }
+
+    .consideration-text {
+      color: #354258;
+    }
+
+    .consideration-none {
+      color: #8b95a5;
+    }
+
+    .consideration-pending {
+      color: #a2660a;
       font-weight: 700;
-      color: #6b4aa5;
     }
 
-    .consideration {
-      line-height: 1.45;
-      min-width: 220px;
+    .consideration-restricted {
+      color: #6d5197;
+      font-weight: 700;
     }
 
-    .details-title {
-      margin: 28px 0 12px;
-      padding-top: 20px;
-      border-top: 2px solid #172033;
+
+    /*
+      =====================================================
+      LEYENDA
+      =====================================================
+    */
+
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 13px;
+      margin-top: 9px;
+      padding-top: 8px;
+      border-top: 1px solid #e1e6ec;
+      color: #657186;
+      font-size: 9px;
+    }
+
+    .legend strong {
+      color: #334158;
+    }
+
+
+    /*
+      =====================================================
+      NOTA DE RESPONSABILIDAD
+      =====================================================
+    */
+
+    .responsibility-note {
+      margin-top: 14px;
+      padding: 11px 13px;
+      border-radius: 7px;
+      background: #f4f6f9;
+      border: 1px solid #dde4ec;
+      font-size: 9.5px;
+      line-height: 1.5;
+      color: #435067;
+    }
+
+    .responsibility-note strong {
+      color: #202e45;
+    }
+
+
+    /*
+      =====================================================
+      DETALLE OPERATIVO
+      =====================================================
+    */
+
+    .detail-page-header {
+      padding-bottom: 12px;
+      border-bottom: 1.5px solid #1c2940;
+    }
+
+    .detail-page-header h2 {
+      margin: 0;
       font-size: 19px;
     }
 
-    .detail-item {
+    .detail-page-header p {
+      margin: 5px 0 0;
+      color: #657186;
+      font-size: 11px;
+      line-height: 1.4;
+    }
+
+    .details-grid {
+      display: grid;
+      grid-template-columns:
+        repeat(
+          2,
+          minmax(
+            0,
+            1fr
+          )
+        );
+      gap: 9px;
+      margin-top: 14px;
+    }
+
+    .detail-card {
       break-inside: avoid;
-      border: 1px solid #dbe2ec;
-      border-radius: 8px;
-      padding: 12px 14px;
-      margin-bottom: 9px;
+      border: 1px solid #dce3eb;
+      border-radius: 7px;
+      padding: 10px 11px;
+      background: #ffffff;
+    }
+
+    .detail-card-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 10px;
+      padding-bottom: 6px;
+      border-bottom: 1px solid #e5e9ef;
     }
 
     .detail-name {
-      font-size: 14px;
-      font-weight: 800;
-      margin-bottom: 5px;
+      font-size: 11px;
+      font-weight: 900;
+      line-height: 1.3;
+      color: #18253a;
     }
 
-    .detail-text {
-      font-size: 12px;
-      line-height: 1.5;
+    .detail-assistance {
+      flex: 0 0 auto;
+      font-size: 9px;
+      font-weight: 900;
+      white-space: nowrap;
+    }
+
+    .detail-body {
+      padding-top: 6px;
+    }
+
+    .detail-row {
+      display: grid;
+      grid-template-columns:
+        105px
+        1fr;
+      gap: 6px;
+      margin-top: 4px;
+      font-size: 9.5px;
+      line-height: 1.4;
     }
 
     .detail-label {
-      font-weight: 700;
+      font-weight: 800;
+      color: #34435a;
     }
 
-    .footer-note {
-      margin-top: 24px;
-      padding-top: 12px;
-      border-top: 1px solid #cfd7e2;
-      font-size: 10px;
-      line-height: 1.45;
-      color: #667085;
+    .detail-value {
+      color: #445168;
     }
+
+    .restricted-card {
+      border-color: #d7cde5;
+      background: #faf8fc;
+    }
+
+    .restricted-text {
+      color: #6d5197;
+      font-size: 9.5px;
+      line-height: 1.45;
+    }
+
+    .no-details {
+      margin-top: 20px;
+      padding: 20px;
+      border: 1px dashed #cfd7e1;
+      border-radius: 8px;
+      text-align: center;
+      color: #687489;
+      font-size: 11px;
+    }
+
+
+    /*
+      =====================================================
+      PIE
+      =====================================================
+    */
+
+    .document-footer {
+      margin-top: 18px;
+      padding-top: 8px;
+      border-top: 1px solid #e0e5eb;
+      color: #7a8596;
+      font-size: 8.5px;
+      line-height: 1.45;
+    }
+
+
+    /*
+      =====================================================
+      ESTADOS
+      =====================================================
+    */
 
     .loading,
     .error {
-      max-width: 900px;
+      width: 100%;
+      max-width: 850px;
       margin: 40px auto;
-      background: #fff;
-      padding: 25px;
-      border-radius: 10px;
+      padding: 24px;
+      border-radius: 9px;
+      background: #ffffff;
+      box-shadow:
+        0 3px 15px rgba(
+          20,
+          31,
+          48,
+          .08
+        );
     }
 
     .error {
-      color: #a12727;
+      color: #a12626;
     }
 
+
+    /*
+      =====================================================
+      IMPRESION
+      =====================================================
+    */
+
     @page {
-      size: A4 landscape;
-      margin: 10mm;
+      size: A4 portrait;
+      margin: 8mm;
     }
 
     @media print {
+      html,
       body {
+        width: 100%;
+        margin: 0;
         padding: 0;
-        background: #fff;
+        background: #ffffff;
       }
 
       .no-print {
@@ -294,49 +631,227 @@
       }
 
       .page {
+        width: 100%;
         max-width: none;
+        margin: 0;
       }
 
-      .sheet {
-        box-shadow: none;
+      .document {
         border-radius: 0;
+        box-shadow: none;
+        overflow: visible;
+      }
+
+      .document-page {
         padding: 0;
       }
 
-      .sheet-header h1 {
-        font-size: 20px;
+      /*
+        Cada bloque document-page es una página lógica.
+
+        Primera página = resumen.
+        Segunda página = detalle.
+      */
+      .document-page + .document-page {
+        border-top: 0;
+        break-before: page;
+        page-break-before: always;
       }
 
-      .kpis {
+      /*
+        Primera página compacta.
+      */
+      #summaryPage {
+        min-height: 0;
+      }
+
+      .document-header {
+        padding-bottom: 7px;
+      }
+
+      .document-title {
+        font-size: 16px;
+      }
+
+      .document-subtitle {
+        margin-top: 3px;
+        font-size: 8.5px;
+      }
+
+      .document-badge {
+        padding: 4px 6px;
+        font-size: 7px;
+      }
+
+      .summary-strip {
+        gap: 4px;
+        margin-top: 7px;
+      }
+
+      .summary-item {
+        padding: 5px 6px;
+        border-radius: 4px;
+      }
+
+      .summary-label {
+        font-size: 6.6px;
+      }
+
+      .summary-value {
+        margin-top: 2px;
+        font-size: 13px;
+      }
+
+      .privacy-note {
+        margin-top: 6px;
+        padding: 5px 7px;
+        border-left-width: 2px;
+        font-size: 7px;
+        line-height: 1.35;
+      }
+
+      .section-head {
+        margin-top: 8px;
+        margin-bottom: 4px;
+      }
+
+      .section-head h2 {
+        font-size: 10px;
+      }
+
+      .section-head p {
+        margin-top: 1px;
+        font-size: 6.8px;
+      }
+
+      .summary-table {
+        font-size: 7px;
+      }
+
+      .summary-table th {
+        padding: 3px 3px;
+        font-size: 6.2px;
+      }
+
+      .summary-table td {
+        padding: 2.7px 3px;
+        line-height: 1.15;
+      }
+
+      .col-number {
+        width: 22px;
+      }
+
+      .col-passenger {
+        width: 31%;
+      }
+
+      .col-sheet {
+        width: 13%;
+      }
+
+      .col-assistance {
+        width: 15%;
+      }
+
+      .legend {
+        gap: 8px;
+        margin-top: 4px;
+        padding-top: 4px;
+        font-size: 6.4px;
+      }
+
+      .responsibility-note {
+        margin-top: 6px;
+        padding: 5px 7px;
+        border-radius: 4px;
+        font-size: 6.8px;
+        line-height: 1.35;
+      }
+
+      .document-footer {
+        margin-top: 6px;
+        padding-top: 4px;
+        font-size: 6px;
+      }
+
+      /*
+        Página de detalle.
+      */
+      .detail-page-header {
+        padding-bottom: 6px;
+      }
+
+      .detail-page-header h2 {
+        font-size: 14px;
+      }
+
+      .detail-page-header p {
+        margin-top: 2px;
+        font-size: 7.5px;
+      }
+
+      .details-grid {
+        gap: 5px;
+        margin-top: 8px;
+      }
+
+      .detail-card {
+        padding: 6px 7px;
+        border-radius: 4px;
+      }
+
+      .detail-card-head {
+        padding-bottom: 4px;
+      }
+
+      .detail-name {
+        font-size: 8px;
+      }
+
+      .detail-assistance {
+        font-size: 6.5px;
+      }
+
+      .detail-body {
+        padding-top: 3px;
+      }
+
+      .detail-row {
         grid-template-columns:
-          repeat(5, 1fr);
+          78px
+          1fr;
+        gap: 4px;
+        margin-top: 2px;
+        font-size: 6.8px;
+        line-height: 1.3;
       }
 
-      .kpi {
-        padding: 8px;
+      .restricted-text {
+        font-size: 6.8px;
       }
 
-      .kpi-value {
-        font-size: 18px;
+      .no-details {
+        margin-top: 12px;
+        padding: 12px;
+        font-size: 8px;
       }
 
-      table {
-        font-size: 9px;
-      }
-
-      th,
-      td {
-        padding: 5px 4px;
-      }
-
-      .detail-item {
-        padding: 8px;
+      /*
+        Evita cortes feos.
+      */
+      .detail-card,
+      .responsibility-note,
+      .summary-item {
+        break-inside: avoid;
+        page-break-inside: avoid;
       }
     }
   </style>
 </head>
 
 <body>
+
   <div
     id="loadingBox"
     class="loading"
@@ -353,6 +868,13 @@
     id="content"
     class="page hidden"
   >
+
+    <!--
+      =====================================================
+      CONTROLES
+      =====================================================
+    -->
+
     <div class="toolbar no-print">
 
       <a
@@ -363,7 +885,8 @@
         Volver a fichas médicas
       </a>
 
-      <div class="view-selector">
+      <div class="mode-group">
+
         <button
           id="btnModoEncargado"
           type="button"
@@ -378,6 +901,7 @@
         >
           Equipo de viaje
         </button>
+
       </div>
 
       <button
@@ -390,79 +914,216 @@
 
     </div>
 
-    <article class="sheet">
 
-      <header class="sheet-header">
-        <h1>
-          Resumen operativo de salud
-        </h1>
+    <!--
+      =====================================================
+      DOCUMENTO
+      =====================================================
+    -->
 
-        <div
-          id="groupSubtitle"
-          class="sheet-subtitle"
-        ></div>
+    <article class="document">
 
-        <div
-          id="documentType"
-          class="document-type"
-        ></div>
-      </header>
 
-      <div
-        id="privacyNotice"
-        class="privacy-notice"
-      ></div>
+      <!--
+        ===================================================
+        PAGINA 1
+        RESUMEN TOTAL
+        ===================================================
+      -->
 
       <section
-        id="kpiContainer"
-        class="kpis"
-      ></section>
+        id="summaryPage"
+        class="document-page"
+      >
 
-      <div class="table-wrap">
-        <table>
+        <header class="document-header">
+
+          <div>
+
+            <h1 class="document-title">
+              Resumen operativo de salud
+            </h1>
+
+            <div
+              id="groupSubtitle"
+              class="document-subtitle"
+            ></div>
+
+          </div>
+
+          <div
+            id="documentType"
+            class="document-badge"
+          ></div>
+
+        </header>
+
+
+        <div
+          id="kpiContainer"
+          class="summary-strip"
+        ></div>
+
+
+        <div
+          id="privacyNotice"
+          class="privacy-note"
+        ></div>
+
+
+        <div class="section-head">
+
+          <div>
+
+            <h2>
+              Situación general del grupo
+            </h2>
+
+            <p>
+              Vista resumida para identificar rápidamente
+              pasajeros que requieren atención especial.
+            </p>
+
+          </div>
+
+        </div>
+
+
+        <table class="summary-table">
+
           <thead>
+
             <tr>
-              <th>#</th>
-              <th>Pasajero</th>
-              <th>Ficha</th>
-              <th>Alimentación</th>
-              <th>Alergias</th>
-              <th>Medicación</th>
-              <th>Necesita asistencia</th>
-              <th>Consideraciones</th>
-              <th id="emergencyHeader">
-                Emergencia
+
+              <th class="col-number">
+                #
               </th>
+
+              <th class="col-passenger">
+                Pasajero
+              </th>
+
+              <th class="col-sheet">
+                Ficha
+              </th>
+
+              <th class="col-assistance">
+                Asistencia
+              </th>
+
+              <th class="col-considerations">
+                Consideraciones
+              </th>
+
             </tr>
+
           </thead>
 
           <tbody id="tableBody"></tbody>
+
         </table>
-      </div>
 
-      <section id="detailsSection">
-        <h2 class="details-title">
-          Detalles operativos relevantes
-        </h2>
 
-        <div id="detailsContainer"></div>
+        <div class="legend">
+
+          <span>
+            <strong>Asistencia No:</strong>
+            operación habitual.
+          </span>
+
+          <span>
+            <strong>Asistencia Sí:</strong>
+            revisar detalle.
+          </span>
+
+          <span>
+            <strong>Pendiente:</strong>
+            ficha médica aún incompleta.
+          </span>
+
+        </div>
+
+
+        <div
+          id="responsibilityNote"
+          class="responsibility-note"
+        ></div>
+
+
+        <footer class="document-footer">
+
+          Documento de uso operativo.
+          La información contenida debe mantenerse
+          bajo acceso restringido y utilizarse
+          exclusivamente para fines de coordinación,
+          seguridad, cuidado y asistencia de los viajeros.
+
+        </footer>
+
       </section>
 
-      <footer class="footer-note">
-        Documento de uso operativo.
-        Contiene información personal y eventualmente
-        antecedentes de salud.
-        Su acceso y circulación deben limitarse a las
-        personas necesarias para la coordinación,
-        seguridad, cuidado y operación del viaje.
-      </footer>
+
+      <!--
+        ===================================================
+        PAGINA 2
+        DETALLE
+        ===================================================
+      -->
+
+      <section
+        id="detailsPage"
+        class="document-page"
+      >
+
+        <header class="detail-page-header">
+
+          <h2>
+            Detalle de consideraciones operativas
+          </h2>
+
+          <p id="detailsSubtitle">
+            Se muestran únicamente pasajeros con información
+            que requiere atención o consideración.
+          </p>
+
+        </header>
+
+
+        <div
+          id="detailsContainer"
+          class="details-grid"
+        ></div>
+
+
+        <div
+          id="noDetails"
+          class="no-details hidden"
+        >
+          No existen consideraciones operativas adicionales
+          para este grupo.
+        </div>
+
+
+        <footer class="document-footer">
+
+          Este detalle complementa el resumen de la página anterior.
+          Ante cualquier duda respecto de una indicación informada
+          por una familia o viajero, debe realizarse la coordinación
+          correspondiente antes o durante el viaje.
+
+        </footer>
+
+      </section>
 
     </article>
+
   </main>
+
 
   <script
     type="module"
-    src="./resumen-operativo-fichas-medicas.js"
+    src="resumen-operativo-fichas-medicas.js"
   ></script>
+
 </body>
 </html>
