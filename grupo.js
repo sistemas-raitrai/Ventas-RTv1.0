@@ -23688,3 +23688,100 @@ window.buscarThiago11053 = async function () {
 
   return window.__thiagoBusqueda;
 };
+
+window.buscarThiagoPublicoGlobal = async function () {
+
+  const snap =
+    await getDocs(
+      collection(
+        db,
+        "inscripciones_pendientes_publicas"
+      )
+    );
+
+  const resultados =
+    snap.docs
+      .map((d) => ({
+        id: d.id,
+        ...d.data()
+      }))
+      .filter((item) => {
+
+        const payload =
+          item.payload || {};
+
+        const identificacion =
+          payload.identificacion || {};
+
+        const texto =
+          normalizeSearchLocal(
+            [
+              identificacion.nombreCompleto,
+              identificacion.nombres,
+              identificacion.primerApellido,
+              identificacion.segundoApellido,
+              item.inscripcionId,
+              item.idGrupo,
+              payload.idGrupo,
+              payload?.grupo?.idGrupo
+            ]
+              .filter(Boolean)
+              .join(" ")
+          );
+
+        return (
+          texto.includes("thiago") ||
+          texto.includes("acauna") ||
+          texto.includes("leon acauna")
+        );
+      });
+
+  console.log(
+    `Encontrados ${resultados.length} posibles registros públicos de Thiago`
+  );
+
+  console.table(
+    resultados.map(
+      (item) => ({
+        docId:
+          item.id,
+
+        idGrupo:
+          item.idGrupo || "",
+
+        inscripcionId:
+          item.inscripcionId || "",
+
+        estado:
+          item.estado || "",
+
+        fase:
+          item.fase || "",
+
+        nombre:
+          item?.payload
+            ?.identificacion
+            ?.nombreCompleto || "",
+
+        rut:
+          item?.payload
+            ?.identificacion
+            ?.rut ||
+          item?.payload
+            ?.identificacion
+            ?.documento ||
+          "",
+
+        privacidad:
+          item?.payload
+            ?.privacidad
+            ?.estado || ""
+      })
+    )
+  );
+
+  window.__thiagoPublicoGlobal =
+    resultados;
+
+  return resultados;
+};
