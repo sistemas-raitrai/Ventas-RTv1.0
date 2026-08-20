@@ -23291,3 +23291,400 @@ window.migrarPasajeros11053a11184 = async function ({
     resultados
   };
 };
+
+window.buscarThiago11053 = async function () {
+
+  const GRUPO = "11053";
+
+  const NOMBRE_BUSCADO =
+    normalizeSearchLocal(
+      "THIAGO AGUSTIN LEON ACAUNA"
+    );
+
+  console.log(
+    "========================================"
+  );
+
+  console.log(
+    "🔎 BUSCANDO THIAGO EN GRUPO 11053"
+  );
+
+  console.log(
+    "========================================"
+  );
+
+  /*
+    =====================================================
+    1. INSCRIPCIONES OFICIALES
+    =====================================================
+  */
+
+  const oficialesSnap =
+    await getDocs(
+      collection(
+        db,
+        "ventas_cotizaciones",
+        GRUPO,
+        "inscripciones"
+      )
+    );
+
+  const oficiales =
+    oficialesSnap.docs
+      .map((d) => ({
+        id: d.id,
+        ...d.data()
+      }))
+      .filter((item) => {
+
+        const nombre =
+          normalizeSearchLocal(
+            `${getInscripcionNombres(item)} ${getInscripcionApellidos(item)}`
+          );
+
+        return (
+          nombre ===
+          NOMBRE_BUSCADO
+        );
+      });
+
+  console.log(
+    "1️⃣ INSCRIPCIONES OFICIALES"
+  );
+
+  console.table(
+    oficiales.map(
+      (item) => ({
+        id:
+          item.id,
+
+        documento:
+          getInscripcionDocumento(item),
+
+        nombre:
+          `${getInscripcionNombres(item)} ${getInscripcionApellidos(item)}`,
+
+        privacidad:
+          item?.privacidad?.estado ||
+          ""
+      })
+    )
+  );
+
+  /*
+    =====================================================
+    2. INSCRIPCIONES ARCHIVADAS
+    =====================================================
+  */
+
+  const archivosSnap =
+    await getDocs(
+      collection(
+        db,
+        "ventas_cotizaciones",
+        GRUPO,
+        "inscripciones_archivadas"
+      )
+    );
+
+  const encontradosArchivo =
+    [];
+
+  archivosSnap.docs.forEach(
+    (archivoDoc) => {
+
+      const archivo =
+        archivoDoc.data() ||
+        {};
+
+      const registros =
+        Array.isArray(
+          archivo.inscripciones
+        )
+          ? archivo.inscripciones
+          : [];
+
+      registros.forEach(
+        (registro) => {
+
+          const data =
+            registro?.data ||
+            {};
+
+          const nombre =
+            normalizeSearchLocal(
+              cleanText(
+                registro?.nombre ||
+                `${getInscripcionNombres(data)} ${getInscripcionApellidos(data)}`
+              )
+            );
+
+          if (
+            nombre !==
+            NOMBRE_BUSCADO
+          ) {
+            return;
+          }
+
+          encontradosArchivo.push({
+            archivoId:
+              archivoDoc.id,
+
+            tipoArchivo:
+              archivo.tipoArchivo ||
+              "",
+
+            motivo:
+              archivo.motivo ||
+              "",
+
+            id:
+              registro.id ||
+              data.id ||
+              "",
+
+            documento:
+              registro.documento ||
+              getInscripcionDocumento(data),
+
+            nombre:
+              registro.nombre ||
+              "",
+
+            tieneDataCompleta:
+              Object.keys(data).length > 0
+          });
+        }
+      );
+    });
+
+  console.log(
+    "2️⃣ INSCRIPCIONES ARCHIVADAS"
+  );
+
+  console.table(
+    encontradosArchivo
+  );
+
+  /*
+    =====================================================
+    3. INSCRIPCIONES PÚBLICAS
+
+    Esta es especialmente importante porque incluso
+    si el documento oficial fue borrado, aquí puede
+    seguir existiendo el payload completo original.
+    =====================================================
+  */
+
+  const publicasSnap =
+    await getDocs(
+      query(
+        collection(
+          db,
+          "inscripciones_pendientes_publicas"
+        ),
+        where(
+          "idGrupo",
+          "==",
+          GRUPO
+        )
+      )
+    );
+
+  const publicas =
+    publicasSnap.docs
+      .map((d) => ({
+        id: d.id,
+        ...d.data()
+      }))
+      .filter((item) => {
+
+        const payload =
+          item.payload ||
+          {};
+
+        const nombre =
+          normalizeSearchLocal(
+            getNombrePublicoInscripcionGrupo(
+              payload
+            )
+          );
+
+        return (
+          nombre ===
+          NOMBRE_BUSCADO
+        );
+      });
+
+  console.log(
+    "3️⃣ INSCRIPCIONES PÚBLICAS"
+  );
+
+  console.table(
+    publicas.map(
+      (item) => ({
+        id:
+          item.id,
+
+        estado:
+          item.estado ||
+          "",
+
+        nombre:
+          getNombrePublicoInscripcionGrupo(
+            item.payload ||
+            {}
+          ),
+
+        rut:
+          getRutKeyInscripcionPublicaGrupo(
+            item.payload ||
+            {}
+          ),
+
+        privacidad:
+          item?.payload
+            ?.privacidad
+            ?.estado ||
+          "",
+
+        tienePayload:
+          !!item.payload,
+
+        camposPayload:
+          item.payload
+            ? Object.keys(
+                item.payload
+              ).length
+            : 0
+      })
+    )
+  );
+
+  /*
+    =====================================================
+    4. HISTORIAL DEL GRUPO
+    =====================================================
+  */
+
+  const historialSnap =
+    await getDocs(
+      query(
+        collection(
+          db,
+          HISTORIAL_COLLECTION
+        ),
+        where(
+          "idGrupo",
+          "==",
+          GRUPO
+        )
+      )
+    );
+
+  const historial =
+    historialSnap.docs
+      .map((d) => ({
+        id: d.id,
+        ...d.data()
+      }))
+      .filter((item) => {
+
+        const texto =
+          normalizeSearchLocal(
+            JSON.stringify(
+              item
+            )
+          );
+
+        return texto.includes(
+          NOMBRE_BUSCADO
+        );
+      });
+
+  console.log(
+    "4️⃣ HISTORIAL"
+  );
+
+  console.table(
+    historial.map(
+      (item) => ({
+        id:
+          item.id,
+
+        tipo:
+          item.tipoMovimiento ||
+          "",
+
+        titulo:
+          item.titulo ||
+          "",
+
+        mensaje:
+          item.mensaje ||
+          "",
+
+        fecha:
+          item.fecha ||
+          item.creadoAt ||
+          ""
+      })
+    )
+  );
+
+  /*
+    =====================================================
+    RESULTADO
+    =====================================================
+  */
+
+  const resumen = {
+    oficiales:
+      oficiales.length,
+
+    archivados:
+      encontradosArchivo.length,
+
+    publicos:
+      publicas.length,
+
+    historial:
+      historial.length
+  };
+
+  console.log(
+    "========================================"
+  );
+
+  console.log(
+    "📌 RESULTADO BÚSQUEDA THIAGO",
+    resumen
+  );
+
+  console.log(
+    "========================================"
+  );
+
+  /*
+    Dejamos los objetos completos accesibles
+    desde la consola para poder inspeccionarlos.
+  */
+
+  window.__thiagoBusqueda = {
+    oficiales,
+    archivados:
+      encontradosArchivo,
+    publicos,
+    historial
+  };
+
+  console.log(
+    "Objetos completos disponibles en:"
+  );
+
+  console.log(
+    "window.__thiagoBusqueda"
+  );
+
+  return window.__thiagoBusqueda;
+};
