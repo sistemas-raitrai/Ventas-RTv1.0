@@ -21973,155 +21973,1917 @@ window.catastroTallasPolera2026 = async function () {
   return resultado;
 };
 
-/*
-  =====================================================
-  BUSCAR FALTANTES EN INSCRIPCIONES PÚBLICAS
+/* =========================================================
+   MIGRACIÓN MANUAL PASAJEROS ENTRE GRUPOS
 
-  Caso Thiago:
-  la inscripción oficial fue eliminada, pero el
-  formulario público original sigue existiendo.
-  =====================================================
-*/
+   CASO ESPECIAL:
+   11053 -> 11184
 
-const nombresYaEncontrados =
-  new Set(
-    encontrados.map(
-      (item) =>
-        normalizeSearchLocal(
-          `${getInscripcionNombres(item)} ${getInscripcionApellidos(item)}`
-        )
-    )
+   OBJETIVO:
+   - Migrar exactamente las 11 personas indicadas.
+   - Leer inscripciones oficiales del 11053.
+   - Si falta alguien, buscar respaldo archivado.
+   - Si sigue faltando, recuperar desde
+     inscripciones_pendientes_publicas.
+   - Caso confirmado:
+     THIAGO AGUSTIN LEON ACUÑA
+     RUT 23639272-4
+     está en pública como eliminada_logica.
+   - Crear/copiar inscripción completa en 11184.
+   - Dejar activas las inscripciones en destino.
+   - Archivar las originales que todavía existan en 11053.
+   - Reactivar y reasignar los registros públicos.
+   - NO sobreescribir si alguien ya existe en destino.
+   - dryRun=true por defecto.
+========================================================= */
+
+window.migrarPasajeros11053a11184 = async function ({
+  dryRun = true,
+  confirmar = false
+} = {}) {
+
+  const GRUPO_ORIGEN = "11053";
+  const GRUPO_DESTINO = "11184";
+
+  /*
+    =====================================================
+    0. PASAJEROS OBJETIVO
+
+    Thiago incluye:
+    - nombre correcto: ACUÑA
+    - variante usada anteriormente: ACAUNA
+    - RUT confirmado desde inscripción pública
+    =====================================================
+  */
+
+  const OBJETIVOS = [
+    {
+      nombre: "THIAGO AGUSTIN LEON ACUNA",
+      aliases: [
+        "THIAGO AGUSTIN LEON ACAUNA"
+      ],
+      rut: "23639272-4"
+    },
+    {
+      nombre: "MATIAS ALEJANDR HEYSER HUILIPAN"
+    },
+    {
+      nombre: "CRISTOBAL MATUS JOFRE"
+    },
+    {
+      nombre: "LISSETTE GRACIELA ACUNA GALAZ"
+    },
+    {
+      nombre: "VALENTIN ALONSO DIAZ MORAGREGA"
+    },
+    {
+      nombre: "MATEO ALBERTO GARRIDO ALIAGA"
+    },
+    {
+      nombre: "NANCY LYHA ALIAGA AGUERO"
+    },
+    {
+      nombre: "LUIS ALBERTO GARRIDO FLORES"
+    },
+    {
+      nombre: "MONSERRAT BELEN AGURTO ACEVEDO"
+    },
+    {
+      nombre: "VICENTE AGUSTIN SOLAR SASSI"
+    },
+    {
+      nombre: "AMANDA ISIDORA NUNEZ BECAR"
+    }
+  ].map((obj) => ({
+    ...obj,
+
+    nombreKey:
+      normalizeSearchLocal(
+        obj.nombre
+      ),
+
+    aliasKeys:
+      [
+        obj.nombre,
+        ...(obj.aliases || [])
+      ].map(
+        normalizeSearchLocal
+      ),
+
+    rutKey:
+      obj.rut
+        ? normalizarRutKeyGrupo(
+            obj.rut
+          )
+        : ""
+  }));
+
+  /*
+    =====================================================
+    HELPERS LOCALES
+    =====================================================
+  */
+
+  function getNombreMigracion(
+    item = {}
+  ) {
+    return cleanText(
+      `${getInscripcionNombres(item)} ${getInscripcionApellidos(item)}`
+    );
+  }
+
+  function getNombreKeyMigracion(
+    item = {}
+  ) {
+    return normalizeSearchLocal(
+      getNombreMigracion(item)
+    );
+  }
+
+  function getRutMigracion(
+    item = {}
+  ) {
+    return normalizarRutKeyGrupo(
+      getInscripcionDocumento(item) ||
+      item.id ||
+      ""
+    );
+  }
+
+  function encontrarObjetivoPorItem(
+    item = {}
+  ) {
+    const nombreKey =
+      getNombreKeyMigracion(item);
+
+    const rutKey =
+      getRutMigracion(item);
+
+    return OBJETIVOS.find(
+      (objetivo) => {
+
+        if (
+          objetivo.rutKey &&
+          rutKey &&
+          objetivo.rutKey === rutKey
+        ) {
+          return true;
+        }
+
+        return objetivo.aliasKeys.includes(
+          nombreKey
+        );
+      }
+    ) || null;
+  }
+
+  function getObjetivoKey(
+    objetivo
+  ) {
+    return objetivo.rutKey
+      ? `RUT:${objetivo.rutKey}`
+      : `NOMBRE:${objetivo.nombreKey}`;
+  }
+
+  function getItemObjetivoKey(
+    item = {}
+  ) {
+    const objetivo =
+      encontrarObjetivoPorItem(
+        item
+      );
+
+    return objetivo
+      ? getObjetivoKey(objetivo)
+      : "";
+  }
+
+  function quitarCamposSoloJs(
+    item = {}
+  ) {
+    const {
+      id: _idSoloJs,
+      esResumenNomina: _esResumenSoloJs,
+
+      _origenMigracion: _origenMigracion,
+      _archivoIdMigracion: _archivoId,
+      _publicaDocIdMigracion: _publicaId,
+      _publicaEstadoOriginal: _publicaEstado,
+
+      ...resto
+    } = item;
+
+    return resto;
+  }
+
+  console.log(
+    "===================================================="
   );
 
-const faltantesPublicos =
-  [...NOMBRES_OBJETIVO].filter(
-    (nombre) =>
-      !nombresYaEncontrados.has(nombre)
+  console.log(
+    dryRun
+      ? "🔎 SIMULACIÓN MIGRACIÓN 11053 → 11184"
+      : "🚚 MIGRACIÓN REAL 11053 → 11184"
   );
 
-if (faltantesPublicos.length) {
-
-  console.warn(
-    "🌎 Buscando pasajeros faltantes en inscripciones_pendientes_publicas...",
-    faltantesPublicos
+  console.log(
+    "===================================================="
   );
 
-  const publicasGlobalSnap =
-    await getDocs(
-      collection(
-        db,
-        "inscripciones_pendientes_publicas"
-      )
+  /*
+    =====================================================
+    1. RESOLVER GRUPOS
+    =====================================================
+  */
+
+  const origen =
+    await resolveGroupByParam(
+      GRUPO_ORIGEN
     );
 
-  const recuperadosPublica = [];
+  const destino =
+    await resolveGroupByParam(
+      GRUPO_DESTINO
+    );
 
-  publicasGlobalSnap.docs.forEach(
-    (publicaDoc) => {
+  if (!origen) {
+    console.error(
+      `❌ No encontré el grupo origen ${GRUPO_ORIGEN}.`
+    );
 
-      const publica = {
-        id: publicaDoc.id,
-        ...publicaDoc.data()
-      };
+    return null;
+  }
 
-      const payload =
-        publica.payload || {};
+  if (!destino) {
+    console.error(
+      `❌ No encontré el grupo destino ${GRUPO_DESTINO}.`
+    );
 
-      const nombre =
-        normalizeSearchLocal(
-          getNombrePublicoInscripcionGrupo(
-            payload
-          )
-        );
+    return null;
+  }
 
-      if (
-        !faltantesPublicos.includes(nombre)
-      ) {
-        return;
-      }
+  if (
+    String(origen.docId) ===
+    String(destino.docId)
+  ) {
+    console.error(
+      "❌ Origen y destino son el mismo documento."
+    );
 
-      /*
-        Para este caso exigimos además que originalmente
-        perteneciera al grupo 11053.
-      */
-      const grupoOriginal =
-        String(
-          publica.idGrupo ||
-          payload.idGrupo ||
-          payload?.grupo?.idGrupo ||
-          ""
-        );
+    return null;
+  }
 
-      if (
-        grupoOriginal !==
-        String(origen.docId)
-      ) {
-        return;
-      }
+  console.log(
+    "Grupo origen:",
+    {
+      solicitado:
+        GRUPO_ORIGEN,
 
-      const idRecuperado =
-        cleanText(
-          publica.inscripcionId ||
-          payload?.identificacion?.documentoNormalizado ||
-          ""
-        );
+      docId:
+        origen.docId,
 
-      if (!idRecuperado) {
-        console.error(
-          "Encontré el formulario público pero no pude determinar inscripcionId.",
-          publica
-        );
+      idGrupo:
+        origen.groupId,
 
-        return;
-      }
-
-      recuperadosPublica.push({
-        ...payload,
-
-        id:
-          idRecuperado,
-
-        _origenMigracion:
-          "inscripciones_pendientes_publicas",
-
-        _publicaDocIdMigracion:
-          publicaDoc.id,
-
-        _publicaEstadoOriginal:
-          publica.estado || ""
-      });
+      nombre:
+        origen.data?.aliasGrupo ||
+        origen.data?.nombreGrupo ||
+        origen.data?.colegio ||
+        ""
     }
   );
 
-  if (recuperadosPublica.length) {
+  console.log(
+    "Grupo destino:",
+    {
+      solicitado:
+        GRUPO_DESTINO,
 
-    console.log(
-      "♻️ Pasajeros recuperados desde formulario público:"
+      docId:
+        destino.docId,
+
+      idGrupo:
+        destino.groupId,
+
+      nombre:
+        destino.data?.aliasGrupo ||
+        destino.data?.nombreGrupo ||
+        destino.data?.colegio ||
+        ""
+    }
+  );
+
+  /*
+    =====================================================
+    2. LEER INSCRIPCIONES OFICIALES ORIGEN
+    =====================================================
+  */
+
+  const origenSnap =
+    await getDocs(
+      collection(
+        db,
+        "ventas_cotizaciones",
+        String(origen.docId),
+        "inscripciones"
+      )
     );
 
-    console.table(
-      recuperadosPublica.map(
-        (item) => ({
+  const todasOrigen =
+    origenSnap.docs.map(
+      (d) => ({
+        id:
+          d.id,
+
+        ...d.data(),
+
+        _origenMigracion:
+          "inscripciones"
+      })
+    );
+
+  /*
+    Solamente conservamos personas objetivo.
+  */
+
+  let encontrados =
+    todasOrigen.filter(
+      (item) =>
+        !!encontrarObjetivoPorItem(
+          item
+        )
+    );
+
+  /*
+    =====================================================
+    3. DETERMINAR FALTANTES
+    =====================================================
+  */
+
+  function obtenerObjetivosFaltantes() {
+
+    const presentes =
+      new Set(
+        encontrados
+          .map(
+            getItemObjetivoKey
+          )
+          .filter(Boolean)
+      );
+
+    return OBJETIVOS.filter(
+      (objetivo) =>
+        !presentes.has(
+          getObjetivoKey(
+            objetivo
+          )
+        )
+    );
+  }
+
+  let faltantesObjetivos =
+    obtenerObjetivosFaltantes();
+
+  /*
+    =====================================================
+    4. BUSCAR FALTANTES EN INSCRIPCIONES_ARCHIVADAS
+    =====================================================
+  */
+
+  if (
+    faltantesObjetivos.length
+  ) {
+
+    console.warn(
+      "⚠️ Faltan pasajeros en inscripciones. Buscando en inscripciones_archivadas...",
+      faltantesObjetivos.map(
+        (x) => x.nombre
+      )
+    );
+
+    const archivadasSnap =
+      await getDocs(
+        collection(
+          db,
+          "ventas_cotizaciones",
+          String(origen.docId),
+          "inscripciones_archivadas"
+        )
+      );
+
+    const recuperadosArchivo =
+      [];
+
+    archivadasSnap.docs.forEach(
+      (archivoDoc) => {
+
+        const archivo =
+          archivoDoc.data() ||
+          {};
+
+        const registros =
+          Array.isArray(
+            archivo.inscripciones
+          )
+            ? archivo.inscripciones
+            : [];
+
+        registros.forEach(
+          (registro) => {
+
+            const data =
+              registro?.data ||
+              {};
+
+            /*
+              Reconstruimos objeto temporal para poder
+              usar las mismas funciones de identificación.
+            */
+
+            const item = {
+              ...data,
+
+              id:
+                registro.id ||
+                data.id ||
+                "",
+
+              _origenMigracion:
+                "inscripciones_archivadas",
+
+              _archivoIdMigracion:
+                archivoDoc.id
+            };
+
+            const objetivo =
+              encontrarObjetivoPorItem(
+                item
+              );
+
+            if (!objetivo) {
+              return;
+            }
+
+            const faltaba =
+              faltantesObjetivos.some(
+                (x) =>
+                  getObjetivoKey(x) ===
+                  getObjetivoKey(objetivo)
+              );
+
+            if (!faltaba) {
+              return;
+            }
+
+            const yaRecuperado =
+              recuperadosArchivo.some(
+                (x) =>
+                  getItemObjetivoKey(x) ===
+                  getObjetivoKey(objetivo)
+              );
+
+            if (yaRecuperado) {
+              return;
+            }
+
+            if (!item.id) {
+              console.error(
+                "❌ Respaldo archivado sin ID.",
+                {
+                  archivoId:
+                    archivoDoc.id,
+
+                  objetivo:
+                    objetivo.nombre
+                }
+              );
+
+              return;
+            }
+
+            recuperadosArchivo.push(
+              item
+            );
+          }
+        );
+      }
+    );
+
+    if (
+      recuperadosArchivo.length
+    ) {
+
+      console.log(
+        "♻️ Recuperados desde archivo:"
+      );
+
+      console.table(
+        recuperadosArchivo.map(
+          (item) => ({
+            id:
+              item.id,
+
+            documento:
+              getInscripcionDocumento(
+                item
+              ),
+
+            nombre:
+              getNombreMigracion(
+                item
+              ),
+
+            archivo:
+              item._archivoIdMigracion
+          })
+        )
+      );
+
+      encontrados = [
+        ...encontrados,
+        ...recuperadosArchivo
+      ];
+    }
+  }
+
+  /*
+    Recalcular después de archivos.
+  */
+
+  faltantesObjetivos =
+    obtenerObjetivosFaltantes();
+
+  /*
+    =====================================================
+    5. BUSCAR FALTANTES EN INSCRIPCIONES PÚBLICAS
+
+    Este es el camino confirmado para Thiago.
+    =====================================================
+  */
+
+  let todasPublicasOrigen =
+    [];
+
+  if (
+    faltantesObjetivos.length
+  ) {
+
+    console.warn(
+      "🌎 Faltan pasajeros. Buscando en inscripciones_pendientes_publicas...",
+      faltantesObjetivos.map(
+        (x) => x.nombre
+      )
+    );
+
+    /*
+      Primero buscamos todos los documentos públicos
+      asociados originalmente al 11053.
+    */
+
+    const publicasOrigenSnap =
+      await getDocs(
+        query(
+          collection(
+            db,
+            "inscripciones_pendientes_publicas"
+          ),
+          where(
+            "idGrupo",
+            "==",
+            String(origen.docId)
+          )
+        )
+      );
+
+    todasPublicasOrigen =
+      publicasOrigenSnap.docs.map(
+        (d) => ({
+          id:
+            d.id,
+
+          ...d.data()
+        })
+      );
+
+    const recuperadosPublica =
+      [];
+
+    todasPublicasOrigen.forEach(
+      (publica) => {
+
+        const payload =
+          publica.payload ||
+          {};
+
+        /*
+          El payload público contiene prácticamente
+          la inscripción completa original.
+        */
+
+        const inscripcionId =
+          cleanText(
+            publica.inscripcionId ||
+            payload?.identificacion
+              ?.documentoNormalizado ||
+            ""
+          );
+
+        const item = {
+          ...payload,
+
+          id:
+            inscripcionId,
+
+          _origenMigracion:
+            "inscripciones_pendientes_publicas",
+
+          _publicaDocIdMigracion:
+            publica.id,
+
+          _publicaEstadoOriginal:
+            publica.estado ||
+            ""
+        };
+
+        const objetivo =
+          encontrarObjetivoPorItem(
+            item
+          );
+
+        if (!objetivo) {
+          return;
+        }
+
+        const faltaba =
+          faltantesObjetivos.some(
+            (x) =>
+              getObjetivoKey(x) ===
+              getObjetivoKey(objetivo)
+          );
+
+        if (!faltaba) {
+          return;
+        }
+
+        const yaRecuperado =
+          recuperadosPublica.some(
+            (x) =>
+              getItemObjetivoKey(x) ===
+              getObjetivoKey(objetivo)
+          );
+
+        if (yaRecuperado) {
+          return;
+        }
+
+        if (!inscripcionId) {
+          console.error(
+            "❌ Encontré formulario público pero no pude determinar inscripcionId.",
+            {
+              publicaDocId:
+                publica.id,
+
+              objetivo:
+                objetivo.nombre
+            }
+          );
+
+          return;
+        }
+
+        recuperadosPublica.push(
+          item
+        );
+      }
+    );
+
+    if (
+      recuperadosPublica.length
+    ) {
+
+      console.log(
+        "♻️ Recuperados desde formulario público:"
+      );
+
+      console.table(
+        recuperadosPublica.map(
+          (item) => ({
+            id:
+              item.id,
+
+            documento:
+              getInscripcionDocumento(
+                item
+              ),
+
+            nombre:
+              getNombreMigracion(
+                item
+              ),
+
+            publicaDoc:
+              item._publicaDocIdMigracion,
+
+            estadoOriginal:
+              item._publicaEstadoOriginal
+          })
+        )
+      );
+
+      encontrados = [
+        ...encontrados,
+        ...recuperadosPublica
+      ];
+    }
+  }
+
+  /*
+    =====================================================
+    6. VALIDACIÓN DEFINITIVA: DEBEN SER EXACTAMENTE 11
+    =====================================================
+  */
+
+  faltantesObjetivos =
+    obtenerObjetivosFaltantes();
+
+  console.log(
+    `Encontrados ${encontrados.length} de ${OBJETIVOS.length} pasajeros.`
+  );
+
+  console.table(
+    encontrados.map(
+      (item) => {
+
+        const objetivo =
+          encontrarObjetivoPorItem(
+            item
+          );
+
+        return {
           id:
             item.id,
 
           documento:
-            getInscripcionDocumento(item),
-
-          nombre:
-            cleanText(
-              `${getInscripcionNombres(item)} ${getInscripcionApellidos(item)}`
+            getInscripcionDocumento(
+              item
             ),
 
-          publicaDoc:
-            item._publicaDocIdMigracion
+          nombre:
+            getNombreMigracion(
+              item
+            ),
+
+          objetivo:
+            objetivo?.nombre ||
+            "",
+
+          tipo:
+            getInscripcionTipoReal(
+              item
+            ),
+
+          privacidad:
+            item?.privacidad?.estado ||
+            (
+              item._origenMigracion ===
+                "inscripciones_pendientes_publicas"
+                ? item._publicaEstadoOriginal
+                : ""
+            ) ||
+            "activa",
+
+          encontradoEn:
+            item._origenMigracion
+        };
+      })
+  );
+
+  if (
+    faltantesObjetivos.length
+  ) {
+
+    console.error(
+      "❌ SIGUEN FALTANDO PASAJEROS. NO SE EJECUTARÁ LA MIGRACIÓN."
+    );
+
+    console.table(
+      faltantesObjetivos.map(
+        (item) => ({
+          nombre:
+            item.nombre,
+
+          rut:
+            item.rut ||
+            ""
         })
       )
     );
 
-    encontrados = [
-      ...encontrados,
-      ...recuperadosPublica
-    ];
+    return {
+      estado:
+        "FALTAN_PASAJEROS",
+
+      encontrados:
+        encontrados.length,
+
+      esperados:
+        OBJETIVOS.length,
+
+      faltantes:
+        faltantesObjetivos
+    };
   }
-}
+
+  /*
+    Verificar que no tengamos una misma persona
+    recuperada dos veces desde fuentes distintas.
+  */
+
+  const keysEncontrados =
+    encontrados
+      .map(
+        getItemObjetivoKey
+      )
+      .filter(Boolean);
+
+  const keysUnicos =
+    new Set(
+      keysEncontrados
+    );
+
+  if (
+    encontrados.length !==
+      OBJETIVOS.length ||
+    keysUnicos.size !==
+      OBJETIVOS.length
+  ) {
+
+    console.error(
+      "❌ La cantidad encontrada no es consistente.",
+      {
+        encontrados:
+          encontrados.length,
+
+        unicos:
+          keysUnicos.size,
+
+        esperados:
+          OBJETIVOS.length
+      }
+    );
+
+    return {
+      estado:
+        "CANTIDAD_INCONSISTENTE",
+
+      encontrados:
+        encontrados.length,
+
+      unicos:
+        keysUnicos.size,
+
+      esperados:
+        OBJETIVOS.length
+    };
+  }
+
+  /*
+    =====================================================
+    7. LEER DESTINO Y DETECTAR DUPLICADOS
+    =====================================================
+  */
+
+  const destinoSnap =
+    await getDocs(
+      collection(
+        db,
+        "ventas_cotizaciones",
+        String(destino.docId),
+        "inscripciones"
+      )
+    );
+
+  const pasajerosDestino =
+    destinoSnap.docs.map(
+      (d) => ({
+        id:
+          d.id,
+
+        ...d.data()
+      })
+    );
+
+  const plan = [];
+
+  for (
+    const item
+    of encontrados
+  ) {
+
+    const objetivo =
+      encontrarObjetivoPorItem(
+        item
+      );
+
+    const rut =
+      getRutMigracion(
+        item
+      );
+
+    const nombreKey =
+      getNombreKeyMigracion(
+        item
+      );
+
+    const duplicado =
+      pasajerosDestino.find(
+        (dest) => {
+
+          const rutDest =
+            getRutMigracion(
+              dest
+            );
+
+          const nombreDest =
+            getNombreKeyMigracion(
+              dest
+            );
+
+          if (
+            rut &&
+            rutDest &&
+            rut === rutDest
+          ) {
+            return true;
+          }
+
+          if (
+            objetivo &&
+            encontrarObjetivoPorItem(dest) &&
+            getItemObjetivoKey(dest) ===
+              getObjetivoKey(objetivo)
+          ) {
+            return true;
+          }
+
+          return (
+            nombreKey &&
+            nombreDest &&
+            nombreKey === nombreDest
+          );
+        }
+      );
+
+    plan.push({
+      item,
+
+      objetivo,
+
+      rut,
+
+      nombre:
+        getNombreMigracion(
+          item
+        ),
+
+      estadoOrigen:
+        item?.privacidad?.estado ||
+        item._publicaEstadoOriginal ||
+        "activa",
+
+      encontradoEn:
+        item._origenMigracion,
+
+      duplicadoDestino:
+        duplicado
+          ? duplicado.id
+          : "",
+
+      accion:
+        duplicado
+          ? "YA_EXISTE_DESTINO"
+          : "MIGRAR"
+    });
+  }
+
+  console.log(
+    "📋 PLAN DE MIGRACIÓN"
+  );
+
+  console.table(
+    plan.map(
+      (x) => ({
+        documento:
+          x.rut,
+
+        nombre:
+          x.nombre,
+
+        estadoOrigen:
+          x.estadoOrigen,
+
+        encontradoEn:
+          x.encontradoEn,
+
+        accion:
+          x.accion,
+
+        duplicadoDestino:
+          x.duplicadoDestino ||
+          ""
+      })
+    )
+  );
+
+  const duplicados =
+    plan.filter(
+      (x) =>
+        x.accion ===
+        "YA_EXISTE_DESTINO"
+    );
+
+  if (
+    duplicados.length
+  ) {
+
+    console.error(
+      "❌ Hay pasajeros que ya existen en el grupo 11184."
+    );
+
+    console.table(
+      duplicados.map(
+        (x) => ({
+          nombre:
+            x.nombre,
+
+          documento:
+            x.rut,
+
+          duplicadoDestino:
+            x.duplicadoDestino
+        })
+      )
+    );
+
+    console.error(
+      "NO se ejecutará la migración para evitar sobreescribir datos."
+    );
+
+    return {
+      estado:
+        "DUPLICADOS_DESTINO",
+
+      duplicados
+    };
+  }
+
+  /*
+    =====================================================
+    8. DRY RUN
+    =====================================================
+  */
+
+  if (dryRun) {
+
+    console.warn(
+      "⚠️ SIMULACIÓN TERMINADA. NO SE MODIFICÓ FIREBASE."
+    );
+
+    console.log(
+      "Si los 11 aparecen como MIGRAR, ejecutar:"
+    );
+
+    console.log(
+      "await migrarPasajeros11053a11184({ dryRun:false, confirmar:true })"
+    );
+
+    return {
+      estado:
+        "DRY_RUN_OK",
+
+      total:
+        plan.length,
+
+      plan
+    };
+  }
+
+  /*
+    =====================================================
+    9. DOBLE PROTECCIÓN PARA EJECUCIÓN REAL
+    =====================================================
+  */
+
+  if (!confirmar) {
+
+    console.error(
+      "❌ Para ejecutar realmente debes usar confirmar:true."
+    );
+
+    return null;
+  }
+
+  const confirmacion =
+    window.confirm(
+      `MIGRACIÓN DEFINITIVA\n\n` +
+      `Grupo ${GRUPO_ORIGEN} → ${GRUPO_DESTINO}\n\n` +
+      `Se migrarán exactamente ${plan.length} pasajeros.\n\n` +
+      `Los documentos existentes en 11053 quedarán archivados.\n` +
+      `Thiago será reconstruido desde su formulario público original.\n` +
+      `Los registros públicos serán reasignados a 11184.\n\n` +
+      `¿Continuar?`
+    );
+
+  if (!confirmacion) {
+
+    console.warn(
+      "Migración cancelada."
+    );
+
+    return null;
+  }
+
+  /*
+    =====================================================
+    10. CARGAR TODOS LOS REGISTROS PÚBLICOS DEL ORIGEN
+
+    Aunque antes quizá ya los cargamos por Thiago,
+    hacemos aquí una lectura fresca antes de modificar.
+    =====================================================
+  */
+
+  const publicasOrigenSnap =
+    await getDocs(
+      query(
+        collection(
+          db,
+          "inscripciones_pendientes_publicas"
+        ),
+        where(
+          "idGrupo",
+          "==",
+          String(origen.docId)
+        )
+      )
+    );
+
+  todasPublicasOrigen =
+    publicasOrigenSnap.docs.map(
+      (d) => ({
+        id:
+          d.id,
+
+        ...d.data()
+      })
+    );
+
+  console.log(
+    `Registros públicos disponibles en 11053: ${todasPublicasOrigen.length}`
+  );
+
+  const resultados = [];
+
+  /*
+    =====================================================
+    11. MIGRAR UNO A UNO
+    =====================================================
+  */
+
+  for (
+    const registro
+    of plan
+  ) {
+
+    const item =
+      registro.item;
+
+    const objetivo =
+      registro.objetivo;
+
+    const inscripcionId =
+      String(
+        item.id
+      ).trim();
+
+    const nombre =
+      registro.nombre;
+
+    const rut =
+      registro.rut;
+
+    console.log(
+      `🚚 Migrando ${nombre} · ${rut || inscripcionId}`
+    );
+
+    if (!inscripcionId) {
+      throw new Error(
+        `No se pudo determinar inscripcionId para ${nombre}.`
+      );
+    }
+
+    /*
+      ===================================================
+      11A. LIMPIAR PRIVACIDAD PARA DESTINO
+      ===================================================
+    */
+
+    const privacidadOriginal = {
+      ...(item.privacidad || {})
+    };
+
+    delete privacidadOriginal.archivadaAt;
+    delete privacidadOriginal.archivadaPor;
+    delete privacidadOriginal.archivadaPorCorreo;
+    delete privacidadOriginal.motivoArchivo;
+    delete privacidadOriginal.archivoId;
+    delete privacidadOriginal.migradaAGrupo;
+
+    const privacidadDestino = {
+      ...privacidadOriginal,
+
+      estado:
+        "activa",
+
+      eliminada:
+        false,
+
+      anonimizada:
+        false,
+
+      motivo:
+        "",
+
+      migradaDesdeGrupo:
+        String(origen.docId),
+
+      migradaAt:
+        serverTimestamp(),
+
+      migradaPor:
+        getDisplayName(
+          state.effectiveUser
+        ),
+
+      migradaPorCorreo:
+        state.effectiveEmail
+    };
+
+    /*
+      ===================================================
+      11B. QUITAR CAMPOS TEMPORALES
+      ===================================================
+    */
+
+    const datosInscripcionParaMigrar =
+      quitarCamposSoloJs(
+        item
+      );
+
+    /*
+      ===================================================
+      11C. ACTUALIZAR CONTEXTO DEL GRUPO
+
+      Conservamos toda la información personal/médica,
+      pero la asociación al grupo debe quedar en 11184.
+
+      Esto evita que internamente siga diciendo 1A/11053.
+      ===================================================
+    */
+
+    const grupoAnterior =
+      datosInscripcionParaMigrar.grupo ||
+      {};
+
+    const cursoDestino =
+      cleanText(
+        destino.data?.curso ||
+        grupoAnterior.cursoBase ||
+        ""
+      );
+
+    const anoBaseDestino =
+      getDocBaseYear(
+        destino.data ||
+        {}
+      );
+
+    const grupoDestino = {
+      ...grupoAnterior,
+
+      idGrupo:
+        String(destino.docId),
+
+      aliasGrupo:
+        cleanText(
+          destino.data?.aliasGrupo ||
+          destino.data?.nombreGrupo ||
+          grupoAnterior.aliasGrupo ||
+          ""
+        ),
+
+      nombreGrupo:
+        cleanText(
+          destino.data?.nombreGrupo ||
+          destino.data?.aliasGrupo ||
+          grupoAnterior.nombreGrupo ||
+          ""
+        ),
+
+      colegio:
+        cleanText(
+          destino.data?.colegio ||
+          grupoAnterior.colegio ||
+          ""
+        ),
+
+      anoViaje:
+        cleanText(
+          destino.data?.anoViaje ||
+          grupoAnterior.anoViaje ||
+          ""
+        ),
+
+      cursoBase:
+        cursoDestino ||
+        grupoAnterior.cursoBase ||
+        "",
+
+      cursoActualInscripcion:
+        cursoDestino
+          ? `${cursoDestino} (${anoBaseDestino})`
+          : (
+              grupoAnterior
+                .cursoActualInscripcion ||
+              ""
+            ),
+
+      destinoPrincipal:
+        cleanText(
+          destino.data?.destinoPrincipal ||
+          grupoAnterior.destinoPrincipal ||
+          ""
+        )
+    };
+
+    /*
+      ===================================================
+      11D. CREAR INSCRIPCIÓN EN GRUPO 11184
+      ===================================================
+    */
+
+    const destinoRef =
+      doc(
+        db,
+        "ventas_cotizaciones",
+        String(destino.docId),
+        "inscripciones",
+        inscripcionId
+      );
+
+    await setDoc(
+      destinoRef,
+      {
+        ...datosInscripcionParaMigrar,
+
+        idGrupo:
+          String(destino.docId),
+
+        groupDocId:
+          String(destino.docId),
+
+        grupo:
+          grupoDestino,
+
+        privacidad:
+          privacidadDestino,
+
+        migracionGrupo: {
+          origenDocId:
+            String(origen.docId),
+
+          origenIdGrupo:
+            String(origen.groupId),
+
+          destinoDocId:
+            String(destino.docId),
+
+          destinoIdGrupo:
+            String(destino.groupId),
+
+          origenRegistro:
+            item._origenMigracion,
+
+          archivoOrigenId:
+            item._archivoIdMigracion ||
+            "",
+
+          publicaOrigenId:
+            item._publicaDocIdMigracion ||
+            "",
+
+          migradoAt:
+            serverTimestamp(),
+
+          migradoPor:
+            getDisplayName(
+              state.effectiveUser
+            ),
+
+          migradoPorCorreo:
+            state.effectiveEmail
+        },
+
+        actualizadoAt:
+          serverTimestamp(),
+
+        actualizadoPor:
+          getDisplayName(
+            state.effectiveUser
+          ),
+
+        actualizadoPorCorreo:
+          state.effectiveEmail
+      }
+    );
+
+    /*
+      ===================================================
+      11E. ARCHIVAR ORIGINAL SI TODAVÍA EXISTE
+
+      Los 10 normales entran aquí.
+
+      Thiago NO entra aquí porque su fuente es:
+      inscripciones_pendientes_publicas
+      ===================================================
+    */
+
+    if (
+      item._origenMigracion ===
+      "inscripciones"
+    ) {
+
+      const origenRef =
+        doc(
+          db,
+          "ventas_cotizaciones",
+          String(origen.docId),
+          "inscripciones",
+          inscripcionId
+        );
+
+      await updateDoc(
+        origenRef,
+        {
+          privacidad: {
+            ...(item.privacidad || {}),
+
+            estado:
+              "archivada",
+
+            archivadaAt:
+              serverTimestamp(),
+
+            archivadaPor:
+              getDisplayName(
+                state.effectiveUser
+              ),
+
+            archivadaPorCorreo:
+              state.effectiveEmail,
+
+            motivoArchivo:
+              `Migrado al grupo ${GRUPO_DESTINO}`,
+
+            migradaAGrupo:
+              String(destino.docId)
+          },
+
+          migracionGrupoDestino:
+            String(destino.docId),
+
+          migracionGrupoAt:
+            serverTimestamp(),
+
+          migracionGrupoPor:
+            getDisplayName(
+              state.effectiveUser
+            ),
+
+          migracionGrupoPorCorreo:
+            state.effectiveEmail
+        }
+      );
+
+    } else {
+
+      console.log(
+        `ℹ️ ${nombre}: no existe inscripción oficial activa en 11053 que archivar.`,
+        {
+          origenRegistro:
+            item._origenMigracion,
+
+          archivo:
+            item._archivoIdMigracion ||
+            "",
+
+          publica:
+            item._publicaDocIdMigracion ||
+            ""
+        }
+      );
+    }
+
+    /*
+      ===================================================
+      11F. ENCONTRAR Y MIGRAR REGISTRO(S) PÚBLICO(S)
+
+      La comparación se hace:
+      1. RUT
+      2. objetivo identificado
+      3. nombre exacto normalizado
+      ===================================================
+    */
+
+    let publicosMigrados =
+      0;
+
+    for (
+      const publica
+      of todasPublicasOrigen
+    ) {
+
+      const payload =
+        publica.payload ||
+        {};
+
+      const itemPublicoTemporal = {
+        ...payload,
+
+        id:
+          publica.inscripcionId ||
+          payload?.identificacion
+            ?.documentoNormalizado ||
+          publica.id
+      };
+
+      const objetivoPublico =
+        encontrarObjetivoPorItem(
+          itemPublicoTemporal
+        );
+
+      const rutPublico =
+        getRutMigracion(
+          itemPublicoTemporal
+        );
+
+      const nombrePublicoKey =
+        getNombreKeyMigracion(
+          itemPublicoTemporal
+        );
+
+      const nombreActualKey =
+        getNombreKeyMigracion(
+          item
+        );
+
+      const coincide =
+        (
+          rut &&
+          rutPublico &&
+          rut === rutPublico
+        ) ||
+        (
+          objetivo &&
+          objetivoPublico &&
+          getObjetivoKey(objetivo) ===
+            getObjetivoKey(
+              objetivoPublico
+            )
+        ) ||
+        (
+          nombreActualKey &&
+          nombrePublicoKey &&
+          nombreActualKey ===
+            nombrePublicoKey
+        );
+
+      if (!coincide) {
+        continue;
+      }
+
+      const privacidadPublica = {
+        ...(payload?.privacidad || {})
+      };
+
+      delete privacidadPublica.archivadaAt;
+      delete privacidadPublica.archivadaPor;
+      delete privacidadPublica.archivadaPorCorreo;
+      delete privacidadPublica.motivoArchivo;
+      delete privacidadPublica.archivoId;
+
+      const grupoPublicoAnterior =
+        payload.grupo ||
+        {};
+
+      const grupoPublicoDestino = {
+        ...grupoPublicoAnterior,
+
+        idGrupo:
+          String(destino.docId),
+
+        aliasGrupo:
+          cleanText(
+            destino.data?.aliasGrupo ||
+            destino.data?.nombreGrupo ||
+            grupoPublicoAnterior.aliasGrupo ||
+            ""
+          ),
+
+        nombreGrupo:
+          cleanText(
+            destino.data?.nombreGrupo ||
+            destino.data?.aliasGrupo ||
+            grupoPublicoAnterior.nombreGrupo ||
+            ""
+          ),
+
+        colegio:
+          cleanText(
+            destino.data?.colegio ||
+            grupoPublicoAnterior.colegio ||
+            ""
+          ),
+
+        anoViaje:
+          cleanText(
+            destino.data?.anoViaje ||
+            grupoPublicoAnterior.anoViaje ||
+            ""
+          ),
+
+        cursoBase:
+          cursoDestino ||
+          grupoPublicoAnterior.cursoBase ||
+          "",
+
+        cursoActualInscripcion:
+          cursoDestino
+            ? `${cursoDestino} (${anoBaseDestino})`
+            : (
+                grupoPublicoAnterior
+                  .cursoActualInscripcion ||
+                ""
+              ),
+
+        destinoPrincipal:
+          cleanText(
+            destino.data?.destinoPrincipal ||
+            grupoPublicoAnterior
+              .destinoPrincipal ||
+            ""
+          )
+      };
+
+      const publicaRef =
+        doc(
+          db,
+          "inscripciones_pendientes_publicas",
+          publica.id
+        );
+
+      await updateDoc(
+        publicaRef,
+        {
+          idGrupo:
+            String(destino.docId),
+
+          groupDocId:
+            String(destino.docId),
+
+          /*
+            Thiago está hoy como eliminada_logica.
+            Lo devolvemos al estado normal procesado.
+          */
+          estado:
+            normalizeSearchLocal(
+              publica.estado ||
+              ""
+            ) === "eliminada_logica"
+              ? "procesado"
+              : (
+                  publica.estado ||
+                  "procesado"
+                ),
+
+          "payload.idGrupo":
+            String(destino.docId),
+
+          "payload.groupDocId":
+            String(destino.docId),
+
+          "payload.grupo":
+            grupoPublicoDestino,
+
+          "payload.privacidad": {
+            ...privacidadPublica,
+
+            estado:
+              "activa",
+
+            eliminada:
+              false,
+
+            anonimizada:
+              false,
+
+            motivo:
+              ""
+          },
+
+          migracionGrupo: {
+            origenDocId:
+              String(origen.docId),
+
+            destinoDocId:
+              String(destino.docId),
+
+            migradoAt:
+              serverTimestamp(),
+
+            migradoPor:
+              getDisplayName(
+                state.effectiveUser
+              ),
+
+            migradoPorCorreo:
+              state.effectiveEmail
+          },
+
+          /*
+            Quitar marcas creadas por la sincronización
+            que dejó a Thiago como eliminada_logica.
+          */
+          eliminadaPorSyncNomina:
+            deleteField(),
+
+          eliminadaPorSyncAt:
+            deleteField(),
+
+          eliminadaPorSyncGrupo:
+            deleteField(),
+
+          eliminadaPorSyncInscripcionId:
+            deleteField()
+        }
+      );
+
+      publicosMigrados++;
+    }
+
+    /*
+      ===================================================
+      11G. RESULTADO INDIVIDUAL
+      ===================================================
+    */
+
+    resultados.push({
+      documento:
+        rut,
+
+      nombre,
+
+      inscripcionId,
+
+      origen:
+        origen.docId,
+
+      destino:
+        destino.docId,
+
+      recuperadoDesde:
+        item._origenMigracion,
+
+      publicaOrigen:
+        item._publicaDocIdMigracion ||
+        "",
+
+      publicosMigrados,
+
+      estado:
+        "MIGRADO"
+    });
+
+    console.log(
+      `✅ ${nombre} migrado correctamente.`,
+      {
+        inscripcionId,
+
+        fuente:
+          item._origenMigracion,
+
+        publicosMigrados
+      }
+    );
+  }
+
+  /*
+    =====================================================
+    12. RESULTADO FINAL
+    =====================================================
+  */
+
+  console.log(
+    "===================================================="
+  );
+
+  console.log(
+    "✅ MIGRACIÓN FINALIZADA"
+  );
+
+  console.log(
+    "===================================================="
+  );
+
+  console.table(
+    resultados
+  );
+
+  const recuperadosPublica =
+    resultados.filter(
+      (x) =>
+        x.recuperadoDesde ===
+        "inscripciones_pendientes_publicas"
+    );
+
+  console.log({
+    totalMigrados:
+      resultados.length,
+
+    origen:
+      origen.docId,
+
+    destino:
+      destino.docId,
+
+    recuperadosDesdePublica:
+      recuperadosPublica.length,
+
+    recuperadosDesdeArchivo:
+      resultados.filter(
+        (x) =>
+          x.recuperadoDesde ===
+          "inscripciones_archivadas"
+      ).length
+  });
+
+  /*
+    =====================================================
+    13. RECARGAR NÓMINA SI ESTAMOS EN UNO DE LOS GRUPOS
+    =====================================================
+  */
+
+  if (
+    String(state.groupDocId) ===
+      String(origen.docId) ||
+    String(state.groupDocId) ===
+      String(destino.docId)
+  ) {
+
+    /*
+      Dejamos margen a los triggers que generan
+      nomina_resumen.
+    */
+
+    await esperar(
+      1500
+    );
+
+    state.inscripcionesCargadas =
+      false;
+
+    state.inscripcionesDetalleCache =
+      new Map();
+
+    await asegurarNominaCargada({
+      mostrar: true,
+      renderizar: true
+    });
+  }
+
+  alert(
+    `Migración terminada.\n\n` +
+    `${resultados.length} pasajeros migrados.\n` +
+    `${GRUPO_ORIGEN} → ${GRUPO_DESTINO}\n\n` +
+    `Recuperados desde pública: ${recuperadosPublica.length}`
+  );
+
+  return {
+    estado:
+      "OK",
+
+    total:
+      resultados.length,
+
+    resultados
+  };
+};
