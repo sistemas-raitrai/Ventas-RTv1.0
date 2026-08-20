@@ -15,6 +15,12 @@ import {
 } from "./ficha-medica-common.js";
 
 
+/*
+  =========================================================
+  ESTADO
+  =========================================================
+*/
+
 const state = {
   groupDocId: "",
   groupId: "",
@@ -24,17 +30,25 @@ const state = {
 
   /*
     encargado:
-      versión limitada según consentimiento.
+      versión limitada según autorización.
 
     viaje:
-      versión operativa para adultos responsables.
+      versión destinada a adultos responsables
+      durante el viaje.
   */
-  mode: "encargado"
+  mode:
+    "encargado"
 };
 
 
 init();
 
+
+/*
+  =========================================================
+  INICIO
+  =========================================================
+*/
 
 function init() {
   onAuthStateChanged(
@@ -42,7 +56,9 @@ function init() {
     async (
       firebaseUser
     ) => {
-      if (!firebaseUser) {
+      if (
+        !firebaseUser
+      ) {
         location.href =
           "login.html";
 
@@ -78,8 +94,9 @@ function bindEvents() {
   $("btnPrint")
     ?.addEventListener(
       "click",
-      () =>
-        window.print()
+      () => {
+        window.print();
+      }
     );
 
   $("btnModoEncargado")
@@ -106,6 +123,12 @@ function bindEvents() {
 }
 
 
+/*
+  =========================================================
+  CARGA
+  =========================================================
+*/
+
 async function loadPage() {
   try {
     const params =
@@ -115,11 +138,17 @@ async function loadPage() {
 
     const requested =
       clean(
-        params.get("id") ||
-        params.get("grupo")
+        params.get(
+          "id"
+        ) ||
+        params.get(
+          "grupo"
+        )
       );
 
-    if (!requested) {
+    if (
+      !requested
+    ) {
       throw new Error(
         "Falta el parámetro ?id= del grupo."
       );
@@ -130,7 +159,9 @@ async function loadPage() {
         requested
       );
 
-    if (!resolved) {
+    if (
+      !resolved
+    ) {
       throw new Error(
         `No se encontró el grupo ${requested}.`
       );
@@ -145,17 +176,23 @@ async function loadPage() {
     state.group =
       resolved.data;
 
+    const allItems =
+      await loadGroupInscriptions(
+        state.groupDocId
+      );
+
     /*
-      Solamente trabajamos con pasajeros vigentes.
+      Gestión médica solo considera pasajeros
+      que actualmente viajan.
+
+      Los anulados quedan fuera.
     */
     state.items =
-      (
-        await loadGroupInscriptions(
-          state.groupDocId
-        )
-      )
+      allItems
         .filter(
-          (item) =>
+          (
+            item
+          ) =>
             !isCancelled(
               item
             )
@@ -167,19 +204,19 @@ async function loadPage() {
           ) =>
             passengerName(
               a
+            ).localeCompare(
+              passengerName(
+                b
+              ),
+              "es",
+              {
+                sensitivity:
+                  "base",
+
+                numeric:
+                  true
+              }
             )
-              .localeCompare(
-                passengerName(
-                  b
-                ),
-                "es",
-                {
-                  sensitivity:
-                    "base",
-                  numeric:
-                    true
-                }
-              )
         );
 
     $("btnVolver").href =
@@ -188,24 +225,22 @@ async function loadPage() {
       )}`;
 
     document.title =
-      `Resumen operativo · ${
-        clean(
-          state.group
-            ?.aliasGrupo ||
-          state.group
-            ?.colegio ||
-          state.groupId
-        )
-      }`;
+      `Resumen operativo · ${clean(
+        state.group
+          ?.aliasGrupo ||
+        state.group
+          ?.colegio ||
+        state.groupId
+      )}`;
 
     $("loadingBox")
-      .classList
+      ?.classList
       .add(
         "hidden"
       );
 
     $("content")
-      .classList
+      ?.classList
       .remove(
         "hidden"
       );
@@ -218,8 +253,9 @@ async function loadPage() {
       ) === "1"
     ) {
       setTimeout(
-        () =>
-          window.print(),
+        () => {
+          window.print();
+        },
         350
       );
     }
@@ -245,27 +281,32 @@ async function loadPage() {
   =========================================================
 */
 
-
 function normalizarFlag(
   value
 ) {
-  const v =
+  const normalized =
     normalize(
       value
     );
 
   if (
     value === true ||
-    v === "si" ||
-    v === "true"
+    normalized ===
+      "si" ||
+    normalized ===
+      "sí" ||
+    normalized ===
+      "true"
   ) {
     return true;
   }
 
   if (
     value === false ||
-    v === "no" ||
-    v === "false"
+    normalized ===
+      "no" ||
+    normalized ===
+      "false"
   ) {
     return false;
   }
@@ -282,7 +323,9 @@ function uniqueText(
       values
         .flat()
         .map(
-          (value) =>
+          (
+            value
+          ) =>
             clean(
               value
             )
@@ -303,11 +346,22 @@ function humanizar(
       value
     );
 
-  if (!raw) {
+  if (
+    !raw
+  ) {
     return "";
   }
 
-  const map = {
+  const normalized =
+    normalize(
+      raw
+    )
+      .replace(
+        /\s+/g,
+        "_"
+      );
+
+  const labels = {
     sin_gluten:
       "Sin gluten",
 
@@ -352,24 +406,12 @@ function humanizar(
   };
 
   if (
-    map[
-      normalize(
-        raw
-      )
-        .replace(
-          /\s+/g,
-          "_"
-        )
+    labels[
+      normalized
     ]
   ) {
-    return map[
-      normalize(
-        raw
-      )
-        .replace(
-          /\s+/g,
-          "_"
-        )
+    return labels[
+      normalized
     ];
   }
 
@@ -396,80 +438,122 @@ function humanizar(
 */
 
 
-function versionConsentimiento(
+function getConsentimientoObject(
   item = {}
 ) {
+  return (
+    item.consentimiento ||
+    {}
+  );
+}
+
+
+function getVersionConsentimiento(
+  item = {}
+) {
+  const consentimiento =
+    getConsentimientoObject(
+      item
+    );
+
   return Number(
-    item
-      ?.consentimiento
-      ?.versionConsentimiento ||
+    consentimiento
+      .versionConsentimiento ||
+    item.versionConsentimientoFicha ||
+    item.versionConsentimiento ||
     1
   );
 }
 
 
 /*
-  Para el ENCARGADO DE GRUPO:
+  Esta función mantiene varias rutas compatibles
+  porque pueden existir fichas de distintas versiones.
 
-  V2:
-    respetamos literalmente
-    autorizaApoderadoCoordinador.
-
-  V1:
-    la pregunta específica todavía no existía.
-    NO interpretamos el silencio como autorización.
-
-    Por seguridad, el encargado no verá detalle
-    médico individual de una ficha V1.
+  Si la ficha tiene expresamente FALSE,
+  el encargado NO recibe detalles médicos.
 */
 function puedeCompartirConEncargado(
   item = {}
 ) {
-  const version =
-    versionConsentimiento(
+  const consentimiento =
+    getConsentimientoObject(
       item
     );
 
+  const candidatos = [
+    consentimiento
+      .autorizaApoderadoCoordinador,
+
+    consentimiento
+      .autorizaEncargadoGrupo,
+
+    consentimiento
+      .autorizaCompartirEncargado,
+
+    item
+      .autorizaApoderadoCoordinador
+  ];
+
+  for (
+    const value of
+    candidatos
+  ) {
+    if (
+      value === true
+    ) {
+      return true;
+    }
+
+    if (
+      value === false
+    ) {
+      return false;
+    }
+  }
+
+  /*
+    Fichas antiguas sin respuesta explícita.
+
+    No damos por hecho que existe autorización
+    para entregar antecedentes médicos a un tercero.
+  */
   if (
-    version < 2
+    getVersionConsentimiento(
+      item
+    ) < 2
   ) {
     return false;
   }
 
-  return (
-    item
-      ?.consentimiento
-      ?.autorizaApoderadoCoordinador ===
-    true
-  );
+  return false;
 }
 
 
 /*
-  Equipo de viaje.
+  El equipo de viaje utiliza la información necesaria
+  para seguridad, asistencia, cuidado y operación.
 
-  El consentimiento V2 que ya utilizas indica
-  expresamente que la ficha y antecedentes
-  relevantes pueden ser consultados por
-  coordinadores Rai Trai y adultos acompañantes
-  responsables cuando sea necesario para
-  seguridad, cuidado y asistencia.
-
-  Por eso en modo viaje utilizamos la información
-  operativa necesaria.
+  Si existiera en tus datos un bloqueo explícito
+  para uso interno, lo respetamos.
 */
 function puedeCompartirConEquipoViaje(
   item = {}
 ) {
-  return (
-    item
-      ?.consentimiento
-      ?.aceptaUsoInterno ===
-      true ||
-    versionConsentimiento(
+  const consentimiento =
+    getConsentimientoObject(
       item
-    ) < 2
-  );
+    );
+
+  if (
+    consentimiento
+      .aceptaUsoInterno ===
+      false
+  ) {
+    return false;
+  }
+
+  return true;
 }
 
 
@@ -495,15 +579,6 @@ function puedeMostrarDetalle(
   =========================================================
   NECESITA ASISTENCIA
   =========================================================
-
-  ESTA ES LA ÚNICA FUNCIÓN QUE DEBEMOS CAMBIAR
-  SI CONFIRMAMOS UN CAMPO GENERAL DIFERENTE.
-
-  Primero busca posibles campos generales nuevos.
-  Después aplica fallback a las preguntas que
-  YA EXISTEN en las fichas actuales:
-    - discapacidadApoyosFlag
-    - neuroApoyosFlag
 */
 
 
@@ -515,22 +590,37 @@ function getNecesitaAsistencia(
     {};
 
   /*
-    CAMPOS CANÓNICOS FUTUROS / POSIBLES.
+    Primero buscamos posibles campos generales.
 
-    Si alguno existe, tiene prioridad absoluta.
+    Si tu formulario definitivo ya guarda una pregunta
+    directa "Necesita asistencia", esta tiene prioridad.
   */
-  const posiblesGenerales = [
-    salud.necesitaAsistencia,
-    salud.necesitaAsistenciaFlag,
-    salud.requiereAsistencia,
-    salud.requiereAsistenciaFlag,
-    item.necesitaAsistencia,
-    item.necesitaAsistenciaFlag
+  const generales = [
+    salud
+      .necesitaAsistencia,
+
+    salud
+      .necesitaAsistenciaFlag,
+
+    salud
+      .requiereAsistencia,
+
+    salud
+      .requiereAsistenciaFlag,
+
+    item
+      .necesitaAsistencia,
+
+    item
+      .necesitaAsistenciaFlag,
+
+    item
+      .requiereAsistencia
   ];
 
   for (
     const value of
-    posiblesGenerales
+    generales
   ) {
     const flag =
       normalizarFlag(
@@ -545,8 +635,14 @@ function getNecesitaAsistencia(
   }
 
   /*
-    COMPATIBILIDAD CON FICHAS ACTUALES.
+    Compatibilidad con las fichas actuales.
+
+    Tu Gestión de Fichas Médicas ya utiliza estos
+    flags en el editor:
+      salud.discapacidadApoyosFlag
+      salud.neuroApoyosFlag
   */
+
   const discapacidad =
     normalizarFlag(
       salud
@@ -559,25 +655,34 @@ function getNecesitaAsistencia(
         .neuroApoyosFlag
     );
 
+  /*
+    Si cualquiera requiere apoyo:
+    asistencia = Sí.
+  */
   if (
     discapacidad ===
       true ||
-    neuro === true
+    neuro ===
+      true
   ) {
     return true;
   }
 
+  /*
+    Si ambas respuestas existen y son No.
+  */
   if (
     discapacidad ===
       false &&
-    neuro === false
+    neuro ===
+      false
   ) {
     return false;
   }
 
   /*
-    Si solo una de las preguntas fue respondida,
-    utilizamos esa respuesta.
+    Si solo existe una de ellas,
+    usamos esa respuesta.
   */
   if (
     discapacidad !==
@@ -591,6 +696,37 @@ function getNecesitaAsistencia(
     null
   ) {
     return neuro;
+  }
+
+  /*
+    Último fallback:
+
+    Si existen instrucciones concretas de asistencia,
+    interpretamos que existe una consideración de apoyo.
+  */
+  if (
+    clean(
+      salud
+        .discapacidadApoyoTipo
+    ) ||
+    clean(
+      salud
+        .discapacidadRecomendaciones
+    ) ||
+    clean(
+      salud
+        .discapacidadAyudaTecnica
+    ) ||
+    clean(
+      salud
+        .discapacidadAyudaIndicaciones
+    ) ||
+    clean(
+      salud
+        .neuroApoyosDetalle
+    )
+  ) {
+    return true;
   }
 
   return null;
@@ -608,12 +744,6 @@ function getNecesitaAsistenciaTexto(
     return "Pendiente";
   }
 
-  /*
-    En el documento del encargado,
-    una persona que NO autorizó compartir
-    no puede revelar aquí información médica
-    indirectamente.
-  */
   if (
     state.mode ===
       "encargado" &&
@@ -621,7 +751,7 @@ function getNecesitaAsistenciaTexto(
       item
     )
   ) {
-    return "Información restringida";
+    return "Restringido";
   }
 
   const value =
@@ -632,7 +762,7 @@ function getNecesitaAsistenciaTexto(
   if (
     value === true
   ) {
-    return "SÍ";
+    return "Sí";
   }
 
   if (
@@ -647,53 +777,44 @@ function getNecesitaAsistenciaTexto(
 
 /*
   =========================================================
-  ALIMENTACIÓN
+  ALIMENTACION
   =========================================================
 */
 
 
-function getAlimentacion(
+function getAlimentacionValues(
   item = {}
 ) {
   const salud =
     item.salud ||
     {};
 
-  if (
-    !puedeMostrarDetalle(
-      item
-    )
-  ) {
-    return "Información restringida";
-  }
-
-  const dietaFlag =
-    normalizarFlag(
-      salud.dietaFlag
-    );
-
   const values =
     [];
 
   if (
     clean(
-      salud.dietaPrincipal
+      salud
+        .dietaPrincipal
     )
   ) {
     values.push(
       humanizar(
-        salud.dietaPrincipal
+        salud
+          .dietaPrincipal
       )
     );
   }
 
   if (
     Array.isArray(
-      salud.dietaTipos
+      salud
+        .dietaTipos
     )
   ) {
     values.push(
-      ...salud.dietaTipos
+      ...salud
+        .dietaTipos
         .map(
           humanizar
         )
@@ -702,7 +823,8 @@ function getAlimentacion(
 
   if (
     Array.isArray(
-      salud.dietaRestricciones
+      salud
+        .dietaRestricciones
     )
   ) {
     values.push(
@@ -725,42 +847,19 @@ function getAlimentacion(
 
   if (
     clean(
-      salud.dietaDetalle
+      salud
+        .dietaDetalle
     )
   ) {
     values.push(
-      salud.dietaDetalle
+      salud
+        .dietaDetalle
     );
   }
 
-  const result =
-    uniqueText(
-      values
-    );
-
-  if (
-    result.length
-  ) {
-    return result.join(
-      " · "
-    );
-  }
-
-  if (
-    dietaFlag ===
-    true
-  ) {
-    return "Requiere consideración";
-  }
-
-  if (
-    dietaFlag ===
-    false
-  ) {
-    return "—";
-  }
-
-  return "—";
+  return uniqueText(
+    values
+  );
 }
 
 
@@ -771,37 +870,32 @@ function getAlimentacion(
 */
 
 
-function getAlergias(
+function getAlergiasValues(
   item = {}
 ) {
   const salud =
     item.salud ||
     {};
 
-  if (
-    !puedeMostrarDetalle(
-      item
-    )
-  ) {
-    return "Información restringida";
-  }
-
   const values =
     [];
 
   if (
     clean(
-      salud.alergiasDetalle
+      salud
+        .alergiasDetalle
     )
   ) {
     values.push(
-      salud.alergiasDetalle
+      salud
+        .alergiasDetalle
     );
   }
 
   if (
     Array.isArray(
-      salud.alergiasAlimentarias
+      salud
+        .alergiasAlimentarias
     )
   ) {
     salud
@@ -810,7 +904,7 @@ function getAlergias(
         (
           alergia
         ) => {
-          const detail =
+          const detalle =
             clean(
               alergia
                 ?.alimento ||
@@ -820,52 +914,42 @@ function getAlergias(
             );
 
           if (
-            detail
+            detalle
           ) {
             values.push(
-              detail
+              detalle
             );
           }
         }
       );
   }
 
-  const result =
-    uniqueText(
-      values
-    );
-
   if (
-    result.length
-  ) {
-    return result.join(
-      " · "
-    );
-  }
-
-  if (
+    !values.length &&
     normalizarFlag(
-      salud.alergiasFlag
-    ) === true ||
-    normalizarFlag(
-      salud.alergiaAlimentariaFlag
+      salud
+        .alergiasFlag
     ) === true
   ) {
-    return "Sí";
+    values.push(
+      "Alergia informada"
+    );
   }
 
-  return "—";
+  return uniqueText(
+    values
+  );
 }
 
 
 /*
   =========================================================
-  MEDICACIÓN
+  MEDICAMENTOS
   =========================================================
 */
 
 
-function getMedicacion(
+function getMedicamentosDetalle(
   item = {}
 ) {
   const salud =
@@ -873,49 +957,132 @@ function getMedicacion(
     {};
 
   if (
-    !puedeMostrarDetalle(
-      item
+    clean(
+      salud
+        .medicamentosDetalle
     )
   ) {
-    return "Información restringida";
+    return clean(
+      salud
+        .medicamentosDetalle
+    );
   }
 
-  const usa =
+  if (
     normalizarFlag(
-      salud.medicamentosFlag
-    );
+      salud
+        .medicamentosFlag
+    ) === true
+  ) {
+    return "Uso de medicamentos informado";
+  }
+
+  return "";
+}
+
+
+function getMedicamentosContraindicados(
+  item = {}
+) {
+  const salud =
+    item.salud ||
+    {};
 
   if (
     clean(
-      salud.medicamentosDetalle
+      salud
+        .medicamentosProhibidosDetalle
     )
   ) {
-    /*
-      Para encargado preferimos no convertir
-      automáticamente la tabla principal
-      en un listado farmacológico.
-
-      Basta indicar que existe medicación.
-      El detalle aparecerá solo en modo viaje.
-    */
-    if (
-      state.mode ===
-      "encargado"
-    ) {
-      return "Sí";
-    }
-
-    return salud
-      .medicamentosDetalle;
+    return clean(
+      salud
+        .medicamentosProhibidosDetalle
+    );
   }
 
   if (
-    usa === true
+    normalizarFlag(
+      salud
+        .medicamentosProhibidosFlag
+    ) === true
   ) {
-    return "Sí";
+    return "Existen medicamentos contraindicados";
   }
 
-  return "—";
+  return "";
+}
+
+
+/*
+  =========================================================
+  CONTACTOS DE EMERGENCIA
+  =========================================================
+*/
+
+
+function getContactoEmergencia(
+  item = {}
+) {
+  const emergencia =
+    item.emergencia ||
+    {};
+
+  return [
+    clean(
+      emergencia.nombre
+    ),
+
+    clean(
+      emergencia.relacion
+    ),
+
+    clean(
+      emergencia.telefono
+    )
+  ]
+    .filter(
+      Boolean
+    )
+    .join(
+      " · "
+    );
+}
+
+
+function getContactoEmergenciaSecundario(
+  item = {}
+) {
+  const emergencia =
+    item
+      .emergenciaSecundaria ||
+    {};
+
+  if (
+    emergencia.aplica ===
+    false
+  ) {
+    return "";
+  }
+
+  return [
+    clean(
+      emergencia.nombre
+    ),
+
+    clean(
+      emergencia.relacion
+    ),
+
+    clean(
+      emergencia.telefono
+    )
+  ]
+    .filter(
+      Boolean
+    )
+    .join(
+      " · "
+    );
 }
 
 
@@ -926,15 +1093,27 @@ function getMedicacion(
 */
 
 
-function getConsideraciones(
+function getConsideracionesOperativas(
   item = {}
 ) {
+  if (
+    !fichaCompleta(
+      item
+    )
+  ) {
+    return [
+      "Ficha médica pendiente"
+    ];
+  }
+
   if (
     !puedeMostrarDetalle(
       item
     )
   ) {
-    return "Información no autorizada para compartir en esta etapa.";
+    return [
+      "Información no autorizada para compartir en esta etapa"
+    ];
   }
 
   const salud =
@@ -945,10 +1124,117 @@ function getConsideraciones(
     [];
 
   /*
-    Solo incorporamos información útil
-    operacionalmente.
+    -----------------------------------------------------
+    ALIMENTACION
+    -----------------------------------------------------
+  */
 
-    No intentamos construir una historia clínica.
+  const alimentacion =
+    getAlimentacionValues(
+      item
+    );
+
+  if (
+    alimentacion.length
+  ) {
+    values.push(
+      `Alimentación: ${alimentacion.join(
+        ", "
+      )}`
+    );
+  }
+
+
+  /*
+    -----------------------------------------------------
+    ALERGIAS
+    -----------------------------------------------------
+  */
+
+  const alergias =
+    getAlergiasValues(
+      item
+    );
+
+  if (
+    alergias.length
+  ) {
+    values.push(
+      `Alergias: ${alergias.join(
+        ", "
+      )}`
+    );
+  }
+
+
+  /*
+    -----------------------------------------------------
+    MEDICACION
+    -----------------------------------------------------
+  */
+
+  const medicamentos =
+    getMedicamentosDetalle(
+      item
+    );
+
+  if (
+    medicamentos
+  ) {
+    /*
+      En encargado solo indicamos existencia.
+
+      En equipo de viaje sí mostramos
+      el detalle disponible.
+    */
+    if (
+      state.mode ===
+      "encargado"
+    ) {
+      values.push(
+        "Utiliza medicamentos"
+      );
+    } else {
+      values.push(
+        `Medicamentos: ${medicamentos}`
+      );
+    }
+  }
+
+
+  /*
+    -----------------------------------------------------
+    CONTRAINDICACIONES
+    -----------------------------------------------------
+  */
+
+  const contraindicados =
+    getMedicamentosContraindicados(
+      item
+    );
+
+  if (
+    contraindicados
+  ) {
+    if (
+      state.mode ===
+      "encargado"
+    ) {
+      values.push(
+        "Existen medicamentos contraindicados"
+      );
+    } else {
+      values.push(
+        `Medicamentos contraindicados: ${contraindicados}`
+      );
+    }
+  }
+
+
+  /*
+    -----------------------------------------------------
+    ASISTENCIA / DISCAPACIDAD
+    -----------------------------------------------------
   */
 
   if (
@@ -958,8 +1244,10 @@ function getConsideraciones(
     )
   ) {
     values.push(
-      salud
-        .discapacidadApoyoTipo
+      clean(
+        salud
+          .discapacidadApoyoTipo
+      )
     );
   }
 
@@ -970,8 +1258,10 @@ function getConsideraciones(
     )
   ) {
     values.push(
-      salud
-        .discapacidadRecomendaciones
+      clean(
+        salud
+          .discapacidadRecomendaciones
+      )
     );
   }
 
@@ -982,10 +1272,21 @@ function getConsideraciones(
     )
   ) {
     values.push(
-      salud
-        .discapacidadAyudaIndicaciones
+      clean(
+        salud
+          .discapacidadAyudaIndicaciones
+      )
     );
   }
+
+
+  /*
+    -----------------------------------------------------
+    NEURODIVERGENCIA:
+    preferimos estrategias prácticas antes que
+    simplemente repetir diagnósticos.
+    -----------------------------------------------------
+  */
 
   if (
     clean(
@@ -994,8 +1295,10 @@ function getConsideraciones(
     )
   ) {
     values.push(
-      salud
-        .neuroApoyosDetalle
+      clean(
+        salud
+          .neuroApoyosDetalle
+      )
     );
   }
 
@@ -1006,8 +1309,10 @@ function getConsideraciones(
     )
   ) {
     values.push(
-      salud
-        .neuroEstrategias
+      clean(
+        salud
+          .neuroEstrategias
+      )
     );
   }
 
@@ -1018,20 +1323,22 @@ function getConsideraciones(
     )
   ) {
     values.push(
-      `Considerar factores de sobrecarga: ${
-        salud.neuroFactores
-      }`
+      `Considerar factores de sobrecarga: ${clean(
+        salud
+          .neuroFactores
+      )}`
     );
   }
 
-  /*
-    En el documento de VIAJE podemos incorporar
-    antecedentes adicionales necesarios para
-    la operación.
 
-    En el documento del ENCARGADO evitamos
-    volcar diagnósticos innecesarios.
+  /*
+    -----------------------------------------------------
+    ANTECEDENTES ADICIONALES.
+
+    Solo para equipo de viaje.
+    -----------------------------------------------------
   */
+
   if (
     state.mode ===
     "viaje"
@@ -1043,8 +1350,10 @@ function getConsideraciones(
       )
     ) {
       values.push(
-        salud
-          .emergenciaMedicaDetalle
+        `Emergencia médica: ${clean(
+          salud
+            .emergenciaMedicaDetalle
+        )}`
       );
     }
 
@@ -1055,8 +1364,24 @@ function getConsideraciones(
       )
     ) {
       values.push(
+        `Antecedente médico: ${clean(
+          salud
+            .enfermedadBaseDetalle
+        )}`
+      );
+    }
+
+    if (
+      clean(
         salud
-          .enfermedadBaseDetalle
+          .saludGeneralDetalle
+      )
+    ) {
+      values.push(
+        clean(
+          salud
+            .saludGeneralDetalle
+        )
       );
     }
 
@@ -1067,88 +1392,29 @@ function getConsideraciones(
       )
     ) {
       values.push(
-        salud
-          .otrosAntecedentesDetalle
+        clean(
+          salud
+            .otrosAntecedentesDetalle
+        )
       );
     }
   }
 
-  const result =
-    uniqueText(
-      values
-    );
-
-  return (
-    result.join(
-      " · "
-    ) ||
-    "—"
+  return uniqueText(
+    values
   );
 }
 
 
 /*
   =========================================================
-  CONTACTO DE EMERGENCIA
+  CONSIDERACION RESUMIDA
+  PAGINA 1
   =========================================================
 */
 
 
-function getContactoEmergencia(
-  item = {}
-) {
-  /*
-    Solo se imprime en versión de viaje.
-  */
-  if (
-    state.mode !==
-    "viaje"
-  ) {
-    return "";
-  }
-
-  const emergencia =
-    item.emergencia ||
-    {};
-
-  const nombre =
-    clean(
-      emergencia.nombre
-    );
-
-  const relacion =
-    clean(
-      emergencia.relacion
-    );
-
-  const telefono =
-    clean(
-      emergencia.telefono
-    );
-
-  return [
-    nombre,
-    relacion,
-    telefono
-  ]
-    .filter(
-      Boolean
-    )
-    .join(
-      " · "
-    ) ||
-    "—";
-}
-
-
-/*
-  =========================================================
-  DETALLE OPERATIVO
-  =========================================================
-*/
-
-
-function tieneDetalleOperativo(
+function getConsideracionResumen(
   item = {}
 ) {
   if (
@@ -1156,226 +1422,216 @@ function tieneDetalleOperativo(
       item
     )
   ) {
-    return false;
+    return "Ficha pendiente";
   }
 
   if (
     !puedeMostrarDetalle(
+      item
+    )
+  ) {
+    return "Información restringida";
+  }
+
+  const salud =
+    item.salud ||
+    {};
+
+  const labels =
+    [];
+
+  /*
+    Alimentación.
+  */
+  const alimentacion =
+    getAlimentacionValues(
+      item
+    );
+
+  if (
+    alimentacion.length
+  ) {
+    labels.push(
+      alimentacion.join(
+        ", "
+      )
+    );
+  }
+
+
+  /*
+    Alergias.
+  */
+  const alergias =
+    getAlergiasValues(
+      item
+    );
+
+  if (
+    alergias.length
+  ) {
+    labels.push(
+      "Alergia"
+    );
+  }
+
+
+  /*
+    Medicamentos.
+  */
+  if (
+    getMedicamentosDetalle(
+      item
+    )
+  ) {
+    labels.push(
+      "Medicación"
+    );
+  }
+
+
+  /*
+    Consideraciones de apoyo.
+  */
+  if (
+    clean(
+      salud
+        .discapacidadApoyoTipo
+    ) ||
+    clean(
+      salud
+        .discapacidadRecomendaciones
+    ) ||
+    clean(
+      salud
+        .discapacidadAyudaIndicaciones
+    ) ||
+    clean(
+      salud
+        .neuroApoyosDetalle
+    ) ||
+    clean(
+      salud
+        .neuroEstrategias
+    ) ||
+    clean(
+      salud
+        .neuroFactores
+    )
+  ) {
+    labels.push(
+      "Ver indicaciones"
+    );
+  }
+
+
+  /*
+    En modo viaje también advertimos
+    antecedentes médicos generales.
+  */
+  if (
+    state.mode ===
+      "viaje" &&
+    (
+      clean(
+        salud
+          .emergenciaMedicaDetalle
+      ) ||
+      clean(
+        salud
+          .enfermedadBaseDetalle
+      ) ||
+      clean(
+        salud
+          .saludGeneralDetalle
+      ) ||
+      clean(
+        salud
+          .otrosAntecedentesDetalle
+      )
+    )
+  ) {
+    labels.push(
+      "Antecedente médico"
+    );
+  }
+
+  const result =
+    uniqueText(
+      labels
+    );
+
+  if (
+    !result.length
+  ) {
+    return "Sin consideraciones";
+  }
+
+  return result.join(
+    " · "
+  );
+}
+
+
+/*
+  =========================================================
+  SABER SI UNA PERSONA DEBE SALIR EN EL DETALLE
+  =========================================================
+*/
+
+
+function debeAparecerEnDetalle(
+  item = {}
+) {
+  if (
+    !fichaCompleta(
+      item
+    )
+  ) {
+    /*
+      Las fichas pendientes NO llenan la página de detalle.
+      Ya están claramente identificadas en el resumen.
+    */
+    return false;
+  }
+
+  /*
+    Si existe información restringida para encargado,
+    sí la mostramos como aviso breve.
+  */
+  if (
+    state.mode ===
+      "encargado" &&
+    !puedeCompartirConEncargado(
       item
     )
   ) {
     return true;
   }
 
-  return (
+  if (
     getNecesitaAsistencia(
       item
-    ) === true ||
-
-    getAlimentacion(
-      item
-    ) !== "—" ||
-
-    getAlergias(
-      item
-    ) !== "—" ||
-
-    getMedicacion(
-      item
-    ) !== "—" ||
-
-    getConsideraciones(
-      item
-    ) !== "—"
-  );
-}
-
-
-function renderDetallePersona(
-  item = {}
-) {
-  const nombre =
-    passengerName(
-      item
-    );
-
-  if (
-    !puedeMostrarDetalle(
-      item
-    )
+    ) === true
   ) {
-    return `
-      <article class="detail-item">
-        <div class="detail-name">
-          ${escapeHtml(
-            nombre
-          )}
-        </div>
-
-        <div class="detail-text status-restricted">
-          Información médica registrada,
-          pero no autorizada para compartir
-          con el/la encargado(a) del grupo
-          en esta etapa.
-        </div>
-      </article>
-    `;
+    return true;
   }
-
-  const detalles =
-    [];
-
-  const alimentacion =
-    getAlimentacion(
-      item
-    );
-
-  const alergias =
-    getAlergias(
-      item
-    );
-
-  const medicacion =
-    getMedicacion(
-      item
-    );
-
-  const asistencia =
-    getNecesitaAsistenciaTexto(
-      item
-    );
 
   const consideraciones =
-    getConsideraciones(
+    getConsideracionesOperativas(
       item
     );
 
-  if (
-    alimentacion !==
-    "—"
-  ) {
-    detalles.push(`
-      <div>
-        <span class="detail-label">
-          Alimentación:
-        </span>
-
-        ${escapeHtml(
-          alimentacion
-        )}
-      </div>
-    `);
-  }
-
-  if (
-    alergias !==
-    "—"
-  ) {
-    detalles.push(`
-      <div>
-        <span class="detail-label">
-          Alergias:
-        </span>
-
-        ${escapeHtml(
-          alergias
-        )}
-      </div>
-    `);
-  }
-
-  if (
-    medicacion !==
-    "—"
-  ) {
-    detalles.push(`
-      <div>
-        <span class="detail-label">
-          Medicación:
-        </span>
-
-        ${escapeHtml(
-          medicacion
-        )}
-      </div>
-    `);
-  }
-
-  detalles.push(`
-    <div>
-      <span class="detail-label">
-        Necesita asistencia:
-      </span>
-
-      ${escapeHtml(
-        asistencia
-      )}
-    </div>
-  `);
-
-  if (
-    consideraciones !==
-    "—"
-  ) {
-    detalles.push(`
-      <div>
-        <span class="detail-label">
-          Consideraciones:
-        </span>
-
-        ${escapeHtml(
-          consideraciones
-        )}
-      </div>
-    `);
-  }
-
-  if (
-    state.mode ===
-    "viaje"
-  ) {
-    const emergencia =
-      getContactoEmergencia(
-        item
-      );
-
-    if (
-      emergencia !==
-      "—"
-    ) {
-      detalles.push(`
-        <div>
-          <span class="detail-label">
-            Emergencia:
-          </span>
-
-          ${escapeHtml(
-            emergencia
-          )}
-        </div>
-      `);
-    }
-  }
-
-  return `
-    <article class="detail-item">
-      <div class="detail-name">
-        ${escapeHtml(
-          nombre
-        )}
-      </div>
-
-      <div class="detail-text">
-        ${detalles.join("")}
-      </div>
-    </article>
-  `;
+  return (
+    consideraciones.length >
+    0
+  );
 }
 
 
 /*
   =========================================================
-  RENDER
+  RENDER GENERAL
   =========================================================
 */
 
@@ -1385,14 +1641,23 @@ function render() {
 
   renderHeader();
 
-  renderPrivacyNotice();
+  renderPrivacy();
 
   renderKpis();
 
   renderTable();
 
+  renderResponsibility();
+
   renderDetails();
 }
+
+
+/*
+  =========================================================
+  MODO
+  =========================================================
+*/
 
 
 function renderMode() {
@@ -1411,15 +1676,14 @@ function renderMode() {
       state.mode ===
         "viaje"
     );
-
-  $("emergencyHeader")
-    ?.classList
-    .toggle(
-      "hidden",
-      state.mode !==
-        "viaje"
-    );
 }
+
+
+/*
+  =========================================================
+  HEADER
+  =========================================================
+*/
 
 
 function renderHeader() {
@@ -1427,10 +1691,12 @@ function renderHeader() {
     state.group ||
     {};
 
-  $("groupSubtitle").textContent =
+  const subtitle =
     [
-      group.aliasGrupo ||
-      group.nombreGrupo ||
+      group
+        .aliasGrupo ||
+      group
+        .nombreGrupo ||
       state.groupId,
 
       group.colegio,
@@ -1448,48 +1714,77 @@ function renderHeader() {
         " · "
       );
 
-  $("documentType").textContent =
-    state.mode ===
-      "encargado"
-      ? "Versión para encargado de grupo"
-      : "Versión operativa para equipo de viaje";
+  $("groupSubtitle")
+    .textContent =
+      subtitle;
+
+  $("documentType")
+    .textContent =
+      state.mode ===
+        "encargado"
+        ? "Encargado de grupo"
+        : "Equipo de viaje";
+
+  $("detailsSubtitle")
+    .textContent =
+      state.mode ===
+        "encargado"
+        ? "Se muestran únicamente pasajeros con información operativa relevante autorizada para esta etapa."
+        : "Se muestran únicamente pasajeros con antecedentes, indicaciones o necesidades relevantes para la operación del viaje.";
 }
 
 
-function renderPrivacyNotice() {
+/*
+  =========================================================
+  PRIVACIDAD
+  =========================================================
+*/
+
+
+function renderPrivacy() {
   if (
     state.mode ===
     "encargado"
   ) {
-    $("privacyNotice").innerHTML = `
-      <strong>
-        Privacidad:
-      </strong>
+    $("privacyNotice")
+      .innerHTML = `
+        <strong>
+          Privacidad:
+        </strong>
 
-      Este documento respeta la autorización
-      entregada para compartir antecedentes con
-      el/la apoderado(a) encargado(a) del grupo.
+        Este resumen muestra únicamente información
+        autorizada para ser compartida con el/la
+        encargado(a) del grupo.
 
-      Cuando dicha autorización no existe,
-      los antecedentes médicos individuales
-      no se muestran.
-    `;
+        Cuando una persona no ha autorizado esta entrega,
+        sus antecedentes médicos específicos permanecen
+        restringidos.
+      `;
 
     return;
   }
 
-  $("privacyNotice").innerHTML = `
-    <strong>
-      Uso operativo:
-    </strong>
+  $("privacyNotice")
+    .innerHTML = `
+      <strong>
+        Uso durante el viaje:
+      </strong>
 
-    Esta versión está destinada exclusivamente
-    al equipo responsable durante el viaje y
-    contiene antecedentes necesarios para la
-    seguridad, cuidado, asistencia y operación
-    del grupo.
-  `;
+      Documento destinado a los adultos responsables
+      del grupo durante el viaje.
+
+      La información debe utilizarse exclusivamente
+      para fines de seguridad, cuidado, asistencia
+      y coordinación operativa.
+    `;
 }
+
+
+/*
+  =========================================================
+  KPIS
+  =========================================================
+*/
 
 
 function renderKpis() {
@@ -1497,324 +1792,299 @@ function renderKpis() {
     state.items.length;
 
   const completas =
-    state.items
-      .filter(
-        fichaCompleta
-      )
-      .length;
+    state.items.filter(
+      fichaCompleta
+    ).length;
 
   const pendientes =
     total -
     completas;
 
   const asistenciaSi =
-    state.items
-      .filter(
-        (
+    state.items.filter(
+      (
+        item
+      ) =>
+        fichaCompleta(
           item
-        ) =>
-          fichaCompleta(
-            item
-          ) &&
-          puedeMostrarDetalle(
-            item
-          ) &&
-          getNecesitaAsistencia(
-            item
-          ) === true
-      )
-      .length;
+        ) &&
+        puedeMostrarDetalle(
+          item
+        ) &&
+        getNecesitaAsistencia(
+          item
+        ) === true
+    ).length;
 
   const asistenciaNo =
-    state.items
-      .filter(
-        (
+    state.items.filter(
+      (
+        item
+      ) =>
+        fichaCompleta(
           item
-        ) =>
-          fichaCompleta(
-            item
-          ) &&
-          puedeMostrarDetalle(
-            item
-          ) &&
-          getNecesitaAsistencia(
-            item
-          ) === false
-      )
-      .length;
-
-  const consideraciones =
-    state.items
-      .filter(
-        (
+        ) &&
+        puedeMostrarDetalle(
           item
-        ) =>
-          fichaCompleta(
-            item
-          ) &&
-          puedeMostrarDetalle(
-            item
-          ) &&
-          tieneDetalleOperativo(
-            item
-          )
-      )
-      .length;
+        ) &&
+        getNecesitaAsistencia(
+          item
+        ) === false
+    ).length;
 
-  $("kpiContainer").innerHTML = `
-    <div class="kpi">
-      <span class="kpi-label">
-        Pasajeros
-      </span>
+  $("kpiContainer")
+    .innerHTML = `
+      <div class="summary-item">
+        <span class="summary-label">
+          Pasajeros
+        </span>
 
-      <span class="kpi-value">
-        ${total}
-      </span>
-    </div>
+        <span class="summary-value">
+          ${total}
+        </span>
+      </div>
 
-    <div class="kpi">
-      <span class="kpi-label">
-        Fichas completas
-      </span>
+      <div class="summary-item">
+        <span class="summary-label">
+          Fichas completas
+        </span>
 
-      <span class="kpi-value">
-        ${completas}
-      </span>
-    </div>
+        <span class="summary-value">
+          ${completas}
+        </span>
+      </div>
 
-    <div class="kpi">
-      <span class="kpi-label">
-        Pendientes
-      </span>
+      <div class="summary-item">
+        <span class="summary-label">
+          Pendientes
+        </span>
 
-      <span class="kpi-value">
-        ${pendientes}
-      </span>
-    </div>
+        <span class="summary-value">
+          ${pendientes}
+        </span>
+      </div>
 
-    <div class="kpi">
-      <span class="kpi-label">
-        Necesitan asistencia
-      </span>
+      <div class="summary-item">
+        <span class="summary-label">
+          Requieren asistencia
+        </span>
 
-      <span class="kpi-value">
-        ${asistenciaSi}
-      </span>
-    </div>
+        <span class="summary-value">
+          ${asistenciaSi}
+        </span>
+      </div>
 
-    <div class="kpi">
-      <span class="kpi-label">
-        No necesitan asistencia
-      </span>
+      <div class="summary-item">
+        <span class="summary-label">
+          No requieren asistencia
+        </span>
 
-      <span class="kpi-value">
-        ${asistenciaNo}
-      </span>
-    </div>
-  `;
+        <span class="summary-value">
+          ${asistenciaNo}
+        </span>
+      </div>
+    `;
 }
+
+
+/*
+  =========================================================
+  TABLA RESUMEN
+  =========================================================
+*/
 
 
 function renderTable() {
-  $("tableBody").innerHTML =
-    state.items
-      .map(
-        (
-          item,
-          index
-        ) => {
-          const completa =
-            fichaCompleta(
-              item
-            );
+  $("tableBody")
+    .innerHTML =
+      state.items
+        .map(
+          (
+            item,
+            index
+          ) => {
+            const completa =
+              fichaCompleta(
+                item
+              );
 
-          const comparte =
-            puedeMostrarDetalle(
-              item
-            );
+            const fichaTexto =
+              completa
+                ? "Completa"
+                : "Pendiente";
 
-          const asistencia =
-            getNecesitaAsistenciaTexto(
-              item
-            );
+            const fichaClase =
+              completa
+                ? "status-complete"
+                : "status-pending";
 
-          let asistenciaClass =
-            "";
+            const asistencia =
+              getNecesitaAsistenciaTexto(
+                item
+              );
 
-          if (
-            asistencia ===
-            "SÍ"
-          ) {
-            asistenciaClass =
-              "status-danger";
-          } else if (
-            asistencia ===
-            "No"
-          ) {
-            asistenciaClass =
-              "status-ok";
-          } else if (
-            asistencia ===
-            "Información restringida"
-          ) {
-            asistenciaClass =
-              "status-restricted";
-          } else {
-            asistenciaClass =
-              "status-warning";
+            let asistenciaClase =
+              "assistance-pending";
+
+            if (
+              asistencia ===
+              "Sí"
+            ) {
+              asistenciaClase =
+                "assistance-yes";
+            }
+
+            if (
+              asistencia ===
+              "No"
+            ) {
+              asistenciaClase =
+                "assistance-no";
+            }
+
+            if (
+              asistencia ===
+              "Restringido"
+            ) {
+              asistenciaClase =
+                "assistance-restricted";
+            }
+
+            const consideracion =
+              getConsideracionResumen(
+                item
+              );
+
+            let consideracionClase =
+              "consideration-text";
+
+            if (
+              consideracion ===
+              "Sin consideraciones"
+            ) {
+              consideracionClase =
+                "consideration-none";
+            }
+
+            if (
+              consideracion ===
+              "Ficha pendiente"
+            ) {
+              consideracionClase =
+                "consideration-pending";
+            }
+
+            if (
+              consideracion ===
+              "Información restringida"
+            ) {
+              consideracionClase =
+                "consideration-restricted";
+            }
+
+            return `
+              <tr>
+
+                <td class="col-number">
+                  ${index + 1}
+                </td>
+
+                <td class="passenger-name">
+                  ${escapeHtml(
+                    passengerName(
+                      item
+                    )
+                  )}
+                </td>
+
+                <td class="${fichaClase}">
+                  ${escapeHtml(
+                    fichaTexto
+                  )}
+                </td>
+
+                <td class="${asistenciaClase}">
+                  ${escapeHtml(
+                    asistencia
+                  )}
+                </td>
+
+                <td class="${consideracionClase}">
+                  ${escapeHtml(
+                    consideracion
+                  )}
+                </td>
+
+              </tr>
+            `;
           }
-
-          const fichaText =
-            completa
-              ? "Completa"
-              : "Pendiente";
-
-          const fichaClass =
-            completa
-              ? "status-ok"
-              : "status-warning";
-
-          const alimentacion =
-            completa
-              ? getAlimentacion(
-                  item
-                )
-              : "—";
-
-          const alergias =
-            completa
-              ? getAlergias(
-                  item
-                )
-              : "—";
-
-          const medicacion =
-            completa
-              ? getMedicacion(
-                  item
-                )
-              : "—";
-
-          const consideraciones =
-            completa
-              ? getConsideraciones(
-                  item
-                )
-              : "Ficha pendiente";
-
-          const emergencia =
-            completa
-              ? getContactoEmergencia(
-                  item
-                )
-              : "—";
-
-          return `
-            <tr>
-              <td>
-                ${index + 1}
-              </td>
-
-              <td class="passenger-name">
-                ${escapeHtml(
-                  passengerName(
-                    item
-                  )
-                )}
-              </td>
-
-              <td class="${fichaClass}">
-                ${escapeHtml(
-                  fichaText
-                )}
-              </td>
-
-              <td class="${
-                !comparte &&
-                state.mode ===
-                  "encargado"
-                  ? "status-restricted"
-                  : ""
-              }">
-                ${escapeHtml(
-                  alimentacion
-                )}
-              </td>
-
-              <td class="${
-                !comparte &&
-                state.mode ===
-                  "encargado"
-                  ? "status-restricted"
-                  : ""
-              }">
-                ${escapeHtml(
-                  alergias
-                )}
-              </td>
-
-              <td class="${
-                !comparte &&
-                state.mode ===
-                  "encargado"
-                  ? "status-restricted"
-                  : ""
-              }">
-                ${escapeHtml(
-                  medicacion
-                )}
-              </td>
-
-              <td class="${asistenciaClass}">
-                ${escapeHtml(
-                  asistencia
-                )}
-              </td>
-
-              <td class="consideration ${
-                !comparte &&
-                state.mode ===
-                  "encargado"
-                  ? "status-restricted"
-                  : ""
-              }">
-                ${escapeHtml(
-                  consideraciones
-                )}
-              </td>
-
-              ${
-                state.mode ===
-                "viaje"
-                  ? `
-                    <td>
-                      ${escapeHtml(
-                        emergencia
-                      )}
-                    </td>
-                  `
-                  : ""
-              }
-            </tr>
-          `;
-        }
-      )
-      .join("");
+        )
+        .join("");
 }
 
 
+/*
+  =========================================================
+  RESPONSABILIDAD / ALCANCE
+  =========================================================
+*/
+
+
+function renderResponsibility() {
+  $("responsibilityNote")
+    .innerHTML = `
+      <strong>
+        Asistencia y acompañamiento:
+      </strong>
+
+      La asistencia, acompañamiento y cumplimiento de las
+      indicaciones particulares informadas para cada viajero
+      corresponden a los adultos responsables que acompañan
+      al grupo.
+
+      Turismo Rai Trai facilita la coordinación y entrega
+      oportunamente la información disponible para contribuir
+      a una operación segura y adecuada.
+
+      La entrega de este resumen forma parte de las medidas
+      de apoyo y coordinación implementadas por Turismo Rai Trai
+      antes y durante el viaje.
+    `;
+}
+
+
+/*
+  =========================================================
+  DETALLE
+  =========================================================
+*/
+
+
 function renderDetails() {
-  const relevantes =
-    state.items
-      .filter(
-        tieneDetalleOperativo
-      );
+  const items =
+    state.items.filter(
+      debeAparecerEnDetalle
+    );
 
   if (
-    !relevantes.length
+    !items.length
   ) {
-    $("detailsSection")
-      .classList
+    $("detailsContainer")
+      .innerHTML =
+        "";
+
+    $("noDetails")
+      ?.classList
+      .remove(
+        "hidden"
+      );
+
+    /*
+      Si realmente no existe ningún detalle,
+      ocultamos página 2 al imprimir y en pantalla.
+    */
+    $("detailsPage")
+      ?.classList
       .add(
         "hidden"
       );
@@ -1822,19 +2092,248 @@ function renderDetails() {
     return;
   }
 
-  $("detailsSection")
-    .classList
+  $("detailsPage")
+    ?.classList
     .remove(
       "hidden"
     );
 
-  $("detailsContainer").innerHTML =
-    relevantes
-      .map(
-        renderDetallePersona
-      )
-      .join("");
+  $("noDetails")
+    ?.classList
+    .add(
+      "hidden"
+    );
+
+  $("detailsContainer")
+    .innerHTML =
+      items
+        .map(
+          renderDetailCard
+        )
+        .join("");
 }
+
+
+function renderDetailCard(
+  item = {}
+) {
+  const nombre =
+    passengerName(
+      item
+    );
+
+  /*
+    PRIVACIDAD ENCARGADO
+  */
+  if (
+    state.mode ===
+      "encargado" &&
+    !puedeCompartirConEncargado(
+      item
+    )
+  ) {
+    return `
+      <article class="detail-card restricted-card">
+
+        <div class="detail-card-head">
+
+          <div class="detail-name">
+            ${escapeHtml(
+              nombre
+            )}
+          </div>
+
+          <div class="detail-assistance assistance-restricted">
+            Información restringida
+          </div>
+
+        </div>
+
+        <div class="detail-body">
+
+          <div class="restricted-text">
+            Existen antecedentes asociados a esta ficha,
+            pero la persona responsable no ha autorizado
+            su entrega al encargado del grupo en esta etapa.
+          </div>
+
+        </div>
+
+      </article>
+    `;
+  }
+
+
+  const asistencia =
+    getNecesitaAsistenciaTexto(
+      item
+    );
+
+  const asistenciaClase =
+    asistencia ===
+      "Sí"
+      ? "assistance-yes"
+      : asistencia ===
+          "No"
+        ? "assistance-no"
+        : "assistance-pending";
+
+
+  const rows =
+    [];
+
+
+  /*
+    CONSIDERACIONES
+  */
+
+  const consideraciones =
+    getConsideracionesOperativas(
+      item
+    );
+
+  if (
+    consideraciones.length
+  ) {
+    rows.push({
+      label:
+        "Consideraciones",
+
+      value:
+        consideraciones.join(
+          " · "
+        )
+    });
+  }
+
+
+  /*
+    CONTACTO DE EMERGENCIA
+    Solo equipo de viaje.
+  */
+
+  if (
+    state.mode ===
+    "viaje"
+  ) {
+    const emergencia1 =
+      getContactoEmergencia(
+        item
+      );
+
+    const emergencia2 =
+      getContactoEmergenciaSecundario(
+        item
+      );
+
+    if (
+      emergencia1
+    ) {
+      rows.push({
+        label:
+          "Emergencia 1",
+
+        value:
+          emergencia1
+      });
+    }
+
+    if (
+      emergencia2
+    ) {
+      rows.push({
+        label:
+          "Emergencia 2",
+
+        value:
+          emergencia2
+      });
+    }
+  }
+
+
+  /*
+    Si por alguna razón la persona quedó marcada
+    para detalle exclusivamente por "Sí asistencia"
+    pero no existen textos adicionales.
+  */
+
+  if (
+    !rows.length
+  ) {
+    rows.push({
+      label:
+        "Consideraciones",
+
+      value:
+        asistencia ===
+          "Sí"
+          ? "La ficha indica que requiere asistencia. Revisar coordinación previa al viaje."
+          : "Existe información operativa asociada a esta ficha."
+    });
+  }
+
+
+  return `
+    <article class="detail-card">
+
+      <div class="detail-card-head">
+
+        <div class="detail-name">
+          ${escapeHtml(
+            nombre
+          )}
+        </div>
+
+        <div class="detail-assistance ${asistenciaClase}">
+          Asistencia:
+          ${escapeHtml(
+            asistencia
+          )}
+        </div>
+
+      </div>
+
+      <div class="detail-body">
+
+        ${
+          rows
+            .map(
+              (
+                row
+              ) => `
+                <div class="detail-row">
+
+                  <div class="detail-label">
+                    ${escapeHtml(
+                      row.label
+                    )}
+                  </div>
+
+                  <div class="detail-value">
+                    ${escapeHtml(
+                      row.value
+                    )}
+                  </div>
+
+                </div>
+              `
+            )
+            .join("")
+        }
+
+      </div>
+
+    </article>
+  `;
+}
+
+
+/*
+  =========================================================
+  ERROR
+  =========================================================
+*/
 
 
 function showError(
@@ -1852,11 +2351,12 @@ function showError(
       "hidden"
     );
 
-  $("errorBox").textContent =
-    message;
+  $("errorBox")
+    .textContent =
+      message;
 
   $("errorBox")
-    .classList
+    ?.classList
     .remove(
       "hidden"
     );
