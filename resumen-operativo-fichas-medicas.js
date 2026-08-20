@@ -182,20 +182,26 @@ async function loadPage() {
       );
 
     /*
-      Gestión médica solo considera pasajeros
-      que actualmente viajan.
-
-      Los anulados quedan fuera.
+      El resumen operativo considera únicamente
+      pasajeros que efectivamente viajan.
+    
+      Quedan fuera:
+        - pendientes de gestión;
+        - listas de espera pendientes;
+        - listas de espera pagadas aún no confirmadas;
+        - nuevos ingresos pendientes;
+        - liberados pendientes;
+        - anulados;
+        - personas marcadas como "No viaja".
+    
+      Una ficha médica pendiente sí permanece cuando
+      corresponde a un pasajero confirmado que viaja.
     */
+    
     state.items =
       allItems
         .filter(
-          (
-            item
-          ) =>
-            !isCancelled(
-              item
-            )
+          esPasajeroQueViaja
         )
         .sort(
           (
@@ -212,7 +218,7 @@ async function loadPage() {
               {
                 sensitivity:
                   "base",
-
+    
                 numeric:
                   true
               }
@@ -430,6 +436,181 @@ function humanizar(
     );
 }
 
+/*
+  =========================================================
+  PASAJERO OPERATIVO: EFECTIVAMENTE VIAJA
+  =========================================================
+*/
+
+function esPasajeroQueViaja(
+  item = {}
+) {
+  /*
+    1. Anulados, no viajan o eliminados:
+       siempre quedan fuera.
+  */
+
+  if (
+    isCancelled(
+      item
+    )
+  ) {
+    return false;
+  }
+
+
+  /*
+    Buscamos el tipo y estado considerando los nombres
+    compatibles que pueden existir en inscripciones
+    de distintas versiones.
+  */
+
+  const tipo =
+    normalize(
+      item.tipoInscripcion ||
+      item.tipoRegistro ||
+      item.tipoIngreso ||
+      item.tipo ||
+      item.origen ||
+      ""
+    );
+
+  const estado =
+    normalize(
+      item.estadoInscripcion ||
+      item.estadoGestion ||
+      item.estado ||
+      item.status ||
+      ""
+    );
+
+
+  /*
+    2. Exclusiones explícitas por estado.
+
+    "Pagada" en Lista de Espera todavía está pendiente
+    de confirmación, por lo tanto aún no viaja.
+  */
+
+  const estadosQueNoViajan = [
+    "pendiente",
+    "pendiente de gestion",
+    "pendiente gestion",
+    "pagada",
+    "pagado",
+    "por confirmar",
+    "espera",
+    "lista de espera",
+    "rechazado",
+    "rechazada",
+    "no viaja",
+    "no viajan",
+    "anulado",
+    "anulada",
+    "eliminado",
+    "eliminada"
+  ];
+
+  if (
+    estadosQueNoViajan.some(
+      (
+        value
+      ) =>
+        estado ===
+          value ||
+        estado.includes(
+          value
+        )
+    )
+  ) {
+    return false;
+  }
+
+
+  /*
+    3. Flujos que obligatoriamente necesitan confirmación.
+
+    Nuevo ingreso, Lista de espera, Liberados e
+    Inscripción inicial solamente forman parte de la
+    lista operativa cuando ya fueron confirmados.
+  */
+
+  const requiereConfirmacion =
+    tipo.includes(
+      "nuevo ingreso"
+    ) ||
+    tipo.includes(
+      "lista de espera"
+    ) ||
+    tipo.includes(
+      "liberado"
+    ) ||
+    tipo.includes(
+      "inscripcion inicial"
+    );
+
+
+  if (
+    requiereConfirmacion
+  ) {
+    const estaConfirmado =
+      estado.includes(
+        "confirmado"
+      ) ||
+      estado.includes(
+        "confirmada"
+      ) ||
+      estado.includes(
+        "completado"
+      ) ||
+      estado.includes(
+        "completada"
+      ) ||
+      estado.includes(
+        "finalizado"
+      ) ||
+      estado.includes(
+        "finalizada"
+      );
+
+    return estaConfirmado;
+  }
+
+
+  /*
+    4. Sistema de Pagos y Nómina Final corresponden
+       a pasajeros activos.
+
+    Pueden tener la ficha médica pendiente, pero eso
+    no significa que estén pendientes de gestión.
+  */
+
+  if (
+    tipo.includes(
+      "sistema de pagos"
+    ) ||
+    tipo.includes(
+      "nomina final"
+    ) ||
+    tipo.includes(
+      "ficha medica"
+    )
+  ) {
+    return true;
+  }
+
+
+  /*
+    5. Compatibilidad con registros antiguos.
+
+    Si no pertenecen a un flujo pendiente y tampoco
+    están anulados, se mantienen como viajeros para no
+    eliminar accidentalmente pasajeros antiguos que
+    sí forman parte de la nómina.
+  */
+
+  return true;
+}
 
 /*
   =========================================================
