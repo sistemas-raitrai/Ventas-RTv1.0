@@ -1251,8 +1251,20 @@ async function loadPage() {
       state.group.anoViaje
     ].filter(Boolean).join(" · ");
 
-    $("btnVolverNomina").href = `gestion-nomina.html?id=${encodeURIComponent(state.groupDocId)}`;
-    $("btnVerGrupo").href = `fichas-medicas-grupo.html?id=${encodeURIComponent(state.groupDocId)}`;
+    $("btnVolverNomina").href =
+      `gestion-nomina.html?id=${encodeURIComponent(
+        state.groupDocId
+      )}`;
+    
+    $("btnVerGrupo").href =
+      `fichas-medicas-grupo.html?id=${encodeURIComponent(
+        state.groupDocId
+      )}`;
+    
+    $("btnResumenOperativo").href =
+      `resumen-operativo-fichas-medicas.html?id=${encodeURIComponent(
+        state.groupDocId
+      )}`;
 
     renderKpis();
     renderTypeOptions();
