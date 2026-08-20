@@ -68,7 +68,15 @@ async function loadPage() {
       state.group.anoViaje
     ].filter(Boolean).join(" · ");
 
-    $("btnVolver").href = `gestion-fichas-medicas.html?id=${encodeURIComponent(state.groupDocId)}`;
+    $("btnVolver").href =
+      `gestion-fichas-medicas.html?id=${encodeURIComponent(
+        state.groupDocId
+      )}`;
+    
+    $("btnResumenOperativo").href =
+      `resumen-operativo-fichas-medicas.html?id=${encodeURIComponent(
+        state.groupDocId
+      )}`;
 
     $("loadingBox").classList.add("hidden");
     $("summaryPanel").classList.remove("hidden");
