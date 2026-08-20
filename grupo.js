@@ -23887,3 +23887,546 @@ window.migrarPasajeros11053a11184 = async function ({
     resultados
   };
 };
+
+/* =========================================================
+   LIMPIEZA DEFINITIVA POST-MIGRACIÓN
+   11053 -> 11184
+
+   SOLO elimina del grupo 11053 las 11 inscripciones
+   que ya fueron migradas al grupo 11184.
+
+   NO toca:
+   - inscripciones del 11184
+   - inscripciones_pendientes_publicas
+   - documentos/archivos en Storage
+   - otros pasajeros del 11053
+
+   dryRun=true por defecto.
+========================================================= */
+
+window.eliminarDefinitivamenteMigrados11053 = async function ({
+  dryRun = true,
+  confirmar = false
+} = {}) {
+
+  const GRUPO_ORIGEN = "11053";
+  const GRUPO_DESTINO = "11184";
+
+  const RUTS_OBJETIVO = new Set([
+    "14126961-5", // Nancy Lyha Aliaga Aguero
+    "14147208-9", // Luis Alberto Garrido Flores
+    "14629963-6", // Lissette Graciela Acuña Galaz
+    "23639272-4", // Thiago Agustín Leon Acuña
+    "23641896-0", // Amanda Isidora Nuñez Becar
+    "23704449-5", // Valentin Alonso Diaz Moragrega
+    "23745236-4", // Matías Alejandr Heyser Huilipan
+    "23775305-4", // Vicente Agustín Solar Sassi
+    "23837287-9", // Mateo Alberto Garrido Aliaga
+    "23940284-4", // Cristóbal Matus Jofré
+    "23945044-K"  // Monserrat Belen Agurto Acevedo
+  ].map(
+    normalizarRutKeyGrupo
+  ));
+
+  console.log(
+    "===================================================="
+  );
+
+  console.log(
+    dryRun
+      ? "🔎 SIMULACIÓN BORRADO DEFINITIVO 11053"
+      : "🗑️ BORRADO DEFINITIVO 11053"
+  );
+
+  console.log(
+    "===================================================="
+  );
+
+  /*
+    =====================================================
+    1. VERIFICAR GRUPOS
+    =====================================================
+  */
+
+  const origen =
+    await resolveGroupByParam(
+      GRUPO_ORIGEN
+    );
+
+  const destino =
+    await resolveGroupByParam(
+      GRUPO_DESTINO
+    );
+
+  if (!origen) {
+    console.error(
+      `❌ No encontré grupo origen ${GRUPO_ORIGEN}.`
+    );
+
+    return null;
+  }
+
+  if (!destino) {
+    console.error(
+      `❌ No encontré grupo destino ${GRUPO_DESTINO}.`
+    );
+
+    return null;
+  }
+
+  /*
+    =====================================================
+    2. LEER INSCRIPCIONES COMPLETAS DEL 11053
+    =====================================================
+  */
+
+  const origenSnap =
+    await getDocs(
+      collection(
+        db,
+        "ventas_cotizaciones",
+        String(origen.docId),
+        "inscripciones"
+      )
+    );
+
+  const origenItems =
+    origenSnap.docs.map(
+      (d) => ({
+        id:
+          d.id,
+
+        ...d.data()
+      })
+    );
+
+  const candidatos =
+    origenItems.filter(
+      (item) => {
+
+        const rut =
+          normalizarRutKeyGrupo(
+            getInscripcionDocumento(item) ||
+            item.id ||
+            ""
+          );
+
+        return RUTS_OBJETIVO.has(
+          rut
+        );
+      }
+    );
+
+  /*
+    =====================================================
+    3. VERIFICAR QUE ESOS MISMOS RUT EXISTAN EN 11184
+
+    Este es el blindaje principal:
+    NO borraremos a nadie del 11053 si no existe
+    previamente en el destino.
+    =====================================================
+  */
+
+  const destinoSnap =
+    await getDocs(
+      collection(
+        db,
+        "ventas_cotizaciones",
+        String(destino.docId),
+        "inscripciones"
+      )
+    );
+
+  const destinoItems =
+    destinoSnap.docs.map(
+      (d) => ({
+        id:
+          d.id,
+
+        ...d.data()
+      })
+    );
+
+  const rutsDestino =
+    new Set(
+      destinoItems.map(
+        (item) =>
+          normalizarRutKeyGrupo(
+            getInscripcionDocumento(item) ||
+            item.id ||
+            ""
+          )
+      ).filter(Boolean)
+    );
+
+  const plan =
+    candidatos.map(
+      (item) => {
+
+        const rut =
+          normalizarRutKeyGrupo(
+            getInscripcionDocumento(item) ||
+            item.id ||
+            ""
+          );
+
+        const existeDestino =
+          rutsDestino.has(
+            rut
+          );
+
+        return {
+          item,
+
+          id:
+            item.id,
+
+          rut,
+
+          nombre:
+            cleanText(
+              `${getInscripcionNombres(item)} ${getInscripcionApellidos(item)}`
+            ),
+
+          privacidad:
+            item?.privacidad?.estado ||
+            "",
+
+          existeDestino,
+
+          accion:
+            existeDestino
+              ? "BORRAR_11053"
+              : "NO_BORRAR_FALTA_11184"
+        };
+      }
+    );
+
+  console.log(
+    "📋 PLAN DE LIMPIEZA"
+  );
+
+  console.table(
+    plan.map(
+      (x) => ({
+        id:
+          x.id,
+
+        rut:
+          x.rut,
+
+        nombre:
+          x.nombre,
+
+        privacidad:
+          x.privacidad,
+
+        existeEn11184:
+          x.existeDestino,
+
+        accion:
+          x.accion
+      })
+    )
+  );
+
+  /*
+    =====================================================
+    4. VALIDACIONES
+    =====================================================
+  */
+
+  if (
+    candidatos.length !==
+    RUTS_OBJETIVO.size
+  ) {
+
+    console.error(
+      "❌ No encontré exactamente los 11 documentos en 11053.",
+      {
+        encontrados:
+          candidatos.length,
+
+        esperados:
+          RUTS_OBJETIVO.size
+      }
+    );
+
+    return {
+      estado:
+        "CANTIDAD_ORIGEN_INCORRECTA",
+
+      encontrados:
+        candidatos.length,
+
+      esperados:
+        RUTS_OBJETIVO.size,
+
+      plan
+    };
+  }
+
+  const noMigrados =
+    plan.filter(
+      (x) =>
+        !x.existeDestino
+    );
+
+  if (
+    noMigrados.length
+  ) {
+
+    console.error(
+      "❌ Hay pasajeros que NO existen en 11184. No borraré nada."
+    );
+
+    console.table(
+      noMigrados.map(
+        (x) => ({
+          rut:
+            x.rut,
+
+          nombre:
+            x.nombre
+        })
+      )
+    );
+
+    return {
+      estado:
+        "FALTAN_EN_DESTINO",
+
+      noMigrados
+    };
+  }
+
+  /*
+    =====================================================
+    5. DRY RUN
+    =====================================================
+  */
+
+  if (dryRun) {
+
+    console.warn(
+      "⚠️ SIMULACIÓN TERMINADA. NO SE BORRÓ NADA."
+    );
+
+    console.log(
+      "Si aparecen exactamente 11 con BORRAR_11053:"
+    );
+
+    console.log(
+      "await eliminarDefinitivamenteMigrados11053({ dryRun:false, confirmar:true })"
+    );
+
+    return {
+      estado:
+        "DRY_RUN_OK",
+
+      total:
+        plan.length,
+
+      plan
+    };
+  }
+
+  /*
+    =====================================================
+    6. CONFIRMACIÓN REAL
+    =====================================================
+  */
+
+  if (!confirmar) {
+
+    console.error(
+      "❌ Debes usar confirmar:true."
+    );
+
+    return null;
+  }
+
+  const ok =
+    window.confirm(
+      `BORRADO DEFINITIVO\n\n` +
+      `Se eliminarán físicamente ${plan.length} inscripciones del grupo ${GRUPO_ORIGEN}.\n\n` +
+      `Ya se verificó que existen en el grupo ${GRUPO_DESTINO}.\n\n` +
+      `NO se borrarán sus registros públicos ni sus copias del grupo destino.\n\n` +
+      `¿Continuar?`
+    );
+
+  if (!ok) {
+
+    console.warn(
+      "Borrado cancelado."
+    );
+
+    return null;
+  }
+
+  /*
+    =====================================================
+    7. BORRAR DEL 11053
+    =====================================================
+  */
+
+  const borrados = [];
+
+  for (
+    const registro
+    of plan
+  ) {
+
+    const ref =
+      doc(
+        db,
+        "ventas_cotizaciones",
+        String(origen.docId),
+        "inscripciones",
+        String(registro.id)
+      );
+
+    console.log(
+      `🗑️ Eliminando de 11053: ${registro.nombre} · ${registro.rut}`
+    );
+
+    await deleteDoc(
+      ref
+    );
+
+    borrados.push({
+      id:
+        registro.id,
+
+      rut:
+        registro.rut,
+
+      nombre:
+        registro.nombre
+    });
+  }
+
+  /*
+    =====================================================
+    8. HISTORIAL
+    =====================================================
+  */
+
+  try {
+
+    await addDoc(
+      collection(
+        db,
+        HISTORIAL_COLLECTION
+      ),
+      {
+        idGrupo:
+          String(origen.groupId),
+
+        groupDocId:
+          String(origen.docId),
+
+        tipoMovimiento:
+          "limpieza_post_migracion_11053_11184",
+
+        modulo:
+          "inscripcion",
+
+        titulo:
+          "Limpieza definitiva post migración",
+
+        mensaje:
+          `${getDisplayName(state.effectiveUser)} eliminó definitivamente del grupo ${GRUPO_ORIGEN} las ${borrados.length} inscripciones previamente migradas al grupo ${GRUPO_DESTINO}.`,
+
+        fecha:
+          serverTimestamp(),
+
+        creadoPor:
+          getDisplayName(
+            state.effectiveUser
+          ),
+
+        creadoPorCorreo:
+          state.effectiveEmail,
+
+        metadata: {
+          grupoOrigen:
+            GRUPO_ORIGEN,
+
+          grupoDestino:
+            GRUPO_DESTINO,
+
+          total:
+            borrados.length,
+
+          pasajeros:
+            borrados
+        }
+      }
+    );
+
+  } catch (error) {
+
+    console.warn(
+      "⚠️ Las inscripciones fueron borradas, pero no se pudo guardar historial.",
+      error
+    );
+  }
+
+  /*
+    =====================================================
+    9. RESULTADO
+    =====================================================
+  */
+
+  console.log(
+    "===================================================="
+  );
+
+  console.log(
+    `✅ BORRADO TERMINADO: ${borrados.length} inscripciones eliminadas del 11053`
+  );
+
+  console.log(
+    "===================================================="
+  );
+
+  console.table(
+    borrados
+  );
+
+  /*
+    Dar margen al trigger que actualiza nomina_resumen.
+  */
+
+  await esperar(
+    1500
+  );
+
+  if (
+    String(state.groupDocId) ===
+    String(origen.docId)
+  ) {
+
+    state.inscripcionesCargadas =
+      false;
+
+    state.inscripcionesDetalleCache =
+      new Map();
+
+    await asegurarNominaCargada({
+      mostrar: true,
+      renderizar: true
+    });
+  }
+
+  return {
+    estado:
+      "OK",
+
+    total:
+      borrados.length,
+
+    borrados
+  };
+};
