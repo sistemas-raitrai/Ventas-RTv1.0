@@ -21979,10 +21979,11 @@ window.catastroTallasPolera2026 = async function () {
    CASO ESPECIAL:
    11053 -> 11184
 
-   - Lee incluso pasajeros archivados.
+   - Lee pasajeros activos.
+   - Busca faltantes en inscripciones_archivadas.
    - Copia TODO el documento de inscripción.
    - Reactiva la inscripción en destino.
-   - Archiva la inscripción original.
+   - Archiva la inscripción original si todavía existe.
    - Migra también inscripción pública si existe.
    - No sobreescribe pasajeros que ya existan en destino.
    - Tiene dryRun por seguridad.
@@ -22105,13 +22106,7 @@ window.migrarPasajeros11053a11184 = async function ({
 
   /*
     =====================================================
-    2. LEER TODA LA NÓMINA ORIGEN
-
-    IMPORTANTE:
-    NO usamos state.inscripciones porque esa colección
-    visible excluye los archivados.
-
-    Así encontraremos también a Thiago.
+    2. LEER TODA LA NÓMINA ACTIVA DEL ORIGEN
     =====================================================
   */
 
@@ -22128,16 +22123,23 @@ window.migrarPasajeros11053a11184 = async function ({
   const pasajerosOrigen =
     origenSnap.docs.map((d) => ({
       id: d.id,
-      ...d.data()
+      ...d.data(),
+
+      /*
+        Marca interna SOLO JS.
+        No se guardará después en Firestore.
+      */
+      _origenMigracion:
+        "inscripciones"
     }));
 
   /*
     =====================================================
-    3. IDENTIFICAR LAS 11 PERSONAS
+    3. IDENTIFICAR LAS PERSONAS EN INSCRIPCIONES
     =====================================================
   */
 
-  const encontrados =
+  let encontrados =
     pasajerosOrigen.filter(
       (item) => {
 
@@ -22156,6 +22158,217 @@ window.migrarPasajeros11053a11184 = async function ({
         );
       }
     );
+
+  /*
+    =====================================================
+    3B. IDENTIFICAR QUIÉNES FALTAN
+    =====================================================
+  */
+
+  const encontradosInicialesKey =
+    new Set(
+      encontrados.map(
+        (item) =>
+          normalizeSearchLocal(
+            `${getInscripcionNombres(item)} ${getInscripcionApellidos(item)}`
+          )
+      )
+    );
+
+  const nombresFaltantesIniciales =
+    [...NOMBRES_OBJETIVO].filter(
+      (nombre) =>
+        !encontradosInicialesKey.has(
+          nombre
+        )
+    );
+
+  /*
+    =====================================================
+    3C. BUSCAR FALTANTES EN INSCRIPCIONES_ARCHIVADAS
+
+    archivarInscripcionesGrupo guarda respaldo completo
+    dentro de:
+
+    ventas_cotizaciones/{grupo}/inscripciones_archivadas
+
+    y cada respaldo contiene:
+    inscripciones[].data
+    =====================================================
+  */
+
+  if (
+    nombresFaltantesIniciales.length
+  ) {
+
+    console.warn(
+      "⚠️ Hay pasajeros que no están en inscripciones. Buscando respaldos archivados...",
+      nombresFaltantesIniciales
+    );
+
+    const archivadasSnap =
+      await getDocs(
+        collection(
+          db,
+          "ventas_cotizaciones",
+          String(origen.docId),
+          "inscripciones_archivadas"
+        )
+      );
+
+    const recuperadosArchivo =
+      [];
+
+    archivadasSnap.docs.forEach(
+      (archivoDoc) => {
+
+        const archivo =
+          archivoDoc.data() ||
+          {};
+
+        const registros =
+          Array.isArray(
+            archivo.inscripciones
+          )
+            ? archivo.inscripciones
+            : [];
+
+        registros.forEach(
+          (registro) => {
+
+            const data =
+              registro?.data ||
+              {};
+
+            const nombreDesdeData =
+              cleanText(
+                `${getInscripcionNombres(data)} ${getInscripcionApellidos(data)}`
+              );
+
+            const nombreFinal =
+              nombreDesdeData ||
+              cleanText(
+                registro?.nombre ||
+                ""
+              );
+
+            const nombreKey =
+              normalizeSearchLocal(
+                nombreFinal
+              );
+
+            if (
+              !nombresFaltantesIniciales.includes(
+                nombreKey
+              )
+            ) {
+              return;
+            }
+
+            const yaRecuperado =
+              recuperadosArchivo.some(
+                (item) => {
+
+                  const nombreItem =
+                    normalizeSearchLocal(
+                      `${getInscripcionNombres(item)} ${getInscripcionApellidos(item)}`
+                    );
+
+                  return (
+                    nombreItem ===
+                    nombreKey
+                  );
+                }
+              );
+
+            if (yaRecuperado) {
+              return;
+            }
+
+            const idRecuperado =
+              cleanText(
+                registro.id ||
+                data.id ||
+                ""
+              );
+
+            if (!idRecuperado) {
+              console.error(
+                "❌ Encontré un respaldo sin ID de inscripción.",
+                {
+                  archivoId:
+                    archivoDoc.id,
+
+                  nombre:
+                    nombreFinal
+                }
+              );
+
+              return;
+            }
+
+            recuperadosArchivo.push({
+              ...data,
+
+              id:
+                idRecuperado,
+
+              /*
+                Marcas internas SOLO JS.
+              */
+              _origenMigracion:
+                "inscripciones_archivadas",
+
+              _archivoIdMigracion:
+                archivoDoc.id
+            });
+          }
+        );
+      }
+    );
+
+    if (
+      recuperadosArchivo.length
+    ) {
+
+      console.log(
+        "♻️ Pasajeros recuperados desde archivo:"
+      );
+
+      console.table(
+        recuperadosArchivo.map(
+          (item) => ({
+            id:
+              item.id,
+
+            documento:
+              getInscripcionDocumento(
+                item
+              ),
+
+            nombre:
+              cleanText(
+                `${getInscripcionNombres(item)} ${getInscripcionApellidos(item)}`
+              ),
+
+            archivo:
+              item._archivoIdMigracion
+          })
+        )
+      );
+
+      encontrados = [
+        ...encontrados,
+        ...recuperadosArchivo
+      ];
+    }
+  }
+
+  /*
+    =====================================================
+    4. VALIDAR QUE ESTÉN LAS 11 PERSONAS
+    =====================================================
+  */
 
   console.log(
     `Encontrados ${encontrados.length} de ${NOMBRES_OBJETIVO.size} pasajeros.`
@@ -22184,15 +22397,18 @@ window.migrarPasajeros11053a11184 = async function ({
 
         privacidad:
           item?.privacidad?.estado ||
-          "activa"
+          (
+            item._origenMigracion ===
+              "inscripciones_archivadas"
+              ? "ARCHIVADA"
+              : "activa"
+          ),
+
+        encontradoEn:
+          item._origenMigracion
       })
     )
   );
-
-  /*
-    Mostramos explícitamente los nombres que
-    no fueron encontrados.
-  */
 
   const encontradosKey =
     new Set(
@@ -22214,6 +22430,7 @@ window.migrarPasajeros11053a11184 = async function ({
       );
 
   if (faltantes.length) {
+
     console.error(
       "❌ FALTAN PASAJEROS. No ejecutaremos la migración real."
     );
@@ -22241,8 +22458,34 @@ window.migrarPasajeros11053a11184 = async function ({
   }
 
   /*
+    Blindaje adicional:
+    por si algún respaldo duplicado genera más de 11.
+  */
+
+  if (
+    encontrados.length !==
+    NOMBRES_OBJETIVO.size
+  ) {
+
+    console.error(
+      "❌ La cantidad encontrada no coincide exactamente con los 11 pasajeros esperados."
+    );
+
+    return {
+      estado:
+        "CANTIDAD_INCONSISTENTE",
+
+      encontrados:
+        encontrados.length,
+
+      esperados:
+        NOMBRES_OBJETIVO.size
+    };
+  }
+
+  /*
     =====================================================
-    4. LEER DESTINO PARA EVITAR DUPLICADOS
+    5. LEER DESTINO PARA EVITAR DUPLICADOS
     =====================================================
   */
 
@@ -22320,7 +22563,9 @@ window.migrarPasajeros11053a11184 = async function ({
 
     plan.push({
       item,
+
       rut,
+
       nombre:
         cleanText(
           `${getInscripcionNombres(item)} ${getInscripcionApellidos(item)}`
@@ -22328,7 +22573,19 @@ window.migrarPasajeros11053a11184 = async function ({
 
       estadoOrigen:
         item?.privacidad?.estado ||
-        "activa",
+        (
+          item._origenMigracion ===
+            "inscripciones_archivadas"
+            ? "archivada"
+            : "activa"
+        ),
+
+      encontradoEn:
+        item._origenMigracion,
+
+      archivoId:
+        item._archivoIdMigracion ||
+        "",
 
       duplicadoDestino:
         duplicado
@@ -22358,6 +22615,9 @@ window.migrarPasajeros11053a11184 = async function ({
         estadoOrigen:
           x.estadoOrigen,
 
+        encontradoEn:
+          x.encontradoEn,
+
         accion:
           x.accion,
 
@@ -22376,12 +22636,28 @@ window.migrarPasajeros11053a11184 = async function ({
     );
 
   if (duplicados.length) {
+
     console.error(
       "❌ Hay personas que ya existen en el grupo destino."
     );
 
     console.error(
       "No ejecutaré la migración para evitar sobreescribir información."
+    );
+
+    console.table(
+      duplicados.map(
+        (x) => ({
+          nombre:
+            x.nombre,
+
+          documento:
+            x.rut,
+
+          duplicadoDestino:
+            x.duplicadoDestino
+        })
+      )
     );
 
     return {
@@ -22394,11 +22670,12 @@ window.migrarPasajeros11053a11184 = async function ({
 
   /*
     =====================================================
-    5. DRY RUN
+    6. DRY RUN
     =====================================================
   */
 
   if (dryRun) {
+
     console.warn(
       "⚠️ SIMULACIÓN TERMINADA. NO SE MODIFICÓ FIREBASE."
     );
@@ -22424,11 +22701,12 @@ window.migrarPasajeros11053a11184 = async function ({
 
   /*
     =====================================================
-    6. SEGURIDAD EJECUCIÓN REAL
+    7. SEGURIDAD EJECUCIÓN REAL
     =====================================================
   */
 
   if (!confirmar) {
+
     console.error(
       "Para ejecutar realmente debes usar confirmar:true."
     );
@@ -22445,11 +22723,14 @@ window.migrarPasajeros11053a11184 = async function ({
       `MIGRACIÓN DE PASAJEROS\n\n` +
       `${GRUPO_ORIGEN} → ${GRUPO_DESTINO}\n\n` +
       `Se migrarán ${plan.length} personas.\n\n` +
-      `La inscripción completa será copiada al grupo nuevo y la original quedará archivada.\n\n` +
+      `La inscripción completa será copiada al grupo nuevo.\n\n` +
+      `Los registros originales activos quedarán archivados.\n` +
+      `Los que ya estaban archivados serán recuperados desde su respaldo.\n\n` +
       `¿Continuar?`
     );
 
   if (!confirmacion) {
+
     console.warn(
       "Migración cancelada."
     );
@@ -22459,7 +22740,11 @@ window.migrarPasajeros11053a11184 = async function ({
 
   /*
     =====================================================
-    7. CARGAR NÓMINA PÚBLICA DEL ORIGEN
+    8. CARGAR NÓMINA PÚBLICA DEL ORIGEN
+
+    OJO:
+    buscamos por idGrupo = groupDocId,
+    que en estos grupos corresponde 11053.
     =====================================================
   */
 
@@ -22488,11 +22773,15 @@ window.migrarPasajeros11053a11184 = async function ({
       })
     );
 
+  console.log(
+    `Registros públicos encontrados en grupo origen: ${publicas.length}`
+  );
+
   const resultados = [];
 
   /*
     =====================================================
-    8. MIGRAR UNO A UNO
+    9. MIGRAR UNO A UNO
     =====================================================
   */
 
@@ -22521,10 +22810,9 @@ window.migrarPasajeros11053a11184 = async function ({
 
     /*
       ===================================================
-      8A. LIMPIAR PRIVACIDAD PARA DESTINO
+      9A. LIMPIAR PRIVACIDAD PARA DESTINO
 
-      Esto DESARCHIVA a Thiago y garantiza que todos
-      queden activos en el grupo correcto.
+      Esto desarchiva a Thiago y deja los 11 activos.
       ===================================================
     */
 
@@ -22537,6 +22825,7 @@ window.migrarPasajeros11053a11184 = async function ({
     delete privacidadOriginal.archivadaPorCorreo;
     delete privacidadOriginal.motivoArchivo;
     delete privacidadOriginal.archivoId;
+    delete privacidadOriginal.migradaAGrupo;
 
     const privacidadDestino = {
       ...privacidadOriginal,
@@ -22561,15 +22850,23 @@ window.migrarPasajeros11053a11184 = async function ({
 
     /*
       ===================================================
-      8B. COPIAR DOCUMENTO COMPLETO AL DESTINO
+      9B. QUITAR CAMPOS SOLO-JS
       ===================================================
     */
 
     const {
       id: _idSoloJs,
       esResumenNomina: _esResumenSoloJs,
+      _origenMigracion: _origenSoloJs,
+      _archivoIdMigracion: _archivoSoloJs,
       ...datosInscripcionParaMigrar
     } = item;
+
+    /*
+      ===================================================
+      9C. COPIAR DOCUMENTO COMPLETO AL DESTINO
+      ===================================================
+    */
 
     const destinoRef =
       doc(
@@ -22607,6 +22904,13 @@ window.migrarPasajeros11053a11184 = async function ({
           destinoIdGrupo:
             String(destino.groupId),
 
+          origenRegistro:
+            item._origenMigracion,
+
+          archivoOrigenId:
+            item._archivoIdMigracion ||
+            "",
+
           migradoAt:
             serverTimestamp(),
 
@@ -22634,62 +22938,83 @@ window.migrarPasajeros11053a11184 = async function ({
 
     /*
       ===================================================
-      8C. ARCHIVAR ORIGINAL
+      9D. ARCHIVAR ORIGINAL SI TODAVÍA EXISTE
 
-      No borramos absolutamente nada.
+      Thiago ya fue archivado anteriormente, así que
+      en su caso NO intentamos ejecutar updateDoc.
       ===================================================
     */
 
-    const origenRef =
-      doc(
-        db,
-        "ventas_cotizaciones",
-        String(origen.docId),
-        "inscripciones",
-        inscripcionId
+    if (
+      item._origenMigracion ===
+      "inscripciones"
+    ) {
+
+      const origenRef =
+        doc(
+          db,
+          "ventas_cotizaciones",
+          String(origen.docId),
+          "inscripciones",
+          inscripcionId
+        );
+
+      await updateDoc(
+        origenRef,
+        {
+          privacidad: {
+            ...(item.privacidad || {}),
+
+            estado:
+              "archivada",
+
+            archivadaAt:
+              serverTimestamp(),
+
+            archivadaPor:
+              getDisplayName(
+                state.effectiveUser
+              ),
+
+            archivadaPorCorreo:
+              state.effectiveEmail,
+
+            motivoArchivo:
+              `Migrado al grupo ${GRUPO_DESTINO}`,
+
+            migradaAGrupo:
+              String(destino.docId)
+          },
+
+          migracionGrupoDestino:
+            String(destino.docId),
+
+          migracionGrupoAt:
+            serverTimestamp()
+        }
       );
 
-    await updateDoc(
-      origenRef,
-      {
-        privacidad: {
-          ...(item.privacidad || {}),
+    } else {
 
-          estado:
-            "archivada",
-
-          archivadaAt:
-            serverTimestamp(),
-
-          archivadaPor:
-            getDisplayName(
-              state.effectiveUser
-            ),
-
-          archivadaPorCorreo:
-            state.effectiveEmail,
-
-          motivoArchivo:
-            `Migrado al grupo ${GRUPO_DESTINO}`,
-
-          migradaAGrupo:
-            String(destino.docId)
-        },
-
-        migracionGrupoDestino:
-          String(destino.docId),
-
-        migracionGrupoAt:
-          serverTimestamp()
-      }
-    );
+      console.log(
+        `ℹ️ ${nombre} fue recuperado desde respaldo archivado; no existe inscripción activa que volver a archivar.`,
+        {
+          archivoId:
+            item._archivoIdMigracion ||
+            ""
+        }
+      );
+    }
 
     /*
       ===================================================
-      8D. MIGRAR REGISTRO PÚBLICO
+      9E. MIGRAR REGISTRO PÚBLICO
 
-      Match principal por RUT.
-      Respaldo por nombre.
+      Match principal:
+      RUT.
+
+      Respaldo:
+      nombre.
       ===================================================
     */
 
@@ -22728,10 +23053,10 @@ window.migrarPasajeros11053a11184 = async function ({
           rut === rutPublico
         ) ||
         (
-          registro.nombre &&
+          nombre &&
           nombrePublico &&
           normalizeSearchLocal(
-            registro.nombre
+            nombre
           ) === nombrePublico
         );
 
@@ -22751,7 +23076,8 @@ window.migrarPasajeros11053a11184 = async function ({
 
       const estadoPublicoActual =
         normalizeSearchLocal(
-          publica.estado || ""
+          publica.estado ||
+          ""
         );
 
       await updateDoc(
@@ -22762,8 +23088,7 @@ window.migrarPasajeros11053a11184 = async function ({
         ),
         {
           /*
-            El registro público ahora pertenece
-            al grupo correcto.
+            Ahora pertenece al grupo destino.
           */
           idGrupo:
             String(destino.docId),
@@ -22772,8 +23097,8 @@ window.migrarPasajeros11053a11184 = async function ({
             String(destino.docId),
 
           /*
-            Si había sido eliminado por el archivado,
-            lo volvemos a un estado visible.
+            Si Thiago había quedado eliminado lógicamente,
+            vuelve a quedar visible.
           */
           estado:
             estadoPublicoActual ===
@@ -22817,8 +23142,8 @@ window.migrarPasajeros11053a11184 = async function ({
           },
 
           /*
-            Limpiamos las marcas creadas cuando
-            el sistema lo ocultó por archivado.
+            Limpiamos marcas de eliminación lógica
+            provocadas anteriormente por archivado.
           */
           eliminadaPorSyncNomina:
             deleteField(),
@@ -22837,6 +23162,12 @@ window.migrarPasajeros11053a11184 = async function ({
       publicosMigrados++;
     }
 
+    /*
+      ===================================================
+      9F. RESULTADO INDIVIDUAL
+      ===================================================
+    */
+
     resultados.push({
       documento:
         rut,
@@ -22851,6 +23182,13 @@ window.migrarPasajeros11053a11184 = async function ({
       destino:
         destino.docId,
 
+      recuperadoDesde:
+        item._origenMigracion,
+
+      archivoOrigen:
+        item._archivoIdMigracion ||
+        "",
+
       publicaMigrada:
         publicosMigrados,
 
@@ -22859,13 +23197,19 @@ window.migrarPasajeros11053a11184 = async function ({
     });
 
     console.log(
-      `✅ ${nombre} migrado correctamente.`
+      `✅ ${nombre} migrado correctamente.`,
+      {
+        inscripcionId,
+        publicosMigrados,
+        origenRegistro:
+          item._origenMigracion
+      }
     );
   }
 
   /*
     =====================================================
-    9. RESULTADO
+    10. RESULTADO FINAL
     =====================================================
   */
 
@@ -22893,12 +23237,19 @@ window.migrarPasajeros11053a11184 = async function ({
       origen.docId,
 
     destino:
-      destino.docId
+      destino.docId,
+
+    recuperadosDesdeArchivo:
+      resultados.filter(
+        (x) =>
+          x.recuperadoDesde ===
+          "inscripciones_archivadas"
+      ).length
   });
 
   /*
     Si estamos mirando uno de los grupos afectados,
-    refrescamos la pantalla.
+    refrescamos la nómina.
   */
 
   if (
@@ -22907,7 +23258,10 @@ window.migrarPasajeros11053a11184 = async function ({
     String(state.groupDocId) ===
       String(destino.docId)
   ) {
-    await esperar(1200);
+
+    await esperar(
+      1200
+    );
 
     state.inscripcionesCargadas =
       false;
