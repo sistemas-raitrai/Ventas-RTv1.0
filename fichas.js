@@ -864,26 +864,218 @@ async function markPendingFichaUpdateRequestsAsReviewedByJefa({
   return pending.length;
 }
 
-async function markOpenFichaUpdateRequestsAsCompleted({
-  resolvedBy = getDisplayName(state.effectiveUser),
-  resolvedByCorreo = state.effectiveEmail,
-  respuestaAdministracion = "",
-  newStatus = "completada"
-} = {}) {
-  const open = getOpenFichaUpdateRequests();
+async function markPendingFichaCorrectionRequestsAsReviewedByJefa({
+  reviewedBy =
+    getDisplayName(
+      state.effectiveUser
+    ),
 
-  for (const item of open) {
-    await setDoc(doc(db, SOLICITUDES_COLLECTION, item.id), {
-      estadoSolicitud: newStatus,
-      respuestaAdministracion,
-      resuelta: true,
-      resueltaPor: resolvedBy,
-      resueltaPorCorreo: resolvedByCorreo,
-      fechaResolucion: serverTimestamp()
-    }, { merge: true });
+  reviewedByCorreo =
+    state.effectiveEmail,
+
+  respuestaJefa = ""
+} = {}) {
+  const pending =
+    getPendingFichaCorrectionRequests();
+
+  for (const item of pending) {
+    await setDoc(
+      doc(
+        db,
+        SOLICITUDES_COLLECTION,
+        item.id
+      ),
+      {
+        estadoSolicitud:
+          "revisada_jefa",
+
+        respuestaJefa,
+
+        revisadaPor:
+          reviewedBy,
+
+        revisadaPorCorreo:
+          reviewedByCorreo,
+
+        fechaRevisionJefa:
+          serverTimestamp()
+      },
+      {
+        merge: true
+      }
+    );
   }
 
-  return open.length;
+  return pending.length;
+}
+
+async function markOpenFichaUpdateRequestsAsCompleted({
+  resolvedBy =
+    getDisplayName(
+      state.effectiveUser
+    ),
+
+  resolvedByCorreo =
+    state.effectiveEmail,
+
+  respuestaAdministracion = "",
+
+  newStatus =
+    "completada"
+} = {}) {
+  /*
+   * Administración cierra cualquiera
+   * de los dos procesos abiertos:
+   *
+   * - actualización de ficha;
+   * - corrección de ficha.
+   */
+  const open = [
+    ...getOpenFichaUpdateRequests(),
+    ...getOpenFichaCorrectionRequests()
+  ];
+
+  /*
+   * Evita eventualmente procesar dos veces
+   * el mismo documento.
+   */
+  const unique =
+    [...new Map(
+      open.map(
+        (item) => [
+          item.id,
+          item
+        ]
+      )
+    ).values()];
+
+  for (const item of unique) {
+    await setDoc(
+      doc(
+        db,
+        SOLICITUDES_COLLECTION,
+        item.id
+      ),
+      {
+        estadoSolicitud:
+          newStatus,
+
+        respuestaAdministracion,
+
+        resuelta:
+          true,
+
+        resueltaPor:
+          resolvedBy,
+
+        resueltaPorCorreo:
+          resolvedByCorreo,
+
+        fechaResolucion:
+          serverTimestamp()
+      },
+      {
+        merge: true
+      }
+    );
+  }
+
+  return unique.length;
+}
+
+async function resolveOpenFichaProcessAlerts({
+  resolvedBy =
+    getDisplayName(
+      state.effectiveUser
+    ),
+
+  resolvedByCorreo =
+    state.effectiveEmail,
+
+  resolucion = ""
+} = {}) {
+  const snap =
+    await getDocs(
+      query(
+        collection(
+          db,
+          ALERTAS_COLLECTION
+        ),
+
+        where(
+          "idGrupo",
+          "==",
+          String(state.groupId)
+        )
+      )
+    );
+
+  /*
+   * Solamente cerramos alertas creadas
+   * por el flujo de actualización/corrección.
+   *
+   * NO tocamos alertas manuales.
+   */
+  const tiposQueSeCierran =
+    new Set([
+      "solicitud_actualizacion_ficha",
+      "solicitud_correccion_ficha"
+    ]);
+
+  const pendientes =
+    snap.docs.filter(
+      (docSnap) => {
+        const data =
+          docSnap.data() || {};
+
+        const tipo =
+          normalizeSearchLocal(
+            data.tipo || ""
+          );
+
+        return (
+          tiposQueSeCierran.has(tipo) &&
+          data.activa !== false &&
+          data.resuelta !== true
+        );
+      }
+    );
+
+  for (const alertSnap of pendientes) {
+    await setDoc(
+      alertSnap.ref,
+      {
+        activa:
+          false,
+
+        resuelta:
+          true,
+
+        resolucion:
+          resolucion || "Cerrada por Administración",
+
+        resolucionAutomatica:
+          true,
+
+        motivoResolucion:
+          "cierre_administracion_ficha",
+
+        resueltaPor:
+          resolvedBy,
+
+        resueltaPorCorreo:
+          resolvedByCorreo,
+
+        fechaResolucion:
+          serverTimestamp()
+      },
+      {
+        merge: true
+      }
+    );
+  }
+
+  return pendientes.length;
 }
 
 function canEditFicha() {
@@ -2341,18 +2533,42 @@ async function signFlowFromFicha(step) {
       alert("La firma de jefa de ventas ya está registrada.");
       return;
     }
-  
+
     let respuestaJefa = "";
-  
-    if (hadPendingRequest) {
-      respuestaJefa = promptRequired(
-        `Motivo del vendedor:\n${pendingRequest?.detalle || "Sin detalle"}\n\n¿Qué cambiaste, revisaste o resolviste?`
-      );
-  
-      if (respuestaJefa === null) return;
-  
+    
+    /*
+     * Tanto una actualización como una corrección
+     * deben dejar explicación de lo realizado.
+     */
+    const solicitudQueSeRevisa =
+      pendingRequest ||
+      pendingCorrection;
+    
+    if (solicitudQueSeRevisa) {
+      const tipoTexto =
+        hadPendingCorrection
+          ? "corrección"
+          : "actualización";
+    
+      respuestaJefa =
+        promptRequired(
+          [
+            `Motivo de la ${tipoTexto}:`,
+            solicitudQueSeRevisa?.detalle ||
+              "Sin detalle",
+            "",
+            "¿Qué cambiaste, corregiste, revisaste o resolviste?"
+          ].join("\n")
+        );
+    
+      if (respuestaJefa === null) {
+        return;
+      }
+    
       if (!respuestaJefa) {
-        alert("Debes escribir qué cambiaste o qué resolviste antes de enviar a Administración.");
+        alert(
+          "Debes escribir qué cambiaste, corregiste o revisaste antes de enviar a Administración."
+        );
         return;
       }
     }
@@ -2385,6 +2601,26 @@ async function signFlowFromFicha(step) {
         revisadaPorCorreo: state.effectiveEmail,
         respuestaJefa,
         fechaRevisionJefa: serverTimestamp()
+      };
+    }
+
+    if (hadPendingCorrection) {
+      flowPatch.ultimaCorreccion = {
+        ...(state.group.flowFicha?.ultimaCorreccion || {}),
+    
+        estado:
+          "revisada_jefa",
+    
+        revisadaPor:
+          nombre,
+    
+        revisadaPorCorreo:
+          state.effectiveEmail,
+    
+        respuestaJefa,
+    
+        fechaRevisionJefa:
+          serverTimestamp()
       };
     }
   
@@ -2446,6 +2682,18 @@ async function signFlowFromFicha(step) {
         destinatarioCorreo: "administracion@raitrai.cl"
       });
     }
+
+    if (hadPendingCorrection) {
+      await markPendingFichaCorrectionRequestsAsReviewedByJefa({
+        reviewedBy:
+          nombre,
+    
+        reviewedByCorreo:
+          state.effectiveEmail,
+    
+        respuestaJefa
+      });
+    }
   
     await refreshFichaUiAfterFlowChange();
     return;
@@ -2473,8 +2721,21 @@ async function signFlowFromFicha(step) {
     return;
   }
 
-    const pendingRequest = getLatestOpenFichaUpdateRequest();
-    const hadPendingRequest = !!pendingRequest;
+    const pendingUpdate =
+      getLatestOpenFichaUpdateRequest();
+    
+    const pendingCorrection =
+      getLatestOpenFichaCorrectionRequest();
+    
+    const pendingRequest =
+      pendingUpdate ||
+      pendingCorrection;
+    
+    const hadPendingRequest =
+      !!pendingRequest;
+    
+    const closingCorrection =
+      !!pendingCorrection;
     
     if (flow?.administracion?.firmado && !hadPendingRequest) {
       alert("La firma de administración ya está registrada.");
@@ -2484,14 +2745,36 @@ async function signFlowFromFicha(step) {
     let respuestaAdministracion = "";
     
     if (hadPendingRequest) {
-      respuestaAdministracion = promptRequired(
-        `Motivo original:\n${pendingRequest?.detalle || "Sin detalle"}\n\nRespuesta jefa:\n${pendingRequest?.respuestaJefa || "Sin respuesta de jefa"}\n\n¿Qué valida o cierra Administración?`
-      );
+      const tipoProceso =
+        closingCorrection
+          ? "corrección"
+          : "actualización";
     
-      if (respuestaAdministracion === null) return;
+      respuestaAdministracion =
+        promptRequired(
+          [
+            `Cierre de ${tipoProceso}`,
+            "",
+            "Motivo original:",
+            pendingRequest?.detalle ||
+              "Sin detalle",
+            "",
+            "Respuesta jefa de ventas:",
+            pendingRequest?.respuestaJefa ||
+              "Sin respuesta registrada",
+            "",
+            "¿Qué valida, resuelve o cierra Administración?"
+          ].join("\n")
+        );
+    
+      if (respuestaAdministracion === null) {
+        return;
+      }
     
       if (!respuestaAdministracion) {
-        alert("Debes escribir qué valida o cierra Administración.");
+        alert(
+          "Debes escribir qué valida, resuelve o cierra Administración."
+        );
         return;
       }
     }
@@ -2516,17 +2799,62 @@ async function signFlowFromFicha(step) {
     };
 
     if (hadPendingRequest) {
-      flowPatch.ultimaSolicitudActualizacion = {
-        ...(state.group.flowFicha?.ultimaSolicitudActualizacion || {}),
-        estado: "completada",
-        cerradaPor: nombre,
-        cerradaPorCorreo: state.effectiveEmail,
-        fechaCierre: serverTimestamp()
-      };
-
-      flowPatch.ultimaActualizacionCerradaAt = serverTimestamp();
-      flowPatch.ultimaActualizacionCerradaPor = nombre;
-      flowPatch.ultimaActualizacionCerradaPorCorreo = state.effectiveEmail;
+      if (closingCorrection) {
+        flowPatch.ultimaCorreccion = {
+          ...(state.group.flowFicha?.ultimaCorreccion || {}),
+    
+          estado:
+            "completada",
+    
+          respuestaJefa:
+            pendingRequest?.respuestaJefa ||
+            state.group.flowFicha?.ultimaCorreccion?.respuestaJefa ||
+            "",
+    
+          respuestaAdministracion,
+    
+          cerradaPor:
+            nombre,
+    
+          cerradaPorCorreo:
+            state.effectiveEmail,
+    
+          fechaCierre:
+            serverTimestamp()
+        };
+      } else {
+        flowPatch.ultimaSolicitudActualizacion = {
+          ...(state.group.flowFicha?.ultimaSolicitudActualizacion || {}),
+    
+          estado:
+            "completada",
+    
+          respuestaJefa:
+            pendingRequest?.respuestaJefa ||
+            state.group.flowFicha?.ultimaSolicitudActualizacion?.respuestaJefa ||
+            "",
+    
+          respuestaAdministracion,
+    
+          cerradaPor:
+            nombre,
+    
+          cerradaPorCorreo:
+            state.effectiveEmail,
+    
+          fechaCierre:
+            serverTimestamp()
+        };
+    
+        flowPatch.ultimaActualizacionCerradaAt =
+          serverTimestamp();
+    
+        flowPatch.ultimaActualizacionCerradaPor =
+          nombre;
+    
+        flowPatch.ultimaActualizacionCerradaPorCorreo =
+          state.effectiveEmail;
+      }
     }
 
     const anoViajeNum = Number(state.group?.anoViaje || 0);
@@ -2588,23 +2916,89 @@ async function signFlowFromFicha(step) {
         respuestaAdministracion
       });
     
-      await createFichaAlert({
-        titulo: "Solicitud de actualización cerrada",
-        mensaje: `${nombre} cerró la solicitud de actualización.\n\nMotivo original: ${pendingRequest?.detalle || "Sin detalle"}`,
-        nivel: "info",
-        destinatarioRol: "vendedor",
-        destinatarioCorreo: state.group?.vendedoraCorreo || pendingRequest?.solicitadoPorCorreo || ""
+      await resolveOpenFichaProcessAlerts({
+        resolvedBy:
+          nombre,
+      
+        resolvedByCorreo:
+          state.effectiveEmail,
+      
+        resolucion:
+          respuestaAdministracion
       });
-    
+      
+      const tipoProcesoCerrado =
+        closingCorrection
+          ? "corrección"
+          : "actualización";
+      
       await createHistoryEntry({
-        tipoMovimiento: "solicitud_actualizacion_cerrada",
-        modulo: "ficha",
-        titulo: "Solicitud de actualización cerrada",
-        asunto: pendingRequest?.asunto || "Solicitud de actualización",
-        mensaje: `${nombre} cerró la solicitud de actualización. Motivo original: ${pendingRequest?.detalle || "Sin detalle"}`,
+        tipoMovimiento:
+          closingCorrection
+            ? "solicitud_correccion_cerrada"
+            : "solicitud_actualizacion_cerrada",
+      
+        modulo:
+          "ficha",
+      
+        titulo:
+          closingCorrection
+            ? "Corrección de ficha cerrada"
+            : "Solicitud de actualización cerrada",
+      
+        asunto:
+          pendingRequest?.asunto ||
+          (
+            closingCorrection
+              ? "Corrección de ficha"
+              : "Solicitud de actualización"
+          ),
+      
+        mensaje:
+          [
+            `${nombre} cerró la ${tipoProcesoCerrado} de ficha.`,
+      
+            `Motivo original: ${
+              pendingRequest?.detalle ||
+              "Sin detalle"
+            }.`,
+      
+            `Revisión jefa de ventas: ${
+              pendingRequest?.respuestaJefa ||
+              "Sin respuesta registrada"
+            }.`,
+      
+            `Cierre Administración: ${
+              respuestaAdministracion
+            }.`
+          ].join(" "),
+      
         metadata: {
-          solicitudId: pendingRequest?.id || "",
-          detalleSolicitud: pendingRequest?.detalle || ""
+          solicitudId:
+            pendingRequest?.id || "",
+      
+          tipoSolicitud:
+            pendingRequest?.tipoSolicitud || "",
+      
+          detalleSolicitud:
+            pendingRequest?.detalle || "",
+      
+          respuestaJefa:
+            pendingRequest?.respuestaJefa || "",
+      
+          respuestaAdministracion,
+      
+          solicitadoPor:
+            pendingRequest?.solicitadoPor || "",
+      
+          solicitadoPorCorreo:
+            pendingRequest?.solicitadoPorCorreo || "",
+      
+          cerradoPor:
+            nombre,
+      
+          cerradoPorCorreo:
+            state.effectiveEmail
         }
       });
     }
