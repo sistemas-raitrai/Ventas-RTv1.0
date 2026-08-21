@@ -6093,6 +6093,163 @@ function bindDatosModalControls() {
   bindPhoneModalInput("d_celularCliente2");
 }
 
+function buildFichaMirrorFromGroupValues(values = {}) {
+  /*
+   * =========================================================
+   * ESPEJO OFICIAL GRUPO -> FICHA
+   * =========================================================
+   *
+   * Editar datos trabaja sobre los campos oficiales del grupo.
+   *
+   * Si ya existe una ficha, mantenemos también sincronizados
+   * sus campos equivalentes.
+   *
+   * Si todavía NO existe ficha, no la creamos artificialmente:
+   * cuando se abra fichas.html, hydrateFicha() tomará estos
+   * mismos datos directamente desde el grupo.
+   */
+
+  const fichaActual =
+    state.group?.ficha || {};
+
+  const fichaExiste =
+    Object.keys(fichaActual).length > 0;
+
+  if (!fichaExiste) {
+    return null;
+  }
+
+  const destino =
+    cleanText(
+      values.destinoPrincipal || ""
+    );
+
+  const destinoOtro =
+    cleanText(
+      values.destinoPrincipalOtro || ""
+    );
+
+  const programa =
+    cleanText(
+      values.programa || ""
+    );
+
+  const programaOtro =
+    cleanText(
+      values.programaOtro || ""
+    );
+
+  const tramo =
+    cleanText(
+      values.tramo || ""
+    );
+
+  const tramoOtro =
+    cleanText(
+      values.tramoOtro || ""
+    );
+
+  const mesViaje =
+    cleanText(
+      values.mesViaje || ""
+    );
+
+  const mesViajeOtro =
+    cleanText(
+      values.mesViajeOtro || ""
+    );
+
+  const nombrePrograma =
+    programa === "OTRO"
+      ? programaOtro
+      : programa;
+
+  const tramoVisible =
+    tramo === "OTRO"
+      ? tramoOtro
+      : tramo;
+
+  const fechaViajeTexto =
+    mesViaje === "OTRO"
+      ? mesViajeOtro
+      : (
+          values.semanaViaje ||
+          mesViaje ||
+          ""
+        );
+
+  return {
+    ...fichaActual,
+
+    /*
+     * CONTACTO PRINCIPAL
+     */
+    apoderadoEncargado:
+      values.nombreCliente || "",
+
+    telefono:
+      values.celularCliente || "",
+
+    correo:
+      values.correoCliente || "",
+
+    /*
+     * DESTINO
+     */
+    destinoPrincipal:
+      destino,
+
+    destinoPrincipalOtro:
+      destino === "OTRO"
+        ? destinoOtro
+        : "",
+
+    /*
+     * PROGRAMA
+     */
+    programa,
+
+    programaOtro:
+      programa === "OTRO"
+        ? programaOtro
+        : "",
+
+    nombrePrograma,
+
+    /*
+     * PAX
+     */
+    numeroPaxTotal:
+      values.cantidadGrupo ?? "",
+
+    /*
+     * TRAMO
+     */
+    tramoSeleccion:
+      tramo,
+
+    tramoOtro:
+      tramo === "OTRO"
+        ? tramoOtro
+        : "",
+
+    tramo:
+      tramoVisible,
+
+    /*
+     * MES / FECHA TENTATIVA
+     */
+    mesViaje,
+
+    mesViajeOtro:
+      mesViaje === "OTRO"
+        ? mesViajeOtro
+        : "",
+
+    fechaViajeTexto
+  };
+}
+
 function groupValueIsEmpty(value) {
   if (value === null || value === undefined) return true;
   return String(value).trim() === "";
@@ -14685,315 +14842,641 @@ async function saveDatos() {
   const patch = {};
   const cambios = [];
 
-  const destinoSeleccionado = normalizeDestinoCanonical($("d_destinoPrincipal")?.value || "");
-  const destinoPrincipalOtro = normalizeTextUpper($("d_destinoPrincipalOtro")?.value || "");
+  const destinoSeleccionado =
+    normalizeDestinoCanonical(
+      $("d_destinoPrincipal")?.value || ""
+    );
 
-  const programaOptions = getProgramOptionsByDestino(destinoSeleccionado);
-  const programaSeleccionado = findCanonicalOption(
-    programaOptions.length ? programaOptions : ["OTRO"],
-    $("d_programa")?.value || ""
-  );
-  const programaOtro = normalizeTextUpper($("d_programaOtro")?.value || "");
+  const destinoPrincipalOtro =
+    normalizeTextUpper(
+      $("d_destinoPrincipalOtro")?.value || ""
+    );
 
-  const tramoSeleccionado = findCanonicalOption(TRAMO_OPTIONS, $("d_tramo")?.value || "");
-  const tramoOtro = normalizeTextUpper($("d_tramoOtro")?.value || "");
+  const programaOptions =
+    getProgramOptionsByDestino(
+      destinoSeleccionado
+    );
 
-  const mesViajeSeleccionado = findCanonicalOption(MES_VIAJE_OPTIONS, $("d_mesViaje")?.value || "");
-  const mesViajeOtro = normalizeTextUpper($("d_mesViajeOtro")?.value || "");
+  const programaSeleccionado =
+    findCanonicalOption(
+      programaOptions.length
+        ? programaOptions
+        : ["OTRO"],
+      $("d_programa")?.value || ""
+    );
+
+  const programaOtro =
+    normalizeTextUpper(
+      $("d_programaOtro")?.value || ""
+    );
+
+  const tramoSeleccionado =
+    findCanonicalOption(
+      TRAMO_OPTIONS,
+      $("d_tramo")?.value || ""
+    );
+
+  const tramoOtro =
+    normalizeTextUpper(
+      $("d_tramoOtro")?.value || ""
+    );
+
+  const mesViajeSeleccionado =
+    findCanonicalOption(
+      MES_VIAJE_OPTIONS,
+      $("d_mesViaje")?.value || ""
+    );
+
+  const mesViajeOtro =
+    normalizeTextUpper(
+      $("d_mesViajeOtro")?.value || ""
+    );
 
   const values = {
-    colegio: normalizeTextUpper($("d_colegio")?.value || state.group?.colegio || ""),
-    curso: normalizeCursoInput($("d_curso")?.value || ""),
-    anoViaje: parseNumberOrText($("d_anoViaje")?.value),
-    cantidadGrupo: parseNumberOrText($("d_cantidadGrupo")?.value),
+    colegio:
+      normalizeTextUpper(
+        $("d_colegio")?.value ||
+        state.group?.colegio ||
+        ""
+      ),
 
-    destinoPrincipal: destinoSeleccionado === "OTRO" ? "OTRO" : normalizeTextUpper(destinoSeleccionado),
-    destinoPrincipalOtro: destinoSeleccionado === "OTRO" ? destinoPrincipalOtro : "",
+    curso:
+      normalizeCursoInput(
+        $("d_curso")?.value || ""
+      ),
 
-    programa: programaSeleccionado === "OTRO" ? "OTRO" : normalizeTextUpper(programaSeleccionado),
-    programaOtro: programaSeleccionado === "OTRO" ? programaOtro : "",
+    anoViaje:
+      parseNumberOrText(
+        $("d_anoViaje")?.value
+      ),
 
-    tramo: tramoSeleccionado === "OTRO" ? "OTRO" : normalizeTextUpper(tramoSeleccionado),
-    tramoOtro: tramoSeleccionado === "OTRO" ? tramoOtro : "",
+    cantidadGrupo:
+      parseNumberOrText(
+        $("d_cantidadGrupo")?.value
+      ),
 
-    mesViaje: mesViajeSeleccionado === "OTRO" ? "OTRO" : normalizeTextUpper(mesViajeSeleccionado),
-    mesViajeOtro: mesViajeSeleccionado === "OTRO" ? mesViajeOtro : "",
-    semanaViaje: mesViajeSeleccionado === "OTRO"
-      ? mesViajeOtro
-      : normalizeTextUpper(mesViajeSeleccionado),
+    destinoPrincipal:
+      destinoSeleccionado === "OTRO"
+        ? "OTRO"
+        : normalizeTextUpper(
+            destinoSeleccionado
+          ),
 
-    comunaCiudad: normalizeTextUpper($("d_comunaCiudad")?.value || ""),
+    destinoPrincipalOtro:
+      destinoSeleccionado === "OTRO"
+        ? destinoPrincipalOtro
+        : "",
 
-    nombreCliente: normalizeTextUpper($("d_nombreCliente")?.value || ""),
-    rolCliente: normalizeTextUpper($("d_rolCliente")?.value || ""),
-    correoCliente: normalizeEmail($("d_correoCliente")?.value || ""),
-    celularCliente: sanitizeChileMobileForSave($("d_celularCliente")?.value || ""),
+    programa:
+      programaSeleccionado === "OTRO"
+        ? "OTRO"
+        : normalizeTextUpper(
+            programaSeleccionado
+          ),
 
-    nombreCliente2: normalizeTextUpper($("d_nombreCliente2")?.value || ""),
-    rolCliente2: normalizeTextUpper($("d_rolCliente2")?.value || ""),
-    correoCliente2: normalizeEmail($("d_correoCliente2")?.value || ""),
-    celularCliente2: sanitizeChileMobileForSave($("d_celularCliente2")?.value || "")
+    programaOtro:
+      programaSeleccionado === "OTRO"
+        ? programaOtro
+        : "",
+
+    tramo:
+      tramoSeleccionado === "OTRO"
+        ? "OTRO"
+        : normalizeTextUpper(
+            tramoSeleccionado
+          ),
+
+    tramoOtro:
+      tramoSeleccionado === "OTRO"
+        ? tramoOtro
+        : "",
+
+    mesViaje:
+      mesViajeSeleccionado === "OTRO"
+        ? "OTRO"
+        : normalizeTextUpper(
+            mesViajeSeleccionado
+          ),
+
+    mesViajeOtro:
+      mesViajeSeleccionado === "OTRO"
+        ? mesViajeOtro
+        : "",
+
+    semanaViaje:
+      mesViajeSeleccionado === "OTRO"
+        ? mesViajeOtro
+        : normalizeTextUpper(
+            mesViajeSeleccionado
+          ),
+
+    comunaCiudad:
+      normalizeTextUpper(
+        $("d_comunaCiudad")?.value || ""
+      ),
+
+    nombreCliente:
+      normalizeTextUpper(
+        $("d_nombreCliente")?.value || ""
+      ),
+
+    rolCliente:
+      normalizeTextUpper(
+        $("d_rolCliente")?.value || ""
+      ),
+
+    correoCliente:
+      normalizeEmail(
+        $("d_correoCliente")?.value || ""
+      ),
+
+    celularCliente:
+      sanitizeChileMobileForSave(
+        $("d_celularCliente")?.value || ""
+      ),
+
+    nombreCliente2:
+      normalizeTextUpper(
+        $("d_nombreCliente2")?.value || ""
+      ),
+
+    rolCliente2:
+      normalizeTextUpper(
+        $("d_rolCliente2")?.value || ""
+      ),
+
+    correoCliente2:
+      normalizeEmail(
+        $("d_correoCliente2")?.value || ""
+      ),
+
+    celularCliente2:
+      sanitizeChileMobileForSave(
+        $("d_celularCliente2")?.value || ""
+      )
   };
 
-  // Blindaje: vendedor puede abrir editar datos, pero no cambiar el nombre del colegio.
+  /*
+   * El vendedor puede editar datos,
+   * pero no cambiar el nombre del colegio.
+   */
   if (!canEditSchoolName()) {
-    values.colegio = normalizeTextUpper(state.group?.colegio || "");
+    values.colegio =
+      normalizeTextUpper(
+        state.group?.colegio || ""
+      );
   }
 
-  // Detectar cambios reales primero
-  for (const path of DATA_FIELDS) {
-    const nuevo = values[path];
-    const anterior = getByPath(state.group, path);
+  /*
+   * =========================================================
+   * DETECTAR CAMBIOS REALES
+   * =========================================================
+   */
 
-    if (!sameValue(anterior, nuevo)) {
-      setNestedValue(patch, path, nuevo);
-      cambios.push({ campo: path, anterior, nuevo });
+  for (const path of DATA_FIELDS) {
+    const nuevo =
+      values[path];
+
+    const anterior =
+      getByPath(
+        state.group,
+        path
+      );
+
+    if (
+      !sameValue(
+        anterior,
+        nuevo
+      )
+    ) {
+      setNestedValue(
+        patch,
+        path,
+        nuevo
+      );
+
+      cambios.push({
+        campo:
+          path,
+
+        anterior,
+
+        nuevo
+      });
     }
   }
 
-  // =========================================================
-  // CONFIRMACIÓN DE DATOS PROVISIONALES
-  // =========================================================
-  
-  // Si el curso estaba pendiente y ahora existe un curso real,
-  // consideramos que fue revisado aunque el resto no haya cambiado.
+  /*
+   * =========================================================
+   * CONFIRMACIÓN DATOS PROVISIONALES
+   * =========================================================
+   */
+
   if (
     state.group?.cursoPorConfirmar === true &&
     values.curso &&
     values.curso !== "0"
   ) {
-    patch.cursoPorConfirmar = false;
-  
+    patch.cursoPorConfirmar =
+      false;
+
     cambios.push({
-      campo: "cursoPorConfirmar",
-      anterior: true,
-      nuevo: false
+      campo:
+        "cursoPorConfirmar",
+
+      anterior:
+        true,
+
+      nuevo:
+        false
     });
   }
-  
-  // Si el año estaba pendiente, guardar Editar datos confirma
-  // expresamente el valor actualmente informado.
-  //
-  // Esto también cubre el caso:
-  // provisional 2026 -> confirmado 2026.
+
   if (
     state.group?.anoViajePorConfirmar === true &&
     values.anoViaje
   ) {
-    patch.anoViajePorConfirmar = false;
-  
+    patch.anoViajePorConfirmar =
+      false;
+
     cambios.push({
-      campo: "anoViajePorConfirmar",
-      anterior: true,
-      nuevo: false
+      campo:
+        "anoViajePorConfirmar",
+
+      anterior:
+        true,
+
+      nuevo:
+        false
     });
   }
 
-  // Si no cambió nada, no forzar validaciones ni guardado
+  /*
+   * Si no cambió nada, no guardamos.
+   */
   if (!cambios.length) {
-    closeModal("modalDatos");
+    closeModal(
+      "modalDatos"
+    );
+
     return;
   }
 
-  const changedFields = new Set(cambios.map((c) => c.campo));
+  const changedFields =
+    new Set(
+      cambios.map(
+        (c) => c.campo
+      )
+    );
 
-  // Helpers de validación parcial
-  const changed = (field) => changedFields.has(field);
+  const changed =
+    (field) =>
+      changedFields.has(field);
 
-  const changedAny = (...fields) => fields.some((field) => changedFields.has(field));
+  const changedAny =
+    (...fields) =>
+      fields.some(
+        (field) =>
+          changedFields.has(field)
+      );
 
-  // Validar solo lo tocado y sus dependencias directas
+  /*
+   * =========================================================
+   * VALIDACIONES
+   * =========================================================
+   */
 
-  if (changed("colegio") && !values.colegio) {
-    alert("El nombre del colegio no puede quedar vacío.");
+  if (
+    changed("colegio") &&
+    !values.colegio
+  ) {
+    alert(
+      "El nombre del colegio no puede quedar vacío."
+    );
+
     return;
   }
 
   if (changed("curso")) {
     if (!values.curso) {
-      alert("Si modificas el curso, no puede quedar vacío.");
+      alert(
+        "Si modificas el curso, no puede quedar vacío."
+      );
+
       return;
     }
 
-    if (!hasValidCursoFormat(values.curso)) {
-      alert("El curso debe comenzar con un número válido (1 a 11) y luego puede llevar letras, todo junto y sin espacios. Ejemplo: 4C, 3DAVINCI, 10A.");
+    if (
+      !hasValidCursoFormat(
+        values.curso
+      )
+    ) {
+      alert(
+        "El curso debe comenzar con un número válido (1 a 11) y luego puede llevar letras, todo junto y sin espacios. Ejemplo: 4C, 3DAVINCI, 10A."
+      );
+
       return;
     }
   }
 
-  if (changed("anoViaje") && !values.anoViaje) {
-    alert("Si modificas el año de viaje, no puede quedar vacío.");
+  if (
+    changed("anoViaje") &&
+    !values.anoViaje
+  ) {
+    alert(
+      "Si modificas el año de viaje, no puede quedar vacío."
+    );
+
     return;
   }
 
-  if (changed("destinoPrincipal")) {
+  if (
+    changedAny(
+      "destinoPrincipal",
+      "destinoPrincipalOtro"
+    )
+  ) {
     if (!values.destinoPrincipal) {
-      alert("Si modificas el destino principal, debes seleccionar uno.");
+      alert(
+        "Si modificas el destino principal, debes seleccionar uno."
+      );
+
       return;
     }
 
-    if (values.destinoPrincipal === "OTRO" && !values.destinoPrincipalOtro) {
-      alert("Debes especificar el otro destino principal.");
+    if (
+      values.destinoPrincipal === "OTRO" &&
+      !values.destinoPrincipalOtro
+    ) {
+      alert(
+        "Debes especificar el otro destino principal."
+      );
+
       return;
     }
   }
 
-  if (changed("destinoPrincipalOtro")) {
-    const destinoFinal = values.destinoPrincipal;
-    if (destinoFinal === "OTRO" && !values.destinoPrincipalOtro) {
-      alert("Debes especificar el otro destino principal.");
-      return;
-    }
-  }
-
-  if (changed("programa")) {
+  if (
+    changedAny(
+      "programa",
+      "programaOtro"
+    )
+  ) {
     if (!values.programa) {
-      alert("Si modificas el programa, debes seleccionar uno.");
+      alert(
+        "Si modificas el programa, debes seleccionar uno."
+      );
+
       return;
     }
 
-    if (values.programa === "OTRO" && !values.programaOtro) {
-      alert("Debes especificar el otro programa.");
+    if (
+      values.programa === "OTRO" &&
+      !values.programaOtro
+    ) {
+      alert(
+        "Debes especificar el otro programa."
+      );
+
       return;
     }
   }
 
-  if (changed("programaOtro")) {
-    if (values.programa === "OTRO" && !values.programaOtro) {
-      alert("Debes especificar el otro programa.");
-      return;
-    }
-  }
-
-  if (changed("tramo")) {
+  if (
+    changedAny(
+      "tramo",
+      "tramoOtro"
+    )
+  ) {
     if (!values.tramo) {
-      alert("Si modificas el tramo, debes seleccionar uno.");
+      alert(
+        "Si modificas el tramo, debes seleccionar uno."
+      );
+
       return;
     }
 
-    if (values.tramo === "OTRO" && !values.tramoOtro) {
-      alert("Debes especificar el otro tramo.");
+    if (
+      values.tramo === "OTRO" &&
+      !values.tramoOtro
+    ) {
+      alert(
+        "Debes especificar el otro tramo."
+      );
+
       return;
     }
   }
 
-  if (changed("tramoOtro")) {
-    if (values.tramo === "OTRO" && !values.tramoOtro) {
-      alert("Debes especificar el otro tramo.");
-      return;
-    }
-  }
-
-  if (changed("mesViaje")) {
+  if (
+    changedAny(
+      "mesViaje",
+      "mesViajeOtro"
+    )
+  ) {
     if (!values.mesViaje) {
-      alert("Si modificas el mes de viaje, debes seleccionar uno.");
+      alert(
+        "Si modificas el mes de viaje, debes seleccionar uno."
+      );
+
       return;
     }
 
-    if (values.mesViaje === "OTRO" && !values.mesViajeOtro) {
-      alert("Debes especificar el otro mes de viaje.");
+    if (
+      values.mesViaje === "OTRO" &&
+      !values.mesViajeOtro
+    ) {
+      alert(
+        "Debes especificar el otro mes de viaje."
+      );
+
       return;
     }
   }
 
-  if (changed("mesViajeOtro")) {
-    if (values.mesViaje === "OTRO" && !values.mesViajeOtro) {
-      alert("Debes especificar el otro mes de viaje.");
-      return;
-    }
-  }
+  /*
+   * =========================================================
+   * RECALCULAR ALIAS
+   * =========================================================
+   */
 
-  // Recalcular alias solo si cambió alguno de los campos que lo afectan
-  if (changedAny("colegio", "curso", "anoViaje")) {
-    const { anoBase, cursoViaje, aliasGrupo, aliasTripKey } = buildDatosAliasPayload();
+  if (
+    changedAny(
+      "colegio",
+      "curso",
+      "anoViaje"
+    )
+  ) {
+    const {
+      anoBase,
+      cursoViaje,
+      aliasGrupo,
+      aliasTripKey
+    } =
+      buildDatosAliasPayload();
 
     if (!values.colegio) {
-      alert("No se encontró el colegio del grupo.");
+      alert(
+        "No se encontró el colegio del grupo."
+      );
+
       return;
     }
 
     if (!values.curso) {
-      alert("Para reconstruir el alias, el curso no puede quedar vacío.");
+      alert(
+        "Para reconstruir el alias, el curso no puede quedar vacío."
+      );
+
       return;
     }
 
-    if (!hasValidCursoFormat(values.curso)) {
-      alert("El curso debe comenzar con un número válido (1 a 11) y luego puede llevar letras, todo junto y sin espacios. Ejemplo: 4C, 3DAVINCI, 10A.");
+    if (
+      !hasValidCursoFormat(
+        values.curso
+      )
+    ) {
+      alert(
+        "El curso debe comenzar con un número válido (1 a 11) y luego puede llevar letras, todo junto y sin espacios. Ejemplo: 4C, 3DAVINCI, 10A."
+      );
+
       return;
     }
 
     if (!values.anoViaje) {
-      alert("Para reconstruir el alias, el año de viaje no puede quedar vacío.");
+      alert(
+        "Para reconstruir el alias, el año de viaje no puede quedar vacío."
+      );
+
       return;
     }
 
-    if (!cursoViaje || !aliasGrupo || !aliasTripKey) {
-      alert("No se pudo reconstruir el alias del grupo. Revisa colegio, curso y año de viaje.");
+    if (
+      !cursoViaje ||
+      !aliasGrupo ||
+      !aliasTripKey
+    ) {
+      alert(
+        "No se pudo reconstruir el alias del grupo. Revisa colegio, curso y año de viaje."
+      );
+
       return;
     }
 
     const derivedValues = {
-      anoBaseCurso: String(anoBase),
+      anoBaseCurso:
+        String(
+          anoBase
+        ),
+
       cursoViaje,
+
       aliasTripKey
     };
-    
-    // Si el nombre fue editado manualmente desde la ficha,
-    // NO volver a recalcular ni pisar aliasGrupo.
-    if (state.group?.nombreGrupoManual !== true) {
-      derivedValues.aliasGrupo = aliasGrupo;
+
+    /*
+     * Si el nombre fue editado manualmente desde la ficha,
+     * no pisamos aliasGrupo.
+     */
+    if (
+      state.group?.nombreGrupoManual !== true
+    ) {
+      derivedValues.aliasGrupo =
+        aliasGrupo;
     }
 
-    Object.entries(derivedValues).forEach(([path, nuevo]) => {
-      const anterior = getByPath(state.group, path);
+    Object.entries(
+      derivedValues
+    ).forEach(
+      ([path, nuevo]) => {
+        const anterior =
+          getByPath(
+            state.group,
+            path
+          );
 
-      if (!sameValue(anterior, nuevo)) {
-        setNestedValue(patch, path, nuevo);
-        cambios.push({ campo: path, anterior, nuevo });
+        if (
+          !sameValue(
+            anterior,
+            nuevo
+          )
+        ) {
+          setNestedValue(
+            patch,
+            path,
+            nuevo
+          );
+
+          cambios.push({
+            campo:
+              path,
+
+            anterior,
+
+            nuevo
+          });
+        }
       }
-    });
+    );
   }
 
-  // =========================================================
-  // ESPEJO GRUPO -> FICHA
-  // Mantener en ficha los mismos datos editados desde el modal Datos.
-  // NO cambia variables de Firebase: usa las mismas ya existentes.
-  // =========================================================
-  const nombreProgramaFicha =
-    values.programa === "OTRO"
-      ? (values.programaOtro || "")
-      : (values.programaOtro || values.programa || "");
-  
-  const tramoFicha =
-    values.tramo === "OTRO"
-      ? (values.tramoOtro || "")
-      : (values.tramoOtro || values.tramo || "");
-  
-  const fechaViajeFicha =
-    values.mesViaje === "OTRO"
-      ? (values.mesViajeOtro || "")
-      : (values.mesViajeOtro || values.mesViaje || values.semanaViaje || "");
-  
-  setNestedValue(patch, "ficha.apoderadoEncargado", values.nombreCliente || "");
-  setNestedValue(patch, "ficha.telefono", values.celularCliente || "");
-  setNestedValue(patch, "ficha.correo", values.correoCliente || "");
-  setNestedValue(patch, "ficha.nombrePrograma", nombreProgramaFicha || "");
-  setNestedValue(patch, "ficha.numeroPaxTotal", values.cantidadGrupo || "");
-  setNestedValue(patch, "ficha.tramo", tramoFicha || "");
-  setNestedValue(patch, "ficha.fechaViajeTexto", fechaViajeFicha || "");
+  /*
+   * =========================================================
+   * ESPEJO GRUPO -> FICHA
+   * =========================================================
+   *
+   * Si ya existe ficha, los datos compartidos
+   * quedan inmediatamente iguales.
+   *
+   * Si todavía no existe ficha, no se crea aquí:
+   * hydrateFicha() los tomará desde el grupo.
+   */
 
-  await applyCriticalChangeRules(patch, cambios);
+  const fichaMirror =
+    buildFichaMirrorFromGroupValues(
+      values
+    );
 
-  await saveGroupPatch(patch, {
-    tipoMovimiento: "edicion_datos",
-    modulo: "grupo",
-    titulo: "Modificación manual de datos",
-    mensaje: `${getDisplayName(state.effectiveUser)} modificó datos del grupo.`,
+  if (fichaMirror) {
+    patch.ficha =
+      fichaMirror;
+  }
+
+  /*
+   * Mantiene las reglas críticas existentes:
+   * reapertura, PDF, firmas, etc.
+   */
+  await applyCriticalChangeRules(
+    patch,
     cambios
-  });
+  );
 
-  closeModal("modalDatos");
-  showSaveNotice("Datos guardados correctamente.");
+  await saveGroupPatch(
+    patch,
+    {
+      tipoMovimiento:
+        "edicion_datos",
+
+      modulo:
+        "grupo",
+
+      titulo:
+        "Modificación manual de datos",
+
+      mensaje:
+        `${getDisplayName(state.effectiveUser)} modificó datos del grupo.`,
+
+      cambios
+    }
+  );
+
+  closeModal(
+    "modalDatos"
+  );
+
+  showSaveNotice(
+    "Datos guardados correctamente."
+  );
 }
 
 async function saveSituacion() {
