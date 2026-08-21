@@ -71,23 +71,45 @@ const state = {
 const FICHA_FIELDS = [
   "solicitudReserva",
   "nombreGrupo",
+
+  /*
+   * DATOS COMPARTIDOS GRUPO <-> FICHA
+   */
   "apoderadoEncargado",
   "telefono",
   "correo",
+
+  "destinoPrincipal",
+  "destinoPrincipalOtro",
+
+  "programa",
+  "programaOtro",
   "nombrePrograma",
+
+  "numeroPaxTotal",
+
+  "tramoSeleccion",
+  "tramoOtro",
+  "tramo",
+
+  "mesViaje",
+  "mesViajeOtro",
+  "fechaViajeTexto",
+
+  /*
+   * DATOS PROPIOS DE FICHA
+   */
   "programaPdfUrl",
   "programaPdfNombre",
   "programaPdfStoragePath",
   "programaPdfSubidoPor",
   "programaPdfSubidoPorCorreo",
+
   "valorPrograma",
-  "numeroPaxTotal",
-  "tramo",
   "liberados",
   "categoriaHoteleraContratada",
   "autorizacionGerencia",
   "descuentoValorBase",
-  "fechaViajeTexto",
   "asistenciaEnViajes",
   "nombreVendedor",
   "numeroNegocio",
@@ -100,6 +122,119 @@ const FICHA_FIELDS = [
   "pdfUrl",
   "pdfNombre"
 ];
+
+const FICHA_DESTINO_PRINCIPAL_OPTIONS = [
+  "BARILOCHE",
+  "SUR DE CHILE",
+  "SUR DE CHILE Y BARILOCHE",
+  "BRASIL",
+  "NORTE DE CHILE",
+  "MÉXICO",
+  "REPÚBLICA DOMINICANA",
+  "OTRO"
+];
+
+const FICHA_TRAMO_OPTIONS = [
+  "36 – 39",
+  "30 – 35",
+  "26 – 29",
+  "23 – 25",
+  "20 – 22",
+  "18 – 19",
+  "15 – 17",
+  "OTRO"
+];
+
+const FICHA_MES_VIAJE_OPTIONS = [
+  "ENERO",
+  "FEBRERO",
+  "MARZO",
+  "ABRIL",
+  "MAYO",
+  "JUNIO",
+  "JULIO",
+  "AGOSTO",
+  "SEPTIEMBRE",
+  "OCTUBRE",
+  "NOVIEMBRE",
+  "DICIEMBRE",
+  "OTRO"
+];
+
+const FICHA_PROGRAM_OPTIONS_BY_DESTINO = {
+  [normalizeFichaOptionKey("BRASIL")]: [
+    "CAMBORIU FULL 8/7",
+    "CAMBORIU ECO 8/7",
+    "CAMBORIU ECO 6/5",
+    "OTRO"
+  ],
+
+  [normalizeFichaOptionKey("BARILOCHE")]: [
+    "BARILOCHE 6/5",
+    "BARILOCHE TERRESTRE 6/5",
+    "BARILOCHE TERRESTRE 5/4",
+    "OTRO"
+  ],
+
+  [normalizeFichaOptionKey("SUR DE CHILE Y BARILOCHE")]: [
+    "SUR DE CHILE Y BARILOCHE CON VALDIVIA 8/7",
+    "SUR DE CHILE Y BARILOCHE CON VALDIVIA 7/6",
+    "SUR DE CHILE Y BARILOCHE SURFACE 7/6",
+    "SUR DE CHILE Y BARILOCHE 7/6",
+    "SUR DE CHILE Y BARILOCHE 6/5",
+    "PUCON Y BARILOCHE 7/6",
+    "OTRO"
+  ],
+
+  [normalizeFichaOptionKey("BARILOCHE Y SUR DE CHILE")]: [
+    "SUR DE CHILE Y BARILOCHE CON VALDIVIA 8/7",
+    "SUR DE CHILE Y BARILOCHE CON VALDIVIA 7/6",
+    "SUR DE CHILE Y BARILOCHE SURFACE 7/6",
+    "SUR DE CHILE Y BARILOCHE 7/6",
+    "SUR DE CHILE Y BARILOCHE 6/5",
+    "PUCON Y BARILOCHE 7/6",
+    "OTRO"
+  ],
+
+  [normalizeFichaOptionKey("SUR DE CHILE")]: [
+    "SUR DE CHILE Y HUILO HUILO 7/6",
+    "SUR DE CHILE Y HUILO HUILO 6/5",
+    "SUR DE CHILE Y PUCON 7/6",
+    "SOLO PUERTO VARAS 7/6",
+    "SOLO PUERTO VARAS 6/5",
+    "SOLO PUERTO VARAS 5/4",
+    "TORRES DEL PAINE 7/6",
+    "TORRES DEL PAINE 6/5",
+    "TORRES DEL PAINE 5/4",
+    "VALLE LAS TRANCAS 6/5",
+    "VALLE LAS TRANCAS 5/4",
+    "OTRO"
+  ],
+
+  [normalizeFichaOptionKey("NORTE DE CHILE")]: [
+    "SAN PEDRO ATACAMA 7/6",
+    "SAN PEDRO ATACAMA 6/5",
+    "OTRO"
+  ],
+
+  [normalizeFichaOptionKey("MÉXICO")]: [
+    "CANCUN Y PLAYA DEL CARMEN 8/7",
+    "CANCUN Y PLAYA DEL CARMEN 7/6",
+    "CANCUN Y PLAYA DEL CARMEN 6/5",
+    "OTRO"
+  ],
+
+  [normalizeFichaOptionKey("REPÚBLICA DOMINICANA")]: [
+    "PUNTA CANA - BAYAHIBE 8/7",
+    "PUNTA CANA - BAYAHIBE 7/6",
+    "PUNTA CANA - BAYAHIBE 6/5",
+    "OTRO"
+  ],
+
+  [normalizeFichaOptionKey("OTRO")]: [
+    "OTRO"
+  ]
+};
 
 const ADMIN_IMPORTANT_FICHA_FIELDS = [
   {
@@ -123,6 +258,88 @@ const ADMIN_IMPORTANT_FICHA_FIELDS = [
     label: "Asistencia en viajes"
   }
 ];
+
+function normalizeFichaOptionKey(value = "") {
+  return String(value ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toUpperCase()
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function findFichaCanonicalOption(options = [], value = "") {
+  const key =
+    normalizeFichaOptionKey(value);
+
+  if (!key) {
+    return "";
+  }
+
+  return (
+    options.find(
+      (option) =>
+        normalizeFichaOptionKey(option) ===
+        key
+    ) || ""
+  );
+}
+
+function normalizeFichaDestinoCanonical(value = "") {
+  const key =
+    normalizeFichaOptionKey(value);
+
+  if (!key) {
+    return "";
+  }
+
+  /*
+   * Compatibilidad con el nombre inverso antiguo.
+   */
+  if (
+    key ===
+    normalizeFichaOptionKey(
+      "BARILOCHE Y SUR DE CHILE"
+    )
+  ) {
+    return "SUR DE CHILE Y BARILOCHE";
+  }
+
+  return (
+    findFichaCanonicalOption(
+      FICHA_DESTINO_PRINCIPAL_OPTIONS,
+      value
+    ) || value
+  );
+}
+
+function getFichaProgramOptionsByDestino(destino = "") {
+  const canonical =
+    normalizeFichaDestinoCanonical(
+      destino
+    );
+
+  const key =
+    normalizeFichaOptionKey(
+      canonical
+    );
+
+  return (
+    FICHA_PROGRAM_OPTIONS_BY_DESTINO[key] ||
+    []
+  );
+}
+
+function getFichaSharedDisplayValue(
+  selected = "",
+  other = ""
+) {
+  return (
+    normalizeSearchLocal(selected) === "otro"
+      ? cleanText(other || "")
+      : cleanText(selected || "")
+  );
+}
 
 function getAdminImportantFichaChanges(previousFicha = {}, nextFicha = {}) {
   return ADMIN_IMPORTANT_FICHA_FIELDS
@@ -1320,354 +1537,675 @@ async function convertirProgramaOfficeAPdf({ archivoStoragePath, archivoNombre }
 }
 
 async function saveProgramaGrupo() {
-  const input = $("f_programaPdfFile");
-  const file = input?.files?.[0] || null;
+  const input =
+    $("f_programaPdfFile");
 
-  if (!canEditProgramaGrupo()) {
-    showToast("No tienes permisos para subir o reemplazar el programa en este momento.", "warning");
+  const file =
+    input?.files?.[0] ||
+    null;
+
+  if (
+    !canEditProgramaGrupo()
+  ) {
+    showToast(
+      "No tienes permisos para subir o reemplazar el programa en este momento.",
+      "warning"
+    );
+
     return;
   }
 
-  const programaAnterior = state.group?.programaGrupo || {};
-  
-  // PDF anterior, si existía
-  const anteriorPdfNombre = getProgramaPdfNombre();
-  const anteriorPdfUrl = getProgramaPdfUrl();
-  
-  // Archivo original anterior, sea PDF, DOC o DOCX
-  const anteriorOriginalNombre = getProgramaOriginalNombre();
-  const anteriorOriginalUrl = getProgramaOriginalUrl();
-  
-  const anteriorNombre = anteriorOriginalNombre || anteriorPdfNombre || "";
-  const anteriorUrl = anteriorOriginalUrl || anteriorPdfUrl || "";
-  
-  if (!file && !anteriorOriginalUrl) {
-    showToast("Debes seleccionar un archivo PDF, DOC o DOCX para guardar el programa.", "warning");
-    return;
-  }
+  const programaAnterior =
+    state.group?.programaGrupo ||
+    {};
 
-  let versionPrograma = cleanText($("f_programaVersion")?.value || "");
-  if (!versionPrograma) {
-    const prev = Number(programaAnterior.versionPrograma || 0);
-    versionPrograma = String(Number.isFinite(prev) && prev > 0 ? prev : 1);
-  }
-
-  const descripcionCambio = cleanText($("f_programaDescripcionCambio")?.value || "");
-  const displayName = getDisplayName(state.effectiveUser);
-  const flow = state.group?.flowFicha || {};
-  const esReemplazo = !!file && !!anteriorUrl;
-  
-  let archivoUrl = programaAnterior.archivoUrl || anteriorOriginalUrl || "";
-  let archivoStoragePath = programaAnterior.archivoStoragePath || "";
-  let archivoNombre = programaAnterior.archivoNombre || anteriorOriginalNombre || "";
-  let archivoTipo = programaAnterior.archivoTipo || "";
-  
-  let downloadUrl = anteriorPdfUrl || "";
-  let storagePath = programaAnterior.storagePath || "";
-  let pdfNombre = anteriorPdfNombre || "";
+  const fichaAnterior =
+    state.group?.ficha ||
+    {};
 
   /*
-    ESPEJO FICHA -> GRUPO
-    Importante:
-    acá NO usamos "values" porque esa variable solo existe dentro de saveFicha().
-    Tomamos los valores directamente desde el formulario actual.
-  */
-  const fichaValues = {
-    nombreGrupo: getValue("f_nombreGrupo"),
-    apoderadoEncargado: getValue("f_apoderadoEncargado"),
-    telefono: getValue("f_telefono"),
-    correo: getValue("f_correo"),
-    nombrePrograma: getValue("f_nombrePrograma"),
-    numeroPaxTotal: getValue("f_numeroPaxTotal"),
-    tramo: getValue("f_tramo"),
-    descuentoValorBase: getValue("f_descuentoValorBase"),
-    nombreVendedor: getValue("f_nombreVendedor"),
-    asistenciaEnViajes: getValue("f_asistenciaEnViajes"),
-    fechaViajeTexto: getValue("f_fechaViajeTexto"),
-    infoOperacionesHtml: getRichEditorHtml("f_infoOperaciones"),
-    infoAdministracionHtml: getRichEditorHtml("f_infoAdministracion")
-  };
+   * PDF anterior.
+   */
+  const anteriorPdfNombre =
+    getProgramaPdfNombre();
 
-  state.isUploadingProgramaPdf = true;
+  const anteriorPdfUrl =
+    getProgramaPdfUrl();
+
+  /*
+   * Original anterior.
+   */
+  const anteriorOriginalNombre =
+    getProgramaOriginalNombre();
+
+  const anteriorOriginalUrl =
+    getProgramaOriginalUrl();
+
+  const anteriorNombre =
+    anteriorOriginalNombre ||
+    anteriorPdfNombre ||
+    "";
+
+  const anteriorUrl =
+    anteriorOriginalUrl ||
+    anteriorPdfUrl ||
+    "";
+
+  if (
+    !file &&
+    !anteriorOriginalUrl
+  ) {
+    showToast(
+      "Debes seleccionar un archivo PDF, DOC o DOCX para guardar el programa.",
+      "warning"
+    );
+
+    return;
+  }
+
+  let versionPrograma =
+    cleanText(
+      $("f_programaVersion")
+        ?.value ||
+      ""
+    );
+
+  if (!versionPrograma) {
+    const prev =
+      Number(
+        programaAnterior
+          .versionPrograma ||
+        0
+      );
+
+    versionPrograma =
+      String(
+        Number.isFinite(prev) &&
+        prev > 0
+          ? prev
+          : 1
+      );
+  }
+
+  const descripcionCambio =
+    cleanText(
+      $("f_programaDescripcionCambio")
+        ?.value ||
+      ""
+    );
+
+  const displayName =
+    getDisplayName(
+      state.effectiveUser
+    );
+
+  const flow =
+    state.group?.flowFicha ||
+    {};
+
+  const esReemplazo =
+    !!file &&
+    !!anteriorUrl;
+
+  let archivoUrl =
+    programaAnterior.archivoUrl ||
+    anteriorOriginalUrl ||
+    "";
+
+  let archivoStoragePath =
+    programaAnterior.archivoStoragePath ||
+    "";
+
+  let archivoNombre =
+    programaAnterior.archivoNombre ||
+    anteriorOriginalNombre ||
+    "";
+
+  let archivoTipo =
+    programaAnterior.archivoTipo ||
+    "";
+
+  let downloadUrl =
+    anteriorPdfUrl ||
+    "";
+
+  let storagePath =
+    programaAnterior.storagePath ||
+    "";
+
+  let pdfNombre =
+    anteriorPdfNombre ||
+    "";
+
+  state.isUploadingProgramaPdf =
+    true;
+
   updateProgramaPdfUi();
 
   try {
     if (file) {
-      const kind = getProgramaFileKind(file);
-    
+      const kind =
+        getProgramaFileKind(
+          file
+        );
+
       if (!kind) {
-        showToast("Solo se permite subir programas en PDF, DOC o DOCX.", "warning");
+        showToast(
+          "Solo se permite subir programas en PDF, DOC o DOCX.",
+          "warning"
+        );
+
         return;
       }
-    
-      const storage = getStorage();
-    
-      // 1) Siempre guardamos el archivo original editable.
-      archivoTipo = kind;
-      archivoNombre = file.name;
-      archivoStoragePath = buildProgramaOriginalStoragePath(file.name);
-    
-      const originalRef = ref(storage, archivoStoragePath);
-    
-      await uploadBytes(originalRef, file, {
-        contentType: getContentTypeByProgramaKind(kind)
-      });
-    
-      archivoUrl = await getDownloadURL(originalRef);
-    
-      // 2) Si es PDF, ese mismo archivo sirve para unir.
+
+      const storage =
+        getStorage();
+
+      /*
+       * Siempre guardamos archivo original.
+       */
+      archivoTipo =
+        kind;
+
+      archivoNombre =
+        file.name;
+
+      archivoStoragePath =
+        buildProgramaOriginalStoragePath(
+          file.name
+        );
+
+      const originalRef =
+        ref(
+          storage,
+          archivoStoragePath
+        );
+
+      await uploadBytes(
+        originalRef,
+        file,
+        {
+          contentType:
+            getContentTypeByProgramaKind(
+              kind
+            )
+        }
+      );
+
+      archivoUrl =
+        await getDownloadURL(
+          originalRef
+        );
+
+      /*
+       * PDF original:
+       * sirve también para unión final.
+       */
       if (kind === "pdf") {
-        downloadUrl = archivoUrl;
-        storagePath = archivoStoragePath;
-        pdfNombre = file.name;
+        downloadUrl =
+          archivoUrl;
+
+        storagePath =
+          archivoStoragePath;
+
+        pdfNombre =
+          file.name;
       }
-    
-      // 3) Si es DOC/DOCX, solo guardamos el original editable.
-      // La conversión/unión PDF queda para el cierre final en ficha-pdf.js.
-      if (kind === "doc" || kind === "docx") {
-        downloadUrl = "";
-        storagePath = "";
-        pdfNombre = "";
+
+      /*
+       * Word:
+       * se conserva original.
+       * La conversión/unión final se hace después.
+       */
+      if (
+        kind === "doc" ||
+        kind === "docx"
+      ) {
+        downloadUrl =
+          "";
+
+        storagePath =
+          "";
+
+        pdfNombre =
+          "";
       }
     }
+
+    /*
+     * =========================================================
+     * PATCH DEL PROGRAMA
+     * =========================================================
+     *
+     * MUY IMPORTANTE:
+     *
+     * Esta función solamente guarda/reemplaza el ARCHIVO.
+     *
+     * NO vuelve a sincronizar silenciosamente todos
+     * los campos de la ficha.
+     *
+     * Esa responsabilidad pertenece exclusivamente
+     * a saveFicha().
+     */
+
+    const fichaConPrograma = {
+      ...fichaAnterior,
+
+      programaPdfUrl:
+        downloadUrl || "",
+
+      programaPdfNombre:
+        pdfNombre || "",
+
+      programaPdfStoragePath:
+        storagePath || ""
+    };
 
     const patch = {
       programaGrupo: {
         ...(programaAnterior || {}),
-        
-        // Archivo original editable
+
         archivoUrl,
+
         archivoNombre,
+
         archivoStoragePath,
+
         archivoTipo,
-      
-        // PDF usado para juntar con la ficha
-        pdfUrl: downloadUrl,
+
+        pdfUrl:
+          downloadUrl,
+
         pdfNombre,
+
         storagePath,
-        
+
         versionPrograma,
+
         descripcionCambio,
-        subidoPor: displayName,
-        subidoPorCorreo: state.effectiveEmail,
-        subidoEl: serverTimestamp(),
-        reemplazaArchivoNombre: esReemplazo ? anteriorNombre || "" : "",
-        reemplazaArchivoUrl: esReemplazo ? anteriorUrl || "" : ""
+
+        subidoPor:
+          displayName,
+
+        subidoPorCorreo:
+          state.effectiveEmail,
+
+        subidoEl:
+          serverTimestamp(),
+
+        reemplazaArchivoNombre:
+          esReemplazo
+            ? anteriorNombre || ""
+            : "",
+
+        reemplazaArchivoUrl:
+          esReemplazo
+            ? anteriorUrl || ""
+            : ""
       },
 
-      "ficha.programaPdfUrl": downloadUrl || "",
-      "ficha.programaPdfNombre": pdfNombre || "",
-      "ficha.programaPdfStoragePath": storagePath || "",
-      
-      programaPdfUrl: downloadUrl || "",
-      programaPdfNombre: pdfNombre || "",
-      programaPdfStoragePath: storagePath || "",
+      ficha:
+        fichaConPrograma,
 
-      fechaActualizacion: serverTimestamp(),
-      fechaActualizacionFicha: serverTimestamp(),
-      actualizadoPor: displayName,
-      actualizadoPorCorreo: state.effectiveEmail
+      /*
+       * Compatibilidad raíz.
+       */
+      programaPdfUrl:
+        downloadUrl || "",
+
+      programaPdfNombre:
+        pdfNombre || "",
+
+      programaPdfStoragePath:
+        storagePath || "",
+
+      fechaActualizacion:
+        serverTimestamp(),
+
+      fechaActualizacionFicha:
+        serverTimestamp(),
+
+      actualizadoPor:
+        displayName,
+
+      actualizadoPorCorreo:
+        state.effectiveEmail
     };
 
-    // =========================================================
-    // ESPEJO FICHA -> GRUPO
-    // Mantiene el grupo coherente con lo que está escrito en ficha.
-    // =========================================================
-    const nombreProgramaGrupo = cleanText(fichaValues.nombrePrograma || "");
-    const tramoGrupo = cleanText(fichaValues.tramo || "");
-    const fechaViajeGrupo = cleanText(fichaValues.fechaViajeTexto || "");
+    /*
+     * =========================================================
+     * REAPERTURA POR REEMPLAZO DE ARCHIVO
+     * =========================================================
+     */
 
-    patch.nombreGrupo = fichaValues.nombreGrupo || "";
-    patch.nombreCliente = fichaValues.apoderadoEncargado || "";
-    patch.celularCliente = sanitizeChileMobileForSave(fichaValues.telefono || "");
-    patch.correoCliente = normalizeEmail(fichaValues.correo || "");
+    const yaFirmoVendedor =
+      !!flow?.vendedor?.firmado;
 
-    patch.programa = nombreProgramaGrupo || "";
-    patch.programaOtro = nombreProgramaGrupo || "";
-    
-    // CLAVE: mantener sincronizado el programa visible en la ficha.
-    // Si se cambia el programa en una actualización, el PDF debe tomar este nuevo valor.
-    setNestedValue(patch, "ficha.nombrePrograma", nombreProgramaGrupo || "");
+    const yaFirmoJefa =
+      !!flow?.jefaVentas?.firmado;
 
-    patch.cantidadGrupo = fichaValues.numeroPaxTotal || "";
-    patch.tramo = tramoGrupo || "";
-    patch.tramoOtro = tramoGrupo || "";
+    const yaFirmoAdmin =
+      !!flow?.administracion?.firmado;
 
-    patch.descuento = fichaValues.descuentoValorBase || "";
-    patch.vendedora = fichaValues.nombreVendedor || "";
-    patch.asistenciaEnViajes = fichaValues.asistenciaEnViajes || "";
-    patch.asistenciaMed = fichaValues.asistenciaEnViajes || "";
+    const estabaAutorizada =
+      !!state.group?.autorizada;
 
-    patch.fechaDeViaje = fechaViajeGrupo || "";
-    patch.fechaViaje = fechaViajeGrupo || "";
-    patch.semanaViaje = fechaViajeGrupo || "";
+    const adminReal =
+      isRealAdminRole();
 
-    setNestedValue(patch, "situacion.observacionOperaciones", fichaValues.infoOperacionesHtml || "");
-    patch.observacionesOperaciones = fichaValues.infoOperacionesHtml || "";
-
-    setNestedValue(patch, "situacion.observacionAdministracion", fichaValues.infoAdministracionHtml || "");
-    patch.observacionesAdministracion = fichaValues.infoAdministracionHtml || "";
-
-    const yaFirmoVendedor = !!flow?.vendedor?.firmado;
-    const yaFirmoJefa = !!flow?.jefaVentas?.firmado;
-    const yaFirmoAdmin = !!flow?.administracion?.firmado;
-    const estabaAutorizada = !!state.group?.autorizada;
-
-    const adminReal = isRealAdminRole();
-    
     const debeReabrirPorJefa =
       esReemplazo &&
       !adminReal &&
       isJefaVentas() &&
       yaFirmoVendedor &&
-      (yaFirmoJefa || yaFirmoAdmin || estabaAutorizada);
-    
+      (
+        yaFirmoJefa ||
+        yaFirmoAdmin ||
+        estabaAutorizada
+      );
+
     const debeReabrirPorAdmin =
       esReemplazo &&
       !adminReal &&
       canActAsFichaAdministracion() &&
       yaFirmoVendedor &&
-      (yaFirmoJefa || yaFirmoAdmin || estabaAutorizada);
+      (
+        yaFirmoJefa ||
+        yaFirmoAdmin ||
+        estabaAutorizada
+      );
 
-    if (esReemplazo && adminReal) {
-      patch.autorizada = false;
-      patch.fichaFlujoAbierto = false;
-      patch.fichaEstado = "autorizada_admin";
-    
-      patch.fichaPdfUrl = "";
-      patch.fichaPdfNombre = "";
-    
-      setNestedValue(patch, "ficha.pdfUrl", "");
-      setNestedValue(patch, "ficha.pdfNombre", "");
-      setNestedValue(patch, "ficha.confirmada", false);
-      setNestedValue(patch, "ficha.pdfPendienteGeneracion", true);
-      setNestedValue(patch, "ficha.estado", "autorizada_admin");
-    
-      setNestedValue(patch, "flowFicha.estado", "autorizada_admin");
-      setNestedValue(patch, "flowFicha.cierrePdfRealizado", false);
+    /*
+     * Admin real:
+     * mantiene su capacidad especial,
+     * pero invalida PDF vigente porque cambió el programa.
+     */
+    if (
+      esReemplazo &&
+      adminReal
+    ) {
+      patch.autorizada =
+        false;
+
+      patch.fichaFlujoAbierto =
+        false;
+
+      patch.fichaEstado =
+        "autorizada_admin";
+
+      patch.fichaPdfUrl =
+        "";
+
+      patch.fichaPdfNombre =
+        "";
+
+      patch.ficha = {
+        ...patch.ficha,
+
+        pdfUrl:
+          "",
+
+        pdfNombre:
+          "",
+
+        confirmada:
+          false,
+
+        pdfPendienteGeneracion:
+          true,
+
+        estado:
+          "autorizada_admin"
+      };
+
+      patch.flowFicha = {
+        ...(flow || {}),
+
+        estado:
+          "autorizada_admin",
+
+        cierrePdfRealizado:
+          false
+      };
     }
 
-    if (debeReabrirPorJefa || debeReabrirPorAdmin) {
-    patch.autorizada = false;
-  
-    // Flujo vuelve a abrirse
-    patch.fichaFlujoAbierto = true;
-  
-    patch.fichaEstado = debeReabrirPorAdmin
-      ? "lista_vendedor"
-      : "revisada_jefa_ventas";
-  
-    // Limpieza firma final
-    patch.firmaAdministracion = "";
-  
-    // Limpieza PDF raíz (compatibilidad)
-    patch.fichaPdfUrl = "";
-    patch.fichaPdfNombre = "";
-  
-    // =========================================================
-    // HISTORIAL PDF ANTERIOR (opcional pero recomendado)
-    // =========================================================
-    const fichaAnterior = state.group?.ficha || {};
-  
-    const pdfHistorialPrevio = Array.isArray(fichaAnterior.pdfHistorial)
-      ? fichaAnterior.pdfHistorial
-      : [];
-  
-    if (fichaAnterior.pdfUrl || fichaAnterior.pdfNombre) {
-      pdfHistorialPrevio.push({
-        pdfUrl: fichaAnterior.pdfUrl || "",
-        pdfNombre: fichaAnterior.pdfNombre || "",
-        version: fichaAnterior.version || "",
-        fechaArchivado: new Date().toISOString(),
-        motivo: "Reapertura por actualización/corrección"
-      });
-    }
-  
-    // =========================================================
-    // Limpieza ficha activa
-    // =========================================================
-    patch.ficha = {
-      ...(fichaAnterior || {}),
-      estado: patch.fichaEstado,
-      flujoModo: "v2",
-      confirmada: false,
-      pdfPendienteGeneracion: true,
-  
-      // PDF ACTIVO
-      pdfUrl: "",
-      pdfNombre: "",
-  
-      // HISTORIAL
-      pdfHistorial: pdfHistorialPrevio
-    };
-  
-    // =========================================================
-    // Flujo firmas
-    // =========================================================
-    patch.flowFicha = {
-      ...(flow || {}),
-      modo: "v2",
-      legacy: false,
-      estado: patch.fichaEstado,
-  
-      requiereActualizacion: false,
-      requiereRefirmaAdministracion: false,
-  
-      // Muy importante:
-      cierrePdfRealizado: false,
-  
-      // Si hubo solicitud previa, ya no debe bloquear nuevo PDF
-      ultimaSolicitudActualizacion: {
-        ...(flow?.ultimaSolicitudActualizacion || {}),
-        estado: "reabierta"
+    if (
+      debeReabrirPorJefa ||
+      debeReabrirPorAdmin
+    ) {
+      patch.autorizada =
+        false;
+
+      patch.fichaFlujoAbierto =
+        true;
+
+      patch.fichaEstado =
+        debeReabrirPorAdmin
+          ? "lista_vendedor"
+          : "revisada_jefa_ventas";
+
+      patch.firmaAdministracion =
+        "";
+
+      patch.fichaPdfUrl =
+        "";
+
+      patch.fichaPdfNombre =
+        "";
+
+      /*
+       * =====================================================
+       * HISTORIAL PDF ANTERIOR
+       * =====================================================
+       */
+
+      const pdfHistorialPrevio =
+        Array.isArray(
+          fichaAnterior.pdfHistorial
+        )
+          ? [
+              ...fichaAnterior.pdfHistorial
+            ]
+          : [];
+
+      if (
+        fichaAnterior.pdfUrl ||
+        fichaAnterior.pdfNombre
+      ) {
+        pdfHistorialPrevio.push({
+          pdfUrl:
+            fichaAnterior.pdfUrl ||
+            "",
+
+          pdfNombre:
+            fichaAnterior.pdfNombre ||
+            "",
+
+          version:
+            fichaAnterior.version ||
+            "",
+
+          fechaArchivado:
+            new Date()
+              .toISOString(),
+
+          motivo:
+            "Reapertura por reemplazo de programa"
+        });
       }
-    };
-  
-    console.warn("[fichas] Reapertura completa: PDF anterior invalidado, listo para nueva versión.");
-  }
 
-    await setDoc(doc(db, "ventas_cotizaciones", state.groupDocId), patch, { merge: true });
+      /*
+       * No perdemos los nuevos datos del archivo del programa.
+       */
+      patch.ficha = {
+        ...patch.ficha,
+
+        estado:
+          patch.fichaEstado,
+
+        flujoModo:
+          "v2",
+
+        confirmada:
+          false,
+
+        pdfPendienteGeneracion:
+          true,
+
+        pdfUrl:
+          "",
+
+        pdfNombre:
+          "",
+
+        pdfHistorial:
+          pdfHistorialPrevio
+      };
+
+      patch.flowFicha = {
+        ...(flow || {}),
+
+        modo:
+          "v2",
+
+        legacy:
+          false,
+
+        estado:
+          patch.fichaEstado,
+
+        requiereActualizacion:
+          false,
+
+        requiereRefirmaAdministracion:
+          false,
+
+        cierrePdfRealizado:
+          false,
+
+        ultimaSolicitudActualizacion: {
+          ...(flow
+            ?.ultimaSolicitudActualizacion ||
+            {}),
+
+          estado:
+            "reabierta"
+        }
+      };
+
+      console.warn(
+        "[fichas] Reapertura por reemplazo de programa: PDF activo invalidado."
+      );
+    }
+
+    await setDoc(
+      doc(
+        db,
+        "ventas_cotizaciones",
+        state.groupDocId
+      ),
+      patch,
+      {
+        merge: true
+      }
+    );
 
     await createHistoryEntry({
-      tipoMovimiento: esReemplazo ? "programa_reemplazado" : "programa_guardado",
-      modulo: "programa",
-      titulo: esReemplazo ? "Programa reemplazado" : "Programa guardado",
-      mensaje: [
+      tipoMovimiento:
         esReemplazo
-          ? `${displayName} reemplazó el programa del grupo.`
-          : `${displayName} guardó el programa del grupo.`,
-        anteriorNombre ? `Archivo anterior: ${anteriorNombre}.` : "",
-        pdfNombre ? `Archivo actual: ${pdfNombre}.` : "",
-        versionPrograma ? `Versión programa: ${versionPrograma}.` : "",
-        descripcionCambio ? `Detalle: ${descripcionCambio}.` : ""
-      ].filter(Boolean).join(" "),
+          ? "programa_reemplazado"
+          : "programa_guardado",
+
+      modulo:
+        "programa",
+
+      titulo:
+        esReemplazo
+          ? "Programa reemplazado"
+          : "Programa guardado",
+
+      mensaje:
+        [
+          esReemplazo
+            ? `${displayName} reemplazó el programa del grupo.`
+            : `${displayName} guardó el programa del grupo.`,
+
+          anteriorNombre
+            ? `Archivo anterior: ${anteriorNombre}.`
+            : "",
+
+          archivoNombre
+            ? `Archivo actual: ${archivoNombre}.`
+            : "",
+
+          versionPrograma
+            ? `Versión programa: ${versionPrograma}.`
+            : "",
+
+          descripcionCambio
+            ? `Detalle: ${descripcionCambio}.`
+            : ""
+        ]
+          .filter(Boolean)
+          .join(" "),
+
       metadata: {
         cambios: [
           {
-            campo: "programaGrupo.pdfNombre",
-            anterior: anteriorNombre || "",
-            nuevo: pdfNombre || ""
+            campo:
+              "programaGrupo.archivoNombre",
+
+            anterior:
+              anteriorNombre || "",
+
+            nuevo:
+              archivoNombre || ""
           },
+
           {
-            campo: "programaGrupo.pdfUrl",
-            anterior: anteriorUrl || "",
-            nuevo: downloadUrl || ""
+            campo:
+              "programaGrupo.archivoUrl",
+
+            anterior:
+              anteriorUrl || "",
+
+            nuevo:
+              archivoUrl || ""
           },
+
           {
-            campo: "programaGrupo.versionPrograma",
-            anterior: programaAnterior.versionPrograma || "",
-            nuevo: versionPrograma || ""
+            campo:
+              "programaGrupo.versionPrograma",
+
+            anterior:
+              programaAnterior
+                .versionPrograma ||
+              "",
+
+            nuevo:
+              versionPrograma ||
+              ""
           },
+
           {
-            campo: "programaGrupo.descripcionCambio",
-            anterior: programaAnterior.descripcionCambio || "",
-            nuevo: descripcionCambio || ""
+            campo:
+              "programaGrupo.descripcionCambio",
+
+            anterior:
+              programaAnterior
+                .descripcionCambio ||
+              "",
+
+            nuevo:
+              descripcionCambio ||
+              ""
           }
         ]
       }
     });
 
     await loadAll();
+
     syncButtons();
 
     showToast(
@@ -1677,12 +2215,33 @@ async function saveProgramaGrupo() {
       "success"
     );
   } catch (error) {
-    console.error("[fichas] saveProgramaGrupo", error);
-    showToast("No se pudo guardar el programa: " + (error?.message || error), "error", { duration: 7000 });
+    console.error(
+      "[fichas] saveProgramaGrupo",
+      error
+    );
+
+    showToast(
+      "No se pudo guardar el programa: " +
+        (
+          error?.message ||
+          error
+        ),
+      "error",
+      {
+        duration: 7000
+      }
+    );
   } finally {
-    state.isUploadingProgramaPdf = false;
-    if (input) input.value = "";
+    state.isUploadingProgramaPdf =
+      false;
+
+    if (input) {
+      input.value =
+        "";
+    }
+
     updateProgramaPdfUi();
+
     syncButtons();
   }
 }
@@ -2043,33 +2602,181 @@ function renderWorkflowPanel() {
 }
 
 function fillForm() {
-  const f = state.ficha || {};
+  const f =
+    state.ficha || {};
 
-  setValue("f_solicitudReserva", toInputDateValue(f.solicitudReserva) || todayInputDate());
-  setValue("f_nombreGrupo", f.nombreGrupo);
-  setValue("f_apoderadoEncargado", f.apoderadoEncargado);
-  setValue("f_telefono", f.telefono);
-  setValue("f_correo", f.correo);
-  setValue("f_nombrePrograma", f.nombrePrograma);
-  setValue("f_valorPrograma", f.valorPrograma);
-  setValue("f_numeroPaxTotal", f.numeroPaxTotal);
-  setValue("f_tramo", f.tramo);
-  setValue("f_liberados", f.liberados);
-  setValue("f_categoriaHoteleraContratada", f.categoriaHoteleraContratada);
-  setValue("f_autorizacionGerencia", f.autorizacionGerencia);
-  setValue("f_descuentoValorBase", f.descuentoValorBase);
-  setValue("f_fechaViajeTexto", f.fechaViajeTexto);
-  setValue("f_asistenciaEnViajes", f.asistenciaEnViajes);
-  setValue("f_nombreVendedor", f.nombreVendedor);
-  setValue("f_numeroNegocio", f.numeroNegocio);
-  setValue("f_usuarioFicha", f.usuarioFicha);
-  setValue("f_claveAdministrativa", f.claveAdministrativa);
-  setValue("f_version", f.version);
-  setValue("f_fechaActualizacionTexto", f.fechaActualizacionTexto);
+  setValue(
+    "f_solicitudReserva",
+    toInputDateValue(
+      f.solicitudReserva
+    ) || todayInputDate()
+  );
 
-  setRichEditorHtml("f_infoOperaciones", f.infoOperacionesHtml);
-  setRichEditorHtml("f_infoAdministracion", f.infoAdministracionHtml);
-  setRichEditorHtml("f_observacionesHtml", f.observacionesHtml);
+  setValue(
+    "f_nombreGrupo",
+    f.nombreGrupo
+  );
+
+  setValue(
+    "f_apoderadoEncargado",
+    f.apoderadoEncargado
+  );
+
+  setValue(
+    "f_telefono",
+    f.telefono
+  );
+
+  setValue(
+    "f_correo",
+    f.correo
+  );
+
+  /*
+   * Estos IDs quedarán activos cuando hagamos
+   * el cambio correspondiente en fichas.html.
+   *
+   * Si todavía no existen, setValue simplemente
+   * no hace nada.
+   */
+  setValue(
+    "f_destinoPrincipal",
+    f.destinoPrincipal
+  );
+
+  setValue(
+    "f_destinoPrincipalOtro",
+    f.destinoPrincipalOtro
+  );
+
+  setValue(
+    "f_programa",
+    f.programa
+  );
+
+  setValue(
+    "f_programaOtro",
+    f.programaOtro
+  );
+
+  /*
+   * Compatibilidad mientras siga existiendo
+   * el input antiguo.
+   */
+  setValue(
+    "f_nombrePrograma",
+    f.nombrePrograma
+  );
+
+  setValue(
+    "f_valorPrograma",
+    f.valorPrograma
+  );
+
+  setValue(
+    "f_numeroPaxTotal",
+    f.numeroPaxTotal
+  );
+
+  setValue(
+    "f_tramoSeleccion",
+    f.tramoSeleccion
+  );
+
+  setValue(
+    "f_tramoOtro",
+    f.tramoOtro
+  );
+
+  setValue(
+    "f_tramo",
+    f.tramo
+  );
+
+  setValue(
+    "f_liberados",
+    f.liberados
+  );
+
+  setValue(
+    "f_categoriaHoteleraContratada",
+    f.categoriaHoteleraContratada
+  );
+
+  setValue(
+    "f_autorizacionGerencia",
+    f.autorizacionGerencia
+  );
+
+  setValue(
+    "f_descuentoValorBase",
+    f.descuentoValorBase
+  );
+
+  setValue(
+    "f_mesViaje",
+    f.mesViaje
+  );
+
+  setValue(
+    "f_mesViajeOtro",
+    f.mesViajeOtro
+  );
+
+  setValue(
+    "f_fechaViajeTexto",
+    f.fechaViajeTexto
+  );
+
+  setValue(
+    "f_asistenciaEnViajes",
+    f.asistenciaEnViajes
+  );
+
+  setValue(
+    "f_nombreVendedor",
+    f.nombreVendedor
+  );
+
+  setValue(
+    "f_numeroNegocio",
+    f.numeroNegocio
+  );
+
+  setValue(
+    "f_usuarioFicha",
+    f.usuarioFicha
+  );
+
+  setValue(
+    "f_claveAdministrativa",
+    f.claveAdministrativa
+  );
+
+  setValue(
+    "f_version",
+    f.version
+  );
+
+  setValue(
+    "f_fechaActualizacionTexto",
+    f.fechaActualizacionTexto
+  );
+
+  setRichEditorHtml(
+    "f_infoOperaciones",
+    f.infoOperacionesHtml
+  );
+
+  setRichEditorHtml(
+    "f_infoAdministracion",
+    f.infoAdministracionHtml
+  );
+
+  setRichEditorHtml(
+    "f_observacionesHtml",
+    f.observacionesHtml
+  );
 
   updateProgramaPdfUi();
 }
@@ -4436,6 +5143,189 @@ async function saveUpdateRequest() {
   );
 }
 
+function buildSharedGroupPatchFromFicha(values = {}) {
+  /*
+   * =========================================================
+   * ESPEJO OFICIAL FICHA -> GRUPO
+   * =========================================================
+   *
+   * Solamente sincronizamos aquí datos que tienen
+   * equivalente real entre:
+   *
+   * - Editar datos de grupo
+   * - Ficha
+   *
+   * NO modificamos:
+   * - vendedor asignado;
+   * - curso/colegio;
+   * - fechas operativas reales;
+   * - firmas;
+   * - PDF.
+   */
+
+  const destinoSeleccion =
+    cleanText(
+      values.destinoPrincipal || ""
+    );
+
+  const destinoOtro =
+    cleanText(
+      values.destinoPrincipalOtro || ""
+    );
+
+  const programaSeleccion =
+    cleanText(
+      values.programa || ""
+    );
+
+  const programaOtro =
+    cleanText(
+      values.programaOtro || ""
+    );
+
+  const tramoSeleccion =
+    cleanText(
+      values.tramoSeleccion || ""
+    );
+
+  const tramoOtro =
+    cleanText(
+      values.tramoOtro || ""
+    );
+
+  const mesSeleccion =
+    cleanText(
+      values.mesViaje || ""
+    );
+
+  const mesOtro =
+    cleanText(
+      values.mesViajeOtro || ""
+    );
+
+  const patch = {
+    /*
+     * CONTACTO PRINCIPAL
+     */
+    nombreCliente:
+      cleanText(
+        values.apoderadoEncargado || ""
+      ),
+
+    correoCliente:
+      normalizeEmail(
+        values.correo || ""
+      ),
+
+    celularCliente:
+      sanitizeChileMobileForSave(
+        values.telefono || ""
+      ),
+
+    /*
+     * DESTINO
+     */
+    destinoPrincipal:
+      destinoSeleccion === "OTRO"
+        ? "OTRO"
+        : destinoSeleccion,
+
+    destinoPrincipalOtro:
+      destinoSeleccion === "OTRO"
+        ? destinoOtro
+        : "",
+
+    /*
+     * PROGRAMA
+     */
+    programa:
+      programaSeleccion === "OTRO"
+        ? "OTRO"
+        : programaSeleccion,
+
+    programaOtro:
+      programaSeleccion === "OTRO"
+        ? programaOtro
+        : "",
+
+    /*
+     * CANTIDAD GRUPO
+     */
+    cantidadGrupo:
+      values.numeroPaxTotal ?? "",
+
+    /*
+     * TRAMO
+     */
+    tramo:
+      tramoSeleccion === "OTRO"
+        ? "OTRO"
+        : tramoSeleccion,
+
+    tramoOtro:
+      tramoSeleccion === "OTRO"
+        ? tramoOtro
+        : "",
+
+    /*
+     * MES / INDICACIÓN TENTATIVA
+     *
+     * NO escribimos fechaInicioViaje,
+     * fechaFinViaje ni fechaViaje real.
+     */
+    mesViaje:
+      mesSeleccion === "OTRO"
+        ? "OTRO"
+        : mesSeleccion,
+
+    mesViajeOtro:
+      mesSeleccion === "OTRO"
+        ? mesOtro
+        : "",
+
+    semanaViaje:
+      mesSeleccion === "OTRO"
+        ? mesOtro
+        : (
+            mesSeleccion ||
+            values.fechaViajeTexto ||
+            ""
+          ),
+
+    /*
+     * OTROS CAMPOS CON ESPEJO REAL
+     */
+    descuento:
+      values.descuentoValorBase || "",
+
+    asistenciaEnViajes:
+      values.asistenciaEnViajes || "",
+
+    asistenciaMed:
+      values.asistenciaEnViajes || "",
+
+    observacionesOperaciones:
+      values.infoOperacionesHtml || "",
+
+    observacionesAdministracion:
+      values.infoAdministracionHtml || ""
+  };
+
+  setNestedValue(
+    patch,
+    "situacion.observacionOperaciones",
+    values.infoOperacionesHtml || ""
+  );
+
+  setNestedValue(
+    patch,
+    "situacion.observacionAdministracion",
+    values.infoAdministracionHtml || ""
+  );
+
+  return patch;
+}
+
 function isAdministrativeReviewEditor() {
   return isJefaVentas() || canActAsFichaAdministracion();
 }
@@ -4546,405 +5436,1280 @@ function isAccidentalFichaMassClear(previousFicha = {}, values = {}) {
 /* =========================================================
    SAVE
 ========================================================= */
-async function saveFicha({ silent = false, reloadAfterSave = true } = {}) {
+async function saveFicha({
+  silent = false,
+  reloadAfterSave = true
+} = {}) {
   if (!canEditFicha()) {
-    showToast(getBlockedEditMessage(), "warning");
-    return { ok: false, reason: "blocked" };
+    showToast(
+      getBlockedEditMessage(),
+      "warning"
+    );
+
+    return {
+      ok: false,
+      reason: "blocked"
+    };
   }
 
-  const oldFicha = state.group?.ficha || {};
-  const previousFichaView = state.ficha || hydrateFicha(state.group || {});
-  const flow = state.group?.flowFicha || {};
-  const nowText = formatDateTime(new Date());
+  const oldFicha =
+    state.group?.ficha || {};
+
+  const previousFichaView =
+    state.ficha ||
+    hydrateFicha(
+      state.group || {}
+    );
+
+  const flow =
+    state.group?.flowFicha || {};
+
+  const nowText =
+    formatDateTime(
+      new Date()
+    );
+
+  /*
+   * =========================================================
+   * DESTINO
+   * =========================================================
+   *
+   * Si el HTML nuevo todavía no tiene estos selectores,
+   * conservamos el dato actual.
+   */
+
+  const destinoRaw =
+    $("f_destinoPrincipal")
+      ? getValue("f_destinoPrincipal")
+      : (
+          previousFichaView.destinoPrincipal ||
+          state.group?.destinoPrincipal ||
+          ""
+        );
+
+  const destinoPrincipal =
+    normalizeFichaDestinoCanonical(
+      destinoRaw
+    );
+
+  const destinoPrincipalOtro =
+    destinoPrincipal === "OTRO"
+      ? (
+          $("f_destinoPrincipalOtro")
+            ? getValue("f_destinoPrincipalOtro")
+            : (
+                previousFichaView.destinoPrincipalOtro ||
+                state.group?.destinoPrincipalOtro ||
+                ""
+              )
+        )
+      : "";
+
+  /*
+   * =========================================================
+   * PROGRAMA
+   * =========================================================
+   */
+
+  const programaOptions =
+    getFichaProgramOptionsByDestino(
+      destinoPrincipal === "OTRO"
+        ? destinoPrincipalOtro
+        : destinoPrincipal
+    );
+
+  let programa =
+    "";
+
+  let programaOtro =
+    "";
+
+  if ($("f_programa")) {
+    const raw =
+      getValue(
+        "f_programa"
+      );
+
+    const canonical =
+      findFichaCanonicalOption(
+        programaOptions.length
+          ? programaOptions
+          : ["OTRO"],
+        raw
+      );
+
+    programa =
+      canonical ||
+      (
+        raw
+          ? "OTRO"
+          : ""
+      );
+
+    programaOtro =
+      programa === "OTRO"
+        ? (
+            getValue(
+              "f_programaOtro"
+            ) ||
+            (
+              canonical
+                ? ""
+                : raw
+            )
+          )
+        : "";
+  } else {
+    /*
+     * Compatibilidad con el HTML actual:
+     * f_nombrePrograma todavía puede ser un input libre.
+     */
+    const nombreProgramaLegacy =
+      getValue(
+        "f_nombrePrograma"
+      );
+
+    const canonical =
+      findFichaCanonicalOption(
+        programaOptions.length
+          ? programaOptions
+          : ["OTRO"],
+        nombreProgramaLegacy
+      );
+
+    if (canonical) {
+      programa =
+        canonical;
+
+      programaOtro =
+        "";
+    } else if (
+      nombreProgramaLegacy
+    ) {
+      programa =
+        "OTRO";
+
+      programaOtro =
+        nombreProgramaLegacy;
+    } else {
+      programa =
+        previousFichaView.programa ||
+        state.group?.programa ||
+        "";
+
+      programaOtro =
+        previousFichaView.programaOtro ||
+        state.group?.programaOtro ||
+        "";
+    }
+  }
+
+  const nombrePrograma =
+    getFichaSharedDisplayValue(
+      programa,
+      programaOtro
+    );
+
+  /*
+   * =========================================================
+   * TRAMO
+   * =========================================================
+   */
+
+  let tramoSeleccion =
+    "";
+
+  let tramoOtro =
+    "";
+
+  if ($("f_tramoSeleccion")) {
+    const raw =
+      getValue(
+        "f_tramoSeleccion"
+      );
+
+    const canonical =
+      findFichaCanonicalOption(
+        FICHA_TRAMO_OPTIONS,
+        raw
+      );
+
+    tramoSeleccion =
+      canonical ||
+      (
+        raw
+          ? "OTRO"
+          : ""
+      );
+
+    tramoOtro =
+      tramoSeleccion === "OTRO"
+        ? (
+            getValue(
+              "f_tramoOtro"
+            ) ||
+            (
+              canonical
+                ? ""
+                : raw
+            )
+          )
+        : "";
+  } else {
+    /*
+     * Compatibilidad con f_tramo antiguo.
+     */
+    const tramoLegacy =
+      getValue(
+        "f_tramo"
+      );
+
+    const canonical =
+      findFichaCanonicalOption(
+        FICHA_TRAMO_OPTIONS,
+        tramoLegacy
+      );
+
+    if (canonical) {
+      tramoSeleccion =
+        canonical;
+
+      tramoOtro =
+        "";
+    } else if (tramoLegacy) {
+      tramoSeleccion =
+        "OTRO";
+
+      tramoOtro =
+        tramoLegacy;
+    } else {
+      tramoSeleccion =
+        previousFichaView.tramoSeleccion ||
+        state.group?.tramo ||
+        "";
+
+      tramoOtro =
+        previousFichaView.tramoOtro ||
+        state.group?.tramoOtro ||
+        "";
+    }
+  }
+
+  const tramo =
+    getFichaSharedDisplayValue(
+      tramoSeleccion,
+      tramoOtro
+    );
+
+  /*
+   * =========================================================
+   * MES / FECHA TENTATIVA
+   * =========================================================
+   */
+
+  const fechaViajeTextoInput =
+    getValue(
+      "f_fechaViajeTexto"
+    );
+
+  let mesViaje =
+    "";
+
+  let mesViajeOtro =
+    "";
+
+  if ($("f_mesViaje")) {
+    const raw =
+      getValue(
+        "f_mesViaje"
+      );
+
+    const canonical =
+      findFichaCanonicalOption(
+        FICHA_MES_VIAJE_OPTIONS,
+        raw
+      );
+
+    mesViaje =
+      canonical ||
+      (
+        raw
+          ? "OTRO"
+          : ""
+      );
+
+    mesViajeOtro =
+      mesViaje === "OTRO"
+        ? (
+            getValue(
+              "f_mesViajeOtro"
+            ) ||
+            (
+              canonical
+                ? ""
+                : raw
+            )
+          )
+        : "";
+  } else {
+    /*
+     * Compatibilidad con ficha antigua.
+     *
+     * Si el texto coincide con un mes conocido,
+     * usamos ese mes.
+     *
+     * Si es otra indicación, queda como OTRO.
+     */
+    const canonical =
+      findFichaCanonicalOption(
+        FICHA_MES_VIAJE_OPTIONS,
+        fechaViajeTextoInput
+      );
+
+    if (canonical) {
+      mesViaje =
+        canonical;
+
+      mesViajeOtro =
+        "";
+    } else if (
+      fechaViajeTextoInput
+    ) {
+      mesViaje =
+        "OTRO";
+
+      mesViajeOtro =
+        fechaViajeTextoInput;
+    } else {
+      mesViaje =
+        previousFichaView.mesViaje ||
+        state.group?.mesViaje ||
+        "";
+
+      mesViajeOtro =
+        previousFichaView.mesViajeOtro ||
+        state.group?.mesViajeOtro ||
+        "";
+    }
+  }
+
+  const fechaViajeTexto =
+    mesViaje === "OTRO"
+      ? (
+          mesViajeOtro ||
+          fechaViajeTextoInput
+        )
+      : (
+          fechaViajeTextoInput ||
+          mesViaje ||
+          ""
+        );
+
+  /*
+   * =========================================================
+   * VALORES DE FICHA
+   * =========================================================
+   */
 
   const values = {
-    solicitudReserva: getValue("f_solicitudReserva"),
-    nombreGrupo: getValue("f_nombreGrupo"),
-    apoderadoEncargado: getValue("f_apoderadoEncargado"),
-    telefono: getValue("f_telefono"),
-    correo: getValue("f_correo"),
-    nombrePrograma: getValue("f_nombrePrograma"),
+    solicitudReserva:
+      getValue(
+        "f_solicitudReserva"
+      ),
 
-    programaPdfUrl: cleanText(oldFicha.programaPdfUrl || ""),
-    programaPdfNombre: cleanText(oldFicha.programaPdfNombre || ""),
-    programaPdfStoragePath: cleanText(oldFicha.programaPdfStoragePath || ""),
-    programaPdfSubidoPor: cleanText(oldFicha.programaPdfSubidoPor || ""),
-    programaPdfSubidoPorCorreo: cleanText(oldFicha.programaPdfSubidoPorCorreo || ""),
-    programaPdfSubidoEl: oldFicha.programaPdfSubidoEl || null,
+    nombreGrupo:
+      getValue(
+        "f_nombreGrupo"
+      ),
 
-    valorPrograma: getValue("f_valorPrograma"),
-    numeroPaxTotal: getValue("f_numeroPaxTotal"),
-    tramo: getValue("f_tramo"),
-    liberados: getValue("f_liberados"),
-    categoriaHoteleraContratada: getValue("f_categoriaHoteleraContratada"),
-    autorizacionGerencia: getValue("f_autorizacionGerencia"),
-    descuentoValorBase: getValue("f_descuentoValorBase"),
-    fechaViajeTexto: getValue("f_fechaViajeTexto"),
-    asistenciaEnViajes: getValue("f_asistenciaEnViajes"),
-    nombreVendedor: getValue("f_nombreVendedor"),
-    numeroNegocio: getValue("f_numeroNegocio"),
-    usuarioFicha: getValue("f_usuarioFicha"),
-    claveAdministrativa: getValue("f_claveAdministrativa"),
-    version: getValue("f_version") || "ORIGINAL",
-    fechaActualizacionTexto: nowText,
-    infoOperacionesHtml: getRichEditorHtml("f_infoOperaciones"),
-    infoAdministracionHtml: getRichEditorHtml("f_infoAdministracion"),
-    observacionesHtml: getRichEditorHtml("f_observacionesHtml"),
-    pdfUrl: cleanText(oldFicha.pdfUrl || ""),
-    pdfNombre: cleanText(oldFicha.pdfNombre || "")
+    apoderadoEncargado:
+      getValue(
+        "f_apoderadoEncargado"
+      ),
+
+    telefono:
+      getValue(
+        "f_telefono"
+      ),
+
+    correo:
+      getValue(
+        "f_correo"
+      ),
+
+    destinoPrincipal,
+
+    destinoPrincipalOtro,
+
+    programa,
+
+    programaOtro,
+
+    nombrePrograma,
+
+    programaPdfUrl:
+      cleanText(
+        oldFicha.programaPdfUrl || ""
+      ),
+
+    programaPdfNombre:
+      cleanText(
+        oldFicha.programaPdfNombre || ""
+      ),
+
+    programaPdfStoragePath:
+      cleanText(
+        oldFicha.programaPdfStoragePath || ""
+      ),
+
+    programaPdfSubidoPor:
+      cleanText(
+        oldFicha.programaPdfSubidoPor || ""
+      ),
+
+    programaPdfSubidoPorCorreo:
+      cleanText(
+        oldFicha.programaPdfSubidoPorCorreo || ""
+      ),
+
+    programaPdfSubidoEl:
+      oldFicha.programaPdfSubidoEl ||
+      null,
+
+    valorPrograma:
+      getValue(
+        "f_valorPrograma"
+      ),
+
+    numeroPaxTotal:
+      getValue(
+        "f_numeroPaxTotal"
+      ),
+
+    tramoSeleccion,
+
+    tramoOtro,
+
+    tramo,
+
+    liberados:
+      getValue(
+        "f_liberados"
+      ),
+
+    categoriaHoteleraContratada:
+      getValue(
+        "f_categoriaHoteleraContratada"
+      ),
+
+    autorizacionGerencia:
+      getValue(
+        "f_autorizacionGerencia"
+      ),
+
+    descuentoValorBase:
+      getValue(
+        "f_descuentoValorBase"
+      ),
+
+    mesViaje,
+
+    mesViajeOtro,
+
+    fechaViajeTexto,
+
+    asistenciaEnViajes:
+      getValue(
+        "f_asistenciaEnViajes"
+      ),
+
+    nombreVendedor:
+      getValue(
+        "f_nombreVendedor"
+      ),
+
+    numeroNegocio:
+      getValue(
+        "f_numeroNegocio"
+      ),
+
+    usuarioFicha:
+      getValue(
+        "f_usuarioFicha"
+      ),
+
+    claveAdministrativa:
+      getValue(
+        "f_claveAdministrativa"
+      ),
+
+    version:
+      getValue(
+        "f_version"
+      ) || "ORIGINAL",
+
+    fechaActualizacionTexto:
+      nowText,
+
+    infoOperacionesHtml:
+      getRichEditorHtml(
+        "f_infoOperaciones"
+      ),
+
+    infoAdministracionHtml:
+      getRichEditorHtml(
+        "f_infoAdministracion"
+      ),
+
+    observacionesHtml:
+      getRichEditorHtml(
+        "f_observacionesHtml"
+      ),
+
+    pdfUrl:
+      cleanText(
+        oldFicha.pdfUrl || ""
+      ),
+
+    pdfNombre:
+      cleanText(
+        oldFicha.pdfNombre || ""
+      )
   };
 
-  if (isAdministracionLimitedAfterVendorSign()) {
-    FICHA_FIELDS.forEach((fieldName) => {
-      if (ADMIN_LIMITED_FICHA_FIELDS.has(fieldName)) return;
+  /*
+   * =========================================================
+   * LIMITACIÓN ADMINISTRACIÓN OPERATIVA
+   * =========================================================
+   */
 
-      if (Object.prototype.hasOwnProperty.call(values, fieldName)) {
-        values[fieldName] =
-          previousFichaView?.[fieldName] ??
-          oldFicha?.[fieldName] ??
-          "";
+  if (
+    isAdministracionLimitedAfterVendorSign()
+  ) {
+    FICHA_FIELDS.forEach(
+      (fieldName) => {
+        if (
+          ADMIN_LIMITED_FICHA_FIELDS.has(
+            fieldName
+          )
+        ) {
+          return;
+        }
+
+        if (
+          Object.prototype.hasOwnProperty.call(
+            values,
+            fieldName
+          )
+        ) {
+          values[fieldName] =
+            previousFichaView?.[fieldName] ??
+            oldFicha?.[fieldName] ??
+            "";
+        }
       }
-    });
+    );
 
-    values.fechaActualizacionTexto = nowText;
+    values.fechaActualizacionTexto =
+      nowText;
   }
 
-  const observacionesPlain = richHtmlToPlainText(values.observacionesHtml);
-  
-  // Blindaje: evita que una reapertura/actualización borre accidentalmente
-  // toda la ficha si el formulario viene vacío o mal hidratado.
-  if (isAccidentalFichaMassClear(previousFichaView, values)) {
+  const observacionesPlain =
+    richHtmlToPlainText(
+      values.observacionesHtml
+    );
+
+  /*
+   * Blindaje contra borrado masivo.
+   */
+  if (
+    isAccidentalFichaMassClear(
+      previousFichaView,
+      values
+    )
+  ) {
     showToast(
       "Se detectó que la ficha quedaría casi vacía. No se guardó para evitar borrar datos existentes. Recarga la página e intenta nuevamente.",
       "error",
-      { duration: 7000 }
+      {
+        duration: 7000
+      }
     );
-  
-    console.warn("[fichas] Guardado bloqueado por posible borrado masivo accidental", {
-      previousFichaView,
-      values
-    });
-  
+
+    console.warn(
+      "[fichas] Guardado bloqueado por posible borrado masivo accidental",
+      {
+        previousFichaView,
+        values
+      }
+    );
+
     return {
       ok: false,
       reason: "mass_clear_guard"
     };
   }
-  
+
+  /*
+   * =========================================================
+   * CAMBIOS
+   * =========================================================
+   */
+
   const actualChanges = [];
   const trackedChanges = [];
 
-  for (const path of FICHA_FIELDS) {
-    const anterior = previousFichaView[path];
-    const nuevo = values[path];
-  
-    const changed = isRichField(path)
-      ? normalizeRichHtml(anterior || "") !== normalizeRichHtml(nuevo || "")
-      : !sameValue(anterior, nuevo);
-  
-    if (!changed) continue;
-  
-    const anteriorSafe = anterior ?? "";
-    const nuevoSafe = nuevo ?? "";
-  
+  for (
+    const path of FICHA_FIELDS
+  ) {
+    const anterior =
+      previousFichaView[path];
+
+    const nuevo =
+      values[path];
+
+    const changed =
+      isRichField(path)
+        ? (
+            normalizeRichHtml(
+              anterior || ""
+            ) !==
+            normalizeRichHtml(
+              nuevo || ""
+            )
+          )
+        : !sameValue(
+            anterior,
+            nuevo
+          );
+
+    if (!changed) {
+      continue;
+    }
+
+    const anteriorSafe =
+      anterior ?? "";
+
+    const nuevoSafe =
+      nuevo ?? "";
+
     actualChanges.push({
-      campo: `ficha.${path}`,
-      anterior: anteriorSafe,
-      nuevo: nuevoSafe
+      campo:
+        `ficha.${path}`,
+
+      anterior:
+        anteriorSafe,
+
+      nuevo:
+        nuevoSafe
     });
-  
-    if (!shouldIgnoreTrackedFichaChange(path, anteriorSafe, nuevoSafe)) {
+
+    if (
+      !shouldIgnoreTrackedFichaChange(
+        path,
+        anteriorSafe,
+        nuevoSafe
+      )
+    ) {
       trackedChanges.push({
-        campo: `ficha.${path}`,
-        anterior: anteriorSafe,
-        nuevo: nuevoSafe
+        campo:
+          `ficha.${path}`,
+
+        anterior:
+          anteriorSafe,
+
+        nuevo:
+          nuevoSafe
       });
     }
   }
 
-  const fichaWasEmpty = !Object.keys(oldFicha || {}).length;
+  const fichaWasEmpty =
+    !Object.keys(
+      oldFicha || {}
+    ).length;
 
-  if (!actualChanges.length && !fichaWasEmpty) {
+  if (
+    !actualChanges.length &&
+    !fichaWasEmpty
+  ) {
     if (!silent) {
-      showToast("No hay cambios para guardar.", "warning");
+      showToast(
+        "No hay cambios para guardar.",
+        "warning"
+      );
     }
-    return { ok: true, changed: false };
+
+    return {
+      ok: true,
+      changed: false
+    };
   }
 
-  const adminImportantChanges = getAdminImportantFichaChanges(previousFichaView, values);
+  const adminImportantChanges =
+    getAdminImportantFichaChanges(
+      previousFichaView,
+      values
+    );
 
-  const reopenFlowByNormalRules = shouldReopenFlowAfterFichaSave(trackedChanges);
-  const reopenFlowByCarolaCorrection = shouldCarolaOpenCorrectionOnSave() && trackedChanges.length > 0;
-  
-  const reopenFlow = reopenFlowByNormalRules || reopenFlowByCarolaCorrection;
-  
-  const nextFlowMode = reopenFlowByCarolaCorrection
-    ? "correccion"
-    : (
-        isFichaUpdateFlowOpen()
-          ? "actualizacion"
-          : "v2"
-      );
+  const reopenFlowByNormalRules =
+    shouldReopenFlowAfterFichaSave(
+      trackedChanges
+    );
 
-  const nextFichaEstado = reopenFlow
-    ? "lista_vendedor"
-    : (
-        state.group?.fichaEstado && state.group.fichaEstado !== "pendiente"
-          ? state.group.fichaEstado
-          : "en_edicion"
-      );
+  const reopenFlowByCarolaCorrection =
+    shouldCarolaOpenCorrectionOnSave() &&
+    trackedChanges.length > 0;
 
-  const nombreGrupoManualNuevo = cleanText(values.nombreGrupo || "");
-  
+  const reopenFlow =
+    reopenFlowByNormalRules ||
+    reopenFlowByCarolaCorrection;
+
+  const nextFlowMode =
+    reopenFlowByCarolaCorrection
+      ? "correccion"
+      : (
+          isFichaUpdateFlowOpen()
+            ? "actualizacion"
+            : "v2"
+        );
+
+  const nextFichaEstado =
+    reopenFlow
+      ? "lista_vendedor"
+      : (
+          state.group?.fichaEstado &&
+          state.group.fichaEstado !==
+            "pendiente"
+            ? state.group.fichaEstado
+            : "en_edicion"
+        );
+
+  const nombreGrupoManualNuevo =
+    cleanText(
+      values.nombreGrupo || ""
+    );
+
+  /*
+   * =========================================================
+   * PATCH FICHA
+   * =========================================================
+   */
+
   const patch = {
     ficha: {
       ...(oldFicha || {}),
+
       ...values,
-      nombreGrupo: nombreGrupoManualNuevo,
-      estado: nextFichaEstado,
-      actualizadoPor: getDisplayName(state.effectiveUser),
-      actualizadoPorCorreo: state.effectiveEmail,
-      fechaActualizacion: serverTimestamp()
+
+      nombreGrupo:
+        nombreGrupoManualNuevo,
+
+      estado:
+        nextFichaEstado,
+
+      actualizadoPor:
+        getDisplayName(
+          state.effectiveUser
+        ),
+
+      actualizadoPorCorreo:
+        state.effectiveEmail,
+
+      fechaActualizacion:
+        serverTimestamp()
     },
-  
-    // =====================================================
-    // ESPEJO FICHA -> GRUPO
-    // Si se edita el nombre en la ficha, pasa a ser el nombre oficial
-    // del grupo en todo el sistema.
-    // =====================================================
-    nombreGrupo: nombreGrupoManualNuevo,
-    aliasGrupo: nombreGrupoManualNuevo,
-    nombreGrupoManual: true,
-  
-    solicitudReserva: values.solicitudReserva,
-    categoriaHoteleraContratada: values.categoriaHoteleraContratada,
-    autorizacionGerencia: values.autorizacionGerencia,
-    asistenciaMed: values.asistenciaEnViajes,
-    liberados: values.liberados,
-    valorPrograma: values.valorPrograma,
-    numeroNegocio: values.numeroNegocio,
-    usuarioProgramaAdm: values.usuarioFicha,
-    claveAdministrativa: values.claveAdministrativa,
-    versionFicha: values.version,
-    fechaActualizacionFicha: serverTimestamp(),
-    camposAdministracionModificados: adminImportantChanges,
-    fechaDeViaje: values.fechaViajeTexto,
-    fechaViaje: values.fechaViajeTexto,
-    observacionesFicha: observacionesPlain,
-    fichaEstado: nextFichaEstado,
-  
-    actualizadoPor: getDisplayName(state.effectiveUser),
-    actualizadoPorCorreo: state.effectiveEmail,
-    fechaActualizacion: serverTimestamp()
+
+    /*
+     * El nombre escrito en ficha sigue siendo
+     * el nombre manual oficial del grupo.
+     */
+    nombreGrupo:
+      nombreGrupoManualNuevo,
+
+    aliasGrupo:
+      nombreGrupoManualNuevo,
+
+    nombreGrupoManual:
+      true,
+
+    /*
+     * CAMPOS PROPIOS DE FICHA / ADMINISTRACIÓN
+     */
+    solicitudReserva:
+      values.solicitudReserva,
+
+    categoriaHoteleraContratada:
+      values.categoriaHoteleraContratada,
+
+    autorizacionGerencia:
+      values.autorizacionGerencia,
+
+    liberados:
+      values.liberados,
+
+    valorPrograma:
+      values.valorPrograma,
+
+    numeroNegocio:
+      values.numeroNegocio,
+
+    usuarioProgramaAdm:
+      values.usuarioFicha,
+
+    claveAdministrativa:
+      values.claveAdministrativa,
+
+    versionFicha:
+      values.version,
+
+    fechaActualizacionFicha:
+      serverTimestamp(),
+
+    camposAdministracionModificados:
+      adminImportantChanges,
+
+    observacionesFicha:
+      observacionesPlain,
+
+    fichaEstado:
+      nextFichaEstado,
+
+    actualizadoPor:
+      getDisplayName(
+        state.effectiveUser
+      ),
+
+    actualizadoPorCorreo:
+      state.effectiveEmail,
+
+    fechaActualizacion:
+      serverTimestamp()
   };
-  
+
+  /*
+   * =========================================================
+   * ESPEJO FICHA -> DATOS OFICIALES DEL GRUPO
+   * =========================================================
+   */
+
+  const sharedGroupPatch =
+    buildSharedGroupPatchFromFicha(
+      values
+    );
+
+  Object.assign(
+    patch,
+    sharedGroupPatch
+  );
+
+  /*
+   * =========================================================
+   * REAPERTURA DEL FLUJO
+   * =========================================================
+   */
+
   if (reopenFlow) {
-    patch.autorizada = false;
-    patch.firmaSupervision = "";
-    patch.firmaAdministracion = "";
-    patch.fichaPdfUrl = "";
-    patch.fichaPdfNombre = "";
-    patch.fichaFlujoAbierto = true;
-    patch.fichaFlujoModo = nextFlowMode;
-  
+    patch.autorizada =
+      false;
+
+    patch.firmaSupervision =
+      "";
+
+    patch.firmaAdministracion =
+      "";
+
+    patch.fichaPdfUrl =
+      "";
+
+    patch.fichaPdfNombre =
+      "";
+
+    patch.fichaFlujoAbierto =
+      true;
+
+    patch.fichaFlujoModo =
+      nextFlowMode;
+
     patch.ficha = {
       ...patch.ficha,
-    
-      flujoModo: nextFlowMode,
-    
+
+      flujoModo:
+        nextFlowMode,
+
       estado:
         reopenFlowByCarolaCorrection
           ? "correccion_pendiente_jefa"
           : "lista_vendedor",
-    
+
+      confirmada:
+        false,
+
+      pdfPendienteGeneracion:
+        true,
+
       /*
-       * La ficha deja de estar confirmada como versión vigente,
-       * porque deberá generarse un nuevo PDF.
+       * Solo se invalida PDF activo.
        */
-      confirmada: false,
-      pdfPendienteGeneracion: true,
-    
+      pdfUrl:
+        "",
+
+      pdfNombre:
+        "",
+
       /*
-       * Se invalida solamente el PDF ACTIVO.
-       *
-       * NO eliminamos la información histórica que permite saber
-       * que anteriormente existió una versión oficial.
+       * Conservamos identidad e historial
+       * de la versión anterior.
        */
-      pdfUrl: "",
-      pdfNombre: "",
-    
-      /*
-       * =========================================================
-       * CONSERVAR IDENTIDAD DE LA ÚLTIMA VERSIÓN
-       * =========================================================
-       *
-       * Estos campos permiten que ficha-pdf.js sepa desde qué
-       * versión debe continuar cuando vuelva a generarse el PDF.
-       */
-    
       tipoVersion:
         oldFicha?.tipoVersion ||
         state.group?.tipoVersionFicha ||
         "original",
-    
+
       version:
         oldFicha?.version ||
         state.group?.versionFicha ||
         values.version ||
         "ORIGINAL",
-    
+
       versionNumero:
         Number(
           oldFicha?.versionNumero ??
           state.group?.versionFichaNumero ??
           1
         ) || 1,
-    
-      /*
-       * Estas huellas de la generación anterior también
-       * deben conservarse.
-       */
+
       confirmadaEl:
-        oldFicha?.confirmadaEl || null,
-    
+        oldFicha?.confirmadaEl ||
+        null,
+
       confirmadaPor:
-        oldFicha?.confirmadaPor || "",
-    
+        oldFicha?.confirmadaPor ||
+        "",
+
       confirmadaPorCorreo:
-        oldFicha?.confirmadaPorCorreo || "",
-    
+        oldFicha?.confirmadaPorCorreo ||
+        "",
+
       storagePathPdf:
-        oldFicha?.storagePathPdf || "",
-    
+        oldFicha?.storagePathPdf ||
+        "",
+
       pdfHistorial:
-        Array.isArray(oldFicha?.pdfHistorial)
+        Array.isArray(
+          oldFicha?.pdfHistorial
+        )
           ? oldFicha.pdfHistorial
           : [],
-    
+
       camposAdministracionModificados:
         adminImportantChanges
     };
-  
+
     patch.flowFicha = {
       ...(state.group.flowFicha || {}),
-      modo: nextFlowMode,
-      legacy: false,
-      estado: reopenFlowByCarolaCorrection ? "correccion_pendiente_jefa" : "lista_vendedor",
-      requiereActualizacion: nextFlowMode === "actualizacion",
-      requiereRefirmaAdministracion: true,
-  
-      correccionPendiente: reopenFlowByCarolaCorrection ? true : (state.group.flowFicha?.correccionPendiente || false),
-      correccionOrigen: reopenFlowByCarolaCorrection ? "jefa_ventas" : (state.group.flowFicha?.correccionOrigen || ""),
-      correccionEstado: reopenFlowByCarolaCorrection ? "pendiente_jefa" : (state.group.flowFicha?.correccionEstado || ""),
-      camposAdministracionModificados: adminImportantChanges,
-  
+
+      modo:
+        nextFlowMode,
+
+      legacy:
+        false,
+
+      estado:
+        reopenFlowByCarolaCorrection
+          ? "correccion_pendiente_jefa"
+          : "lista_vendedor",
+
+      requiereActualizacion:
+        nextFlowMode ===
+        "actualizacion",
+
+      requiereRefirmaAdministracion:
+        true,
+
+      correccionPendiente:
+        reopenFlowByCarolaCorrection
+          ? true
+          : (
+              state.group.flowFicha
+                ?.correccionPendiente ||
+              false
+            ),
+
+      correccionOrigen:
+        reopenFlowByCarolaCorrection
+          ? "jefa_ventas"
+          : (
+              state.group.flowFicha
+                ?.correccionOrigen ||
+              ""
+            ),
+
+      correccionEstado:
+        reopenFlowByCarolaCorrection
+          ? "pendiente_jefa"
+          : (
+              state.group.flowFicha
+                ?.correccionEstado ||
+              ""
+            ),
+
+      camposAdministracionModificados:
+        adminImportantChanges,
+
       jefaVentas: {
         ...(flow?.jefaVentas || {}),
-        firmado: false,
-        firmadoAt: null,
-        firmadoPor: "",
-        firmadoPorCorreo: "",
-        observacion: ""
+
+        firmado:
+          false,
+
+        firmadoAt:
+          null,
+
+        firmadoPor:
+          "",
+
+        firmadoPorCorreo:
+          "",
+
+        observacion:
+          ""
       },
-  
+
       administracion: {
         ...(flow?.administracion || {}),
-        firmado: false,
-        firmadoAt: null,
-        firmadoPor: "",
-        firmadoPorCorreo: "",
-        observacion: ""
+
+        firmado:
+          false,
+
+        firmadoAt:
+          null,
+
+        firmadoPor:
+          "",
+
+        firmadoPorCorreo:
+          "",
+
+        observacion:
+          ""
       }
     };
-  
+
     patch.documentos = {
       ...(state.group.documentos || {}),
+
       fichaGrupo: {
-        ...(state.group.documentos?.fichaGrupo || {}),
-        estado: reopenFlowByCarolaCorrection ? "correccion_pendiente_jefa" : "lista_vendedor"
+        ...(state.group.documentos
+          ?.fichaGrupo || {}),
+
+        estado:
+          reopenFlowByCarolaCorrection
+            ? "correccion_pendiente_jefa"
+            : "lista_vendedor"
       }
     };
   }
 
-  await setDoc(doc(db, "ventas_cotizaciones", state.groupDocId), patch, { merge: true });
+  /*
+   * =========================================================
+   * GUARDAR
+   * =========================================================
+   */
 
-  const historyChanges = [...trackedChanges];
+  await setDoc(
+    doc(
+      db,
+      "ventas_cotizaciones",
+      state.groupDocId
+    ),
+    patch,
+    {
+      merge: true
+    }
+  );
+
+  const historyChanges = [
+    ...trackedChanges
+  ];
 
   if (reopenFlow) {
     historyChanges.push(
       {
-        campo: "fichaEstado",
-        anterior: state.group?.fichaEstado || "",
-        nuevo: "lista_vendedor"
+        campo:
+          "fichaEstado",
+
+        anterior:
+          state.group?.fichaEstado ||
+          "",
+
+        nuevo:
+          reopenFlowByCarolaCorrection
+            ? "correccion_pendiente_jefa"
+            : "lista_vendedor"
       },
+
       {
-        campo: "flowFicha.jefaVentas.firmado",
-        anterior: !!state.group?.flowFicha?.jefaVentas?.firmado,
-        nuevo: false
+        campo:
+          "flowFicha.jefaVentas.firmado",
+
+        anterior:
+          !!state.group?.flowFicha
+            ?.jefaVentas?.firmado,
+
+        nuevo:
+          false
       },
+
       {
-        campo: "flowFicha.administracion.firmado",
-        anterior: !!state.group?.flowFicha?.administracion?.firmado,
-        nuevo: false
+        campo:
+          "flowFicha.administracion.firmado",
+
+        anterior:
+          !!state.group?.flowFicha
+            ?.administracion?.firmado,
+
+        nuevo:
+          false
       },
+
       {
-        campo: "firmaSupervision",
-        anterior: state.group?.firmaSupervision || "",
-        nuevo: ""
+        campo:
+          "firmaSupervision",
+
+        anterior:
+          state.group
+            ?.firmaSupervision ||
+          "",
+
+        nuevo:
+          ""
       },
+
       {
-        campo: "firmaAdministracion",
-        anterior: state.group?.firmaAdministracion || "",
-        nuevo: ""
+        campo:
+          "firmaAdministracion",
+
+        anterior:
+          state.group
+            ?.firmaAdministracion ||
+          "",
+
+        nuevo:
+          ""
       }
     );
   }
 
-  if (fichaWasEmpty || historyChanges.length) {
-    const editorLabel = isAdministracion()
-      ? "administración"
-      : isJefaVentas()
-        ? "jefa de ventas"
-        : "usuario";
-  
-    const observacionesChanged = historyChanges.some(
-      (item) => item.campo === "ficha.observacionesHtml"
+  /*
+   * =========================================================
+   * HISTORIAL
+   * =========================================================
+   */
+
+  if (
+    fichaWasEmpty ||
+    historyChanges.length
+  ) {
+    const editorLabel =
+      isAdministracion()
+        ? "administración"
+        : isJefaVentas()
+          ? "jefa de ventas"
+          : "usuario";
+
+    const observacionesChanged =
+      historyChanges.some(
+        (item) =>
+          item.campo ===
+          "ficha.observacionesHtml"
+      );
+
+    const observacionesMsg =
+      observacionesChanged
+        ? (
+            observacionesPlain
+              ? ` Observaciones ficha: ${truncateForHistory(observacionesPlain)}.`
+              : " Observaciones ficha vaciadas."
+          )
+        : "";
+
+    await addDoc(
+      collection(
+        db,
+        HISTORIAL_COLLECTION
+      ),
+      {
+        idGrupo:
+          String(
+            state.groupId
+          ),
+
+        codigoRegistro:
+          cleanText(
+            state.group?.codigoRegistro
+          ),
+
+        aliasGrupo:
+          cleanText(
+            nombreGrupoManualNuevo ||
+            state.group?.aliasGrupo
+          ),
+
+        colegio:
+          cleanText(
+            state.group?.colegio
+          ),
+
+        tipoMovimiento:
+          reopenFlow
+            ? "ficha_actualizada_reabre_flujo"
+            : (
+                fichaWasEmpty
+                  ? "ficha_creada"
+                  : "ficha_actualizada"
+              ),
+
+        modulo:
+          "ficha",
+
+        titulo:
+          reopenFlow
+            ? "Actualización de ficha con reapertura de flujo"
+            : (
+                fichaWasEmpty
+                  ? "Creación de ficha"
+                  : "Actualización de ficha"
+              ),
+
+        mensaje:
+          reopenFlow
+            ? `${getDisplayName(state.effectiveUser)} actualizó la ficha desde ${editorLabel}. La revisión vuelve a jefa de ventas y luego a administración.${observacionesMsg}`
+            : `${getDisplayName(state.effectiveUser)} ${fichaWasEmpty ? "creó" : "actualizó"} la ficha del grupo.${observacionesMsg}`,
+
+        metadata: {
+          cambios:
+            historyChanges
+        },
+
+        creadoPor:
+          getDisplayName(
+            state.effectiveUser
+          ),
+
+        creadoPorCorreo:
+          state.effectiveEmail,
+
+        fecha:
+          serverTimestamp()
+      }
     );
-  
-    const observacionesMsg = observacionesChanged
-      ? (
-          observacionesPlain
-            ? ` Observaciones ficha: ${truncateForHistory(observacionesPlain)}.`
-            : " Observaciones ficha vaciadas."
-        )
-      : "";
-  
-    await addDoc(collection(db, HISTORIAL_COLLECTION), {
-      idGrupo: String(state.groupId),
-      codigoRegistro: cleanText(state.group?.codigoRegistro),
-      aliasGrupo: cleanText(state.group?.aliasGrupo),
-      colegio: cleanText(state.group?.colegio),
-      tipoMovimiento: reopenFlow
-        ? "ficha_actualizada_reabre_flujo"
-        : (fichaWasEmpty ? "ficha_creada" : "ficha_actualizada"),
-      modulo: "ficha",
-      titulo: reopenFlow
-        ? "Actualización de ficha con reapertura de flujo"
-        : (fichaWasEmpty ? "Creación de ficha" : "Actualización de ficha"),
-      mensaje: reopenFlow
-        ? `${getDisplayName(state.effectiveUser)} actualizó la ficha desde ${editorLabel}. La revisión vuelve a jefa de ventas y luego a administración.${observacionesMsg}`
-        : `${getDisplayName(state.effectiveUser)} ${fichaWasEmpty ? "creó" : "actualizó"} la ficha del grupo.${observacionesMsg}`,
-      metadata: { cambios: historyChanges },
-      creadoPor: getDisplayName(state.effectiveUser),
-      creadoPorCorreo: state.effectiveEmail,
-      fecha: serverTimestamp()
-    });
   }
 
   if (reloadAfterSave) {
     await loadAll();
   }
-  
+
   if (!silent) {
     showToast(
       reopenFlow
@@ -4958,7 +6723,8 @@ async function saveFicha({ silent = false, reloadAfterSave = true } = {}) {
     ok: true,
     changed: true,
     reopenFlow,
-    trackedChanges: trackedChanges.length
+    trackedChanges:
+      trackedChanges.length
   };
 }
 
@@ -5047,8 +6813,233 @@ async function createHistoryEntry({
    DATA BUILD
 ========================================================= */
 function hydrateFicha(group = {}) {
-  const ficha = getByPath(group, "ficha") || {};
-  const situacion = getByPath(group, "situacion") || {};
+  const ficha =
+    getByPath(
+      group,
+      "ficha"
+    ) || {};
+
+  const situacion =
+    getByPath(
+      group,
+      "situacion"
+    ) || {};
+
+  /*
+   * =========================================================
+   * DATOS COMPARTIDOS
+   * =========================================================
+   *
+   * Mientras hacemos la transición, la ficha sigue teniendo
+   * prioridad cuando ya trae un dato, pero el grupo sirve
+   * de respaldo.
+   */
+
+  const destinoRoot =
+    cleanText(
+      group.destinoPrincipal || ""
+    );
+
+  const destinoOtroRoot =
+    cleanText(
+      group.destinoPrincipalOtro || ""
+    );
+
+  const destinoFicha =
+    cleanText(
+      ficha.destinoPrincipal || ""
+    );
+
+  const destinoOtroFicha =
+    cleanText(
+      ficha.destinoPrincipalOtro || ""
+    );
+
+  const destinoPrincipal =
+    destinoFicha ||
+    destinoRoot ||
+    "";
+
+  const destinoPrincipalOtro =
+    normalizeSearchLocal(
+      destinoPrincipal
+    ) === "otro"
+      ? (
+          destinoOtroFicha ||
+          destinoOtroRoot ||
+          ""
+        )
+      : "";
+
+  const programaRoot =
+    cleanText(
+      group.programa || ""
+    );
+
+  const programaOtroRoot =
+    cleanText(
+      group.programaOtro || ""
+    );
+
+  const programaFicha =
+    cleanText(
+      ficha.programa || ""
+    );
+
+  const programaOtroFicha =
+    cleanText(
+      ficha.programaOtro || ""
+    );
+
+  let programa =
+    programaFicha ||
+    programaRoot ||
+    "";
+
+  let programaOtro =
+    programaOtroFicha ||
+    programaOtroRoot ||
+    "";
+
+  /*
+   * Compatibilidad con fichas antiguas que solamente
+   * tenían nombrePrograma como texto.
+   */
+  if (
+    !programa &&
+    ficha.nombrePrograma
+  ) {
+    const options =
+      getFichaProgramOptionsByDestino(
+        getFichaSharedDisplayValue(
+          destinoPrincipal,
+          destinoPrincipalOtro
+        )
+      );
+
+    const canonical =
+      findFichaCanonicalOption(
+        options,
+        ficha.nombrePrograma
+      );
+
+    if (canonical) {
+      programa =
+        canonical;
+
+      programaOtro =
+        "";
+    } else {
+      programa =
+        "OTRO";
+
+      programaOtro =
+        cleanText(
+          ficha.nombrePrograma
+        );
+    }
+  }
+
+  const nombrePrograma =
+    getFichaSharedDisplayValue(
+      programa,
+      programaOtro
+    );
+
+  const tramoRoot =
+    cleanText(
+      group.tramo || ""
+    );
+
+  const tramoOtroRoot =
+    cleanText(
+      group.tramoOtro || ""
+    );
+
+  const tramoSeleccionFicha =
+    cleanText(
+      ficha.tramoSeleccion || ""
+    );
+
+  const tramoOtroFicha =
+    cleanText(
+      ficha.tramoOtro || ""
+    );
+
+  let tramoSeleccion =
+    tramoSeleccionFicha ||
+    tramoRoot ||
+    "";
+
+  let tramoOtro =
+    tramoOtroFicha ||
+    tramoOtroRoot ||
+    "";
+
+  /*
+   * Compatibilidad con ficha antigua donde tramo
+   * era solamente el valor visible.
+   */
+  if (
+    !tramoSeleccion &&
+    ficha.tramo
+  ) {
+    const canonical =
+      findFichaCanonicalOption(
+        FICHA_TRAMO_OPTIONS,
+        ficha.tramo
+      );
+
+    if (canonical) {
+      tramoSeleccion =
+        canonical;
+    } else {
+      tramoSeleccion =
+        "OTRO";
+
+      tramoOtro =
+        cleanText(
+          ficha.tramo
+        );
+    }
+  }
+
+  const tramo =
+    getFichaSharedDisplayValue(
+      tramoSeleccion,
+      tramoOtro
+    );
+
+  const mesViaje =
+    cleanText(
+      ficha.mesViaje ||
+      group.mesViaje ||
+      ""
+    );
+
+  const mesViajeOtro =
+    cleanText(
+      ficha.mesViajeOtro ||
+      group.mesViajeOtro ||
+      ""
+    );
+
+  const fechaViajeTexto =
+    cleanText(
+      ficha.fechaViajeTexto ||
+      (
+        normalizeSearchLocal(mesViaje) ===
+        "otro"
+          ? mesViajeOtro
+          : (
+              group.semanaViaje ||
+              mesViaje ||
+              group.fechaDeViaje ||
+              group.fechaViaje ||
+              ""
+            )
+      )
+    );
 
   const observacionesFallbackTexto =
     pick(
@@ -5059,221 +7050,276 @@ function hydrateFicha(group = {}) {
     ) || "";
 
   return {
-    solicitudReserva: pick(
-      ficha.solicitudReserva,
-      group.solicitudReserva,
-      ""
-    ),
-
-    nombreGrupo: pick(
-      ficha.nombreGrupo,
-      group.nombreGrupo,
-      group.aliasGrupo,
-      buildDefaultGroupName(group)
-    ),
-
-    apoderadoEncargado: pick(
-      ficha.apoderadoEncargado,
-      group.nombreCliente,
-      ""
-    ),
-
-    telefono: pick(
-      ficha.telefono,
-      group.celularCliente,
-      ""
-    ),
-
-    correo: pick(
-      ficha.correo,
-      group.correoCliente,
-      ""
-    ),
-
-    nombrePrograma: pick(
-      ficha.nombrePrograma,
-      group.programaOtro,
-      group.programa,
-      ""
-    ),
-
-    programaPdfUrl: pick(
-      ficha.programaPdfUrl,
-      group.programaPdfUrl,
-      ""
-    ),
-
-    programaPdfNombre: pick(
-      ficha.programaPdfNombre,
-      group.programaPdfNombre,
-      ""
-    ),
-
-    programaPdfStoragePath: pick(
-      ficha.programaPdfStoragePath,
-      group.programaPdfStoragePath,
-      ""
-    ),
-
-    programaPdfSubidoPor: pick(
-      ficha.programaPdfSubidoPor,
-      group.programaPdfSubidoPor,
-      ""
-    ),
-
-    programaPdfSubidoPorCorreo: pick(
-      ficha.programaPdfSubidoPorCorreo,
-      group.programaPdfSubidoPorCorreo,
-      ""
-    ),
-
-    valorPrograma: pick(
-      ficha.valorPrograma,
-      group.valorPrograma,
-      ""
-    ),
-
-    numeroPaxTotal: pick(
-      ficha.numeroPaxTotal,
-      group.cantidadGrupo,
-      ""
-    ),
-
-    tramo: pick(
-      ficha.tramo,
-      group.tramo,
-      ""
-    ),
-
-    liberados: pick(
-      ficha.liberados,
-      group.liberados,
-      ""
-    ),
-
-    categoriaHoteleraContratada: pick(
-      ficha.categoriaHoteleraContratada,
-      group.categoriaHoteleraContratada,
-      group.hotel,
-      group.Hotel,
-      group.solicitudHotel,
-      ""
-    ),
-
-    autorizacionGerencia: pick(
-      ficha.autorizacionGerencia,
-      group.autorizacionGerencia,
-      group.Autorizacion,
-      group.autorizacion,
-      situacion.resumen,
-      ""
-    ),
-
-    descuentoValorBase: pick(
-      ficha.descuentoValorBase,
-      group.descuento,
-      "NO"
-    ),
-
-    fechaViajeTexto: pick(
-      ficha.fechaViajeTexto,
-      group.fechaDeViaje,
-      group.fechaViaje,
-      group.semanaViaje,
-      group.mesViaje,
-      ""
-    ),
-
-    asistenciaEnViajes: pick(
-      ficha.asistenciaEnViajes,
-      group.asistenciaEnViajes,
-      group.asistenciaMed,
-      ""
-    ),
-
-    nombreVendedor: pick(
-      ficha.nombreVendedor,
-      group.vendedora,
-      ""
-    ),
-
-    numeroNegocio: pick(
-      ficha.numeroNegocio,
-      group.numeroNegocio,
-      ""
-    ),
-
-    usuarioFicha: pick(
-      ficha.usuarioFicha,
-      group.usuarioProgramaAdm,
-      ""
-    ),
-
-    claveAdministrativa: pick(
-      ficha.claveAdministrativa,
-      group.claveAdministrativa,
-      ""
-    ),
-
-    version: normalizePlainText(
+    solicitudReserva:
       pick(
-        ficha.version,
-        group.versionFicha,
-        "ORIGINAL"
-      )
-    ) || "ORIGINAL",
+        ficha.solicitudReserva,
+        group.solicitudReserva,
+        ""
+      ),
 
-    fechaActualizacionTexto: pick(
-      ficha.fechaActualizacionTexto,
-      formatFichaDateTimeText(ficha.fechaActualizacion),
-      formatFichaDateTimeText(group.fechaActualizacionFicha),
-      ""
-    ),
+    nombreGrupo:
+      pick(
+        ficha.nombreGrupo,
+        group.nombreGrupo,
+        group.aliasGrupo,
+        buildDefaultGroupName(group)
+      ),
 
-    infoOperacionesHtml: pick(
-      ficha.infoOperacionesHtml,
-      situacion.observacionOperaciones,
-      group.observacionesOperaciones,
-      ""
-    ),
+    /*
+     * CONTACTO PRINCIPAL
+     */
+    apoderadoEncargado:
+      pick(
+        ficha.apoderadoEncargado,
+        group.nombreCliente,
+        ""
+      ),
 
-    infoAdministracionHtml: pick(
-      ficha.infoAdministracionHtml,
-      situacion.observacionAdministracion,
-      group.observacionesAdministracion,
-      ""
-    ),
+    telefono:
+      pick(
+        ficha.telefono,
+        group.celularCliente,
+        ""
+      ),
 
-    observacionesHtml: pick(
-      ficha.observacionesHtml,
-      plainTextToRichHtml(observacionesFallbackTexto),
-      ""
-    ),
+    correo:
+      pick(
+        ficha.correo,
+        group.correoCliente,
+        ""
+      ),
 
-    pdfUrl: pick(
-      ficha.pdfUrl,
-      group.fichaPdfUrl,
-      ""
-    ),
+    /*
+     * DESTINO / PROGRAMA
+     */
+    destinoPrincipal,
+    destinoPrincipalOtro,
 
-    pdfNombre: pick(
-      ficha.pdfNombre,
-      group.fichaPdfNombre,
-      ""
-    ),
+    programa,
+    programaOtro,
+    nombrePrograma,
 
-    estado: pick(
-      ficha.estado,
-      group.fichaEstado,
-      "pendiente"
-    ),
+    programaPdfUrl:
+      pick(
+        ficha.programaPdfUrl,
+        group.programaPdfUrl,
+        ""
+      ),
 
-    actualizadoPor: pick(ficha.actualizadoPor, ""),
-    actualizadoPorCorreo: pick(ficha.actualizadoPorCorreo, ""),
-    fechaActualizacion: ficha.fechaActualizacion || group.fechaActualizacionFicha || null
+    programaPdfNombre:
+      pick(
+        ficha.programaPdfNombre,
+        group.programaPdfNombre,
+        ""
+      ),
+
+    programaPdfStoragePath:
+      pick(
+        ficha.programaPdfStoragePath,
+        group.programaPdfStoragePath,
+        ""
+      ),
+
+    programaPdfSubidoPor:
+      pick(
+        ficha.programaPdfSubidoPor,
+        group.programaPdfSubidoPor,
+        ""
+      ),
+
+    programaPdfSubidoPorCorreo:
+      pick(
+        ficha.programaPdfSubidoPorCorreo,
+        group.programaPdfSubidoPorCorreo,
+        ""
+      ),
+
+    valorPrograma:
+      pick(
+        ficha.valorPrograma,
+        group.valorPrograma,
+        ""
+      ),
+
+    /*
+     * CANTIDAD
+     */
+    numeroPaxTotal:
+      pick(
+        ficha.numeroPaxTotal,
+        group.cantidadGrupo,
+        ""
+      ),
+
+    /*
+     * TRAMO
+     */
+    tramoSeleccion,
+    tramoOtro,
+    tramo,
+
+    liberados:
+      pick(
+        ficha.liberados,
+        group.liberados,
+        ""
+      ),
+
+    categoriaHoteleraContratada:
+      pick(
+        ficha.categoriaHoteleraContratada,
+        group.categoriaHoteleraContratada,
+        group.hotel,
+        group.Hotel,
+        group.solicitudHotel,
+        ""
+      ),
+
+    autorizacionGerencia:
+      pick(
+        ficha.autorizacionGerencia,
+        group.autorizacionGerencia,
+        group.Autorizacion,
+        group.autorizacion,
+        situacion.resumen,
+        ""
+      ),
+
+    descuentoValorBase:
+      pick(
+        ficha.descuentoValorBase,
+        group.descuento,
+        "NO"
+      ),
+
+    /*
+     * MES / FECHA
+     */
+    mesViaje,
+    mesViajeOtro,
+    fechaViajeTexto,
+
+    asistenciaEnViajes:
+      pick(
+        ficha.asistenciaEnViajes,
+        group.asistenciaEnViajes,
+        group.asistenciaMed,
+        ""
+      ),
+
+    nombreVendedor:
+      pick(
+        ficha.nombreVendedor,
+        group.vendedora,
+        ""
+      ),
+
+    numeroNegocio:
+      pick(
+        ficha.numeroNegocio,
+        group.numeroNegocio,
+        ""
+      ),
+
+    usuarioFicha:
+      pick(
+        ficha.usuarioFicha,
+        group.usuarioProgramaAdm,
+        ""
+      ),
+
+    claveAdministrativa:
+      pick(
+        ficha.claveAdministrativa,
+        group.claveAdministrativa,
+        ""
+      ),
+
+    version:
+      normalizePlainText(
+        pick(
+          ficha.version,
+          group.versionFicha,
+          "ORIGINAL"
+        )
+      ) || "ORIGINAL",
+
+    fechaActualizacionTexto:
+      pick(
+        ficha.fechaActualizacionTexto,
+        formatFichaDateTimeText(
+          ficha.fechaActualizacion
+        ),
+        formatFichaDateTimeText(
+          group.fechaActualizacionFicha
+        ),
+        ""
+      ),
+
+    infoOperacionesHtml:
+      pick(
+        ficha.infoOperacionesHtml,
+        situacion.observacionOperaciones,
+        group.observacionesOperaciones,
+        ""
+      ),
+
+    infoAdministracionHtml:
+      pick(
+        ficha.infoAdministracionHtml,
+        situacion.observacionAdministracion,
+        group.observacionesAdministracion,
+        ""
+      ),
+
+    observacionesHtml:
+      pick(
+        ficha.observacionesHtml,
+        plainTextToRichHtml(
+          observacionesFallbackTexto
+        ),
+        ""
+      ),
+
+    pdfUrl:
+      pick(
+        ficha.pdfUrl,
+        group.fichaPdfUrl,
+        ""
+      ),
+
+    pdfNombre:
+      pick(
+        ficha.pdfNombre,
+        group.fichaPdfNombre,
+        ""
+      ),
+
+    estado:
+      pick(
+        ficha.estado,
+        group.fichaEstado,
+        "pendiente"
+      ),
+
+    actualizadoPor:
+      pick(
+        ficha.actualizadoPor,
+        ""
+      ),
+
+    actualizadoPorCorreo:
+      pick(
+        ficha.actualizadoPorCorreo,
+        ""
+      ),
+
+    fechaActualizacion:
+      ficha.fechaActualizacion ||
+      group.fechaActualizacionFicha ||
+      null
   };
 }
-
 /* =========================================================
    RICH TEXT
 ========================================================= */
