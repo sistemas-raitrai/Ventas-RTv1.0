@@ -2325,18 +2325,28 @@ function canManageMeetings() {
 }
 
 function canCreateAlertsAndComments() {
-  // Debe poder:
-  // - quien ya puede editar normalmente
-  // - y además el rol "registro", pero solo para alertas/comentarios
-  const rol = String(state.effectiveUser?.rol || "").toLowerCase();
-
-  if (canEditGroup()) return true;
-
-  if (rol === "registro" && canAccessGroup(state.group)) {
-    return true;
+  /*
+   * REGLA:
+   *
+   * Alertas manuales y comentarios son herramientas
+   * de trabajo del grupo.
+   *
+   * Cualquier usuario que tenga acceso al grupo
+   * puede utilizarlas, sin importar:
+   *
+   * - rol;
+   * - estado comercial;
+   * - si puede editar la cotización;
+   * - si la ficha está cerrada;
+   * - si el grupo está ganado, perdido, etc.
+   */
+  if (!state.group) {
+    return false;
   }
 
-  return false;
+  return canAccessGroup(
+    state.group
+  );
 }
 
 function canEditDocuments() {
@@ -14184,54 +14194,139 @@ async function openEditMeetingModal(id) {
 
 
 function openAlertModal() {
+  /*
+   * Cualquier usuario con acceso al grupo
+   * puede crear una alerta manual.
+   */
   if (!canCreateAlertsAndComments()) {
-    alert("No tienes permisos para crear alertas en este grupo.");
+    alert(
+      "No tienes permisos para acceder a este grupo."
+    );
+
     return;
   }
 
-  $("formAlerta")?.reset();
-  setFormValue("a_nivel", "warning");
-  openModal("modalAlerta");
+  const form =
+    $("formAlerta");
+
+  if (form) {
+    form.reset();
+  }
+
+  /*
+   * Las alertas manuales solamente pueden ser:
+   *
+   * - Pendiente
+   * - Crítica
+   *
+   * Dejamos Pendiente como valor por defecto.
+   */
+  const nivel =
+    $("a_nivel");
+
+  if (nivel) {
+    nivel.value =
+      "warning";
+  }
+
+  openModal(
+    "modalAlerta"
+  );
 }
 
 function openCommentModal() {
+  /*
+   * Cualquier usuario con acceso al grupo
+   * puede agregar comentarios.
+   */
   if (!canCreateAlertsAndComments()) {
-    alert("No tienes permisos para crear comentarios en este grupo.");
+    alert(
+      "No tienes permisos para acceder a este grupo."
+    );
+
     return;
   }
 
-  $("formComentario")?.reset();
-  openModal("modalComentario");
+  const form =
+    $("formComentario");
+
+  if (form) {
+    form.reset();
+  }
+
+  openModal(
+    "modalComentario"
+  );
 }
 
 async function saveComment() {
+  /*
+   * Los comentarios son siempre permitidos
+   * para usuarios con acceso al grupo.
+   */
   if (!canCreateAlertsAndComments()) {
-    alert("No tienes permisos para crear comentarios en este grupo.");
+    alert(
+      "No tienes permisos para acceder a este grupo."
+    );
+
     return;
   }
 
-  const titulo = cleanText($("c_titulo")?.value);
-  const mensaje = cleanText($("c_mensaje")?.value);
+  const mensaje =
+    cleanText(
+      $("c_mensaje")?.value || ""
+    );
 
-  if (!titulo || !mensaje) {
-    alert("Debes completar el título y el comentario.");
+  if (!mensaje) {
+    alert(
+      "Debes escribir un comentario."
+    );
+
     return;
   }
 
+  const autor =
+    getDisplayName(
+      state.effectiveUser
+    );
+
+  /*
+   * El comentario NO genera alerta.
+   *
+   * Solamente queda en historial.
+   */
   await createHistoryEntry({
-    tipoMovimiento: "comentario",
-    modulo: "bitacora",
-    titulo: "Comentario",
-    asunto: titulo,
+    tipoMovimiento:
+      "comentario",
+
+    modulo:
+      "bitacora",
+
+    titulo:
+      "Nuevo comentario",
+
+    asunto:
+      "Comentario",
+
     mensaje,
+
     metadata: {
-      tipoRegistro: "comentario"
+      autor,
+
+      autorCorreo:
+        state.effectiveEmail
     }
   });
 
-  closeModal("modalComentario");
+  closeModal(
+    "modalComentario"
+  );
+
   await loadAll();
-  showSaveNotice("Comentario guardado correctamente.");
+
+  showSaveNotice(
+    "Comentario guardado correctamente."
+  );
 }
 
 function getHistoryTypeLabel(item = {}) {
@@ -15476,59 +15571,176 @@ async function completeMeeting(id) {
 }
 
 async function saveManualAlert() {
+  /*
+   * REGLA:
+   * crear alertas manuales no depende
+   * de permisos de edición del grupo.
+   */
   if (!canCreateAlertsAndComments()) {
-    alert("No tienes permisos para crear alertas en este grupo.");
+    alert(
+      "No tienes permisos para acceder a este grupo."
+    );
+
     return;
   }
 
-  const titulo = cleanText($("a_titulo")?.value);
-  const nivel = cleanText($("a_nivel")?.value || "warning");
-  const mensaje = cleanText($("a_mensaje")?.value);
+  const titulo =
+    cleanText(
+      $("a_titulo")?.value || ""
+    );
 
-  if (!titulo || !mensaje) {
-    alert("Debes completar el título y el mensaje de la alerta.");
+  const mensaje =
+    cleanText(
+      $("a_mensaje")?.value || ""
+    );
+
+  const nivelRaw =
+    normalizeSearchLocal(
+      $("a_nivel")?.value || ""
+    );
+
+  /*
+   * Blindaje:
+   * aunque quedara algún HTML antiguo con "info",
+   * una alerta manual nueva solo puede guardarse
+   * como warning o critica.
+   */
+  const nivel =
+    nivelRaw === "critica"
+      ? "critica"
+      : "warning";
+
+  if (!titulo) {
+    alert(
+      "Debes escribir un título para la alerta."
+    );
+
     return;
   }
 
-  await addDoc(collection(db, ALERTAS_COLLECTION), {
-    idGrupo: String(state.groupId),
-    codigoRegistro: cleanText(state.group.codigoRegistro),
-    aliasGrupo: cleanText(state.group.aliasGrupo),
-    tipo: "manual",
-    origen: "grupo",
-    nivel,
-    titulo,
-    mensaje,
-    activa: true,
-    visibleEnIndex: true,
-    visibleEnGrupo: true,
-    resuelta: false,
-    resueltaPor: "",
-    resueltaPorCorreo: "",
-    fechaResolucion: null,
-    creadoPor: getDisplayName(state.effectiveUser),
-    creadoPorCorreo: state.effectiveEmail,
-    fechaCreacion: serverTimestamp()
-  });
+  if (!mensaje) {
+    alert(
+      "Debes escribir el detalle de la alerta."
+    );
 
+    return;
+  }
+
+  const creadoPor =
+    getDisplayName(
+      state.effectiveUser
+    );
+
+  const alertaRef =
+    await addDoc(
+      collection(
+        db,
+        ALERTAS_COLLECTION
+      ),
+      {
+        idGrupo:
+          String(
+            state.groupId
+          ),
+
+        codigoRegistro:
+          cleanText(
+            state.group?.codigoRegistro
+          ),
+
+        aliasGrupo:
+          cleanText(
+            state.group?.aliasGrupo
+          ),
+
+        colegio:
+          cleanText(
+            state.group?.colegio
+          ),
+
+        tipo:
+          "manual",
+
+        origen:
+          "manual",
+
+        modulo:
+          "grupo",
+
+        nivel,
+
+        titulo,
+
+        mensaje,
+
+        activa:
+          true,
+
+        visibleEnIndex:
+          true,
+
+        visibleEnGrupo:
+          true,
+
+        resuelta:
+          false,
+
+        creadoPor,
+
+        creadoPorCorreo:
+          state.effectiveEmail,
+
+        fechaCreacion:
+          serverTimestamp()
+      }
+    );
+
+  /*
+   * También dejamos trazabilidad
+   * de la creación en historial.
+   */
   await createHistoryEntry({
-    tipoMovimiento: "alerta_manual",
-    modulo: "alertas",
-    titulo: "Alerta manual",
-    asunto: titulo,
-    mensaje,
+    tipoMovimiento:
+      "alerta_manual_creada",
+
+    modulo:
+      "alertas",
+
+    titulo:
+      "Alerta manual creada",
+
+    asunto:
+      titulo,
+
+    mensaje:
+      `${creadoPor} creó una alerta manual "${titulo}". Detalle: ${mensaje}`,
+
     metadata: {
-      cambios: [
-        { campo: "alerta.titulo", anterior: "", nuevo: titulo },
-        { campo: "alerta.nivel", anterior: "", nuevo: nivel },
-        { campo: "alerta.mensaje", anterior: "", nuevo: mensaje }
-      ]
+      alertaId:
+        alertaRef.id,
+
+      nivel,
+
+      titulo,
+
+      mensaje,
+
+      creadoPor,
+
+      creadoPorCorreo:
+        state.effectiveEmail
     }
   });
 
-  closeModal("modalAlerta");
+  closeModal(
+    "modalAlerta"
+  );
+
   await loadAll();
-  showSaveNotice("Alerta guardada correctamente.");
+
+  showSaveNotice(
+    "Alerta creada correctamente."
+  );
 }
 
 async function resolveManualAlert(alertId) {
