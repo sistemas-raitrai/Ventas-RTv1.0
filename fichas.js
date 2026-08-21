@@ -2633,40 +2633,27 @@ function fillForm() {
   );
 
   /*
-   * Estos IDs quedarán activos cuando hagamos
-   * el cambio correspondiente en fichas.html.
+   * =========================================================
+   * DESTINO / PROGRAMA / TRAMO / MES
+   * =========================================================
    *
-   * Si todavía no existen, setValue simplemente
-   * no hace nada.
+   * Esta función:
+   * - carga destino;
+   * - genera programas según destino;
+   * - maneja OTRO;
+   * - carga tramo;
+   * - carga mes / fecha tentativa.
    */
-  setValue(
-    "f_destinoPrincipal",
-    f.destinoPrincipal
-  );
 
-  setValue(
-    "f_destinoPrincipalOtro",
-    f.destinoPrincipalOtro
-  );
-
-  setValue(
-    "f_programa",
-    f.programa
-  );
-
-  setValue(
-    "f_programaOtro",
-    f.programaOtro
+  syncFichaSharedSelectors(
+    f
   );
 
   /*
-   * Compatibilidad mientras siga existiendo
-   * el input antiguo.
+   * =========================================================
+   * RESTO DE FICHA
+   * =========================================================
    */
-  setValue(
-    "f_nombrePrograma",
-    f.nombrePrograma
-  );
 
   setValue(
     "f_valorPrograma",
@@ -2676,21 +2663,6 @@ function fillForm() {
   setValue(
     "f_numeroPaxTotal",
     f.numeroPaxTotal
-  );
-
-  setValue(
-    "f_tramoSeleccion",
-    f.tramoSeleccion
-  );
-
-  setValue(
-    "f_tramoOtro",
-    f.tramoOtro
-  );
-
-  setValue(
-    "f_tramo",
-    f.tramo
   );
 
   setValue(
@@ -2711,21 +2683,6 @@ function fillForm() {
   setValue(
     "f_descuentoValorBase",
     f.descuentoValorBase
-  );
-
-  setValue(
-    "f_mesViaje",
-    f.mesViaje
-  );
-
-  setValue(
-    "f_mesViajeOtro",
-    f.mesViajeOtro
-  );
-
-  setValue(
-    "f_fechaViajeTexto",
-    f.fechaViajeTexto
   );
 
   setValue(
@@ -3248,103 +3205,362 @@ function renderFatal(message) {
    EVENTS
 ========================================================= */
 function bindEvents() {
-  $("btnVolverGrupo")?.addEventListener("click", () => {
-    location.href = `grupo.html?id=${encodeURIComponent(state.groupId || state.requestedId || "")}`;
-  });
+  /*
+   * =========================================================
+   * NAVEGACIÓN / GUARDADO
+   * =========================================================
+   */
 
-  $("btnGuardarFicha")?.addEventListener("click", () => saveFicha());
-  $("btnGuardarFichaBottom")?.addEventListener("click", () => saveFicha());
-  
-  $("btnGenerarPdfVersion")?.addEventListener("click", async () => {
-    await handleGenerarPdfVersion();
-  });
-  
-  $("btnGenerarPdfVersionBottom")?.addEventListener("click", async () => {
-    await handleGenerarPdfVersion();
-  });
-  
-  $("btnAbrirPdfFicha")?.addEventListener("click", () => {
-    const url = cleanText(state.ficha?.pdfUrl || state.group?.fichaPdfUrl || "");
-    if (!url) {
-      alert("Esta ficha todavía no tiene PDF guardado.");
-      return;
+  $("btnVolverGrupo")?.addEventListener(
+    "click",
+    () => {
+      location.href =
+        `grupo.html?id=${encodeURIComponent(
+          state.groupId ||
+          state.requestedId ||
+          ""
+        )}`;
     }
-    window.open(url, "_blank", "noopener");
-  });
+  );
 
-  $("btnAbrirContratoPdf")?.addEventListener("click", () => {
-    const id = state.groupId || state.requestedId || state.group?.idGrupo || "";
-    if (!id) {
-      alert("No encontré el ID del grupo para abrir el contrato.");
-      return;
+  $("btnGuardarFicha")?.addEventListener(
+    "click",
+    () => saveFicha()
+  );
+
+  $("btnGuardarFichaBottom")?.addEventListener(
+    "click",
+    () => saveFicha()
+  );
+
+  /*
+   * =========================================================
+   * SELECTORES COMPARTIDOS GRUPO <-> FICHA
+   * =========================================================
+   */
+
+  $("f_destinoPrincipal")?.addEventListener(
+    "change",
+    () => {
+      syncFichaDestinoOtroVisibility();
+
+      /*
+       * Al cambiar destino se reinicia el programa,
+       * porque las opciones dependen del destino.
+       */
+      syncFichaProgramaOptions({
+        selectedProgram:
+          "",
+
+        selectedOther:
+          ""
+      });
     }
-  
-    window.open(`contrato-pdf.html?id=${encodeURIComponent(id)}`, "_blank", "noopener");
-  });
+  );
 
-  $("btnGuardarProgramaPdf")?.addEventListener("click", saveProgramaGrupo);
-
-  $("btnAbrirProgramaPdf")?.addEventListener("click", () => {
-    const url = getProgramaOriginalUrl();
-    if (!url) {
-      alert("Todavía no hay un programa cargado.");
-      return;
+  $("f_programa")?.addEventListener(
+    "change",
+    () => {
+      syncFichaProgramaOtroVisibility();
     }
-    window.open(url, "_blank", "noopener");
-  });
+  );
 
-  $("btnFirmarFichaVendedor")?.addEventListener("click", async () => {
-    try {
-      await signFlowFromFicha("vendedor");
-    } catch (error) {
-      console.error("[fichas] firma vendedor", error);
-      showToast("No se pudo registrar la firma de vendedor(a): " + (error?.message || error), "error", { duration: 5000 });
+  $("f_tramoSeleccion")?.addEventListener(
+    "change",
+    () => {
+      syncFichaTramoOtroVisibility();
     }
-  });
+  );
 
-  $("btnFirmarFichaJefa")?.addEventListener("click", async () => {
-    try {
-      await signFlowFromFicha("jefaVentas");
-    } catch (error) {
-      console.error("[fichas] firma jefa", error);
-      showToast("No se pudo registrar la firma de jefa de ventas: " + (error?.message || error), "error", { duration: 5000 });
+  $("f_mesViaje")?.addEventListener(
+    "change",
+    () => {
+      syncFichaMesViajeOtroVisibility();
     }
-  });
+  );
 
-  $("btnFirmarFichaAdmin")?.addEventListener("click", async () => {
-    try {
-      await signFlowFromFicha("administracion");
-    } catch (error) {
-      console.error("[fichas] firma administración", error);
-      showToast("No se pudo registrar la firma de administración: " + (error?.message || error), "error", { duration: 5000 });
+  /*
+   * =========================================================
+   * GENERADOR PDF
+   * =========================================================
+   */
+
+  $("btnGenerarPdfVersion")?.addEventListener(
+    "click",
+    async () => {
+      await handleGenerarPdfVersion();
     }
-  });
+  );
 
-  $("btnSolicitarActualizacionFicha")?.addEventListener("click", () => {
-    openRequestModal("actualizacion");
-  });
-  
-  $("btnSolicitarActualizacionFichaBottom")?.addEventListener("click", () => {
-    openRequestModal("actualizacion");
-  });
-  
-  $("btnSolicitarCorreccionFicha")?.addEventListener("click", () => {
-    openRequestModal("correccion");
-  });
-  
-  $("btnSolicitarCorreccionFichaBottom")?.addEventListener("click", () => {
-    openRequestModal("correccion");
-  });
-  
-  $("btnEnviarSolicitudFicha")?.addEventListener("click", saveUpdateRequest);
+  $("btnGenerarPdfVersionBottom")?.addEventListener(
+    "click",
+    async () => {
+      await handleGenerarPdfVersion();
+    }
+  );
 
-  document.querySelectorAll("[data-close]").forEach((btn) => {
-    btn.addEventListener("click", () => closeModal(btn.dataset.close));
-  });
+  $("btnAbrirPdfFicha")?.addEventListener(
+    "click",
+    () => {
+      const url =
+        cleanText(
+          state.ficha?.pdfUrl ||
+          state.group?.fichaPdfUrl ||
+          ""
+        );
 
-  $("modalSolicitudFicha")?.addEventListener("click", (e) => {
-    if (e.target === $("modalSolicitudFicha")) closeModal("modalSolicitudFicha");
-  });
+      if (!url) {
+        alert(
+          "Esta ficha todavía no tiene PDF guardado."
+        );
+
+        return;
+      }
+
+      window.open(
+        url,
+        "_blank",
+        "noopener"
+      );
+    }
+  );
+
+  /*
+   * =========================================================
+   * CONTRATO
+   * =========================================================
+   */
+
+  $("btnAbrirContratoPdf")?.addEventListener(
+    "click",
+    () => {
+      const id =
+        state.groupId ||
+        state.requestedId ||
+        state.group?.idGrupo ||
+        "";
+
+      if (!id) {
+        alert(
+          "No encontré el ID del grupo para abrir el contrato."
+        );
+
+        return;
+      }
+
+      window.open(
+        `contrato-pdf.html?id=${encodeURIComponent(id)}`,
+        "_blank",
+        "noopener"
+      );
+    }
+  );
+
+  /*
+   * =========================================================
+   * PROGRAMA DEL GRUPO
+   * =========================================================
+   */
+
+  $("btnGuardarProgramaPdf")?.addEventListener(
+    "click",
+    saveProgramaGrupo
+  );
+
+  $("btnAbrirProgramaPdf")?.addEventListener(
+    "click",
+    () => {
+      const url =
+        getProgramaOriginalUrl();
+
+      if (!url) {
+        alert(
+          "Todavía no hay un programa cargado."
+        );
+
+        return;
+      }
+
+      window.open(
+        url,
+        "_blank",
+        "noopener"
+      );
+    }
+  );
+
+  /*
+   * =========================================================
+   * FIRMAS
+   * =========================================================
+   */
+
+  $("btnFirmarFichaVendedor")?.addEventListener(
+    "click",
+    async () => {
+      try {
+        await signFlowFromFicha(
+          "vendedor"
+        );
+      } catch (error) {
+        console.error(
+          "[fichas] firma vendedor",
+          error
+        );
+
+        showToast(
+          "No se pudo registrar la firma de vendedor(a): " +
+            (
+              error?.message ||
+              error
+            ),
+          "error",
+          {
+            duration: 5000
+          }
+        );
+      }
+    }
+  );
+
+  $("btnFirmarFichaJefa")?.addEventListener(
+    "click",
+    async () => {
+      try {
+        await signFlowFromFicha(
+          "jefaVentas"
+        );
+      } catch (error) {
+        console.error(
+          "[fichas] firma jefa",
+          error
+        );
+
+        showToast(
+          "No se pudo registrar la firma de jefa de ventas: " +
+            (
+              error?.message ||
+              error
+            ),
+          "error",
+          {
+            duration: 5000
+          }
+        );
+      }
+    }
+  );
+
+  $("btnFirmarFichaAdmin")?.addEventListener(
+    "click",
+    async () => {
+      try {
+        await signFlowFromFicha(
+          "administracion"
+        );
+      } catch (error) {
+        console.error(
+          "[fichas] firma administración",
+          error
+        );
+
+        showToast(
+          "No se pudo registrar la firma de administración: " +
+            (
+              error?.message ||
+              error
+            ),
+          "error",
+          {
+            duration: 5000
+          }
+        );
+      }
+    }
+  );
+
+  /*
+   * =========================================================
+   * SOLICITUDES
+   * =========================================================
+   */
+
+  $("btnSolicitarActualizacionFicha")?.addEventListener(
+    "click",
+    () => {
+      openRequestModal(
+        "actualizacion"
+      );
+    }
+  );
+
+  $("btnSolicitarActualizacionFichaBottom")?.addEventListener(
+    "click",
+    () => {
+      openRequestModal(
+        "actualizacion"
+      );
+    }
+  );
+
+  $("btnSolicitarCorreccionFicha")?.addEventListener(
+    "click",
+    () => {
+      openRequestModal(
+        "correccion"
+      );
+    }
+  );
+
+  $("btnSolicitarCorreccionFichaBottom")?.addEventListener(
+    "click",
+    () => {
+      openRequestModal(
+        "correccion"
+      );
+    }
+  );
+
+  $("btnEnviarSolicitudFicha")?.addEventListener(
+    "click",
+    saveUpdateRequest
+  );
+
+  /*
+   * =========================================================
+   * MODALES
+   * =========================================================
+   */
+
+  document
+    .querySelectorAll(
+      "[data-close]"
+    )
+    .forEach(
+      (btn) => {
+        btn.addEventListener(
+          "click",
+          () =>
+            closeModal(
+              btn.dataset.close
+            )
+        );
+      }
+    );
+
+  $("modalSolicitudFicha")?.addEventListener(
+    "click",
+    (e) => {
+      if (
+        e.target ===
+        $("modalSolicitudFicha")
+      ) {
+        closeModal(
+          "modalSolicitudFicha"
+        );
+      }
+    }
+  );
 }
 
 function openModal(id) {
