@@ -11296,72 +11296,198 @@ function renderAlerts() {
   if (!list) return;
 
   const merged = [
-    ...state.autoAlerts.map((item) => ({ ...item, tipoLista: "auto" })),
-    ...state.alertsManual.map((item) => ({ ...item, tipoLista: "manual" }))
+    ...state.autoAlerts.map((item) => ({
+      ...item,
+      tipoLista: "auto"
+    })),
+
+    ...state.alertsManual.map((item) => ({
+      ...item,
+      tipoLista: "manual"
+    }))
   ];
 
   if (!merged.length) {
-    list.innerHTML = `<div class="empty-box">No hay alertas activas para este grupo.</div>`;
+    list.innerHTML = `
+      <div class="empty-box">
+        No hay alertas activas para este grupo.
+      </div>
+    `;
     return;
   }
 
-  const levelOrder = { critica: 3, warning: 2, info: 1 };
+  /*
+   * Las automáticas todavía pueden usar nivel "info".
+   *
+   * Las manuales nuevas solamente podrán ser:
+   * - warning
+   * - critica
+   */
+  const levelOrder = {
+    critica: 3,
+    warning: 2,
+    info: 1
+  };
 
   const sorted = [...merged].sort((a, b) => {
-    const nivelA = normalizeSearchLocal(a.nivel || "info");
-    const nivelB = normalizeSearchLocal(b.nivel || "info");
+    const nivelA =
+      normalizeSearchLocal(
+        a.nivel || "info"
+      );
 
-    const diffNivel = (levelOrder[nivelB] || 0) - (levelOrder[nivelA] || 0);
-    if (diffNivel !== 0) return diffNivel;
+    const nivelB =
+      normalizeSearchLocal(
+        b.nivel || "info"
+      );
 
-    return dateValue(b.fechaCreacion || b.fecha || null) - dateValue(a.fechaCreacion || a.fecha || null);
+    const diffNivel =
+      (levelOrder[nivelB] || 0) -
+      (levelOrder[nivelA] || 0);
+
+    if (diffNivel !== 0) {
+      return diffNivel;
+    }
+
+    return (
+      dateValue(
+        b.fechaCreacion ||
+        b.fecha ||
+        null
+      ) -
+      dateValue(
+        a.fechaCreacion ||
+        a.fecha ||
+        null
+      )
+    );
   });
 
-  list.innerHTML = sorted.map((alertItem) => {
-    const isManual = alertItem.tipoLista === "manual";
-    const levelClass = normalizeSearchLocal(alertItem.nivel) === "critica" ? "alert-critical" : "";
-    const baseClass = isManual ? "alert-manual" : "alert-auto";
+  list.innerHTML = sorted
+    .map((alertItem) => {
+      const isManual =
+        alertItem.tipoLista === "manual";
 
-    const author = isManual
-      ? (alertItem.creadoPor || alertItem.creadoPorCorreo || "Sin autor")
-      : "Sistema";
+      const level =
+        normalizeSearchLocal(
+          alertItem.nivel || "info"
+        );
 
-    const dateLabel = isManual && alertItem.fechaCreacion
-      ? formatDateTime(alertItem.fechaCreacion)
-      : "En tiempo real";
+      const levelClass =
+        level === "critica"
+          ? "alert-critical"
+          : "";
 
-    const levelLabel = normalizeSearchLocal(alertItem.nivel) === "critica"
-      ? "Crítica"
-      : normalizeSearchLocal(alertItem.nivel) === "warning"
-        ? "Pendiente"
-        : "Info";
+      const baseClass =
+        isManual
+          ? "alert-manual"
+          : "alert-auto";
 
-    return `
-      <article class="registro-card registro-alert-card ${baseClass} ${levelClass}">
-        <div class="registro-card-top">
-          <div class="registro-meta-row">
-            <span>${escapeHtml(author)}</span>
-            <span>·</span>
-            <span>${escapeHtml(dateLabel)}</span>
+      const author =
+        isManual
+          ? (
+              alertItem.creadoPor ||
+              alertItem.creadoPorCorreo ||
+              "Sin autor"
+            )
+          : "Sistema";
+
+      const dateLabel =
+        isManual &&
+        alertItem.fechaCreacion
+          ? formatDateTime(
+              alertItem.fechaCreacion
+            )
+          : "En tiempo real";
+
+      const levelLabel =
+        level === "critica"
+          ? "Crítica"
+          : level === "warning"
+            ? "Pendiente"
+            : "Info";
+
+      /*
+       * REGLA:
+       *
+       * Una alerta manual puede resolverla
+       * cualquier usuario que tenga acceso
+       * al grupo.
+       *
+       * No depende de canEditGroup().
+       */
+      const puedeResolver =
+        isManual &&
+        canAccessGroup(state.group);
+
+      return `
+        <article
+          class="
+            registro-card
+            registro-alert-card
+            ${baseClass}
+            ${levelClass}
+          "
+        >
+          <div class="registro-card-top">
+
+            <div class="registro-meta-row">
+              <span>
+                ${escapeHtml(author)}
+              </span>
+
+              <span>·</span>
+
+              <span>
+                ${escapeHtml(dateLabel)}
+              </span>
+            </div>
+
+            <div class="registro-card-actions">
+
+              <span class="registro-tag">
+                ${isManual ? "Manual" : "Automática"}
+              </span>
+
+              <span class="registro-tag is-soft">
+                ${escapeHtml(levelLabel)}
+              </span>
+
+              ${
+                puedeResolver
+                  ? `
+                    <button
+                      class="btn-danger"
+                      type="button"
+                      data-action="resolver-alerta"
+                      data-id="${escapeHtml(alertItem.id)}"
+                    >
+                      Resolver
+                    </button>
+                  `
+                  : ""
+              }
+
+            </div>
           </div>
 
-          <div class="registro-card-actions">
-            <span class="registro-tag">${isManual ? "Manual" : "Automática"}</span>
-            <span class="registro-tag is-soft">${escapeHtml(levelLabel)}</span>
-
-            ${
-              isManual && canEditGroup()
-                ? `<button class="btn-danger" type="button" data-action="resolver-alerta" data-id="${escapeHtml(alertItem.id)}">Resolver</button>`
-                : ""
-            }
+          <div class="registro-title">
+            ${escapeHtml(
+              alertItem.titulo ||
+              "Alerta"
+            )}
           </div>
-        </div>
 
-        <div class="registro-title">${escapeHtml(alertItem.titulo || "Alerta")}</div>
-        <div class="registro-message">${escapeHtml(alertItem.mensaje || "Sin mensaje")}</div>
-      </article>
-    `;
-  }).join("");
+          <div class="registro-message">
+            ${escapeHtml(
+              alertItem.mensaje ||
+              "Sin mensaje"
+            )}
+          </div>
+
+        </article>
+      `;
+    })
+    .join("");
 }
 
 function buildDuplicateReviewHtml(item = {}) {
@@ -15406,35 +15532,164 @@ async function saveManualAlert() {
 }
 
 async function resolveManualAlert(alertId) {
-  const item = state.alertsManual.find((x) => x.id === alertId);
-  if (!item) return;
+  const item =
+    state.alertsManual.find(
+      (x) => x.id === alertId
+    );
 
-  const ok = confirm(`¿Marcar como resuelta la alerta "${item.titulo}"?`);
-  if (!ok) return;
+  if (!item) {
+    return;
+  }
 
-  await setDoc(doc(db, ALERTAS_COLLECTION, alertId), {
-    activa: false,
-    resuelta: true,
-    resueltaPor: getDisplayName(state.effectiveUser),
-    resueltaPorCorreo: state.effectiveEmail,
-    fechaResolucion: serverTimestamp()
-  }, { merge: true });
+  /*
+   * REGLA:
+   * cualquier usuario que tenga acceso al grupo
+   * puede resolver una alerta manual.
+   */
+  if (!canAccessGroup(state.group)) {
+    alert(
+      "No tienes permisos para resolver alertas de este grupo."
+    );
+    return;
+  }
 
+  const resolucionRaw =
+    window.prompt(
+      [
+        `Resolver alerta: "${item.titulo || "Alerta"}"`,
+        "",
+        "Indica brevemente cómo se resolvió:"
+      ].join("\n"),
+      ""
+    );
+
+  /*
+   * Cancelar no hace nada.
+   */
+  if (resolucionRaw === null) {
+    return;
+  }
+
+  const resolucion =
+    cleanText(
+      resolucionRaw
+    );
+
+  if (!resolucion) {
+    alert(
+      "Debes indicar cómo se resolvió la alerta."
+    );
+    return;
+  }
+
+  const nombre =
+    getDisplayName(
+      state.effectiveUser
+    );
+
+  /*
+   * Cerramos la alerta.
+   */
+  await setDoc(
+    doc(
+      db,
+      ALERTAS_COLLECTION,
+      alertId
+    ),
+    {
+      activa: false,
+      resuelta: true,
+
+      resolucion,
+
+      resueltaPor:
+        nombre,
+
+      resueltaPorCorreo:
+        state.effectiveEmail,
+
+      fechaResolucion:
+        serverTimestamp()
+    },
+    {
+      merge: true
+    }
+  );
+
+  /*
+   * Historial permanente.
+   *
+   * Conservamos:
+   * - qué alerta era;
+   * - cuál era el mensaje original;
+   * - cómo se resolvió;
+   * - quién la resolvió.
+   */
   await createHistoryEntry({
-    tipoMovimiento: "alerta_manual",
-    modulo: "alertas",
-    titulo: "Alerta resuelta",
-    asunto: item.titulo || "Alerta manual",
-    mensaje: `${getDisplayName(state.effectiveUser)} resolvió esta alerta manual.`,
+    tipoMovimiento:
+      "alerta_manual_resuelta",
+
+    modulo:
+      "alertas",
+
+    titulo:
+      "Alerta resuelta",
+
+    asunto:
+      item.titulo ||
+      "Alerta manual",
+
+    mensaje:
+      `${nombre} resolvió la alerta "${item.titulo || "Alerta"}". Resolución: ${resolucion}`,
+
     metadata: {
+      alertaId:
+        alertId,
+
+      nivel:
+        item.nivel || "",
+
+      mensajeOriginal:
+        item.mensaje || "",
+
+      resolucion,
+
+      resueltaPor:
+        nombre,
+
+      resueltaPorCorreo:
+        state.effectiveEmail,
+
       cambios: [
-        { campo: "alerta.activa", anterior: true, nuevo: false },
-        { campo: "alerta.resuelta", anterior: false, nuevo: true }
+        {
+          campo:
+            "alerta.activa",
+
+          anterior:
+            true,
+
+          nuevo:
+            false
+        },
+        {
+          campo:
+            "alerta.resuelta",
+
+          anterior:
+            false,
+
+          nuevo:
+            true
+        }
       ]
     }
   });
 
   await loadAll();
+
+  showSaveNotice(
+    "Alerta resuelta correctamente."
+  );
 }
 
 /* =========================================================
