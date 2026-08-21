@@ -661,6 +661,13 @@ function hasPendingUpdateRequest() {
   return getOpenFichaUpdateRequests().length > 0;
 }
 
+function hasOpenFichaProcessRequest() {
+  return (
+    getOpenFichaUpdateRequests().length > 0 ||
+    getOpenFichaCorrectionRequests().length > 0
+  );
+}
+
 function getLatestPendingFichaUpdateRequest() {
   return getPendingFichaUpdateRequests()[0] || null;
 }
@@ -2068,88 +2075,281 @@ function fillForm() {
 }
 
 function syncButtons() {
-  const editable = canEditFicha();
-  const tienePdf = !!cleanText(state.ficha?.pdfUrl || state.group?.fichaPdfUrl || "");
-  const tienePrograma = hasProgramaOriginal();
-  const flow = state.group?.flowFicha || {};
-  const isGanada = normalizeState(state.group?.estado) === "ganada";
-  const pendingUpdate = hasPendingUpdateRequest();
-  const pendingRequest = getLatestPendingFichaUpdateRequest();
+  const editable =
+    canEditFicha();
 
-  const btnGuardar = $("btnGuardarFicha");
-  if (btnGuardar) btnGuardar.disabled = !editable || state.isUploadingProgramaPdf;
-  
-  const btnGuardarBottom = $("btnGuardarFichaBottom");
-  if (btnGuardarBottom) btnGuardarBottom.disabled = !editable || state.isUploadingProgramaPdf;
-  
-  const flujoAbierto = !!state.group?.fichaFlujoAbierto;
-  const pdfVigente = tienePdf && !flujoAbierto;
-  const autorizada = !!state.group?.autorizada;
+  const tienePdf =
+    !!cleanText(
+      state.ficha?.pdfUrl ||
+      state.group?.fichaPdfUrl ||
+      ""
+    );
 
-  const btnAbrirPdf = $("btnAbrirPdfFicha");
+  const tienePrograma =
+    hasProgramaOriginal();
+
+  const flow =
+    state.group?.flowFicha || {};
+
+  const isGanada =
+    normalizeState(
+      state.group?.estado
+    ) === "ganada";
+
+  /*
+   * =========================================================
+   * PROCESOS ABIERTOS
+   * =========================================================
+   */
+
+  const pendingUpdate =
+    getOpenFichaUpdateRequests().length > 0;
+
+  const pendingCorrection =
+    getOpenFichaCorrectionRequests().length > 0;
+
+  const pendingProcess =
+    pendingUpdate ||
+    pendingCorrection;
+
+  const pendingRequest =
+    getLatestPendingFichaUpdateRequest() ||
+    getLatestPendingFichaCorrectionRequest() ||
+    getLatestOpenFichaUpdateRequest() ||
+    getLatestOpenFichaCorrectionRequest();
+
+  /*
+   * =========================================================
+   * GUARDAR
+   * =========================================================
+   */
+
+  const btnGuardar =
+    $("btnGuardarFicha");
+
+  if (btnGuardar) {
+    btnGuardar.disabled =
+      !editable ||
+      state.isUploadingProgramaPdf;
+  }
+
+  const btnGuardarBottom =
+    $("btnGuardarFichaBottom");
+
+  if (btnGuardarBottom) {
+    btnGuardarBottom.disabled =
+      !editable ||
+      state.isUploadingProgramaPdf;
+  }
+
+  /*
+   * =========================================================
+   * PDF
+   * =========================================================
+   */
+
+  const flujoAbierto =
+    !!state.group?.fichaFlujoAbierto;
+
+  const pdfVigente =
+    tienePdf &&
+    !flujoAbierto;
+
+  const autorizada =
+    !!state.group?.autorizada;
+
+  const btnAbrirPdf =
+    $("btnAbrirPdfFicha");
+
   if (btnAbrirPdf) {
-    btnAbrirPdf.classList.toggle("hidden", !tienePdf);
-    btnAbrirPdf.disabled = !tienePdf;
+    btnAbrirPdf.classList.toggle(
+      "hidden",
+      !tienePdf
+    );
 
-    btnAbrirPdf.classList.toggle("btn-light", pdfVigente);
-    btnAbrirPdf.classList.toggle("btn-pill", !pdfVigente);
+    btnAbrirPdf.disabled =
+      !tienePdf;
+
+    btnAbrirPdf.classList.toggle(
+      "btn-light",
+      pdfVigente
+    );
+
+    btnAbrirPdf.classList.toggle(
+      "btn-pill",
+      !pdfVigente
+    );
   }
 
-  const btnContrato = $("btnAbrirContratoPdf");
+  /*
+   * =========================================================
+   * CONTRATO
+   * =========================================================
+   */
+
+  const btnContrato =
+    $("btnAbrirContratoPdf");
+
   if (btnContrato) {
-    const vendedor = isVendorRole();
+    const vendedor =
+      isVendorRole();
 
-    btnContrato.classList.toggle("hidden", vendedor && !autorizada);
-    btnContrato.disabled = vendedor && !autorizada;
+    btnContrato.classList.toggle(
+      "hidden",
+      vendedor &&
+      !autorizada
+    );
 
-    btnContrato.classList.toggle("btn-light", autorizada);
-    btnContrato.classList.toggle("btn-pill", !autorizada);
+    btnContrato.disabled =
+      vendedor &&
+      !autorizada;
+
+    btnContrato.classList.toggle(
+      "btn-light",
+      autorizada
+    );
+
+    btnContrato.classList.toggle(
+      "btn-pill",
+      !autorizada
+    );
   }
-  
-  const canGeneratePdf = canGeneratePdfVersionAsCurrentUser();
-  
+
+  /*
+   * =========================================================
+   * GENERADOR PDF
+   * =========================================================
+   */
+
+  const canGeneratePdf =
+    canGeneratePdfVersionAsCurrentUser();
+
+  const pdfPendienteGeneracion =
+    state.group?.ficha?.pdfPendienteGeneracion === true ||
+    state.group?.pdfPendienteGeneracion === true ||
+    state.group?.fichaPdfPendienteGeneracion === true;
+
   const listoParaGenerarPdf =
     canGeneratePdf &&
     canOpenFicha() &&
-    normalizeSearchLocal(state.group?.fichaEstado || "") === "autorizada_admin" &&
-    state.group?.flowFicha?.administracion?.firmado === true;
-  
-  const btnGenerarPdf = $("btnGenerarPdfVersion");
+    normalizeSearchLocal(
+      state.group?.fichaEstado || ""
+    ) === "autorizada_admin" &&
+    state.group?.flowFicha?.administracion?.firmado === true &&
+    (
+      !tienePdf ||
+      pdfPendienteGeneracion
+    );
+
+  const btnGenerarPdf =
+    $("btnGenerarPdfVersion");
+
   if (btnGenerarPdf) {
-    btnGenerarPdf.classList.toggle("hidden", !canGeneratePdf);
-    btnGenerarPdf.disabled = !canGeneratePdf || !canOpenFicha();
-  
-    btnGenerarPdf.classList.toggle("btn-light", listoParaGenerarPdf && !pdfVigente);
-    btnGenerarPdf.classList.toggle("btn-pill", !(listoParaGenerarPdf && !pdfVigente));
+    btnGenerarPdf.classList.toggle(
+      "hidden",
+      !canGeneratePdf
+    );
+
+    btnGenerarPdf.disabled =
+      !canGeneratePdf ||
+      !canOpenFicha();
+
+    btnGenerarPdf.classList.toggle(
+      "btn-light",
+      listoParaGenerarPdf
+    );
+
+    btnGenerarPdf.classList.toggle(
+      "btn-pill",
+      !listoParaGenerarPdf
+    );
   }
-  
-  const btnGenerarPdfBottom = $("btnGenerarPdfVersionBottom");
+
+  const btnGenerarPdfBottom =
+    $("btnGenerarPdfVersionBottom");
+
   if (btnGenerarPdfBottom) {
-    btnGenerarPdfBottom.classList.toggle("hidden", !canGeneratePdf);
-    btnGenerarPdfBottom.disabled = !canGeneratePdf || !canOpenFicha();
-  
-    btnGenerarPdfBottom.classList.toggle("btn-light", listoParaGenerarPdf && !pdfVigente);
-    btnGenerarPdfBottom.classList.toggle("btn-pill", !(listoParaGenerarPdf && !pdfVigente));
+    btnGenerarPdfBottom.classList.toggle(
+      "hidden",
+      !canGeneratePdf
+    );
+
+    btnGenerarPdfBottom.disabled =
+      !canGeneratePdf ||
+      !canOpenFicha();
+
+    btnGenerarPdfBottom.classList.toggle(
+      "btn-light",
+      listoParaGenerarPdf
+    );
+
+    btnGenerarPdfBottom.classList.toggle(
+      "btn-pill",
+      !listoParaGenerarPdf
+    );
   }
-  
-  document.querySelectorAll("#formFicha input, #formFicha select, #formFicha textarea").forEach((el) => {
-    el.disabled = !editable || state.isUploadingProgramaPdf;
+
+  /*
+   * =========================================================
+   * CAMPOS DE FORMULARIO
+   * =========================================================
+   */
+
+  document
+    .querySelectorAll(
+      "#formFicha input, #formFicha select, #formFicha textarea"
+    )
+    .forEach((el) => {
+      el.disabled =
+        !editable ||
+        state.isUploadingProgramaPdf;
+    });
+
+  [
+    "f_infoOperaciones",
+    "f_infoAdministracion",
+    "f_observacionesHtml"
+  ].forEach((id) => {
+    const el =
+      $(id);
+
+    if (el) {
+      el.contentEditable =
+        editable
+          ? "true"
+          : "false";
+    }
   });
 
-  ["f_infoOperaciones", "f_infoAdministracion", "f_observacionesHtml"].forEach((id) => {
-    const el = $(id);
-    if (el) el.contentEditable = editable ? "true" : "false";
-  });
+  document
+    .querySelectorAll(
+      ".rich-btn, .rich-color"
+    )
+    .forEach((el) => {
+      el.disabled =
+        !editable ||
+        state.isUploadingProgramaPdf;
+    });
 
-  document.querySelectorAll(".rich-btn, .rich-color").forEach((el) => {
-    el.disabled = !editable || state.isUploadingProgramaPdf;
-  });
-  
-  const btnVend = $("btnFirmarFichaVendedor");
+  /*
+   * =========================================================
+   * FIRMA VENDEDOR
+   * =========================================================
+   */
+
+  const btnVend =
+    $("btnFirmarFichaVendedor");
+
   if (btnVend) {
-    const puedeFirmarComoVendedor = isVendorRole() || isRealAdminRole();
-  
-    btnVend.classList.toggle("hidden", !puedeFirmarComoVendedor);
+    const puedeFirmarComoVendedor =
+      isVendorRole() ||
+      isRealAdminRole();
+
+    btnVend.classList.toggle(
+      "hidden",
+      !puedeFirmarComoVendedor
+    );
+
     btnVend.disabled =
       !puedeFirmarComoVendedor ||
       !editable ||
@@ -2157,59 +2357,168 @@ function syncButtons() {
       !tienePrograma ||
       !!flow?.vendedor?.firmado ||
       state.isUploadingProgramaPdf;
-  
-    btnVend.textContent = isRealAdminRole()
-      ? "Firmar vendedor(a) como admin"
-      : "Firmar vendedor(a)";
+
+    btnVend.textContent =
+      isRealAdminRole()
+        ? "Firmar vendedor(a) como admin"
+        : "Firmar vendedor(a)";
   }
 
-  const btnJefa = $("btnFirmarFichaJefa");
+  /*
+   * =========================================================
+   * FIRMA JEFA DE VENTAS
+   * =========================================================
+   *
+   * Si ya había firmado pero aparece:
+   * - actualización;
+   * - corrección;
+   *
+   * debe poder volver a revisar / firmar.
+   */
+
+  const btnJefa =
+    $("btnFirmarFichaJefa");
+
   if (btnJefa) {
-    btnJefa.classList.toggle("hidden", !isJefaVentas());
-  
+    btnJefa.classList.toggle(
+      "hidden",
+      !isJefaVentas()
+    );
+
     btnJefa.disabled =
       !isJefaVentas() ||
       !flow?.vendedor?.firmado ||
-      (!!flow?.jefaVentas?.firmado && !pendingRequest);
+      (
+        !!flow?.jefaVentas?.firmado &&
+        !pendingProcess
+      );
   }
-  
-  const btnAdmin = $("btnFirmarFichaAdmin");
+
+  /*
+   * =========================================================
+   * FIRMA ADMINISTRACIÓN
+   * =========================================================
+   *
+   * Administración también debe poder refirmar
+   * cuando existe actualización/corrección abierta.
+   */
+
+  const btnAdmin =
+    $("btnFirmarFichaAdmin");
+
   if (btnAdmin) {
-    btnAdmin.classList.toggle("hidden", !canActAsFichaAdministracion());
-    btnAdmin.disabled = !canActAsFichaAdministracion() || !flow?.jefaVentas?.firmado || !!flow?.administracion?.firmado;
+    btnAdmin.classList.toggle(
+      "hidden",
+      !canActAsFichaAdministracion()
+    );
+
+    btnAdmin.disabled =
+      !canActAsFichaAdministracion() ||
+      !flow?.jefaVentas?.firmado ||
+      (
+        !!flow?.administracion?.firmado &&
+        !pendingProcess
+      );
   }
 
-  const canUpdate = canRequestFichaUpdate();
-  const canCorrection = canRequestFichaCorrection();
+  /*
+   * =========================================================
+   * SOLICITUD ACTUALIZACIÓN
+   * =========================================================
+   */
 
-  const btnSolicitar = $("btnSolicitarActualizacionFicha");
+  const canUpdate =
+    canRequestFichaUpdate();
+
+  const canCorrection =
+    canRequestFichaCorrection();
+
+  const btnSolicitar =
+    $("btnSolicitarActualizacionFicha");
+
   if (btnSolicitar) {
-    btnSolicitar.classList.toggle("hidden", !canUpdate);
-    btnSolicitar.disabled = !canUpdate || pendingUpdate;
-    btnSolicitar.textContent = pendingUpdate ? "Actualización solicitada" : "Solicitar actualización";
+    btnSolicitar.classList.toggle(
+      "hidden",
+      !canUpdate
+    );
+
+    btnSolicitar.disabled =
+      !canUpdate ||
+      pendingProcess;
+
+    btnSolicitar.textContent =
+      pendingProcess
+        ? "Solicitud abierta"
+        : "Solicitar actualización";
   }
 
-  const btnSolicitarBottom = $("btnSolicitarActualizacionFichaBottom");
+  const btnSolicitarBottom =
+    $("btnSolicitarActualizacionFichaBottom");
+
   if (btnSolicitarBottom) {
-    btnSolicitarBottom.classList.toggle("hidden", !canUpdate);
-    btnSolicitarBottom.disabled = !canUpdate || pendingUpdate;
-    btnSolicitarBottom.textContent = pendingUpdate ? "Actualización solicitada" : "Solicitar actualización";
+    btnSolicitarBottom.classList.toggle(
+      "hidden",
+      !canUpdate
+    );
+
+    btnSolicitarBottom.disabled =
+      !canUpdate ||
+      pendingProcess;
+
+    btnSolicitarBottom.textContent =
+      pendingProcess
+        ? "Solicitud abierta"
+        : "Solicitar actualización";
   }
 
-  const btnCorreccion = $("btnSolicitarCorreccionFicha");
+  /*
+   * =========================================================
+   * SOLICITUD CORRECCIÓN
+   * =========================================================
+   */
+
+  const btnCorreccion =
+    $("btnSolicitarCorreccionFicha");
+
   if (btnCorreccion) {
-    btnCorreccion.classList.toggle("hidden", !canCorrection);
-    btnCorreccion.disabled = !canCorrection || pendingUpdate;
-    btnCorreccion.textContent = pendingUpdate ? "Solicitud abierta" : "Solicitar corrección";
+    btnCorreccion.classList.toggle(
+      "hidden",
+      !canCorrection
+    );
+
+    btnCorreccion.disabled =
+      !canCorrection ||
+      pendingProcess;
+
+    btnCorreccion.textContent =
+      pendingProcess
+        ? "Solicitud abierta"
+        : "Solicitar corrección";
   }
 
-  const btnCorreccionBottom = $("btnSolicitarCorreccionFichaBottom");
+  const btnCorreccionBottom =
+    $("btnSolicitarCorreccionFichaBottom");
+
   if (btnCorreccionBottom) {
-    btnCorreccionBottom.classList.toggle("hidden", !canCorrection);
-    btnCorreccionBottom.disabled = !canCorrection || pendingUpdate;
-    btnCorreccionBottom.textContent = pendingUpdate ? "Solicitud abierta" : "Solicitar corrección";
+    btnCorreccionBottom.classList.toggle(
+      "hidden",
+      !canCorrection
+    );
+
+    btnCorreccionBottom.disabled =
+      !canCorrection ||
+      pendingProcess;
+
+    btnCorreccionBottom.textContent =
+      pendingProcess
+        ? "Solicitud abierta"
+        : "Solicitar corrección";
   }
 
+  /*
+   * Conserva restricciones especiales
+   * del programa.
+   */
   updateProgramaPdfUi();
 }
 
@@ -2340,29 +2649,58 @@ function closeModal(id) {
 }
 
 function openRequestModal(mode = "actualizacion") {
-  const isCorrection = mode === "correccion";
+  const isCorrection =
+    mode === "correccion";
 
-  if (isCorrection && !canRequestFichaCorrection()) {
-    alert("No tienes permisos para solicitar corrección.");
+  if (
+    isCorrection &&
+    !canRequestFichaCorrection()
+  ) {
+    alert(
+      "No tienes permisos para solicitar corrección."
+    );
+
     return;
   }
 
-  if (!isCorrection && !canRequestFichaUpdate()) {
-    alert("No tienes permisos para solicitar actualización.");
+  if (
+    !isCorrection &&
+    !canRequestFichaUpdate()
+  ) {
+    alert(
+      "No tienes permisos para solicitar actualización."
+    );
+
     return;
   }
 
-  if (hasPendingUpdateRequest()) {
-    alert("Ya existe una solicitud pendiente para este grupo.");
+  /*
+   * REGLA:
+   *
+   * No puede existir al mismo tiempo:
+   * - una actualización abierta;
+   * - una corrección abierta;
+   * - dos correcciones;
+   * - dos actualizaciones.
+   */
+  if (hasOpenFichaProcessRequest()) {
+    alert(
+      "Ya existe una solicitud de actualización o corrección abierta para este grupo."
+    );
+
     return;
   }
 
-  state.requestMode = isCorrection ? "correccion" : "actualizacion";
+  state.requestMode =
+    isCorrection
+      ? "correccion"
+      : "actualizacion";
 
   $("formSolicitudFicha")?.reset();
 
   setText(
     "modalSolicitudFichaTitle",
+
     isCorrection
       ? "Solicitar corrección de ficha"
       : "Solicitar actualización de ficha"
@@ -2370,6 +2708,7 @@ function openRequestModal(mode = "actualizacion") {
 
   setText(
     "sr_detalle_label",
+
     isCorrection
       ? "Qué hay que corregir"
       : "Qué hay que actualizar"
@@ -2377,12 +2716,24 @@ function openRequestModal(mode = "actualizacion") {
 
   setValue(
     "sr_asunto",
+
     isCorrection
-      ? `Corrección ficha · ${state.group?.aliasGrupo || state.group?.colegio || state.groupId}`
-      : `Actualizar ficha · ${state.group?.aliasGrupo || state.group?.colegio || state.groupId}`
+      ? `Corrección ficha · ${
+          state.group?.aliasGrupo ||
+          state.group?.colegio ||
+          state.groupId
+        }`
+
+      : `Actualizar ficha · ${
+          state.group?.aliasGrupo ||
+          state.group?.colegio ||
+          state.groupId
+        }`
   );
 
-  openModal("modalSolicitudFicha");
+  openModal(
+    "modalSolicitudFicha"
+  );
 }
 
 async function refreshFichaUiAfterFlowChange() {
@@ -2395,161 +2746,301 @@ async function refreshFichaUiAfterFlowChange() {
 }
 
 async function signFlowFromFicha(step) {
-  if (!state.group) return;
+  if (!state.group) {
+    return;
+  }
 
-  const flow = state.group.flowFicha || {};
-  const nombre = getDisplayName(state.effectiveUser);
-  const firmanteComoAdmin = isRealAdminRole();
+  const flow =
+    state.group.flowFicha || {};
+
+  const nombre =
+    getDisplayName(
+      state.effectiveUser
+    );
+
+  const firmanteComoAdmin =
+    isRealAdminRole();
+
+  /*
+   * =========================================================
+   * FIRMA VENDEDOR
+   * =========================================================
+   */
 
   if (step === "vendedor") {
-    if (!isVendorRole() && !isRealAdminRole()) {
-      alert("Esta firma solo la realiza el vendedor(a) o admin.");
+    if (
+      !isVendorRole() &&
+      !isRealAdminRole()
+    ) {
+      alert(
+        "Esta firma solo la realiza el vendedor(a) o admin."
+      );
+
       return;
     }
 
     if (!canEditFicha()) {
-      alert(getBlockedEditMessage());
+      alert(
+        getBlockedEditMessage()
+      );
+
       return;
     }
 
-    if (normalizeState(state.group.estado) !== "ganada") {
-      alert("La firma de vendedor(a) solo se habilita cuando el grupo está GANADA.");
+    if (
+      normalizeState(
+        state.group.estado
+      ) !== "ganada"
+    ) {
+      alert(
+        "La firma de vendedor(a) solo se habilita cuando el grupo está GANADA."
+      );
+
       return;
     }
 
     if (flow?.vendedor?.firmado) {
-      alert("La firma de vendedor(a) ya está registrada.");
+      alert(
+        "La firma de vendedor(a) ya está registrada."
+      );
+
       return;
     }
-    
+
     const resumenNominaFirmaVendedor =
       await obtenerResumenNominaParaFirmaAdmin();
-    
+
     const puedeFirmarPorOrigenNomina =
       inscripcionInicialEstaCerradaParaFirma() ||
       resumenNominaFirmaVendedor.tieneSistemaPagos;
-    
-    if (!isRealAdminRole() && !puedeFirmarPorOrigenNomina) {
+
+    if (
+      !isRealAdminRole() &&
+      !puedeFirmarPorOrigenNomina
+    ) {
       alert(
         "Antes de firmar la ficha debes cumplir una de estas condiciones:\n\n" +
         "• Cerrar la Inscripción Inicial del grupo.\n" +
         "• Tener cargada la nómina base desde Sistema de Pagos.\n\n" +
         "Revisa la sección Inscripciones del grupo y luego vuelve a firmar."
       );
-    
+
       return;
     }
 
-    const faltantesFicha = getDatosFaltantesParaCompletarFicha();
+    const faltantesFicha =
+      getDatosFaltantesParaCompletarFicha();
 
-    if (!isRealAdminRole() && faltantesFicha.length) {
+    if (
+      !isRealAdminRole() &&
+      faltantesFicha.length
+    ) {
       alert(
         "No puedes firmar la ficha porque faltan datos necesarios:\n\n" +
-        faltantesFicha.map((x) => `- ${x}`).join("\n") +
+        faltantesFicha
+          .map(
+            (x) => `- ${x}`
+          )
+          .join("\n") +
         "\n\nCompleta estos datos en Editar Grupo o directamente en la ficha antes de firmar."
       );
+
       return;
     }
 
     const patch = {
-      fichaFlujoModo: "v2",
-      fichaEstado: "lista_vendedor",
-      firmaVendedor: nombre,
+      fichaFlujoModo:
+        "v2",
+
+      fichaEstado:
+        "lista_vendedor",
+
+      firmaVendedor:
+        nombre,
 
       documentos: {
         ...(state.group.documentos || {}),
+
         fichaGrupo: {
           ...(state.group.documentos?.fichaGrupo || {}),
-          estado: "lista_vendedor"
+
+          estado:
+            "lista_vendedor"
         }
       },
 
       ficha: {
         ...(state.group.ficha || {}),
-        flujoModo: "v2",
-        estado: "lista_vendedor"
+
+        flujoModo:
+          "v2",
+
+        estado:
+          "lista_vendedor"
       },
 
       flowFicha: {
         ...(state.group.flowFicha || {}),
-        modo: "v2",
-        legacy: false,
-        habilitada: true,
-        estado: "lista_vendedor",
-        bloqueadaParaVendedor: true,
-        requiereActualizacion: false,
+
+        modo:
+          "v2",
+
+        legacy:
+          false,
+
+        habilitada:
+          true,
+
+        estado:
+          "lista_vendedor",
+
+        bloqueadaParaVendedor:
+          true,
+
+        requiereActualizacion:
+          false,
+
         vendedor: {
           ...(state.group.flowFicha?.vendedor || {}),
-          firmado: true,
-          firmadoAt: serverTimestamp(),
-          firmadoPor: nombre,
-          firmadoPorCorreo: state.effectiveEmail,
-          observacion: ""
+
+          firmado:
+            true,
+
+          firmadoAt:
+            serverTimestamp(),
+
+          firmadoPor:
+            nombre,
+
+          firmadoPorCorreo:
+            state.effectiveEmail,
+
+          observacion:
+            ""
         }
       }
     };
 
-    await saveGroupPatch(patch, {
-      tipoMovimiento: "firma_vendedor",
-      modulo: "ficha",
-      titulo: "Firma de vendedor(a)",
-      mensaje: firmanteComoAdmin
-        ? `${nombre} (admin) registró firma como vendedor(a).`
-        : `${nombre} dejó la ficha lista como vendedor(a).`,
-      cambios: [
-        { campo: "fichaEstado", anterior: state.group.fichaEstado || "", nuevo: "lista_vendedor" }
-      ],
-      reloadAfterSave: false,
-      successMessage: "Firma de vendedor(a) registrada correctamente."
-    });
+    await saveGroupPatch(
+      patch,
+      {
+        tipoMovimiento:
+          "firma_vendedor",
+
+        modulo:
+          "ficha",
+
+        titulo:
+          "Firma de vendedor(a)",
+
+        mensaje:
+          firmanteComoAdmin
+            ? `${nombre} (admin) registró firma como vendedor(a).`
+            : `${nombre} dejó la ficha lista como vendedor(a).`,
+
+        cambios: [
+          {
+            campo:
+              "fichaEstado",
+
+            anterior:
+              state.group.fichaEstado || "",
+
+            nuevo:
+              "lista_vendedor"
+          }
+        ],
+
+        reloadAfterSave:
+          false,
+
+        successMessage:
+          "Firma de vendedor(a) registrada correctamente."
+      }
+    );
 
     await refreshFichaUiAfterFlowChange();
+
     return;
   }
 
+  /*
+   * =========================================================
+   * FIRMA / REVISIÓN JEFA DE VENTAS
+   * =========================================================
+   */
+
   if (step === "jefaVentas") {
     if (!isJefaVentas()) {
-      alert("Esta firma solo puede realizarla la jefa de ventas.");
-      return;
-    }
-  
-    if (!flow?.vendedor?.firmado) {
-      alert("Primero debe firmar el vendedor(a).");
-      return;
-    }
-  
-    const pendingRequest = getLatestPendingFichaUpdateRequest();
-    const pendingCorrection = getLatestPendingFichaCorrectionRequest();
-    
-    const hadPendingRequest = !!pendingRequest;
-    const hadPendingCorrection = !!pendingCorrection;
-    
-    const esCorreccionActiva =
-      hadPendingCorrection ||
-      flow?.correccionPendiente === true ||
-      normalizeSearchLocal(flow?.modo || "") === "correccion";
-  
-    if (flow?.jefaVentas?.firmado && !hadPendingRequest && !esCorreccionActiva) {
-      alert("La firma de jefa de ventas ya está registrada.");
+      alert(
+        "Esta firma solo puede realizarla la jefa de ventas."
+      );
+
       return;
     }
 
-    let respuestaJefa = "";
-    
+    if (!flow?.vendedor?.firmado) {
+      alert(
+        "Primero debe firmar el vendedor(a)."
+      );
+
+      return;
+    }
+
+    const pendingRequest =
+      getLatestPendingFichaUpdateRequest();
+
+    const pendingCorrection =
+      getLatestPendingFichaCorrectionRequest();
+
+    const hadPendingRequest =
+      !!pendingRequest;
+
+    const hadPendingCorrection =
+      !!pendingCorrection;
+
+    const esCorreccionActiva =
+      hadPendingCorrection ||
+      flow?.correccionPendiente === true ||
+      normalizeSearchLocal(
+        flow?.modo || ""
+      ) === "correccion";
+
     /*
-     * Tanto una actualización como una corrección
-     * deben dejar explicación de lo realizado.
+     * Si ya firmó y no existe ningún proceso
+     * nuevo que revisar, no firma nuevamente.
      */
+    if (
+      flow?.jefaVentas?.firmado &&
+      !hadPendingRequest &&
+      !esCorreccionActiva
+    ) {
+      alert(
+        "La firma de jefa de ventas ya está registrada."
+      );
+
+      return;
+    }
+
+    /*
+     * =====================================================
+     * EXPLICACIÓN OBLIGATORIA
+     * =====================================================
+     */
+
+    let respuestaJefa =
+      "";
+
     const solicitudQueSeRevisa =
       pendingRequest ||
       pendingCorrection;
-    
+
     if (solicitudQueSeRevisa) {
       const tipoTexto =
         hadPendingCorrection
           ? "corrección"
           : "actualización";
-    
+
       respuestaJefa =
         promptRequired(
           [
@@ -2560,126 +3051,314 @@ async function signFlowFromFicha(step) {
             "¿Qué cambiaste, corregiste, revisaste o resolviste?"
           ].join("\n")
         );
-    
-      if (respuestaJefa === null) {
+
+      if (
+        respuestaJefa === null
+      ) {
         return;
       }
-    
+
       if (!respuestaJefa) {
         alert(
           "Debes escribir qué cambiaste, corregiste o revisaste antes de enviar a Administración."
         );
+
         return;
       }
     }
-  
+
+    /*
+     * =====================================================
+     * FLOW
+     * =====================================================
+     */
+
     const flowPatch = {
       ...(state.group.flowFicha || {}),
-      modo: "v2",
-      legacy: false,
-      modo: esCorreccionActiva ? "correccion" : "v2",
-      estado: esCorreccionActiva ? "correccion_pendiente_administracion" : "revisada_jefa_ventas",
-      requiereActualizacion: hadPendingRequest,
-      requiereRefirmaAdministracion: esCorreccionActiva ? true : flow?.requiereRefirmaAdministracion || false,
-      correccionPendiente: esCorreccionActiva ? true : flow?.correccionPendiente || false,
-      correccionEstado: esCorreccionActiva ? "pendiente_administracion" : flow?.correccionEstado || "",
+
+      modo:
+        esCorreccionActiva
+          ? "correccion"
+          : "v2",
+
+      legacy:
+        false,
+
+      estado:
+        esCorreccionActiva
+          ? "correccion_pendiente_administracion"
+          : "revisada_jefa_ventas",
+
+      requiereActualizacion:
+        hadPendingRequest,
+
+      requiereRefirmaAdministracion:
+        esCorreccionActiva
+          ? true
+          : (
+              flow?.requiereRefirmaAdministracion ||
+              false
+            ),
+
+      correccionPendiente:
+        esCorreccionActiva
+          ? true
+          : (
+              flow?.correccionPendiente ||
+              false
+            ),
+
+      correccionEstado:
+        esCorreccionActiva
+          ? "pendiente_administracion"
+          : (
+              flow?.correccionEstado ||
+              ""
+            ),
+
       jefaVentas: {
         ...(state.group.flowFicha?.jefaVentas || {}),
-        firmado: true,
-        firmadoAt: serverTimestamp(),
-        firmadoPor: nombre,
-        firmadoPorCorreo: state.effectiveEmail,
-        observacion: respuestaJefa || ""
+
+        firmado:
+          true,
+
+        firmadoAt:
+          serverTimestamp(),
+
+        firmadoPor:
+          nombre,
+
+        firmadoPorCorreo:
+          state.effectiveEmail,
+
+        observacion:
+          respuestaJefa || ""
       }
     };
-  
+
+    /*
+     * DATOS DE ACTUALIZACIÓN
+     */
+
     if (hadPendingRequest) {
       flowPatch.ultimaSolicitudActualizacion = {
         ...(state.group.flowFicha?.ultimaSolicitudActualizacion || {}),
-        estado: "revisada_jefa",
-        revisadaPor: nombre,
-        revisadaPorCorreo: state.effectiveEmail,
-        respuestaJefa,
-        fechaRevisionJefa: serverTimestamp()
-      };
-    }
 
-    if (hadPendingCorrection) {
-      flowPatch.ultimaCorreccion = {
-        ...(state.group.flowFicha?.ultimaCorreccion || {}),
-    
         estado:
           "revisada_jefa",
-    
+
         revisadaPor:
           nombre,
-    
+
         revisadaPorCorreo:
           state.effectiveEmail,
-    
+
         respuestaJefa,
-    
+
         fechaRevisionJefa:
           serverTimestamp()
       };
     }
-  
+
+    /*
+     * DATOS DE CORRECCIÓN
+     */
+
+    if (hadPendingCorrection) {
+      flowPatch.ultimaCorreccion = {
+        ...(state.group.flowFicha?.ultimaCorreccion || {}),
+
+        estado:
+          "revisada_jefa",
+
+        revisadaPor:
+          nombre,
+
+        revisadaPorCorreo:
+          state.effectiveEmail,
+
+        respuestaJefa,
+
+        fechaRevisionJefa:
+          serverTimestamp()
+      };
+    }
+
     const patch = {
-      fichaFlujoModo: esCorreccionActiva ? "correccion" : "v2",
-      fichaEstado: esCorreccionActiva ? "correccion_pendiente_administracion" : "revisada_jefa_ventas",
-      firmaSupervision: nombre,
-  
+      fichaFlujoModo:
+        esCorreccionActiva
+          ? "correccion"
+          : "v2",
+
+      fichaEstado:
+        esCorreccionActiva
+          ? "correccion_pendiente_administracion"
+          : "revisada_jefa_ventas",
+
+      firmaSupervision:
+        nombre,
+
       documentos: {
         ...(state.group.documentos || {}),
+
         fichaGrupo: {
           ...(state.group.documentos?.fichaGrupo || {}),
-          estado: "revisada_jefa_ventas"
+
+          estado:
+            esCorreccionActiva
+              ? "correccion_pendiente_administracion"
+              : "revisada_jefa_ventas"
         }
       },
-  
+
       ficha: {
         ...(state.group.ficha || {}),
-        flujoModo: esCorreccionActiva ? "correccion" : "v2",
-        estado: esCorreccionActiva ? "correccion_pendiente_administracion" : "revisada_jefa_ventas"
+
+        flujoModo:
+          esCorreccionActiva
+            ? "correccion"
+            : "v2",
+
+        estado:
+          esCorreccionActiva
+            ? "correccion_pendiente_administracion"
+            : "revisada_jefa_ventas"
       },
-  
-      flowFicha: flowPatch
+
+      flowFicha:
+        flowPatch
     };
-  
-    await saveGroupPatch(patch, {
-      tipoMovimiento: hadPendingRequest
-        ? "solicitud_actualizacion_revisada_jefa"
-        : "firma_jefa_ventas",
-      modulo: "ficha",
-      titulo: hadPendingRequest
-        ? "Solicitud revisada por jefa de ventas"
-        : "Firma jefa de ventas",
-      mensaje: hadPendingRequest
-        ? `${nombre} revisó la solicitud de actualización. Motivo original: ${pendingRequest?.detalle || "Sin detalle"}. Respuesta jefa: ${respuestaJefa}`
-        : `${nombre} revisó la ficha como jefa de ventas.`,
-      cambios: [
-        { campo: "fichaEstado", anterior: state.group.fichaEstado || "", nuevo: "revisada_jefa_ventas" },
-        { campo: "firmaSupervision", anterior: state.group.firmaSupervision || "", nuevo: nombre }
-      ],
-      reloadAfterSave: false,
-      successMessage: hadPendingRequest
-        ? "Solicitud revisada por jefa de ventas y enviada a Administración."
-        : "Firma de jefa de ventas registrada correctamente."
-    });
-  
+
+    /*
+     * =====================================================
+     * HISTORIAL JEFA
+     * =====================================================
+     */
+
+    await saveGroupPatch(
+      patch,
+      {
+        tipoMovimiento:
+          hadPendingCorrection
+            ? "solicitud_correccion_revisada_jefa"
+            : hadPendingRequest
+              ? "solicitud_actualizacion_revisada_jefa"
+              : "firma_jefa_ventas",
+
+        modulo:
+          "ficha",
+
+        titulo:
+          hadPendingCorrection
+            ? "Corrección revisada por jefa de ventas"
+            : hadPendingRequest
+              ? "Solicitud revisada por jefa de ventas"
+              : "Firma jefa de ventas",
+
+        mensaje:
+          hadPendingCorrection
+            ? [
+                `${nombre} revisó la corrección de ficha.`,
+                `Motivo original: ${
+                  pendingCorrection?.detalle ||
+                  "Sin detalle"
+                }.`,
+                `Revisión / corrección realizada: ${respuestaJefa}.`
+              ].join(" ")
+
+            : hadPendingRequest
+              ? [
+                  `${nombre} revisó la solicitud de actualización.`,
+                  `Motivo original: ${
+                    pendingRequest?.detalle ||
+                    "Sin detalle"
+                  }.`,
+                  `Revisión / actualización realizada: ${respuestaJefa}.`
+                ].join(" ")
+
+              : `${nombre} revisó la ficha como jefa de ventas.`,
+
+        cambios: [
+          {
+            campo:
+              "fichaEstado",
+
+            anterior:
+              state.group.fichaEstado || "",
+
+            nuevo:
+              esCorreccionActiva
+                ? "correccion_pendiente_administracion"
+                : "revisada_jefa_ventas"
+          },
+
+          {
+            campo:
+              "firmaSupervision",
+
+            anterior:
+              state.group.firmaSupervision || "",
+
+            nuevo:
+              nombre
+          }
+        ],
+
+        reloadAfterSave:
+          false,
+
+        successMessage:
+          hadPendingCorrection
+            ? "Corrección revisada por jefa de ventas y enviada a Administración."
+            : hadPendingRequest
+              ? "Solicitud revisada por jefa de ventas y enviada a Administración."
+              : "Firma de jefa de ventas registrada correctamente."
+      }
+    );
+
+    /*
+     * =====================================================
+     * ACTUALIZA DOCUMENTO DE SOLICITUD
+     * =====================================================
+     */
+
     if (hadPendingRequest) {
       await markPendingFichaUpdateRequestsAsReviewedByJefa({
-        reviewedBy: nombre,
-        reviewedByCorreo: state.effectiveEmail,
+        reviewedBy:
+          nombre,
+
+        reviewedByCorreo:
+          state.effectiveEmail,
+
         respuestaJefa
       });
-  
+
+      /*
+       * NO creamos alerta info.
+       *
+       * Esta warning permite que Administración
+       * sepa que ya debe atenderla.
+       */
       await createFichaAlert({
-        titulo: "Solicitud revisada por jefa de ventas",
-        mensaje: `${nombre} revisó una solicitud de actualización.\n\nMotivo original: ${pendingRequest?.detalle || "Sin detalle"}\n\nRespuesta jefa: ${respuestaJefa}`,
-        nivel: "warning",
-        destinatarioRol: "administracion",
-        destinatarioCorreo: "administracion@raitrai.cl"
+        titulo:
+          "Solicitud revisada por jefa de ventas",
+
+        mensaje:
+          `${nombre} revisó una solicitud de actualización.\n\n` +
+          `Motivo original: ${pendingRequest?.detalle || "Sin detalle"}\n\n` +
+          `Respuesta jefa: ${respuestaJefa}`,
+
+        nivel:
+          "warning",
+
+        destinatarioRol:
+          "administracion",
+
+        destinatarioCorreo:
+          "administracion@raitrai.cl",
+
+        tipo:
+          "solicitud_actualizacion_ficha"
       });
     }
 
@@ -2687,69 +3366,134 @@ async function signFlowFromFicha(step) {
       await markPendingFichaCorrectionRequestsAsReviewedByJefa({
         reviewedBy:
           nombre,
-    
+
         reviewedByCorreo:
           state.effectiveEmail,
-    
+
         respuestaJefa
       });
+
+      /*
+       * También dejamos alerta orientada
+       * a Administración para la corrección.
+       */
+      await createFichaAlert({
+        titulo:
+          "Corrección revisada por jefa de ventas",
+
+        mensaje:
+          `${nombre} revisó una corrección de ficha.\n\n` +
+          `Motivo original: ${pendingCorrection?.detalle || "Sin detalle"}\n\n` +
+          `Respuesta jefa: ${respuestaJefa}`,
+
+        nivel:
+          "warning",
+
+        destinatarioRol:
+          "administracion",
+
+        destinatarioCorreo:
+          "administracion@raitrai.cl",
+
+        tipo:
+          "solicitud_correccion_ficha"
+      });
     }
-  
+
     await refreshFichaUiAfterFlowChange();
+
     return;
   }
-  
+
+  /*
+   * =========================================================
+   * FIRMA / CIERRE ADMINISTRACIÓN
+   * =========================================================
+   */
+
   if (step === "administracion") {
-    if (!canActAsFichaAdministracion()) {
-      alert("Esta firma solo puede realizarla administración.");
+    if (
+      !canActAsFichaAdministracion()
+    ) {
+      alert(
+        "Esta firma solo puede realizarla administración."
+      );
+
       return;
     }
 
-  const resumenNomina = await obtenerResumenNominaParaFirmaAdmin();
-  
-  const debeBloquearFirmaAdmin =
-    !isRealAdminRole() &&
-    resumenNomina.existeNomina &&
-    !resumenNomina.tieneSistemaPagos &&
-    !nominaInicialEstaCargadaEnPagos();
-  
-  if (debeBloquearFirmaAdmin) {
-    alert(
-      "Antes de firmar como Administración debes marcar la nómina inicial como Cargado a Pagos.\n\n" +
-      "Ve al Portafolio del grupo, hace clic al botón Cargado a Pagos y luego vuelve a firmar."
-    );
-    return;
-  }
+    /*
+     * =====================================================
+     * VALIDACIÓN NÓMINA
+     * =====================================================
+     */
+
+    const resumenNomina =
+      await obtenerResumenNominaParaFirmaAdmin();
+
+    const debeBloquearFirmaAdmin =
+      !isRealAdminRole() &&
+      resumenNomina.existeNomina &&
+      !resumenNomina.tieneSistemaPagos &&
+      !nominaInicialEstaCargadaEnPagos();
+
+    if (debeBloquearFirmaAdmin) {
+      alert(
+        "Antes de firmar como Administración debes marcar la nómina inicial como Cargado a Pagos.\n\n" +
+        "Ve al Portafolio del grupo, hace clic al botón Cargado a Pagos y luego vuelve a firmar."
+      );
+
+      return;
+    }
+
+    /*
+     * =====================================================
+     * PROCESO PENDIENTE
+     * =====================================================
+     */
 
     const pendingUpdate =
       getLatestOpenFichaUpdateRequest();
-    
+
     const pendingCorrection =
       getLatestOpenFichaCorrectionRequest();
-    
+
     const pendingRequest =
       pendingUpdate ||
       pendingCorrection;
-    
+
     const hadPendingRequest =
       !!pendingRequest;
-    
+
     const closingCorrection =
       !!pendingCorrection;
-    
-    if (flow?.administracion?.firmado && !hadPendingRequest) {
-      alert("La firma de administración ya está registrada.");
+
+    if (
+      flow?.administracion?.firmado &&
+      !hadPendingRequest
+    ) {
+      alert(
+        "La firma de administración ya está registrada."
+      );
+
       return;
     }
-    
-    let respuestaAdministracion = "";
-    
+
+    /*
+     * =====================================================
+     * EXPLICACIÓN OBLIGATORIA DEL CIERRE
+     * =====================================================
+     */
+
+    let respuestaAdministracion =
+      "";
+
     if (hadPendingRequest) {
       const tipoProceso =
         closingCorrection
           ? "corrección"
           : "actualización";
-    
+
       respuestaAdministracion =
         promptRequired(
           [
@@ -2766,186 +3510,413 @@ async function signFlowFromFicha(step) {
             "¿Qué valida, resuelve o cierra Administración?"
           ].join("\n")
         );
-    
-      if (respuestaAdministracion === null) {
+
+      if (
+        respuestaAdministracion === null
+      ) {
         return;
       }
-    
+
       if (!respuestaAdministracion) {
         alert(
           "Debes escribir qué valida, resuelve o cierra Administración."
         );
+
         return;
       }
     }
 
+    /*
+     * =====================================================
+     * DETERMINAR SI REALMENTE NECESITA NUEVO PDF
+     * =====================================================
+     *
+     * IMPORTANTE:
+     *
+     * Cerrar una actualización/corrección NO significa
+     * automáticamente crear un nuevo PDF.
+     *
+     * Si saveFicha() cambió datos que invalidan el PDF,
+     * ya habrá dejado:
+     *
+     * pdfPendienteGeneracion = true
+     * y normalmente pdfUrl = ""
+     */
+
+    const tienePdfActual =
+      !!cleanText(
+        state.group?.ficha?.pdfUrl ||
+        state.group?.fichaPdfUrl ||
+        ""
+      );
+
+    const pdfYaEstabaPendiente =
+      state.group?.ficha?.pdfPendienteGeneracion === true ||
+      state.group?.pdfPendienteGeneracion === true ||
+      state.group?.fichaPdfPendienteGeneracion === true;
+
+    const debeGenerarNuevoPdf =
+      !tienePdfActual ||
+      pdfYaEstabaPendiente;
+
+    /*
+     * =====================================================
+     * FLOW ADMINISTRACIÓN
+     * =====================================================
+     */
+
     const flowPatch = {
       ...(state.group.flowFicha || {}),
-      modo: "v2",
-      legacy: false,
-      estado: "autorizada_admin",
-      requiereActualizacion: false,
-      correccionPendiente: false,
-      correccionEstado: "cerrada",
-      requiereRefirmaAdministracion: false,
+
+      modo:
+        "v2",
+
+      legacy:
+        false,
+
+      estado:
+        "autorizada_admin",
+
+      requiereActualizacion:
+        false,
+
+      correccionPendiente:
+        false,
+
+      correccionEstado:
+        "cerrada",
+
+      requiereRefirmaAdministracion:
+        false,
+
       administracion: {
         ...(state.group.flowFicha?.administracion || {}),
-        firmado: true,
-        firmadoAt: serverTimestamp(),
-        firmadoPor: nombre,
-        firmadoPorCorreo: state.effectiveEmail,
-        observacion: ""
+
+        firmado:
+          true,
+
+        firmadoAt:
+          serverTimestamp(),
+
+        firmadoPor:
+          nombre,
+
+        firmadoPorCorreo:
+          state.effectiveEmail,
+
+        /*
+         * Guardamos también la explicación
+         * directamente en la firma.
+         */
+        observacion:
+          respuestaAdministracion || ""
       }
     };
+
+    /*
+     * =====================================================
+     * CIERRE ACTUALIZACIÓN / CORRECCIÓN
+     * =====================================================
+     */
 
     if (hadPendingRequest) {
       if (closingCorrection) {
         flowPatch.ultimaCorreccion = {
           ...(state.group.flowFicha?.ultimaCorreccion || {}),
-    
+
           estado:
             "completada",
-    
+
           respuestaJefa:
             pendingRequest?.respuestaJefa ||
             state.group.flowFicha?.ultimaCorreccion?.respuestaJefa ||
             "",
-    
+
           respuestaAdministracion,
-    
+
           cerradaPor:
             nombre,
-    
+
           cerradaPorCorreo:
             state.effectiveEmail,
-    
+
           fechaCierre:
             serverTimestamp()
         };
       } else {
         flowPatch.ultimaSolicitudActualizacion = {
           ...(state.group.flowFicha?.ultimaSolicitudActualizacion || {}),
-    
+
           estado:
             "completada",
-    
+
           respuestaJefa:
             pendingRequest?.respuestaJefa ||
             state.group.flowFicha?.ultimaSolicitudActualizacion?.respuestaJefa ||
             "",
-    
+
           respuestaAdministracion,
-    
+
           cerradaPor:
             nombre,
-    
+
           cerradaPorCorreo:
             state.effectiveEmail,
-    
+
           fechaCierre:
             serverTimestamp()
         };
-    
+
         flowPatch.ultimaActualizacionCerradaAt =
           serverTimestamp();
-    
+
         flowPatch.ultimaActualizacionCerradaPor =
           nombre;
-    
+
         flowPatch.ultimaActualizacionCerradaPorCorreo =
           state.effectiveEmail;
       }
     }
 
-    const anoViajeNum = Number(state.group?.anoViaje || 0);
-    const esFichaLegacy2025 = anoViajeNum <= 2025;
-    
+    /*
+     * =====================================================
+     * AUTORIZACIÓN
+     * =====================================================
+     */
+
+    const anoViajeNum =
+      Number(
+        state.group?.anoViaje || 0
+      );
+
+    const esFichaLegacy2025 =
+      anoViajeNum <= 2025;
+
+    /*
+     * 2026+:
+     *
+     * - Si falta PDF nuevo -> todavía NO autorizada.
+     * - Si ya existe PDF vigente y no requiere reemplazo
+     *   -> puede seguir autorizada.
+     */
+    const debeQuedarAutorizada =
+      esFichaLegacy2025 ||
+      (
+        tienePdfActual &&
+        !debeGenerarNuevoPdf
+      );
+
     const patch = {
-      fichaFlujoModo: "v2",
-      fichaEstado: "autorizada_admin",
-      firmaAdministracion: nombre,
-    
-      // Regla:
-      // 2025 o anterior queda autorizada al firmar administración.
-      // 2026 en adelante solo queda autorizada cuando se genera PDF real en ficha-pdf.js.
-      // Cerrada = ya están las 3 firmas.
-      // Autorizada = 2025 se autoriza aquí; 2026+ recién cuando se genera PDF.
-      autorizada: esFichaLegacy2025,
-      fichaFlujoAbierto: false,
+      fichaFlujoModo:
+        "v2",
+
+      fichaEstado:
+        "autorizada_admin",
+
+      firmaAdministracion:
+        nombre,
+
+      autorizada:
+        debeQuedarAutorizada,
+
+      /*
+       * El procedimiento de revisión sí queda cerrado.
+       */
+      fichaFlujoAbierto:
+        false,
 
       documentos: {
         ...(state.group.documentos || {}),
+
         fichaGrupo: {
           ...(state.group.documentos?.fichaGrupo || {}),
-          estado: "autorizada_admin"
+
+          estado:
+            "autorizada_admin"
         }
       },
 
       ficha: {
         ...(state.group.ficha || {}),
-        flujoModo: "v2",
-        estado: "autorizada_admin",
-        pdfPendienteGeneracion: true
+
+        flujoModo:
+          "v2",
+
+        estado:
+          "autorizada_admin",
+
+        /*
+         * CLAVE:
+         *
+         * No forzamos un PDF nuevo solo porque
+         * Administración cerró la solicitud.
+         */
+        pdfPendienteGeneracion:
+          debeGenerarNuevoPdf
       },
 
-      flowFicha: flowPatch
+      flowFicha:
+        flowPatch
     };
 
-    await saveGroupPatch(patch, {
-      tipoMovimiento: "firma_administracion",
-      modulo: "ficha",
-      titulo: hadPendingRequest ? "Refirma administración" : "Firma administración",
-      mensaje: hadPendingRequest
-        ? `${nombre} aprobó nuevamente la ficha desde administración y cerró la solicitud de actualización.`
-        : `${nombre} autorizó el grupo desde administración.`,
-      cambios: [
-        { campo: "autorizada", anterior: !!state.group.autorizada, nuevo: esFichaLegacy2025 },
-        { campo: "fichaFlujoAbierto", anterior: !!state.group.fichaFlujoAbierto, nuevo: false },
-        { campo: "fichaEstado", anterior: state.group.fichaEstado || "", nuevo: "autorizada_admin" }
-      ],
-      reloadAfterSave: false,
-      successMessage: hadPendingRequest
-        ? "Refirma de administración registrada correctamente."
-        : "Firma de administración registrada correctamente."
-    });
+    /*
+     * =====================================================
+     * FIRMA ADMINISTRACIÓN
+     * =====================================================
+     */
+
+    await saveGroupPatch(
+      patch,
+      {
+        tipoMovimiento:
+          hadPendingRequest
+            ? (
+                closingCorrection
+                  ? "refirma_administracion_correccion"
+                  : "refirma_administracion_actualizacion"
+              )
+            : "firma_administracion",
+
+        modulo:
+          "ficha",
+
+        titulo:
+          hadPendingRequest
+            ? (
+                closingCorrection
+                  ? "Cierre administrativo de corrección"
+                  : "Cierre administrativo de actualización"
+              )
+            : "Firma administración",
+
+        mensaje:
+          hadPendingRequest
+            ? (
+                closingCorrection
+                  ? `${nombre} aprobó nuevamente la ficha desde Administración y cerró la corrección.`
+                  : `${nombre} aprobó nuevamente la ficha desde Administración y cerró la solicitud de actualización.`
+              )
+            : `${nombre} autorizó el grupo desde administración.`,
+
+        cambios: [
+          {
+            campo:
+              "autorizada",
+
+            anterior:
+              !!state.group.autorizada,
+
+            nuevo:
+              debeQuedarAutorizada
+          },
+
+          {
+            campo:
+              "fichaFlujoAbierto",
+
+            anterior:
+              !!state.group.fichaFlujoAbierto,
+
+            nuevo:
+              false
+          },
+
+          {
+            campo:
+              "fichaEstado",
+
+            anterior:
+              state.group.fichaEstado || "",
+
+            nuevo:
+              "autorizada_admin"
+          },
+
+          {
+            campo:
+              "ficha.pdfPendienteGeneracion",
+
+            anterior:
+              state.group?.ficha?.pdfPendienteGeneracion === true,
+
+            nuevo:
+              debeGenerarNuevoPdf
+          }
+        ],
+
+        reloadAfterSave:
+          false,
+
+        successMessage:
+          hadPendingRequest
+            ? (
+                closingCorrection
+                  ? "Corrección cerrada correctamente por Administración."
+                  : "Actualización cerrada correctamente por Administración."
+              )
+            : "Firma de administración registrada correctamente."
+      }
+    );
+
+    /*
+     * =====================================================
+     * CIERRE DEL DOCUMENTO SOLICITUD + ALERTAS
+     * =====================================================
+     */
 
     if (hadPendingRequest) {
       await markOpenFichaUpdateRequestsAsCompleted({
-        resolvedBy: nombre,
-        resolvedByCorreo: state.effectiveEmail,
+        resolvedBy:
+          nombre,
+
+        resolvedByCorreo:
+          state.effectiveEmail,
+
         respuestaAdministracion
       });
-    
+
+      /*
+       * Cierra las warnings del proceso.
+       *
+       * Esto incluye tanto la alerta inicial como
+       * las alertas posteriores creadas para Administración.
+       */
       await resolveOpenFichaProcessAlerts({
         resolvedBy:
           nombre,
-      
+
         resolvedByCorreo:
           state.effectiveEmail,
-      
+
         resolucion:
           respuestaAdministracion
       });
-      
+
+      /*
+       * ===================================================
+       * HISTORIAL COMPLETO
+       * ===================================================
+       */
+
       const tipoProcesoCerrado =
         closingCorrection
           ? "corrección"
           : "actualización";
-      
+
       await createHistoryEntry({
         tipoMovimiento:
           closingCorrection
             ? "solicitud_correccion_cerrada"
             : "solicitud_actualizacion_cerrada",
-      
+
         modulo:
           "ficha",
-      
+
         titulo:
           closingCorrection
             ? "Corrección de ficha cerrada"
             : "Solicitud de actualización cerrada",
-      
+
         asunto:
           pendingRequest?.asunto ||
           (
@@ -2953,91 +3924,155 @@ async function signFlowFromFicha(step) {
               ? "Corrección de ficha"
               : "Solicitud de actualización"
           ),
-      
+
         mensaje:
           [
             `${nombre} cerró la ${tipoProcesoCerrado} de ficha.`,
-      
+
             `Motivo original: ${
               pendingRequest?.detalle ||
               "Sin detalle"
             }.`,
-      
+
             `Revisión jefa de ventas: ${
               pendingRequest?.respuestaJefa ||
               "Sin respuesta registrada"
             }.`,
-      
+
             `Cierre Administración: ${
               respuestaAdministracion
-            }.`
+            }.`,
+
+            debeGenerarNuevoPdf
+              ? "La ficha quedó pendiente de generación de un nuevo PDF."
+              : "No fue necesario generar un nuevo PDF para cerrar este procedimiento."
           ].join(" "),
-      
+
         metadata: {
           solicitudId:
             pendingRequest?.id || "",
-      
+
           tipoSolicitud:
             pendingRequest?.tipoSolicitud || "",
-      
+
           detalleSolicitud:
             pendingRequest?.detalle || "",
-      
+
           respuestaJefa:
             pendingRequest?.respuestaJefa || "",
-      
+
           respuestaAdministracion,
-      
+
           solicitadoPor:
             pendingRequest?.solicitadoPor || "",
-      
+
           solicitadoPorCorreo:
             pendingRequest?.solicitadoPorCorreo || "",
-      
+
           cerradoPor:
             nombre,
-      
+
           cerradoPorCorreo:
-            state.effectiveEmail
+            state.effectiveEmail,
+
+          requiereNuevoPdf:
+            debeGenerarNuevoPdf,
+
+          pdfExistente:
+            tienePdfActual
         }
       });
     }
 
     await refreshFichaUiAfterFlowChange();
+
     return;
   }
 }
 
 async function saveUpdateRequest() {
-  const mode = state.requestMode === "correccion" ? "correccion" : "actualizacion";
-  const esCorreccion = mode === "correccion";
+  const mode =
+    state.requestMode === "correccion"
+      ? "correccion"
+      : "actualizacion";
 
-  if (esCorreccion && !canRequestFichaCorrection()) {
-    showToast("No tienes permisos para solicitar corrección.", "warning");
+  const esCorreccion =
+    mode === "correccion";
+
+  /*
+   * =========================================================
+   * PERMISOS
+   * =========================================================
+   */
+
+  if (
+    esCorreccion &&
+    !canRequestFichaCorrection()
+  ) {
+    showToast(
+      "No tienes permisos para solicitar corrección.",
+      "warning"
+    );
+
     return;
   }
 
-  if (!esCorreccion && !canRequestFichaUpdate()) {
-    showToast("No tienes permisos para solicitar actualización.", "warning");
+  if (
+    !esCorreccion &&
+    !canRequestFichaUpdate()
+  ) {
+    showToast(
+      "No tienes permisos para solicitar actualización.",
+      "warning"
+    );
+
     return;
   }
 
-  if (hasPendingUpdateRequest()) {
-    showToast("Ya existe una solicitud abierta para este grupo.", "warning");
-    closeModal("modalSolicitudFicha");
+  /*
+   * =========================================================
+   * EVITAR PROCESOS DUPLICADOS
+   * =========================================================
+   */
+
+  if (hasOpenFichaProcessRequest()) {
+    showToast(
+      "Ya existe una solicitud de actualización o corrección abierta para este grupo.",
+      "warning"
+    );
+
+    closeModal(
+      "modalSolicitudFicha"
+    );
+
     return;
   }
 
-  const asunto = getValue("sr_asunto");
-  const detalle = getValue("sr_detalle");
+  /*
+   * =========================================================
+   * DATOS SOLICITUD
+   * =========================================================
+   */
+
+  const asunto =
+    getValue(
+      "sr_asunto"
+    );
+
+  const detalle =
+    getValue(
+      "sr_detalle"
+    );
 
   if (!detalle) {
     showToast(
       esCorreccion
         ? "Debes explicar qué hay que corregir."
         : "Debes explicar qué hay que actualizar.",
+
       "warning"
     );
+
     return;
   }
 
@@ -3045,142 +4080,358 @@ async function saveUpdateRequest() {
     asunto ||
     (
       esCorreccion
-        ? `Corrección ficha · ${state.group.aliasGrupo || state.group.colegio || state.groupId}`
-        : `Actualizar ficha · ${state.group.aliasGrupo || state.group.colegio || state.groupId}`
+        ? `Corrección ficha · ${
+            state.group.aliasGrupo ||
+            state.group.colegio ||
+            state.groupId
+          }`
+
+        : `Actualizar ficha · ${
+            state.group.aliasGrupo ||
+            state.group.colegio ||
+            state.groupId
+          }`
     );
 
-  await addDoc(collection(db, SOLICITUDES_COLLECTION), {
-    idGrupo: String(state.groupId),
-    codigoRegistro: cleanText(state.group.codigoRegistro),
-    aliasGrupo: cleanText(state.group.aliasGrupo),
-    colegio: cleanText(state.group.colegio),
+  const solicitadoPor =
+    getDisplayName(
+      state.effectiveUser
+    );
 
-    tipoSolicitud: esCorreccion
-      ? "correccion_ficha"
-      : "actualizacion_ficha",
+  /*
+   * =========================================================
+   * DOCUMENTO SOLICITUD
+   * =========================================================
+   */
 
-    asunto: asuntoFinal,
-    detalle,
+  await addDoc(
+    collection(
+      db,
+      SOLICITUDES_COLLECTION
+    ),
+    {
+      idGrupo:
+        String(
+          state.groupId
+        ),
 
-    estadoSolicitud: esCorreccion
-      ? "pendiente_jefa"
-      : "pendiente",
+      codigoRegistro:
+        cleanText(
+          state.group.codigoRegistro
+        ),
 
-    resuelta: false,
+      aliasGrupo:
+        cleanText(
+          state.group.aliasGrupo
+        ),
 
-    destinatarioRol: "jefa_ventas",
-    destinatarioCorreo: "chernandez@raitrai.cl",
+      colegio:
+        cleanText(
+          state.group.colegio
+        ),
 
-    solicitadoPor: getDisplayName(state.effectiveUser),
-    solicitadoPorCorreo: state.effectiveEmail,
-    fechaSolicitud: serverTimestamp()
-  });
+      tipoSolicitud:
+        esCorreccion
+          ? "correccion_ficha"
+          : "actualizacion_ficha",
 
-  const flowActual = state.group.flowFicha || {};
+      asunto:
+        asuntoFinal,
 
-  const flowPatch = esCorreccion
-    ? {
-        ...flowActual,
-        modo: "correccion",
-        correccionPendiente: true,
-        correccionOrigen: isStrictAdministracionUser()
-          ? "administracion"
-          : isRealAdminRole()
-            ? "admin"
-            : "jefa_ventas",
-        correccionEstado: "pendiente_jefa",
-        correccionSolicitadaPor: getDisplayName(state.effectiveUser),
-        correccionSolicitadaPorCorreo: state.effectiveEmail,
-        correccionSolicitadaAt: serverTimestamp(),
-        requiereActualizacion: false,
-        ultimaCorreccion: {
-          asunto: asuntoFinal,
-          detalle,
-          solicitadaPor: getDisplayName(state.effectiveUser),
-          solicitadaPorCorreo: state.effectiveEmail,
-          fechaSolicitud: serverTimestamp(),
-          estado: "pendiente_jefa"
+      detalle,
+
+      estadoSolicitud:
+        esCorreccion
+          ? "pendiente_jefa"
+          : "pendiente",
+
+      resuelta:
+        false,
+
+      destinatarioRol:
+        "jefa_ventas",
+
+      destinatarioCorreo:
+        "chernandez@raitrai.cl",
+
+      solicitadoPor,
+
+      solicitadoPorCorreo:
+        state.effectiveEmail,
+
+      fechaSolicitud:
+        serverTimestamp()
+    }
+  );
+
+  /*
+   * =========================================================
+   * FLOW GRUPO
+   * =========================================================
+   */
+
+  const flowActual =
+    state.group.flowFicha || {};
+
+  const flowPatch =
+    esCorreccion
+
+      ? {
+          ...flowActual,
+
+          modo:
+            "correccion",
+
+          correccionPendiente:
+            true,
+
+          correccionOrigen:
+            isStrictAdministracionUser()
+              ? "administracion"
+              : isRealAdminRole()
+                ? "admin"
+                : "jefa_ventas",
+
+          correccionEstado:
+            "pendiente_jefa",
+
+          correccionSolicitadaPor:
+            solicitadoPor,
+
+          correccionSolicitadaPorCorreo:
+            state.effectiveEmail,
+
+          correccionSolicitadaAt:
+            serverTimestamp(),
+
+          requiereActualizacion:
+            false,
+
+          ultimaCorreccion: {
+            asunto:
+              asuntoFinal,
+
+            detalle,
+
+            solicitadaPor:
+              solicitadoPor,
+
+            solicitadaPorCorreo:
+              state.effectiveEmail,
+
+            fechaSolicitud:
+              serverTimestamp(),
+
+            estado:
+              "pendiente_jefa"
+          }
         }
-      }
-    : {
-        ...flowActual,
-        modo: "v2",
-        requiereActualizacion: true,
-        ultimaSolicitudActualizacion: {
-          asunto: asuntoFinal,
-          detalle,
-          solicitadaPor: getDisplayName(state.effectiveUser),
-          solicitadaPorCorreo: state.effectiveEmail,
-          fechaSolicitud: serverTimestamp(),
-          estado: "pendiente"
-        }
-      };
 
-  await setDoc(doc(db, "ventas_cotizaciones", state.groupDocId), {
-    // Una solicitud de actualización/corrección abre la ficha nuevamente.
-    fichaFlujoAbierto: true,
-  
-    fichaFlujoModo: esCorreccion ? "correccion" : "v2",
-    fichaEstado: esCorreccion
-      ? "correccion_pendiente_jefa"
-      : state.group?.fichaEstado || "en_edicion",
+      : {
+          ...flowActual,
 
-    ficha: {
-      ...(state.group.ficha || {}),
-      flujoModo: esCorreccion ? "correccion" : "v2",
-      estado: esCorreccion
-        ? "correccion_pendiente_jefa"
-        : state.group?.ficha?.estado || state.group?.fichaEstado || "en_edicion"
+          modo:
+            "v2",
+
+          requiereActualizacion:
+            true,
+
+          ultimaSolicitudActualizacion: {
+            asunto:
+              asuntoFinal,
+
+            detalle,
+
+            solicitadaPor:
+              solicitadoPor,
+
+            solicitadaPorCorreo:
+              state.effectiveEmail,
+
+            fechaSolicitud:
+              serverTimestamp(),
+
+            estado:
+              "pendiente"
+          }
+        };
+
+  /*
+   * =========================================================
+   * ABRIR PROCEDIMIENTO
+   * =========================================================
+   *
+   * IMPORTANTE:
+   *
+   * Esto abre el procedimiento de revisión,
+   * pero NO invalida por sí solo el PDF existente.
+   *
+   * Si después realmente se modifica la ficha,
+   * saveFicha() determinará si debe generarse
+   * una nueva versión.
+   */
+
+  await setDoc(
+    doc(
+      db,
+      "ventas_cotizaciones",
+      state.groupDocId
+    ),
+    {
+      fichaFlujoAbierto:
+        true,
+
+      fichaFlujoModo:
+        esCorreccion
+          ? "correccion"
+          : "v2",
+
+      fichaEstado:
+        esCorreccion
+          ? "correccion_pendiente_jefa"
+          : (
+              state.group?.fichaEstado ||
+              "en_edicion"
+            ),
+
+      ficha: {
+        ...(state.group.ficha || {}),
+
+        flujoModo:
+          esCorreccion
+            ? "correccion"
+            : "v2",
+
+        estado:
+          esCorreccion
+            ? "correccion_pendiente_jefa"
+            : (
+                state.group?.ficha?.estado ||
+                state.group?.fichaEstado ||
+                "en_edicion"
+              )
+      },
+
+      flowFicha:
+        flowPatch,
+
+      actualizadoPor:
+        solicitadoPor,
+
+      actualizadoPorCorreo:
+        state.effectiveEmail,
+
+      fechaActualizacion:
+        serverTimestamp()
     },
+    {
+      merge:
+        true
+    }
+  );
 
-    flowFicha: flowPatch,
-
-    actualizadoPor: getDisplayName(state.effectiveUser),
-    actualizadoPorCorreo: state.effectiveEmail,
-    fechaActualizacion: serverTimestamp()
-  }, { merge: true });
+  /*
+   * =========================================================
+   * HISTORIAL
+   * =========================================================
+   */
 
   await createHistoryEntry({
-    tipoMovimiento: esCorreccion
-      ? "solicitud_correccion_ficha"
-      : "solicitud_actualizacion_ficha",
-    modulo: "ficha",
-    titulo: esCorreccion
-      ? "Solicitud de corrección de ficha"
-      : "Solicitud de actualización de ficha",
-    asunto: asuntoFinal,
-    mensaje: esCorreccion
-      ? `${getDisplayName(state.effectiveUser)} solicitó corrección de la ficha. Motivo: ${detalle}`
-      : `${getDisplayName(state.effectiveUser)} solicitó actualización de la ficha. Motivo: ${detalle}`,
+    tipoMovimiento:
+      esCorreccion
+        ? "solicitud_correccion_ficha"
+        : "solicitud_actualizacion_ficha",
+
+    modulo:
+      "ficha",
+
+    titulo:
+      esCorreccion
+        ? "Solicitud de corrección de ficha"
+        : "Solicitud de actualización de ficha",
+
+    asunto:
+      asuntoFinal,
+
+    mensaje:
+      esCorreccion
+        ? `${solicitadoPor} solicitó corrección de la ficha. Motivo: ${detalle}`
+        : `${solicitadoPor} solicitó actualización de la ficha. Motivo: ${detalle}`,
+
     metadata: {
-      asunto: asuntoFinal,
-      detalleSolicitud: detalle,
-      destinatarioCorreo: "chernandez@raitrai.cl",
-      tipoSolicitud: esCorreccion ? "correccion_ficha" : "actualizacion_ficha"
+      asunto:
+        asuntoFinal,
+
+      detalleSolicitud:
+        detalle,
+
+      destinatarioCorreo:
+        "chernandez@raitrai.cl",
+
+      tipoSolicitud:
+        esCorreccion
+          ? "correccion_ficha"
+          : "actualizacion_ficha",
+
+      solicitadoPor,
+
+      solicitadoPorCorreo:
+        state.effectiveEmail
     }
   });
 
+  /*
+   * =========================================================
+   * ALERTA AUTOMÁTICA
+   * =========================================================
+   */
+
   await createFichaAlert({
-    titulo: esCorreccion
-      ? "Corrección de ficha solicitada"
-      : "Solicitud de actualización de ficha",
-    mensaje: esCorreccion
-      ? `${getDisplayName(state.effectiveUser)} solicitó corregir la ficha.\n\nMotivo: ${detalle}`
-      : `${getDisplayName(state.effectiveUser)} solicitó actualizar la ficha.\n\nMotivo: ${detalle}`,
-    nivel: "warning",
-    destinatarioRol: "jefa_ventas",
-    destinatarioCorreo: "chernandez@raitrai.cl",
-    tipo: esCorreccion ? "solicitud_correccion_ficha" : "solicitud_actualizacion_ficha"
+    titulo:
+      esCorreccion
+        ? "Corrección de ficha solicitada"
+        : "Solicitud de actualización de ficha",
+
+    mensaje:
+      esCorreccion
+        ? `${solicitadoPor} solicitó corregir la ficha.\n\nMotivo: ${detalle}`
+        : `${solicitadoPor} solicitó actualizar la ficha.\n\nMotivo: ${detalle}`,
+
+    nivel:
+      "warning",
+
+    destinatarioRol:
+      "jefa_ventas",
+
+    destinatarioCorreo:
+      "chernandez@raitrai.cl",
+
+    tipo:
+      esCorreccion
+        ? "solicitud_correccion_ficha"
+        : "solicitud_actualizacion_ficha"
   });
 
-  state.requestMode = "";
-  closeModal("modalSolicitudFicha");
+  /*
+   * =========================================================
+   * CIERRE UI
+   * =========================================================
+   */
+
+  state.requestMode =
+    "";
+
+  closeModal(
+    "modalSolicitudFicha"
+  );
+
   await loadAll();
 
   showToast(
     esCorreccion
       ? "Corrección enviada a jefa de ventas correctamente."
       : "Solicitud de actualización enviada a jefa de ventas correctamente.",
+
     "success"
   );
 }
