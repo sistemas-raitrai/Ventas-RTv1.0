@@ -942,10 +942,66 @@
                 <input id="f_correo" type="email" />
               </div>
 
-               <div class="field span-5">
-                <label for="f_nombrePrograma">Nombre programa</label>
-                <input id="f_nombrePrograma" type="text" />
+              <!-- =====================================================
+                   DESTINO / PROGRAMA
+                   Misma lógica que Editar datos del grupo
+              ===================================================== -->
+              
+              <div class="field span-6">
+                <label for="f_destinoPrincipal">Destino principal</label>
+              
+                <select id="f_destinoPrincipal">
+                  <option value="">Seleccionar destino...</option>
+                  <option value="BARILOCHE">BARILOCHE</option>
+                  <option value="SUR DE CHILE">SUR DE CHILE</option>
+                  <option value="SUR DE CHILE Y BARILOCHE">SUR DE CHILE Y BARILOCHE</option>
+                  <option value="BRASIL">BRASIL</option>
+                  <option value="NORTE DE CHILE">NORTE DE CHILE</option>
+                  <option value="MÉXICO">MÉXICO</option>
+                  <option value="REPÚBLICA DOMINICANA">REPÚBLICA DOMINICANA</option>
+                  <option value="OTRO">OTRO</option>
+                </select>
               </div>
+              
+              <div
+                class="field span-6 hidden"
+                id="wrapFichaDestinoPrincipalOtro"
+              >
+                <label for="f_destinoPrincipalOtro">Otro destino</label>
+              
+                <input
+                  id="f_destinoPrincipalOtro"
+                  type="text"
+                  placeholder="Especificar destino"
+                />
+              </div>
+              
+              
+              <div class="field span-6">
+                <label for="f_programa">Programa</label>
+              
+                <select id="f_programa">
+                  <option value="">Selecciona primero un destino...</option>
+                </select>
+              </div>
+              
+              <div
+                class="field span-6 hidden"
+                id="wrapFichaProgramaOtro"
+              >
+                <label for="f_programaOtro">Otro programa</label>
+              
+                <input
+                  id="f_programaOtro"
+                  type="text"
+                  placeholder="Especificar programa"
+                />
+              </div>
+              
+              
+              <!-- =====================================================
+                   VALORES / PAX
+              ===================================================== -->
               
               <div class="field span-3">
                 <label for="f_valorPrograma">Valor programa</label>
@@ -956,35 +1012,121 @@
                 <label for="f_numeroPaxTotal">Número pax total</label>
                 <input id="f_numeroPaxTotal" type="text" />
               </div>
-
+              
+              
+              <!-- =====================================================
+                   TRAMO
+              ===================================================== -->
+              
               <div class="field span-3">
-                <label for="f_tramo">Tramo</label>
-                <input id="f_tramo" type="text" />
+                <label for="f_tramoSeleccion">Tramo</label>
+              
+                <select id="f_tramoSeleccion">
+                  <option value="">Seleccionar tramo...</option>
+                  <option value="36 – 39">36 – 39</option>
+                  <option value="30 – 35">30 – 35</option>
+                  <option value="26 – 29">26 – 29</option>
+                  <option value="23 – 25">23 – 25</option>
+                  <option value="20 – 22">20 – 22</option>
+                  <option value="18 – 19">18 – 19</option>
+                  <option value="15 – 17">15 – 17</option>
+                  <option value="OTRO">OTRO</option>
+                </select>
               </div>
-
+              
+              <div
+                class="field span-3 hidden"
+                id="wrapFichaTramoOtro"
+              >
+                <label for="f_tramoOtro">Otro tramo</label>
+              
+                <input
+                  id="f_tramoOtro"
+                  type="text"
+                  placeholder="Especificar tramo"
+                />
+              </div>
+              
+              
               <div class="field span-3">
                 <label for="f_liberados">Liberados</label>
                 <input id="f_liberados" type="text" />
               </div>
-
+              
+              
+              <!-- =====================================================
+                   HOTEL / GERENCIA / DESCUENTO
+              ===================================================== -->
+              
               <div class="field span-12">
-                <label for="f_categoriaHoteleraContratada">Categoría hotelera contratada</label>
-                <input id="f_categoriaHoteleraContratada" type="text" />
+                <label for="f_categoriaHoteleraContratada">
+                  Categoría hotelera contratada
+                </label>
+              
+                <input
+                  id="f_categoriaHoteleraContratada"
+                  type="text"
+                />
               </div>
               
               <div class="field span-12">
-                <label for="f_autorizacionGerencia">Autorización gerencia</label>
+                <label for="f_autorizacionGerencia">
+                  Autorización gerencia
+                </label>
+              
                 <textarea id="f_autorizacionGerencia"></textarea>
               </div>
               
               <div class="field span-12">
-                <label for="f_descuentoValorBase">Descuento de valor base</label>
-                <input id="f_descuentoValorBase" type="text" />
+                <label for="f_descuentoValorBase">
+                  Descuento de valor base
+                </label>
+              
+                <input
+                  id="f_descuentoValorBase"
+                  type="text"
+                />
               </div>
               
-              <div class="field span-12">
-                <label for="f_fechaViajeTexto">Fecha de viaje</label>
-                <textarea id="f_fechaViajeTexto"></textarea>
+              
+              <!-- =====================================================
+                   MES / FECHA TENTATIVA
+              ===================================================== -->
+              
+              <div class="field span-6">
+                <label for="f_mesViaje">Mes de viaje</label>
+              
+                <select id="f_mesViaje">
+                  <option value="">Seleccionar mes...</option>
+                  <option value="ENERO">ENERO</option>
+                  <option value="FEBRERO">FEBRERO</option>
+                  <option value="MARZO">MARZO</option>
+                  <option value="ABRIL">ABRIL</option>
+                  <option value="MAYO">MAYO</option>
+                  <option value="JUNIO">JUNIO</option>
+                  <option value="JULIO">JULIO</option>
+                  <option value="AGOSTO">AGOSTO</option>
+                  <option value="SEPTIEMBRE">SEPTIEMBRE</option>
+                  <option value="OCTUBRE">OCTUBRE</option>
+                  <option value="NOVIEMBRE">NOVIEMBRE</option>
+                  <option value="DICIEMBRE">DICIEMBRE</option>
+                  <option value="OTRO">OTRO</option>
+                </select>
+              </div>
+              
+              <div
+                class="field span-6 hidden"
+                id="wrapFichaMesViajeOtro"
+              >
+                <label for="f_mesViajeOtro">
+                  Otra fecha / período
+                </label>
+              
+                <input
+                  id="f_mesViajeOtro"
+                  type="text"
+                  placeholder="Ej: SEGUNDA SEMANA DE OCTUBRE"
+                />
               </div>
               
               <div class="field span-12">
