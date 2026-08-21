@@ -729,31 +729,166 @@ function getTextoResumen(texto = "", max = 90) {
 }
 
 function renderMotivoCorreccion(row = {}) {
-  const detalle = getCorreccionDetalle(row);
-  if (!detalle) return "";
+  const flow =
+    row?.flowFicha || {};
 
-  const resumen = getTextoResumen(detalle, 90);
-  const uid = `motivo-correccion-${getRowId(row)}`;
+  const correccion =
+    flow?.ultimaCorreccion ||
+    row?.ultimaCorreccion ||
+    row?.ficha?.ultimaCorreccion ||
+    {};
+
+  const detalle =
+    String(
+      correccion.detalle ||
+      correccion.asunto ||
+      getCorreccionDetalle(row) ||
+      ""
+    ).trim();
+
+  const respuestaJefa =
+    String(
+      correccion.respuestaJefa ||
+      ""
+    ).trim();
+
+  const respuestaAdministracion =
+    String(
+      correccion.respuestaAdministracion ||
+      ""
+    ).trim();
+
+  const solicitadoPor =
+    String(
+      correccion.solicitadaPor ||
+      flow?.correccionSolicitadaPor ||
+      ""
+    ).trim();
+
+  const revisadaPor =
+    String(
+      correccion.revisadaPor ||
+      ""
+    ).trim();
+
+  if (
+    !detalle &&
+    !respuestaJefa &&
+    !respuestaAdministracion
+  ) {
+    return "";
+  }
+
+  const uid =
+    `motivo-correccion-${getRowId(row)}`;
+
+  const resumen =
+    getTextoResumen(
+      detalle ||
+      "Corrección de ficha",
+      90
+    );
 
   return `
-    <div style="margin-top:10px; padding:10px 12px; border-radius:14px; background:#fff8eb; border:1px solid #f0c27a; color:#5f3b00; font-size:13px; line-height:1.45;">
-      <strong>Motivo:</strong> ${escapeHtml(resumen)}
+    <div
+      style="
+        margin-top:10px;
+        padding:10px 12px;
+        border-radius:14px;
+        background:#fff8eb;
+        border:1px solid #f0c27a;
+        color:#5f3b00;
+        font-size:13px;
+        line-height:1.45;
+      "
+    >
+      <strong>Motivo:</strong>
+      ${escapeHtml(resumen)}
 
       <button
         type="button"
         data-toggle-motivo="${escapeHtml(uid)}"
-        style="margin-left:8px; border:0; background:#f2dfbd; color:#4b2d00; border-radius:999px; padding:5px 9px; font-weight:800; cursor:pointer;"
+        style="
+          margin-left:8px;
+          border:0;
+          background:#f2dfbd;
+          color:#4b2d00;
+          border-radius:999px;
+          padding:5px 9px;
+          font-weight:800;
+          cursor:pointer;
+        "
       >
-        Ver motivo
+        Ver detalle
       </button>
 
       <div
         id="${escapeHtml(uid)}"
         hidden
-        style="margin-top:10px; padding-top:10px; border-top:1px solid #e8c98f;"
+        style="
+          margin-top:10px;
+          padding-top:10px;
+          border-top:1px solid #e8c98f;
+        "
       >
-        <strong>Motivo completo:</strong><br>
-        ${escapeHtml(detalle)}
+
+        ${
+          solicitadoPor
+            ? `
+              <div style="margin-bottom:8px;">
+                <strong>Solicitado por:</strong><br>
+                ${escapeHtml(solicitadoPor)}
+              </div>
+            `
+            : ""
+        }
+
+        ${
+          detalle
+            ? `
+              <div style="margin-bottom:8px;">
+                <strong>Motivo de la corrección:</strong><br>
+                ${escapeHtml(detalle)}
+              </div>
+            `
+            : ""
+        }
+
+        ${
+          respuestaJefa
+            ? `
+              <div style="margin-bottom:8px;">
+                <strong>
+                  Qué corrigió / revisó jefa de ventas:
+                </strong><br>
+                ${escapeHtml(respuestaJefa)}
+
+                ${
+                  revisadaPor
+                    ? `
+                      <br>
+                      <small>
+                        Por ${escapeHtml(revisadaPor)}
+                      </small>
+                    `
+                    : ""
+                }
+              </div>
+            `
+            : ""
+        }
+
+        ${
+          respuestaAdministracion
+            ? `
+              <div>
+                <strong>Cierre Administración:</strong><br>
+                ${escapeHtml(respuestaAdministracion)}
+              </div>
+            `
+            : ""
+        }
+
       </div>
     </div>
   `;
