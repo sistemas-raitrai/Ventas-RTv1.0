@@ -3363,6 +3363,166 @@
     </div>
   </div>
 
+    <!-- =====================================================
+       CONFIGURACIÓN DE CONTROLES DE ADMINISTRACIÓN
+  ====================================================== -->
+  <div
+    class="modal"
+    id="modalConfigAdministracion"
+  >
+    <div class="modal-card admin-config-modal-card">
+      <header class="modal-head">
+        <div>
+          <h2>
+            Configurar controles de Administración
+          </h2>
+
+          <p>
+            Solo Jefatura de Administración y Admin pueden modificar esta configuración.
+          </p>
+        </div>
+
+        <button
+          id="btnCerrarConfigAdministracion"
+          class="modal-close"
+          type="button"
+          aria-label="Cerrar"
+        >
+          ×
+        </button>
+      </header>
+
+      <div class="modal-content">
+
+        <!-- =============================================
+             CONTROLES FIJOS
+        ============================================== -->
+        <div class="admin-config-fixed">
+          <strong>
+            Controles fijos
+          </strong>
+
+          <div>
+            ✓ Estado Carnet
+          </div>
+
+          <div>
+            ✓ Estado Económico
+          </div>
+
+          <p class="gn-sub">
+            Estos controles siempre están activos y no pueden eliminarse.
+          </p>
+        </div>
+
+
+        <!-- =============================================
+             CONTROLES CONFIGURABLES
+        ============================================== -->
+        <div class="admin-config-list">
+
+          <!-- CONTROL ADICIONAL 1 -->
+          <div class="admin-config-row">
+            <div>
+              <label for="adminConfigNombre_variable_3">
+                Control adicional 1
+              </label>
+
+              <input
+                id="adminConfigNombre_variable_3"
+                type="text"
+                placeholder="Ej.: Polerones"
+              />
+            </div>
+
+            <label class="admin-config-check">
+              <input
+                id="adminConfigActiva_variable_3"
+                type="checkbox"
+              />
+
+              Mostrar
+            </label>
+          </div>
+
+
+          <!-- CONTROL ADICIONAL 2 -->
+          <div class="admin-config-row">
+            <div>
+              <label for="adminConfigNombre_variable_4">
+                Control adicional 2
+              </label>
+
+              <input
+                id="adminConfigNombre_variable_4"
+                type="text"
+                placeholder="Ej.: Documentación"
+              />
+            </div>
+
+            <label class="admin-config-check">
+              <input
+                id="adminConfigActiva_variable_4"
+                type="checkbox"
+              />
+
+              Mostrar
+            </label>
+          </div>
+
+
+          <!-- CONTROL ADICIONAL 3 -->
+          <div class="admin-config-row">
+            <div>
+              <label for="adminConfigNombre_variable_5">
+                Control adicional 3
+              </label>
+
+              <input
+                id="adminConfigNombre_variable_5"
+                type="text"
+                placeholder="Ej.: Revisión pagos"
+              />
+            </div>
+
+            <label class="admin-config-check">
+              <input
+                id="adminConfigActiva_variable_5"
+                type="checkbox"
+              />
+
+              Mostrar
+            </label>
+          </div>
+
+        </div>
+
+
+        <!-- =============================================
+             ACCIONES
+        ============================================== -->
+        <div class="admin-config-actions">
+          <button
+            id="btnCancelarConfigAdministracion"
+            class="btn-secondary"
+            type="button"
+          >
+            Cancelar
+          </button>
+
+          <button
+            id="btnGuardarConfigAdministracion"
+            class="btn-primary"
+            type="button"
+          >
+            Guardar configuración
+          </button>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
   <script
     type="module"
     src="layout.js"
