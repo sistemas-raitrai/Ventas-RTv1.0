@@ -5910,6 +5910,787 @@ function syncDatosMesViajeOtroVisibility() {
   }
 }
 
+async function getNextSequentialIdGrupoTemporal() {
+  const snap =
+    await getDocs(
+      collection(
+        db,
+        "ventas_cotizaciones"
+      )
+    );
+
+  let maxId = 10935;
+
+  snap.docs.forEach((row) => {
+    const data =
+      row.data() || {};
+
+    const candidates = [
+      String(row.id || "").trim(),
+      String(data.idGrupo || "").trim()
+    ];
+
+    candidates.forEach(
+      (candidate) => {
+        if (
+          /^\d+$/.test(candidate)
+        ) {
+          maxId =
+            Math.max(
+              maxId,
+              Number(candidate)
+            );
+        }
+      }
+    );
+  });
+
+  return String(
+    maxId + 1
+  );
+}
+
+async function crearGrupoDerivadoDesdeActual({
+  cursoNuevo = "",
+  numeroNegocioNuevo = "",
+  cantidadGrupoNueva = null,
+  dryRun = true
+} = {}) {
+  /*
+   * =====================================================
+   * VALIDACIONES
+   * =====================================================
+   */
+
+  if (!state.groupDocId || !state.group) {
+    throw new Error(
+      "Debes ejecutar esta función estando dentro del grupo origen."
+    );
+  }
+
+  const curso =
+    normalizeCursoInput(
+      cursoNuevo
+    );
+
+  const numeroNegocio =
+    cleanText(
+      numeroNegocioNuevo
+    );
+
+  if (!curso) {
+    throw new Error(
+      "Debes indicar cursoNuevo."
+    );
+  }
+
+  if (!numeroNegocio) {
+    throw new Error(
+      "Debes indicar numeroNegocioNuevo."
+    );
+  }
+
+  /*
+   * =====================================================
+   * GRUPO ORIGEN
+   * =====================================================
+   */
+
+  const origenRef =
+    doc(
+      db,
+      "ventas_cotizaciones",
+      String(state.groupDocId)
+    );
+
+  const origenSnap =
+    await getDoc(
+      origenRef
+    );
+
+  if (!origenSnap.exists()) {
+    throw new Error(
+      "No encontré el grupo origen."
+    );
+  }
+
+  const origen = {
+    ...origenSnap.data()
+  };
+
+  /*
+   * =====================================================
+   * SIGUIENTE ID COMO REGISTRO NORMAL
+   * =====================================================
+   */
+
+  const nuevoIdGrupo =
+    await getNextSequentialIdGrupoTemporal();
+
+  const nuevoRef =
+    doc(
+      db,
+      "ventas_cotizaciones",
+      nuevoIdGrupo
+    );
+
+  const existeNuevo =
+    await getDoc(
+      nuevoRef
+    );
+
+  if (existeNuevo.exists()) {
+    throw new Error(
+      `El ID ${nuevoIdGrupo} ya existe. Recarga e intenta nuevamente.`
+    );
+  }
+
+  /*
+   * =====================================================
+   * IDENTIDAD DEL NUEVO GRUPO
+   * =====================================================
+   */
+
+  const colegio =
+    normalizeTextUpper(
+      origen.colegio ||
+      ""
+    );
+
+  const anoViaje =
+    cleanText(
+      origen.anoViaje ||
+      ""
+    );
+
+  const anoBase =
+    getDocBaseYear(
+      origen
+    );
+
+  const cursoViaje =
+    projectCursoToYear(
+      curso,
+      anoBase,
+      anoViaje
+    );
+
+  const aliasGrupo =
+    buildAliasGrupo({
+      cursoBase:
+        curso,
+
+      anoBase,
+
+      cursoViaje,
+
+      anoViaje,
+
+      colegio
+    });
+
+  const aliasTripKey =
+    buildAliasTripKey({
+      colegio,
+
+      cursoViaje,
+
+      anoViaje
+    });
+
+  /*
+   * Código equivalente al usado por registro normal.
+   */
+  const codigoRegistro =
+    `COT-${new Date().getFullYear()}-${String(
+      nuevoIdGrupo
+    )
+      .slice(0, 6)
+      .toUpperCase()}`;
+
+  /*
+   * =====================================================
+   * PAX
+   * =====================================================
+   *
+   * Si todavía no sabemos el PAX real de 4B,
+   * dejamos 0.
+   *
+   * Luego importarNominaPagosPorNumeroNegocio("1582")
+   * dejará la nómina correspondiente.
+   */
+
+  const cantidadGrupo =
+    cantidadGrupoNueva === null ||
+    cantidadGrupoNueva === undefined
+      ? 0
+      : Number(
+          cantidadGrupoNueva
+        );
+
+  if (
+    !Number.isFinite(
+      cantidadGrupo
+    ) ||
+    cantidadGrupo < 0
+  ) {
+    throw new Error(
+      "cantidadGrupoNueva debe ser un número válido."
+    );
+  }
+
+  /*
+   * =====================================================
+   * FICHA
+   * =====================================================
+   */
+
+  const fichaOrigen =
+    origen.ficha &&
+    typeof origen.ficha ===
+      "object"
+      ? origen.ficha
+      : {};
+
+  const fichaNueva = {
+    ...fichaOrigen,
+
+    nombreGrupo:
+      aliasGrupo,
+
+    numeroNegocio:
+      numeroNegocio,
+
+    numeroPaxTotal:
+      cantidadGrupo,
+
+    /*
+     * El PDF antiguo corresponde al grupo compuesto,
+     * por lo tanto NO puede quedar vigente en 4B.
+     */
+    pdfUrl:
+      "",
+
+    pdfNombre:
+      "",
+
+    confirmada:
+      false,
+
+    pdfPendienteGeneracion:
+      true
+  };
+
+  /*
+   * =====================================================
+   * DOCUMENTOS
+   * =====================================================
+   */
+
+  const documentosOrigen =
+    origen.documentos &&
+    typeof origen.documentos ===
+      "object"
+      ? origen.documentos
+      : {};
+
+  const documentosNuevos = {
+    ...documentosOrigen,
+
+    fichaGrupo: {
+      ...(
+        documentosOrigen
+          .fichaGrupo ||
+        {}
+      ),
+
+      estado:
+        "pendiente"
+    }
+  };
+
+  /*
+   * =====================================================
+   * CREAR COPIA CONTROLADA
+   * =====================================================
+   */
+
+  const nuevoGrupo = {
+    ...origen,
+
+    /*
+     * Identidad nueva
+     */
+    idGrupo:
+      nuevoIdGrupo,
+
+    codigoRegistro,
+
+    curso,
+
+    cursoViaje,
+
+    cursoPorConfirmar:
+      false,
+
+    aliasGrupo,
+
+    aliasTripKey,
+
+    nombreGrupo:
+      aliasGrupo,
+
+    nombreGrupoManual:
+      false,
+
+    numeroNegocio,
+
+    cantidadGrupo,
+
+    /*
+     * La ficha usa identidad nueva.
+     */
+    ficha:
+      fichaNueva,
+
+    documentos:
+      documentosNuevos,
+
+    /*
+     * ===================================================
+     * PDF RAÍZ
+     * ===================================================
+     */
+
+    fichaPdfUrl:
+      "",
+
+    fichaPdfNombre:
+      "",
+
+    fichaPdfPendienteGeneracion:
+      true,
+
+    /*
+     * ===================================================
+     * INSCRIPCIÓN PRINCIPAL
+     * ===================================================
+     *
+     * El nuevo grupo NO puede compartir links o tokens
+     * públicos con el 4AB.
+     */
+
+    inscripcionHabilitada:
+      false,
+
+    tokenInscripcion:
+      "",
+
+    inscripcionEstado:
+      "cerrada",
+
+    faseInscripcion:
+      "cerrada",
+
+    fechaAperturaInscripcion:
+      null,
+
+    inscripcion: {
+      estado:
+        "cerrada",
+
+      faseActual:
+        "cerrada",
+
+      claveActual:
+        "",
+
+      labelActual:
+        "",
+
+      tipoInscripcionActual:
+        "",
+
+      estadoCupoActual:
+        "",
+
+      tokenActual:
+        "",
+
+      linkActual:
+        ""
+    },
+
+    /*
+     * ===================================================
+     * NUEVO INGRESO
+     * ===================================================
+     */
+
+    inscripcionNuevos: {
+      activo:
+        false,
+
+      tokenActual:
+        "",
+
+      linkActual:
+        ""
+    },
+
+    /*
+     * ===================================================
+     * LISTA DE ESPERA
+     * ===================================================
+     */
+
+    inscripcionListaEspera: {
+      activo:
+        false,
+
+      tokenActual:
+        "",
+
+      linkActual:
+        ""
+    },
+
+    /*
+     * ===================================================
+     * LIBERADOS
+     * ===================================================
+     */
+
+    inscripcionLiberados: {
+      activo:
+        false,
+
+      tokenActual:
+        "",
+
+      linkActual:
+        ""
+    },
+
+    linkLiberadosActivo:
+      false,
+
+    tokenInscripcionLiberados:
+      "",
+
+    /*
+     * ===================================================
+     * FECHAS DEL NUEVO REGISTRO
+     * ===================================================
+     */
+
+    creadoPor:
+      getDisplayName(
+        state.effectiveUser
+      ),
+
+    creadoPorCorreo:
+      state.effectiveEmail,
+
+    fechaCreacion:
+      serverTimestamp(),
+
+    actualizadoPor:
+      getDisplayName(
+        state.effectiveUser
+      ),
+
+    actualizadoPorCorreo:
+      state.effectiveEmail,
+
+    fechaActualizacion:
+      serverTimestamp()
+  };
+
+  /*
+   * =====================================================
+   * PREVISUALIZACIÓN
+   * =====================================================
+   */
+
+  const resumen = {
+    dryRun,
+
+    grupoOrigen: {
+      idGrupo:
+        state.groupId,
+
+      documento:
+        state.groupDocId,
+
+      aliasGrupo:
+        origen.aliasGrupo ||
+        origen.nombreGrupo ||
+        "",
+
+      numeroNegocio:
+        origen.numeroNegocio ||
+        "",
+
+      curso:
+        origen.curso ||
+        ""
+    },
+
+    grupoNuevo: {
+      idGrupo:
+        nuevoIdGrupo,
+
+      codigoRegistro,
+
+      aliasGrupo,
+
+      curso,
+
+      cursoViaje,
+
+      numeroNegocio,
+
+      cantidadGrupo,
+
+      anoViaje,
+
+      colegio
+    },
+
+    acciones: {
+      modificaGrupoOrigen:
+        false,
+
+      copiaInscripciones:
+        false,
+
+      copiaNominaResumen:
+        false,
+
+      linksPublicosReiniciados:
+        true,
+
+      pdfAnteriorCopiado:
+        false
+    }
+  };
+
+  console.log(
+    "%c[GRUPO DERIVADO] PREVISUALIZACIÓN",
+    "font-weight:bold;color:#7a5cf0;"
+  );
+
+  console.table(
+    [
+      {
+        tipo:
+          "ORIGEN",
+
+        idGrupo:
+          resumen.grupoOrigen
+            .idGrupo,
+
+        curso:
+          resumen.grupoOrigen
+            .curso,
+
+        numeroNegocio:
+          resumen.grupoOrigen
+            .numeroNegocio,
+
+        alias:
+          resumen.grupoOrigen
+            .aliasGrupo
+      },
+
+      {
+        tipo:
+          "NUEVO",
+
+        idGrupo:
+          resumen.grupoNuevo
+            .idGrupo,
+
+        curso:
+          resumen.grupoNuevo
+            .curso,
+
+        numeroNegocio:
+          resumen.grupoNuevo
+            .numeroNegocio,
+
+        alias:
+          resumen.grupoNuevo
+            .aliasGrupo
+      }
+    ]
+  );
+
+  console.log(
+    "[GRUPO DERIVADO] Resumen:",
+    resumen
+  );
+
+  /*
+   * =====================================================
+   * DRY RUN
+   * =====================================================
+   */
+
+  if (dryRun) {
+    console.warn(
+      "[GRUPO DERIVADO] DRY RUN: no se escribió nada en Firebase."
+    );
+
+    return {
+      ok:
+        true,
+
+      creado:
+        false,
+
+      ...resumen
+    };
+  }
+
+  /*
+   * =====================================================
+   * CONFIRMACIÓN FINAL
+   * =====================================================
+   */
+
+  const confirmar =
+    window.confirm(
+      [
+        "VAS A CREAR UN NUEVO GRUPO.",
+        "",
+        `Origen: ${origen.aliasGrupo || origen.nombreGrupo || state.groupId}`,
+        `Origen NO será modificado.`,
+        "",
+        `Nuevo ID Grupo: ${nuevoIdGrupo}`,
+        `Nuevo grupo: ${aliasGrupo}`,
+        `Curso: ${curso}`,
+        `N° negocio: ${numeroNegocio}`,
+        "",
+        "La nómina NO se copiará.",
+        "Los links públicos NO se copiarán.",
+        "El PDF anterior NO quedará vigente.",
+        "",
+        "¿Crear el grupo?"
+      ].join("\n")
+    );
+
+  if (!confirmar) {
+    return {
+      ok:
+        false,
+
+      cancelado:
+        true,
+
+      ...resumen
+    };
+  }
+
+  /*
+   * Volvemos a revisar el ID justo antes de escribir.
+   */
+  const checkFinal =
+    await getDoc(
+      nuevoRef
+    );
+
+  if (checkFinal.exists()) {
+    throw new Error(
+      `El ID ${nuevoIdGrupo} fue ocupado antes de guardar. Ejecuta nuevamente la función.`
+    );
+  }
+
+  /*
+   * =====================================================
+   * GUARDAR
+   * =====================================================
+   */
+
+  await setDoc(
+    nuevoRef,
+    nuevoGrupo
+  );
+
+  /*
+   * =====================================================
+   * VERIFICACIÓN POSTERIOR
+   * =====================================================
+   */
+
+  const guardado =
+    await getDoc(
+      nuevoRef
+    );
+
+  if (!guardado.exists()) {
+    throw new Error(
+      "La escritura terminó, pero el nuevo grupo no pudo verificarse."
+    );
+  }
+
+  const dataGuardada =
+    guardado.data() || {};
+
+  const resultado = {
+    ok:
+      true,
+
+    creado:
+      true,
+
+    idGrupoNuevo:
+      nuevoIdGrupo,
+
+    codigoRegistro,
+
+    curso:
+      dataGuardada.curso ||
+      "",
+
+    cursoViaje:
+      dataGuardada.cursoViaje ||
+      "",
+
+    numeroNegocio:
+      dataGuardada.numeroNegocio ||
+      "",
+
+    aliasGrupo:
+      dataGuardada.aliasGrupo ||
+      "",
+
+    cantidadGrupo:
+      dataGuardada.cantidadGrupo ??
+      0,
+
+    url:
+      `grupo.html?id=${encodeURIComponent(
+        nuevoIdGrupo
+      )}`
+  };
+
+  console.log(
+    "%c[GRUPO DERIVADO] GRUPO CREADO CORRECTAMENTE",
+    "font-weight:bold;color:#09832e;"
+  );
+
+  console.log(
+    resultado
+  );
+
+  return resultado;
+}
+
+window.crearGrupoDerivadoDesdeActual =
+  crearGrupoDerivadoDesdeActual;
+
 function buildDatosAliasPayload() {
   const colegio = normalizeTextUpper($("d_colegio")?.value || state.group?.colegio || "");
   const cursoBase = normalizeCursoInput($("d_curso")?.value || "");
