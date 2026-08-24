@@ -1189,27 +1189,79 @@ function esVendedorGestionNomina() {
 }
 
 function puedeEjecutarControlAdministracion() {
+  const email =
+    normalizeEmail(
+      state.email ||
+      ""
+    );
+
+  const rol =
+    getRolGestionActual();
+
   /*
-    El vendedor jamás ve ni ejecuta
-    este módulo.
+    =====================================================
+    VENDEDORES
+
+    Nunca ven ni ejecutan el módulo.
+    =====================================================
   */
+
   if (
-    esVendedorGestionNomina()
+    rol ===
+    "vendedor"
   ) {
     return false;
   }
 
   /*
-    Usamos además la autorización administrativa
-    que Gestión Nómina ya tiene definida en
-    inscripciones-manager.js.
+    =====================================================
+    ADMIN
+
+    Siempre puede ejecutar.
+    =====================================================
   */
-  return (
-    state.user?.rol ===
-      "admin" ||
-    state.manager
-      ?.puedeAdministrarNomina() ===
-      true
+
+  if (
+    rol ===
+    "admin"
+  ) {
+    return true;
+  }
+
+  /*
+    =====================================================
+    PERFILES OPERATIVOS / ADMINISTRATIVOS
+
+    Conservamos los mismos usuarios que actualmente
+    están autorizados para gestionar Nómina.
+
+    IMPORTANTE:
+    esto NO les entrega acceso al panel Progreso
+    ni a Configuración.
+
+    Solamente pueden:
+    - ver las columnas,
+    - marcar Pendiente / OK.
+    =====================================================
+  */
+
+  if (
+    rol ===
+      "supervision" ||
+    rol ===
+      "registro"
+  ) {
+    return true;
+  }
+
+  return [
+    "administracion@raitrai.cl",
+    "raitrai@raitrai.cl",
+    "yenny@raitrai.cl",
+    "giras@raitrai.cl",
+    "sistemas@raitrai.cl"
+  ].includes(
+    email
   );
 }
 
@@ -1466,12 +1518,11 @@ async function cargarHistorialAdministracion() {
 
   try {
     /*
-      Consultamos solamente movimientos
-      del módulo administración.
-
-      El año se filtra después en memoria,
-      evitando necesidad de índice compuesto.
+      Solo descargamos movimientos
+      administrativos del año actualmente
+      seleccionado en Gestión Nómina.
     */
+
     const snap =
       await getDocs(
         query(
@@ -1479,10 +1530,19 @@ async function cargarHistorialAdministracion() {
             db,
             HISTORIAL_COLLECTION
           ),
+
           where(
             "modulo",
             "==",
             "administracion"
+          ),
+
+          where(
+            "anoViaje",
+            "==",
+            Number(
+              state.anoSeleccionado
+            )
           )
         )
       );
@@ -1496,16 +1556,6 @@ async function cargarHistorialAdministracion() {
 
             ...documento.data()
           })
-        )
-        .filter(
-          (item) =>
-            Number(
-              item.anoViaje ||
-              0
-            ) ===
-            Number(
-              state.anoSeleccionado
-            )
         )
         .sort(
           (a, b) =>
@@ -4022,17 +4072,47 @@ async function cambiarEstadoControlAdministracion(
     actualizadoPorCorreo:
       state.email,
 
-    /*
-      Para estado local inmediato usamos Date.
-      En Firestore se guarda timestamp servidor
-      a nivel documento.
-    */
     actualizadoAtCliente:
       new Date()
         .toISOString()
   };
 
+  const mensaje =
+    `${usuarioNombre} cambió ${columna.nombre} de ${actual.toUpperCase()} a ${nuevo.toUpperCase()}.`;
+
+  const cambios = [
+    {
+      campo:
+        columna.nombre,
+
+      controlId,
+
+      anterior:
+        actual,
+
+      nuevo
+    }
+  ];
+
+  const metadata = {
+    controlId,
+
+    controlNombre:
+      columna.nombre,
+
+    anterior:
+      actual,
+
+    nuevo
+  };
+
   try {
+    /*
+      =====================================================
+      1. ESTADO ACTUAL DEL CONTROL
+      =====================================================
+    */
+
     await setDoc(
       doc(
         db,
@@ -4090,8 +4170,17 @@ async function cambiarEstadoControlAdministracion(
     );
 
     /*
-      Historial auditable.
+      =====================================================
+      2. HISTORIAL GENERAL
+
+      Este es el que utilizará:
+      - Progreso Administración
+      - gráficos
+      - actividad por día
+      - actividad por usuario
+      =====================================================
     */
+
     await addDoc(
       collection(
         db,
@@ -4138,34 +4227,11 @@ async function cambiarEstadoControlAdministracion(
         titulo:
           `Administración · ${columna.nombre}`,
 
-        mensaje:
-          `${usuarioNombre} cambió ${columna.nombre} de ${actual.toUpperCase()} a ${nuevo.toUpperCase()}.`,
+        mensaje,
 
-        cambios: [
-          {
-            campo:
-              columna.nombre,
+        cambios,
 
-            controlId,
-
-            anterior:
-              actual,
-
-            nuevo
-          }
-        ],
-
-        metadata: {
-          controlId,
-
-          controlNombre:
-            columna.nombre,
-
-          anterior:
-            actual,
-
-          nuevo
-        },
+        metadata,
 
         creadoPor:
           usuarioNombre,
@@ -4179,8 +4245,76 @@ async function cambiarEstadoControlAdministracion(
     );
 
     /*
-      Actualización local inmediata.
+      =====================================================
+      3. HISTORIAL DEL MODAL DE GESTIÓN NÓMINA
+
+      IMPORTANTE:
+      inscripciones-manager.js carga este historial desde:
+
+      ventas_cotizaciones/{groupDocId}/historial_nomina
+
+      Por eso también registramos aquí.
+      =====================================================
     */
+
+    await addDoc(
+      collection(
+        db,
+        "ventas_cotizaciones",
+        groupDocId,
+        "historial_nomina"
+      ),
+      {
+        idGrupo:
+          String(
+            row.groupId ||
+            ""
+          ),
+
+        groupDocId,
+
+        anoViaje:
+          Number(
+            state.anoSeleccionado
+          ),
+
+        modulo:
+          "administracion",
+
+        tipoMovimiento:
+          "control_administracion",
+
+        titulo:
+          `Administración · ${columna.nombre}`,
+
+        mensaje,
+
+        cambios,
+
+        metadata,
+
+        creadoPor:
+          usuarioNombre,
+
+        creadoPorCorreo:
+          state.email,
+
+        usuarioNombre,
+
+        usuarioCorreo:
+          state.email,
+
+        fecha:
+          serverTimestamp()
+      }
+    );
+
+    /*
+      =====================================================
+      4. ACTUALIZACIÓN LOCAL
+      =====================================================
+    */
+
     state.administracionControles
       .set(
         groupDocId,
@@ -4205,10 +4339,11 @@ async function cambiarEstadoControlAdministracion(
     renderRows();
 
     /*
-      Si la jefa/admin tiene abierto
-      Progreso, actualizamos también
-      el historial y el panel.
+      =====================================================
+      5. ACTUALIZAR PANEL DE SUPERVISIÓN
+      =====================================================
     */
+
     if (
       puedeSupervisarAdministracion()
     ) {
