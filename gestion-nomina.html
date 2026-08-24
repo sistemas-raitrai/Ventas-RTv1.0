@@ -281,28 +281,205 @@
     }
 
     .table-wrap {
-      overflow: auto;
+      overflow-x: auto;
+      overflow-y: visible;
+    
+      position: relative;
+    
+      max-width: 100%;
     }
-
+    
     .main-table {
-      width: 100%;
-      min-width: 1200px;
-      border-collapse: collapse;
+      width: max-content;
+      min-width: 100%;
+    
+      border-collapse: separate;
+      border-spacing: 0;
     }
-
+    
     .main-table th {
+      position: sticky;
+      top: 0;
+    
       background: #2b1940;
       color: #fff;
+    
       text-align: left;
+    
       padding: 12px;
+    
       font-size: 12px;
       text-transform: uppercase;
+    
+      z-index: 5;
+    
+      white-space: nowrap;
     }
-
+    
     .main-table td {
       padding: 12px;
+    
       border-bottom: 1px solid #eee9f1;
+    
       vertical-align: middle;
+    
+      background: #fff;
+    
+      white-space: nowrap;
+    }
+    
+    
+    /* =====================================================
+       COLUMNAS FIJAS IZQUIERDA
+    ===================================================== */
+    
+    /*
+      1. GRUPO
+    */
+    .main-table th:nth-child(1),
+    .main-table td:nth-child(1) {
+      position: sticky;
+    
+      left: 0;
+    
+      min-width: 280px;
+      width: 280px;
+      max-width: 280px;
+    
+      z-index: 4;
+    }
+    
+    
+    /*
+      2. ID GRUPO
+    */
+    .main-table th:nth-child(2),
+    .main-table td:nth-child(2) {
+      position: sticky;
+    
+      left: 280px;
+    
+      min-width: 105px;
+      width: 105px;
+      max-width: 105px;
+    
+      z-index: 4;
+    }
+    
+    
+    /*
+      3. NEGOCIO
+    */
+    .main-table th:nth-child(3),
+    .main-table td:nth-child(3) {
+      position: sticky;
+    
+      left: 385px;
+    
+      min-width: 100px;
+      width: 100px;
+      max-width: 100px;
+    
+      z-index: 4;
+    }
+    
+    
+    /*
+      Encabezados fijos por encima
+      de las celdas fijas.
+    */
+    .main-table th:nth-child(1),
+    .main-table th:nth-child(2),
+    .main-table th:nth-child(3) {
+      z-index: 8;
+    
+      background: #2b1940;
+    }
+    
+    
+    /*
+      Fondo de las tres columnas congeladas.
+    
+      Es importante porque al mover la tabla
+      horizontalmente no queremos ver las otras
+      columnas "por debajo".
+    */
+    .main-table td:nth-child(1),
+    .main-table td:nth-child(2),
+    .main-table td:nth-child(3) {
+      background: #fff;
+    }
+    
+    
+    /*
+      Sombra visual al final de las columnas fijas.
+    */
+    .main-table th:nth-child(3),
+    .main-table td:nth-child(3) {
+      box-shadow:
+        5px 0 8px
+        rgba(
+          43,
+          25,
+          64,
+          .08
+        );
+    }
+    
+    
+    /*
+      El nombre del grupo sí puede partirse
+      en varias líneas.
+    
+      Las otras columnas pueden seguir
+      creciendo horizontalmente.
+    */
+    .main-table td:nth-child(1) {
+      white-space: normal;
+    }
+    
+    
+    /* =====================================================
+       ANCHOS DEL RESTO
+    ===================================================== */
+    
+    .main-table th:nth-child(4),
+    .main-table td:nth-child(4) {
+      min-width: 150px;
+    }
+    
+    .main-table th:nth-child(5),
+    .main-table td:nth-child(5) {
+      min-width: 130px;
+    }
+    
+    .main-table th:nth-child(6),
+    .main-table td:nth-child(6) {
+      min-width: 100px;
+    }
+    
+    .main-table th:nth-child(7),
+    .main-table td:nth-child(7) {
+      min-width: 120px;
+    }
+    
+    .main-table th:nth-child(8),
+    .main-table td:nth-child(8) {
+      min-width: 120px;
+    }
+    
+    
+    /*
+      Las funciones administrativas tienen
+      su propio ancho y pueden seguir creciendo
+      hacia la derecha.
+    */
+    .admin-control-column {
+      min-width: 155px;
+    
+      text-align: center !important;
+    
+      white-space: nowrap;
     }
 
     .gn-group {
