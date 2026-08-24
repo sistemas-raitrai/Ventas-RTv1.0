@@ -39,6 +39,7 @@ const ADMIN_CONTROL_COLLECTION = "ventas_administracion_control";
 const ADMIN_CONFIG_COLLECTION = "ventas_configuracion";
 const ADMIN_CONFIG_DOC = "administracion_control";
 const HISTORIAL_COLLECTION = "ventas_historial";
+const ADMIN_CONFIG_VERSIONES_SUBCOLLECTION = "versiones";
 const JEFA_ADMINISTRACION_EMAIL = "administracion@raitrai.cl";
 
 const EQUIPO_ADMINISTRACION = [
@@ -49,42 +50,6 @@ const EQUIPO_ADMINISTRACION = [
   "secretaria@raitrai.cl"
 ];
 
-function getNombreEquipoAdministracion(
-  email = ""
-) {
-  const correo =
-    normalizeEmail(
-      email
-    );
-
-  if (!correo) {
-    return "Sin usuario";
-  }
-
-  const user =
-    getVentasUser(
-      correo
-    );
-
-  if (!user) {
-    return correo;
-  }
-
-  const nombreCompleto =
-    [
-      user.nombre,
-      user.apellido
-    ]
-      .filter(Boolean)
-      .join(" ")
-      .trim();
-
-  return (
-    nombreCompleto ||
-    user.nombre ||
-    correo
-  );
-}
 
 /*
   Mantenemos los IDs de la versión ya instalada para no perder
@@ -143,12 +108,17 @@ const state = {
   email: "",
   anoSeleccionado: ANO_ACTUAL,
   periodo: "7",
+  fechaReferencia: fechaInputValue(new Date()),
   rows: [],
   config: {
     columnas: FUNCIONES_BASE.map((item) => ({ ...item }))
   },
+  configActual: {
+    columnas: FUNCIONES_BASE.map((item) => ({ ...item }))
+  },
   controles: new Map(),
   historial: [],
+  configVersiones: [],
   detalleFuncionId: ""
 };
 
@@ -157,6 +127,7 @@ init();
 async function init() {
   await waitForLayoutReady();
   configurarSelectorAno();
+  configurarFechaReferencia();
   bindEvents();
 
   onAuthStateChanged(auth, async (firebaseUser) => {
@@ -225,6 +196,68 @@ function getNombreUsuario() {
   );
 }
 
+function getNombreEquipoAdministracion(email = "") {
+  const correo = normalizeEmail(email);
+  if (!correo) return "Sin usuario";
+
+  const user = getVentasUser(correo);
+  if (!user) return correo;
+
+  return (
+    [user.nombre, user.apellido]
+      .filter(Boolean)
+      .join(" ")
+      .trim() ||
+    user.nombre ||
+    correo
+  );
+}
+
+function fechaInputValue(date = new Date()) {
+  const d = new Date(date);
+  if (Number.isNaN(d.getTime())) return "";
+
+  return [
+    d.getFullYear(),
+    String(d.getMonth() + 1).padStart(2, "0"),
+    String(d.getDate()).padStart(2, "0")
+  ].join("-");
+}
+
+function dateFromInput(value = "") {
+  const [year, month, day] = String(value || "")
+    .split("-")
+    .map(Number);
+
+  if (!year || !month || !day) return new Date();
+  return new Date(year, month - 1, day, 12, 0, 0, 0);
+}
+
+function configurarFechaReferencia() {
+  const input = $("adminFechaReferencia");
+  if (!input) return;
+
+  const params = new URLSearchParams(location.search);
+  const fechaUrl = params.get("fecha");
+
+  state.fechaReferencia = /^\d{4}-\d{2}-\d{2}$/.test(fechaUrl || "")
+    ? fechaUrl
+    : fechaInputValue(new Date());
+
+  input.value = state.fechaReferencia;
+  input.max = fechaInputValue(new Date());
+}
+
+function esFechaReferenciaHoy() {
+  return state.fechaReferencia === fechaInputValue(new Date());
+}
+
+function finFechaReferencia() {
+  const d = dateFromInput(state.fechaReferencia);
+  d.setHours(23, 59, 59, 999);
+  return d;
+}
+
 function bindHeader() {
   bindLayoutButtons({
     homeUrl: "index.html",
@@ -285,6 +318,24 @@ function bindEvents() {
     state.periodo = $("adminPeriodo")?.value || "7";
     renderTodo();
   });
+
+  $("adminFechaReferencia")?.addEventListener("change", async () => {
+    state.fechaReferencia = $("adminFechaReferencia")?.value || fechaInputValue(new Date());
+    state.detalleFuncionId = "";
+    aplicarConfiguracionReferencia();
+    renderTodo();
+  });
+
+  $("btnFechaHoy")?.addEventListener("click", () => {
+    state.fechaReferencia = fechaInputValue(new Date());
+    if ($("adminFechaReferencia")) {
+      $("adminFechaReferencia").value = state.fechaReferencia;
+    }
+    aplicarConfiguracionReferencia();
+    renderTodo();
+  });
+
+  $("btnExportarXls")?.addEventListener("click", exportarXlsAdministracion);
 
   $("adminBuscar")?.addEventListener("input", debounce(renderTodo, 150));
 
@@ -353,13 +404,17 @@ async function cargarPantalla() {
   set("kPendientes", "…");
   set("kAvance", "…");
 
+  await cargarConfiguracion();
+
   await Promise.all([
-    cargarConfiguracion(),
+    cargarVersionesConfiguracion(),
     cargarGrupos(),
     cargarControles(),
     cargarHistorial()
   ]);
 
+  await asegurarVersionInicialConfiguracion();
+  aplicarConfiguracionReferencia();
   renderTodo();
 }
 
@@ -369,13 +424,122 @@ async function cargarConfiguracion() {
       doc(db, ADMIN_CONFIG_COLLECTION, ADMIN_CONFIG_DOC)
     );
 
-    state.config = normalizarConfiguracion(
+    state.configActual = normalizarConfiguracion(
       snap.exists() ? snap.data() : {}
     );
+    state.config = normalizarConfiguracion(state.configActual);
   } catch (error) {
     console.error("[gestion-administracion] cargarConfiguracion", error);
-    state.config = normalizarConfiguracion({});
+    state.configActual = normalizarConfiguracion({});
+    state.config = normalizarConfiguracion(state.configActual);
   }
+}
+
+async function cargarVersionesConfiguracion() {
+  state.configVersiones = [];
+
+  try {
+    const snap = await getDocs(
+      collection(
+        db,
+        ADMIN_CONFIG_COLLECTION,
+        ADMIN_CONFIG_DOC,
+        ADMIN_CONFIG_VERSIONES_SUBCOLLECTION
+      )
+    );
+
+    state.configVersiones = snap.docs
+      .map((documento) => ({
+        id: documento.id,
+        ...documento.data()
+      }))
+      .sort((a, b) => getVersionDesdeMs(a) - getVersionDesdeMs(b));
+  } catch (error) {
+    console.error("[gestion-administracion] cargarVersionesConfiguracion", error);
+    state.configVersiones = [];
+  }
+}
+
+function getVersionDesdeMs(version = {}) {
+  return (
+    fechaMs(version.vigenteDesde) ||
+    fechaMs(version.vigenteDesdeCliente) ||
+    fechaMs(version.fecha) ||
+    0
+  );
+}
+
+async function asegurarVersionInicialConfiguracion() {
+  if (state.configVersiones.length) return;
+
+  const columnas = (state.config?.columnas || []).map((item) => ({
+    ...item,
+    responsables: [...(item.responsables || [])]
+  }));
+
+  if (!columnas.length) return;
+
+  try {
+    const versionId = `v_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+    const ref = doc(
+      db,
+      ADMIN_CONFIG_COLLECTION,
+      ADMIN_CONFIG_DOC,
+      ADMIN_CONFIG_VERSIONES_SUBCOLLECTION,
+      versionId
+    );
+
+    const vigenteDesdeCliente = new Date().toISOString();
+
+    await setDoc(ref, {
+      versionId,
+      anoContexto: Number(state.anoSeleccionado),
+      columnas,
+      equipo: EQUIPO_ADMINISTRACION,
+      vigenteDesde: serverTimestamp(),
+      vigenteDesdeCliente,
+      creadoPor: getNombreUsuario(),
+      creadoPorCorreo: state.email
+    });
+
+    state.configVersiones.push({
+      id: versionId,
+      versionId,
+      anoContexto: Number(state.anoSeleccionado),
+      columnas,
+      equipo: EQUIPO_ADMINISTRACION,
+      vigenteDesdeCliente,
+      creadoPor: getNombreUsuario(),
+      creadoPorCorreo: state.email
+    });
+  } catch (error) {
+    console.error("[gestion-administracion] asegurarVersionInicialConfiguracion", error);
+  }
+}
+
+function getConfiguracionParaFecha(fecha = state.fechaReferencia) {
+  const fin = dateFromInput(fecha);
+  fin.setHours(23, 59, 59, 999);
+  const limite = fin.getTime();
+
+  const candidatas = state.configVersiones
+    .filter((item) => getVersionDesdeMs(item) <= limite)
+    .sort((a, b) => getVersionDesdeMs(b) - getVersionDesdeMs(a));
+
+  if (!candidatas.length) {
+    return normalizarConfiguracion(state.config || {});
+  }
+
+  return normalizarConfiguracion(candidatas[0]);
+}
+
+function aplicarConfiguracionReferencia() {
+  if (esFechaReferenciaHoy()) {
+    state.config = normalizarConfiguracion(state.configActual || {});
+    return;
+  }
+
+  state.config = getConfiguracionParaFecha(state.fechaReferencia);
 }
 
 function normalizarConfiguracion(data = {}) {
@@ -567,6 +731,10 @@ function getControlGrupo(row = {}) {
 }
 
 function getEstadoFuncion(row = {}, funcion = {}) {
+  if (!esFechaReferenciaHoy()) {
+    return getEstadoFuncionHistorico(row, funcion);
+  }
+
   const documento = getControlGrupo(row);
   const control = documento?.controles?.[funcion.id] || {};
 
@@ -578,6 +746,34 @@ function getEstadoFuncion(row = {}, funcion = {}) {
   const cicloControl = String(control.cicloId || "legacy");
 
   return cicloEsperado === cicloControl
+    ? "ok"
+    : "pendiente";
+}
+
+function getEstadoFuncionHistorico(row = {}, funcion = {}) {
+  const limite = finFechaReferencia().getTime();
+  const idsGrupo = new Set(
+    [row.docId, row.id, row.groupId]
+      .map((value) => String(value || "").trim())
+      .filter(Boolean)
+  );
+
+  const cicloEsperado = String(funcion.cicloId || "legacy");
+
+  const movimientos = state.historial
+    .filter((item) => item.tipoMovimiento === "control_administracion")
+    .filter((item) => fechaMs(item.fecha) <= limite)
+    .filter((item) => {
+      const groupKey = String(item.groupDocId || item.idGrupo || "").trim();
+      return idsGrupo.has(groupKey);
+    })
+    .filter((item) => String(item?.metadata?.controlId || "") === String(funcion.id))
+    .filter((item) => String(item?.metadata?.cicloId || "legacy") === cicloEsperado)
+    .sort((a, b) => fechaMs(b.fecha) - fechaMs(a.fecha));
+
+  if (!movimientos.length) return "pendiente";
+
+  return normalizar(movimientos[0]?.metadata?.nuevo || "") === "ok"
     ? "ok"
     : "pendiente";
 }
@@ -637,39 +833,40 @@ function inicioDia(date = new Date()) {
 }
 
 function getInicioPeriodo() {
-  const ahora = new Date();
+  const referencia = dateFromInput(state.fechaReferencia);
   const periodo = String(state.periodo || "7");
 
   if (periodo === "hoy") {
-    return inicioDia(ahora);
+    return inicioDia(referencia);
   }
 
   if (periodo === "ayer") {
-    const ayer = inicioDia(ahora);
+    const ayer = inicioDia(referencia);
     ayer.setDate(ayer.getDate() - 1);
     return ayer;
   }
 
   if (periodo === "mes") {
-    return new Date(ahora.getFullYear(), ahora.getMonth(), 1);
+    return new Date(referencia.getFullYear(), referencia.getMonth(), 1);
   }
 
   const dias = Number(periodo || 7);
-  const inicio = inicioDia(ahora);
+  const inicio = inicioDia(referencia);
   inicio.setDate(inicio.getDate() - Math.max(dias - 1, 0));
   return inicio;
 }
 
 function getFinPeriodo() {
-  const ahora = new Date();
+  const referencia = dateFromInput(state.fechaReferencia);
 
   if (String(state.periodo) === "ayer") {
-    const fin = inicioDia(ahora);
+    const fin = inicioDia(referencia);
     fin.setMilliseconds(-1);
     return fin;
   }
 
-  return ahora;
+  referencia.setHours(23, 59, 59, 999);
+  return referencia;
 }
 
 function getHistorialPeriodo() {
@@ -756,179 +953,74 @@ function getActividadPorDia(historial = []) {
     .sort((a, b) => a.fecha.localeCompare(b.fecha));
 }
 
-function getActividadPorPersona(
-  historial = []
-) {
-  const map =
-    new Map();
+function getActividadPorPersona(historial = []) {
+  const map = new Map();
 
-  historial.forEach(
-    (item) => {
-      const correo =
-        normalizeEmail(
-          item.creadoPorCorreo ||
-          item.usuarioCorreo ||
-          ""
-        );
-
-      const nombreDesdeHistorial =
-        String(
-          item.creadoPor ||
-          item.usuarioNombre ||
-          ""
-        ).trim();
-
-      const nombre =
-        nombreDesdeHistorial ||
-        getNombreEquipoAdministracion(
-          correo
-        );
-
-      const key =
-        correo ||
-        normalizar(
-          nombre
-        );
-
-      if (
-        !map.has(
-          key
-        )
-      ) {
-        map.set(
-          key,
-          {
-            correo,
-            nombre,
-            ok: 0,
-            reabiertos: 0,
-            grupos:
-              new Set(),
-            dias:
-              new Set(),
-            funciones:
-              new Map()
-          }
-        );
-      }
-
-      const row =
-        map.get(
-          key
-        );
-
-      if (
-        esOk(
-          item
-        )
-      ) {
-        row.ok +=
-          1;
-      }
-
-      if (
-        esReapertura(
-          item
-        )
-      ) {
-        row.reabiertos +=
-          1;
-      }
-
-      const grupo =
-        String(
-          item.groupDocId ||
-          item.idGrupo ||
-          ""
-        );
-
-      if (grupo) {
-        row.grupos.add(
-          grupo
-        );
-      }
-
-      const dia =
-        getFechaClave(
-          item.fecha
-        );
-
-      if (dia) {
-        row.dias.add(
-          dia
-        );
-      }
-
-      if (
-        esOk(
-          item
-        )
-      ) {
-        const nombreFuncion =
-          String(
-            item
-              ?.metadata
-              ?.controlNombre ||
-            item
-              ?.metadata
-              ?.controlId ||
-            "Otra función"
-          );
-
-        row.funciones.set(
-          nombreFuncion,
-          (
-            row.funciones.get(
-              nombreFuncion
-            ) ||
-            0
-          ) +
-          1
-        );
-      }
-    }
-  );
-
-  return [
-    ...map.values()
-  ]
-    .map(
-      (item) => ({
-        correo:
-          item.correo,
-
-        nombre:
-          item.nombre,
-
-        ok:
-          item.ok,
-
-        reabiertos:
-          item.reabiertos,
-
-        grupos:
-          item.grupos.size,
-
-        dias:
-          item.dias.size,
-
-        funciones:
-          [
-            ...item.funciones
-              .entries()
-          ]
-            .sort(
-              (a, b) =>
-                b[1] -
-                a[1]
-            )
-      })
-    )
-    .sort(
-      (a, b) =>
-        b.ok -
-        a.ok
+  historial.forEach((item) => {
+    const correo = normalizeEmail(
+      item.creadoPorCorreo ||
+      item.usuarioCorreo ||
+      ""
     );
+
+    const nombre = String(
+      item.creadoPor ||
+      item.usuarioNombre ||
+      LABEL_EQUIPO[correo] ||
+      correo ||
+      "Sin usuario"
+    );
+
+    const key = correo || normalizar(nombre);
+
+    if (!map.has(key)) {
+      map.set(key, {
+        correo,
+        nombre,
+        ok: 0,
+        reabiertos: 0,
+        grupos: new Set(),
+        dias: new Set(),
+        funciones: new Map()
+      });
+    }
+
+    const row = map.get(key);
+
+    if (esOk(item)) row.ok += 1;
+    if (esReapertura(item)) row.reabiertos += 1;
+
+    const grupo = String(item.groupDocId || item.idGrupo || "");
+    if (grupo) row.grupos.add(grupo);
+
+    const dia = getFechaClave(item.fecha);
+    if (dia) row.dias.add(dia);
+
+    if (esOk(item)) {
+      const nombreFuncion = String(
+        item?.metadata?.controlNombre ||
+        item?.metadata?.controlId ||
+        "Otra función"
+      );
+
+      row.funciones.set(
+        nombreFuncion,
+        (row.funciones.get(nombreFuncion) || 0) + 1
+      );
+    }
+  });
+
+  return [...map.values()]
+    .map((item) => ({
+      correo: item.correo,
+      nombre: item.nombre,
+      ok: item.ok,
+      reabiertos: item.reabiertos,
+      grupos: item.grupos.size,
+      dias: item.dias.size,
+      funciones: [...item.funciones.entries()].sort((a, b) => b[1] - a[1])
+    }))
+    .sort((a, b) => b.ok - a.ok);
 }
 
 function getActividadPorFuncion(historial = []) {
@@ -965,88 +1057,39 @@ function getActividadPorFuncion(historial = []) {
     .sort((a, b) => b.ok - a.ok);
 }
 
-function getCargaEquipo(
-  historialPeriodo = []
-) {
-  const funciones =
-    getFuncionesActivas();
+function getCargaEquipo(historialPeriodo = []) {
+  const funciones = getFuncionesActivas();
+  const actividad = getActividadPorPersona(historialPeriodo);
 
-  const actividad =
-    getActividadPorPersona(
-      historialPeriodo
+  return EQUIPO_ADMINISTRACION.map((email) => {
+    const asignadas = funciones.filter((funcion) =>
+      (funcion.responsables || []).includes(email)
     );
 
-  return EQUIPO_ADMINISTRACION.map(
-    (email) => {
-      const asignadas =
-        funciones.filter(
-          (funcion) =>
-            (
-              funcion.responsables ||
-              []
-            ).includes(
-              email
-            )
-        );
+    const pendientes = asignadas.reduce((total, funcion) => {
+      return total + state.rows.filter(
+        (row) => getEstadoFuncion(row, funcion) !== "ok"
+      ).length;
+    }, 0);
 
-      const pendientes =
-        asignadas.reduce(
-          (
-            total,
-            funcion
-          ) => {
-            return (
-              total +
-              state.rows.filter(
-                (row) =>
-                  getEstadoFuncion(
-                    row,
-                    funcion
-                  ) !==
-                  "ok"
-              ).length
-            );
-          },
-          0
-        );
+    const actividadPersona = actividad.find(
+      (item) => normalizeEmail(item.correo) === email
+    ) || {
+      ok: 0,
+      grupos: 0,
+      dias: 0
+    };
 
-      const actividadPersona =
-        actividad.find(
-          (item) =>
-            normalizeEmail(
-              item.correo
-            ) ===
-            email
-        ) ||
-        {
-          ok: 0,
-          grupos: 0,
-          dias: 0
-        };
-
-      return {
-        email,
-
-        nombre:
-          getNombreEquipoAdministracion(
-            email
-          ),
-
-        asignadas,
-
-        pendientes,
-
-        okPeriodo:
-          actividadPersona.ok,
-
-        gruposPeriodo:
-          actividadPersona.grupos,
-
-        diasPeriodo:
-          actividadPersona.dias
-      };
-    }
-  );
+    return {
+      email,
+      nombre: LABEL_EQUIPO[email] || email,
+      asignadas,
+      pendientes,
+      okPeriodo: actividadPersona.ok,
+      gruposPeriodo: actividadPersona.grupos,
+      diasPeriodo: actividadPersona.dias
+    };
+  });
 }
 
 function renderTodo() {
@@ -1281,149 +1324,88 @@ function renderDetallePendientes() {
 }
 
 function renderConfiguracion() {
-  const cont =
-    $("configFunciones");
+  const cont = $("configFunciones");
+  if (!cont) return;
 
-  if (!cont) {
-    return;
+  const historica = !esFechaReferenciaHoy();
+
+  cont.innerHTML = (state.config?.columnas || []).map((funcion, index) => {
+    const todosAsignados = EQUIPO_ADMINISTRACION.every(
+      (email) => (funcion.responsables || []).includes(email)
+    );
+
+    return `
+      <div class="config-row" data-config-funcion="${esc(funcion.id)}">
+        <div class="admin-field">
+          <label>Función ${index + 1}</label>
+          <input
+            type="text"
+            data-config-nombre="${esc(funcion.id)}"
+            value="${esc(funcion.nombre || "")}"
+            placeholder="Nombre de la función"
+            ${historica ? "disabled" : ""}
+          />
+        </div>
+
+        <label class="config-active">
+          <input
+            type="checkbox"
+            data-config-activa="${esc(funcion.id)}"
+            ${funcion.activa === true ? "checked" : ""}
+            ${historica ? "disabled" : ""}
+          />
+          Activa
+        </label>
+
+        <div class="config-responsables">
+          <label class="all-team">
+            <input
+              type="checkbox"
+              data-responsables-todos="${esc(funcion.id)}"
+              ${todosAsignados ? "checked" : ""}
+              ${historica ? "disabled" : ""}
+            />
+            Asignar a todo el equipo
+          </label>
+
+          ${EQUIPO_ADMINISTRACION.map((email) => `
+            <label title="${esc(email)}">
+              <input
+                type="checkbox"
+                data-responsable-funcion="${esc(funcion.id)}"
+                value="${esc(email)}"
+                ${(funcion.responsables || []).includes(email) ? "checked" : ""}
+                ${historica ? "disabled" : ""}
+              />
+              ${esc(getNombreEquipoAdministracion(email))}
+            </label>
+          `).join("")}
+        </div>
+      </div>
+    `;
+  }).join("");
+
+  const button = $("btnGuardarConfiguracion");
+  if (button) {
+    button.disabled = historica;
+    button.title = historica
+      ? "Vuelve a la fecha de hoy para modificar la organización."
+      : "";
   }
 
-  cont.innerHTML =
-    (
-      state.config
-        ?.columnas ||
-      []
-    )
-      .map(
-        (
-          funcion,
-          index
-        ) => {
-          const todosAsignados =
-            EQUIPO_ADMINISTRACION
-              .every(
-                (email) =>
-                  (
-                    funcion.responsables ||
-                    []
-                  ).includes(
-                    email
-                  )
-              );
-
-          return `
-            <div
-              class="config-row"
-              data-config-funcion="${esc(
-                funcion.id
-              )}"
-            >
-              <div class="admin-field">
-                <label>
-                  Función ${index + 1}
-                </label>
-
-                <input
-                  type="text"
-                  data-config-nombre="${esc(
-                    funcion.id
-                  )}"
-                  value="${esc(
-                    funcion.nombre ||
-                    ""
-                  )}"
-                  placeholder="Nombre de la función"
-                />
-              </div>
-
-              <label class="config-active">
-                <input
-                  type="checkbox"
-                  data-config-activa="${esc(
-                    funcion.id
-                  )}"
-                  ${
-                    funcion.activa ===
-                    true
-                      ? "checked"
-                      : ""
-                  }
-                />
-
-                Activa
-              </label>
-
-              <div class="config-responsables">
-                <label class="all-team">
-                  <input
-                    type="checkbox"
-                    data-responsables-todos="${esc(
-                      funcion.id
-                    )}"
-                    ${
-                      todosAsignados
-                        ? "checked"
-                        : ""
-                    }
-                  />
-
-                  Asignar a todo el equipo
-                </label>
-
-                ${
-                  EQUIPO_ADMINISTRACION
-                    .map(
-                      (email) => {
-                        const nombre =
-                          getNombreEquipoAdministracion(
-                            email
-                          );
-
-                        return `
-                          <label
-                            title="${esc(
-                              email
-                            )}"
-                          >
-                            <input
-                              type="checkbox"
-                              data-responsable-funcion="${esc(
-                                funcion.id
-                              )}"
-                              value="${esc(
-                                email
-                              )}"
-                              ${
-                                (
-                                  funcion.responsables ||
-                                  []
-                                ).includes(
-                                  email
-                                )
-                                  ? "checked"
-                                  : ""
-                              }
-                            />
-
-                            ${esc(
-                              nombre
-                            )}
-                          </label>
-                        `;
-                      }
-                    )
-                    .join("")
-                }
-              </div>
-            </div>
-          `;
-        }
-      )
-      .join("");
+  const aviso = $("configHistoricaAviso");
+  if (aviso) {
+    aviso.classList.toggle("hidden", !historica);
+  }
 }
 
 async function guardarConfiguracion() {
   if (!puedeSupervisarAdministracion()) return;
+
+  if (!esFechaReferenciaHoy()) {
+    alert("Estás viendo una fecha histórica. Vuelve a Hoy para modificar funciones y responsables.");
+    return;
+  }
 
   const actuales = state.config?.columnas || [];
   const nuevas = [];
@@ -1521,6 +1503,29 @@ async function guardarConfiguracion() {
       { merge: true }
     );
 
+    const versionId = `v_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+    const vigenteDesdeCliente = new Date().toISOString();
+
+    await setDoc(
+      doc(
+        db,
+        ADMIN_CONFIG_COLLECTION,
+        ADMIN_CONFIG_DOC,
+        ADMIN_CONFIG_VERSIONES_SUBCOLLECTION,
+        versionId
+      ),
+      {
+        versionId,
+        anoContexto: Number(state.anoSeleccionado),
+        columnas: nuevas,
+        equipo: EQUIPO_ADMINISTRACION,
+        vigenteDesde: serverTimestamp(),
+        vigenteDesdeCliente,
+        creadoPor: getNombreUsuario(),
+        creadoPorCorreo: state.email
+      }
+    );
+
     if (cambiosHistorial.length) {
       await addDoc(
         collection(db, HISTORIAL_COLLECTION),
@@ -1541,9 +1546,11 @@ async function guardarConfiguracion() {
       );
     }
 
-    state.config = normalizarConfiguracion({ columnas: nuevas });
+    state.configActual = normalizarConfiguracion({ columnas: nuevas });
+    state.config = normalizarConfiguracion(state.configActual);
 
     await Promise.all([
+      cargarVersionesConfiguracion(),
       cargarControles(),
       cargarHistorial()
     ]);
@@ -1565,23 +1572,265 @@ function crearCicloId(id = "") {
   return `${id}_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
 }
 
-function formatResponsables(
-  responsables = []
-) {
-  if (
-    !responsables.length
-  ) {
-    return "Sin responsable asignado";
-  }
+function formatResponsables(responsables = []) {
+  if (!responsables.length) return "Sin responsable asignado";
 
   return responsables
-    .map(
-      (email) =>
-        getNombreEquipoAdministracion(
-          email
-        )
-    )
+    .map((email) => getNombreEquipoAdministracion(email))
     .join(", ");
+}
+
+function exportarXlsAdministracion() {
+  if (!window.XLSX) {
+    alert("No se pudo cargar el módulo de Excel. Recarga la página e intenta nuevamente.");
+    return;
+  }
+
+  const resumen = getResumenActual();
+  const historialPeriodo = getHistorialPeriodo();
+  const actividadPersonas = getActividadPorPersona(historialPeriodo);
+  const actividadFunciones = getActividadPorFuncion(historialPeriodo);
+  const cargaEquipo = getCargaEquipo(historialPeriodo);
+  const funciones = getFuncionesActivas();
+  const rows = getRowsVisibles();
+
+  const parametros = [
+    ["Parámetro", "Valor"],
+    ["Año de viaje", state.anoSeleccionado],
+    ["Fecha de referencia", state.fechaReferencia],
+    ["Período de actividad", getEtiquetaPeriodo()],
+    ["Desde actividad", fechaInputValue(getInicioPeriodo())],
+    ["Hasta actividad", fechaInputValue(getFinPeriodo())],
+    ["Búsqueda", $("adminBuscar")?.value || ""],
+    ["Grupos considerados", resumen.grupos],
+    ["Funciones activas", funciones.length],
+    ["Tareas OK", resumen.totalOk],
+    ["Pendientes", resumen.pendientes],
+    ["Avance global", `${resumen.porcentaje}%`],
+    ["Exportado por", getNombreUsuario()],
+    ["Correo", state.email],
+    ["Fecha exportación", new Date().toLocaleString("es-CL")]
+  ];
+
+  const funcionesSheet = [[
+    "Función",
+    "Activa",
+    "Ciclo",
+    "Responsables",
+    "Grupos",
+    "OK",
+    "Pendientes",
+    "Avance %"
+  ]];
+
+  resumen.detalle.forEach((item) => {
+    funcionesSheet.push([
+      item.nombre,
+      item.activa ? "Sí" : "No",
+      item.cicloId || "",
+      formatResponsables(item.responsables || []),
+      item.total,
+      item.ok,
+      item.pendientes,
+      item.porcentaje
+    ]);
+  });
+
+  const equipoSheet = [[
+    "Integrante",
+    "Correo",
+    "Funciones asignadas",
+    "Pendientes asignados",
+    "OK en período",
+    "Grupos trabajados",
+    "Días activos"
+  ]];
+
+  cargaEquipo.forEach((item) => {
+    equipoSheet.push([
+      item.nombre,
+      item.email,
+      item.asignadas.map((funcion) => funcion.nombre).join(" | "),
+      item.pendientes,
+      item.okPeriodo,
+      item.gruposPeriodo,
+      item.diasPeriodo
+    ]);
+  });
+
+  const actividadSheet = [[
+    "Fecha",
+    "Hora",
+    "Persona",
+    "Correo",
+    "Función",
+    "Grupo",
+    "ID Grupo",
+    "Negocio",
+    "Anterior",
+    "Nuevo",
+    "Ciclo"
+  ]];
+
+  historialPeriodo
+    .filter((item) => item.tipoMovimiento === "control_administracion")
+    .sort((a, b) => fechaMs(a.fecha) - fechaMs(b.fecha))
+    .forEach((item) => {
+      const d = new Date(fechaMs(item.fecha));
+      actividadSheet.push([
+        d.toLocaleDateString("es-CL"),
+        d.toLocaleTimeString("es-CL", { hour: "2-digit", minute: "2-digit" }),
+        item.creadoPor || item.usuarioNombre || getNombreEquipoAdministracion(item.creadoPorCorreo || item.usuarioCorreo || ""),
+        item.creadoPorCorreo || item.usuarioCorreo || "",
+        item?.metadata?.controlNombre || item?.metadata?.controlId || "",
+        item.aliasGrupo || "",
+        item.idGrupo || item.groupDocId || "",
+        item.numeroNegocio || "",
+        item?.metadata?.anterior || "",
+        item?.metadata?.nuevo || "",
+        item?.metadata?.cicloId || "legacy"
+      ]);
+    });
+
+  const estadoGruposSheet = [[
+    "Grupo",
+    "ID Grupo",
+    "Negocio",
+    ...funciones.map((funcion) => funcion.nombre)
+  ]];
+
+  rows.forEach((row) => {
+    estadoGruposSheet.push([
+      row.titulo,
+      row.groupId || row.docId,
+      row.negocio,
+      ...funciones.map((funcion) =>
+        getEstadoFuncion(row, funcion) === "ok" ? "OK" : "Pendiente"
+      )
+    ]);
+  });
+
+  const configHistoricaSheet = [[
+    "Versión",
+    "Vigente desde",
+    "Función",
+    "Nombre",
+    "Activa",
+    "Ciclo",
+    "Responsables",
+    "Creado por",
+    "Correo"
+  ]];
+
+  state.configVersiones
+    .slice()
+    .sort((a, b) => getVersionDesdeMs(a) - getVersionDesdeMs(b))
+    .forEach((version) => {
+      const desde = getVersionDesdeMs(version);
+      (version.columnas || []).forEach((funcion) => {
+        configHistoricaSheet.push([
+          version.versionId || version.id || "",
+          desde ? new Date(desde).toLocaleString("es-CL") : "",
+          funcion.id || "",
+          funcion.nombre || "",
+          funcion.activa === true ? "Sí" : "No",
+          funcion.cicloId || "legacy",
+          formatResponsables(funcion.responsables || []),
+          version.creadoPor || "",
+          version.creadoPorCorreo || ""
+        ]);
+      });
+    });
+
+  const actividadFuncionSheet = [[
+    "Función",
+    "OK en período",
+    "Reabiertas",
+    "Grupos trabajados"
+  ]];
+
+  actividadFunciones.forEach((item) => {
+    actividadFuncionSheet.push([
+      item.nombre,
+      item.ok,
+      item.reabiertos,
+      item.grupos
+    ]);
+  });
+
+  const actividadPersonaSheet = [[
+    "Persona",
+    "Correo",
+    "OK",
+    "Reabiertas",
+    "Grupos",
+    "Días activos",
+    "Detalle funciones"
+  ]];
+
+  actividadPersonas.forEach((item) => {
+    actividadPersonaSheet.push([
+      item.nombre,
+      item.correo,
+      item.ok,
+      item.reabiertos,
+      item.grupos,
+      item.dias,
+      item.funciones.map(([nombre, cantidad]) => `${nombre}: ${cantidad}`).join(" | ")
+    ]);
+  });
+
+  const wb = window.XLSX.utils.book_new();
+
+  agregarHojaXls(wb, "PARAMETROS", parametros);
+  agregarHojaXls(wb, "FUNCIONES", funcionesSheet);
+  agregarHojaXls(wb, "EQUIPO", equipoSheet);
+  agregarHojaXls(wb, "ACTIVIDAD", actividadSheet);
+  agregarHojaXls(wb, "ESTADO GRUPOS", estadoGruposSheet);
+  agregarHojaXls(wb, "ACTIVIDAD FUNCION", actividadFuncionSheet);
+  agregarHojaXls(wb, "ACTIVIDAD PERSONA", actividadPersonaSheet);
+  agregarHojaXls(wb, "CONFIG HISTORICA", configHistoricaSheet);
+
+  const nombreArchivo = [
+    "administracion",
+    state.anoSeleccionado,
+    state.fechaReferencia,
+    String(state.periodo || "7")
+  ].join("_") + ".xlsx";
+
+  window.XLSX.writeFile(wb, nombreArchivo);
+}
+
+function agregarHojaXls(workbook, nombre, rows) {
+  const ws = window.XLSX.utils.aoa_to_sheet(rows);
+
+  ws["!cols"] = calcularAnchosXls(rows);
+  window.XLSX.utils.book_append_sheet(workbook, ws, nombre.slice(0, 31));
+}
+
+function calcularAnchosXls(rows = []) {
+  const maxCols = Math.max(0, ...rows.map((row) => row.length));
+
+  return Array.from({ length: maxCols }, (_, index) => {
+    const max = Math.max(
+      10,
+      ...rows.map((row) => String(row[index] ?? "").length)
+    );
+
+    return { wch: Math.min(max + 2, 45) };
+  });
+}
+
+function getEtiquetaPeriodo() {
+  const value = String(state.periodo || "7");
+
+  return ({
+    hoy: "Día de referencia",
+    ayer: "Día anterior",
+    "7": "Últimos 7 días",
+    "30": "Últimos 30 días",
+    mes: "Mes de la fecha de referencia"
+  })[value] || value;
 }
 
 function fechaMs(value) {
