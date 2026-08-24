@@ -66,7 +66,7 @@
 
     .admin-toolbar {
       display: grid;
-      grid-template-columns: minmax(130px, 180px) minmax(160px, 220px) 1fr auto;
+      grid-template-columns: minmax(120px, 160px) minmax(145px, 180px) minmax(145px, 180px) 1fr auto auto;
       gap: 10px;
       margin: 20px 0;
       align-items: end;
@@ -95,6 +95,17 @@
       border-radius: 9px;
       padding: 0 10px;
       background: #fff;
+    }
+
+    .admin-reference-note {
+      margin: -8px 0 16px;
+      padding: 10px 12px;
+      border: 1px solid #e6d29b;
+      border-radius: 10px;
+      background: #fff8df;
+      color: #7a5a00;
+      font-size: 12px;
+      font-weight: 800;
     }
 
     .admin-section {
@@ -512,13 +523,18 @@
         </div>
 
         <div class="admin-field">
+          <label for="adminFechaReferencia">Estado al</label>
+          <input id="adminFechaReferencia" type="date" />
+        </div>
+
+        <div class="admin-field">
           <label for="adminPeriodo">Actividad</label>
           <select id="adminPeriodo">
-            <option value="hoy">Hoy</option>
-            <option value="ayer">Ayer</option>
+            <option value="hoy">Día de referencia</option>
+            <option value="ayer">Día anterior</option>
             <option value="7" selected>Últimos 7 días</option>
             <option value="30">Últimos 30 días</option>
-            <option value="mes">Este mes</option>
+            <option value="mes">Mes de referencia</option>
           </select>
         </div>
 
@@ -527,6 +543,16 @@
           <input id="adminBuscar" type="text" placeholder="Colegio, curso, ID o negocio..." />
         </div>
 
+        <button id="btnFechaHoy" class="admin-btn secondary" type="button">
+          Hoy
+        </button>
+
+        <button id="btnExportarXls" class="admin-btn primary" type="button">
+          Exportar XLS
+        </button>
+      </div>
+
+      <div class="admin-head-actions" style="margin-bottom:16px; justify-content:flex-end;">
         <button id="btnIrConfiguracion" class="admin-btn secondary" type="button">
           Configurar funciones y responsables
         </button>
@@ -535,8 +561,8 @@
       <section class="admin-section">
         <div class="admin-section-head">
           <div>
-            <h2>Resumen general</h2>
-            <p>Estado actual de las funciones activas del año seleccionado.</p>
+            <h2>Resumen general · <span id="estadoReferenciaLabel">Estado actual</span></h2>
+            <p>Funciones activas del año seleccionado según la fecha de referencia.</p>
           </div>
         </div>
 
@@ -688,10 +714,12 @@
       <section id="configuracionSection" class="admin-section">
         <div class="admin-section-head">
           <div>
-            <h2>Configurar las 5 funciones</h2>
+            <h2 id="configReferenciaLabel">Configuración vigente</h2>
             <p>La Jefatura de Administración define nombre, activación y responsables.</p>
           </div>
         </div>
+
+        <div id="configHistoricaAviso" class="admin-reference-note hidden">Vista histórica: esta configuración es solo de consulta. Vuelve a Hoy para modificar funciones o responsables.</div>
 
         <div id="configFunciones" class="config-grid"></div>
 
@@ -704,6 +732,7 @@
     </section>
   </main>
 
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <script type="module" src="layout.js"></script>
   <script type="module" src="gestion-administracion.js"></script>
 </body>
