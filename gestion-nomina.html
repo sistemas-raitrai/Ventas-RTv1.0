@@ -1261,6 +1261,610 @@
       cursor: wait;
     }
 
+    /* =====================================================
+       CONTROL ADMINISTRACIÓN
+    ===================================================== */
+    
+    .admin-head-actions {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+    
+    .admin-control-column {
+      min-width: 135px;
+      text-align: center !important;
+    }
+    
+    .admin-control-status {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 7px;
+    
+      min-height: 34px;
+      padding: 5px 10px;
+    
+      border: 0;
+      border-radius: 999px;
+    
+      background: transparent;
+    
+      font: inherit;
+      font-size: 11px;
+      font-weight: 900;
+    
+      cursor: pointer;
+    }
+    
+    .admin-control-icon {
+      display: inline-flex;
+    
+      width: 22px;
+      height: 22px;
+    
+      align-items: center;
+      justify-content: center;
+    
+      border-radius: 50%;
+    
+      font-size: 14px;
+      line-height: 1;
+    }
+    
+    .admin-control-status.is-pending {
+      color: #766b7f;
+    }
+    
+    .admin-control-status.is-pending
+    .admin-control-icon {
+      border: 2px solid #aaa0b3;
+      background: #fff;
+    }
+    
+    .admin-control-status.is-ok {
+      color: #166534;
+    }
+    
+    .admin-control-status.is-ok
+    .admin-control-icon {
+      border: 2px solid #16a34a;
+      background: #16a34a;
+      color: #fff;
+    }
+    
+    .admin-control-status:hover {
+      background: #f3eef7;
+    }
+    
+    .admin-control-status:disabled {
+      opacity: .5;
+      cursor: wait;
+    }
+    
+    
+    /* =====================================================
+       PROGRESO ADMINISTRACIÓN
+    ===================================================== */
+    
+    .admin-progress-modal-card {
+      width: min(
+        1450px,
+        calc(100vw - 30px)
+      );
+    
+      height: calc(
+        100vh - 30px
+      );
+    }
+    
+    .admin-progress-toolbar {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: flex-end;
+      flex-wrap: wrap;
+    
+      margin-bottom: 18px;
+    }
+    
+    .admin-progress-toolbar label {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    
+      color: #6d6278;
+    
+      font-size: 11px;
+      font-weight: 900;
+      text-transform: uppercase;
+    }
+    
+    .admin-progress-toolbar select {
+      min-width: 190px;
+      min-height: 42px;
+    
+      border: 1px solid #d7cde0;
+      border-radius: 9px;
+    
+      padding: 0 10px;
+    
+      background: #fff;
+    }
+    
+    .admin-progress-section {
+      margin-top: 18px;
+      padding: 16px;
+    
+      border: 1px solid #e0d8e6;
+      border-radius: 16px;
+    
+      background: #faf8fc;
+    }
+    
+    .admin-progress-section:first-of-type {
+      margin-top: 0;
+    }
+    
+    .admin-progress-section h3 {
+      margin: 0;
+      color: #2b1940;
+    }
+    
+    .admin-progress-section-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: flex-start;
+    
+      margin-bottom: 14px;
+    }
+    
+    .admin-progress-section-head p {
+      margin: 4px 0 0;
+    
+      color: #786d82;
+    
+      font-size: 12px;
+    }
+    
+    .admin-general-kpis,
+    .admin-period-kpis {
+      display: grid;
+      gap: 10px;
+    
+      margin-bottom: 14px;
+    }
+    
+    .admin-general-kpis {
+      grid-template-columns:
+        repeat(
+          5,
+          minmax(0, 1fr)
+        );
+    }
+    
+    .admin-period-kpis {
+      grid-template-columns:
+        repeat(
+          3,
+          minmax(0, 1fr)
+        );
+    }
+    
+    .admin-general-kpis article,
+    .admin-period-kpis article {
+      padding: 14px;
+    
+      border: 1px solid #dfd6e6;
+      border-radius: 13px;
+    
+      background: #fff;
+    }
+    
+    .admin-general-kpis span,
+    .admin-period-kpis span {
+      display: block;
+    
+      color: #786d82;
+    
+      font-size: 10px;
+      font-weight: 900;
+      text-transform: uppercase;
+    }
+    
+    .admin-general-kpis strong,
+    .admin-period-kpis strong {
+      display: block;
+    
+      margin-top: 5px;
+    
+      color: #2b1940;
+    
+      font-size: 26px;
+    }
+    
+    
+    /* RESUMEN POR CONTROL */
+    
+    .admin-control-summary-grid {
+      display: grid;
+    
+      grid-template-columns:
+        repeat(
+          auto-fit,
+          minmax(220px, 1fr)
+        );
+    
+      gap: 10px;
+    }
+    
+    .admin-control-card {
+      padding: 14px;
+    
+      border: 1px solid #ded6e5;
+      border-radius: 14px;
+    
+      background: #fff;
+    }
+    
+    .admin-control-card-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      align-items: center;
+    
+      color: #2b1940;
+    }
+    
+    .admin-control-card-head > span {
+      color: #166534;
+      font-weight: 900;
+    }
+    
+    .admin-progress-track {
+      height: 9px;
+    
+      margin-top: 12px;
+    
+      overflow: hidden;
+    
+      border-radius: 999px;
+    
+      background: #e9e3ed;
+    }
+    
+    .admin-progress-value {
+      height: 100%;
+    
+      border-radius: 999px;
+    
+      background: #16a34a;
+    }
+    
+    .admin-control-card-values {
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+    
+      margin-top: 10px;
+    
+      color: #716678;
+    
+      font-size: 11px;
+    }
+    
+    .admin-control-card-values button {
+      border: 0;
+      padding: 0;
+    
+      background: transparent;
+      color: #a16207;
+    
+      font: inherit;
+      cursor: pointer;
+      text-decoration: underline;
+    }
+    
+    
+    /* GRÁFICO DIARIO */
+    
+    .admin-daily-chart {
+      display: flex;
+      gap: 8px;
+      align-items: flex-end;
+    
+      min-height: 260px;
+    
+      padding: 16px 12px 0;
+    
+      overflow-x: auto;
+    
+      border: 1px solid #e4dce9;
+      border-radius: 14px;
+    
+      background: #fff;
+    }
+    
+    .admin-chart-column {
+      display: grid;
+    
+      grid-template-rows:
+        20px
+        180px
+        35px;
+    
+      min-width: 55px;
+    
+      flex: 1;
+    
+      align-items: end;
+    }
+    
+    .admin-chart-value {
+      text-align: center;
+    
+      color: #2b1940;
+    
+      font-size: 11px;
+      font-weight: 900;
+    }
+    
+    .admin-chart-track {
+      position: relative;
+    
+      width: 72%;
+      height: 180px;
+    
+      margin: 0 auto;
+    
+      display: flex;
+      align-items: flex-end;
+    
+      border-radius: 8px 8px 0 0;
+    
+      background: #eee9f1;
+    }
+    
+    .admin-chart-bar {
+      width: 100%;
+    
+      min-height: 0;
+    
+      border-radius: 8px 8px 0 0;
+    
+      background: #4a2570;
+    }
+    
+    .admin-chart-label {
+      padding-top: 7px;
+    
+      color: #786d82;
+    
+      font-size: 9px;
+      font-weight: 800;
+      text-align: center;
+    }
+    
+    
+    /* TABLAS */
+    
+    .admin-table-wrap {
+      margin-top: 12px;
+    
+      overflow: auto;
+    
+      border: 1px solid #e3dbe8;
+      border-radius: 12px;
+    }
+    
+    .admin-progress-table {
+      width: 100%;
+    
+      border-collapse: collapse;
+    }
+    
+    .admin-progress-table th {
+      padding: 10px;
+    
+      background: #eee8f3;
+      color: #2b1940;
+    
+      text-align: left;
+    
+      font-size: 10px;
+      text-transform: uppercase;
+    }
+    
+    .admin-progress-table td {
+      padding: 10px;
+    
+      border-bottom: 1px solid #eee9f1;
+    
+      font-size: 12px;
+      vertical-align: top;
+    }
+    
+    .admin-user-control +
+    .admin-user-control {
+      margin-top: 3px;
+    }
+    
+    
+    /* PENDIENTES */
+    
+    .admin-detail-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+    
+      margin-bottom: 12px;
+    }
+    
+    .admin-pending-list {
+      display: flex;
+      flex-direction: column;
+      gap: 7px;
+    }
+    
+    .admin-pending-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: center;
+    
+      padding: 11px 12px;
+    
+      border: 1px solid #e3dce8;
+      border-radius: 11px;
+    
+      background: #fff;
+    }
+    
+    .admin-all-ok {
+      padding: 16px;
+    
+      border: 1px solid #bbdfc5;
+      border-radius: 12px;
+    
+      background: #eef9f1;
+      color: #166534;
+    
+      font-weight: 900;
+    }
+    
+    
+    /* =====================================================
+       CONFIGURACIÓN ADMINISTRACIÓN
+    ===================================================== */
+    
+    .admin-config-modal-card {
+      width: min(
+        720px,
+        calc(100vw - 30px)
+      );
+    
+      height: auto;
+    
+      max-height: calc(
+        100vh - 30px
+      );
+    }
+    
+    .admin-config-fixed {
+      margin-bottom: 18px;
+      padding: 14px;
+    
+      border: 1px solid #d7e4da;
+      border-radius: 13px;
+    
+      background: #f2f9f3;
+    }
+    
+    .admin-config-fixed > div {
+      margin-top: 6px;
+    
+      color: #166534;
+    
+      font-weight: 800;
+    }
+    
+    .admin-config-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    
+    .admin-config-row {
+      display: grid;
+    
+      grid-template-columns:
+        minmax(0, 1fr)
+        auto;
+    
+      gap: 14px;
+      align-items: end;
+    
+      padding: 14px;
+    
+      border: 1px solid #e0d8e6;
+      border-radius: 13px;
+    
+      background: #faf8fc;
+    }
+    
+    .admin-config-row label {
+      display: block;
+    
+      margin-bottom: 6px;
+    
+      color: #45364f;
+    
+      font-size: 12px;
+      font-weight: 900;
+    }
+    
+    .admin-config-row input[type="text"] {
+      width: 100%;
+      min-height: 42px;
+    
+      box-sizing: border-box;
+    
+      border: 1px solid #d3cadb;
+      border-radius: 9px;
+    
+      padding: 0 10px;
+    }
+    
+    .admin-config-check {
+      display: flex !important;
+      gap: 7px;
+      align-items: center;
+    
+      min-height: 42px;
+    
+      margin: 0 !important;
+    
+      cursor: pointer;
+    }
+    
+    .admin-config-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 9px;
+    
+      margin-top: 18px;
+    }
+    
+    @media (max-width: 900px) {
+      .admin-general-kpis {
+        grid-template-columns:
+          repeat(
+            2,
+            minmax(0, 1fr)
+          );
+      }
+    
+      .admin-period-kpis {
+        grid-template-columns: 1fr;
+      }
+    }
+    
+    @media (max-width: 600px) {
+      .admin-general-kpis {
+        grid-template-columns: 1fr;
+      }
+    
+      .admin-pending-row {
+        align-items: stretch;
+        flex-direction: column;
+      }
+    
+      .admin-config-row {
+        grid-template-columns: 1fr;
+      }
+    }
+
     .modal-open {
       overflow: hidden;
     }
@@ -1353,10 +1957,20 @@
               2026
             </span>
           </h1>
-
+      
           <p>
             Administración de links, fases y pasajeros por grupo.
           </p>
+        </div>
+      
+        <div class="admin-head-actions">
+          <button
+            id="btnProgresoAdministracion"
+            class="btn-primary hidden"
+            type="button"
+          >
+            Progreso Administración
+          </button>
         </div>
       </div>
 
@@ -1616,7 +2230,7 @@
         <div class="table-wrap">
           <table class="main-table">
             <thead>
-              <tr>
+              <tr id="gnHeadRow">
                 <th>Grupo</th>
                 <th>ID Grupo</th>
                 <th>Negocio</th>
@@ -2247,7 +2861,11 @@
                 <option value="archivos">
                   Archivados
                 </option>
-        
+                
+                <option value="administracion">
+                  Administración
+                </option>
+                
                 <option value="notas">
                   Notas
                 </option>
@@ -2466,6 +3084,281 @@
             </div>
           </div>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- =====================================================
+     PROGRESO ADMINISTRACIÓN
+  ====================================================== -->
+  <div
+    class="modal"
+    id="modalProgresoAdministracion"
+  >
+    <div class="modal-card admin-progress-modal-card">
+      <header class="modal-head">
+        <div>
+          <h2>
+            Progreso Administración
+          </h2>
+  
+          <p>
+            Seguimiento de avance, actividad diaria y carga de trabajo.
+          </p>
+        </div>
+  
+        <button
+          id="btnCerrarProgresoAdministracion"
+          class="modal-close"
+          type="button"
+          aria-label="Cerrar"
+        >
+          ×
+        </button>
+      </header>
+  
+      <div class="modal-content">
+        <div class="admin-progress-toolbar">
+          <label>
+            Período de actividad
+  
+            <select id="adminPeriodo">
+              <option value="hoy">
+                Hoy
+              </option>
+  
+              <option value="ayer">
+                Ayer
+              </option>
+  
+              <option value="7" selected>
+                Últimos 7 días
+              </option>
+  
+              <option value="30">
+                Últimos 30 días
+              </option>
+  
+              <option value="mes">
+                Este mes
+              </option>
+            </select>
+          </label>
+  
+          <button
+            id="btnConfigurarAdministracion"
+            class="btn-secondary hidden"
+            type="button"
+          >
+            Configurar controles
+          </button>
+        </div>
+  
+        <!-- ==============================================
+             ESTADO ACTUAL
+        =============================================== -->
+        <section class="admin-progress-section">
+          <div class="admin-progress-section-head">
+            <div>
+              <h3>
+                Estado actual
+              </h3>
+  
+              <p>
+                Fotografía actual de los grupos del año seleccionado.
+              </p>
+            </div>
+          </div>
+  
+          <div class="admin-general-kpis">
+            <article>
+              <span>
+                Grupos
+              </span>
+  
+              <strong id="adminProgGrupos">
+                0
+              </strong>
+            </article>
+  
+            <article>
+              <span>
+                Controles OK
+              </span>
+  
+              <strong id="adminProgOkActual">
+                0
+              </strong>
+            </article>
+  
+            <article>
+              <span>
+                Pendientes
+              </span>
+  
+              <strong id="adminProgPendientes">
+                0
+              </strong>
+            </article>
+  
+            <article>
+              <span>
+                Grupos completos
+              </span>
+  
+              <strong id="adminProgCompletos">
+                0
+              </strong>
+            </article>
+  
+            <article>
+              <span>
+                Avance general
+              </span>
+  
+              <strong id="adminProgPorcentaje">
+                0%
+              </strong>
+            </article>
+          </div>
+  
+          <div
+            id="adminResumenControles"
+            class="admin-control-summary-grid"
+          ></div>
+        </section>
+  
+        <!-- ==============================================
+             ACTIVIDAD DEL PERÍODO
+        =============================================== -->
+        <section class="admin-progress-section">
+          <div class="admin-progress-section-head">
+            <div>
+              <h3>
+                Trabajo realizado
+              </h3>
+  
+              <p>
+                Movimientos registrados durante el período seleccionado.
+              </p>
+            </div>
+          </div>
+  
+          <div class="admin-period-kpis">
+            <article>
+              <span>
+                Tareas llevadas a OK
+              </span>
+  
+              <strong id="adminProgPeriodoOk">
+                0
+              </strong>
+            </article>
+  
+            <article>
+              <span>
+                Reabiertas
+              </span>
+  
+              <strong id="adminProgPeriodoReabiertos">
+                0
+              </strong>
+            </article>
+  
+            <article>
+              <span>
+                Grupos trabajados
+              </span>
+  
+              <strong id="adminProgPeriodoGrupos">
+                0
+              </strong>
+            </article>
+          </div>
+        </section>
+  
+        <!-- ==============================================
+             GRÁFICO
+        =============================================== -->
+        <section class="admin-progress-section">
+          <div class="admin-progress-section-head">
+            <div>
+              <h3>
+                Actividad por día
+              </h3>
+  
+              <p>
+                Cantidad de tareas llevadas a OK cada día.
+              </p>
+            </div>
+          </div>
+  
+          <div
+            id="adminGraficoActividad"
+            class="admin-daily-chart"
+          ></div>
+        </section>
+  
+        <!-- ==============================================
+             RESUMEN DIARIO
+        =============================================== -->
+        <section class="admin-progress-section">
+          <h3>
+            Resumen diario
+          </h3>
+  
+          <div class="admin-table-wrap">
+            <table class="admin-progress-table">
+              <thead>
+                <tr>
+                  <th>Día</th>
+                  <th>OK realizados</th>
+                  <th>Reabiertos</th>
+                  <th>Grupos trabajados</th>
+                </tr>
+              </thead>
+  
+              <tbody id="adminActividadDiasTbody">
+              </tbody>
+            </table>
+          </div>
+        </section>
+  
+        <!-- ==============================================
+             ACTIVIDAD POR PERSONA
+        =============================================== -->
+        <section class="admin-progress-section">
+          <h3>
+            Actividad por persona
+          </h3>
+  
+          <div class="admin-table-wrap">
+            <table class="admin-progress-table">
+              <thead>
+                <tr>
+                  <th>Persona</th>
+                  <th>OK</th>
+                  <th>Reabiertos</th>
+                  <th>Grupos</th>
+                  <th>Días activos</th>
+                  <th>Trabajo realizado</th>
+                </tr>
+              </thead>
+  
+              <tbody id="adminActividadUsuariosTbody">
+              </tbody>
+            </table>
+          </div>
+        </section>
+  
+        <!-- ==============================================
+             DETALLE DE PENDIENTES
+        =============================================== -->
+        <section
+          id="adminDetallePendientes"
+          class="admin-progress-section"
+        >
+        </section>
       </div>
     </div>
   </div>
