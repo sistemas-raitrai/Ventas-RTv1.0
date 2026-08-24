@@ -9,8 +9,13 @@ import {
 import {
   collection,
   getDocs,
+  getDoc,
+  doc,
+  setDoc,
+  addDoc,
   query,
-  where
+  where,
+  serverTimestamp
 } from "https://www.gstatic.com/firebasejs/11.7.3/firebase-firestore.js";
  
 import {
@@ -56,6 +61,74 @@ const ANO_MAXIMO_GESTION =
 const ALERTAS_INSCRIPCIONES_COLLECTION =
   "ventas_alertas_inscripciones";
 
+const ADMIN_CONTROL_COLLECTION =
+  "ventas_administracion_control";
+
+const ADMIN_CONFIG_COLLECTION =
+  "ventas_configuracion";
+
+const ADMIN_CONFIG_DOC =
+  "administracion_control";
+
+const HISTORIAL_COLLECTION =
+  "ventas_historial";
+
+const JEFA_ADMINISTRACION_EMAIL =
+  "administracion@raitrai.cl";
+
+const ADMIN_COLUMNAS_DEFAULT = [
+  {
+    id:
+      "estado_carnet",
+    nombre:
+      "Estado Carnet",
+    fija:
+      true,
+    activa:
+      true
+  },
+  {
+    id:
+      "estado_economico",
+    nombre:
+      "Estado Económico",
+    fija:
+      true,
+    activa:
+      true
+  },
+  {
+    id:
+      "variable_3",
+    nombre:
+      "",
+    fija:
+      false,
+    activa:
+      false
+  },
+  {
+    id:
+      "variable_4",
+    nombre:
+      "",
+    fija:
+      false,
+    activa:
+      false
+  },
+  {
+    id:
+      "variable_5",
+    nombre:
+      "",
+    fija:
+      false,
+    activa:
+      false
+  }
+];
+
 const state = {
   realUser: null,
   user: null,
@@ -97,7 +170,45 @@ const state = {
     "todos",
   
   vistaModalNomina:
-    "pasajeros"
+    "pasajeros",
+
+  /*
+    =====================================================
+    CONTROL DE ADMINISTRACIÓN
+    =====================================================
+  */
+
+  administracionConfig: {
+    columnas:
+      ADMIN_COLUMNAS_DEFAULT
+        .map(
+          (item) => ({
+            ...item
+          })
+        )
+  },
+
+  /*
+    Map:
+    groupDocId -> documento de control
+  */
+  administracionControles:
+    new Map(),
+
+  /*
+    Movimientos del año seleccionado.
+  */
+  administracionHistorial:
+    [],
+
+  /*
+    Período visible en el panel Progreso.
+  */
+  administracionPeriodo:
+    "7",
+
+  administracionDetalleControl:
+    ""
 };
 
 init();
@@ -108,6 +219,8 @@ async function init() {
   configurarSelectorAnos();
   actualizarTituloAno();
   bindEvents();
+  bindAdministracionEvents();
+
 
   onAuthStateChanged(
     auth,
@@ -122,6 +235,743 @@ async function init() {
     }
   );
 }
+
+function actualizarVisibilidadModuloAdministracion() {
+  /*
+    Progreso completo:
+    solamente Jefa de Administración y Admin.
+  */
+  $("btnProgresoAdministracion")
+    ?.classList.toggle(
+      "hidden",
+      !puedeSupervisarAdministracion()
+    );
+
+  $("btnConfigurarAdministracion")
+    ?.classList.toggle(
+      "hidden",
+      !puedeConfigurarAdministracion()
+    );
+}
+
+function inicioDia(
+  date = new Date()
+) {
+  const d =
+    new Date(
+      date
+    );
+
+  d.setHours(
+    0,
+    0,
+    0,
+    0
+  );
+
+  return d;
+}
+
+function getInicioPeriodoAdministracion() {
+  const ahora =
+    new Date();
+
+  const periodo =
+    String(
+      state.administracionPeriodo ||
+      "7"
+    );
+
+  if (
+    periodo ===
+    "hoy"
+  ) {
+    return inicioDia(
+      ahora
+    );
+  }
+
+  if (
+    periodo ===
+    "ayer"
+  ) {
+    const ayer =
+      inicioDia(
+        ahora
+      );
+
+    ayer.setDate(
+      ayer.getDate() -
+      1
+    );
+
+    return ayer;
+  }
+
+  if (
+    periodo ===
+    "mes"
+  ) {
+    return new Date(
+      ahora.getFullYear(),
+      ahora.getMonth(),
+      1
+    );
+  }
+
+  const dias =
+    Number(
+      periodo ||
+      7
+    );
+
+  const inicio =
+    inicioDia(
+      ahora
+    );
+
+  inicio.setDate(
+    inicio.getDate() -
+    Math.max(
+      dias - 1,
+      0
+    )
+  );
+
+  return inicio;
+}
+
+function getFinPeriodoAdministracion() {
+  const ahora =
+    new Date();
+
+  const periodo =
+    String(
+      state.administracionPeriodo ||
+      "7"
+    );
+
+  if (
+    periodo ===
+    "ayer"
+  ) {
+    const fin =
+      inicioDia(
+        ahora
+      );
+
+    fin.setMilliseconds(
+      -1
+    );
+
+    return fin;
+  }
+
+  return ahora;
+}
+
+function getHistorialAdministracionPeriodo() {
+  const inicio =
+    getInicioPeriodoAdministracion()
+      .getTime();
+
+  const fin =
+    getFinPeriodoAdministracion()
+      .getTime();
+
+  return state
+    .administracionHistorial
+    .filter(
+      (item) => {
+        const ms =
+          fechaMs(
+            item.fecha
+          );
+
+        return (
+          ms >= inicio &&
+          ms <= fin
+        );
+      }
+    );
+}
+
+function getResumenActualAdministracion() {
+  const columnas =
+    getColumnasAdministracionActivas();
+
+  const grupos =
+    state.rows;
+
+  const controles =
+    columnas.map(
+      (columna) => {
+        const ok =
+          grupos.filter(
+            (row) =>
+              getEstadoControlAdministracion(
+                row,
+                columna.id
+              ) ===
+              "ok"
+          ).length;
+
+        const total =
+          grupos.length;
+
+        const pendientes =
+          Math.max(
+            total -
+            ok,
+            0
+          );
+
+        const porcentaje =
+          total
+            ? Math.round(
+                (
+                  ok /
+                  total
+                ) *
+                100
+              )
+            : 0;
+
+        return {
+          ...columna,
+          ok,
+          pendientes,
+          total,
+          porcentaje
+        };
+      }
+    );
+
+  const totalTareas =
+    grupos.length *
+    columnas.length;
+
+  const totalOk =
+    controles.reduce(
+      (sum, item) =>
+        sum +
+        item.ok,
+      0
+    );
+
+  const totalPendientes =
+    Math.max(
+      totalTareas -
+      totalOk,
+      0
+    );
+
+  const gruposCompletos =
+    grupos.filter(
+      (row) =>
+        columnas.length >
+          0 &&
+        columnas.every(
+          (columna) =>
+            getEstadoControlAdministracion(
+              row,
+              columna.id
+            ) ===
+            "ok"
+        )
+    ).length;
+
+  return {
+    grupos:
+      grupos.length,
+
+    columnas:
+      columnas.length,
+
+    controles,
+
+    totalTareas,
+
+    totalOk,
+
+    totalPendientes,
+
+    gruposCompletos,
+
+    porcentaje:
+      totalTareas
+        ? Math.round(
+            (
+              totalOk /
+              totalTareas
+            ) *
+            100
+          )
+        : 0
+  };
+}
+
+function esMovimientoOkAdministracion(
+  item = {}
+) {
+  return (
+    normalizar(
+      item
+        ?.metadata
+        ?.nuevo ||
+      ""
+    ) ===
+    "ok"
+  );
+}
+
+function esMovimientoReaperturaAdministracion(
+  item = {}
+) {
+  return (
+    normalizar(
+      item
+        ?.metadata
+        ?.anterior ||
+      ""
+    ) ===
+      "ok" &&
+    normalizar(
+      item
+        ?.metadata
+        ?.nuevo ||
+      ""
+    ) ===
+      "pendiente"
+  );
+}
+
+function getFechaClaveAdministracion(
+  value
+) {
+  const ms =
+    fechaMs(
+      value
+    );
+
+  if (!ms) {
+    return "";
+  }
+
+  const d =
+    new Date(
+      ms
+    );
+
+  const year =
+    d.getFullYear();
+
+  const month =
+    String(
+      d.getMonth() +
+      1
+    ).padStart(
+      2,
+      "0"
+    );
+
+  const day =
+    String(
+      d.getDate()
+    ).padStart(
+      2,
+      "0"
+    );
+
+  return `${year}-${month}-${day}`;
+}
+
+function formatDiaCortoAdministracion(
+  key = ""
+) {
+  if (!key) {
+    return "—";
+  }
+
+  const [
+    year,
+    month,
+    day
+  ] =
+    key.split(
+      "-"
+    ).map(
+      Number
+    );
+
+  const date =
+    new Date(
+      year,
+      month - 1,
+      day
+    );
+
+  return date
+    .toLocaleDateString(
+      "es-CL",
+      {
+        weekday:
+          "short",
+        day:
+          "2-digit",
+        month:
+          "2-digit"
+      }
+    )
+    .replace(
+      ".",
+      ""
+    );
+}
+
+function getActividadPorDiaAdministracion(
+  historial = []
+) {
+  const map =
+    new Map();
+
+  historial.forEach(
+    (item) => {
+      const key =
+        getFechaClaveAdministracion(
+          item.fecha
+        );
+
+      if (!key) {
+        return;
+      }
+
+      if (
+        !map.has(
+          key
+        )
+      ) {
+        map.set(
+          key,
+          {
+            fecha:
+              key,
+            ok:
+              0,
+            reabiertos:
+              0,
+            grupos:
+              new Set()
+          }
+        );
+      }
+
+      const row =
+        map.get(
+          key
+        );
+
+      if (
+        esMovimientoOkAdministracion(
+          item
+        )
+      ) {
+        row.ok +=
+          1;
+      }
+
+      if (
+        esMovimientoReaperturaAdministracion(
+          item
+        )
+      ) {
+        row.reabiertos +=
+          1;
+      }
+
+      if (
+        item.groupDocId ||
+        item.idGrupo
+      ) {
+        row.grupos.add(
+          String(
+            item.groupDocId ||
+            item.idGrupo
+          )
+        );
+      }
+    }
+  );
+
+  return [
+    ...map.values()
+  ]
+    .map(
+      (item) => ({
+        fecha:
+          item.fecha,
+
+        ok:
+          item.ok,
+
+        reabiertos:
+          item.reabiertos,
+
+        grupos:
+          item.grupos.size
+      })
+    )
+    .sort(
+      (a, b) =>
+        a.fecha.localeCompare(
+          b.fecha
+        )
+    );
+}
+
+function getActividadPorUsuarioAdministracion(
+  historial = []
+) {
+  const map =
+    new Map();
+
+  historial.forEach(
+    (item) => {
+      const correo =
+        normalizeEmail(
+          item.creadoPorCorreo ||
+          item.usuarioCorreo ||
+          ""
+        );
+
+      const nombre =
+        String(
+          item.creadoPor ||
+          item.usuarioNombre ||
+          correo ||
+          "Sin usuario"
+        );
+
+      const key =
+        correo ||
+        normalizar(
+          nombre
+        );
+
+      if (
+        !map.has(
+          key
+        )
+      ) {
+        map.set(
+          key,
+          {
+            key,
+            nombre,
+            correo,
+            ok:
+              0,
+            reabiertos:
+              0,
+            grupos:
+              new Set(),
+            dias:
+              new Set(),
+            controles:
+              new Map()
+          }
+        );
+      }
+
+      const row =
+        map.get(
+          key
+        );
+
+      if (
+        esMovimientoOkAdministracion(
+          item
+        )
+      ) {
+        row.ok +=
+          1;
+      }
+
+      if (
+        esMovimientoReaperturaAdministracion(
+          item
+        )
+      ) {
+        row.reabiertos +=
+          1;
+      }
+
+      if (
+        item.groupDocId ||
+        item.idGrupo
+      ) {
+        row.grupos.add(
+          String(
+            item.groupDocId ||
+            item.idGrupo
+          )
+        );
+      }
+
+      const fecha =
+        getFechaClaveAdministracion(
+          item.fecha
+        );
+
+      if (fecha) {
+        row.dias.add(
+          fecha
+        );
+      }
+
+      if (
+        esMovimientoOkAdministracion(
+          item
+        )
+      ) {
+        const control =
+          String(
+            item
+              ?.metadata
+              ?.controlNombre ||
+            item
+              ?.metadata
+              ?.controlId ||
+            "Otro"
+          );
+
+        row.controles.set(
+          control,
+          (
+            row.controles.get(
+              control
+            ) ||
+            0
+          ) +
+          1
+        );
+      }
+    }
+  );
+
+  return [
+    ...map.values()
+  ]
+    .map(
+      (item) => ({
+        nombre:
+          item.nombre,
+
+        correo:
+          item.correo,
+
+        ok:
+          item.ok,
+
+        reabiertos:
+          item.reabiertos,
+
+        grupos:
+          item.grupos.size,
+
+        dias:
+          item.dias.size,
+
+        controles:
+          [
+            ...item.controles
+              .entries()
+          ]
+            .sort(
+              (a, b) =>
+                b[1] -
+                a[1]
+            )
+      })
+    )
+    .sort(
+      (a, b) =>
+        b.ok -
+        a.ok
+    );
+}
+
+function renderGraficoActividadAdministracion(
+  rows = []
+) {
+  const container =
+    $("adminGraficoActividad");
+
+  if (!container) {
+    return;
+  }
+
+  if (!rows.length) {
+    container.innerHTML = `
+      <div class="gn-empty">
+        No hay actividad registrada en este período.
+      </div>
+    `;
+
+    return;
+  }
+
+  const max =
+    Math.max(
+      ...rows.map(
+        (item) =>
+          item.ok
+      ),
+      1
+    );
+
+  container.innerHTML =
+    rows.map(
+      (item) => {
+        const porcentaje =
+          Math.max(
+            (
+              item.ok /
+              max
+            ) *
+            100,
+            item.ok
+              ? 4
+              : 0
+          );
+
+        return `
+          <div class="admin-chart-column">
+            <div class="admin-chart-value">
+              ${item.ok}
+            </div>
+
+            <div class="admin-chart-track">
+              <div
+                class="admin-chart-bar"
+                style="height:${porcentaje}%"
+                title="${item.ok} tareas OK"
+              ></div>
+            </div>
+
+            <div class="admin-chart-label">
+              ${esc(
+                formatDiaCortoAdministracion(
+                  item.fecha
+                )
+              )}
+            </div>
+          </div>
+        `;
+      }
+    ).join("");
+}
+
 
 function configurarSelectorAnos() {
   const select =
@@ -318,6 +1168,389 @@ async function bootstrap() {
           state.current?.data ||
           {}
     });
+}
+
+function getRolGestionActual() {
+  return normalizar(
+    state.user?.rol ||
+    ""
+  )
+    .replace(
+      /\s+/g,
+      "_"
+    );
+}
+
+function esVendedorGestionNomina() {
+  return (
+    getRolGestionActual() ===
+    "vendedor"
+  );
+}
+
+function puedeEjecutarControlAdministracion() {
+  /*
+    El vendedor jamás ve ni ejecuta
+    este módulo.
+  */
+  if (
+    esVendedorGestionNomina()
+  ) {
+    return false;
+  }
+
+  /*
+    Usamos además la autorización administrativa
+    que Gestión Nómina ya tiene definida en
+    inscripciones-manager.js.
+  */
+  return (
+    state.user?.rol ===
+      "admin" ||
+    state.manager
+      ?.puedeAdministrarNomina() ===
+      true
+  );
+}
+
+function puedeSupervisarAdministracion() {
+  if (
+    esVendedorGestionNomina()
+  ) {
+    return false;
+  }
+
+  const email =
+    normalizeEmail(
+      state.email ||
+      ""
+    );
+
+  const rol =
+    getRolGestionActual();
+
+  /*
+    FACULTADES ESPECIALES:
+    - rol admin
+    - administracion@raitrai.cl
+  */
+  return (
+    rol ===
+      "admin" ||
+    email ===
+      JEFA_ADMINISTRACION_EMAIL
+  );
+}
+
+function puedeConfigurarAdministracion() {
+  return puedeSupervisarAdministracion();
+}
+
+function getNombreUsuarioGestion() {
+  return (
+    [
+      state.user?.nombre,
+      state.user?.apellido
+    ]
+      .filter(Boolean)
+      .join(" ")
+      .trim() ||
+    state.email ||
+    "Usuario"
+  );
+}
+
+function getConfiguracionAdministracionDefault() {
+  return {
+    columnas:
+      ADMIN_COLUMNAS_DEFAULT
+        .map(
+          (item) => ({
+            ...item
+          })
+        )
+  };
+}
+
+function normalizarConfiguracionAdministracion(
+  data = {}
+) {
+  const defaultConfig =
+    getConfiguracionAdministracionDefault();
+
+  const recibidas =
+    Array.isArray(
+      data.columnas
+    )
+      ? data.columnas
+      : [];
+
+  const mapRecibidas =
+    new Map(
+      recibidas.map(
+        (item) => [
+          String(
+            item.id ||
+            ""
+          ),
+          item
+        ]
+      )
+    );
+
+  return {
+    columnas:
+      defaultConfig.columnas.map(
+        (base) => {
+          const recibida =
+            mapRecibidas.get(
+              base.id
+            ) ||
+            {};
+
+          /*
+            Las dos columnas fijas no pueden
+            desaparecer ni desactivarse.
+          */
+          if (
+            base.fija ===
+            true
+          ) {
+            return {
+              ...base,
+              nombre:
+                base.nombre,
+              activa:
+                true
+            };
+          }
+
+          const nombre =
+            String(
+              recibida.nombre ||
+              ""
+            ).trim();
+
+          return {
+            ...base,
+
+            nombre,
+
+            activa:
+              recibida.activa ===
+                true &&
+              !!nombre
+          };
+        }
+      )
+  };
+}
+
+async function cargarConfiguracionAdministracion() {
+  if (
+    !puedeEjecutarControlAdministracion()
+  ) {
+    state.administracionConfig =
+      getConfiguracionAdministracionDefault();
+
+    return;
+  }
+
+  try {
+    const snap =
+      await getDoc(
+        doc(
+          db,
+          ADMIN_CONFIG_COLLECTION,
+          ADMIN_CONFIG_DOC
+        )
+      );
+
+    if (!snap.exists()) {
+      state.administracionConfig =
+        getConfiguracionAdministracionDefault();
+
+      return;
+    }
+
+    state.administracionConfig =
+      normalizarConfiguracionAdministracion(
+        snap.data() ||
+        {}
+      );
+  } catch (error) {
+    console.error(
+      "[gestion-nomina] cargarConfiguracionAdministracion",
+      error
+    );
+
+    state.administracionConfig =
+      getConfiguracionAdministracionDefault();
+  }
+}
+
+async function cargarControlesAdministracion() {
+  state.administracionControles =
+    new Map();
+
+  if (
+    !puedeEjecutarControlAdministracion()
+  ) {
+    return;
+  }
+
+  try {
+    const snap =
+      await getDocs(
+        query(
+          collection(
+            db,
+            ADMIN_CONTROL_COLLECTION
+          ),
+          where(
+            "anoViaje",
+            "==",
+            Number(
+              state.anoSeleccionado
+            )
+          )
+        )
+      );
+
+    snap.docs.forEach(
+      (documento) => {
+        const data =
+          documento.data() ||
+          {};
+
+        const groupDocId =
+          String(
+            data.groupDocId ||
+            documento.id ||
+            ""
+          ).trim();
+
+        if (!groupDocId) {
+          return;
+        }
+
+        state.administracionControles
+          .set(
+            groupDocId,
+            {
+              id:
+                documento.id,
+
+              ...data
+            }
+          );
+      }
+    );
+  } catch (error) {
+    console.error(
+      "[gestion-nomina] cargarControlesAdministracion",
+      error
+    );
+  }
+}
+
+async function cargarHistorialAdministracion() {
+  state.administracionHistorial =
+    [];
+
+  if (
+    !puedeSupervisarAdministracion()
+  ) {
+    return;
+  }
+
+  try {
+    /*
+      Consultamos solamente movimientos
+      del módulo administración.
+
+      El año se filtra después en memoria,
+      evitando necesidad de índice compuesto.
+    */
+    const snap =
+      await getDocs(
+        query(
+          collection(
+            db,
+            HISTORIAL_COLLECTION
+          ),
+          where(
+            "modulo",
+            "==",
+            "administracion"
+          )
+        )
+      );
+
+    state.administracionHistorial =
+      snap.docs
+        .map(
+          (documento) => ({
+            id:
+              documento.id,
+
+            ...documento.data()
+          })
+        )
+        .filter(
+          (item) =>
+            Number(
+              item.anoViaje ||
+              0
+            ) ===
+            Number(
+              state.anoSeleccionado
+            )
+        )
+        .sort(
+          (a, b) =>
+            fechaMs(
+              b.fecha
+            ) -
+            fechaMs(
+              a.fecha
+            )
+        );
+  } catch (error) {
+    console.error(
+      "[gestion-nomina] cargarHistorialAdministracion",
+      error
+    );
+
+    state.administracionHistorial =
+      [];
+  }
+}
+
+async function cargarModuloAdministracion() {
+  if (
+    !puedeEjecutarControlAdministracion()
+  ) {
+    state.administracionControles =
+      new Map();
+
+    state.administracionHistorial =
+      [];
+
+    actualizarVisibilidadModuloAdministracion();
+
+    return;
+  }
+
+  await Promise.all([
+    cargarConfiguracionAdministracion(),
+    cargarControlesAdministracion(),
+    cargarHistorialAdministracion()
+  ]);
+
+  actualizarVisibilidadModuloAdministracion();
+
+  renderTableHeader();
 }
 
 function bindHeader() {
@@ -665,6 +1898,154 @@ function bindEvents() {
   );
 }
 
+function bindAdministracionEvents() {
+  /*
+    CAPTURE = true.
+
+    Esto intercepta el clic ANTES del listener
+    general de la fila y evita que marcar un OK
+    abra el modal del grupo.
+  */
+  $("gnTbody")
+    ?.addEventListener(
+      "click",
+      async (event) => {
+        const button =
+          event.target.closest(
+            "[data-admin-control]"
+          );
+
+        if (!button) {
+          return;
+        }
+
+        event.preventDefault();
+        event.stopPropagation();
+
+        if (
+          button.disabled
+        ) {
+          return;
+        }
+
+        try {
+          button.disabled =
+            true;
+
+          await cambiarEstadoControlAdministracion(
+            button.dataset
+              .adminRow ||
+            "",
+            button.dataset
+              .adminControl ||
+            ""
+          );
+        } finally {
+          button.disabled =
+            false;
+        }
+      },
+      true
+    );
+
+  $("btnProgresoAdministracion")
+    ?.addEventListener(
+      "click",
+      abrirProgresoAdministracion
+    );
+
+  $("btnCerrarProgresoAdministracion")
+    ?.addEventListener(
+      "click",
+      cerrarProgresoAdministracion
+    );
+
+  $("modalProgresoAdministracion")
+    ?.addEventListener(
+      "click",
+      (event) => {
+        if (
+          event.target ===
+          $("modalProgresoAdministracion")
+        ) {
+          cerrarProgresoAdministracion();
+        }
+      }
+    );
+
+  $("adminPeriodo")
+    ?.addEventListener(
+      "change",
+      () => {
+        state.administracionPeriodo =
+          $("adminPeriodo")
+            ?.value ||
+          "7";
+
+        renderProgresoAdministracion();
+      }
+    );
+
+  $("adminResumenControles")
+    ?.addEventListener(
+      "click",
+      (event) => {
+        const button =
+          event.target.closest(
+            "[data-admin-pendientes]"
+          );
+
+        if (!button) {
+          return;
+        }
+
+        state.administracionDetalleControl =
+          button.dataset
+            .adminPendientes ||
+          "";
+
+        renderDetallePendientesAdministracion();
+      }
+    );
+
+  $("btnConfigurarAdministracion")
+    ?.addEventListener(
+      "click",
+      abrirConfiguracionAdministracion
+    );
+
+  $("btnCerrarConfigAdministracion")
+    ?.addEventListener(
+      "click",
+      cerrarConfiguracionAdministracion
+    );
+
+  $("btnCancelarConfigAdministracion")
+    ?.addEventListener(
+      "click",
+      cerrarConfiguracionAdministracion
+    );
+
+  $("btnGuardarConfigAdministracion")
+    ?.addEventListener(
+      "click",
+      guardarConfiguracionAdministracion
+    );
+
+  $("modalConfigAdministracion")
+    ?.addEventListener(
+      "click",
+      (event) => {
+        if (
+          event.target ===
+          $("modalConfigAdministracion")
+        ) {
+          cerrarConfiguracionAdministracion();
+        }
+      }
+    );
+}
+
 async function cargarPantalla() {
   actualizarTituloAno();
 
@@ -676,6 +2057,32 @@ async function cargarPantalla() {
     cargarGrupos(),
     cargarAlertasInscripciones()
   ]);
+
+  /*
+    El vendedor termina aquí.
+  */
+  if (
+    !puedeEjecutarControlAdministracion()
+  ) {
+    actualizarVisibilidadModuloAdministracion();
+    renderTableHeader();
+    renderRows();
+
+    return;
+  }
+
+  /*
+    Carga separada y liviana del módulo
+    administrativo.
+  */
+  await cargarModuloAdministracion();
+
+  /*
+    Ahora que tenemos los estados
+    administrativos, volvemos a pintar.
+  */
+  renderTableHeader();
+  renderRows();
 }
 
 async function cargarGrupos() {
@@ -2101,6 +3508,187 @@ function filtrarDesdeKpiResumen(
   );
 }
 
+function getColumnasAdministracionActivas() {
+  if (
+    !puedeEjecutarControlAdministracion()
+  ) {
+    return [];
+  }
+
+  return (
+    state.administracionConfig
+      ?.columnas ||
+    []
+  ).filter(
+    (columna) =>
+      columna.activa ===
+        true &&
+      String(
+        columna.nombre ||
+        ""
+      ).trim()
+  );
+}
+
+function getCantidadColumnasTablaGestion() {
+  /*
+    Tabla normal del vendedor:
+    10 columnas.
+  */
+  return (
+    10 +
+    getColumnasAdministracionActivas()
+      .length
+  );
+}
+
+function getControlAdministracionGrupo(
+  row = {}
+) {
+  const docId =
+    String(
+      row.docId ||
+      ""
+    ).trim();
+
+  return (
+    state.administracionControles
+      .get(
+        docId
+      ) ||
+    {
+      controles:
+        {}
+    }
+  );
+}
+
+function getEstadoControlAdministracion(
+  row = {},
+  controlId = ""
+) {
+  const documento =
+    getControlAdministracionGrupo(
+      row
+    );
+
+  const control =
+    documento
+      ?.controles
+      ?.[controlId] ||
+    {};
+
+  return (
+    normalizar(
+      control.estado ||
+      ""
+    ) ===
+      "ok"
+      ? "ok"
+      : "pendiente"
+  );
+}
+
+function renderControlAdministracionButton(
+  row = {},
+  columna = {}
+) {
+  const estado =
+    getEstadoControlAdministracion(
+      row,
+      columna.id
+    );
+
+  const ok =
+    estado ===
+    "ok";
+
+  return `
+    <button
+      type="button"
+      class="admin-control-status ${
+        ok
+          ? "is-ok"
+          : "is-pending"
+      }"
+      data-admin-control="${esc(
+        columna.id
+      )}"
+      data-admin-row="${esc(
+        row.id
+      )}"
+      title="${esc(
+        ok
+          ? `${columna.nombre}: OK. Clic para volver a pendiente.`
+          : `${columna.nombre}: pendiente. Clic para marcar OK.`
+      )}"
+      aria-label="${esc(
+        `${columna.nombre}: ${
+          ok
+            ? "OK"
+            : "Pendiente"
+        }`
+      )}"
+    >
+      <span class="admin-control-icon">
+        ${
+          ok
+            ? "✓"
+            : ""
+        }
+      </span>
+
+      <span class="admin-control-label">
+        ${
+          ok
+            ? "OK"
+            : "Pendiente"
+        }
+      </span>
+    </button>
+  `;
+}
+
+function renderTableHeader() {
+  const tr =
+    $("gnHeadRow");
+
+  if (!tr) {
+    return;
+  }
+
+  const columnasAdmin =
+    getColumnasAdministracionActivas();
+
+  tr.innerHTML = `
+    <th>Grupo</th>
+    <th>ID Grupo</th>
+    <th>Negocio</th>
+    <th>Vendedor</th>
+    <th>Destino</th>
+    <th>Pax</th>
+    <th>Ficha médica</th>
+    <th>Carnet</th>
+
+    ${
+      columnasAdmin
+        .map(
+          (columna) => `
+            <th class="admin-control-column">
+              ${esc(
+                columna.nombre
+              )}
+            </th>
+          `
+        )
+        .join("")
+    }
+
+    <th>Fase / link</th>
+    <th>Acción</th>
+  `;
+}
+
 function renderRows() {
   const tbody =
     $("gnTbody");
@@ -2109,13 +3697,18 @@ function renderRows() {
     return;
   }
 
+  renderTableHeader();
+
+  const columnasAdmin =
+    getColumnasAdministracionActivas();
+
   if (
     !state.filtered.length
   ) {
     tbody.innerHTML = `
       <tr>
         <td
-          colspan="10"
+          colspan="${getCantidadColumnasTablaGestion()}"
           class="gn-empty"
         >
           No hay grupos para mostrar.
@@ -2196,7 +3789,7 @@ function renderRows() {
                   0
                 )} viajan
               </strong>
-            
+
               ${
                 Number(
                   row.cuposReservados ||
@@ -2237,6 +3830,21 @@ function renderRows() {
               )}
             </td>
 
+            ${
+              columnasAdmin
+                .map(
+                  (columna) => `
+                    <td class="admin-control-column">
+                      ${renderControlAdministracionButton(
+                        row,
+                        columna
+                      )}
+                    </td>
+                  `
+                )
+                .join("")
+            }
+
             <td>
               ${getFaseGrupoHtml(
                 row
@@ -2270,7 +3878,7 @@ function renderMensaje(
   tbody.innerHTML = `
     <tr>
       <td
-        colspan="10"
+        colspan="${getCantidadColumnasTablaGestion()}"
         class="gn-empty"
       >
         ${esc(
@@ -2279,6 +3887,353 @@ function renderMensaje(
       </td>
     </tr>
   `;
+}
+
+function getColumnaAdministracion(
+  controlId = ""
+) {
+  return (
+    state.administracionConfig
+      ?.columnas ||
+    []
+  ).find(
+    (item) =>
+      String(
+        item.id
+      ) ===
+      String(
+        controlId
+      )
+  ) ||
+  null;
+}
+
+async function cambiarEstadoControlAdministracion(
+  rowId = "",
+  controlId = ""
+) {
+  if (
+    !puedeEjecutarControlAdministracion()
+  ) {
+    alert(
+      "No tienes permisos para modificar controles de Administración."
+    );
+
+    return;
+  }
+
+  const row =
+    state.rows.find(
+      (item) =>
+        String(
+          item.id
+        ) ===
+        String(
+          rowId
+        )
+    );
+
+  if (!row) {
+    alert(
+      "No se encontró el grupo."
+    );
+
+    return;
+  }
+
+  const columna =
+    getColumnaAdministracion(
+      controlId
+    );
+
+  if (
+    !columna ||
+    columna.activa !==
+      true
+  ) {
+    alert(
+      "Este control administrativo no está activo."
+    );
+
+    return;
+  }
+
+  const actual =
+    getEstadoControlAdministracion(
+      row,
+      controlId
+    );
+
+  const nuevo =
+    actual ===
+      "ok"
+      ? "pendiente"
+      : "ok";
+
+  const confirmar =
+    confirm(
+      `¿Cambiar "${columna.nombre}" de ${actual.toUpperCase()} a ${nuevo.toUpperCase()} para ${row.titulo}?`
+    );
+
+  if (!confirmar) {
+    return;
+  }
+
+  const groupDocId =
+    String(
+      row.docId ||
+      row.id ||
+      ""
+    ).trim();
+
+  if (!groupDocId) {
+    alert(
+      "No se pudo determinar el documento del grupo."
+    );
+
+    return;
+  }
+
+  const documentoActual =
+    getControlAdministracionGrupo(
+      row
+    );
+
+  const controlesActuales = {
+    ...(
+      documentoActual
+        ?.controles ||
+      {}
+    )
+  };
+
+  const usuarioNombre =
+    getNombreUsuarioGestion();
+
+  controlesActuales[
+    controlId
+  ] = {
+    estado:
+      nuevo,
+
+    actualizadoPor:
+      usuarioNombre,
+
+    actualizadoPorCorreo:
+      state.email,
+
+    /*
+      Para estado local inmediato usamos Date.
+      En Firestore se guarda timestamp servidor
+      a nivel documento.
+    */
+    actualizadoAtCliente:
+      new Date()
+        .toISOString()
+  };
+
+  try {
+    await setDoc(
+      doc(
+        db,
+        ADMIN_CONTROL_COLLECTION,
+        groupDocId
+      ),
+      {
+        groupDocId,
+
+        idGrupo:
+          String(
+            row.groupId ||
+            ""
+          ),
+
+        numeroNegocio:
+          String(
+            row.negocio ||
+            ""
+          ),
+
+        aliasGrupo:
+          row.titulo ||
+          "",
+
+        colegio:
+          row.colegio ||
+          "",
+
+        curso:
+          row.curso ||
+          "",
+
+        anoViaje:
+          Number(
+            state.anoSeleccionado
+          ),
+
+        controles:
+          controlesActuales,
+
+        actualizadoAt:
+          serverTimestamp(),
+
+        actualizadoPor:
+          usuarioNombre,
+
+        actualizadoPorCorreo:
+          state.email
+      },
+      {
+        merge:
+          true
+      }
+    );
+
+    /*
+      Historial auditable.
+    */
+    await addDoc(
+      collection(
+        db,
+        HISTORIAL_COLLECTION
+      ),
+      {
+        idGrupo:
+          String(
+            row.groupId ||
+            ""
+          ),
+
+        groupDocId,
+
+        numeroNegocio:
+          String(
+            row.negocio ||
+            ""
+          ),
+
+        aliasGrupo:
+          row.titulo ||
+          "",
+
+        colegio:
+          row.colegio ||
+          "",
+
+        curso:
+          row.curso ||
+          "",
+
+        anoViaje:
+          Number(
+            state.anoSeleccionado
+          ),
+
+        modulo:
+          "administracion",
+
+        tipoMovimiento:
+          "control_administracion",
+
+        titulo:
+          `Administración · ${columna.nombre}`,
+
+        mensaje:
+          `${usuarioNombre} cambió ${columna.nombre} de ${actual.toUpperCase()} a ${nuevo.toUpperCase()}.`,
+
+        cambios: [
+          {
+            campo:
+              columna.nombre,
+
+            controlId,
+
+            anterior:
+              actual,
+
+            nuevo
+          }
+        ],
+
+        metadata: {
+          controlId,
+
+          controlNombre:
+            columna.nombre,
+
+          anterior:
+            actual,
+
+          nuevo
+        },
+
+        creadoPor:
+          usuarioNombre,
+
+        creadoPorCorreo:
+          state.email,
+
+        fecha:
+          serverTimestamp()
+      }
+    );
+
+    /*
+      Actualización local inmediata.
+    */
+    state.administracionControles
+      .set(
+        groupDocId,
+        {
+          ...documentoActual,
+
+          groupDocId,
+
+          idGrupo:
+            row.groupId,
+
+          anoViaje:
+            Number(
+              state.anoSeleccionado
+            ),
+
+          controles:
+            controlesActuales
+        }
+      );
+
+    renderRows();
+
+    /*
+      Si la jefa/admin tiene abierto
+      Progreso, actualizamos también
+      el historial y el panel.
+    */
+    if (
+      puedeSupervisarAdministracion()
+    ) {
+      await cargarHistorialAdministracion();
+
+      if (
+        $("modalProgresoAdministracion")
+          ?.classList.contains(
+            "show"
+          )
+      ) {
+        renderProgresoAdministracion();
+      }
+    }
+  } catch (error) {
+    console.error(
+      "[gestion-nomina] cambiarEstadoControlAdministracion",
+      error
+    );
+
+    alert(
+      error.message ||
+      "No se pudo guardar el estado administrativo."
+    );
+  }
 }
 
 function renderSummary() {
@@ -2745,6 +4700,16 @@ function getCategoriaHistorialNomina(
 
   if (
     tipo.includes(
+      "control_administracion"
+    ) ||
+    item.modulo ===
+      "administracion"
+  ) {
+    return "administracion";
+  }
+
+  if (
+    tipo.includes(
       "edicion_nomina"
     )
   ) {
@@ -2792,7 +4757,6 @@ function getCategoriaHistorialNomina(
 
   return "otros";
 }
-
 
 function renderCambioHistorial(
   cambio = {}
@@ -8286,3 +10250,704 @@ function cssEscape(
     "\\$&"
   );
 }
+function renderProgresoAdministracion() {
+  if (
+    !puedeSupervisarAdministracion()
+  ) {
+    return;
+  }
+
+  const actual =
+    getResumenActualAdministracion();
+
+  const historial =
+    getHistorialAdministracionPeriodo();
+
+  const porDia =
+    getActividadPorDiaAdministracion(
+      historial
+    );
+
+  const porUsuario =
+    getActividadPorUsuarioAdministracion(
+      historial
+    );
+
+  const movimientosOk =
+    historial.filter(
+      esMovimientoOkAdministracion
+    );
+
+  const reabiertos =
+    historial.filter(
+      esMovimientoReaperturaAdministracion
+    );
+
+  const gruposTrabajados =
+    new Set(
+      historial
+        .map(
+          (item) =>
+            String(
+              item.groupDocId ||
+              item.idGrupo ||
+              ""
+            )
+        )
+        .filter(Boolean)
+    ).size;
+
+  set(
+    "adminProgGrupos",
+    actual.grupos
+  );
+
+  set(
+    "adminProgOkActual",
+    actual.totalOk
+  );
+
+  set(
+    "adminProgPendientes",
+    actual.totalPendientes
+  );
+
+  set(
+    "adminProgCompletos",
+    actual.gruposCompletos
+  );
+
+  set(
+    "adminProgPorcentaje",
+    `${actual.porcentaje}%`
+  );
+
+  set(
+    "adminProgPeriodoOk",
+    movimientosOk.length
+  );
+
+  set(
+    "adminProgPeriodoReabiertos",
+    reabiertos.length
+  );
+
+  set(
+    "adminProgPeriodoGrupos",
+    gruposTrabajados
+  );
+
+  /*
+    =====================================================
+    RESUMEN POR CONTROL
+    =====================================================
+  */
+
+  const controles =
+    $("adminResumenControles");
+
+  if (controles) {
+    controles.innerHTML =
+      actual.controles.length
+        ? actual.controles
+            .map(
+              (item) => `
+                <article class="admin-control-card">
+                  <div class="admin-control-card-head">
+                    <strong>
+                      ${esc(
+                        item.nombre
+                      )}
+                    </strong>
+
+                    <span>
+                      ${item.porcentaje}%
+                    </span>
+                  </div>
+
+                  <div class="admin-progress-track">
+                    <div
+                      class="admin-progress-value"
+                      style="width:${item.porcentaje}%"
+                    ></div>
+                  </div>
+
+                  <div class="admin-control-card-values">
+                    <span>
+                      <strong>${item.ok}</strong>
+                      OK
+                    </span>
+
+                    <button
+                      type="button"
+                      data-admin-pendientes="${esc(
+                        item.id
+                      )}"
+                    >
+                      <strong>
+                        ${item.pendientes}
+                      </strong>
+                      pendientes
+                    </button>
+                  </div>
+                </article>
+              `
+            )
+            .join("")
+        : `
+          <div class="gn-empty">
+            No hay controles administrativos activos.
+          </div>
+        `;
+  }
+
+  /*
+    =====================================================
+    GRÁFICO DIARIO
+    =====================================================
+  */
+
+  renderGraficoActividadAdministracion(
+    porDia
+  );
+
+  /*
+    =====================================================
+    TABLA POR DÍA
+    =====================================================
+  */
+
+  const tbodyDias =
+    $("adminActividadDiasTbody");
+
+  if (tbodyDias) {
+    tbodyDias.innerHTML =
+      porDia.length
+        ? [
+            ...porDia
+          ]
+            .reverse()
+            .map(
+              (item) => `
+                <tr>
+                  <td>
+                    ${esc(
+                      formatDiaCortoAdministracion(
+                        item.fecha
+                      )
+                    )}
+                  </td>
+
+                  <td>
+                    <strong>
+                      ${item.ok}
+                    </strong>
+                  </td>
+
+                  <td>
+                    ${item.reabiertos}
+                  </td>
+
+                  <td>
+                    ${item.grupos}
+                  </td>
+                </tr>
+              `
+            )
+            .join("")
+        : `
+          <tr>
+            <td
+              colspan="4"
+              class="gn-empty"
+            >
+              Sin actividad para este período.
+            </td>
+          </tr>
+        `;
+  }
+
+  /*
+    =====================================================
+    TABLA POR PERSONA
+    =====================================================
+  */
+
+  const tbodyUsuarios =
+    $("adminActividadUsuariosTbody");
+
+  if (tbodyUsuarios) {
+    tbodyUsuarios.innerHTML =
+      porUsuario.length
+        ? porUsuario
+            .map(
+              (item) => `
+                <tr>
+                  <td>
+                    <strong>
+                      ${esc(
+                        item.nombre
+                      )}
+                    </strong>
+
+                    ${
+                      item.correo
+                        ? `
+                          <div class="gn-sub">
+                            ${esc(
+                              item.correo
+                            )}
+                          </div>
+                        `
+                        : ""
+                    }
+                  </td>
+
+                  <td>
+                    <strong>
+                      ${item.ok}
+                    </strong>
+                  </td>
+
+                  <td>
+                    ${item.reabiertos}
+                  </td>
+
+                  <td>
+                    ${item.grupos}
+                  </td>
+
+                  <td>
+                    ${item.dias}
+                  </td>
+
+                  <td>
+                    ${
+                      item.controles.length
+                        ? item.controles
+                            .map(
+                              (control) => `
+                                <div class="admin-user-control">
+                                  ${esc(
+                                    control[0]
+                                  )}
+                                  ·
+                                  <strong>
+                                    ${control[1]}
+                                  </strong>
+                                </div>
+                              `
+                            )
+                            .join("")
+                        : "—"
+                    }
+                  </td>
+                </tr>
+              `
+            )
+            .join("")
+        : `
+          <tr>
+            <td
+              colspan="6"
+              class="gn-empty"
+            >
+              Sin actividad para este período.
+            </td>
+          </tr>
+        `;
+  }
+
+  renderDetallePendientesAdministracion();
+}
+
+function renderDetallePendientesAdministracion() {
+  const container =
+    $("adminDetallePendientes");
+
+  if (!container) {
+    return;
+  }
+
+  const controlId =
+    state.administracionDetalleControl;
+
+  if (!controlId) {
+    container.innerHTML = `
+      <div class="gn-sub">
+        Haz clic sobre los pendientes de un control para revisar los grupos.
+      </div>
+    `;
+
+    return;
+  }
+
+  const columna =
+    getColumnaAdministracion(
+      controlId
+    );
+
+  if (!columna) {
+    container.innerHTML =
+      "";
+
+    return;
+  }
+
+  const rows =
+    state.rows
+      .filter(
+        (row) =>
+          getEstadoControlAdministracion(
+            row,
+            controlId
+          ) !==
+          "ok"
+      )
+      .sort(
+        (a, b) =>
+          a.titulo.localeCompare(
+            b.titulo,
+            "es",
+            {
+              numeric:
+                true,
+              sensitivity:
+                "base"
+            }
+          )
+      );
+
+  container.innerHTML = `
+    <div class="admin-detail-head">
+      <div>
+        <h3>
+          Pendientes · ${esc(
+            columna.nombre
+          )}
+        </h3>
+
+        <div class="gn-sub">
+          ${rows.length} grupo${
+            rows.length ===
+            1
+              ? ""
+              : "s"
+          } pendiente${
+            rows.length ===
+            1
+              ? ""
+              : "s"
+          }
+        </div>
+      </div>
+    </div>
+
+    ${
+      rows.length
+        ? `
+          <div class="admin-pending-list">
+            ${rows
+              .map(
+                (row) => `
+                  <div class="admin-pending-row">
+                    <div>
+                      <strong>
+                        ${esc(
+                          row.titulo
+                        )}
+                      </strong>
+
+                      <div class="gn-sub">
+                        ID ${
+                          esc(
+                            row.groupId ||
+                            row.docId
+                          )
+                        }
+                        · Negocio ${
+                          esc(
+                            row.negocio ||
+                            "—"
+                          )
+                        }
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      class="btn-secondary"
+                      onclick="window.open('grupo.html?id=${encodeURIComponent(
+                        row.groupId ||
+                        row.docId
+                      )}','_blank','noopener')"
+                    >
+                      Abrir grupo
+                    </button>
+                  </div>
+                `
+              )
+              .join("")}
+          </div>
+        `
+        : `
+          <div class="admin-all-ok">
+            ✓ Todos los grupos están OK en este control.
+          </div>
+        `
+    }
+  `;
+}
+
+async function abrirProgresoAdministracion() {
+  if (
+    !puedeSupervisarAdministracion()
+  ) {
+    alert(
+      "Solo la Jefatura de Administración o Admin pueden acceder al panel de supervisión."
+    );
+
+    return;
+  }
+
+  state.administracionDetalleControl =
+    "";
+
+  $("modalProgresoAdministracion")
+    ?.classList.add(
+      "show"
+    );
+
+  document.body.classList.add(
+    "modal-open"
+  );
+
+  /*
+    Refrescamos historial para que el panel
+    muestre siempre la actividad más reciente.
+  */
+  await cargarHistorialAdministracion();
+
+  renderProgresoAdministracion();
+}
+
+function cerrarProgresoAdministracion() {
+  $("modalProgresoAdministracion")
+    ?.classList.remove(
+      "show"
+    );
+
+  state.administracionDetalleControl =
+    "";
+
+  if (
+    !$("gnModal")
+      ?.classList.contains(
+        "show"
+      )
+  ) {
+    document.body.classList.remove(
+      "modal-open"
+    );
+  }
+}
+
+function abrirConfiguracionAdministracion() {
+  if (
+    !puedeConfigurarAdministracion()
+  ) {
+    alert(
+      "Solo la Jefatura de Administración o Admin pueden configurar estos controles."
+    );
+
+    return;
+  }
+
+  const columnas =
+    state.administracionConfig
+      ?.columnas ||
+    [];
+
+  [
+    "variable_3",
+    "variable_4",
+    "variable_5"
+  ].forEach(
+    (id) => {
+      const item =
+        columnas.find(
+          (columna) =>
+            columna.id ===
+            id
+        ) ||
+        {};
+
+      const input =
+        $(
+          `adminConfigNombre_${id}`
+        );
+
+      const checkbox =
+        $(
+          `adminConfigActiva_${id}`
+        );
+
+      if (input) {
+        input.value =
+          item.nombre ||
+          "";
+      }
+
+      if (checkbox) {
+        checkbox.checked =
+          item.activa ===
+          true;
+      }
+    }
+  );
+
+  $("modalConfigAdministracion")
+    ?.classList.add(
+      "show"
+    );
+
+  document.body.classList.add(
+    "modal-open"
+  );
+}
+
+function cerrarConfiguracionAdministracion() {
+  $("modalConfigAdministracion")
+    ?.classList.remove(
+      "show"
+    );
+
+  if (
+    !$("modalProgresoAdministracion")
+      ?.classList.contains(
+        "show"
+      ) &&
+    !$("gnModal")
+      ?.classList.contains(
+        "show"
+      )
+  ) {
+    document.body.classList.remove(
+      "modal-open"
+    );
+  }
+}
+
+async function guardarConfiguracionAdministracion() {
+  if (
+    !puedeConfigurarAdministracion()
+  ) {
+    return;
+  }
+
+  const columnas =
+    ADMIN_COLUMNAS_DEFAULT
+      .map(
+        (base) => {
+          if (
+            base.fija
+          ) {
+            return {
+              ...base
+            };
+          }
+
+          const nombre =
+            String(
+              $(
+                `adminConfigNombre_${base.id}`
+              )?.value ||
+              ""
+            ).trim();
+
+          const activa =
+            $(
+              `adminConfigActiva_${base.id}`
+            )?.checked ===
+              true &&
+            !!nombre;
+
+          return {
+            ...base,
+            nombre,
+            activa
+          };
+        }
+      );
+
+  const button =
+    $("btnGuardarConfigAdministracion");
+
+  try {
+    if (button) {
+      button.disabled =
+        true;
+
+      button.textContent =
+        "Guardando...";
+    }
+
+    await setDoc(
+      doc(
+        db,
+        ADMIN_CONFIG_COLLECTION,
+        ADMIN_CONFIG_DOC
+      ),
+      {
+        columnas,
+
+        actualizadoAt:
+          serverTimestamp(),
+
+        actualizadoPor:
+          getNombreUsuarioGestion(),
+
+        actualizadoPorCorreo:
+          state.email
+      },
+      {
+        merge:
+          true
+      }
+    );
+
+    state.administracionConfig = {
+      columnas
+    };
+
+    cerrarConfiguracionAdministracion();
+
+    renderTableHeader();
+    renderRows();
+    renderProgresoAdministracion();
+
+    alert(
+      "Configuración de Administración guardada."
+    );
+  } catch (error) {
+    console.error(
+      "[gestion-nomina] guardarConfiguracionAdministracion",
+      error
+    );
+
+    alert(
+      error.message ||
+      "No se pudo guardar la configuración."
+    );
+  } finally {
+    if (button) {
+      button.disabled =
+        false;
+
+      button.textContent =
+        "Guardar configuración";
+    }
+  }
+}
+
+
