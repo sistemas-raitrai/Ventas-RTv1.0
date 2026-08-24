@@ -76,56 +76,49 @@ const HISTORIAL_COLLECTION =
 const JEFA_ADMINISTRACION_EMAIL =
   "administracion@raitrai.cl";
 
+const EQUIPO_ADMINISTRACION = [
+  "yenny@raitrai.cl",
+  "raitrai@raitrai.cl",
+  "contacto@raitrai.cl",
+  "giras@raitrai.cl",
+  "secretaria@raitrai.cl"
+];
+
 const ADMIN_COLUMNAS_DEFAULT = [
   {
-    id:
-      "estado_carnet",
-    nombre:
-      "Estado Carnet",
-    fija:
-      true,
-    activa:
-      true
+    id: "estado_carnet",
+    nombre: "Estado Carnet",
+    activa: true,
+    responsables: [],
+    cicloId: "legacy"
   },
   {
-    id:
-      "estado_economico",
-    nombre:
-      "Estado Económico",
-    fija:
-      true,
-    activa:
-      true
+    id: "estado_economico",
+    nombre: "Estado Económico",
+    activa: true,
+    responsables: [],
+    cicloId: "legacy"
   },
   {
-    id:
-      "variable_3",
-    nombre:
-      "",
-    fija:
-      false,
-    activa:
-      false
+    id: "variable_3",
+    nombre: "",
+    activa: false,
+    responsables: [],
+    cicloId: "legacy"
   },
   {
-    id:
-      "variable_4",
-    nombre:
-      "",
-    fija:
-      false,
-    activa:
-      false
+    id: "variable_4",
+    nombre: "",
+    activa: false,
+    responsables: [],
+    cicloId: "legacy"
   },
   {
-    id:
-      "variable_5",
-    nombre:
-      "",
-    fija:
-      false,
-    activa:
-      false
+    id: "variable_5",
+    nombre: "",
+    activa: false,
+    responsables: [],
+    cicloId: "legacy"
   }
 ];
 
@@ -216,11 +209,12 @@ init();
 async function init() {
   await waitForLayoutReady();
 
+  aplicarAnoDesdeUrlGestionNomina();
+
   configurarSelectorAnos();
   actualizarTituloAno();
   bindEvents();
   bindAdministracionEvents();
-
 
   onAuthStateChanged(
     auth,
@@ -237,20 +231,10 @@ async function init() {
 }
 
 function actualizarVisibilidadModuloAdministracion() {
-  /*
-    Progreso completo:
-    solamente Jefa de Administración y Admin.
-  */
-  $("btnProgresoAdministracion")
+  $("btnPanelAdministracion")
     ?.classList.toggle(
       "hidden",
       !puedeSupervisarAdministracion()
-    );
-
-  $("btnConfigurarAdministracion")
-    ?.classList.toggle(
-      "hidden",
-      !puedeConfigurarAdministracion()
     );
 }
 
@@ -972,6 +956,33 @@ function renderGraficoActividadAdministracion(
     ).join("");
 }
 
+function aplicarAnoDesdeUrlGestionNomina() {
+  const params =
+    new URLSearchParams(
+      location.search
+    );
+
+  const ano =
+    Number(
+      params.get(
+        "ano"
+      ) ||
+      0
+    );
+
+  if (
+    Number.isInteger(
+      ano
+    ) &&
+    ano >=
+      ANO_MINIMO_GESTION &&
+    ano <=
+      ANO_MAXIMO_GESTION
+  ) {
+    state.anoSeleccionado =
+      ano;
+  }
+}
 
 function configurarSelectorAnos() {
   const select =
@@ -1199,13 +1210,9 @@ function puedeEjecutarControlAdministracion() {
     getRolGestionActual();
 
   /*
-    =====================================================
-    VENDEDORES
-
-    Nunca ven ni ejecutan el módulo.
-    =====================================================
+    Vendedor:
+    no ve nada del módulo.
   */
-
   if (
     rol ===
     "vendedor"
@@ -1214,13 +1221,9 @@ function puedeEjecutarControlAdministracion() {
   }
 
   /*
-    =====================================================
-    ADMIN
-
-    Siempre puede ejecutar.
-    =====================================================
+    Admin:
+    acceso total.
   */
-
   if (
     rol ===
     "admin"
@@ -1229,38 +1232,20 @@ function puedeEjecutarControlAdministracion() {
   }
 
   /*
-    =====================================================
-    PERFILES OPERATIVOS / ADMINISTRATIVOS
-
-    Conservamos los mismos usuarios que actualmente
-    están autorizados para gestionar Nómina.
-
-    IMPORTANTE:
-    esto NO les entrega acceso al panel Progreso
-    ni a Configuración.
-
-    Solamente pueden:
-    - ver las columnas,
-    - marcar Pendiente / OK.
-    =====================================================
+    Jefa Administración:
+    puede ejecutar además de supervisar.
   */
-
   if (
-    rol ===
-      "supervision" ||
-    rol ===
-      "registro"
+    email ===
+    JEFA_ADMINISTRACION_EMAIL
   ) {
     return true;
   }
 
-  return [
-    "administracion@raitrai.cl",
-    "raitrai@raitrai.cl",
-    "yenny@raitrai.cl",
-    "giras@raitrai.cl",
-    "sistemas@raitrai.cl"
-  ].includes(
+  /*
+    Equipo que ejecuta las funciones.
+  */
+  return EQUIPO_ADMINISTRACION.includes(
     email
   );
 }
@@ -1327,9 +1312,6 @@ function getConfiguracionAdministracionDefault() {
 function normalizarConfiguracionAdministracion(
   data = {}
 ) {
-  const defaultConfig =
-    getConfiguracionAdministracionDefault();
-
   const recibidas =
     Array.isArray(
       data.columnas
@@ -1352,7 +1334,7 @@ function normalizarConfiguracionAdministracion(
 
   return {
     columnas:
-      defaultConfig.columnas.map(
+      ADMIN_COLUMNAS_DEFAULT.map(
         (base) => {
           const recibida =
             mapRecibidas.get(
@@ -1360,38 +1342,62 @@ function normalizarConfiguracionAdministracion(
             ) ||
             {};
 
-          /*
-            Las dos columnas fijas no pueden
-            desaparecer ni desactivarse.
-          */
-          if (
-            base.fija ===
-            true
-          ) {
-            return {
-              ...base,
-              nombre:
-                base.nombre,
-              activa:
-                true
-            };
-          }
-
           const nombre =
             String(
-              recibida.nombre ||
-              ""
+              recibida.nombre !==
+                undefined
+                ? recibida.nombre
+                : base.nombre
             ).trim();
 
+          const responsables =
+            Array.isArray(
+              recibida.responsables
+            )
+              ? [
+                  ...new Set(
+                    recibida.responsables
+                      .map(
+                        normalizeEmail
+                      )
+                      .filter(
+                        (email) =>
+                          EQUIPO_ADMINISTRACION.includes(
+                            email
+                          )
+                      )
+                  )
+                ]
+              : [];
+
           return {
-            ...base,
+            id:
+              base.id,
 
             nombre,
 
             activa:
-              recibida.activa ===
-                true &&
-              !!nombre
+              recibida.activa !==
+                undefined
+                ? (
+                    recibida.activa ===
+                      true &&
+                    !!nombre
+                  )
+                : (
+                    base.activa ===
+                      true &&
+                    !!nombre
+                  ),
+
+            responsables,
+
+            cicloId:
+              String(
+                recibida.cicloId ||
+                base.cicloId ||
+                "legacy"
+              )
           };
         }
       )
@@ -1471,31 +1477,42 @@ async function cargarControlesAdministracion() {
 
     snap.docs.forEach(
       (documento) => {
-        const data =
-          documento.data() ||
-          {};
+        const data = {
+          id:
+            documento.id,
 
-        const groupDocId =
-          String(
-            data.groupDocId ||
-            documento.id ||
-            ""
-          ).trim();
+          ...documento.data()
+        };
 
-        if (!groupDocId) {
-          return;
-        }
+        /*
+          Registramos todos los identificadores
+          conocidos para poder encontrar el estado
+          aunque resumen/grupo usen IDs distintos.
+        */
 
-        state.administracionControles
-          .set(
-            groupDocId,
-            {
-              id:
-                documento.id,
+        const ids = [
+          documento.id,
+          data.groupDocId,
+          data.idGrupo
+        ]
+          .map(
+            (value) =>
+              String(
+                value ||
+                ""
+              ).trim()
+          )
+          .filter(Boolean);
 
-              ...data
-            }
-          );
+        ids.forEach(
+          (id) => {
+            state.administracionControles
+              .set(
+                id,
+                data
+              );
+          }
+        );
       }
     );
   } catch (error) {
@@ -1584,18 +1601,16 @@ async function cargarModuloAdministracion() {
     state.administracionControles =
       new Map();
 
-    state.administracionHistorial =
-      [];
-
     actualizarVisibilidadModuloAdministracion();
+
+    renderTableHeader();
 
     return;
   }
 
   await Promise.all([
     cargarConfiguracionAdministracion(),
-    cargarControlesAdministracion(),
-    cargarHistorialAdministracion()
+    cargarControlesAdministracion()
   ]);
 
   actualizarVisibilidadModuloAdministracion();
@@ -1950,12 +1965,11 @@ function bindEvents() {
 
 function bindAdministracionEvents() {
   /*
-    CAPTURE = true.
-
-    Esto intercepta el clic ANTES del listener
-    general de la fila y evita que marcar un OK
-    abra el modal del grupo.
+    =====================================================
+    EJECUCIÓN DE LAS 5 FUNCIONES
+    =====================================================
   */
+
   $("gnTbody")
     ?.addEventListener(
       "click",
@@ -1969,6 +1983,10 @@ function bindAdministracionEvents() {
           return;
         }
 
+        /*
+          Evitamos que al marcar OK
+          se abra el modal del grupo.
+        */
         event.preventDefault();
         event.stopPropagation();
 
@@ -1998,100 +2016,26 @@ function bindAdministracionEvents() {
       true
     );
 
-  $("btnProgresoAdministracion")
+  /*
+    =====================================================
+    PANEL DE SUPERVISIÓN
+    =====================================================
+  */
+
+  $("btnPanelAdministracion")
     ?.addEventListener(
       "click",
-      abrirProgresoAdministracion
-    );
-
-  $("btnCerrarProgresoAdministracion")
-    ?.addEventListener(
-      "click",
-      cerrarProgresoAdministracion
-    );
-
-  $("modalProgresoAdministracion")
-    ?.addEventListener(
-      "click",
-      (event) => {
-        if (
-          event.target ===
-          $("modalProgresoAdministracion")
-        ) {
-          cerrarProgresoAdministracion();
-        }
-      }
-    );
-
-  $("adminPeriodo")
-    ?.addEventListener(
-      "change",
       () => {
-        state.administracionPeriodo =
-          $("adminPeriodo")
-            ?.value ||
-          "7";
-
-        renderProgresoAdministracion();
-      }
-    );
-
-  $("adminResumenControles")
-    ?.addEventListener(
-      "click",
-      (event) => {
-        const button =
-          event.target.closest(
-            "[data-admin-pendientes]"
-          );
-
-        if (!button) {
+        if (
+          !puedeSupervisarAdministracion()
+        ) {
           return;
         }
 
-        state.administracionDetalleControl =
-          button.dataset
-            .adminPendientes ||
-          "";
-
-        renderDetallePendientesAdministracion();
-      }
-    );
-
-  $("btnConfigurarAdministracion")
-    ?.addEventListener(
-      "click",
-      abrirConfiguracionAdministracion
-    );
-
-  $("btnCerrarConfigAdministracion")
-    ?.addEventListener(
-      "click",
-      cerrarConfiguracionAdministracion
-    );
-
-  $("btnCancelarConfigAdministracion")
-    ?.addEventListener(
-      "click",
-      cerrarConfiguracionAdministracion
-    );
-
-  $("btnGuardarConfigAdministracion")
-    ?.addEventListener(
-      "click",
-      guardarConfiguracionAdministracion
-    );
-
-  $("modalConfigAdministracion")
-    ?.addEventListener(
-      "click",
-      (event) => {
-        if (
-          event.target ===
-          $("modalConfigAdministracion")
-        ) {
-          cerrarConfiguracionAdministracion();
-        }
+        location.href =
+          `gestion-administracion.html?ano=${encodeURIComponent(
+            state.anoSeleccionado
+          )}`;
       }
     );
 }
@@ -3595,22 +3539,41 @@ function getCantidadColumnasTablaGestion() {
 function getControlAdministracionGrupo(
   row = {}
 ) {
-  const docId =
-    String(
-      row.docId ||
-      ""
-    ).trim();
+  const ids = [
+    row.docId,
+    row.id,
+    row.groupId
+  ]
+    .map(
+      (value) =>
+        String(
+          value ||
+          ""
+        ).trim()
+    )
+    .filter(Boolean);
 
-  return (
-    state.administracionControles
-      .get(
-        docId
-      ) ||
-    {
-      controles:
-        {}
+  for (
+    const id of ids
+  ) {
+    if (
+      state.administracionControles
+        .has(
+          id
+        )
+    ) {
+      return state
+        .administracionControles
+        .get(
+          id
+        );
     }
-  );
+  }
+
+  return {
+    controles:
+      {}
+  };
 }
 
 function getEstadoControlAdministracion(
@@ -3628,15 +3591,49 @@ function getEstadoControlAdministracion(
       ?.[controlId] ||
     {};
 
-  return (
+  const columna =
+    getColumnaAdministracion(
+      controlId
+    );
+
+  if (!columna) {
+    return "pendiente";
+  }
+
+  if (
     normalizar(
       control.estado ||
       ""
-    ) ===
-      "ok"
-      ? "ok"
-      : "pendiente"
-  );
+    ) !==
+    "ok"
+  ) {
+    return "pendiente";
+  }
+
+  /*
+    Compatibilidad con los estados que
+    ya alcanzaste a crear.
+  */
+  const cicloControl =
+    String(
+      control.cicloId ||
+      "legacy"
+    );
+
+  const cicloActual =
+    String(
+      columna.cicloId ||
+      "legacy"
+    );
+
+  if (
+    cicloControl !==
+    cicloActual
+  ) {
+    return "pendiente";
+  }
+
+  return "ok";
 }
 
 function renderControlAdministracionButton(
@@ -4002,7 +3999,7 @@ async function cambiarEstadoControlAdministracion(
       true
   ) {
     alert(
-      "Este control administrativo no está activo."
+      "Esta función administrativa no está activa."
     );
 
     return;
@@ -4020,12 +4017,11 @@ async function cambiarEstadoControlAdministracion(
       ? "pendiente"
       : "ok";
 
-  const confirmar =
-    confirm(
+  if (
+    !confirm(
       `¿Cambiar "${columna.nombre}" de ${actual.toUpperCase()} a ${nuevo.toUpperCase()} para ${row.titulo}?`
-    );
-
-  if (!confirmar) {
+    )
+  ) {
     return;
   }
 
@@ -4038,7 +4034,7 @@ async function cambiarEstadoControlAdministracion(
 
   if (!groupDocId) {
     alert(
-      "No se pudo determinar el documento del grupo."
+      "No se pudo identificar el documento del grupo."
     );
 
     return;
@@ -4060,11 +4056,22 @@ async function cambiarEstadoControlAdministracion(
   const usuarioNombre =
     getNombreUsuarioGestion();
 
+  const cicloId =
+    String(
+      columna.cicloId ||
+      "legacy"
+    );
+
   controlesActuales[
     controlId
   ] = {
     estado:
       nuevo,
+
+    cicloId,
+
+    nombreFuncion:
+      columna.nombre,
 
     actualizadoPor:
       usuarioNombre,
@@ -4100,16 +4107,22 @@ async function cambiarEstadoControlAdministracion(
     controlNombre:
       columna.nombre,
 
+    cicloId,
+
     anterior:
       actual,
 
-    nuevo
+    nuevo,
+
+    responsables:
+      columna.responsables ||
+      []
   };
 
   try {
     /*
       =====================================================
-      1. ESTADO ACTUAL DEL CONTROL
+      ESTADO ACTUAL
       =====================================================
     */
 
@@ -4171,13 +4184,7 @@ async function cambiarEstadoControlAdministracion(
 
     /*
       =====================================================
-      2. HISTORIAL GENERAL
-
-      Este es el que utilizará:
-      - Progreso Administración
-      - gráficos
-      - actividad por día
-      - actividad por usuario
+      HISTORIAL GENERAL PARA EL PANEL
       =====================================================
     */
 
@@ -4246,14 +4253,7 @@ async function cambiarEstadoControlAdministracion(
 
     /*
       =====================================================
-      3. HISTORIAL DEL MODAL DE GESTIÓN NÓMINA
-
-      IMPORTANTE:
-      inscripciones-manager.js carga este historial desde:
-
-      ventas_cotizaciones/{groupDocId}/historial_nomina
-
-      Por eso también registramos aquí.
+      HISTORIAL DEL GRUPO
       =====================================================
     */
 
@@ -4311,53 +4311,52 @@ async function cambiarEstadoControlAdministracion(
 
     /*
       =====================================================
-      4. ACTUALIZACIÓN LOCAL
+      ACTUALIZACIÓN LOCAL
       =====================================================
     */
 
-    state.administracionControles
-      .set(
-        groupDocId,
-        {
-          ...documentoActual,
+    const documentoActualizado = {
+      ...documentoActual,
 
-          groupDocId,
+      groupDocId,
 
-          idGrupo:
-            row.groupId,
+      idGrupo:
+        row.groupId,
 
-          anoViaje:
-            Number(
-              state.anoSeleccionado
-            ),
+      anoViaje:
+        Number(
+          state.anoSeleccionado
+        ),
 
-          controles:
-            controlesActuales
+      controles:
+        controlesActuales
+    };
+
+    [
+      groupDocId,
+      row.docId,
+      row.id,
+      row.groupId
+    ]
+      .map(
+        (value) =>
+          String(
+            value ||
+            ""
+          ).trim()
+      )
+      .filter(Boolean)
+      .forEach(
+        (id) => {
+          state.administracionControles
+            .set(
+              id,
+              documentoActualizado
+            );
         }
       );
 
     renderRows();
-
-    /*
-      =====================================================
-      5. ACTUALIZAR PANEL DE SUPERVISIÓN
-      =====================================================
-    */
-
-    if (
-      puedeSupervisarAdministracion()
-    ) {
-      await cargarHistorialAdministracion();
-
-      if (
-        $("modalProgresoAdministracion")
-          ?.classList.contains(
-            "show"
-          )
-      ) {
-        renderProgresoAdministracion();
-      }
-    }
   } catch (error) {
     console.error(
       "[gestion-nomina] cambiarEstadoControlAdministracion",
