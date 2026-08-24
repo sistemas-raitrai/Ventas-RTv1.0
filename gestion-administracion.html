@@ -1,0 +1,710 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Panel Administración | Sistema Ventas RT</title>
+
+  <link rel="stylesheet" href="estilos.css" />
+  <link rel="icon" type="image/png" href="IMG/logo-raitrai.png" />
+
+  <style>
+    .admin-page {
+      padding: 20px 30px 34px;
+    }
+
+    .admin-shell {
+      background: #f2f0f5;
+      border: 1px solid #d8d1df;
+      border-radius: 22px;
+      padding: 22px;
+    }
+
+    .admin-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .admin-head h1 {
+      margin: 0;
+      color: var(--header);
+      font-size: 30px;
+    }
+
+    .admin-head p {
+      margin: 5px 0 0;
+      color: #6a6075;
+    }
+
+    .admin-head-actions {
+      display: flex;
+      gap: 9px;
+      flex-wrap: wrap;
+    }
+
+    .admin-btn {
+      min-height: 40px;
+      border: 0;
+      border-radius: 10px;
+      padding: 0 14px;
+      font-weight: 900;
+      cursor: pointer;
+    }
+
+    .admin-btn.primary {
+      background: #4a2570;
+      color: #fff;
+    }
+
+    .admin-btn.secondary {
+      background: #6b6178;
+      color: #fff;
+    }
+
+    .admin-toolbar {
+      display: grid;
+      grid-template-columns: minmax(130px, 180px) minmax(160px, 220px) 1fr auto;
+      gap: 10px;
+      margin: 20px 0;
+      align-items: end;
+    }
+
+    .admin-field {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+      min-width: 0;
+    }
+
+    .admin-field label {
+      color: #6d6278;
+      font-size: 10px;
+      font-weight: 900;
+      text-transform: uppercase;
+    }
+
+    .admin-field input,
+    .admin-field select {
+      width: 100%;
+      min-height: 42px;
+      box-sizing: border-box;
+      border: 1px solid #d5ccdd;
+      border-radius: 9px;
+      padding: 0 10px;
+      background: #fff;
+    }
+
+    .admin-section {
+      margin-top: 16px;
+      padding: 16px;
+      border: 1px solid #dfd7e5;
+      border-radius: 16px;
+      background: #faf8fc;
+    }
+
+    .admin-section:first-of-type {
+      margin-top: 0;
+    }
+
+    .admin-section-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: flex-start;
+      flex-wrap: wrap;
+      margin-bottom: 13px;
+    }
+
+    .admin-section-head h2,
+    .admin-section-head h3 {
+      margin: 0;
+      color: #2b1940;
+    }
+
+    .admin-section-head p {
+      margin: 4px 0 0;
+      color: #786d82;
+      font-size: 12px;
+    }
+
+    .general-kpis {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .general-kpis article,
+    .period-kpis article {
+      padding: 14px;
+      border: 1px solid #dfd6e6;
+      border-radius: 13px;
+      background: #fff;
+    }
+
+    .general-kpis span,
+    .period-kpis span {
+      display: block;
+      color: #786d82;
+      font-size: 10px;
+      font-weight: 900;
+      text-transform: uppercase;
+    }
+
+    .general-kpis strong,
+    .period-kpis strong {
+      display: block;
+      margin-top: 5px;
+      color: #2b1940;
+      font-size: 26px;
+    }
+
+    .funciones-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 10px;
+    }
+
+    .funcion-card {
+      padding: 14px;
+      border: 1px solid #ded6e5;
+      border-radius: 14px;
+      background: #fff;
+    }
+
+    .funcion-card.inactiva {
+      opacity: .62;
+    }
+
+    .funcion-card-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      align-items: flex-start;
+    }
+
+    .funcion-card h3 {
+      margin: 0;
+      color: #2b1940;
+      font-size: 15px;
+    }
+
+    .funcion-card .porcentaje {
+      color: #166534;
+      font-weight: 900;
+    }
+
+    .funcion-progress {
+      height: 9px;
+      margin-top: 12px;
+      overflow: hidden;
+      border-radius: 999px;
+      background: #e9e3ed;
+    }
+
+    .funcion-progress > div {
+      height: 100%;
+      border-radius: 999px;
+      background: #16a34a;
+    }
+
+    .funcion-values {
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+      margin-top: 9px;
+      color: #716678;
+      font-size: 11px;
+    }
+
+    .funcion-values button {
+      border: 0;
+      padding: 0;
+      background: transparent;
+      color: #a16207;
+      font: inherit;
+      font-weight: 900;
+      text-decoration: underline;
+      cursor: pointer;
+    }
+
+    .responsables-line {
+      margin-top: 10px;
+      padding-top: 9px;
+      border-top: 1px solid #eee8f2;
+      color: #6b6178;
+      font-size: 11px;
+      line-height: 1.4;
+    }
+
+    .responsables-line strong {
+      color: #2b1940;
+    }
+
+    .period-kpis {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+
+    .admin-chart {
+      display: flex;
+      align-items: flex-end;
+      gap: 8px;
+      min-height: 250px;
+      padding: 16px 12px 0;
+      overflow-x: auto;
+      border: 1px solid #e4dce9;
+      border-radius: 14px;
+      background: #fff;
+    }
+
+    .chart-col {
+      display: grid;
+      grid-template-rows: 20px 170px 35px;
+      min-width: 52px;
+      flex: 1;
+      align-items: end;
+    }
+
+    .chart-value {
+      text-align: center;
+      color: #2b1940;
+      font-size: 11px;
+      font-weight: 900;
+    }
+
+    .chart-track {
+      width: 72%;
+      height: 170px;
+      margin: 0 auto;
+      display: flex;
+      align-items: flex-end;
+      border-radius: 8px 8px 0 0;
+      background: #eee9f1;
+    }
+
+    .chart-bar {
+      width: 100%;
+      border-radius: 8px 8px 0 0;
+      background: #4a2570;
+    }
+
+    .chart-label {
+      padding-top: 7px;
+      color: #786d82;
+      font-size: 9px;
+      font-weight: 800;
+      text-align: center;
+    }
+
+    .admin-table-wrap {
+      overflow: auto;
+      border: 1px solid #e3dbe8;
+      border-radius: 12px;
+      background: #fff;
+    }
+
+    .admin-table {
+      width: 100%;
+      min-width: 850px;
+      border-collapse: collapse;
+    }
+
+    .admin-table th {
+      padding: 10px;
+      background: #eee8f3;
+      color: #2b1940;
+      text-align: left;
+      font-size: 10px;
+      text-transform: uppercase;
+    }
+
+    .admin-table td {
+      padding: 10px;
+      border-bottom: 1px solid #eee9f1;
+      font-size: 12px;
+      vertical-align: top;
+    }
+
+    .sub {
+      margin-top: 3px;
+      color: #7a7084;
+      font-size: 11px;
+    }
+
+    .tag {
+      display: inline-flex;
+      min-height: 24px;
+      align-items: center;
+      border-radius: 999px;
+      padding: 0 8px;
+      background: #eee8f3;
+      color: #4a2570;
+      font-size: 10px;
+      font-weight: 900;
+    }
+
+    .tag + .tag {
+      margin-left: 4px;
+    }
+
+    .config-grid {
+      display: grid;
+      gap: 10px;
+    }
+
+    .config-row {
+      display: grid;
+      grid-template-columns: minmax(190px, 1fr) auto minmax(360px, 2fr);
+      gap: 14px;
+      align-items: start;
+      padding: 14px;
+      border: 1px solid #e0d8e6;
+      border-radius: 13px;
+      background: #fff;
+    }
+
+    .config-row input[type="text"] {
+      width: 100%;
+      min-height: 40px;
+      box-sizing: border-box;
+      border: 1px solid #d3cadb;
+      border-radius: 9px;
+      padding: 0 10px;
+    }
+
+    .config-active {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+      min-height: 40px;
+      color: #45364f;
+      font-weight: 900;
+      font-size: 11px;
+    }
+
+    .config-responsables {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 6px 10px;
+    }
+
+    .config-responsables label {
+      display: flex;
+      gap: 6px;
+      align-items: flex-start;
+      color: #5f5468;
+      font-size: 11px;
+      overflow-wrap: anywhere;
+    }
+
+    .config-responsables .all-team {
+      grid-column: 1 / -1;
+      padding-bottom: 5px;
+      margin-bottom: 2px;
+      border-bottom: 1px solid #eee8f2;
+      color: #2b1940;
+      font-weight: 900;
+    }
+
+    .config-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 9px;
+      margin-top: 14px;
+    }
+
+    .detail-list {
+      display: flex;
+      flex-direction: column;
+      gap: 7px;
+    }
+
+    .detail-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: center;
+      padding: 11px 12px;
+      border: 1px solid #e3dce8;
+      border-radius: 11px;
+      background: #fff;
+    }
+
+    .empty {
+      padding: 24px;
+      text-align: center;
+      color: #6a6075;
+      font-weight: 800;
+    }
+
+    .hidden {
+      display: none !important;
+    }
+
+    button:disabled {
+      opacity: .48;
+      cursor: wait;
+    }
+
+    @media (max-width: 1050px) {
+      .general-kpis {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .config-row {
+        grid-template-columns: 1fr;
+      }
+
+      .admin-toolbar {
+        grid-template-columns: 1fr 1fr;
+      }
+    }
+
+    @media (max-width: 650px) {
+      .admin-page {
+        padding: 14px;
+      }
+
+      .general-kpis,
+      .period-kpis,
+      .admin-toolbar,
+      .config-responsables {
+        grid-template-columns: 1fr;
+      }
+
+      .detail-row {
+        align-items: stretch;
+        flex-direction: column;
+      }
+    }
+  </style>
+</head>
+<body class="ventas-body" data-page="gestion-administracion">
+  <div id="layout-top"></div>
+
+  <main class="page-shell admin-page">
+    <section class="admin-shell">
+      <div class="admin-head">
+        <div>
+          <h1>Panel Administración</h1>
+          <p>Organización de funciones, responsables, pendientes y trabajo realizado.</p>
+        </div>
+
+        <div class="admin-head-actions">
+          <button id="btnVolverNomina" class="admin-btn secondary" type="button">
+            Volver a Gestión Nómina
+          </button>
+          <button id="btnRecargarAdmin" class="admin-btn primary" type="button">
+            Recargar
+          </button>
+        </div>
+      </div>
+
+      <div class="admin-toolbar">
+        <div class="admin-field">
+          <label for="adminAno">Año de viaje</label>
+          <select id="adminAno"></select>
+        </div>
+
+        <div class="admin-field">
+          <label for="adminPeriodo">Actividad</label>
+          <select id="adminPeriodo">
+            <option value="hoy">Hoy</option>
+            <option value="ayer">Ayer</option>
+            <option value="7" selected>Últimos 7 días</option>
+            <option value="30">Últimos 30 días</option>
+            <option value="mes">Este mes</option>
+          </select>
+        </div>
+
+        <div class="admin-field">
+          <label for="adminBuscar">Buscar grupo</label>
+          <input id="adminBuscar" type="text" placeholder="Colegio, curso, ID o negocio..." />
+        </div>
+
+        <button id="btnIrConfiguracion" class="admin-btn secondary" type="button">
+          Configurar funciones y responsables
+        </button>
+      </div>
+
+      <section class="admin-section">
+        <div class="admin-section-head">
+          <div>
+            <h2>Resumen general</h2>
+            <p>Estado actual de las funciones activas del año seleccionado.</p>
+          </div>
+        </div>
+
+        <div class="general-kpis">
+          <article>
+            <span>Grupos</span>
+            <strong id="kGrupos">0</strong>
+          </article>
+          <article>
+            <span>Tareas OK</span>
+            <strong id="kOk">0</strong>
+          </article>
+          <article>
+            <span>Pendientes</span>
+            <strong id="kPendientes">0</strong>
+          </article>
+          <article>
+            <span>Avance global</span>
+            <strong id="kAvance">0%</strong>
+          </article>
+        </div>
+      </section>
+
+      <section class="admin-section">
+        <div class="admin-section-head">
+          <div>
+            <h2>Funciones de Administración</h2>
+            <p>Cuántos grupos están pendientes y quién tiene asignada cada función.</p>
+          </div>
+        </div>
+
+        <div id="funcionesResumen" class="funciones-grid"></div>
+      </section>
+
+      <section class="admin-section">
+        <div class="admin-section-head">
+          <div>
+            <h2>Carga del equipo</h2>
+            <p>Pendientes asociados a las funciones asignadas a cada integrante.</p>
+          </div>
+        </div>
+
+        <div class="admin-table-wrap">
+          <table class="admin-table">
+            <thead>
+              <tr>
+                <th>Integrante</th>
+                <th>Funciones asignadas</th>
+                <th>Pendientes asignados</th>
+                <th>OK en período</th>
+                <th>Grupos trabajados</th>
+                <th>Días activos</th>
+              </tr>
+            </thead>
+            <tbody id="equipoTbody"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="admin-section">
+        <div class="admin-section-head">
+          <div>
+            <h2>Trabajo realizado</h2>
+            <p>Actividad registrada durante el período seleccionado.</p>
+          </div>
+        </div>
+
+        <div class="period-kpis">
+          <article>
+            <span>Tareas llevadas a OK</span>
+            <strong id="kPeriodoOk">0</strong>
+          </article>
+          <article>
+            <span>Reabiertas</span>
+            <strong id="kPeriodoReabiertas">0</strong>
+          </article>
+          <article>
+            <span>Grupos trabajados</span>
+            <strong id="kPeriodoGrupos">0</strong>
+          </article>
+        </div>
+
+        <div id="actividadGrafico" class="admin-chart"></div>
+      </section>
+
+      <section class="admin-section">
+        <div class="admin-section-head">
+          <div>
+            <h2>Actividad por función</h2>
+            <p>Cuánto se avanzó en cada función durante el período.</p>
+          </div>
+        </div>
+
+        <div class="admin-table-wrap">
+          <table class="admin-table">
+            <thead>
+              <tr>
+                <th>Función</th>
+                <th>OK realizados</th>
+                <th>Reabiertos</th>
+                <th>Grupos trabajados</th>
+                <th>Responsables actuales</th>
+              </tr>
+            </thead>
+            <tbody id="funcionesActividadTbody"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="admin-section">
+        <div class="admin-section-head">
+          <div>
+            <h2>Actividad por persona</h2>
+            <p>Detalle del trabajo ejecutado por cada integrante.</p>
+          </div>
+        </div>
+
+        <div class="admin-table-wrap">
+          <table class="admin-table">
+            <thead>
+              <tr>
+                <th>Persona</th>
+                <th>OK</th>
+                <th>Reabiertos</th>
+                <th>Grupos</th>
+                <th>Días activos</th>
+                <th>Detalle por función</th>
+              </tr>
+            </thead>
+            <tbody id="personasActividadTbody"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="detallePendientesSection" class="admin-section hidden">
+        <div class="admin-section-head">
+          <div>
+            <h2 id="detallePendientesTitulo">Pendientes</h2>
+            <p id="detallePendientesSubtitulo"></p>
+          </div>
+          <button id="btnCerrarDetallePendientes" class="admin-btn secondary" type="button">
+            Cerrar detalle
+          </button>
+        </div>
+
+        <div id="detallePendientesLista" class="detail-list"></div>
+      </section>
+
+      <section id="configuracionSection" class="admin-section">
+        <div class="admin-section-head">
+          <div>
+            <h2>Configurar las 5 funciones</h2>
+            <p>La Jefatura de Administración define nombre, activación y responsables.</p>
+          </div>
+        </div>
+
+        <div id="configFunciones" class="config-grid"></div>
+
+        <div class="config-actions">
+          <button id="btnGuardarConfiguracion" class="admin-btn primary" type="button">
+            Guardar organización
+          </button>
+        </div>
+      </section>
+    </section>
+  </main>
+
+  <script type="module" src="layout.js"></script>
+  <script type="module" src="gestion-administracion.js"></script>
+</body>
+</html>
