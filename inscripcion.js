@@ -1450,6 +1450,25 @@ async function validarRutNominaFinal() {
 
     const data = snap.data() || {};
 
+    if (estaInscripcionAnuladaPublica(data)) {
+      mostrarMensaje(
+        "error",
+        `
+          Este pasajero se encuentra <strong>ANULADO</strong> dentro del grupo.
+          <br><br>
+    
+          No corresponde completar la
+          <strong>Nómina Final / Ficha Médica</strong>
+          mientras el pasajero se encuentre anulado.
+          <br><br>
+    
+          Si considera que esto es incorrecto, comuníquese con Administración.
+        `
+      );
+    
+      return;
+    }
+
     if (
       data.tipoInscripcion !==
       "sistema_pagos"
