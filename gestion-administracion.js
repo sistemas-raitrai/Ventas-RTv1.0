@@ -49,13 +49,42 @@ const EQUIPO_ADMINISTRACION = [
   "secretaria@raitrai.cl"
 ];
 
-const LABEL_EQUIPO = {
-  "yenny@raitrai.cl": "Yenny",
-  "raitrai@raitrai.cl": "Rai Trai",
-  "contacto@raitrai.cl": "Contacto",
-  "giras@raitrai.cl": "Giras",
-  "secretaria@raitrai.cl": "Secretaría"
-};
+function getNombreEquipoAdministracion(
+  email = ""
+) {
+  const correo =
+    normalizeEmail(
+      email
+    );
+
+  if (!correo) {
+    return "Sin usuario";
+  }
+
+  const user =
+    getVentasUser(
+      correo
+    );
+
+  if (!user) {
+    return correo;
+  }
+
+  const nombreCompleto =
+    [
+      user.nombre,
+      user.apellido
+    ]
+      .filter(Boolean)
+      .join(" ")
+      .trim();
+
+  return (
+    nombreCompleto ||
+    user.nombre ||
+    correo
+  );
+}
 
 /*
   Mantenemos los IDs de la versión ya instalada para no perder
@@ -727,74 +756,179 @@ function getActividadPorDia(historial = []) {
     .sort((a, b) => a.fecha.localeCompare(b.fecha));
 }
 
-function getActividadPorPersona(historial = []) {
-  const map = new Map();
+function getActividadPorPersona(
+  historial = []
+) {
+  const map =
+    new Map();
 
-  historial.forEach((item) => {
-    const correo = normalizeEmail(
-      item.creadoPorCorreo ||
-      item.usuarioCorreo ||
-      ""
-    );
+  historial.forEach(
+    (item) => {
+      const correo =
+        normalizeEmail(
+          item.creadoPorCorreo ||
+          item.usuarioCorreo ||
+          ""
+        );
 
-    const nombre = String(
-      item.creadoPor ||
-      item.usuarioNombre ||
-      LABEL_EQUIPO[correo] ||
-      correo ||
-      "Sin usuario"
-    );
+      const nombreDesdeHistorial =
+        String(
+          item.creadoPor ||
+          item.usuarioNombre ||
+          ""
+        ).trim();
 
-    const key = correo || normalizar(nombre);
+      const nombre =
+        nombreDesdeHistorial ||
+        getNombreEquipoAdministracion(
+          correo
+        );
 
-    if (!map.has(key)) {
-      map.set(key, {
-        correo,
-        nombre,
-        ok: 0,
-        reabiertos: 0,
-        grupos: new Set(),
-        dias: new Set(),
-        funciones: new Map()
-      });
+      const key =
+        correo ||
+        normalizar(
+          nombre
+        );
+
+      if (
+        !map.has(
+          key
+        )
+      ) {
+        map.set(
+          key,
+          {
+            correo,
+            nombre,
+            ok: 0,
+            reabiertos: 0,
+            grupos:
+              new Set(),
+            dias:
+              new Set(),
+            funciones:
+              new Map()
+          }
+        );
+      }
+
+      const row =
+        map.get(
+          key
+        );
+
+      if (
+        esOk(
+          item
+        )
+      ) {
+        row.ok +=
+          1;
+      }
+
+      if (
+        esReapertura(
+          item
+        )
+      ) {
+        row.reabiertos +=
+          1;
+      }
+
+      const grupo =
+        String(
+          item.groupDocId ||
+          item.idGrupo ||
+          ""
+        );
+
+      if (grupo) {
+        row.grupos.add(
+          grupo
+        );
+      }
+
+      const dia =
+        getFechaClave(
+          item.fecha
+        );
+
+      if (dia) {
+        row.dias.add(
+          dia
+        );
+      }
+
+      if (
+        esOk(
+          item
+        )
+      ) {
+        const nombreFuncion =
+          String(
+            item
+              ?.metadata
+              ?.controlNombre ||
+            item
+              ?.metadata
+              ?.controlId ||
+            "Otra función"
+          );
+
+        row.funciones.set(
+          nombreFuncion,
+          (
+            row.funciones.get(
+              nombreFuncion
+            ) ||
+            0
+          ) +
+          1
+        );
+      }
     }
+  );
 
-    const row = map.get(key);
+  return [
+    ...map.values()
+  ]
+    .map(
+      (item) => ({
+        correo:
+          item.correo,
 
-    if (esOk(item)) row.ok += 1;
-    if (esReapertura(item)) row.reabiertos += 1;
+        nombre:
+          item.nombre,
 
-    const grupo = String(item.groupDocId || item.idGrupo || "");
-    if (grupo) row.grupos.add(grupo);
+        ok:
+          item.ok,
 
-    const dia = getFechaClave(item.fecha);
-    if (dia) row.dias.add(dia);
+        reabiertos:
+          item.reabiertos,
 
-    if (esOk(item)) {
-      const nombreFuncion = String(
-        item?.metadata?.controlNombre ||
-        item?.metadata?.controlId ||
-        "Otra función"
-      );
+        grupos:
+          item.grupos.size,
 
-      row.funciones.set(
-        nombreFuncion,
-        (row.funciones.get(nombreFuncion) || 0) + 1
-      );
-    }
-  });
+        dias:
+          item.dias.size,
 
-  return [...map.values()]
-    .map((item) => ({
-      correo: item.correo,
-      nombre: item.nombre,
-      ok: item.ok,
-      reabiertos: item.reabiertos,
-      grupos: item.grupos.size,
-      dias: item.dias.size,
-      funciones: [...item.funciones.entries()].sort((a, b) => b[1] - a[1])
-    }))
-    .sort((a, b) => b.ok - a.ok);
+        funciones:
+          [
+            ...item.funciones
+              .entries()
+          ]
+            .sort(
+              (a, b) =>
+                b[1] -
+                a[1]
+            )
+      })
+    )
+    .sort(
+      (a, b) =>
+        b.ok -
+        a.ok
+    );
 }
 
 function getActividadPorFuncion(historial = []) {
@@ -831,39 +965,88 @@ function getActividadPorFuncion(historial = []) {
     .sort((a, b) => b.ok - a.ok);
 }
 
-function getCargaEquipo(historialPeriodo = []) {
-  const funciones = getFuncionesActivas();
-  const actividad = getActividadPorPersona(historialPeriodo);
+function getCargaEquipo(
+  historialPeriodo = []
+) {
+  const funciones =
+    getFuncionesActivas();
 
-  return EQUIPO_ADMINISTRACION.map((email) => {
-    const asignadas = funciones.filter((funcion) =>
-      (funcion.responsables || []).includes(email)
+  const actividad =
+    getActividadPorPersona(
+      historialPeriodo
     );
 
-    const pendientes = asignadas.reduce((total, funcion) => {
-      return total + state.rows.filter(
-        (row) => getEstadoFuncion(row, funcion) !== "ok"
-      ).length;
-    }, 0);
+  return EQUIPO_ADMINISTRACION.map(
+    (email) => {
+      const asignadas =
+        funciones.filter(
+          (funcion) =>
+            (
+              funcion.responsables ||
+              []
+            ).includes(
+              email
+            )
+        );
 
-    const actividadPersona = actividad.find(
-      (item) => normalizeEmail(item.correo) === email
-    ) || {
-      ok: 0,
-      grupos: 0,
-      dias: 0
-    };
+      const pendientes =
+        asignadas.reduce(
+          (
+            total,
+            funcion
+          ) => {
+            return (
+              total +
+              state.rows.filter(
+                (row) =>
+                  getEstadoFuncion(
+                    row,
+                    funcion
+                  ) !==
+                  "ok"
+              ).length
+            );
+          },
+          0
+        );
 
-    return {
-      email,
-      nombre: LABEL_EQUIPO[email] || email,
-      asignadas,
-      pendientes,
-      okPeriodo: actividadPersona.ok,
-      gruposPeriodo: actividadPersona.grupos,
-      diasPeriodo: actividadPersona.dias
-    };
-  });
+      const actividadPersona =
+        actividad.find(
+          (item) =>
+            normalizeEmail(
+              item.correo
+            ) ===
+            email
+        ) ||
+        {
+          ok: 0,
+          grupos: 0,
+          dias: 0
+        };
+
+      return {
+        email,
+
+        nombre:
+          getNombreEquipoAdministracion(
+            email
+          ),
+
+        asignadas,
+
+        pendientes,
+
+        okPeriodo:
+          actividadPersona.ok,
+
+        gruposPeriodo:
+          actividadPersona.grupos,
+
+        diasPeriodo:
+          actividadPersona.dias
+      };
+    }
+  );
 }
 
 function renderTodo() {
@@ -1098,60 +1281,145 @@ function renderDetallePendientes() {
 }
 
 function renderConfiguracion() {
-  const cont = $("configFunciones");
-  if (!cont) return;
+  const cont =
+    $("configFunciones");
 
-  cont.innerHTML = (state.config?.columnas || []).map((funcion, index) => {
-    const todosAsignados = EQUIPO_ADMINISTRACION.every(
-      (email) => (funcion.responsables || []).includes(email)
-    );
+  if (!cont) {
+    return;
+  }
 
-    return `
-      <div class="config-row" data-config-funcion="${esc(funcion.id)}">
-        <div class="admin-field">
-          <label>Función ${index + 1}</label>
-          <input
-            type="text"
-            data-config-nombre="${esc(funcion.id)}"
-            value="${esc(funcion.nombre || "")}"
-            placeholder="Nombre de la función"
-          />
-        </div>
+  cont.innerHTML =
+    (
+      state.config
+        ?.columnas ||
+      []
+    )
+      .map(
+        (
+          funcion,
+          index
+        ) => {
+          const todosAsignados =
+            EQUIPO_ADMINISTRACION
+              .every(
+                (email) =>
+                  (
+                    funcion.responsables ||
+                    []
+                  ).includes(
+                    email
+                  )
+              );
 
-        <label class="config-active">
-          <input
-            type="checkbox"
-            data-config-activa="${esc(funcion.id)}"
-            ${funcion.activa === true ? "checked" : ""}
-          />
-          Activa
-        </label>
+          return `
+            <div
+              class="config-row"
+              data-config-funcion="${esc(
+                funcion.id
+              )}"
+            >
+              <div class="admin-field">
+                <label>
+                  Función ${index + 1}
+                </label>
 
-        <div class="config-responsables">
-          <label class="all-team">
-            <input
-              type="checkbox"
-              data-responsables-todos="${esc(funcion.id)}"
-              ${todosAsignados ? "checked" : ""}
-            />
-            Asignar a todo el equipo
-          </label>
+                <input
+                  type="text"
+                  data-config-nombre="${esc(
+                    funcion.id
+                  )}"
+                  value="${esc(
+                    funcion.nombre ||
+                    ""
+                  )}"
+                  placeholder="Nombre de la función"
+                />
+              </div>
 
-          ${EQUIPO_ADMINISTRACION.map((email) => `
-            <label>
-              <input
-                type="checkbox"
-                data-responsable-funcion="${esc(funcion.id)}"
-                value="${esc(email)}"
-                ${(funcion.responsables || []).includes(email) ? "checked" : ""}
-              />
-              ${esc(email)}
-            </label>
-          `).join("")}
-        </div>
-      </div>
-    `;
-  }).join("");
+              <label class="config-active">
+                <input
+                  type="checkbox"
+                  data-config-activa="${esc(
+                    funcion.id
+                  )}"
+                  ${
+                    funcion.activa ===
+                    true
+                      ? "checked"
+                      : ""
+                  }
+                />
+
+                Activa
+              </label>
+
+              <div class="config-responsables">
+                <label class="all-team">
+                  <input
+                    type="checkbox"
+                    data-responsables-todos="${esc(
+                      funcion.id
+                    )}"
+                    ${
+                      todosAsignados
+                        ? "checked"
+                        : ""
+                    }
+                  />
+
+                  Asignar a todo el equipo
+                </label>
+
+                ${
+                  EQUIPO_ADMINISTRACION
+                    .map(
+                      (email) => {
+                        const nombre =
+                          getNombreEquipoAdministracion(
+                            email
+                          );
+
+                        return `
+                          <label
+                            title="${esc(
+                              email
+                            )}"
+                          >
+                            <input
+                              type="checkbox"
+                              data-responsable-funcion="${esc(
+                                funcion.id
+                              )}"
+                              value="${esc(
+                                email
+                              )}"
+                              ${
+                                (
+                                  funcion.responsables ||
+                                  []
+                                ).includes(
+                                  email
+                                )
+                                  ? "checked"
+                                  : ""
+                              }
+                            />
+
+                            ${esc(
+                              nombre
+                            )}
+                          </label>
+                        `;
+                      }
+                    )
+                    .join("")
+                }
+              </div>
+            </div>
+          `;
+        }
+      )
+      .join("");
 }
 
 async function guardarConfiguracion() {
@@ -1297,11 +1565,22 @@ function crearCicloId(id = "") {
   return `${id}_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
 }
 
-function formatResponsables(responsables = []) {
-  if (!responsables.length) return "Sin responsable asignado";
+function formatResponsables(
+  responsables = []
+) {
+  if (
+    !responsables.length
+  ) {
+    return "Sin responsable asignado";
+  }
 
   return responsables
-    .map((email) => LABEL_EQUIPO[email] || email)
+    .map(
+      (email) =>
+        getNombreEquipoAdministracion(
+          email
+        )
+    )
     .join(", ");
 }
 
