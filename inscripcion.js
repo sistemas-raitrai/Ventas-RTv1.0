@@ -4332,10 +4332,11 @@ function renderBannerFaseInscripcion() {
     box.className = "notice ok";
 
     box.innerHTML = `
-      ${titulo("🔵", "REGISTRO DE ADULTOS")}
+      ${titulo("🔵", "REGISTRO DE ADULTOS LIBERADOS")}
 
-      Estás ingresando al grupo mediante un cupo liberado completo o parcial.
-      A continuación registra la información solicitada para registrar
+      Estás ingresando al grupo mediante un cupo liberado completo. Si tienes un cupo liberado parcial o eres estudiante con cupo liberado total 
+      o parcial este link de formulario No es el correcto.
+      En caso de si cumplir con el requerimiento, a continuación registra la información solicitada para registrar
       correctamente la participación en el viaje.
     `;
   } else if (contexto.clave === "nomina_final") {
