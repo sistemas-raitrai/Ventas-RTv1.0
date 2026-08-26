@@ -4168,8 +4168,16 @@ function getContextoFormulario() {
 }
 
 function requiereCarnetIdentidad() {
-  const contexto = getContextoFormulario();
-  return ["nuevo_ingreso", "lista_espera"].includes(contexto.clave);
+  const contexto =
+    getContextoFormulario();
+
+  return [
+    "nuevo_ingreso",
+    "lista_espera",
+    "liberado"
+  ].includes(
+    contexto.clave
+  );
 }
 
 function requiereComprobantePago() {
