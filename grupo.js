@@ -11556,10 +11556,20 @@ async function enviarNominaInicialPagos() {
     const correoVendedora =
       getCorreoVendedoraGrupoParaCopia();
     
-    const destinatarioResumen =
-      normalizeEmail(
-        correoVendedora ||
-        "raitrai@raitrai.cl"
+    const correoRaitrai =
+      "raitrai@raitrai.cl";
+    
+    const destinatariosResumen = [
+      correoVendedora,
+      correoRaitrai
+    ]
+      .map((correo) =>
+        normalizeEmail(correo || "")
+      )
+      .filter(Boolean)
+      .filter(
+        (correo, index, lista) =>
+          lista.indexOf(correo) === index
       );
     
     const ejemplo = validos[0];
@@ -11638,10 +11648,10 @@ async function enviarNominaInicialPagos() {
           "pendiente",
     
         destinatario:
-          destinatarioResumen,
-    
+          destinatariosResumen,
+        
         to:
-          destinatarioResumen,
+          destinatariosResumen,
     
         asunto:
           `Resumen envío pagos · ${
@@ -11710,7 +11720,7 @@ async function enviarNominaInicialPagos() {
         correoCopiaFija:
           correoRaitrai,
     
-        destinatarioResumen,
+        destinatariosResumen,
     
         totalCorreos:
           validos.length,
