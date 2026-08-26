@@ -37,29 +37,45 @@ async function init() {
       return;
     }
 
-    const tokenSnap = await getDoc(doc(db, "nominas_publicas", token));
+    const tokenSnap = await getDoc(
+      doc(db, "nominas_publicas", token)
+    );
 
     if (!tokenSnap.exists()) {
-      renderError("La nómina no existe o el link fue reemplazado.");
+      renderError(
+        "La nómina no existe o el link fue reemplazado."
+      );
       return;
     }
 
-    const tokenData = tokenSnap.data();
+    const tokenData =
+      tokenSnap.data() || {};
 
     if (tokenData.activo === false) {
-      renderError("Esta nómina ya no está activa.");
+      renderError(
+        "Esta nómina ya no está activa."
+      );
       return;
     }
 
-    const groupDocId = String(tokenData.groupDocId || "").trim();
+    const groupDocId =
+      String(
+        tokenData.groupDocId || ""
+      ).trim();
 
     if (!groupDocId) {
-      renderError("El link no tiene grupo asociado.");
+      renderError(
+        "El link no tiene grupo asociado."
+      );
       return;
     }
 
     const grupoSnap = await getDoc(
-      doc(db, "ventas_cotizaciones", groupDocId)
+      doc(
+        db,
+        "ventas_cotizaciones",
+        groupDocId
+      )
     );
 
     if (!grupoSnap.exists()) {
@@ -69,94 +85,156 @@ async function init() {
       return;
     }
 
-    const grupo = grupoSnap.data() || {};
+    const grupo =
+      grupoSnap.data() || {};
 
     // ============================================================
-    // 1. NÓMINA OFICIAL
-    // ventas_cotizaciones/{grupo}/inscripciones
+    // 1. VISTA LIVIANA OFICIAL
+    //
+    // IMPORTANTE:
+    // NO descargamos las fichas completas.
+    //
+    // Esta misma colección es la que grupo.js usa
+    // para mostrar la nómina sin descargar información
+    // médica/personal completa.
     // ============================================================
 
-    const oficialesSnap = await getDocs(
-      collection(
-        db,
-        "ventas_cotizaciones",
-        groupDocId,
-        "inscripciones"
-      )
-    );
+    const resumenSnap =
+      await getDocs(
+        collection(
+          db,
+          "ventas_cotizaciones",
+          groupDocId,
+          "nomina_resumen"
+        )
+      );
 
-    const oficiales = oficialesSnap.docs.map((d) => ({
-      id: d.id,
-      fuente: "oficial",
-      ...d.data()
-    }));
+    const oficiales =
+      resumenSnap.docs
+        .map((d) => ({
+          id: d.id,
+          fuente: "oficial",
+          ...d.data()
+        }))
+        .filter((item) => {
+          const privacidad =
+            normalizarClaveMonitor(
+              item?.privacidad?.estado ||
+              ""
+            );
+
+          return (
+            privacidad !==
+              "eliminada_logica" &&
+            privacidad !==
+              "archivada"
+          );
+        });
 
     // ============================================================
     // 2. FORMULARIOS PÚBLICOS
     //
-    // Nos sirven especialmente para detectar:
-    // - nuevo ingreso posterior
-    // - lista de espera
-    // - reingreso de alguien que todavía figura ANULADO
-    //   en la nómina oficial / Sistema de Pagos.
+    // Solamente sirven como respaldo de solicitudes
+    // todavía no reflejadas en nomina_resumen.
     // ============================================================
 
-    const pendientesSnap = await getDocs(
-      query(
-        collection(db, "inscripciones_pendientes_publicas"),
-        where("idGrupo", "==", groupDocId)
-      )
-    );
+    const pendientesSnap =
+      await getDocs(
+        query(
+          collection(
+            db,
+            "inscripciones_pendientes_publicas"
+          ),
+          where(
+            "idGrupo",
+            "==",
+            groupDocId
+          )
+        )
+      );
 
-    const pendientes = pendientesSnap.docs
-      .map((d) => ({
-        id: d.id,
-        fuente: "formulario_publico",
-        ...d.data()
-      }))
-      .filter((item) => {
-        const payload = item.payload || {};
+    const pendientes =
+      pendientesSnap.docs
+        .map((d) => ({
+          id: d.id,
+          fuente:
+            "formulario_publico",
+          ...d.data()
+        }))
+        .filter((item) => {
+          const payload =
+            item.payload || {};
 
-        return (
-          item?.estado !== "eliminada_logica" &&
-          payload?.privacidad?.estado !== "eliminada_logica" &&
-          payload?.privacidad?.estado !== "archivada"
-        );
+          const estadoDocumento =
+            normalizarClaveMonitor(
+              item.estado || ""
+            );
+
+          const estadoPrivacidad =
+            normalizarClaveMonitor(
+              payload?.privacidad
+                ?.estado ||
+              ""
+            );
+
+          return (
+            estadoDocumento !==
+              "eliminada_logica" &&
+            estadoPrivacidad !==
+              "eliminada_logica" &&
+            estadoPrivacidad !==
+              "archivada"
+          );
+        });
+
+    // ============================================================
+    // 3. CONSTRUIR MONITOR
+    // ============================================================
+
+    const resultado =
+      construirMonitorNomina({
+        oficiales,
+        pendientes
       });
 
-    // ============================================================
-    // 3. CONSTRUIR MONITOR PÚBLICO
-    // ============================================================
+    let pasajeros =
+      resultado.pasajeros;
 
-    const resultado = construirMonitorNomina({
-      oficiales,
-      pendientes
-    });
-
-    let pasajeros = resultado.pasajeros;
     let fichasMedicasPendientes =
-      resultado.fichasMedicasPendientes;
+      resultado
+        .fichasMedicasPendientes;
 
     // ============================================================
-    // RESPALDO PARA LINKS ANTIGUOS TIPO "FOTO"
+    // RESPALDO PARA LINKS ANTIGUOS
     // ============================================================
 
     if (
       !pasajeros.length &&
-      Array.isArray(tokenData.pasajeros)
+      !fichasMedicasPendientes.length &&
+      Array.isArray(
+        tokenData.pasajeros
+      )
     ) {
-      pasajeros = tokenData.pasajeros
-        .map((p) => ({
-          nombre: p.nombre || "",
-          fechaInscripcion:
-            p.fechaInscripcion || "—",
-          fechaOrden: 0,
-          categoria: "base",
-          etiqueta: ""
-        }))
-        .filter((p) => p.nombre);
+      pasajeros =
+        tokenData.pasajeros
+          .map((p) => ({
+            nombre:
+              p.nombre || "",
 
-      fichasMedicasPendientes = [];
+            fechaInscripcion:
+              p.fechaInscripcion ||
+              "—",
+
+            fechaOrden: 0,
+
+            categoria:
+              "base",
+
+            etiqueta: ""
+          }))
+          .filter(
+            (p) => p.nombre
+          );
     }
 
     renderNomina({
@@ -191,12 +269,19 @@ async function init() {
         "Nómina del grupo",
 
       pasajeros,
+
       fichasMedicasPendientes
     });
 
   } catch (error) {
-    console.error("[nomina pública]", error);
-    renderError("Ocurrió un error al cargar la nómina.");
+    console.error(
+      "[nomina pública]",
+      error
+    );
+
+    renderError(
+      "Ocurrió un error al cargar la nómina."
+    );
   }
 }
 
@@ -317,115 +402,157 @@ function construirMonitorNomina({
   pendientes = []
 } = {}) {
 
-  const registros = [];
-
   // ============================================================
-  // NÓMINA OFICIAL
+  // NORMALIZAR LA NÓMINA OFICIAL
   // ============================================================
 
-  oficiales.forEach((item) => {
-    registros.push(
-      normalizarRegistroMonitor(item)
-    );
-  });
+  const registrosOficiales =
+    oficiales
+      .map((item) =>
+        normalizarRegistroMonitor(
+          item
+        )
+      )
+      .filter(Boolean);
 
   // ============================================================
-  // FORMULARIOS PÚBLICOS
+  // ÍNDICE DE PERSONAS QUE YA EXISTEN EN OFICIAL
   // ============================================================
 
-  pendientes.forEach((item) => {
-    registros.push(
-      normalizarRegistroMonitor(item)
-    );
-  });
+  const oficialesPorPersona =
+    new Map();
 
-  const validos = registros.filter(
-    (item) =>
-      item &&
-      item.nombre &&
-      item.identidadKey
+  registrosOficiales.forEach(
+    (registro) => {
+      if (!registro.identidadKey) {
+        return;
+      }
+
+      oficialesPorPersona.set(
+        registro.identidadKey,
+        registro
+      );
+    }
   );
 
   // ============================================================
-  // AGRUPAR TODOS LOS REGISTROS DE UNA MISMA PERSONA
+  // NORMALIZAR FORMULARIOS PÚBLICOS
   // ============================================================
 
-  const porPersona = new Map();
+  const registrosPublicos =
+    pendientes
+      .map((item) =>
+        normalizarRegistroMonitor(
+          item
+        )
+      )
+      .filter(Boolean);
 
-  validos.forEach((item) => {
-    if (!porPersona.has(item.identidadKey)) {
-      porPersona.set(
-        item.identidadKey,
-        []
-      );
-    }
+  // ============================================================
+  // SOLAMENTE UTILIZAMOS UN FORMULARIO PÚBLICO
+  // SI TODAVÍA NO EXISTE ESA PERSONA EN LA VISTA OFICIAL.
+  //
+  // Si ya existe en nomina_resumen:
+  // MANDA SIEMPRE nomina_resumen.
+  // ============================================================
 
-    porPersona
-      .get(item.identidadKey)
-      .push(item);
-  });
+  const publicosSinOficial =
+    registrosPublicos.filter(
+      (registro) =>
+        !oficialesPorPersona.has(
+          registro.identidadKey
+        )
+    );
+
+  // ============================================================
+  // RESULTADO PRINCIPAL
+  // ============================================================
 
   const pasajeros = [];
 
   // ============================================================
-  // PARA CADA PERSONA DECIDIMOS QUÉ MOSTRAR
+  // 1. PROCESAR OFICIALES
   // ============================================================
 
-  porPersona.forEach((historial) => {
+  registrosOficiales.forEach(
+    (registro) => {
 
-    historial.sort(
-      (a, b) =>
-        a.fechaOrden - b.fechaOrden
-    );
+      // ----------------------------------------------------------
+      // ANULADOS:
+      // NO aparecen en ninguna parte del monitor público.
+      // ----------------------------------------------------------
 
-    const visiblesPosteriores =
-      historial.filter((r) =>
-        esIncorporacionPosteriorVisible(r)
+      if (registro.anulado) {
+        return;
+      }
+
+      // ----------------------------------------------------------
+      // SISTEMA DE PAGOS + FICHA PENDIENTE:
+      //
+      // NO aparece en la tabla principal.
+      // Se mostrará abajo, en el bloque especial.
+      // ----------------------------------------------------------
+
+      if (
+        registro.tipo ===
+          "sistema_pagos" &&
+        fichaMedicaPendienteMonitor(
+          registro.raw
+        )
+      ) {
+        return;
+      }
+
+      pasajeros.push(
+        registro
       );
-
-    const oficialesActivos =
-      historial.filter(
-        (r) =>
-          r.fuente === "oficial" &&
-          !r.anulado
-      );
-
-    const oficialesAnulados =
-      historial.filter(
-        (r) =>
-          r.fuente === "oficial" &&
-          r.anulado
-      );
-
-    // ========================================================
-    // REGLA ANULADO
-    //
-    // Si solamente existe como ANULADO → no aparece.
-    //
-    // Si después volvió por:
-    // - Nuevo ingreso
-    // - Lista de espera
-    //
-    // sí aparece, porque existe una reincorporación posterior.
-    // ========================================================
-
-    if (
-      !oficialesActivos.length &&
-      oficialesAnulados.length &&
-      !visiblesPosteriores.length
-    ) {
-      return;
     }
+  );
 
-    const registroElegido =
-      elegirRegistroPublicoPersona(
-        historial
+  // ============================================================
+  // 2. PROCESAR FORMULARIOS TODAVÍA NO OFICIALIZADOS
+  //
+  // Solo queremos:
+  // - Nuevo ingreso
+  // - Lista de espera
+  // - Liberado
+  //
+  // No queremos reconstruir una nómina base completa
+  // desde formularios históricos.
+  // ============================================================
+
+  publicosSinOficial.forEach(
+    (registro) => {
+
+      if (registro.anulado) {
+        return;
+      }
+
+      if (
+        registro.categoria !==
+          "nuevo_ingreso" &&
+        registro.categoria !==
+          "lista_espera" &&
+        registro.categoria !==
+          "liberado"
+      ) {
+        return;
+      }
+
+      pasajeros.push(
+        registro
       );
+    }
+  );
 
-    if (!registroElegido) return;
+  // ============================================================
+  // DEDUPLICAR RESULTADO
+  // ============================================================
 
-    pasajeros.push(registroElegido);
-  });
+  const pasajerosUnicos =
+    deduplicarRegistrosMonitor(
+      pasajeros
+    );
 
   // ============================================================
   // ORDEN PÚBLICO
@@ -436,41 +563,57 @@ function construirMonitorNomina({
   // 4. Lista de espera
   // ============================================================
 
-  pasajeros.sort((a, b) => {
-    const ordenCategoria = {
-      nuevo_ingreso: 1,
-      base: 2,
-      liberado: 3,
-      lista_espera: 4
-    };
+  pasajerosUnicos.sort(
+    (a, b) => {
 
-    const oa =
-      ordenCategoria[a.categoria] || 99;
+      const ordenCategoria = {
+        nuevo_ingreso: 1,
+        base: 2,
+        liberado: 3,
+        lista_espera: 4
+      };
 
-    const ob =
-      ordenCategoria[b.categoria] || 99;
+      const ordenA =
+        ordenCategoria[
+          a.categoria
+        ] || 99;
 
-    if (oa !== ob) {
-      return oa - ob;
+      const ordenB =
+        ordenCategoria[
+          b.categoria
+        ] || 99;
+
+      if (ordenA !== ordenB) {
+        return (
+          ordenA - ordenB
+        );
+      }
+
+      // Nuevas incorporaciones:
+      // más nuevas primero.
+      if (
+        a.categoria ===
+          "nuevo_ingreso"
+      ) {
+        return (
+          b.fechaOrden -
+          a.fechaOrden
+        );
+      }
+
+      // Lista de espera:
+      // dejamos los movimientos recientes
+      // más abajo pero internamente ordenados
+      // cronológicamente.
+      return (
+        a.fechaOrden -
+        b.fechaOrden
+      );
     }
-
-    // Dentro de Nuevo Ingreso:
-    // más recientes arriba.
-    if (
-      a.categoria === "nuevo_ingreso"
-    ) {
-      return b.fechaOrden - a.fechaOrden;
-    }
-
-    // En el resto mantenemos orden cronológico.
-    return a.fechaOrden - b.fechaOrden;
-  });
+  );
 
   // ============================================================
-  // PENDIENTES DE FICHA MÉDICA
-  //
-  // SOLO pasajeros importados originalmente
-  // desde Sistema de Pagos.
+  // FICHAS MÉDICAS PENDIENTES
   // ============================================================
 
   const fichasMedicasPendientes =
@@ -479,9 +622,62 @@ function construirMonitorNomina({
     );
 
   return {
-    pasajeros,
+    pasajeros:
+      pasajerosUnicos,
+
     fichasMedicasPendientes
   };
+}
+
+function deduplicarRegistrosMonitor(
+  lista = []
+) {
+  const map =
+    new Map();
+
+  lista.forEach(
+    (registro) => {
+
+      const key =
+        registro.identidadKey ||
+        registro.rutKey ||
+        normalizarNombreParaComparar(
+          registro.nombre
+        );
+
+      if (!key) {
+        return;
+      }
+
+      const anterior =
+        map.get(key);
+
+      if (!anterior) {
+        map.set(
+          key,
+          registro
+        );
+
+        return;
+      }
+
+      // Si por alguna razón llegan dos,
+      // conservamos el más reciente.
+      if (
+        registro.fechaOrden >
+        anterior.fechaOrden
+      ) {
+        map.set(
+          key,
+          registro
+        );
+      }
+    }
+  );
+
+  return Array.from(
+    map.values()
+  );
 }
 
 function normalizarRegistroMonitor(item = {}) {
@@ -653,93 +849,107 @@ function getEstadoCupoMonitor(
   registroExterior = {}
 ) {
   const tipo =
-    getTipoInscripcionMonitor(data);
+    getTipoInscripcionMonitor(
+      data
+    );
 
   // ============================================================
-  // 1. ESTADO OPERATIVO DEL DOCUMENTO EXTERIOR
-  //
-  // En inscripciones_pendientes_publicas el documento puede ir:
-  // pendiente → pagada → confirmada.
-  //
-  // Este estado es más reciente que el estadoCupo original
-  // guardado dentro del payload.
+  // TIPO EXPLÍCITO TIENE PRIORIDAD
+  // ============================================================
+
+  if (
+    tipo ===
+    "lista_espera_confirmada"
+  ) {
+    return "confirmado";
+  }
+
+  if (
+    tipo ===
+    "lista_espera_pagada"
+  ) {
+    return "pagado";
+  }
+
+  if (
+    tipo ===
+    "nuevo_ingreso_confirmado"
+  ) {
+    return "confirmado";
+  }
+
+  // ============================================================
+  // ESTADO DE CUPO REAL
+  // ============================================================
+
+  const estadoCupo =
+    normalizarClaveMonitor(
+      data.estadoCupo ||
+      registroExterior.estadoCupo ||
+      ""
+    );
+
+  if (
+    estadoCupo ===
+    "confirmado"
+  ) {
+    return "confirmado";
+  }
+
+  if (
+    estadoCupo ===
+    "pagado"
+  ) {
+    return "pagado";
+  }
+
+  // ============================================================
+  // ESTADO ADMINISTRATIVO DEL FORMULARIO PÚBLICO
   // ============================================================
 
   const estadoExterior =
     normalizarClaveMonitor(
       registroExterior.estado ||
-      registroExterior.estadoSolicitud ||
       ""
     );
 
   if (
-    estadoExterior === "confirmada" ||
-    estadoExterior === "confirmado"
+    estadoExterior ===
+      "confirmada" ||
+    estadoExterior ===
+      "confirmado"
   ) {
     return "confirmado";
   }
 
   if (
-    estadoExterior === "pagada" ||
-    estadoExterior === "pagado"
+    estadoExterior ===
+      "pagada" ||
+    estadoExterior ===
+      "pagado"
   ) {
     return "pagado";
   }
 
   // ============================================================
-  // 2. TIPOS QUE YA EXPRESAN EL ESTADO
+  // DEFAULT
   // ============================================================
 
   if (
-    tipo === "lista_espera_confirmada"
-  ) {
-    return "confirmado";
-  }
-
-  if (
-    tipo === "lista_espera_pagada"
-  ) {
-    return "pagado";
-  }
-
-  if (
-    tipo === "nuevo_ingreso_confirmado"
-  ) {
-    return "confirmado";
-  }
-
-  // ============================================================
-  // 3. ESTADO DE LA INSCRIPCIÓN OFICIAL / PAYLOAD
-  // ============================================================
-
-  const estadoCupo =
-    normalizarClaveMonitor(
-      registroExterior.estadoCupo ||
-      data.estadoCupo ||
-      ""
-    );
-
-  if (estadoCupo) {
-    return estadoCupo;
-  }
-
-  // ============================================================
-  // 4. DEFAULT SEGÚN TIPO
-  // ============================================================
-
-  if (
-    tipo === "lista_espera"
+    tipo ===
+    "lista_espera"
   ) {
     return "pendiente";
   }
 
   if (
-    tipo === "nuevo_ingreso"
+    tipo ===
+    "nuevo_ingreso"
   ) {
     return "pendiente_confirmacion";
   }
 
-  return "";
+  return estadoCupo;
 }
 
 function getCategoriaPublicaMonitor({
@@ -808,34 +1018,61 @@ function getEtiquetaPublicaMonitor({
 function estaAnuladoMonitor(
   item = {}
 ) {
-  const estado = normalizarClaveMonitor(
-    item.estadoViaje ||
-    item.estado ||
-    item?.sistemaPagos?.estadoViaje ||
-    item?.sistemaPagos?.estado ||
-    ""
-  );
+  const estadoViaje =
+    normalizarClaveMonitor(
+      item.estadoViaje ||
+      item?.sistemaPagos
+        ?.estadoViaje ||
+      ""
+    );
+
+  const estadoGeneral =
+    normalizarClaveMonitor(
+      item.estado ||
+      item?.sistemaPagos
+        ?.estado ||
+      ""
+    );
 
   const privacidadEstado =
     normalizarClaveMonitor(
-      item?.privacidad?.estado ||
+      item?.privacidad
+        ?.estado ||
       ""
     );
+
+  const sistemaPagosViaja =
+    item?.sistemaPagos
+      ?.viaja;
 
   return (
     item.anulado === true ||
     item.anulada === true ||
     item.viaja === false ||
+    sistemaPagosViaja === false ||
 
-    estado === "anulado" ||
-    estado === "anulada" ||
-    estado === "no_viaja" ||
-    estado === "eliminado_en_sp" ||
+    estadoViaje ===
+      "anulado" ||
+    estadoViaje ===
+      "anulada" ||
+    estadoViaje ===
+      "no_viaja" ||
+    estadoViaje ===
+      "eliminado_en_sp" ||
+
+    estadoGeneral ===
+      "anulado" ||
+    estadoGeneral ===
+      "anulada" ||
+    estadoGeneral ===
+      "no_viaja" ||
+    estadoGeneral ===
+      "eliminado_en_sp" ||
 
     privacidadEstado ===
-      "eliminada_logica" ||
+      "archivada" ||
     privacidadEstado ===
-      "archivada"
+      "eliminada_logica"
   );
 }
 
@@ -857,210 +1094,156 @@ function elegirRegistroPublicoPersona(
     return null;
   }
 
-  const ordenados =
-    [...historial].sort(
+  const activos =
+    historial.filter(
+      (registro) =>
+        !registro.anulado
+    );
+
+  if (!activos.length) {
+    return null;
+  }
+
+  return [...activos]
+    .sort(
       (a, b) =>
-        b.fechaOrden - a.fechaOrden
-    );
-
-  // ============================================================
-  // LISTA DE ESPERA
-  // ============================================================
-
-  const registrosListaEspera =
-    ordenados.filter(
-      (r) =>
-        r.categoria ===
-        "lista_espera"
-    );
-
-  let listaEspera = null;
-
-  if (registrosListaEspera.length) {
-
-    // Prioridad:
-    // confirmado > pagado > pendiente
-
-    listaEspera =
-      registrosListaEspera.find(
-        (r) =>
-          r.estadoCupo ===
-            "confirmado" ||
-          r.tipo ===
-            "lista_espera_confirmada"
-      ) ||
-
-      registrosListaEspera.find(
-        (r) =>
-          r.estadoCupo ===
-            "pagado" ||
-          r.tipo ===
-            "lista_espera_pagada"
-      ) ||
-
-      registrosListaEspera[0];
-  }
-
-  // ============================================================
-  // NUEVO INGRESO
-  // ============================================================
-
-  const registrosNuevoIngreso =
-    ordenados.filter(
-      (r) =>
-        r.categoria ===
-        "nuevo_ingreso"
-    );
-
-  const nuevoIngreso =
-    registrosNuevoIngreso.find(
-      (r) =>
-        r.estadoCupo ===
-          "confirmado" ||
-        r.tipo ===
-          "nuevo_ingreso_confirmado"
-    ) ||
-    registrosNuevoIngreso[0] ||
-    null;
-
-  // ============================================================
-  // SI PASÓ POR AMBOS PROCESOS
-  //
-  // Manda el proceso MÁS RECIENTE.
-  // ============================================================
-
-  if (
-    listaEspera &&
-    nuevoIngreso
-  ) {
-    return (
-      listaEspera.fechaOrden >
-      nuevoIngreso.fechaOrden
-        ? listaEspera
-        : nuevoIngreso
-    );
-  }
-
-  if (nuevoIngreso) {
-    return nuevoIngreso;
-  }
-
-  if (listaEspera) {
-    return listaEspera;
-  }
-
-  // ============================================================
-  // LIBERADO
-  // ============================================================
-
-  const liberado =
-    ordenados.find(
-      (r) =>
-        r.categoria ===
-          "liberado" &&
-        !r.anulado
-    );
-
-  if (liberado) {
-    return liberado;
-  }
-
-  // ============================================================
-  // NÓMINA BASE ACTIVA
-  //
-  // - Sistema de Pagos
-  // - Inscripción Inicial
-  // - Nómina Final
-  // ============================================================
-
-  const baseActiva =
-    ordenados.find(
-      (r) =>
-        r.categoria ===
-          "base" &&
-        !r.anulado
-    );
-
-  if (baseActiva) {
-    return baseActiva;
-  }
-
-  return null;
+        b.fechaOrden -
+        a.fechaOrden
+    )[0];
 }
 
 function construirPendientesFichaMedica(
   oficiales = []
 ) {
-  const lista = oficiales
-    .filter((item) => {
-      const tipo =
-        getTipoInscripcionMonitor(
-          item
-        );
+  const lista =
+    oficiales
+      .filter((item) => {
 
-      if (
-        tipo !== "sistema_pagos"
-      ) {
-        return false;
-      }
+        const tipo =
+          getTipoInscripcionMonitor(
+            item
+          );
 
-      if (
-        estaAnuladoMonitor(item)
-      ) {
-        return false;
-      }
+        // --------------------------------------------------------
+        // SOLAMENTE SISTEMA DE PAGOS
+        // --------------------------------------------------------
 
-      return fichaMedicaPendienteMonitor(
-        item
-      );
-    })
-    .map((item) => {
-      const nombre =
-        getNombrePublicoInscripcion(
-          item
-        );
+        if (
+          tipo !==
+          "sistema_pagos"
+        ) {
+          return false;
+        }
 
-      const rutKey =
-        getRutKeyInscripcion(
-          item
-        );
+        // --------------------------------------------------------
+        // ANULADOS NO APARECEN
+        // --------------------------------------------------------
 
-      return {
-        nombre,
-        rutKey,
-        identidadKey:
-          rutKey ||
-          normalizarNombreParaComparar(
-            nombre
+        if (
+          estaAnuladoMonitor(
+            item
           )
-      };
-    })
-    .filter((item) => item.nombre);
+        ) {
+          return false;
+        }
 
-  return deduplicarPorIdentidadMonitor(
-    lista
-  ).sort((a, b) =>
-    a.nombre.localeCompare(
-      b.nombre,
-      "es",
-      {
-        sensitivity: "base"
-      }
+        // --------------------------------------------------------
+        // SOLAMENTE FICHA REALMENTE PENDIENTE
+        // --------------------------------------------------------
+
+        return (
+          fichaMedicaPendienteMonitor(
+            item
+          )
+        );
+      })
+      .map((item) => {
+
+        const nombre =
+          getNombrePublicoInscripcion(
+            item
+          );
+
+        const rutKey =
+          getRutKeyInscripcion(
+            item
+          );
+
+        return {
+          nombre,
+
+          rutKey,
+
+          identidadKey:
+            rutKey ||
+            normalizarNombreParaComparar(
+              nombre
+            )
+        };
+      })
+      .filter(
+        (item) =>
+          item.nombre
+      );
+
+  return (
+    deduplicarPorIdentidadMonitor(
+      lista
     )
+      .sort(
+        (a, b) =>
+          a.nombre.localeCompare(
+            b.nombre,
+            "es",
+            {
+              sensitivity:
+                "base"
+            }
+          )
+      )
   );
 }
 
 function fichaMedicaPendienteMonitor(
   item = {}
 ) {
+  if (
+    estaAnuladoMonitor(
+      item
+    )
+  ) {
+    return false;
+  }
+
+  const tipo =
+    getTipoInscripcionMonitor(
+      item
+    );
+
+  if (
+    tipo !==
+    "sistema_pagos"
+  ) {
+    return false;
+  }
+
   return !(
-    item.fichaMedicaCompleta === true ||
-    item.nominaFinalCompleta === true ||
-    item.fichaMedicaCompletada === true ||
-    item.nominaFinalCompletada === true ||
+    item.fichaMedicaCompleta ===
+      true ||
+
+    item.nominaFinalCompleta ===
+      true ||
+
+    item.fichaMedicaCompletada ===
+      true ||
+
+    item.nominaFinalCompletada ===
+      true ||
+
     normalizarClaveMonitor(
       item.fichaMedicaEstado
     ) === "completa" ||
+
     normalizarClaveMonitor(
       item.fichaMedicaEstado
     ) === "completada"
