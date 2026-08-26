@@ -341,6 +341,545 @@ function getFichaSharedDisplayValue(
   );
 }
 
+/* =========================================================
+   COMPATIBILIDAD FICHAS ANTIGUAS <-> SELECTORES NUEVOS
+========================================================= */
+
+function resolveFichaLegacySelector({
+  options = [],
+  selected = "",
+  other = "",
+  legacyValue = ""
+} = {}) {
+  const selectedClean =
+    cleanText(selected || "");
+
+  const otherClean =
+    cleanText(other || "");
+
+  const legacyClean =
+    cleanText(legacyValue || "");
+
+  /*
+   * =====================================================
+   * 1. YA EXISTE ESTRUCTURA NUEVA
+   * =====================================================
+   */
+
+  if (selectedClean) {
+    const canonical =
+      findFichaCanonicalOption(
+        options,
+        selectedClean
+      );
+
+    /*
+     * Valor nuevo reconocido.
+     */
+    if (canonical) {
+      if (
+        normalizeSearchLocal(canonical) ===
+        "otro"
+      ) {
+        return {
+          selected: "OTRO",
+          other:
+            otherClean ||
+            legacyClean ||
+            ""
+        };
+      }
+
+      return {
+        selected: canonical,
+        other: ""
+      };
+    }
+
+    /*
+     * Puede existir una ficha intermedia donde
+     * selected todavía contiene directamente
+     * el texto libre antiguo.
+     */
+    return {
+      selected: "OTRO",
+      other:
+        otherClean ||
+        selectedClean ||
+        legacyClean ||
+        ""
+    };
+  }
+
+  /*
+   * =====================================================
+   * 2. NO HAY ESTRUCTURA NUEVA:
+   *    INTENTAMOS RECUPERAR TEXTO ANTIGUO
+   * =====================================================
+   */
+
+  if (!legacyClean) {
+    return {
+      selected: "",
+      other: ""
+    };
+  }
+
+  const canonical =
+    findFichaCanonicalOption(
+      options,
+      legacyClean
+    );
+
+  /*
+   * Texto antiguo coincide exactamente
+   * con una opción actual.
+   */
+  if (canonical) {
+    return {
+      selected: canonical,
+      other: ""
+    };
+  }
+
+  /*
+   * Texto antiguo NO coincide.
+   *
+   * NO SE PIERDE.
+   *
+   * Se representa como:
+   *
+   * OTRO + texto histórico completo.
+   */
+  return {
+    selected: "OTRO",
+    other: legacyClean
+  };
+}
+
+function setFichaSelectOptions(
+  selectId,
+  options = [],
+  selectedValue = ""
+) {
+  const select =
+    $(selectId);
+
+  if (!select) {
+    return;
+  }
+
+  const selectedCanonical =
+    findFichaCanonicalOption(
+      options,
+      selectedValue
+    );
+
+  const selected =
+    selectedCanonical ||
+    (
+      normalizeSearchLocal(
+        selectedValue
+      ) === "otro"
+        ? "OTRO"
+        : ""
+    );
+
+  select.innerHTML = "";
+
+  const empty =
+    document.createElement(
+      "option"
+    );
+
+  empty.value =
+    "";
+
+  empty.textContent =
+    "Seleccionar";
+
+  select.appendChild(
+    empty
+  );
+
+  options.forEach(
+    (optionValue) => {
+      const option =
+        document.createElement(
+          "option"
+        );
+
+      option.value =
+        optionValue;
+
+      option.textContent =
+        optionValue;
+
+      select.appendChild(
+        option
+      );
+    }
+  );
+
+  select.value =
+    selected || "";
+}
+
+function syncFichaDestinoOtroVisibility() {
+  const select =
+    $("f_destinoPrincipal");
+
+  const otro =
+    $("f_destinoPrincipalOtro");
+
+  if (!otro) {
+    return;
+  }
+
+  const esOtro =
+    normalizeSearchLocal(
+      select?.value || ""
+    ) === "otro";
+
+  /*
+   * Funciona tanto si el HTML usa hidden
+   * como si solamente tiene input normal.
+   */
+  otro.classList.toggle(
+    "hidden",
+    !esOtro
+  );
+
+  const wrapper =
+    otro.closest(
+      ".form-group, .field, .ficha-field, .form-field"
+    );
+
+  wrapper?.classList.toggle(
+    "hidden",
+    !esOtro
+  );
+
+  otro.disabled =
+    !esOtro ||
+    !canEditFicha();
+}
+
+function syncFichaProgramaOtroVisibility() {
+  const select =
+    $("f_programa");
+
+  const otro =
+    $("f_programaOtro");
+
+  if (!otro) {
+    return;
+  }
+
+  const esOtro =
+    normalizeSearchLocal(
+      select?.value || ""
+    ) === "otro";
+
+  otro.classList.toggle(
+    "hidden",
+    !esOtro
+  );
+
+  const wrapper =
+    otro.closest(
+      ".form-group, .field, .ficha-field, .form-field"
+    );
+
+  wrapper?.classList.toggle(
+    "hidden",
+    !esOtro
+  );
+
+  otro.disabled =
+    !esOtro ||
+    !canEditFicha();
+}
+
+function syncFichaTramoOtroVisibility() {
+  const select =
+    $("f_tramoSeleccion");
+
+  const otro =
+    $("f_tramoOtro");
+
+  if (!otro) {
+    return;
+  }
+
+  const esOtro =
+    normalizeSearchLocal(
+      select?.value || ""
+    ) === "otro";
+
+  otro.classList.toggle(
+    "hidden",
+    !esOtro
+  );
+
+  const wrapper =
+    otro.closest(
+      ".form-group, .field, .ficha-field, .form-field"
+    );
+
+  wrapper?.classList.toggle(
+    "hidden",
+    !esOtro
+  );
+
+  otro.disabled =
+    !esOtro ||
+    !canEditFicha();
+}
+
+function syncFichaMesViajeOtroVisibility() {
+  const select =
+    $("f_mesViaje");
+
+  const otro =
+    $("f_mesViajeOtro");
+
+  if (!otro) {
+    return;
+  }
+
+  const esOtro =
+    normalizeSearchLocal(
+      select?.value || ""
+    ) === "otro";
+
+  otro.classList.toggle(
+    "hidden",
+    !esOtro
+  );
+
+  const wrapper =
+    otro.closest(
+      ".form-group, .field, .ficha-field, .form-field"
+    );
+
+  wrapper?.classList.toggle(
+    "hidden",
+    !esOtro
+  );
+
+  otro.disabled =
+    !esOtro ||
+    !canEditFicha();
+}
+
+function syncFichaProgramaOptions({
+  selectedProgram = "",
+  selectedOther = ""
+} = {}) {
+  const select =
+    $("f_programa");
+
+  if (!select) {
+    return;
+  }
+
+  const destinoSeleccion =
+    getValue(
+      "f_destinoPrincipal"
+    );
+
+  const destinoOtro =
+    getValue(
+      "f_destinoPrincipalOtro"
+    );
+
+  const destinoVisible =
+    getFichaSharedDisplayValue(
+      destinoSeleccion,
+      destinoOtro
+    );
+
+  let options =
+    getFichaProgramOptionsByDestino(
+      destinoVisible
+    );
+
+  /*
+   * Si el destino antiguo no existe
+   * dentro del catálogo actual,
+   * de todas maneras permitimos conservar
+   * el programa histórico como OTRO.
+   */
+  if (!options.length) {
+    options = [
+      "OTRO"
+    ];
+  }
+
+  const resolved =
+    resolveFichaLegacySelector({
+      options,
+      selected:
+        selectedProgram,
+
+      other:
+        selectedOther,
+
+      legacyValue:
+        selectedOther
+    });
+
+  setFichaSelectOptions(
+    "f_programa",
+    options,
+    resolved.selected
+  );
+
+  setValue(
+    "f_programaOtro",
+    resolved.other
+  );
+
+  syncFichaProgramaOtroVisibility();
+}
+
+function syncFichaSharedSelectors(
+  ficha = {}
+) {
+  /*
+   * =====================================================
+   * DESTINO
+   * =====================================================
+   */
+
+  const destinoResolved =
+    resolveFichaLegacySelector({
+      options:
+        FICHA_DESTINO_PRINCIPAL_OPTIONS,
+
+      selected:
+        ficha.destinoPrincipal,
+
+      other:
+        ficha.destinoPrincipalOtro,
+
+      legacyValue:
+        ficha.destinoPrincipalOtro
+    });
+
+  setFichaSelectOptions(
+    "f_destinoPrincipal",
+    FICHA_DESTINO_PRINCIPAL_OPTIONS,
+    destinoResolved.selected
+  );
+
+  setValue(
+    "f_destinoPrincipalOtro",
+    destinoResolved.other
+  );
+
+  syncFichaDestinoOtroVisibility();
+
+  /*
+   * =====================================================
+   * PROGRAMA
+   * =====================================================
+   */
+
+  syncFichaProgramaOptions({
+    selectedProgram:
+      ficha.programa,
+
+    selectedOther:
+      ficha.programaOtro ||
+      (
+        normalizeSearchLocal(
+          ficha.programa
+        ) === "otro"
+          ? ficha.nombrePrograma
+          : ""
+      )
+  });
+
+  /*
+   * =====================================================
+   * TRAMO
+   * =====================================================
+   */
+
+  const tramoResolved =
+    resolveFichaLegacySelector({
+      options:
+        FICHA_TRAMO_OPTIONS,
+
+      selected:
+        ficha.tramoSeleccion,
+
+      other:
+        ficha.tramoOtro,
+
+      legacyValue:
+        ficha.tramo
+    });
+
+  setFichaSelectOptions(
+    "f_tramoSeleccion",
+    FICHA_TRAMO_OPTIONS,
+    tramoResolved.selected
+  );
+
+  setValue(
+    "f_tramoOtro",
+    tramoResolved.other
+  );
+
+  syncFichaTramoOtroVisibility();
+
+  /*
+   * =====================================================
+   * MES / FECHA TENTATIVA
+   * =====================================================
+   */
+
+  const mesResolved =
+    resolveFichaLegacySelector({
+      options:
+        FICHA_MES_VIAJE_OPTIONS,
+
+      selected:
+        ficha.mesViaje,
+
+      other:
+        ficha.mesViajeOtro,
+
+      legacyValue:
+        ficha.fechaViajeTexto
+    });
+
+  setFichaSelectOptions(
+    "f_mesViaje",
+    FICHA_MES_VIAJE_OPTIONS,
+    mesResolved.selected
+  );
+
+  setValue(
+    "f_mesViajeOtro",
+    mesResolved.other
+  );
+
+  /*
+   * Conservamos también el campo viejo
+   * si todavía existe en el HTML.
+   */
+  setValue(
+    "f_fechaViajeTexto",
+    ficha.fechaViajeTexto
+  );
+
+  syncFichaMesViajeOtroVisibility();
+}
+
 function getAdminImportantFichaChanges(previousFicha = {}, nextFicha = {}) {
   return ADMIN_IMPORTANT_FICHA_FIELDS
     .map((item) => {
@@ -7043,219 +7582,449 @@ function hydrateFicha(group = {}) {
 
   /*
    * =========================================================
-   * DATOS COMPARTIDOS
+   * DESTINO
    * =========================================================
    *
-   * Mientras hacemos la transición, la ficha sigue teniendo
-   * prioridad cuando ya trae un dato, pero el grupo sirve
-   * de respaldo.
+   * Prioridad:
+   *
+   * 1. estructura nueva dentro de ficha;
+   * 2. estructura antigua/raíz del grupo.
+   *
+   * Si encontramos un texto que ya no pertenece
+   * al catálogo actual, NO lo descartamos:
+   * se transforma visualmente en OTRO + texto.
    */
 
-  const destinoRoot =
+  const destinoLegacy =
     cleanText(
-      group.destinoPrincipal || ""
+      ficha.destinoPrincipal ||
+      group.destinoPrincipal ||
+      ""
     );
 
-  const destinoOtroRoot =
+  const destinoOtroLegacy =
     cleanText(
-      group.destinoPrincipalOtro || ""
+      ficha.destinoPrincipalOtro ||
+      group.destinoPrincipalOtro ||
+      ""
     );
 
-  const destinoFicha =
-    cleanText(
-      ficha.destinoPrincipal || ""
-    );
+  const destinoBase =
+    resolveFichaLegacySelector({
+      options:
+        FICHA_DESTINO_PRINCIPAL_OPTIONS,
 
-  const destinoOtroFicha =
-    cleanText(
-      ficha.destinoPrincipalOtro || ""
-    );
+      selected:
+        destinoLegacy,
+
+      other:
+        destinoOtroLegacy,
+
+      legacyValue:
+        destinoOtroLegacy ||
+        destinoLegacy
+    });
 
   const destinoPrincipal =
-    destinoFicha ||
-    destinoRoot ||
-    "";
+    destinoBase.selected;
 
   const destinoPrincipalOtro =
-    normalizeSearchLocal(
-      destinoPrincipal
-    ) === "otro"
-      ? (
-          destinoOtroFicha ||
-          destinoOtroRoot ||
-          ""
-        )
-      : "";
-
-  const programaRoot =
-    cleanText(
-      group.programa || ""
-    );
-
-  const programaOtroRoot =
-    cleanText(
-      group.programaOtro || ""
-    );
-
-  const programaFicha =
-    cleanText(
-      ficha.programa || ""
-    );
-
-  const programaOtroFicha =
-    cleanText(
-      ficha.programaOtro || ""
-    );
-
-  let programa =
-    programaFicha ||
-    programaRoot ||
-    "";
-
-  let programaOtro =
-    programaOtroFicha ||
-    programaOtroRoot ||
-    "";
+    destinoBase.other;
 
   /*
-   * Compatibilidad con fichas antiguas que solamente
-   * tenían nombrePrograma como texto.
+   * =========================================================
+   * PROGRAMA
+   * =========================================================
+   *
+   * MUY IMPORTANTE:
+   *
+   * En fichas antiguas el valor oficial estaba
+   * principalmente en:
+   *
+   * ficha.nombrePrograma
+   *
+   * Por eso ese campo tiene prioridad frente a
+   * valores raíz dudosos o antiguos.
    */
-  if (
-    !programa &&
-    ficha.nombrePrograma
-  ) {
-    const options =
-      getFichaProgramOptionsByDestino(
-        getFichaSharedDisplayValue(
-          destinoPrincipal,
-          destinoPrincipalOtro
-        )
-      );
 
-    const canonical =
-      findFichaCanonicalOption(
-        options,
-        ficha.nombrePrograma
-      );
+  const programaLegacyFicha =
+    cleanText(
+      ficha.nombrePrograma ||
+      ""
+    );
 
-    if (canonical) {
-      programa =
-        canonical;
+  const programaNuevoFicha =
+    cleanText(
+      ficha.programa ||
+      ""
+    );
 
-      programaOtro =
-        "";
-    } else {
-      programa =
-        "OTRO";
+  const programaOtroNuevoFicha =
+    cleanText(
+      ficha.programaOtro ||
+      ""
+    );
 
-      programaOtro =
-        cleanText(
-          ficha.nombrePrograma
-        );
-    }
+  const programaGrupo =
+    cleanText(
+      group.programa ||
+      ""
+    );
+
+  const programaOtroGrupo =
+    cleanText(
+      group.programaOtro ||
+      ""
+    );
+
+  const destinoVisible =
+    getFichaSharedDisplayValue(
+      destinoPrincipal,
+      destinoPrincipalOtro
+    );
+
+  let programaOptions =
+    getFichaProgramOptionsByDestino(
+      destinoVisible
+    );
+
+  if (!programaOptions.length) {
+    programaOptions = [
+      "OTRO"
+    ];
   }
+
+  /*
+   * Primero intentamos estructura nueva de ficha.
+   *
+   * Si no existe, recuperamos nombrePrograma histórico.
+   *
+   * Solamente al final usamos la raíz del grupo.
+   */
+
+  let programaResolved;
+
+  if (
+    programaNuevoFicha ||
+    programaOtroNuevoFicha
+  ) {
+    programaResolved =
+      resolveFichaLegacySelector({
+        options:
+          programaOptions,
+
+        selected:
+          programaNuevoFicha,
+
+        other:
+          programaOtroNuevoFicha,
+
+        legacyValue:
+          programaLegacyFicha
+      });
+  } else if (
+    programaLegacyFicha
+  ) {
+    programaResolved =
+      resolveFichaLegacySelector({
+        options:
+          programaOptions,
+
+        legacyValue:
+          programaLegacyFicha
+      });
+  } else {
+    programaResolved =
+      resolveFichaLegacySelector({
+        options:
+          programaOptions,
+
+        selected:
+          programaGrupo,
+
+        other:
+          normalizeSearchLocal(
+            programaGrupo
+          ) === "otro"
+            ? programaOtroGrupo
+            : "",
+
+        legacyValue:
+          programaOtroGrupo ||
+          programaGrupo
+      });
+  }
+
+  const programa =
+    programaResolved.selected;
+
+  const programaOtro =
+    programaResolved.other;
 
   const nombrePrograma =
     getFichaSharedDisplayValue(
       programa,
       programaOtro
-    );
+    ) ||
+    programaLegacyFicha ||
+    programaOtroGrupo ||
+    programaGrupo ||
+    "";
 
-  const tramoRoot =
-    cleanText(
-      group.tramo || ""
-    );
+  /*
+   * =========================================================
+   * TRAMO
+   * =========================================================
+   *
+   * Igual que programa:
+   * ficha.tramo antiguo tiene prioridad.
+   */
 
-  const tramoOtroRoot =
+  const tramoLegacyFicha =
     cleanText(
-      group.tramoOtro || ""
+      ficha.tramo ||
+      ""
     );
 
   const tramoSeleccionFicha =
     cleanText(
-      ficha.tramoSeleccion || ""
+      ficha.tramoSeleccion ||
+      ""
     );
 
   const tramoOtroFicha =
     cleanText(
-      ficha.tramoOtro || ""
+      ficha.tramoOtro ||
+      ""
     );
 
-  let tramoSeleccion =
-    tramoSeleccionFicha ||
-    tramoRoot ||
-    "";
+  const tramoGrupo =
+    cleanText(
+      group.tramo ||
+      ""
+    );
 
-  let tramoOtro =
-    tramoOtroFicha ||
-    tramoOtroRoot ||
-    "";
+  const tramoOtroGrupo =
+    cleanText(
+      group.tramoOtro ||
+      ""
+    );
 
-  /*
-   * Compatibilidad con ficha antigua donde tramo
-   * era solamente el valor visible.
-   */
+  let tramoResolved;
+
   if (
-    !tramoSeleccion &&
-    ficha.tramo
+    tramoSeleccionFicha ||
+    tramoOtroFicha
   ) {
-    const canonical =
-      findFichaCanonicalOption(
-        FICHA_TRAMO_OPTIONS,
-        ficha.tramo
-      );
+    tramoResolved =
+      resolveFichaLegacySelector({
+        options:
+          FICHA_TRAMO_OPTIONS,
 
-    if (canonical) {
-      tramoSeleccion =
-        canonical;
-    } else {
-      tramoSeleccion =
-        "OTRO";
+        selected:
+          tramoSeleccionFicha,
 
-      tramoOtro =
-        cleanText(
-          ficha.tramo
-        );
-    }
+        other:
+          tramoOtroFicha,
+
+        legacyValue:
+          tramoLegacyFicha
+      });
+  } else if (
+    tramoLegacyFicha
+  ) {
+    tramoResolved =
+      resolveFichaLegacySelector({
+        options:
+          FICHA_TRAMO_OPTIONS,
+
+        legacyValue:
+          tramoLegacyFicha
+      });
+  } else {
+    tramoResolved =
+      resolveFichaLegacySelector({
+        options:
+          FICHA_TRAMO_OPTIONS,
+
+        selected:
+          tramoGrupo,
+
+        other:
+          normalizeSearchLocal(
+            tramoGrupo
+          ) === "otro"
+            ? tramoOtroGrupo
+            : "",
+
+        legacyValue:
+          tramoOtroGrupo ||
+          tramoGrupo
+      });
   }
+
+  const tramoSeleccion =
+    tramoResolved.selected;
+
+  const tramoOtro =
+    tramoResolved.other;
 
   const tramo =
     getFichaSharedDisplayValue(
       tramoSeleccion,
       tramoOtro
+    ) ||
+    tramoLegacyFicha ||
+    tramoOtroGrupo ||
+    tramoGrupo ||
+    "";
+
+  /*
+   * =========================================================
+   * MES / FECHA TENTATIVA
+   * =========================================================
+   *
+   * Las fichas antiguas podían traer cosas como:
+   *
+   * "segunda semana de noviembre"
+   * "noviembre - diciembre"
+   * "a confirmar"
+   *
+   * Nada de eso se pierde.
+   *
+   * Si no coincide exactamente con un mes:
+   * OTRO + texto histórico.
+   */
+
+  const fechaLegacyFicha =
+    cleanText(
+      ficha.fechaViajeTexto ||
+      ""
     );
 
-  const mesViaje =
+  const fechaLegacyGrupo =
     cleanText(
-      ficha.mesViaje ||
+      group.fechaDeViaje ||
+      group.fechaViaje ||
+      group.semanaViaje ||
       group.mesViaje ||
       ""
     );
 
-  const mesViajeOtro =
+  const mesFicha =
+    cleanText(
+      ficha.mesViaje ||
+      ""
+    );
+
+  const mesOtroFicha =
     cleanText(
       ficha.mesViajeOtro ||
+      ""
+    );
+
+  const mesGrupo =
+    cleanText(
+      group.mesViaje ||
+      ""
+    );
+
+  const mesOtroGrupo =
+    cleanText(
       group.mesViajeOtro ||
       ""
     );
 
+  let mesResolved;
+
+  if (
+    mesFicha ||
+    mesOtroFicha
+  ) {
+    mesResolved =
+      resolveFichaLegacySelector({
+        options:
+          FICHA_MES_VIAJE_OPTIONS,
+
+        selected:
+          mesFicha,
+
+        other:
+          mesOtroFicha,
+
+        legacyValue:
+          fechaLegacyFicha
+      });
+  } else if (
+    fechaLegacyFicha
+  ) {
+    mesResolved =
+      resolveFichaLegacySelector({
+        options:
+          FICHA_MES_VIAJE_OPTIONS,
+
+        legacyValue:
+          fechaLegacyFicha
+      });
+  } else if (
+    mesGrupo ||
+    mesOtroGrupo
+  ) {
+    mesResolved =
+      resolveFichaLegacySelector({
+        options:
+          FICHA_MES_VIAJE_OPTIONS,
+
+        selected:
+          mesGrupo,
+
+        other:
+          normalizeSearchLocal(
+            mesGrupo
+          ) === "otro"
+            ? mesOtroGrupo
+            : "",
+
+        legacyValue:
+          fechaLegacyGrupo
+      });
+  } else {
+    mesResolved =
+      resolveFichaLegacySelector({
+        options:
+          FICHA_MES_VIAJE_OPTIONS,
+
+        legacyValue:
+          fechaLegacyGrupo
+      });
+  }
+
+  const mesViaje =
+    mesResolved.selected;
+
+  const mesViajeOtro =
+    mesResolved.other;
+
   const fechaViajeTexto =
-    cleanText(
-      ficha.fechaViajeTexto ||
-      (
-        normalizeSearchLocal(mesViaje) ===
-        "otro"
-          ? mesViajeOtro
-          : (
-              group.semanaViaje ||
-              mesViaje ||
-              group.fechaDeViaje ||
-              group.fechaViaje ||
-              ""
-            )
-      )
-    );
+    fechaLegacyFicha ||
+    (
+      normalizeSearchLocal(
+        mesViaje
+      ) === "otro"
+        ? mesViajeOtro
+        : (
+            mesViaje ||
+            fechaLegacyGrupo
+          )
+    ) ||
+    fechaLegacyGrupo ||
+    "";
+
+  /*
+   * =========================================================
+   * OBSERVACIONES
+   * =========================================================
+   */
 
   const observacionesFallbackTexto =
     pick(
@@ -7264,6 +8033,12 @@ function hydrateFicha(group = {}) {
       group.observacionesGenerales,
       ""
     ) || "";
+
+  /*
+   * =========================================================
+   * RESULTADO FINAL
+   * =========================================================
+   */
 
   return {
     solicitudReserva:
@@ -7278,7 +8053,9 @@ function hydrateFicha(group = {}) {
         ficha.nombreGrupo,
         group.nombreGrupo,
         group.aliasGrupo,
-        buildDefaultGroupName(group)
+        buildDefaultGroupName(
+          group
+        )
       ),
 
     /*
@@ -7306,11 +8083,14 @@ function hydrateFicha(group = {}) {
       ),
 
     /*
-     * DESTINO / PROGRAMA
+     * DESTINO
      */
     destinoPrincipal,
     destinoPrincipalOtro,
 
+    /*
+     * PROGRAMA
+     */
     programa,
     programaOtro,
     nombrePrograma,
@@ -7458,17 +8238,21 @@ function hydrateFicha(group = {}) {
           group.versionFicha,
           "ORIGINAL"
         )
-      ) || "ORIGINAL",
+      ) ||
+      "ORIGINAL",
 
     fechaActualizacionTexto:
       pick(
         ficha.fechaActualizacionTexto,
+
         formatFichaDateTimeText(
           ficha.fechaActualizacion
         ),
+
         formatFichaDateTimeText(
           group.fechaActualizacionFicha
         ),
+
         ""
       ),
 
@@ -7491,9 +8275,11 @@ function hydrateFicha(group = {}) {
     observacionesHtml:
       pick(
         ficha.observacionesHtml,
+
         plainTextToRichHtml(
           observacionesFallbackTexto
         ),
+
         ""
       ),
 
