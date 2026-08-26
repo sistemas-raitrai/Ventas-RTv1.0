@@ -43,7 +43,6 @@ async function init() {
       renderError(
         "Link inválido. Falta el token de acceso."
       );
-
       return;
     }
 
@@ -64,7 +63,6 @@ async function init() {
       renderError(
         "La nómina no existe o el link fue reemplazado."
       );
-
       return;
     }
 
@@ -77,12 +75,11 @@ async function init() {
       renderError(
         "Esta nómina ya no está activa."
       );
-
       return;
     }
 
     // ============================================================
-    // PASAJEROS DE LA NÓMINA PRINCIPAL
+    // NÓMINA OFICIAL
     // ============================================================
 
     const pasajeros =
@@ -118,12 +115,43 @@ async function init() {
             )
         : [];
 
+    // ============================================================
+    // LISTA DE ESPERA · CUPO PENDIENTE
+    // ============================================================
+
+    const listaEsperaPendiente =
+      Array.isArray(
+        data.listaEsperaPendiente
+      )
+        ? data.listaEsperaPendiente
+            .map((p) => ({
+              nombre:
+                cleanText(
+                  p?.nombre || ""
+                ),
+
+              fechaInscripcion:
+                formatPublicDateTime(
+                  p?.fechaInscripcion ||
+                  ""
+                ),
+
+              estadoCupo:
+                normalizarClaveMonitor(
+                  p?.estadoCupo ||
+                  "pendiente"
+                )
+            }))
+            .filter(
+              (p) => p.nombre
+            )
+        : [];
+
     renderNomina({
       ...data,
-
       pasajeros,
-
-      fichasMedicasPendientes
+      fichasMedicasPendientes,
+      listaEsperaPendiente
     });
 
   } catch (error) {
@@ -209,7 +237,9 @@ function normalizarPasajeroPublico(
   };
 }
 
-function renderNomina(data = {}) {
+function renderNomina(
+  data = {}
+) {
   $("tituloNomina").textContent =
     String(
       data.nombreGrupo ||
@@ -220,17 +250,50 @@ function renderNomina(data = {}) {
     [
       data.colegio,
       data.curso,
+
       data.anoViaje
         ? `Año ${data.anoViaje}`
         : "",
+
       data.destino
     ]
       .filter(Boolean)
       .join(" · ");
 
+  const resumen =
+    data.resumen || {};
+
+  const pasajeros =
+    Array.isArray(
+      data.pasajeros
+    )
+      ? data.pasajeros
+      : [];
+
+  const fichasMedicasPendientes =
+    Array.isArray(
+      data.fichasMedicasPendientes
+    )
+      ? data.fichasMedicasPendientes
+      : [];
+
+  const listaEsperaPendiente =
+    Array.isArray(
+      data.listaEsperaPendiente
+    )
+      ? data.listaEsperaPendiente
+      : [];
+
+  // ============================================================
+  // DATOS DEL GRUPO + RESUMEN
+  // ============================================================
+
   $("datosGrupoNomina").innerHTML = `
     <div class="info-box">
-      <div class="label">Colegio</div>
+      <div class="label">
+        Colegio
+      </div>
+
       <div class="value">
         ${escapeHtml(
           data.colegio || "—"
@@ -239,7 +302,10 @@ function renderNomina(data = {}) {
     </div>
 
     <div class="info-box">
-      <div class="label">Curso</div>
+      <div class="label">
+        Curso
+      </div>
+
       <div class="value">
         ${escapeHtml(
           data.curso || "—"
@@ -248,21 +314,96 @@ function renderNomina(data = {}) {
     </div>
 
     <div class="info-box">
-      <div class="label">Año viaje</div>
+      <div class="label">
+        Año viaje
+      </div>
+
       <div class="value">
         ${escapeHtml(
           data.anoViaje || "—"
         )}
       </div>
     </div>
+
+    <div style="
+      grid-column:1/-1;
+      margin-top:8px;
+    ">
+      <div style="
+        font-size:12px;
+        font-weight:800;
+        letter-spacing:.06em;
+        color:#64748b;
+        margin-bottom:8px;
+      ">
+        RESUMEN
+      </div>
+
+      <div style="
+        display:grid;
+        grid-template-columns:
+          repeat(3,minmax(0,1fr));
+        gap:10px;
+      ">
+
+        <div class="info-box"
+             style="text-align:center;">
+          <div class="label">
+            VIAJAN
+          </div>
+
+          <div class="value"
+               style="
+                 font-size:26px;
+                 font-weight:800;
+               ">
+            ${Number(
+              resumen.viajan || 0
+            )}
+          </div>
+        </div>
+
+        <div class="info-box"
+             style="text-align:center;">
+          <div class="label">
+            FICHAS PENDIENTES
+          </div>
+
+          <div class="value"
+               style="
+                 font-size:26px;
+                 font-weight:800;
+               ">
+            ${Number(
+              resumen.fichasPendientes || 0
+            )}
+          </div>
+        </div>
+
+        <div class="info-box"
+             style="text-align:center;">
+          <div class="label">
+            EN LISTA DE ESPERA
+          </div>
+
+          <div class="value"
+               style="
+                 font-size:26px;
+                 font-weight:800;
+               ">
+            ${Number(
+              resumen.listaEsperaPendiente || 0
+            )}
+          </div>
+        </div>
+
+      </div>
+    </div>
   `;
 
-  const pasajeros =
-    Array.isArray(
-      data.pasajeros
-    )
-      ? data.pasajeros
-      : [];
+  // ============================================================
+  // NÓMINA OFICIAL
+  // ============================================================
 
   $("tablaNominaPublica").innerHTML =
     pasajeros.length
@@ -289,16 +430,19 @@ function renderNomina(data = {}) {
 
               return `
                 <tr>
-                  <td style="text-align:center;">
+                  <td style="
+                    text-align:center;
+                  ">
                     ${i + 1}
                   </td>
 
                   <td>
-                    <div style="font-weight:700;">
+                    <div style="
+                      font-weight:700;
+                    ">
                       ${escapeHtml(
                         String(
-                          p.nombre ||
-                          ""
+                          p.nombre || ""
                         ).toUpperCase()
                       )}
                     </div>
@@ -320,17 +464,27 @@ function renderNomina(data = {}) {
       : `
         <tr>
           <td colspan="3">
-            No hay pasajeros inscritos actualmente.
+            No hay pasajeros confirmados actualmente.
           </td>
         </tr>
       `;
 
+  // ============================================================
+  // ORDEN FINAL
+  //
+  // 1. NÓMINA OFICIAL
+  // 2. PENDIENTES FICHA MÉDICA
+  // 3. LISTA DE ESPERA PENDIENTE
+  // ============================================================
+
   renderFichasMedicasPendientes(
-    data.fichasMedicasPendientes ||
-    []
+    fichasMedicasPendientes
+  );
+
+  renderListaEsperaPendiente(
+    listaEsperaPendiente
   );
 }
-
 function construirMonitorNomina({
   oficiales = [],
   pendientes = []
@@ -1288,6 +1442,169 @@ function renderFichasMedicasPendientes(
                     ).toUpperCase()
                   )}
                 </div>
+              </div>
+            `
+          )
+          .join("")}
+      </div>
+
+    </div>
+  `;
+}
+
+function renderListaEsperaPendiente(
+  lista = []
+) {
+  const tabla =
+    $("tablaNominaPublica");
+
+  if (!tabla) {
+    return;
+  }
+
+  const tablaContenedor =
+    tabla.closest(
+      "table"
+    );
+
+  if (!tablaContenedor) {
+    return;
+  }
+
+  let bloque =
+    $(
+      "bloqueListaEsperaPendiente"
+    );
+
+  if (!lista.length) {
+    bloque?.remove();
+    return;
+  }
+
+  if (!bloque) {
+    bloque =
+      document.createElement(
+        "section"
+      );
+
+    bloque.id =
+      "bloqueListaEsperaPendiente";
+
+    bloque.style.marginTop =
+      "28px";
+  }
+
+  // ============================================================
+  // SIEMPRE DEBE QUEDAR DESPUÉS DE FICHAS PENDIENTES
+  // ============================================================
+
+  const bloqueFichas =
+    $(
+      "bloqueFichasMedicasPendientes"
+    );
+
+  if (bloqueFichas) {
+    bloqueFichas
+      .insertAdjacentElement(
+        "afterend",
+        bloque
+      );
+  } else {
+    tablaContenedor
+      .insertAdjacentElement(
+        "afterend",
+        bloque
+      );
+  }
+
+  bloque.innerHTML = `
+    <div style="
+      padding:18px 20px;
+      border-radius:12px;
+      background:#fff8e8;
+      border:1px solid #f0d58a;
+    ">
+
+      <div style="
+        font-size:18px;
+        font-weight:800;
+        margin-bottom:5px;
+      ">
+        Lista de espera · Cupo pendiente
+      </div>
+
+      <div style="
+        color:#64748b;
+        font-size:13px;
+        margin-bottom:14px;
+      ">
+        ${lista.length}
+        ${
+          lista.length === 1
+            ? "persona se encuentra"
+            : "personas se encuentran"
+        }
+        a la espera de confirmación de cupo.
+      </div>
+
+      <div>
+        ${lista
+          .map(
+            (p, i) => `
+              <div style="
+                display:grid;
+                grid-template-columns:
+                  28px 1fr auto;
+                gap:10px;
+                align-items:center;
+                padding:8px 0;
+                border-top:
+                  ${
+                    i === 0
+                      ? "0"
+                      : "1px solid rgba(0,0,0,.08)"
+                  };
+              ">
+
+                <div style="
+                  color:#64748b;
+                  font-weight:700;
+                ">
+                  ${i + 1}.
+                </div>
+
+                <div>
+                  <div style="
+                    font-weight:700;
+                  ">
+                    ${escapeHtml(
+                      String(
+                        p.nombre || ""
+                      ).toUpperCase()
+                    )}
+                  </div>
+
+                  <div style="
+                    margin-top:2px;
+                    font-size:11px;
+                    font-weight:700;
+                    color:#a16207;
+                  ">
+                    CUPO PENDIENTE
+                  </div>
+                </div>
+
+                <div style="
+                  color:#64748b;
+                  font-size:12px;
+                  white-space:nowrap;
+                ">
+                  ${escapeHtml(
+                    p.fechaInscripcion ||
+                    "—"
+                  )}
+                </div>
+
               </div>
             `
           )
