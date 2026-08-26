@@ -5,7 +5,10 @@ import {
   collection,
   getDocs,
   where,
-  query
+  query,
+  doc,
+  updateDoc,
+  serverTimestamp
 } from "https://www.gstatic.com/firebasejs/11.7.3/firebase-firestore.js";
 
 import { auth, db, VENTAS_USERS } from "./firebase-init.js";
@@ -73,6 +76,7 @@ const state = {
   inscripcionNuevoIngresoRows: [],
   inscripcionListaEsperaRows: [],
   listaEsperaPagadaRows: [],
+  formularioAdultoLiberadoRows: [],
   anoFichaFiltro: String(new Date().getFullYear()),
 
   scopedRows: [],
@@ -923,9 +927,25 @@ function syncAlertRowsByRole(effectiveUser = null) {
   setAlertRowVisibleByChild("link-alertas-warning", !!user);
   setAlertRowVisibleByChild("link-alertas-pagos", !!user);
   setAlertRowVisibleByChild("link-reunion-3dias", !!user);
-  setAlertRowVisibleByChild("link-inscripcion-nuevo-ingreso", !!user);
-  setAlertRowVisibleByChild("link-inscripcion-lista-espera", !!user);
-  setAlertRowVisibleByChild("link-lista-espera-pagada", !!user);
+  setAlertRowVisibleByChild(
+    "link-inscripcion-nuevo-ingreso",
+    !!user
+  );
+
+  setAlertRowVisibleByChild(
+    "link-formulario-adulto-liberado",
+    !!user
+  );
+
+  setAlertRowVisibleByChild(
+    "link-inscripcion-lista-espera",
+    !!user
+  );
+
+  setAlertRowVisibleByChild(
+    "link-lista-espera-pagada",
+    !!user
+  );
 }
 
 function setAlertRowVisibleByChild(childId, visible = true) {
@@ -1526,6 +1546,18 @@ function esListaEsperaPagadaPendienteConfirmar(
   );
 }
 
+function esFormularioAdultoLiberadoPendiente(
+  item = {}
+) {
+  return (
+    esAlertaInscripcionActivaHome(
+      item
+    ) &&
+    item.tipoAlerta ===
+      "formulario_adulto_liberado"
+  );
+}
+
 function getByPathHome(obj = {}, path = "") {
   return String(path || "")
     .split(".")
@@ -1605,6 +1637,272 @@ function renderInscripcionesHomeCards(rows = []) {
       </div>
     `;
   }).join("");
+}
+
+function renderFormularioLiberadosHomeCards(
+  rows = []
+) {
+  if (!rows.length) {
+    return emptyHtml(
+      "No hay formularios de adultos liberados pendientes de revisión."
+    );
+  }
+
+  return rows
+    .map(
+      (item) => {
+        const idGrupo =
+          String(
+            item.idGrupo ||
+            item.groupDocId ||
+            ""
+          ).trim();
+
+        return `
+          <div class="home-card-row">
+
+            <div style="min-width:0;">
+
+              <div class="home-card-row-title">
+                ${escapeHtml(
+                  getInscripcionNombreHome(
+                    item
+                  )
+                )}
+              </div>
+
+              <div class="home-card-row-text">
+
+                Grupo:
+                ${escapeHtml(
+                  item.aliasGrupo ||
+                  item.colegio ||
+                  idGrupo ||
+                  "Sin grupo"
+                )}
+                <br>
+
+                Año:
+                ${escapeHtml(
+                  item.anoViaje ||
+                  "Sin año"
+                )}
+                · Curso:
+                ${escapeHtml(
+                  item.curso ||
+                  "Sin curso"
+                )}
+                <br>
+
+                Documento:
+                ${escapeHtml(
+                  item.documento ||
+                  "Sin documento"
+                )}
+                <br>
+
+                Vendedor(a):
+                ${escapeHtml(
+                  item.vendedora ||
+                  item.vendedoraCorreo ||
+                  "Sin vendedor"
+                )}
+                <br>
+
+                Fecha formulario:
+                ${escapeHtml(
+                  formatDate(
+                    getInscripcionFechaHome(
+                      item
+                    )
+                  )
+                )}
+
+              </div>
+
+            </div>
+
+            <div
+              style="
+                display:flex;
+                gap:8px;
+                flex-wrap:wrap;
+                justify-content:flex-end;
+              "
+            >
+
+              <a
+                href="grupo.html?id=${encodeURIComponent(
+                  idGrupo
+                )}"
+                target="_blank"
+                rel="noopener"
+                class="home-btn"
+              >
+                Abrir grupo
+              </a>
+
+              <button
+                type="button"
+                class="home-btn"
+                data-revisar-liberado="${escapeHtml(
+                  item.id
+                )}"
+                style="
+                  background:#6d4a92;
+                "
+              >
+                Marcar revisado
+              </button>
+
+            </div>
+
+          </div>
+        `;
+      }
+    )
+    .join("");
+}
+
+
+async function marcarFormularioLiberadoRevisado(
+  alertaId = ""
+) {
+  const item =
+    state.formularioAdultoLiberadoRows
+      .find(
+        (row) =>
+          String(row.id) ===
+          String(alertaId)
+      );
+
+  if (!item) {
+    alert(
+      "No se encontró la alerta seleccionada."
+    );
+
+    return;
+  }
+
+  const groupDocId =
+    String(
+      item.groupDocId ||
+      item.idGrupo ||
+      ""
+    ).trim();
+
+  const inscripcionId =
+    String(
+      item.inscripcionId ||
+      ""
+    ).trim();
+
+  if (
+    !groupDocId ||
+    !inscripcionId
+  ) {
+    alert(
+      "La alerta no contiene los identificadores necesarios para marcar el formulario como revisado."
+    );
+
+    return;
+  }
+
+  const nombre =
+    getInscripcionNombreHome(
+      item
+    );
+
+  const ok =
+    window.confirm(
+      [
+        "¿Marcar este formulario de adulto liberado como revisado?",
+        "",
+        `Pasajero: ${nombre}`,
+        `Grupo: ${
+          item.aliasGrupo ||
+          item.colegio ||
+          item.idGrupo ||
+          "—"
+        }`,
+        "",
+        "La inscripción seguirá activa normalmente.",
+        "Solo se cerrará esta alerta administrativa."
+      ].join("\n")
+    );
+
+  if (!ok) {
+    return;
+  }
+
+  const effectiveUser =
+    getEffectiveUser();
+
+  const inscripcionRef =
+    doc(
+      db,
+      "ventas_cotizaciones",
+      groupDocId,
+      "inscripciones",
+      inscripcionId
+    );
+
+  await updateDoc(
+    inscripcionRef,
+    {
+      revisionLiberado: {
+        revisado: true,
+
+        revisadoAt:
+          serverTimestamp(),
+
+        revisadoPor:
+          [
+            effectiveUser?.nombre,
+            effectiveUser?.apellido
+          ]
+            .filter(Boolean)
+            .join(" ")
+            .trim() ||
+          effectiveUser?.email ||
+          "Usuario",
+
+        revisadoPorCorreo:
+          normalizeEmail(
+            effectiveUser?.email ||
+            ""
+          )
+      }
+    }
+  );
+
+  /*
+    El trigger de Google Cloud cerrará
+    ventas_alertas_inscripciones.
+
+    Localmente la quitamos de inmediato
+    para que el Home responda sin esperar
+    a la Cloud Function.
+  */
+  item.activa =
+    false;
+
+  item.resuelta =
+    true;
+
+  state.formularioAdultoLiberadoRows =
+    state.formularioAdultoLiberadoRows
+      .filter(
+        (row) =>
+          String(row.id) !==
+          String(alertaId)
+      );
+
+  renderHome();
+
+  closeDialog(
+    $("modal-listado-home")
+  );
 }
 
 /* =========================================================
@@ -1810,6 +2108,13 @@ function renderHome() {
     inscripcionesScope.filter(esListaEsperaPagadaPendienteConfirmar)
   );
 
+  state.formularioAdultoLiberadoRows =
+    sortInscripcionesHome(
+      inscripcionesScope.filter(
+        esFormularioAdultoLiberadoPendiente
+      )
+    );
+
   setText("count-sin-asignar", state.sinAsignarRows.length);
   setText("count-a-contactar", state.aContactarRows.length);
   setText("count-fichas-firmar", state.fichasPorFirmarRows.length);
@@ -1824,6 +2129,11 @@ function renderHome() {
   setText("count-inscripcion-nuevo-ingreso", state.inscripcionNuevoIngresoRows.length);
   setText("count-inscripcion-lista-espera", state.inscripcionListaEsperaRows.length);
   setText("count-lista-espera-pagada", state.listaEsperaPagadaRows.length);
+  setText(
+    "count-formulario-adulto-liberado",
+    state.formularioAdultoLiberadoRows
+      .length
+  );
   
   syncAlertRowsByRole(effectiveUser);
 }
@@ -2410,10 +2720,82 @@ function bindAlertButtons() {
   const linkWarning = $("link-alertas-warning");
   const linkAlertasPagos = $("link-alertas-pagos");
   const linkReuniones = $("link-reunion-3dias");
-  const linkInscripcionNuevoIngreso = $("link-inscripcion-nuevo-ingreso");
-  const linkInscripcionListaEspera = $("link-inscripcion-lista-espera");
-  const linkListaEsperaPagada = $("link-lista-espera-pagada");
+  const linkInscripcionNuevoIngreso =
+    $("link-inscripcion-nuevo-ingreso");
+
+  const linkFormularioAdultoLiberado =
+    $("link-formulario-adulto-liberado");
+
+  const linkInscripcionListaEspera =
+    $("link-inscripcion-lista-espera");
+
+  const linkListaEsperaPagada =
+    $("link-lista-espera-pagada");
   const selectAnoFichas = $("select-home-ano-fichas");
+
+  if (
+    !document.body.dataset
+      .boundRevisionLiberado
+  ) {
+    document.body.dataset
+      .boundRevisionLiberado =
+      "1";
+
+    document.addEventListener(
+      "click",
+      async (event) => {
+        const btn =
+          event.target.closest(
+            "[data-revisar-liberado]"
+          );
+
+        if (!btn) {
+          return;
+        }
+
+        event.preventDefault();
+
+        const alertaId =
+          String(
+            btn.dataset
+              .revisarLiberado ||
+            ""
+          ).trim();
+
+        if (!alertaId) {
+          return;
+        }
+
+        try {
+          btn.disabled =
+            true;
+
+          btn.textContent =
+            "Guardando...";
+
+          await marcarFormularioLiberadoRevisado(
+            alertaId
+          );
+
+        } catch (error) {
+          console.error(
+            "[HOME] Error marcando liberado revisado:",
+            error
+          );
+
+          alert(
+            "No fue posible marcar el formulario como revisado."
+          );
+
+          btn.disabled =
+            false;
+
+          btn.textContent =
+            "Marcar revisado";
+        }
+      }
+    );
+  }
 
   // AGREGAR: permite abrir/cerrar el motivo completo de corrección
   if (!document.body.dataset.boundToggleMotivo) {
@@ -2589,6 +2971,46 @@ function bindAlertButtons() {
         renderFn: renderInscripcionesHomeCards
       });
     });
+  }
+
+  if (
+    linkFormularioAdultoLiberado &&
+    !linkFormularioAdultoLiberado
+      .dataset.bound
+  ) {
+    linkFormularioAdultoLiberado
+      .dataset.bound =
+      "1";
+
+    linkFormularioAdultoLiberado
+      .addEventListener(
+        "click",
+        (e) => {
+          e.preventDefault();
+
+          openListadoModal({
+            titulo:
+              "Formulario adulto liberado",
+
+            subtitulo:
+              "Formularios de cupos liberados pendientes de revisión administrativa.",
+
+            resumen:
+              `Hay ${
+                state
+                  .formularioAdultoLiberadoRows
+                  .length
+              } formulario(s) pendiente(s) de revisión.`,
+
+            rows:
+              state
+                .formularioAdultoLiberadoRows,
+
+            renderFn:
+              renderFormularioLiberadosHomeCards
+          });
+        }
+      );
   }
 
   if (linkInscripcionListaEspera && !linkInscripcionListaEspera.dataset.bound) {
