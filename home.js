@@ -77,6 +77,7 @@ const state = {
   inscripcionListaEsperaRows: [],
   listaEsperaPagadaRows: [],
   formularioAdultoLiberadoRows: [],
+  rutSospechosoPagosRows: [],
   anoFichaFiltro: String(new Date().getFullYear()),
 
   scopedRows: [],
@@ -938,6 +939,11 @@ function syncAlertRowsByRole(effectiveUser = null) {
   );
 
   setAlertRowVisibleByChild(
+    "link-rut-sospechoso-pagos",
+    !!user
+  );
+
+  setAlertRowVisibleByChild(
     "link-inscripcion-lista-espera",
     !!user
   );
@@ -1558,6 +1564,17 @@ function esFormularioAdultoLiberadoPendiente(
   );
 }
 
+function esRutSospechosoSistemaPagos(
+  item = {}
+) {
+  return (
+    item.activa !== false &&
+    item.resuelta !== true &&
+    item.tipoAlerta ===
+      "rut_sospechoso_sistema_pagos"
+  );
+}
+
 function getByPathHome(obj = {}, path = "") {
   return String(path || "")
     .split(".")
@@ -1764,6 +1781,156 @@ function renderFormularioLiberadosHomeCards(
     .join("");
 }
 
+function renderRutSospechosoPagosCards(
+  rows = []
+) {
+  if (!rows.length) {
+    return emptyHtml(
+      "No hay diferencias de RUT pendientes de revisión."
+    );
+  }
+
+  return rows
+    .map(
+      (item) => {
+        const idGrupo =
+          String(
+            item.idGrupo ||
+            item.groupDocId ||
+            ""
+          ).trim();
+
+        return `
+          <div class="home-card-row">
+
+            <div style="min-width:0;">
+
+              <div class="home-card-row-title">
+                ${escapeHtml(
+                  item.nombreParticipante ||
+                  item.nombreNuestro ||
+                  "Sin nombre"
+                )}
+              </div>
+
+              <div class="home-card-row-text">
+
+                Grupo:
+                ${escapeHtml(
+                  item.aliasGrupo ||
+                  item.colegio ||
+                  idGrupo ||
+                  "Sin grupo"
+                )}
+                <br>
+
+                Año:
+                ${escapeHtml(
+                  item.anoViaje ||
+                  "Sin año"
+                )}
+                <br>
+
+                N° negocio:
+                ${escapeHtml(
+                  item.numeroNegocio ||
+                  "Sin número"
+                )}
+                <br><br>
+
+                <strong>
+                  Nuestro sistema
+                </strong>
+                <br>
+
+                Nombre:
+                ${escapeHtml(
+                  item.nombreNuestro ||
+                  item.nombreParticipante ||
+                  "Sin nombre"
+                )}
+                <br>
+
+                RUT:
+                ${escapeHtml(
+                  item.rutNuestro ||
+                  item.documento ||
+                  "Sin RUT"
+                )}
+                <br><br>
+
+                <strong>
+                  Sistema de Pagos
+                </strong>
+                <br>
+
+                Nombre:
+                ${escapeHtml(
+                  item.nombrePagos ||
+                  "Sin nombre"
+                )}
+                <br>
+
+                RUT:
+                ${escapeHtml(
+                  item.rutPagos ||
+                  "Sin RUT"
+                )}
+                <br><br>
+
+                Detectada:
+                ${escapeHtml(
+                  formatDate(
+                    item.detectadaAt ||
+                    item.creadoAt
+                  )
+                )}
+
+              </div>
+
+            </div>
+
+            <div
+              style="
+                display:flex;
+                gap:8px;
+                flex-wrap:wrap;
+                justify-content:flex-end;
+              "
+            >
+
+              <a
+                href="grupo.html?id=${encodeURIComponent(
+                  idGrupo
+                )}"
+                target="_blank"
+                rel="noopener"
+                class="home-btn"
+              >
+                Abrir grupo
+              </a>
+
+              <button
+                type="button"
+                class="home-btn"
+                data-resolver-rut-pagos="${escapeHtml(
+                  item.id
+                )}"
+                style="
+                  background:#6d4a92;
+                "
+              >
+                Marcar resuelto
+              </button>
+
+            </div>
+
+          </div>
+        `;
+      }
+    )
+    .join("");
+}
 
 async function marcarFormularioLiberadoRevisado(
   alertaId = ""
@@ -1892,6 +2059,160 @@ async function marcarFormularioLiberadoRevisado(
 
   state.formularioAdultoLiberadoRows =
     state.formularioAdultoLiberadoRows
+      .filter(
+        (row) =>
+          String(row.id) !==
+          String(alertaId)
+      );
+
+  renderHome();
+
+  closeDialog(
+    $("modal-listado-home")
+  );
+}
+
+async function marcarRutSospechosoResuelto(
+  alertaId = ""
+) {
+  const item =
+    state.rutSospechosoPagosRows
+      .find(
+        (row) =>
+          String(row.id) ===
+          String(alertaId)
+      );
+
+  if (!item) {
+    alert(
+      "No se encontró la alerta seleccionada."
+    );
+
+    return;
+  }
+
+  const groupDocId =
+    String(
+      item.groupDocId ||
+      item.idGrupo ||
+      ""
+    ).trim();
+
+  const inscripcionId =
+    String(
+      item.inscripcionId ||
+      ""
+    ).trim();
+
+  if (
+    !groupDocId ||
+    !inscripcionId
+  ) {
+    alert(
+      "La alerta no contiene los identificadores necesarios."
+    );
+
+    return;
+  }
+
+  const ok =
+    window.confirm(
+      [
+        "¿Marcar esta diferencia de RUT como resuelta?",
+        "",
+        `Pasajero: ${
+          item.nombreParticipante ||
+          item.nombreNuestro ||
+          "—"
+        }`,
+        "",
+        `Nuestro RUT: ${
+          item.rutNuestro ||
+          item.documento ||
+          "—"
+        }`,
+        `RUT Sistema de Pagos: ${
+          item.rutPagos ||
+          "—"
+        }`,
+        "",
+        "La próxima sincronización NO volverá a alertar por esta misma combinación de RUT.",
+        "Si en el futuro aparece otra diferencia distinta, podrá generarse una nueva alerta."
+      ].join("\n")
+    );
+
+  if (!ok) {
+    return;
+  }
+
+  const effectiveUser =
+    getEffectiveUser();
+
+  const nombreUsuario =
+    [
+      effectiveUser?.nombre,
+      effectiveUser?.apellido
+    ]
+      .filter(Boolean)
+      .join(" ")
+      .trim() ||
+    effectiveUser?.email ||
+    "Usuario";
+
+  const correoUsuario =
+    normalizeEmail(
+      effectiveUser?.email ||
+      ""
+    );
+
+  const inscripcionRef =
+    doc(
+      db,
+      "ventas_cotizaciones",
+      groupDocId,
+      "inscripciones",
+      inscripcionId
+    );
+
+  /*
+    Usamos rutas con punto para modificar
+    solamente la alerta, sin reemplazar
+    el resto de sistemaPagos.
+  */
+  await updateDoc(
+    inscripcionRef,
+    {
+      "sistemaPagos.alertaRutSospechoso.activa":
+        false,
+
+      "sistemaPagos.alertaRutSospechoso.resueltaManualmente":
+        true,
+
+      "sistemaPagos.alertaRutSospechoso.resueltaAt":
+        serverTimestamp(),
+
+      "sistemaPagos.alertaRutSospechoso.resueltaPor":
+        nombreUsuario,
+
+      "sistemaPagos.alertaRutSospechoso.resueltaPorCorreo":
+        correoUsuario
+    }
+  );
+
+  /*
+    El trigger Cloud cerrará el documento
+    de ventas_alertas_inscripciones.
+
+    Localmente lo quitamos inmediatamente.
+  */
+  item.activa =
+    false;
+
+  item.resuelta =
+    true;
+
+  state.rutSospechosoPagosRows =
+    state.rutSospechosoPagosRows
       .filter(
         (row) =>
           String(row.id) !==
@@ -2115,6 +2436,13 @@ function renderHome() {
       )
     );
 
+  state.rutSospechosoPagosRows =
+    sortInscripcionesHome(
+      inscripcionesScope.filter(
+        esRutSospechosoSistemaPagos
+      )
+    );
+
   setText("count-sin-asignar", state.sinAsignarRows.length);
   setText("count-a-contactar", state.aContactarRows.length);
   setText("count-fichas-firmar", state.fichasPorFirmarRows.length);
@@ -2133,6 +2461,10 @@ function renderHome() {
     "count-formulario-adulto-liberado",
     state.formularioAdultoLiberadoRows
       .length
+  );
+  setText(
+    "count-rut-sospechoso-pagos",
+    state.rutSospechosoPagosRows.length
   );
   
   syncAlertRowsByRole(effectiveUser);
@@ -2708,30 +3040,63 @@ function openSinAsignarPopup() {
 }
 
 function bindAlertButtons() {
-  const linkSinAsignar = $("link-sin-asignar");
-  const linkAContactar = $("link-a-contactar");
-  const linkFichas = $("link-fichas-firmar");
-  const linkFichasCorregidas = $("link-fichas-corregidas");
-  const linkSolicitudes = $("link-solicitudes-actualizacion");
-  const linkHomeFichasAbiertas = $("link-home-fichas-abiertas");
-  const linkHomeFichasCerradas = $("link-home-fichas-cerradas");
-  const linkHomeFichasAutorizadas = $("link-home-fichas-autorizadas");
-  const linkCriticas = $("link-alertas-criticas");
-  const linkWarning = $("link-alertas-warning");
-  const linkAlertasPagos = $("link-alertas-pagos");
-  const linkReuniones = $("link-reunion-3dias");
+  const linkSinAsignar =
+    $("link-sin-asignar");
+
+  const linkAContactar =
+    $("link-a-contactar");
+
+  const linkFichas =
+    $("link-fichas-firmar");
+
+  const linkFichasCorregidas =
+    $("link-fichas-corregidas");
+
+  const linkSolicitudes =
+    $("link-solicitudes-actualizacion");
+
+  const linkHomeFichasAbiertas =
+    $("link-home-fichas-abiertas");
+
+  const linkHomeFichasCerradas =
+    $("link-home-fichas-cerradas");
+
+  const linkHomeFichasAutorizadas =
+    $("link-home-fichas-autorizadas");
+
+  const linkCriticas =
+    $("link-alertas-criticas");
+
+  const linkWarning =
+    $("link-alertas-warning");
+
+  const linkAlertasPagos =
+    $("link-alertas-pagos");
+
+  const linkReuniones =
+    $("link-reunion-3dias");
+
   const linkInscripcionNuevoIngreso =
     $("link-inscripcion-nuevo-ingreso");
 
   const linkFormularioAdultoLiberado =
     $("link-formulario-adulto-liberado");
 
+  const linkRutSospechosoPagos =
+    $("link-rut-sospechoso-pagos");
+
   const linkInscripcionListaEspera =
     $("link-inscripcion-lista-espera");
 
   const linkListaEsperaPagada =
     $("link-lista-espera-pagada");
-  const selectAnoFichas = $("select-home-ano-fichas");
+
+  const selectAnoFichas =
+    $("select-home-ano-fichas");
+
+  /* =====================================================
+     MARCAR LIBERADO REVISADO
+  ===================================================== */
 
   if (
     !document.body.dataset
@@ -2797,151 +3162,446 @@ function bindAlertButtons() {
     );
   }
 
-  // AGREGAR: permite abrir/cerrar el motivo completo de corrección
-  if (!document.body.dataset.boundToggleMotivo) {
-    document.body.dataset.boundToggleMotivo = "1";
-  
-    document.addEventListener("click", (e) => {
-      const btn = e.target.closest("[data-toggle-motivo]");
-      if (!btn) return;
-  
-      const targetId = btn.dataset.toggleMotivo;
-      const box = document.getElementById(targetId);
-      if (!box) return;
-  
-      const isHidden = box.hidden;
-      box.hidden = !isHidden;
-      btn.textContent = isHidden ? "Ocultar motivo" : "Ver motivo";
-    });
+  /* =====================================================
+     MARCAR RUT SOSPECHOSO RESUELTO
+  ===================================================== */
+
+  if (
+    !document.body.dataset
+      .boundResolverRutPagos
+  ) {
+    document.body.dataset
+      .boundResolverRutPagos =
+      "1";
+
+    document.addEventListener(
+      "click",
+      async (event) => {
+        const btn =
+          event.target.closest(
+            "[data-resolver-rut-pagos]"
+          );
+
+        if (!btn) {
+          return;
+        }
+
+        event.preventDefault();
+
+        const alertaId =
+          String(
+            btn.dataset
+              .resolverRutPagos ||
+            ""
+          ).trim();
+
+        if (!alertaId) {
+          return;
+        }
+
+        try {
+          btn.disabled =
+            true;
+
+          btn.textContent =
+            "Guardando...";
+
+          await marcarRutSospechosoResuelto(
+            alertaId
+          );
+
+        } catch (error) {
+          console.error(
+            "[HOME] Error resolviendo alerta RUT:",
+            error
+          );
+
+          alert(
+            "No fue posible marcar la alerta de RUT como resuelta."
+          );
+
+          btn.disabled =
+            false;
+
+          btn.textContent =
+            "Marcar resuelto";
+        }
+      }
+    );
   }
 
-  if (linkSinAsignar && !linkSinAsignar.dataset.bound) {
-    linkSinAsignar.dataset.bound = "1";
-    linkSinAsignar.addEventListener("click", (e) => {
-      e.preventDefault();
-      openSinAsignarPopup();
-    });
+  /* =====================================================
+     MOSTRAR / OCULTAR MOTIVO CORRECCIÓN
+  ===================================================== */
+
+  if (
+    !document.body.dataset
+      .boundToggleMotivo
+  ) {
+    document.body.dataset
+      .boundToggleMotivo =
+      "1";
+
+    document.addEventListener(
+      "click",
+      (e) => {
+        const btn =
+          e.target.closest(
+            "[data-toggle-motivo]"
+          );
+
+        if (!btn) {
+          return;
+        }
+
+        const targetId =
+          btn.dataset.toggleMotivo;
+
+        const box =
+          document.getElementById(
+            targetId
+          );
+
+        if (!box) {
+          return;
+        }
+
+        const isHidden =
+          box.hidden;
+
+        box.hidden =
+          !isHidden;
+
+        btn.textContent =
+          isHidden
+            ? "Ocultar motivo"
+            : "Ver motivo";
+      }
+    );
   }
 
-  if (linkAContactar && !linkAContactar.dataset.bound) {
-    linkAContactar.dataset.bound = "1";
-    linkAContactar.addEventListener("click", (e) => {
-      e.preventDefault();
+  /* =====================================================
+     SIN ASIGNAR
+  ===================================================== */
 
-      openListadoModal({
-        titulo: "Contactos a contactar",
-        subtitulo: "Grupos pendientes de primer contacto según tu rol.",
-        resumen: `Hay ${state.aContactarRows.length} contacto(s) por contactar.`,
-        rows: state.aContactarRows,
-        renderFn: (rows) => renderGroupCards(rows, {
-          buttonLabel: "Abrir grupo",
-          hrefBase: "grupo.html"
-        })
-      });
-    });
+  if (
+    linkSinAsignar &&
+    !linkSinAsignar.dataset.bound
+  ) {
+    linkSinAsignar.dataset.bound =
+      "1";
+
+    linkSinAsignar.addEventListener(
+      "click",
+      (e) => {
+        e.preventDefault();
+
+        openSinAsignarPopup();
+      }
+    );
   }
 
-  if (linkFichas && !linkFichas.dataset.bound) {
-    linkFichas.dataset.bound = "1";
-    linkFichas.addEventListener("click", (e) => {
-      e.preventDefault();
+  /* =====================================================
+     A CONTACTAR
+  ===================================================== */
 
-      openListadoModal({
-        titulo: "Fichas por firmar",
-        subtitulo: "Fichas pendientes según rol y correo del usuario.",
-        resumen: `Hay ${state.fichasPorFirmarRows.length} ficha(s) pendiente(s).`,
-        rows: state.fichasPorFirmarRows,
-        renderFn: (rows) => renderGroupCards(rows, {
-          buttonLabel: "Abrir ficha",
-          hrefBase: "fichas.html",
-          extraRenderer: (row) => `
-            <div style="margin-top:10px; color:#3e3550; font-size:14px;">
-              <strong>Pendiente:</strong> ${escapeHtml(getFichaPendienteLabel(row))}
-            </div>
-          `
-        })
-      });
-    });
+  if (
+    linkAContactar &&
+    !linkAContactar.dataset.bound
+  ) {
+    linkAContactar.dataset.bound =
+      "1";
+
+    linkAContactar.addEventListener(
+      "click",
+      (e) => {
+        e.preventDefault();
+
+        openListadoModal({
+          titulo:
+            "Contactos a contactar",
+
+          subtitulo:
+            "Grupos pendientes de primer contacto según tu rol.",
+
+          resumen:
+            `Hay ${state.aContactarRows.length} contacto(s) por contactar.`,
+
+          rows:
+            state.aContactarRows,
+
+          renderFn:
+            (rows) =>
+              renderGroupCards(
+                rows,
+                {
+                  buttonLabel:
+                    "Abrir grupo",
+
+                  hrefBase:
+                    "grupo.html"
+                }
+              )
+        });
+      }
+    );
   }
 
-  if (linkFichasCorregidas && !linkFichasCorregidas.dataset.bound) {
-    linkFichasCorregidas.dataset.bound = "1";
-  
-    linkFichasCorregidas.addEventListener("click", (e) => {
-      e.preventDefault();
-  
-      openListadoModal({
-        titulo: "Fichas corregidas",
-        subtitulo: "Correcciones internas pendientes según tu rol.",
-        resumen: `Hay ${state.fichasCorregidasRows.length} ficha(s) corregida(s) pendiente(s).`,
-        rows: state.fichasCorregidasRows,
-        renderFn: (rows) => renderGroupCards(rows, {
-          buttonLabel: "Abrir ficha",
-          hrefBase: "fichas.html",
-          extraRenderer: (row) => `
-            <div style="margin-top:10px; color:#3e3550; font-size:14px;">
-              <strong>Corrección:</strong> ${escapeHtml(getFichaCorregidaLabel(row))}
-            </div>
-          
-            ${renderMotivoCorreccion(row)}
-          
-            ${renderAdminImportantChanges(row, getEffectiveUser())}
-          `
-        })
-      });
-    });
+  /* =====================================================
+     FICHAS POR FIRMAR
+  ===================================================== */
+
+  if (
+    linkFichas &&
+    !linkFichas.dataset.bound
+  ) {
+    linkFichas.dataset.bound =
+      "1";
+
+    linkFichas.addEventListener(
+      "click",
+      (e) => {
+        e.preventDefault();
+
+        openListadoModal({
+          titulo:
+            "Fichas por firmar",
+
+          subtitulo:
+            "Fichas pendientes según rol y correo del usuario.",
+
+          resumen:
+            `Hay ${state.fichasPorFirmarRows.length} ficha(s) pendiente(s).`,
+
+          rows:
+            state.fichasPorFirmarRows,
+
+          renderFn:
+            (rows) =>
+              renderGroupCards(
+                rows,
+                {
+                  buttonLabel:
+                    "Abrir ficha",
+
+                  hrefBase:
+                    "fichas.html",
+
+                  extraRenderer:
+                    (row) => `
+                      <div
+                        style="
+                          margin-top:10px;
+                          color:#3e3550;
+                          font-size:14px;
+                        "
+                      >
+                        <strong>Pendiente:</strong>
+                        ${escapeHtml(
+                          getFichaPendienteLabel(
+                            row
+                          )
+                        )}
+                      </div>
+                    `
+                }
+              )
+        });
+      }
+    );
   }
 
-  if (linkSolicitudes && !linkSolicitudes.dataset.bound) {
-    linkSolicitudes.dataset.bound = "1";
-    linkSolicitudes.addEventListener("click", (e) => {
-      e.preventDefault();
+  /* =====================================================
+     FICHAS CORREGIDAS
+  ===================================================== */
 
-      openListadoModal({
-        titulo: "Solicitudes de actualización",
-        subtitulo: "Solicitudes abiertas visibles para este usuario.",
-        resumen: `Hay ${state.solicitudesActualizacionRows.length} solicitud(es) abierta(s).`,
-        rows: state.solicitudesActualizacionRows, 
-        renderFn: renderSolicitudesCards
-      });
-    });
+  if (
+    linkFichasCorregidas &&
+    !linkFichasCorregidas.dataset.bound
+  ) {
+    linkFichasCorregidas.dataset.bound =
+      "1";
+
+    linkFichasCorregidas.addEventListener(
+      "click",
+      (e) => {
+        e.preventDefault();
+
+        openListadoModal({
+          titulo:
+            "Fichas corregidas",
+
+          subtitulo:
+            "Correcciones internas pendientes según tu rol.",
+
+          resumen:
+            `Hay ${state.fichasCorregidasRows.length} ficha(s) corregida(s) pendiente(s).`,
+
+          rows:
+            state.fichasCorregidasRows,
+
+          renderFn:
+            (rows) =>
+              renderGroupCards(
+                rows,
+                {
+                  buttonLabel:
+                    "Abrir ficha",
+
+                  hrefBase:
+                    "fichas.html",
+
+                  extraRenderer:
+                    (row) => `
+                      <div
+                        style="
+                          margin-top:10px;
+                          color:#3e3550;
+                          font-size:14px;
+                        "
+                      >
+                        <strong>Corrección:</strong>
+                        ${escapeHtml(
+                          getFichaCorregidaLabel(
+                            row
+                          )
+                        )}
+                      </div>
+
+                      ${renderMotivoCorreccion(
+                        row
+                      )}
+
+                      ${renderAdminImportantChanges(
+                        row,
+                        getEffectiveUser()
+                      )}
+                    `
+                }
+              )
+        });
+      }
+    );
   }
 
-  if (linkCriticas && !linkCriticas.dataset.bound) {
-    linkCriticas.dataset.bound = "1";
-    linkCriticas.addEventListener("click", (e) => {
-      e.preventDefault();
+  /* =====================================================
+     SOLICITUDES
+  ===================================================== */
 
-      openListadoModal({
-        titulo: "Alertas críticas",
-        subtitulo: "Alertas críticas activas según la vista del usuario.",
-        resumen: `Hay ${state.alertasCriticasRows.length} alerta(s) crítica(s).`,
-        rows: state.alertasCriticasRows,
-        renderFn: renderAlertCards
-      });
-    });
+  if (
+    linkSolicitudes &&
+    !linkSolicitudes.dataset.bound
+  ) {
+    linkSolicitudes.dataset.bound =
+      "1";
+
+    linkSolicitudes.addEventListener(
+      "click",
+      (e) => {
+        e.preventDefault();
+
+        openListadoModal({
+          titulo:
+            "Solicitudes de actualización",
+
+          subtitulo:
+            "Solicitudes abiertas visibles para este usuario.",
+
+          resumen:
+            `Hay ${state.solicitudesActualizacionRows.length} solicitud(es) abierta(s).`,
+
+          rows:
+            state.solicitudesActualizacionRows,
+
+          renderFn:
+            renderSolicitudesCards
+        });
+      }
+    );
   }
 
-  if (linkWarning && !linkWarning.dataset.bound) {
-    linkWarning.dataset.bound = "1";
-    linkWarning.addEventListener("click", (e) => {
-      e.preventDefault();
+  /* =====================================================
+     ALERTAS CRÍTICAS
+  ===================================================== */
 
-      openListadoModal({
-        titulo: "Alertas pendientes",
-        subtitulo: "Alertas pendientes activas según la vista del usuario.",
-        resumen: `Hay ${state.alertasWarningRows.length} alerta(s) pendiente(s).`,
-        rows: state.alertasWarningRows,
-        renderFn: renderAlertCards
-      });
-    });
+  if (
+    linkCriticas &&
+    !linkCriticas.dataset.bound
+  ) {
+    linkCriticas.dataset.bound =
+      "1";
+
+    linkCriticas.addEventListener(
+      "click",
+      (e) => {
+        e.preventDefault();
+
+        openListadoModal({
+          titulo:
+            "Alertas críticas",
+
+          subtitulo:
+            "Alertas críticas activas según la vista del usuario.",
+
+          resumen:
+            `Hay ${state.alertasCriticasRows.length} alerta(s) crítica(s).`,
+
+          rows:
+            state.alertasCriticasRows,
+
+          renderFn:
+            renderAlertCards
+        });
+      }
+    );
   }
+
+  /* =====================================================
+     ALERTAS WARNING
+  ===================================================== */
+
+  if (
+    linkWarning &&
+    !linkWarning.dataset.bound
+  ) {
+    linkWarning.dataset.bound =
+      "1";
+
+    linkWarning.addEventListener(
+      "click",
+      (e) => {
+        e.preventDefault();
+
+        openListadoModal({
+          titulo:
+            "Alertas pendientes",
+
+          subtitulo:
+            "Alertas pendientes activas según la vista del usuario.",
+
+          resumen:
+            `Hay ${state.alertasWarningRows.length} alerta(s) pendiente(s).`,
+
+          rows:
+            state.alertasWarningRows,
+
+          renderFn:
+            renderAlertCards
+        });
+      }
+    );
+  }
+
+  /* =====================================================
+     ALERTAS PAGOS
+  ===================================================== */
 
   if (
     linkAlertasPagos &&
     !linkAlertasPagos.dataset.bound
   ) {
-    linkAlertasPagos.dataset.bound = "1";
+    linkAlertasPagos.dataset.bound =
+      "1";
 
     linkAlertasPagos.addEventListener(
       "click",
@@ -2957,21 +3617,49 @@ function bindAlertButtons() {
     );
   }
 
-  if (linkInscripcionNuevoIngreso && !linkInscripcionNuevoIngreso.dataset.bound) {
-    linkInscripcionNuevoIngreso.dataset.bound = "1";
+  /* =====================================================
+     NUEVO INGRESO
+  ===================================================== */
 
-    linkInscripcionNuevoIngreso.addEventListener("click", (e) => {
-      e.preventDefault();
+  if (
+    linkInscripcionNuevoIngreso &&
+    !linkInscripcionNuevoIngreso
+      .dataset.bound
+  ) {
+    linkInscripcionNuevoIngreso
+      .dataset.bound =
+      "1";
 
-      openListadoModal({
-        titulo: "Inscripción Nuevo Ingreso",
-        subtitulo: "Formularios de nuevo ingreso pendientes de confirmación.",
-        resumen: `Hay ${state.inscripcionNuevoIngresoRows.length} nuevo(s) ingreso(s) pendiente(s).`,
-        rows: state.inscripcionNuevoIngresoRows,
-        renderFn: renderInscripcionesHomeCards
-      });
-    });
+    linkInscripcionNuevoIngreso
+      .addEventListener(
+        "click",
+        (e) => {
+          e.preventDefault();
+
+          openListadoModal({
+            titulo:
+              "Inscripción Nuevo Ingreso",
+
+            subtitulo:
+              "Formularios de nuevo ingreso pendientes de confirmación.",
+
+            resumen:
+              `Hay ${state.inscripcionNuevoIngresoRows.length} nuevo(s) ingreso(s) pendiente(s).`,
+
+            rows:
+              state
+                .inscripcionNuevoIngresoRows,
+
+            renderFn:
+              renderInscripcionesHomeCards
+          });
+        }
+      );
   }
+
+  /* =====================================================
+     ADULTO LIBERADO
+  ===================================================== */
 
   if (
     linkFormularioAdultoLiberado &&
@@ -3013,146 +3701,451 @@ function bindAlertButtons() {
       );
   }
 
-  if (linkInscripcionListaEspera && !linkInscripcionListaEspera.dataset.bound) {
-    linkInscripcionListaEspera.dataset.bound = "1";
+  /* =====================================================
+     RUT SOSPECHOSO SISTEMA DE PAGOS
+  ===================================================== */
 
-    linkInscripcionListaEspera.addEventListener("click", (e) => {
-      e.preventDefault();
+  if (
+    linkRutSospechosoPagos &&
+    !linkRutSospechosoPagos.dataset.bound
+  ) {
+    linkRutSospechosoPagos.dataset.bound =
+      "1";
 
-      openListadoModal({
-        titulo: "Inscripción Lista de Espera",
-        subtitulo: "Formularios de lista de espera pendientes de pago.",
-        resumen: `Hay ${state.inscripcionListaEsperaRows.length} lista(s) de espera pendiente(s).`,
-        rows: state.inscripcionListaEsperaRows,
-        renderFn: renderInscripcionesHomeCards
-      });
-    });
+    linkRutSospechosoPagos.addEventListener(
+      "click",
+      (e) => {
+        e.preventDefault();
+
+        openListadoModal({
+          titulo:
+            "RUT por revisar",
+
+          subtitulo:
+            "Posibles diferencias entre nuestro sistema y Sistema de Pagos.",
+
+          resumen:
+            `Hay ${
+              state
+                .rutSospechosoPagosRows
+                .length
+            } caso(s) pendiente(s) de revisión.`,
+
+          rows:
+            state
+              .rutSospechosoPagosRows,
+
+          renderFn:
+            renderRutSospechosoPagosCards
+        });
+      }
+    );
   }
 
-  if (linkListaEsperaPagada && !linkListaEsperaPagada.dataset.bound) {
-    linkListaEsperaPagada.dataset.bound = "1";
+  /* =====================================================
+     LISTA DE ESPERA PENDIENTE
+  ===================================================== */
 
-    linkListaEsperaPagada.addEventListener("click", (e) => {
-      e.preventDefault();
+  if (
+    linkInscripcionListaEspera &&
+    !linkInscripcionListaEspera
+      .dataset.bound
+  ) {
+    linkInscripcionListaEspera
+      .dataset.bound =
+      "1";
 
-      openListadoModal({
-        titulo: "Lista de Espera pendiente por confirmar",
-        subtitulo: "Listas de espera pagadas, pendientes de confirmar cupo.",
-        resumen: `Hay ${state.listaEsperaPagadaRows.length} lista(s) de espera pagada(s) pendiente(s) de confirmar.`,
-        rows: state.listaEsperaPagadaRows,
-        renderFn: renderInscripcionesHomeCards
-      });
-    });
+    linkInscripcionListaEspera
+      .addEventListener(
+        "click",
+        (e) => {
+          e.preventDefault();
+
+          openListadoModal({
+            titulo:
+              "Inscripción Lista de Espera",
+
+            subtitulo:
+              "Formularios de lista de espera pendientes de pago.",
+
+            resumen:
+              `Hay ${state.inscripcionListaEsperaRows.length} lista(s) de espera pendiente(s).`,
+
+            rows:
+              state
+                .inscripcionListaEsperaRows,
+
+            renderFn:
+              renderInscripcionesHomeCards
+          });
+        }
+      );
   }
 
-  if (linkReuniones && !linkReuniones.dataset.bound) {
-    linkReuniones.dataset.bound = "1";
-    linkReuniones.addEventListener("click", (e) => {
-      e.preventDefault();
+  /* =====================================================
+     LISTA ESPERA PAGADA
+  ===================================================== */
 
-      openListadoModal({
-        titulo: "Reuniones próximas",
-        subtitulo: "Reuniones confirmadas dentro de los próximos tres días.",
-        resumen: `Hay ${state.reuniones3DiasRows.length} reunión(es) próxima(s).`,
-        rows: state.reuniones3DiasRows,
-        renderFn: (rows) => renderGroupCards(rows, {
-          buttonLabel: "Abrir grupo",
-          hrefBase: "grupo.html",
-          extraRenderer: (row) => `
-            <div style="margin-top:10px; color:#3e3550; font-size:14px;">
-              <strong>Fecha reunión:</strong> ${escapeHtml(formatDate(getMeetingDate(row)))}
-            </div>
-          `
-        })
-      });
-    });
+  if (
+    linkListaEsperaPagada &&
+    !linkListaEsperaPagada
+      .dataset.bound
+  ) {
+    linkListaEsperaPagada
+      .dataset.bound =
+      "1";
+
+    linkListaEsperaPagada
+      .addEventListener(
+        "click",
+        (e) => {
+          e.preventDefault();
+
+          openListadoModal({
+            titulo:
+              "Lista de Espera pendiente por confirmar",
+
+            subtitulo:
+              "Listas de espera pagadas, pendientes de confirmar cupo.",
+
+            resumen:
+              `Hay ${state.listaEsperaPagadaRows.length} lista(s) de espera pagada(s) pendiente(s) de confirmar.`,
+
+            rows:
+              state
+                .listaEsperaPagadaRows,
+
+            renderFn:
+              renderInscripcionesHomeCards
+          });
+        }
+      );
   }
 
-  const btnCerrarListado = $("btn-cerrar-modal-listado");
-  const modalListado = $("modal-listado-home");
+  /* =====================================================
+     REUNIONES
+  ===================================================== */
 
-  if (btnCerrarListado && !btnCerrarListado.dataset.bound) {
-    btnCerrarListado.dataset.bound = "1";
-    btnCerrarListado.addEventListener("click", () => closeDialog(modalListado));
+  if (
+    linkReuniones &&
+    !linkReuniones.dataset.bound
+  ) {
+    linkReuniones.dataset.bound =
+      "1";
+
+    linkReuniones.addEventListener(
+      "click",
+      (e) => {
+        e.preventDefault();
+
+        openListadoModal({
+          titulo:
+            "Reuniones próximas",
+
+          subtitulo:
+            "Reuniones confirmadas dentro de los próximos tres días.",
+
+          resumen:
+            `Hay ${state.reuniones3DiasRows.length} reunión(es) próxima(s).`,
+
+          rows:
+            state.reuniones3DiasRows,
+
+          renderFn:
+            (rows) =>
+              renderGroupCards(
+                rows,
+                {
+                  buttonLabel:
+                    "Abrir grupo",
+
+                  hrefBase:
+                    "grupo.html",
+
+                  extraRenderer:
+                    (row) => `
+                      <div
+                        style="
+                          margin-top:10px;
+                          color:#3e3550;
+                          font-size:14px;
+                        "
+                      >
+                        <strong>Fecha reunión:</strong>
+                        ${escapeHtml(
+                          formatDate(
+                            getMeetingDate(
+                              row
+                            )
+                          )
+                        )}
+                      </div>
+                    `
+                }
+              )
+        });
+      }
+    );
   }
 
-  if (modalListado && !modalListado.dataset.bound) {
-    modalListado.dataset.bound = "1";
-    modalListado.addEventListener("click", (e) => {
-      if (e.target === modalListado) closeDialog(modalListado);
-    });
+  /* =====================================================
+     CERRAR MODAL LISTADO
+  ===================================================== */
+
+  const btnCerrarListado =
+    $("btn-cerrar-modal-listado");
+
+  const modalListado =
+    $("modal-listado-home");
+
+  if (
+    btnCerrarListado &&
+    !btnCerrarListado.dataset.bound
+  ) {
+    btnCerrarListado.dataset.bound =
+      "1";
+
+    btnCerrarListado.addEventListener(
+      "click",
+      () =>
+        closeDialog(
+          modalListado
+        )
+    );
   }
 
-  const btnCerrarDetalle = $("btn-cerrar-modal-detalle");
-  const modalDetalle = $("modal-detalle-home");
+  if (
+    modalListado &&
+    !modalListado.dataset.bound
+  ) {
+    modalListado.dataset.bound =
+      "1";
 
-  if (btnCerrarDetalle && !btnCerrarDetalle.dataset.bound) {
-    btnCerrarDetalle.dataset.bound = "1";
-    btnCerrarDetalle.addEventListener("click", () => closeDialog(modalDetalle));
+    modalListado.addEventListener(
+      "click",
+      (e) => {
+        if (
+          e.target ===
+          modalListado
+        ) {
+          closeDialog(
+            modalListado
+          );
+        }
+      }
+    );
   }
 
-  if (modalDetalle && !modalDetalle.dataset.bound) {
-    modalDetalle.dataset.bound = "1";
-    modalDetalle.addEventListener("click", (e) => {
-      if (e.target === modalDetalle) closeDialog(modalDetalle);
-    });
+  /* =====================================================
+     CERRAR MODAL DETALLE
+  ===================================================== */
+
+  const btnCerrarDetalle =
+    $("btn-cerrar-modal-detalle");
+
+  const modalDetalle =
+    $("modal-detalle-home");
+
+  if (
+    btnCerrarDetalle &&
+    !btnCerrarDetalle.dataset.bound
+  ) {
+    btnCerrarDetalle.dataset.bound =
+      "1";
+
+    btnCerrarDetalle.addEventListener(
+      "click",
+      () =>
+        closeDialog(
+          modalDetalle
+        )
+    );
   }
-  function abrirModalFichasHome(tipo = "", rows = []) {
+
+  if (
+    modalDetalle &&
+    !modalDetalle.dataset.bound
+  ) {
+    modalDetalle.dataset.bound =
+      "1";
+
+    modalDetalle.addEventListener(
+      "click",
+      (e) => {
+        if (
+          e.target ===
+          modalDetalle
+        ) {
+          closeDialog(
+            modalDetalle
+          );
+        }
+      }
+    );
+  }
+
+  /* =====================================================
+     MODAL FICHAS ADMIN
+  ===================================================== */
+
+  function abrirModalFichasHome(
+    tipo = "",
+    rows = []
+  ) {
     const titulos = {
-      abiertas: "Fichas abiertas",
-      cerradas: "Fichas cerradas",
-      autorizadas: "Fichas autorizadas"
+      abiertas:
+        "Fichas abiertas",
+
+      cerradas:
+        "Fichas cerradas",
+
+      autorizadas:
+        "Fichas autorizadas"
     };
-  
+
     openListadoModal({
-      titulo: titulos[tipo] || "Fichas",
-      subtitulo: "Detalle administrativo de fichas.",
-      resumen: `Hay ${rows.length} ficha(s).`,
+      titulo:
+        titulos[tipo] ||
+        "Fichas",
+
+      subtitulo:
+        "Detalle administrativo de fichas.",
+
+      resumen:
+        `Hay ${rows.length} ficha(s).`,
+
       rows,
-      renderFn: (lista) => renderGroupCards(lista, {
-        buttonLabel: "Abrir ficha",
-        hrefBase: "fichas.html",
-        extraRenderer: (row) => `
-          <div style="margin-top:10px; color:#3e3550; font-size:14px;">
-            <strong>Estado administrativo:</strong> ${escapeHtml(getFichaAdminMotivo(row))}
-          </div>
-          ${renderAdminImportantChanges(row, getEffectiveUser())}
-        `
-      })
-    });
-  }
-  
-  if (linkHomeFichasAbiertas && !linkHomeFichasAbiertas.dataset.bound) {
-    linkHomeFichasAbiertas.dataset.bound = "1";
-    linkHomeFichasAbiertas.addEventListener("click", (e) => {
-      e.preventDefault();
-      abrirModalFichasHome("abiertas", state.fichasAbiertasRows);
-    });
-  }
-  
-  if (linkHomeFichasCerradas && !linkHomeFichasCerradas.dataset.bound) {
-    linkHomeFichasCerradas.dataset.bound = "1";
-    linkHomeFichasCerradas.addEventListener("click", (e) => {
-      e.preventDefault();
-      abrirModalFichasHome("cerradas", state.fichasCerradasRows);
-    });
-  }
-  
-  if (linkHomeFichasAutorizadas && !linkHomeFichasAutorizadas.dataset.bound) {
-    linkHomeFichasAutorizadas.dataset.bound = "1";
-    linkHomeFichasAutorizadas.addEventListener("click", (e) => {
-      e.preventDefault();
-      abrirModalFichasHome("autorizadas", state.fichasAutorizadasRows);
+
+      renderFn:
+        (lista) =>
+          renderGroupCards(
+            lista,
+            {
+              buttonLabel:
+                "Abrir ficha",
+
+              hrefBase:
+                "fichas.html",
+
+              extraRenderer:
+                (row) => `
+                  <div
+                    style="
+                      margin-top:10px;
+                      color:#3e3550;
+                      font-size:14px;
+                    "
+                  >
+                    <strong>
+                      Estado administrativo:
+                    </strong>
+
+                    ${escapeHtml(
+                      getFichaAdminMotivo(
+                        row
+                      )
+                    )}
+                  </div>
+
+                  ${renderAdminImportantChanges(
+                    row,
+                    getEffectiveUser()
+                  )}
+                `
+            }
+          )
     });
   }
 
-  if (selectAnoFichas && !selectAnoFichas.dataset.bound) {
-    selectAnoFichas.dataset.bound = "1";
-  
-    selectAnoFichas.addEventListener("change", () => {
-      state.anoFichaFiltro = selectAnoFichas.value;
-      renderHome();
-    });
+  if (
+    linkHomeFichasAbiertas &&
+    !linkHomeFichasAbiertas
+      .dataset.bound
+  ) {
+    linkHomeFichasAbiertas
+      .dataset.bound =
+      "1";
+
+    linkHomeFichasAbiertas
+      .addEventListener(
+        "click",
+        (e) => {
+          e.preventDefault();
+
+          abrirModalFichasHome(
+            "abiertas",
+            state.fichasAbiertasRows
+          );
+        }
+      );
+  }
+
+  if (
+    linkHomeFichasCerradas &&
+    !linkHomeFichasCerradas
+      .dataset.bound
+  ) {
+    linkHomeFichasCerradas
+      .dataset.bound =
+      "1";
+
+    linkHomeFichasCerradas
+      .addEventListener(
+        "click",
+        (e) => {
+          e.preventDefault();
+
+          abrirModalFichasHome(
+            "cerradas",
+            state.fichasCerradasRows
+          );
+        }
+      );
+  }
+
+  if (
+    linkHomeFichasAutorizadas &&
+    !linkHomeFichasAutorizadas
+      .dataset.bound
+  ) {
+    linkHomeFichasAutorizadas
+      .dataset.bound =
+      "1";
+
+    linkHomeFichasAutorizadas
+      .addEventListener(
+        "click",
+        (e) => {
+          e.preventDefault();
+
+          abrirModalFichasHome(
+            "autorizadas",
+            state.fichasAutorizadasRows
+          );
+        }
+      );
+  }
+
+  /* =====================================================
+     SELECTOR AÑO FICHAS
+  ===================================================== */
+
+  if (
+    selectAnoFichas &&
+    !selectAnoFichas.dataset.bound
+  ) {
+    selectAnoFichas.dataset.bound =
+      "1";
+
+    selectAnoFichas.addEventListener(
+      "change",
+      () => {
+        state.anoFichaFiltro =
+          selectAnoFichas.value;
+
+        renderHome();
+      }
+    );
   }
 }
 
