@@ -29,244 +29,97 @@ init();
 
 async function init() {
   try {
-    const params = new URLSearchParams(location.search);
-    const token = String(params.get("t") || "").trim();
+    const params =
+      new URLSearchParams(
+        location.search
+      );
+
+    const token =
+      String(
+        params.get("t") || ""
+      ).trim();
 
     if (!token) {
-      renderError("Link inválido. Falta el token de acceso.");
+      renderError(
+        "Link inválido. Falta el token de acceso."
+      );
+
       return;
     }
 
-    const tokenSnap = await getDoc(
-      doc(db, "nominas_publicas", token)
-    );
+    // ============================================================
+    // ÚNICA FUENTE PÚBLICA
+    // ============================================================
+
+    const tokenSnap =
+      await getDoc(
+        doc(
+          db,
+          "nominas_publicas",
+          token
+        )
+      );
 
     if (!tokenSnap.exists()) {
       renderError(
         "La nómina no existe o el link fue reemplazado."
       );
+
       return;
     }
 
-    const tokenData =
+    const data =
       tokenSnap.data() || {};
 
-    if (tokenData.activo === false) {
+    if (
+      data.activo === false
+    ) {
       renderError(
         "Esta nómina ya no está activa."
       );
+
       return;
     }
 
-    const groupDocId =
-      String(
-        tokenData.groupDocId || ""
-      ).trim();
-
-    if (!groupDocId) {
-      renderError(
-        "El link no tiene grupo asociado."
-      );
-      return;
-    }
-
-    const grupoSnap = await getDoc(
-      doc(
-        db,
-        "ventas_cotizaciones",
-        groupDocId
-      )
-    );
-
-    if (!grupoSnap.exists()) {
-      renderError(
-        "No fue posible encontrar el grupo asociado a esta nómina."
-      );
-      return;
-    }
-
-    const grupo =
-      grupoSnap.data() || {};
-
     // ============================================================
-    // 1. VISTA LIVIANA OFICIAL
-    //
-    // IMPORTANTE:
-    // NO descargamos las fichas completas.
-    //
-    // Esta misma colección es la que grupo.js usa
-    // para mostrar la nómina sin descargar información
-    // médica/personal completa.
+    // PASAJEROS DE LA NÓMINA PRINCIPAL
     // ============================================================
 
-    const resumenSnap =
-      await getDocs(
-        collection(
-          db,
-          "ventas_cotizaciones",
-          groupDocId,
-          "nomina_resumen"
-        )
-      );
-
-    const oficiales =
-      resumenSnap.docs
-        .map((d) => ({
-          id: d.id,
-          fuente: "oficial",
-          ...d.data()
-        }))
-        .filter((item) => {
-          const privacidad =
-            normalizarClaveMonitor(
-              item?.privacidad?.estado ||
-              ""
-            );
-
-          return (
-            privacidad !==
-              "eliminada_logica" &&
-            privacidad !==
-              "archivada"
-          );
-        });
-
-    // ============================================================
-    // 2. FORMULARIOS PÚBLICOS
-    //
-    // Solamente sirven como respaldo de solicitudes
-    // todavía no reflejadas en nomina_resumen.
-    // ============================================================
-
-    const pendientesSnap =
-      await getDocs(
-        query(
-          collection(
-            db,
-            "inscripciones_pendientes_publicas"
-          ),
-          where(
-            "idGrupo",
-            "==",
-            groupDocId
-          )
-        )
-      );
-
-    const pendientes =
-      pendientesSnap.docs
-        .map((d) => ({
-          id: d.id,
-          fuente:
-            "formulario_publico",
-          ...d.data()
-        }))
-        .filter((item) => {
-          const payload =
-            item.payload || {};
-
-          const estadoDocumento =
-            normalizarClaveMonitor(
-              item.estado || ""
-            );
-
-          const estadoPrivacidad =
-            normalizarClaveMonitor(
-              payload?.privacidad
-                ?.estado ||
-              ""
-            );
-
-          return (
-            estadoDocumento !==
-              "eliminada_logica" &&
-            estadoPrivacidad !==
-              "eliminada_logica" &&
-            estadoPrivacidad !==
-              "archivada"
-          );
-        });
-
-    // ============================================================
-    // 3. CONSTRUIR MONITOR
-    // ============================================================
-
-    const resultado =
-      construirMonitorNomina({
-        oficiales,
-        pendientes
-      });
-
-    let pasajeros =
-      resultado.pasajeros;
-
-    let fichasMedicasPendientes =
-      resultado
-        .fichasMedicasPendientes;
-
-    // ============================================================
-    // RESPALDO PARA LINKS ANTIGUOS
-    // ============================================================
-
-    if (
-      !pasajeros.length &&
-      !fichasMedicasPendientes.length &&
+    const pasajeros =
       Array.isArray(
-        tokenData.pasajeros
+        data.pasajeros
       )
-    ) {
-      pasajeros =
-        tokenData.pasajeros
-          .map((p) => ({
-            nombre:
-              p.nombre || "",
+        ? data.pasajeros
+            .map(
+              normalizarPasajeroPublico
+            )
+            .filter(
+              (p) => p.nombre
+            )
+        : [];
 
-            fechaInscripcion:
-              p.fechaInscripcion ||
-              "—",
+    // ============================================================
+    // FICHAS MÉDICAS PENDIENTES
+    // ============================================================
 
-            fechaOrden: 0,
-
-            categoria:
-              "base",
-
-            etiqueta: ""
-          }))
-          .filter(
-            (p) => p.nombre
-          );
-    }
+    const fichasMedicasPendientes =
+      Array.isArray(
+        data.fichasPendientes
+      )
+        ? data.fichasPendientes
+            .map((p) => ({
+              nombre:
+                cleanText(
+                  p?.nombre || ""
+                )
+            }))
+            .filter(
+              (p) => p.nombre
+            )
+        : [];
 
     renderNomina({
-      ...tokenData,
-
-      colegio:
-        grupo.colegio ||
-        tokenData.colegio ||
-        "",
-
-      curso:
-        grupo.curso ||
-        tokenData.curso ||
-        "",
-
-      anoViaje:
-        grupo.anoViaje ||
-        tokenData.anoViaje ||
-        "",
-
-      destino:
-        grupo.destinoPrincipal ||
-        grupo.destino ||
-        tokenData.destino ||
-        "",
-
-      nombreGrupo:
-        grupo.aliasGrupo ||
-        grupo.nombreGrupo ||
-        grupo.colegio ||
-        tokenData.nombreGrupo ||
-        "Nómina del grupo",
+      ...data,
 
       pasajeros,
 
@@ -285,6 +138,77 @@ async function init() {
   }
 }
 
+function normalizarPasajeroPublico(
+  item = {}
+) {
+  const categoria =
+    cleanText(
+      item.categoria ||
+      "base"
+    );
+
+  const estadoCupo =
+    normalizarClaveMonitor(
+      item.estadoCupo ||
+      ""
+    );
+
+  let etiqueta = "";
+
+  if (
+    categoria ===
+    "nuevo_ingreso"
+  ) {
+    etiqueta =
+      "INSCRITO POSTERIOR A LA NÓMINA INICIAL";
+  }
+
+  if (
+    categoria ===
+    "liberado"
+  ) {
+    etiqueta =
+      "CUPO LIBERADO";
+  }
+
+  if (
+    categoria ===
+    "lista_espera"
+  ) {
+    etiqueta =
+      estadoCupo ===
+      "confirmado"
+        ? "LISTA DE ESPERA · CUPO CONFIRMADO"
+        : "LISTA DE ESPERA · CUPO PENDIENTE";
+  }
+
+  const fechaOriginal =
+    item.fechaInscripcion ||
+    "";
+
+  return {
+    nombre:
+      cleanText(
+        item.nombre ||
+        ""
+      ),
+
+    fechaInscripcion:
+      formatPublicDateTime(
+        fechaOriginal
+      ),
+
+    fechaOrden:
+      getPublicDateTimeMs(
+        fechaOriginal
+      ),
+
+    categoria,
+    estadoCupo,
+    etiqueta
+  };
+}
+
 function renderNomina(data = {}) {
   $("tituloNomina").textContent =
     String(
@@ -292,93 +216,106 @@ function renderNomina(data = {}) {
       "Nómina del grupo"
     ).toUpperCase();
 
-  $("subtituloNomina").textContent = [
-    data.colegio,
-    data.curso,
-    data.anoViaje
-      ? `Año ${data.anoViaje}`
-      : "",
-    data.destino
-  ]
-    .filter(Boolean)
-    .join(" · ");
+  $("subtituloNomina").textContent =
+    [
+      data.colegio,
+      data.curso,
+      data.anoViaje
+        ? `Año ${data.anoViaje}`
+        : "",
+      data.destino
+    ]
+      .filter(Boolean)
+      .join(" · ");
 
   $("datosGrupoNomina").innerHTML = `
     <div class="info-box">
       <div class="label">Colegio</div>
       <div class="value">
-        ${escapeHtml(data.colegio || "—")}
+        ${escapeHtml(
+          data.colegio || "—"
+        )}
       </div>
     </div>
 
     <div class="info-box">
       <div class="label">Curso</div>
       <div class="value">
-        ${escapeHtml(data.curso || "—")}
+        ${escapeHtml(
+          data.curso || "—"
+        )}
       </div>
     </div>
 
     <div class="info-box">
       <div class="label">Año viaje</div>
       <div class="value">
-        ${escapeHtml(data.anoViaje || "—")}
+        ${escapeHtml(
+          data.anoViaje || "—"
+        )}
       </div>
     </div>
   `;
 
   const pasajeros =
-    Array.isArray(data.pasajeros)
+    Array.isArray(
+      data.pasajeros
+    )
       ? data.pasajeros
       : [];
-
-  // ============================================================
-  // TABLA PRINCIPAL
-  // ============================================================
 
   $("tablaNominaPublica").innerHTML =
     pasajeros.length
       ? pasajeros
-          .map((p, i) => {
+          .map(
+            (p, i) => {
+              const etiqueta =
+                p.etiqueta
+                  ? `
+                    <div style="
+                      margin-top:3px;
+                      font-size:11px;
+                      font-weight:700;
+                      color:${getColorEtiquetaPublica(
+                        p.categoria
+                      )};
+                    ">
+                      ${escapeHtml(
+                        p.etiqueta
+                      )}
+                    </div>
+                  `
+                  : "";
 
-            const etiqueta = p.etiqueta
-              ? `
-                <div style="
-                  margin-top:3px;
-                  font-size:11px;
-                  font-weight:700;
-                  color:${getColorEtiquetaPublica(p.categoria)};
-                ">
-                  ${escapeHtml(p.etiqueta)}
-                </div>
-              `
-              : "";
+              return `
+                <tr>
+                  <td style="text-align:center;">
+                    ${i + 1}
+                  </td>
 
-            return `
-              <tr>
-                <td style="text-align:center;">
-                  ${i + 1}
-                </td>
+                  <td>
+                    <div style="font-weight:700;">
+                      ${escapeHtml(
+                        String(
+                          p.nombre ||
+                          ""
+                        ).toUpperCase()
+                      )}
+                    </div>
 
-                <td>
-                  <div style="font-weight:700;">
+                    ${etiqueta}
+                  </td>
+
+                  <td>
                     ${escapeHtml(
-                      String(
-                        p.nombre || ""
-                      ).toUpperCase()
+                      p.fechaInscripcion ||
+                      "—"
                     )}
-                  </div>
-
-                  ${etiqueta}
-                </td>
-
-                <td>
-                  ${escapeHtml(
-                    p.fechaInscripcion || "—"
-                  )}
-                </td>
-              </tr>
-            `;
-          })
+                  </td>
+                </tr>
+              `;
+            }
+          )
           .join("")
       : `
         <tr>
@@ -388,12 +325,9 @@ function renderNomina(data = {}) {
         </tr>
       `;
 
-  // ============================================================
-  // FICHAS MÉDICAS PENDIENTES
-  // ============================================================
-
   renderFichasMedicasPendientes(
-    data.fichasMedicasPendientes || []
+    data.fichasMedicasPendientes ||
+    []
   );
 }
 
@@ -1397,17 +1331,53 @@ function getFechaFormularioInscripcion(item = {}) {
   );
 }
 
-function formatPublicDateTime(value) {
-  const d = toDate(value);
-  if (!d) return "—";
+function formatPublicDateTime(
+  value
+) {
+  if (!value) {
+    return "—";
+  }
 
-  return d.toLocaleString("es-CL", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit"
-  });
+  /*
+    Si ya viene como texto formateado
+    desde una versión antigua,
+    lo conservamos tal cual.
+  */
+  if (
+    typeof value === "string"
+  ) {
+    const texto =
+      cleanText(value);
+
+    if (
+      /^\d{2}-\d{2}-\d{2},/.test(
+        texto
+      ) ||
+      /^\d{2}\/\d{2}\/\d{2}/.test(
+        texto
+      )
+    ) {
+      return texto;
+    }
+  }
+
+  const d =
+    toDate(value);
+
+  if (!d) {
+    return "—";
+  }
+
+  return d.toLocaleString(
+    "es-CL",
+    {
+      day: "2-digit",
+      month: "2-digit",
+      year: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit"
+    }
+  );
 }
 
 function getPublicDateTimeMs(value) {
