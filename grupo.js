@@ -12677,6 +12677,55 @@ function ensureBotonCorreosInscripcion() {
   btnCerrar.insertAdjacentElement("afterend", btn);
 }
 
+function ensureBotonGestionFichasMedicas() {
+  if ($("btnGestionFichasMedicas")) return;
+
+  const btnLinkNomina = $("btnGenerarLinkNominaPublica");
+
+  if (
+    !btnLinkNomina ||
+    !btnLinkNomina.parentElement
+  ) {
+    return;
+  }
+
+  const btn = document.createElement("button");
+
+  btn.id = "btnGestionFichasMedicas";
+  btn.type = "button";
+  btn.className = "btn-pill btn-gestion-fichas-medicas";
+  btn.textContent = "Gestionar fichas médicas";
+
+  btnLinkNomina.insertAdjacentElement(
+    "afterend",
+    btn
+  );
+}
+
+function abrirGestionFichasMedicasGrupo() {
+  const groupDocId =
+    String(
+      state.groupDocId ||
+      ""
+    ).trim();
+
+  if (!groupDocId) {
+    alert(
+      "No se pudo identificar el grupo para gestionar sus fichas médicas."
+    );
+
+    return;
+  }
+
+  window.open(
+    `gestion-fichas-medicas.html?id=${encodeURIComponent(
+      groupDocId
+    )}`,
+    "_blank",
+    "noopener"
+  );
+}
+
 function tieneBotonVisible(contenedorId) {
   const contenedor = $(contenedorId);
 
@@ -12691,6 +12740,8 @@ function tieneBotonVisible(contenedorId) {
 
 function syncButtons() {
   ensureBotonCorreosInscripcion();
+  ensureBotonGestionFichasMedicas();
+
   const editable = canEditGroup();
   const isGanada = normalizeState(state.group.estado) === "ganada";
   const autorizada = !!state.group.autorizada;
@@ -14609,6 +14660,10 @@ function bindEvents() {
     renderEmailBulkRecipients();
   });
   $("btnGenerarLinkNominaPublica")?.addEventListener("click", generarLinkNominaPublica);
+  $("btnGestionFichasMedicas")?.addEventListener(
+    "click",
+    abrirGestionFichasMedicasGrupo
+  );
   $("btnNominaInicialPagos")?.addEventListener(
     "click",
     async () => {
