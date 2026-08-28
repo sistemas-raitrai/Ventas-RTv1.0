@@ -6115,12 +6115,6 @@ function buildSharedGroupPatchFromFicha(values = {}) {
     /*
      * MES / INDICACIÓN TENTATIVA
      *
-     * NO escribimos fechaInicioViaje,
-     * fechaFinViaje ni fechaViaje real.
-     */
-    /*
-     * MES / INDICACIÓN TENTATIVA
-     *
      * mesViaje guarda el mes principal.
      *
      * mesViajeOtro guarda una especificación opcional
