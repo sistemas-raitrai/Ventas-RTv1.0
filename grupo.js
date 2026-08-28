@@ -13198,10 +13198,23 @@ function syncButtons() {
   }
 
   if (btnEditarNominaInscripcion) {
-    const puedeEditarNomina = canEditarNominaInscripcion();
+    /*
+      EDICIÓN DE NÓMINA DESACTIVADA EN GRUPO.HTML
   
-    btnEditarNominaInscripcion.classList.toggle("hidden", !puedeEditarNomina);
-    btnEditarNominaInscripcion.disabled = !puedeEditarNomina || !tieneInscripciones;
+      La edición se centraliza en Gestión Nómina.
+  
+      Se conserva:
+      - botón
+      - modal
+      - funciones
+      - eventos
+  
+      para poder rehabilitar esta funcionalidad
+      en el futuro sin reconstruirla.
+    */
+  
+    btnEditarNominaInscripcion.classList.add("hidden");
+    btnEditarNominaInscripcion.disabled = true;
   }
 
   if (btnNominaInicialPagos) {
