@@ -23337,31 +23337,22 @@ window.catastroTallasPolera2026 = async function () {
         );
       });
 
-  const resumenGrupo =
-    [];
+  const resumenGrupo = [];
+  const detalle = [];
+  const gruposConError = [];
 
-  const detalle =
-    [];
+  const totalPorTalla = {};
 
-  const totalPorTalla =
-    {};
-
-  let totalActivos =
-    0;
-
-  let totalConTalla =
-    0;
-
-  let totalSinTalla =
-    0;
+  let totalActivos = 0;
+  let totalConTalla = 0;
+  let totalSinTalla = 0;
 
   for (
     let i = 0;
     i < grupos.length;
     i += 1
   ) {
-    const grupo =
-      grupos[i];
+    const grupo = grupos[i];
 
     const numeroNegocio =
       String(
@@ -23377,205 +23368,273 @@ window.catastroTallasPolera2026 = async function () {
       grupo?.elementosIncluidos
         ?.polera !== false;
 
-    const snap =
-      await getDocs(
-        collection(
-          db,
-          "ventas_cotizaciones",
-          grupo.docId,
-          "inscripciones"
-        )
-      );
-
-    const activos =
-      snap.docs
-        .map((d) => ({
-          id: d.id,
-          ...d.data()
-        }))
-        .filter(
-          (item) =>
-            !estaInscripcionAnulada(
-              item
-            )
+    try {
+      const snap =
+        await getDocs(
+          collection(
+            db,
+            "ventas_cotizaciones",
+            grupo.docId,
+            "inscripciones"
+          )
         );
 
-    totalActivos +=
-      activos.length;
-
-    const tallasGrupo =
-      {};
-
-    let conTalla =
-      0;
-
-    let sinTalla =
-      0;
-
-    activos.forEach(
-      (item) => {
-        const tallaRaw =
-          item?.identificacion
-            ?.tallaPolera ||
-          item?.elementos
-            ?.tallaPolera ||
-          item?.tallaPolera ||
-          item?.talla ||
-          "";
-
-        const talla =
-          String(
-            tallaRaw ||
-            ""
-          )
-            .trim()
-            .toUpperCase();
-
-        const nombre =
-          buildNombreCompletoInscripcion(
-            item
-          ) ||
-          item?.identificacion
-            ?.nombreCompleto ||
-          "SIN NOMBRE";
-
-        const documento =
-          getInscripcionDocumento(
-            item
-          ) ||
-          item?.identificacion
-            ?.documento ||
-          item.id;
-
-        if (talla) {
-          conTalla += 1;
-          totalConTalla += 1;
-
-          tallasGrupo[talla] =
-            (
-              tallasGrupo[talla] ||
-              0
-            ) + 1;
-
-          totalPorTalla[talla] =
-            (
-              totalPorTalla[talla] ||
-              0
-            ) + 1;
-        } else {
-          sinTalla += 1;
-          totalSinTalla += 1;
-        }
-
-        detalle.push({
-          numeroNegocio,
-
-          idGrupo:
-            grupo.idGrupo ||
-            grupo.docId,
-
-          colegio:
-            grupo.colegio ||
-            "",
-
-          curso:
-            grupo.curso ||
-            "",
-
-          incluyePolera:
-            incluyePolera
-              ? "SÍ"
-              : "NO",
-
-          nombre,
-
-          documento,
-
-          talla:
-            talla ||
-            "SIN TALLA"
-        });
-      }
-    );
-
-    resumenGrupo.push({
-      numeroNegocio,
-
-      idGrupo:
-        grupo.idGrupo ||
-        grupo.docId,
-
-      colegio:
-        grupo.colegio ||
-        "",
-
-      curso:
-        grupo.curso ||
-        "",
-
-      incluyePolera:
-        incluyePolera
-          ? "SÍ"
-          : "NO",
-
-      pasajerosActivos:
-        activos.length,
-
-      conTalla,
-
-      sinTalla,
-
-      XS:
-        tallasGrupo.XS ||
-        0,
-
-      S:
-        tallasGrupo.S ||
-        0,
-
-      M:
-        tallasGrupo.M ||
-        0,
-
-      L:
-        tallasGrupo.L ||
-        0,
-
-      XL:
-        tallasGrupo.XL ||
-        0,
-
-      XXL:
-        tallasGrupo.XXL ||
-        0,
-
-      otras:
-        Object.entries(
-          tallasGrupo
-        )
+      const activos =
+        snap.docs
+          .map((d) => ({
+            id: d.id,
+            ...d.data()
+          }))
           .filter(
-            ([talla]) =>
-              ![
-                "XS",
-                "S",
-                "M",
-                "L",
-                "XL",
-                "XXL"
-              ].includes(
-                talla
+            (item) =>
+              !estaInscripcionAnulada(
+                item
               )
+          );
+
+      totalActivos +=
+        activos.length;
+
+      const tallasGrupo = {};
+
+      let conTalla = 0;
+      let sinTalla = 0;
+
+      activos.forEach(
+        (item) => {
+          const tallaRaw =
+            item?.identificacion
+              ?.tallaPolera ||
+            item?.elementos
+              ?.tallaPolera ||
+            item?.tallaPolera ||
+            item?.talla ||
+            "";
+
+          const talla =
+            String(
+              tallaRaw ||
+              ""
+            )
+              .trim()
+              .toUpperCase();
+
+          const nombre =
+            buildNombreCompletoInscripcion(
+              item
+            ) ||
+            item?.identificacion
+              ?.nombreCompleto ||
+            "SIN NOMBRE";
+
+          const documento =
+            getInscripcionDocumento(
+              item
+            ) ||
+            item?.identificacion
+              ?.documento ||
+            item.id;
+
+          if (talla) {
+            conTalla += 1;
+            totalConTalla += 1;
+
+            tallasGrupo[talla] =
+              (
+                tallasGrupo[talla] ||
+                0
+              ) + 1;
+
+            totalPorTalla[talla] =
+              (
+                totalPorTalla[talla] ||
+                0
+              ) + 1;
+          } else {
+            sinTalla += 1;
+            totalSinTalla += 1;
+          }
+
+          detalle.push({
+            numeroNegocio,
+
+            idGrupo:
+              grupo.idGrupo ||
+              grupo.docId,
+
+            colegio:
+              grupo.colegio ||
+              "",
+
+            curso:
+              grupo.curso ||
+              "",
+
+            incluyePolera:
+              incluyePolera
+                ? "SÍ"
+                : "NO",
+
+            nombre,
+
+            documento,
+
+            talla:
+              talla ||
+              "SIN TALLA"
+          });
+        }
+      );
+
+      resumenGrupo.push({
+        numeroNegocio,
+
+        idGrupo:
+          grupo.idGrupo ||
+          grupo.docId,
+
+        colegio:
+          grupo.colegio ||
+          "",
+
+        curso:
+          grupo.curso ||
+          "",
+
+        incluyePolera:
+          incluyePolera
+            ? "SÍ"
+            : "NO",
+
+        pasajerosActivos:
+          activos.length,
+
+        conTalla,
+
+        sinTalla,
+
+        XS:
+          tallasGrupo.XS ||
+          0,
+
+        S:
+          tallasGrupo.S ||
+          0,
+
+        M:
+          tallasGrupo.M ||
+          0,
+
+        L:
+          tallasGrupo.L ||
+          0,
+
+        XL:
+          tallasGrupo.XL ||
+          0,
+
+        XXL:
+          tallasGrupo.XXL ||
+          0,
+
+        otras:
+          Object.entries(
+            tallasGrupo
           )
-          .reduce(
-            (
-              suma,
-              [, cantidad]
-            ) =>
-              suma +
-              cantidad,
-            0
-          )
-    });
+            .filter(
+              ([talla]) =>
+                ![
+                  "XS",
+                  "S",
+                  "M",
+                  "L",
+                  "XL",
+                  "XXL"
+                ].includes(
+                  talla
+                )
+            )
+            .reduce(
+              (
+                suma,
+                [, cantidad]
+              ) =>
+                suma +
+                Number(
+                  cantidad ||
+                  0
+                ),
+              0
+            )
+      });
+    } catch (error) {
+      console.error(
+        `❌ Error procesando negocio ${numeroNegocio || grupo.docId}:`,
+        error
+      );
+
+      gruposConError.push({
+        numeroNegocio:
+          numeroNegocio ||
+          "",
+
+        idGrupo:
+          grupo.idGrupo ||
+          grupo.docId,
+
+        colegio:
+          grupo.colegio ||
+          "",
+
+        curso:
+          grupo.curso ||
+          "",
+
+        error:
+          error?.message ||
+          String(error)
+      });
+
+      resumenGrupo.push({
+        numeroNegocio,
+
+        idGrupo:
+          grupo.idGrupo ||
+          grupo.docId,
+
+        colegio:
+          grupo.colegio ||
+          "",
+
+        curso:
+          grupo.curso ||
+          "",
+
+        incluyePolera:
+          incluyePolera
+            ? "SÍ"
+            : "NO",
+
+        pasajerosActivos:
+          "ERROR",
+
+        conTalla:
+          "ERROR",
+
+        sinTalla:
+          "ERROR",
+
+        XS: 0,
+        S: 0,
+        M: 0,
+        L: 0,
+        XL: 0,
+        XXL: 0,
+        otras: 0
+      });
+
+      continue;
+    }
   }
 
   console.log(
@@ -23626,22 +23685,12 @@ window.catastroTallasPolera2026 = async function () {
     tablaTotalTallas
   );
 
-  console.log(
-    "📌 TOTALES",
-    {
-      gruposGanados:
-        grupos.length,
-
-      pasajerosActivos:
-        totalActivos,
-
-      conTalla:
-        totalConTalla,
-
-      sinTalla:
-        totalSinTalla
-    }
-  );
+  const sinTalla =
+    detalle.filter(
+      (item) =>
+        item.talla ===
+        "SIN TALLA"
+    );
 
   console.log(
     "======================================"
@@ -23659,19 +23708,140 @@ window.catastroTallasPolera2026 = async function () {
     detalle
   );
 
-  const sinTalla =
-    detalle.filter(
-      (item) =>
-        item.talla ===
-        "SIN TALLA"
-    );
-
   console.log(
     `⚠️ PERSONAS SIN TALLA (${sinTalla.length})`
   );
 
   console.table(
     sinTalla
+  );
+
+  if (
+    gruposConError.length >
+    0
+  ) {
+    console.log(
+      "======================================"
+    );
+
+    console.log(
+      `❌ GRUPOS CON ERROR (${gruposConError.length})`
+    );
+
+    console.log(
+      "======================================"
+    );
+
+    console.table(
+      gruposConError
+    );
+  }
+
+  /*
+    =====================================================
+    RESUMEN FINAL COMPACTO
+    =====================================================
+  */
+
+  const formatoNumero = (
+    valor
+  ) =>
+    Number(
+      valor ||
+      0
+    ).toLocaleString(
+      "es-CL"
+    );
+
+  const tallasPrincipales = [
+    "XS",
+    "S",
+    "M",
+    "L",
+    "XL",
+    "XXL"
+  ];
+
+  const totalOtrasTallas =
+    Object.entries(
+      totalPorTalla
+    )
+      .filter(
+        ([talla]) =>
+          !tallasPrincipales.includes(
+            talla
+          )
+      )
+      .reduce(
+        (
+          suma,
+          [, cantidad]
+        ) =>
+          suma +
+          Number(
+            cantidad ||
+            0
+          ),
+        0
+      );
+
+  console.log("");
+  console.log(
+    "======================================"
+  );
+  console.log(
+    "👕 RESUMEN FINAL POLERAS 2026"
+  );
+  console.log(
+    "======================================"
+  );
+
+  console.log(
+    `GRUPOS GANADOS: ${formatoNumero(grupos.length)}`
+  );
+
+  console.log(
+    `PASAJEROS ACTIVOS: ${formatoNumero(totalActivos)}`
+  );
+
+  console.log(
+    `TOTAL CON TALLA: ${formatoNumero(totalConTalla)}`
+  );
+
+  console.log("");
+
+  tallasPrincipales.forEach(
+    (talla) => {
+      console.log(
+        `${talla}: ${formatoNumero(
+          totalPorTalla[talla] ||
+          0
+        )}`
+      );
+    }
+  );
+
+  if (
+    totalOtrasTallas >
+    0
+  ) {
+    console.log(
+      `OTRAS TALLAS: ${formatoNumero(totalOtrasTallas)}`
+    );
+  }
+
+  console.log("");
+
+  console.log(
+    `⚠️ SIN TALLA: ${formatoNumero(totalSinTalla)}`
+  );
+
+  console.log(
+    `❌ GRUPOS CON ERROR: ${formatoNumero(gruposConError.length)}`
+  );
+
+  console.log(
+    "======================================"
   );
 
   const resultado = {
@@ -23689,7 +23859,13 @@ window.catastroTallasPolera2026 = async function () {
         totalSinTalla,
 
       porTalla:
-        totalPorTalla
+        totalPorTalla,
+
+      otrasTallas:
+        totalOtrasTallas,
+
+      gruposConError:
+        gruposConError.length
     },
 
     resumenPorGrupo:
@@ -23697,7 +23873,9 @@ window.catastroTallasPolera2026 = async function () {
 
     detalle,
 
-    sinTalla
+    sinTalla,
+
+    gruposConError
   };
 
   window.__catastroTallasPolera2026 =
