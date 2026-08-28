@@ -648,14 +648,41 @@ function syncFichaMesViajeOtroVisibility() {
     return;
   }
 
-  const esOtro =
-    normalizeSearchLocal(
-      select?.value || ""
-    ) === "otro";
+  /*
+   * NUEVA REGLA:
+   *
+   * "Especificar" está disponible para CUALQUIER mes.
+   *
+   * Ejemplos:
+   *
+   * NOVIEMBRE
+   * Segunda quincena
+   *
+   * SEPTIEMBRE
+   * Primera semana
+   *
+   * NOVIEMBRE
+   * [vacío]
+   *
+   * OTRO
+   * Fecha por definir
+   */
 
+  const hayMesSeleccionado =
+    !!cleanText(
+      select?.value || ""
+    );
+
+  /*
+   * Si todavía no se selecciona mes,
+   * dejamos oculto el campo.
+   *
+   * Apenas existe una selección,
+   * cualquiera que sea, se muestra.
+   */
   otro.classList.toggle(
     "hidden",
-    !esOtro
+    !hayMesSeleccionado
   );
 
   const wrapper =
@@ -665,11 +692,11 @@ function syncFichaMesViajeOtroVisibility() {
 
   wrapper?.classList.toggle(
     "hidden",
-    !esOtro
+    !hayMesSeleccionado
   );
 
   otro.disabled =
-    !esOtro ||
+    !hayMesSeleccionado ||
     !canEditFicha();
 }
 
@@ -840,37 +867,100 @@ function syncFichaSharedSelectors(
    * =====================================================
    * MES / FECHA TENTATIVA
    * =====================================================
+   *
+   * A diferencia de DESTINO / PROGRAMA / TRAMO,
+   * aquí "mesViajeOtro" NO significa solamente OTRO.
+   *
+   * También funciona como especificación opcional:
+   *
+   * NOVIEMBRE + Segunda quincena
+   * SEPTIEMBRE + Primera semana
    */
 
-  const mesResolved =
-    resolveFichaLegacySelector({
-      options:
+  const mesSeleccionadoRaw =
+    cleanText(
+      ficha.mesViaje || ""
+    );
+
+  const mesEspecificacionRaw =
+    cleanText(
+      ficha.mesViajeOtro || ""
+    );
+
+  const fechaLegacy =
+    cleanText(
+      ficha.fechaViajeTexto || ""
+    );
+
+  let mesSeleccionado =
+    "";
+
+  let mesEspecificacion =
+    mesEspecificacionRaw;
+
+  if (mesSeleccionadoRaw) {
+    const canonical =
+      findFichaCanonicalOption(
         FICHA_MES_VIAJE_OPTIONS,
+        mesSeleccionadoRaw
+      );
 
-      selected:
-        ficha.mesViaje,
+    if (canonical) {
+      mesSeleccionado =
+        canonical;
+    } else {
+      /*
+       * Ficha intermedia / antigua donde mesViaje
+       * contenía directamente texto libre.
+       */
+      mesSeleccionado =
+        "OTRO";
 
-      other:
-        ficha.mesViajeOtro,
+      if (!mesEspecificacion) {
+        mesEspecificacion =
+          mesSeleccionadoRaw;
+      }
+    }
+  } else if (fechaLegacy) {
+    /*
+     * Compatibilidad con fichas antiguas que solamente
+     * tenían fechaViajeTexto.
+     */
+    const canonical =
+      findFichaCanonicalOption(
+        FICHA_MES_VIAJE_OPTIONS,
+        fechaLegacy
+      );
 
-      legacyValue:
-        ficha.fechaViajeTexto
-    });
+    if (canonical) {
+      mesSeleccionado =
+        canonical;
+    } else {
+      mesSeleccionado =
+        "OTRO";
+
+      mesEspecificacion =
+        mesEspecificacion ||
+        fechaLegacy;
+    }
+  }
 
   setFichaSelectOptions(
     "f_mesViaje",
     FICHA_MES_VIAJE_OPTIONS,
-    mesResolved.selected
+    mesSeleccionado
   );
 
   setValue(
     "f_mesViajeOtro",
-    mesResolved.other
+    mesEspecificacion
   );
 
   /*
-   * Conservamos también el campo viejo
-   * si todavía existe en el HTML.
+   * Campo antiguo.
+   *
+   * Lo conservamos por compatibilidad,
+   * pero ya no manda sobre la estructura nueva.
    */
   setValue(
     "f_fechaViajeTexto",
@@ -6028,24 +6118,41 @@ function buildSharedGroupPatchFromFicha(values = {}) {
      * NO escribimos fechaInicioViaje,
      * fechaFinViaje ni fechaViaje real.
      */
+    /*
+     * MES / INDICACIÓN TENTATIVA
+     *
+     * mesViaje guarda el mes principal.
+     *
+     * mesViajeOtro guarda una especificación opcional
+     * para cualquier mes:
+     *
+     * NOVIEMBRE + Segunda quincena
+     * SEPTIEMBRE + Primera semana
+     *
+     * También sigue soportando:
+     *
+     * OTRO + texto libre
+     *
+     * NO escribimos fechaInicioViaje,
+     * fechaFinViaje ni fechaViaje real.
+     */
     mesViaje:
-      mesSeleccion === "OTRO"
-        ? "OTRO"
-        : mesSeleccion,
+      mesSeleccion,
 
     mesViajeOtro:
-      mesSeleccion === "OTRO"
-        ? mesOtro
-        : "",
+      mesOtro,
 
+    /*
+     * Campo antiguo utilizado por otras partes
+     * del sistema.
+     *
+     * Priorizamos la especificación si existe.
+     */
     semanaViaje:
-      mesSeleccion === "OTRO"
-        ? mesOtro
-        : (
-            mesSeleccion ||
-            values.fechaViajeTexto ||
-            ""
-          ),
+      mesOtro ||
+      mesSeleccion ||
+      values.fechaViajeTexto ||
+      "",
 
     /*
      * OTROS CAMPOS CON ESPEJO REAL
@@ -6457,6 +6564,7 @@ async function saveFicha({
     );
 
   /*
+  /*
    * =========================================================
    * MES / FECHA TENTATIVA
    * =========================================================
@@ -6485,6 +6593,13 @@ async function saveFicha({
         raw
       );
 
+    /*
+     * Si el selector trae un mes reconocido,
+     * guardamos ese mes.
+     *
+     * Si por compatibilidad llega texto libre,
+     * se convierte en OTRO.
+     */
     mesViaje =
       canonical ||
       (
@@ -6493,27 +6608,37 @@ async function saveFicha({
           : ""
       );
 
+    /*
+     * NUEVA REGLA:
+     *
+     * mesViajeOtro siempre puede contener
+     * una especificación opcional,
+     * independientemente del mes.
+     */
     mesViajeOtro =
-      mesViaje === "OTRO"
-        ? (
-            getValue(
-              "f_mesViajeOtro"
-            ) ||
-            (
-              canonical
-                ? ""
-                : raw
-            )
-          )
-        : "";
+      cleanText(
+        getValue(
+          "f_mesViajeOtro"
+        )
+      );
+
+    /*
+     * Si llegó texto libre directamente al selector
+     * por alguna ficha antigua/intermedia,
+     * lo conservamos como especificación de OTRO.
+     */
+    if (
+      mesViaje === "OTRO" &&
+      !mesViajeOtro &&
+      raw &&
+      !canonical
+    ) {
+      mesViajeOtro =
+        raw;
+    }
   } else {
     /*
-     * Compatibilidad con ficha antigua.
-     *
-     * Si el texto coincide con un mes conocido,
-     * usamos ese mes.
-     *
-     * Si es otra indicación, queda como OTRO.
+     * Compatibilidad con HTML/fichas antiguas.
      */
     const canonical =
       findFichaCanonicalOption(
@@ -6526,6 +6651,8 @@ async function saveFicha({
         canonical;
 
       mesViajeOtro =
+        previousFichaView.mesViajeOtro ||
+        state.group?.mesViajeOtro ||
         "";
     } else if (
       fechaViajeTextoInput
@@ -6548,17 +6675,19 @@ async function saveFicha({
     }
   }
 
+  /*
+   * Texto de compatibilidad.
+   *
+   * Si hay especificación, esa es la descripción
+   * más precisa.
+   *
+   * Si no, usamos el mes.
+   */
   const fechaViajeTexto =
-    mesViaje === "OTRO"
-      ? (
-          mesViajeOtro ||
-          fechaViajeTextoInput
-        )
-      : (
-          fechaViajeTextoInput ||
-          mesViaje ||
-          ""
-        );
+    mesViajeOtro ||
+    mesViaje ||
+    fechaViajeTextoInput ||
+    "";
 
   /*
    * =========================================================
@@ -7935,88 +8064,126 @@ function hydrateFicha(group = {}) {
       ""
     );
 
-  let mesResolved;
+  let mesViaje =
+    "";
+
+  let mesViajeOtro =
+    "";
 
   if (
     mesFicha ||
     mesOtroFicha
   ) {
-    mesResolved =
-      resolveFichaLegacySelector({
-        options:
-          FICHA_MES_VIAJE_OPTIONS,
+    const canonical =
+      findFichaCanonicalOption(
+        FICHA_MES_VIAJE_OPTIONS,
+        mesFicha
+      );
 
-        selected:
-          mesFicha,
+    if (canonical) {
+      mesViaje =
+        canonical;
 
-        other:
-          mesOtroFicha,
+      mesViajeOtro =
+        mesOtroFicha;
+    } else if (mesFicha) {
+      mesViaje =
+        "OTRO";
 
-        legacyValue:
-          fechaLegacyFicha
-      });
+      mesViajeOtro =
+        mesOtroFicha ||
+        mesFicha ||
+        fechaLegacyFicha ||
+        "";
+    } else {
+      mesViaje =
+        "OTRO";
+
+      mesViajeOtro =
+        mesOtroFicha;
+    }
   } else if (
     fechaLegacyFicha
   ) {
-    mesResolved =
-      resolveFichaLegacySelector({
-        options:
-          FICHA_MES_VIAJE_OPTIONS,
+    const canonical =
+      findFichaCanonicalOption(
+        FICHA_MES_VIAJE_OPTIONS,
+        fechaLegacyFicha
+      );
 
-        legacyValue:
-          fechaLegacyFicha
-      });
+    if (canonical) {
+      mesViaje =
+        canonical;
+
+      mesViajeOtro =
+        "";
+    } else {
+      mesViaje =
+        "OTRO";
+
+      mesViajeOtro =
+        fechaLegacyFicha;
+    }
   } else if (
     mesGrupo ||
     mesOtroGrupo
   ) {
-    mesResolved =
-      resolveFichaLegacySelector({
-        options:
-          FICHA_MES_VIAJE_OPTIONS,
+    const canonical =
+      findFichaCanonicalOption(
+        FICHA_MES_VIAJE_OPTIONS,
+        mesGrupo
+      );
 
-        selected:
-          mesGrupo,
+    if (canonical) {
+      mesViaje =
+        canonical;
 
-        other:
-          normalizeSearchLocal(
-            mesGrupo
-          ) === "otro"
-            ? mesOtroGrupo
-            : "",
+      mesViajeOtro =
+        mesOtroGrupo;
+    } else if (mesGrupo) {
+      mesViaje =
+        "OTRO";
 
-        legacyValue:
-          fechaLegacyGrupo
-      });
-  } else {
-    mesResolved =
-      resolveFichaLegacySelector({
-        options:
-          FICHA_MES_VIAJE_OPTIONS,
+      mesViajeOtro =
+        mesOtroGrupo ||
+        mesGrupo ||
+        fechaLegacyGrupo ||
+        "";
+    } else {
+      mesViaje =
+        "OTRO";
 
-        legacyValue:
-          fechaLegacyGrupo
-      });
+      mesViajeOtro =
+        mesOtroGrupo;
+    }
+  } else if (
+    fechaLegacyGrupo
+  ) {
+    const canonical =
+      findFichaCanonicalOption(
+        FICHA_MES_VIAJE_OPTIONS,
+        fechaLegacyGrupo
+      );
+
+    if (canonical) {
+      mesViaje =
+        canonical;
+
+      mesViajeOtro =
+        "";
+    } else {
+      mesViaje =
+        "OTRO";
+
+      mesViajeOtro =
+        fechaLegacyGrupo;
+    }
   }
 
-  const mesViaje =
-    mesResolved.selected;
-
-  const mesViajeOtro =
-    mesResolved.other;
-
   const fechaViajeTexto =
+    mesViajeOtro ||
     fechaLegacyFicha ||
-    (
-      normalizeSearchLocal(
-        mesViaje
-      ) === "otro"
-        ? mesViajeOtro
-        : (
-            mesViaje ||
-            fechaLegacyGrupo
-          )
-    ) ||
+    mesViaje ||
     fechaLegacyGrupo ||
     "";
 
