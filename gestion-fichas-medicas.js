@@ -144,6 +144,12 @@ const MEDICAL_FIELD_OVERRIDES = {
     options: [
       {
         value:
+          "XS",
+        label:
+          "XS"
+      },
+      {
+        value:
           "S",
         label:
           "S"
@@ -171,6 +177,18 @@ const MEDICAL_FIELD_OVERRIDES = {
           "2XL",
         label:
           "2XL"
+      },
+      {
+        value:
+          "3XL",
+        label:
+          "3XL"
+      },
+      {
+        value:
+          "4XL",
+        label:
+          "4XL"
       }
     ]
   },
