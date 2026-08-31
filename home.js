@@ -77,7 +77,8 @@ const state = {
   inscripcionListaEsperaRows: [],
   listaEsperaPagadaRows: [],
   formularioAdultoLiberadoRows: [],
-  rutSospechosoPagosRows: [],
+  rutPendientePagosRows: [],
+  nominaPagosDesalineadaRows: [],
   anoFichaFiltro: String(new Date().getFullYear()),
 
   scopedRows: [],
@@ -939,7 +940,12 @@ function syncAlertRowsByRole(effectiveUser = null) {
   );
 
   setAlertRowVisibleByChild(
-    "link-rut-sospechoso-pagos",
+    "link-rut-pendiente-pagos",
+    !!user
+  );
+
+  setAlertRowVisibleByChild(
+    "link-nomina-pagos-desalineada",
     !!user
   );
 
@@ -1564,14 +1570,25 @@ function esFormularioAdultoLiberadoPendiente(
   );
 }
 
-function esRutSospechosoSistemaPagos(
+function esRutPendienteSistemaPagos(
   item = {}
 ) {
   return (
     item.activa !== false &&
     item.resuelta !== true &&
     item.tipoAlerta ===
-      "rut_sospechoso_sistema_pagos"
+      "rut_pendiente_sistema_pagos"
+  );
+}
+
+function esNominaPagosDesalineada(
+  item = {}
+) {
+  return (
+    item.activa !== false &&
+    item.resuelta !== true &&
+    item.tipoAlerta ===
+      "nomina_pagos_desalineada"
   );
 }
 
@@ -1781,154 +1798,328 @@ function renderFormularioLiberadosHomeCards(
     .join("");
 }
 
-function renderRutSospechosoPagosCards(
+function renderRutPendientePagosCards(
   rows = []
 ) {
   if (!rows.length) {
     return emptyHtml(
-      "No hay diferencias de RUT pendientes de revisión."
+      "No hay RUT pendientes de revisión."
     );
   }
 
   return rows
-    .map(
-      (item) => {
-        const idGrupo =
-          String(
-            item.idGrupo ||
-            item.groupDocId ||
-            ""
-          ).trim();
+    .map((item) => {
+      const idGrupo =
+        String(
+          item.idGrupo ||
+          item.groupDocId ||
+          ""
+        ).trim();
 
-        return `
-          <div class="home-card-row">
+      const motivo =
+        item.motivoRutPendiente ===
+        "posible_correccion"
+          ? "Posible diferencia de RUT"
+          : "Pasajero de Pagos sin coincidencia en nuestra nómina";
 
-            <div style="min-width:0;">
+      return `
+        <div class="home-card-row">
 
-              <div class="home-card-row-title">
-                ${escapeHtml(
-                  item.nombreParticipante ||
-                  item.nombreNuestro ||
-                  "Sin nombre"
-                )}
-              </div>
+          <div style="min-width:0;">
 
-              <div class="home-card-row-text">
-
-                Grupo:
-                ${escapeHtml(
-                  item.aliasGrupo ||
-                  item.colegio ||
-                  idGrupo ||
-                  "Sin grupo"
-                )}
-                <br>
-
-                Año:
-                ${escapeHtml(
-                  item.anoViaje ||
-                  "Sin año"
-                )}
-                <br>
-
-                N° negocio:
-                ${escapeHtml(
-                  item.numeroNegocio ||
-                  "Sin número"
-                )}
-                <br><br>
-
-                <strong>
-                  Nuestro sistema
-                </strong>
-                <br>
-
-                Nombre:
-                ${escapeHtml(
-                  item.nombreNuestro ||
-                  item.nombreParticipante ||
-                  "Sin nombre"
-                )}
-                <br>
-
-                RUT:
-                ${escapeHtml(
-                  item.rutNuestro ||
-                  item.documento ||
-                  "Sin RUT"
-                )}
-                <br><br>
-
-                <strong>
-                  Sistema de Pagos
-                </strong>
-                <br>
-
-                Nombre:
-                ${escapeHtml(
-                  item.nombrePagos ||
-                  "Sin nombre"
-                )}
-                <br>
-
-                RUT:
-                ${escapeHtml(
-                  item.rutPagos ||
-                  "Sin RUT"
-                )}
-                <br><br>
-
-                Detectada:
-                ${escapeHtml(
-                  formatDate(
-                    item.detectadaAt ||
-                    item.creadoAt
-                  )
-                )}
-
-              </div>
-
+            <div class="home-card-row-title">
+              ${escapeHtml(
+                item.nombrePagos ||
+                item.nombreNuestro ||
+                "Sin nombre"
+              )}
             </div>
 
-            <div
-              style="
-                display:flex;
-                gap:8px;
-                flex-wrap:wrap;
-                justify-content:flex-end;
-              "
-            >
+            <div class="home-card-row-text">
 
-              <a
-                href="grupo.html?id=${encodeURIComponent(
-                  idGrupo
-                )}"
-                target="_blank"
-                rel="noopener"
-                class="home-btn"
-              >
-                Abrir grupo
-              </a>
+              Grupo:
+              ${escapeHtml(
+                item.aliasGrupo ||
+                item.grupo ||
+                item.colegio ||
+                idGrupo ||
+                "Sin grupo"
+              )}
+              <br>
 
-              <button
-                type="button"
-                class="home-btn"
-                data-resolver-rut-pagos="${escapeHtml(
-                  item.id
-                )}"
-                style="
-                  background:#6d4a92;
-                "
-              >
-                Marcar resuelto
-              </button>
+              Año:
+              ${escapeHtml(
+                item.anoViaje ||
+                "Sin año"
+              )}
+              <br>
+
+              N° negocio:
+              ${escapeHtml(
+                item.numeroNegocio ||
+                "Sin número"
+              )}
+              <br><br>
+
+              <strong>Motivo</strong>
+              <br>
+
+              ${escapeHtml(motivo)}
+              <br><br>
+
+              ${
+                item.rutNuestro ||
+                item.nombreNuestro
+                  ? `
+                    <strong>
+                      Nuestro sistema
+                    </strong>
+                    <br>
+
+                    Nombre:
+                    ${escapeHtml(
+                      item.nombreNuestro ||
+                      "Sin nombre"
+                    )}
+                    <br>
+
+                    RUT:
+                    ${escapeHtml(
+                      item.rutNuestro ||
+                      "Sin RUT"
+                    )}
+                    <br><br>
+                  `
+                  : `
+                    <strong>
+                      Nuestro sistema
+                    </strong>
+                    <br>
+                    No se encontró una inscripción
+                    coincidente.
+                    <br><br>
+                  `
+              }
+
+              <strong>
+                Sistema de Pagos
+              </strong>
+              <br>
+
+              Nombre:
+              ${escapeHtml(
+                item.nombrePagos ||
+                "Sin nombre"
+              )}
+              <br>
+
+              RUT:
+              ${escapeHtml(
+                item.rutPagos ||
+                "Sin RUT"
+              )}
+              <br><br>
+
+              Detectada:
+              ${escapeHtml(
+                formatDate(
+                  item.ultimaDeteccionAt ||
+                  item.detectadaAt ||
+                  item.creadoAt ||
+                  item.actualizadoAt
+                )
+              )}
 
             </div>
 
           </div>
-        `;
-      }
-    )
+
+          <div
+            style="
+              display:flex;
+              gap:8px;
+              flex-wrap:wrap;
+              justify-content:flex-end;
+            "
+          >
+
+            <a
+              href="grupo.html?id=${encodeURIComponent(
+                idGrupo
+              )}"
+              target="_blank"
+              rel="noopener"
+              class="home-btn"
+            >
+              Abrir grupo
+            </a>
+
+            <button
+              type="button"
+              class="home-btn"
+              data-resolver-rut-pagos="${escapeHtml(
+                item.id
+              )}"
+              style="
+                background:#6d4a92;
+              "
+            >
+              Marcar resuelto
+            </button>
+
+          </div>
+
+        </div>
+      `;
+    })
+    .join("");
+}
+
+function renderNominaPagosDesalineadaCards(
+  rows = []
+) {
+  if (!rows.length) {
+    return emptyHtml(
+      "No hay nóminas desalineadas pendientes de revisión."
+    );
+  }
+
+  return rows
+    .map((item) => {
+      const idGrupo =
+        String(
+          item.idGrupo ||
+          item.groupDocId ||
+          ""
+        ).trim();
+
+      const totalPagos =
+        Number(
+          item.totalPagosActivos || 0
+        );
+
+      const totalFirebase =
+        Number(
+          item.totalFirebase || 0
+        );
+
+      const coincidencias =
+        Number(
+          item.totalCoincidencias || 0
+        );
+
+      const sinCoincidencia =
+        Number(
+          item.totalSinCoincidencia || 0
+        );
+
+      const porcentaje =
+        Number(
+          item.porcentajeSinCoincidencia || 0
+        );
+
+      return `
+        <div class="home-card-row">
+
+          <div style="min-width:0;">
+
+            <div class="home-card-row-title">
+              ${escapeHtml(
+                item.aliasGrupo ||
+                item.grupo ||
+                item.colegio ||
+                `Grupo ${idGrupo}`
+              )}
+            </div>
+
+            <div class="home-card-row-text">
+
+              ID grupo:
+              ${escapeHtml(
+                idGrupo ||
+                "Sin ID"
+              )}
+              <br>
+
+              N° negocio:
+              ${escapeHtml(
+                item.numeroNegocio ||
+                "Sin número"
+              )}
+              <br>
+
+              Año:
+              ${escapeHtml(
+                item.anoViaje ||
+                "Sin año"
+              )}
+              <br><br>
+
+              <strong>
+                Comparación de nóminas
+              </strong>
+              <br>
+
+              Pasajeros activos en Pagos:
+              <strong>${totalPagos}</strong>
+              <br>
+
+              Inscripciones en nuestro sistema:
+              <strong>${totalFirebase}</strong>
+              <br>
+
+              Coincidencias por RUT:
+              <strong>${coincidencias}</strong>
+              <br>
+
+              Sin coincidencia:
+              <strong>${sinCoincidencia}</strong>
+              <br>
+
+              Porcentaje sin coincidencia:
+              <strong>${porcentaje}%</strong>
+              <br><br>
+
+              ${
+                item.mensaje
+                  ? `
+                    ${escapeHtml(
+                      item.mensaje
+                    )}
+                    <br><br>
+                  `
+                  : ""
+              }
+
+              Detectada:
+              ${escapeHtml(
+                formatDate(
+                  item.ultimaDeteccionAt ||
+                  item.actualizadoAt ||
+                  item.creadoAt
+                )
+              )}
+
+            </div>
+
+          </div>
+
+          <div>
+            <a
+              href="grupo.html?id=${encodeURIComponent(
+                idGrupo
+              )}"
+              target="_blank"
+              rel="noopener"
+              class="home-btn"
+            >
+              Abrir grupo
+            </a>
+          </div>
+
+        </div>
+      `;
+    })
     .join("");
 }
 
@@ -2072,11 +2263,11 @@ async function marcarFormularioLiberadoRevisado(
   );
 }
 
-async function marcarRutSospechosoResuelto(
+async function marcarRutPendienteResuelto(
   alertaId = ""
 ) {
   const item =
-    state.rutSospechosoPagosRows
+    state.rutPendientePagosRows
       .find(
         (row) =>
           String(row.id) ===
@@ -2091,53 +2282,26 @@ async function marcarRutSospechosoResuelto(
     return;
   }
 
-  const groupDocId =
-    String(
-      item.groupDocId ||
-      item.idGrupo ||
-      ""
-    ).trim();
-
-  const inscripcionId =
-    String(
-      item.inscripcionId ||
-      ""
-    ).trim();
-
-  if (
-    !groupDocId ||
-    !inscripcionId
-  ) {
-    alert(
-      "La alerta no contiene los identificadores necesarios."
-    );
-
-    return;
-  }
-
   const ok =
     window.confirm(
       [
-        "¿Marcar esta diferencia de RUT como resuelta?",
+        "¿Marcar este RUT pendiente como resuelto?",
         "",
-        `Pasajero: ${
-          item.nombreParticipante ||
-          item.nombreNuestro ||
+        `Pasajero en Pagos: ${
+          item.nombrePagos ||
           "—"
         }`,
-        "",
-        `Nuestro RUT: ${
-          item.rutNuestro ||
-          item.documento ||
-          "—"
-        }`,
-        `RUT Sistema de Pagos: ${
+        `RUT en Pagos: ${
           item.rutPagos ||
           "—"
         }`,
         "",
-        "La próxima sincronización NO volverá a alertar por esta misma combinación de RUT.",
-        "Si en el futuro aparece otra diferencia distinta, podrá generarse una nueva alerta."
+        item.rutNuestro
+          ? `RUT en nuestro sistema: ${item.rutNuestro}`
+          : "No existe una coincidencia de RUT en nuestro sistema.",
+        "",
+        "Esta resolución quedará registrada como manual.",
+        "La sincronización no volverá a abrir exactamente el mismo caso mientras la combinación detectada no cambie."
       ].join("\n")
     );
 
@@ -2165,45 +2329,45 @@ async function marcarRutSospechosoResuelto(
       ""
     );
 
-  const inscripcionRef =
+  const alertaRef =
     doc(
       db,
-      "ventas_cotizaciones",
-      groupDocId,
-      "inscripciones",
-      inscripcionId
+      ALERTAS_INSCRIPCIONES_COLLECTION,
+      String(alertaId)
     );
 
-  /*
-    Usamos rutas con punto para modificar
-    solamente la alerta, sin reemplazar
-    el resto de sistemaPagos.
-  */
   await updateDoc(
-    inscripcionRef,
+    alertaRef,
     {
-      "sistemaPagos.alertaRutSospechoso.activa":
+      activa:
         false,
 
-      "sistemaPagos.alertaRutSospechoso.resueltaManualmente":
+      resuelta:
         true,
 
-      "sistemaPagos.alertaRutSospechoso.resueltaAt":
+      resueltaManualmente:
+        true,
+
+      resueltaAt:
         serverTimestamp(),
 
-      "sistemaPagos.alertaRutSospechoso.resueltaPor":
+      resueltaPor:
         nombreUsuario,
 
-      "sistemaPagos.alertaRutSospechoso.resueltaPorCorreo":
-        correoUsuario
+      resueltaPorCorreo:
+        correoUsuario,
+
+      actualizadoAt:
+        serverTimestamp()
     }
   );
 
   /*
-    El trigger Cloud cerrará el documento
-    de ventas_alertas_inscripciones.
+    NO modificamos la inscripción.
 
-    Localmente lo quitamos inmediatamente.
+    Esta alerta pertenece directamente
+    a ventas_alertas_inscripciones y puede
+    incluso no tener inscripcionId.
   */
   item.activa =
     false;
@@ -2211,13 +2375,22 @@ async function marcarRutSospechosoResuelto(
   item.resuelta =
     true;
 
-  state.rutSospechosoPagosRows =
-    state.rutSospechosoPagosRows
-      .filter(
-        (row) =>
-          String(row.id) !==
-          String(alertaId)
-      );
+  item.resueltaManualmente =
+    true;
+
+  state.inscripcionesRows =
+    state.inscripcionesRows.filter(
+      (row) =>
+        String(row.id) !==
+        String(alertaId)
+    );
+
+  state.rutPendientePagosRows =
+    state.rutPendientePagosRows.filter(
+      (row) =>
+        String(row.id) !==
+        String(alertaId)
+    );
 
   renderHome();
 
@@ -2436,10 +2609,17 @@ function renderHome() {
       )
     );
 
-  state.rutSospechosoPagosRows =
+  state.rutPendientePagosRows =
     sortInscripcionesHome(
       inscripcionesScope.filter(
-        esRutSospechosoSistemaPagos
+        esRutPendienteSistemaPagos
+      )
+    );
+
+  state.nominaPagosDesalineadaRows =
+    sortInscripcionesHome(
+      inscripcionesScope.filter(
+        esNominaPagosDesalineada
       )
     );
 
@@ -2463,8 +2643,13 @@ function renderHome() {
       .length
   );
   setText(
-    "count-rut-sospechoso-pagos",
-    state.rutSospechosoPagosRows.length
+    "count-rut-pendiente-pagos",
+    state.rutPendientePagosRows.length
+  );
+
+  setText(
+    "count-nomina-pagos-desalineada",
+    state.nominaPagosDesalineadaRows.length
   );
   
   syncAlertRowsByRole(effectiveUser);
@@ -3082,8 +3267,11 @@ function bindAlertButtons() {
   const linkFormularioAdultoLiberado =
     $("link-formulario-adulto-liberado");
 
-  const linkRutSospechosoPagos =
-    $("link-rut-sospechoso-pagos");
+  const linkRutPendientePagos =
+    $("link-rut-pendiente-pagos");
+
+  const linkNominaPagosDesalineada =
+    $("link-nomina-pagos-desalineada");
 
   const linkInscripcionListaEspera =
     $("link-inscripcion-lista-espera");
@@ -3163,7 +3351,7 @@ function bindAlertButtons() {
   }
 
   /* =====================================================
-     MARCAR RUT SOSPECHOSO RESUELTO
+     MARCAR RUT PENDIENTE RESUELTO
   ===================================================== */
 
   if (
@@ -3206,7 +3394,7 @@ function bindAlertButtons() {
           btn.textContent =
             "Guardando...";
 
-          await marcarRutSospechosoResuelto(
+          await marcarRutPendienteResuelto(
             alertaId
           );
 
@@ -3702,46 +3890,81 @@ function bindAlertButtons() {
   }
 
   /* =====================================================
-     RUT SOSPECHOSO SISTEMA DE PAGOS
+     RUT PENDIENTE SISTEMA DE PAGOS
   ===================================================== */
 
   if (
-    linkRutSospechosoPagos &&
-    !linkRutSospechosoPagos.dataset.bound
+    linkRutPendientePagos &&
+    !linkRutPendientePagos.dataset.bound
   ) {
-    linkRutSospechosoPagos.dataset.bound =
+    linkRutPendientePagos.dataset.bound =
       "1";
 
-    linkRutSospechosoPagos.addEventListener(
+    linkRutPendientePagos.addEventListener(
       "click",
       (e) => {
         e.preventDefault();
 
         openListadoModal({
           titulo:
-            "RUT por revisar",
+            "RUT pendientes",
 
           subtitulo:
-            "Posibles diferencias entre nuestro sistema y Sistema de Pagos.",
+            "Pasajeros activos en Sistema de Pagos cuyo RUT requiere revisión.",
 
           resumen:
             `Hay ${
-              state
-                .rutSospechosoPagosRows
-                .length
+              state.rutPendientePagosRows.length
             } caso(s) pendiente(s) de revisión.`,
 
           rows:
-            state
-              .rutSospechosoPagosRows,
+            state.rutPendientePagosRows,
 
           renderFn:
-            renderRutSospechosoPagosCards
+            renderRutPendientePagosCards
         });
       }
     );
   }
 
+  /* =====================================================
+     NÓMINAS DESALINEADAS CON SISTEMA DE PAGOS
+  ===================================================== */
+
+  if (
+    linkNominaPagosDesalineada &&
+    !linkNominaPagosDesalineada.dataset.bound
+  ) {
+    linkNominaPagosDesalineada.dataset.bound =
+      "1";
+
+    linkNominaPagosDesalineada.addEventListener(
+      "click",
+      (e) => {
+        e.preventDefault();
+
+        openListadoModal({
+          titulo:
+            "Nóminas desalineadas",
+
+          subtitulo:
+            "Grupos donde la diferencia entre nuestra nómina y Sistema de Pagos es demasiado grande para tratarla como errores individuales de RUT.",
+
+          resumen:
+            `Hay ${
+              state.nominaPagosDesalineadaRows.length
+            } grupo(s) pendiente(s) de revisión.`,
+
+          rows:
+            state.nominaPagosDesalineadaRows,
+
+          renderFn:
+            renderNominaPagosDesalineadaCards
+        });
+      }
+    );
+  }
+  
   /* =====================================================
      LISTA DE ESPERA PENDIENTE
   ===================================================== */
