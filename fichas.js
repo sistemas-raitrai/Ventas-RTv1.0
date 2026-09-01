@@ -9606,64 +9606,294 @@ async function ({
     );
 
   /*
+   * Buscar también las solicitudes reales.
+   *
+   * Las solicitudes antiguas pueden estar correctamente cerradas
+   * aunque el historial todavía no tenga
+   * metadata.requiereNuevoPdf.
+   */
+  const posiblesIdsGrupo = [
+    String(
+      group.idGrupo ||
+      ""
+    ),
+
+    String(
+      groupSnapshot.id ||
+      ""
+    ),
+
+    String(
+      targetId ||
+      ""
+    )
+  ].filter(
+    (value, index, array) =>
+      value &&
+      array.indexOf(value) === index
+  );
+
+  const solicitudesMap =
+    new Map();
+
+  for (
+    const possibleId of posiblesIdsGrupo
+  ) {
+    const solicitudesQuery =
+      query(
+        collection(
+          db,
+          SOLICITUDES_COLLECTION
+        ),
+        where(
+          "idGrupo",
+          "==",
+          possibleId
+        )
+      );
+
+    const solicitudesSnapshot =
+      await getDocs(
+        solicitudesQuery
+      );
+
+    solicitudesSnapshot.docs.forEach(
+      (item) => {
+        solicitudesMap.set(
+          item.id,
+          {
+            id:
+              item.id,
+
+            ...item.data()
+          }
+        );
+      }
+    );
+  }
+
+  const solicitudes =
+    Array.from(
+      solicitudesMap.values()
+    );
+
+  console.log(
+    "SOLICITUDES ENCONTRADAS:",
+    solicitudes.map(
+      (item) => ({
+        id:
+          item.id,
+
+        tipoSolicitud:
+          item.tipoSolicitud,
+
+        estadoSolicitud:
+          item.estadoSolicitud,
+
+        resuelta:
+          item.resuelta,
+
+        detalle:
+          item.detalle,
+
+        respuestaJefa:
+          item.respuestaJefa,
+
+        respuestaAdministracion:
+          item.respuestaAdministracion
+      })
+    )
+  );
+
+  /*
    * Solamente cuentan los procedimientos cerrados
    * que exigieron efectivamente un nuevo PDF.
    */
-  const procesosConNuevoPdf =
-    history.filter((item) => {
-      const tipo =
-        normalizeSearchLocal(
-          item.tipoMovimiento ||
+  /*
+   * =========================================================
+   * 1. PROCESOS CONFIRMADOS POR EL HISTORIAL NUEVO
+   * =========================================================
+   */
+
+  const procesosHistorial =
+    history.filter(
+      (item) => {
+        const tipo =
+          normalizeSearchLocal(
+            item.tipoMovimiento ||
+            ""
+          );
+
+        const esCierre =
+          tipo ===
+            "solicitud_actualizacion_cerrada" ||
+          tipo ===
+            "solicitud_correccion_cerrada";
+
+        return (
+          esCierre &&
+          item.metadata?.requiereNuevoPdf === true
+        );
+      }
+    );
+
+  /*
+   * =========================================================
+   * 2. SOLICITUDES ANTIGUAS CERRADAS
+   * =========================================================
+   *
+   * Compatibilidad con procedimientos anteriores a la creación
+   * de metadata.requiereNuevoPdf.
+   */
+
+  const solicitudesCerradas =
+    solicitudes.filter(
+      (item) => {
+        const tipo =
+          normalizeSearchLocal(
+            item.tipoSolicitud ||
+            ""
+          );
+
+        const estado =
+          normalizeSearchLocal(
+            item.estadoSolicitud ||
+            ""
+          );
+
+        const tipoValido =
+          tipo === "actualizacion_ficha" ||
+          tipo === "correccion_ficha";
+
+        const estaCerrada =
+          item.resuelta === true ||
+          estado === "completada" ||
+          estado === "cerrada" ||
+          !!cleanText(
+            item.respuestaAdministracion ||
+            ""
+          );
+
+        return (
+          tipoValido &&
+          estaCerrada
+        );
+      }
+    );
+
+  /*
+   * =========================================================
+   * 3. UNIFICAR SIN DUPLICAR SOLICITUDES
+   * =========================================================
+   */
+
+  const procesosMap =
+    new Map();
+
+  procesosHistorial.forEach(
+    (item) => {
+      const solicitudId =
+        cleanText(
+          item.metadata?.solicitudId ||
           ""
         );
 
-      const esCierre =
-        tipo ===
-          "solicitud_actualizacion_cerrada" ||
-        tipo ===
-          "solicitud_correccion_cerrada";
+      const key =
+        solicitudId
+          ? `solicitud:${solicitudId}`
+          : `historial:${item.id}`;
 
-      const requiereNuevoPdf =
-        item.metadata?.requiereNuevoPdf ===
-        true;
+      procesosMap.set(
+        key,
+        {
+          fuente:
+            "ventas_historial",
 
-      return (
-        esCierre &&
-        requiereNuevoPdf
+          id:
+            item.id,
+
+          solicitudId,
+
+          tipoSolicitud:
+            item.metadata?.tipoSolicitud ||
+            "",
+
+          detalle:
+            item.metadata?.detalleSolicitud ||
+            "",
+
+          requiereNuevoPdf:
+            true
+        }
       );
-    });
+    }
+  );
 
-  /*
-   * Evita contar dos veces la misma solicitud.
-   */
-  const procesosUnicos = [];
-  const solicitudesVistas =
-    new Set();
-
-  procesosConNuevoPdf.forEach(
+  solicitudesCerradas.forEach(
     (item) => {
       const key =
-        cleanText(
-          item.metadata?.solicitudId ||
-          item.id
-        );
+        `solicitud:${item.id}`;
 
+      /*
+       * Si el historial nuevo ya registró esta misma solicitud,
+       * no la agregamos dos veces.
+       */
       if (
-        !key ||
-        solicitudesVistas.has(key)
+        procesosMap.has(key)
       ) {
         return;
       }
 
-      solicitudesVistas.add(key);
+      procesosMap.set(
+        key,
+        {
+          fuente:
+            "ventas_solicitudes_actualizacion",
 
-      procesosUnicos.push(item);
+          id:
+            item.id,
+
+          solicitudId:
+            item.id,
+
+          tipoSolicitud:
+            item.tipoSolicitud ||
+            "",
+
+          detalle:
+            item.detalle ||
+            item.asunto ||
+            "",
+
+          estadoSolicitud:
+            item.estadoSolicitud ||
+            "",
+
+          resuelta:
+            item.resuelta === true,
+
+          /*
+           * En solicitudes antiguas no existía esta propiedad.
+           * Al estar cerrada y existir un PDF actualizado vigente,
+           * la utilizamos como evidencia histórica.
+           */
+          requiereNuevoPdf:
+            true,
+
+          compatibilidadLegacy:
+            true
+        }
+      );
     }
   );
 
+  const procesosUnicos =
+    Array.from(
+      procesosMap.values()
+    );
+
   const cantidadActualizaciones =
     procesosUnicos.length;
-
   const tienePdfOficial =
     !!cleanText(
       ficha.pdfUrl ||
@@ -9785,19 +10015,28 @@ async function ({
     procesos:
       procesosUnicos.map(
         (item) => ({
-          id:
-            item.id,
+          fuente:
+            item.fuente ||
+            "",
 
-          tipoMovimiento:
-            item.tipoMovimiento,
+          id:
+            item.id ||
+            "",
 
           solicitudId:
-            item.metadata?.solicitudId ||
+            item.solicitudId ||
             "",
 
           tipoSolicitud:
-            item.metadata?.tipoSolicitud ||
-            ""
+            item.tipoSolicitud ||
+            "",
+
+          detalle:
+            item.detalle ||
+            "",
+
+          compatibilidadLegacy:
+            item.compatibilidadLegacy === true
         })
       ),
 
