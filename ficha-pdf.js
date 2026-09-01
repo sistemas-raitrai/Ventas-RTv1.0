@@ -791,55 +791,99 @@ async function handlePrintButtonClick() {
   if (isVendorPdfReadOnlyView()) {
     return;
   }
-  
-  const alreadyConfirmed = isPdfOfficiallyConfirmed();
-  const existingPdfUrl = getExistingPdfUrl();
-  const needsNewGeneration = hasPreviousPdfButNeedsNewGeneration();
-  
-  console.log("[ficha-pdf] Estado generación PDF", {
-    alreadyConfirmed,
-    existingPdfUrl,
-    needsNewGeneration,
-    fichaEstado: state.group?.fichaEstado,
-    fichaFlujoAbierto: state.group?.fichaFlujoAbierto,
-    pdfPendienteGeneracion: getByPath(state.group, "ficha.pdfPendienteGeneracion")
-  });
-  
-  if (alreadyConfirmed && existingPdfUrl && !needsNewGeneration) {
-    const wantsOpenExisting = window.confirm(
-      "Esta ficha ya tiene un PDF real generado.\n\nAceptar = abrir el PDF actual.\nCancelar = continuar para generar una nueva versión."
-    );
-  
-    if (wantsOpenExisting) {
-      window.open(existingPdfUrl, "_blank", "noopener");
-      return;
-    }
-  
-    const claveNuevaVersion = window.prompt(
-      "Para generar una nueva versión, ingresa la clave de autorización:"
-    );
-  
-    if (claveNuevaVersion === null) {
-      showPdfStatus("Generación de nueva versión cancelada.");
-      hidePdfStatus(2500);
-      return;
-    }
-  
-    if (String(claveNuevaVersion).trim() !== "Raitrai2026") {
-      showPdfStatus("Clave incorrecta. No se generó una nueva versión.", true);
-      alert("Clave incorrecta. No autorizado para generar una nueva versión.");
-      hidePdfStatus(4000);
-      return;
-    }
-  }
 
-  if (!alreadyConfirmed && !canFinalizeFichaPdf()) {
-    alert(getFinalizeBlockedMessage());
+  const alreadyConfirmed =
+    isPdfOfficiallyConfirmed();
+
+  const existingPdfUrl =
+    getExistingPdfUrl();
+
+  const needsNewGeneration =
+    hasPreviousPdfButNeedsNewGeneration();
+
+  const fichaActual =
+    getByPath(state.group, "ficha") || {};
+
+  const regenerarMismaVersion =
+    fichaActual.regenerarMismaVersion === true;
+
+  const procesoPendiente =
+    getPendingPdfVersionProcess();
+
+  console.log(
+    "[ficha-pdf] Estado generación PDF",
+    {
+      alreadyConfirmed,
+      existingPdfUrl,
+      needsNewGeneration,
+      regenerarMismaVersion,
+      procesoPendiente,
+      fichaEstado:
+        state.group?.fichaEstado,
+      fichaFlujoAbierto:
+        state.group?.fichaFlujoAbierto,
+      pdfPendienteGeneracion:
+        fichaActual.pdfPendienteGeneracion
+    }
+  );
+
+  /*
+   * PDF confirmado y sin ningún proceso pendiente:
+   * solamente se abre el PDF existente.
+   *
+   * Ya no se permite inventar una nueva versión usando una clave.
+   */
+  if (
+    alreadyConfirmed &&
+    existingPdfUrl &&
+    !needsNewGeneration
+  ) {
+    window.open(
+      existingPdfUrl,
+      "_blank",
+      "noopener"
+    );
+
     return;
   }
 
-  if (alreadyConfirmed && !canFinalizeFichaAsCurrentUser()) {
-    alert("Solo admin, yenny@raitrai.cl o administracion@raitrai.cl pueden regenerar este PDF real.");
+  /*
+   * Si existe un PDF anterior y se pretende crear una versión
+   * nueva, debe existir una corrección, actualización o reemplazo
+   * de programa que justifique esa generación.
+   */
+  if (
+    existingPdfUrl &&
+    !regenerarMismaVersion &&
+    !procesoPendiente &&
+    fichaActual.pdfPendienteGeneracion !== true
+  ) {
+    alert(
+      "No existe una corrección o actualización pendiente que justifique una nueva versión del PDF."
+    );
+
+    return;
+  }
+
+  if (
+    !alreadyConfirmed &&
+    !canFinalizeFichaPdf()
+  ) {
+    alert(
+      getFinalizeBlockedMessage()
+    );
+
+    return;
+  }
+
+  if (
+    alreadyConfirmed &&
+    !canFinalizeFichaAsCurrentUser()
+  ) {
+    alert(
+      "Solo admin, yenny@raitrai.cl o administracion@raitrai.cl pueden regenerar este PDF real."
+    );
+
     return;
   }
 
@@ -849,52 +893,144 @@ async function handlePrintButtonClick() {
     cleanText(state.ficha?.nombreGrupo) ||
     `Grupo ${state.groupId}`;
 
-  const ok = window.confirm(
-    alreadyConfirmed
-      ? `La ficha ${alias} ya está confirmada. Vas a generar y guardar el PDF real en Storage usando la versión actual.`
-      : `Vas a confirmar oficialmente la ficha del grupo ${alias} y generar el PDF real en Storage.`
-  );
+  const versionPreview =
+    regenerarMismaVersion
+      ? getCurrentVersionData()
+      : resolveNextFichaVersion();
+
+  const versionLabel =
+    getFichaVersionLabel(
+      versionPreview
+    );
+
+  const mensajeConfirmacion =
+    regenerarMismaVersion
+      ? [
+          `Vas a corregir el PDF oficial de ${alias}.`,
+          "",
+          `Se mantendrá exactamente la versión ${versionLabel}.`,
+          "",
+          "Esta regeneración no aumentará el número."
+        ].join("\n")
+
+      : existingPdfUrl
+        ? [
+            `Vas a generar una nueva versión oficial de ${alias}.`,
+            "",
+            `La nueva versión será ${versionLabel}.`
+          ].join("\n")
+
+        : [
+            `Vas a confirmar oficialmente la ficha de ${alias}.`,
+            "",
+            `La versión será ${versionLabel}.`
+          ].join("\n");
+
+  const ok =
+    window.confirm(
+      mensajeConfirmacion
+    );
 
   if (!ok) return;
 
-  state.isClosingPdf = true;
+  state.isClosingPdf =
+    true;
+
   syncPrintButton();
+
   showPdfStatus(
-    alreadyConfirmed
-      ? "Generando nueva versión del PDF real..."
-      : "Generando PDF real..."
+    regenerarMismaVersion
+      ? `Regenerando ${versionLabel} sin aumentar la versión...`
+      : `Generando ${versionLabel}...`
   );
-  
+
   try {
-    const result = await confirmOfficialPdfClosure({
-      preserveCurrentVersion: false
-    });
-  
-    showPdfStatus("Actualizando datos de la ficha...");
+    const result =
+      await confirmOfficialPdfClosure({
+        preserveCurrentVersion:
+          regenerarMismaVersion
+      });
+
+    showPdfStatus(
+      "Actualizando datos de la ficha..."
+    );
+
     await loadAll();
-  
-    if (result?.blob && result?.pdfNombre) {
-      showPdfStatus("Descargando PDF generado...");
-      downloadBlobLocally(result.blob, result.pdfNombre);
+
+    if (
+      result?.blob &&
+      result?.pdfNombre
+    ) {
+      showPdfStatus(
+        "Descargando PDF generado..."
+      );
+
+      downloadBlobLocally(
+        result.blob,
+        result.pdfNombre
+      );
     }
-  
-    if (result?.emailQueued === false) {
-      showPdfStatus("PDF generado correctamente, pero el correo quedó pendiente.", true);
-      alert("El PDF real se generó y guardó correctamente, pero el correo quedó pendiente de envío.");
+
+    if (
+      result?.emailQueued === false
+    ) {
+      showPdfStatus(
+        "PDF generado correctamente, pero el correo quedó pendiente.",
+        true
+      );
+
+      alert(
+        "El PDF real se generó y guardó correctamente, pero el correo quedó pendiente de envío."
+      );
+
       hidePdfStatus(5000);
+
       return;
     }
-  
-    showPdfStatus("PDF real generado correctamente.");
-    alert("PDF real generado, subido a Storage y enlazado correctamente.");
+
+    showPdfStatus(
+      regenerarMismaVersion
+        ? `PDF corregido correctamente como ${versionLabel}.`
+        : `PDF real generado correctamente como ${versionLabel}.`
+    );
+
+    alert(
+      regenerarMismaVersion
+        ? `PDF corregido correctamente. Se mantuvo la versión ${versionLabel}.`
+        : `PDF real generado correctamente como ${versionLabel}.`
+    );
+
     hidePdfStatus(3500);
+
   } catch (error) {
-    console.error("[ficha-pdf] confirmOfficialPdfClosure", error);
-    showPdfStatus("Error al generar el PDF real: " + (error?.message || error), true);
-    alert("No se pudo generar el PDF real: " + (error?.message || error));
+    console.error(
+      "[ficha-pdf] confirmOfficialPdfClosure",
+      error
+    );
+
+    showPdfStatus(
+      "Error al generar el PDF real: " +
+      (
+        error?.message ||
+        error
+      ),
+      true
+    );
+
+    alert(
+      "No se pudo generar el PDF real: " +
+      (
+        error?.message ||
+        error
+      )
+    );
+
     hidePdfStatus(7000);
+
   } finally {
-    state.isClosingPdf = false;
+    state.isClosingPdf =
+      false;
+
     syncPrintButton();
   }
 }
@@ -1030,12 +1166,24 @@ function isPdfOfficiallyConfirmed() {
 }
 
 function hasPreviousPdfButNeedsNewGeneration() {
-  const ficha = getByPath(state.group, "ficha") || {};
-  const existingPdfUrl = getExistingPdfUrl();
+  const ficha =
+    getByPath(state.group, "ficha") || {};
+
+  const existingPdfUrl =
+    getExistingPdfUrl();
 
   return !!existingPdfUrl && (
     ficha.pdfPendienteGeneracion === true ||
-    state.group?.fichaFlujoAbierto === true
+    state.group?.fichaFlujoAbierto === true ||
+
+    /*
+     * Utilizado para corregir PDFs históricos cuyo número
+     * quedó mal impreso.
+     *
+     * Regenera el PDF manteniendo exactamente la versión
+     * corregida en Firestore.
+     */
+    ficha.regenerarMismaVersion === true
   );
 }
 
@@ -1060,132 +1208,216 @@ function getDisplayName(user = {}) {
   return "Usuario";
 }
 
-function resolveNextFichaVersion() {
+function getPdfSnapshotKey(item = {}) {
+  return cleanText(
+    item.storagePath ||
+    item.storagePathPdf ||
+    item.pdfUrl ||
+    item.url ||
+    item.pdfNombre ||
+    ""
+  );
+}
+
+function getOfficialPdfSnapshots() {
   const fichaActual =
     getByPath(state.group, "ficha") || {};
 
-  /*
-   * =========================================================
-   * ¿EXISTIÓ REALMENTE UNA VERSIÓN FINAL ANTERIOR?
-   * =========================================================
-   *
-   * IMPORTANTE:
-   * No podemos depender solamente de ficha.pdfUrl / fichaPdfUrl.
-   *
-   * Cuando una ficha se reabre para actualizarla,
-   * esos campos se limpian intencionalmente para invalidar
-   * el PDF vigente.
-   *
-   * Sin embargo, siguen quedando huellas de que anteriormente
-   * existió un PDF oficial:
-   *
-   * - ficha.confirmadaEl
-   * - ficha.confirmadaPor
-   * - ficha.storagePathPdf
-   * - ficha.pdfHistorial
-   * - ficha.pdfUrl / fichaPdfUrl si todavía están presentes
-   */
+  const rawHistorial =
+    Array.isArray(fichaActual.pdfHistorial)
+      ? fichaActual.pdfHistorial
+      : [];
 
-  const pdfActual = cleanText(
-    fichaActual.pdfUrl ||
-    state.group?.fichaPdfUrl ||
-    ""
-  );
+  const snapshots = [];
+  const keys = new Set();
 
-  const storagePathPdfAnterior = cleanText(
-    fichaActual.storagePathPdf ||
-    ""
-  );
+  const addSnapshot = (item = {}) => {
+    const key =
+      getPdfSnapshotKey(item);
 
-  const tieneConfirmacionAnterior =
-    !!fichaActual.confirmadaEl ||
-    !!cleanText(fichaActual.confirmadaPor || "") ||
-    !!cleanText(fichaActual.confirmadaPorCorreo || "");
+    if (!key || keys.has(key)) {
+      return;
+    }
 
-  const pdfHistorial = Array.isArray(
-    fichaActual.pdfHistorial
-  )
-    ? fichaActual.pdfHistorial
-    : [];
+    keys.add(key);
 
-  const tuvoVersionFinalAnterior =
-    !!pdfActual ||
-    !!storagePathPdfAnterior ||
-    tieneConfirmacionAnterior ||
-    pdfHistorial.length > 0;
+    snapshots.push({
+      ...item
+    });
+  };
 
   /*
-   * =========================================================
-   * PRIMER PDF REAL DEL GRUPO
-   * =========================================================
-   *
-   * Aunque en la ficha editable aparezca por defecto ORIGINAL,
-   * si nunca existió una generación final real,
-   * esta sigue siendo la primera versión.
+   * PDFs oficiales ya archivados.
    */
-  if (!tuvoVersionFinalAnterior) {
+  rawHistorial.forEach(addSnapshot);
+
+  /*
+   * PDF oficial vigente.
+   *
+   * Si la ficha fue reabierta, normalmente pdfUrl ya está vacío
+   * y la versión anterior debe encontrarse en pdfHistorial.
+   */
+  const currentPdfUrl =
+    cleanText(
+      fichaActual.pdfUrl ||
+      state.group?.fichaPdfUrl ||
+      ""
+    );
+
+  const currentPdfNombre =
+    cleanText(
+      fichaActual.pdfNombre ||
+      state.group?.fichaPdfNombre ||
+      ""
+    );
+
+  const currentStoragePath =
+    cleanText(
+      fichaActual.storagePathPdf ||
+      ""
+    );
+
+  if (
+    currentPdfUrl ||
+    currentPdfNombre ||
+    currentStoragePath
+  ) {
+    addSnapshot({
+      pdfUrl:
+        currentPdfUrl,
+
+      pdfNombre:
+        currentPdfNombre,
+
+      storagePath:
+        currentStoragePath,
+
+      version:
+        fichaActual.version ||
+        state.group?.versionFicha ||
+        "ORIGINAL",
+
+      tipoVersion:
+        fichaActual.tipoVersion ||
+        state.group?.tipoVersionFicha ||
+        "original",
+
+      versionNumero:
+        Number(
+          fichaActual.versionNumero ??
+          state.group?.versionFichaNumero ??
+          1
+        ) || 1
+    });
+  }
+
+  /*
+   * Compatibilidad con fichas reabiertas antiguas:
+   * puede no existir pdfUrl, pero sí quedar evidencia
+   * de una confirmación oficial anterior.
+   */
+  if (
+    snapshots.length === 0 &&
+    (
+      fichaActual.confirmadaEl ||
+      fichaActual.confirmadaPor ||
+      fichaActual.confirmadaPorCorreo ||
+      fichaActual.storagePathPdf
+    )
+  ) {
+    snapshots.push({
+      evidenciaLegacy:
+        true,
+
+      version:
+        fichaActual.version ||
+        state.group?.versionFicha ||
+        "ORIGINAL",
+
+      tipoVersion:
+        fichaActual.tipoVersion ||
+        state.group?.tipoVersionFicha ||
+        "original",
+
+      versionNumero:
+        Number(
+          fichaActual.versionNumero ??
+          state.group?.versionFichaNumero ??
+          1
+        ) || 1
+    });
+  }
+
+  return snapshots;
+}
+
+function getPendingPdfVersionProcess() {
+  const ficha =
+    getByPath(state.group, "ficha") || {};
+
+  const pending =
+    ficha.versionPendienteGeneracion;
+
+  if (
+    !pending ||
+    typeof pending !== "object"
+  ) {
+    return null;
+  }
+
+  return pending;
+}
+
+function resolveNextFichaVersion() {
+  const officialPdfs =
+    getOfficialPdfSnapshots();
+
+  /*
+   * No existe ningún PDF oficial anterior:
+   * esta generación corresponde al ORIGINAL.
+   */
+  if (officialPdfs.length === 0) {
     return {
-      tipoVersion: "original",
-      version: "ORIGINAL",
-      versionNumero: 1
+      tipoVersion:
+        "original",
+
+      version:
+        "ORIGINAL",
+
+      /*
+       * Se conserva 1 por compatibilidad con los datos antiguos.
+       * El rótulo visible seguirá siendo ORIGINAL.
+       */
+      versionNumero:
+        1
     };
   }
 
   /*
-   * =========================================================
-   * LEER LA ÚLTIMA VERSIÓN CONOCIDA
-   * =========================================================
+   * Después del original, cada nuevo PDF oficial corresponde
+   * a una actualización, independientemente de si se originó
+   * por una corrección o una actualización.
+   *
+   * PDFs anteriores:
+   * 1 = ORIGINAL                  -> próxima ACTUALIZACIÓN 1
+   * 2 = ORIGINAL + ACTUALIZACIÓN 1 -> próxima ACTUALIZACIÓN 2
+   * 3 = ORIGINAL + ACT. 1 + ACT. 2 -> próxima ACTUALIZACIÓN 3
    */
-
-  const tipoAnterior = normalizeSearchLocal(
-    fichaActual.tipoVersion ||
-    state.group?.tipoVersionFicha ||
-    ""
-  );
-
-  const versionAnterior = cleanText(
-    fichaActual.version ||
-    state.group?.versionFicha ||
-    ""
-  ).toUpperCase();
-
-  const numeroAnterior = Number(
-    pick(
-      fichaActual.versionNumero,
-      state.group?.versionFichaNumero,
-      0
-    )
-  );
-
-  const anteriorYaEraActualizacion =
-    tipoAnterior === "actualizacion" ||
-    versionAnterior === "ACTUALIZACIÓN" ||
-    versionAnterior.startsWith("ACTUALIZACIÓN ");
-
-  /*
-   * =========================================================
-   * SIGUIENTE VERSIÓN
-   * =========================================================
-   *
-   * ORIGINAL anterior
-   *    -> ACTUALIZACIÓN 1
-   *
-   * ACTUALIZACIÓN 1
-   *    -> ACTUALIZACIÓN 2
-   *
-   * ACTUALIZACIÓN 2
-   *    -> ACTUALIZACIÓN 3
-   * etc.
-   */
+  const numeroActualizacion =
+    Math.max(
+      1,
+      officialPdfs.length
+    );
 
   return {
-    tipoVersion: "actualizacion",
-    version: "ACTUALIZACIÓN",
+    tipoVersion:
+      "actualizacion",
+
+    version:
+      "ACTUALIZACIÓN",
+
     versionNumero:
-      anteriorYaEraActualizacion &&
-      numeroAnterior >= 1
-        ? numeroAnterior + 1
-        : 1
+      numeroActualizacion
   };
 }
 
@@ -1927,6 +2159,12 @@ async function confirmOfficialPdfClosure({ preserveCurrentVersion = false } = {}
 
   const versionLabel = getFichaVersionLabel(versionData);
   const pdfNombre = buildConfirmedPdfName(versionLabel);
+
+  const procesoOrigen =
+    getPendingPdfVersionProcess();
+
+  const pdfHistorialPrevio =
+    getOfficialPdfSnapshots();
   
   // Actualiza la versión visible ANTES de generar el PDF visual
   state.ficha.version = versionData.version;
@@ -1965,6 +2203,97 @@ async function confirmOfficialPdfClosure({ preserveCurrentVersion = false } = {}
   // 3) subir PDF combinado a Firebase Storage
   const { downloadUrl, storagePath } = await uploadRealPdfToStorage(pdfBlob, pdfNombre);
 
+  const nuevaEntradaPdf = {
+    pdfUrl:
+      downloadUrl,
+
+    pdfNombre:
+      pdfNombre,
+
+    storagePath:
+      storagePath,
+
+    tipoVersion:
+      versionData.tipoVersion,
+
+    version:
+      versionData.version,
+
+    versionNumero:
+      versionData.versionNumero,
+
+    versionLabel:
+      versionLabel,
+
+    generadoEl:
+      new Date().toISOString(),
+
+    generadoPor:
+      nombre,
+
+    generadoPorCorreo:
+      state.effectiveEmail,
+
+    /*
+     * La regeneración correctiva conserva versión y no representa
+     * un nuevo proceso de actualización.
+     */
+    esRegeneracionMismaVersion:
+      preserveCurrentVersion === true,
+
+    origenProceso:
+      preserveCurrentVersion
+        ? "regeneracion_correctiva"
+        : (
+            procesoOrigen?.tipoProceso ||
+            (
+              pdfHistorialPrevio.length === 0
+                ? "generacion_original"
+                : "actualizacion_ficha"
+            )
+          ),
+
+    solicitudId:
+      procesoOrigen?.solicitudId ||
+      "",
+
+    detalleProceso:
+      procesoOrigen?.detalle ||
+      ""
+  };
+
+  /*
+   * Si se está corrigiendo físicamente el PDF actual,
+   * reemplazamos su registro en vez de agregar una nueva versión.
+   */
+  let pdfHistorialNuevo;
+
+  if (
+    preserveCurrentVersion === true
+  ) {
+    const currentLabel =
+      getFichaVersionLabel(
+        versionData
+      );
+
+    pdfHistorialNuevo =
+      pdfHistorialPrevio.filter(
+        (item) =>
+          getFichaVersionLabel(item) !==
+          currentLabel
+      );
+
+    pdfHistorialNuevo.push(
+      nuevaEntradaPdf
+    );
+
+  } else {
+    pdfHistorialNuevo = [
+      ...pdfHistorialPrevio,
+      nuevaEntradaPdf
+    ];
+  }
+
   // 3) guardar URL real en Firestore
    await updateDoc(groupRef, {
     fichaEstado: "confirmada_pdf",
@@ -2002,6 +2331,20 @@ async function confirmOfficialPdfClosure({ preserveCurrentVersion = false } = {}
     "ficha.pdfNombre": pdfNombre,
     "ficha.storagePathPdf": storagePath,
     "ficha.pdfPendienteGeneracion": false,
+    "ficha.pdfHistorial":
+      pdfHistorialNuevo,
+
+    /*
+     * El proceso que justificaba la nueva versión ya fue consumido.
+     */
+    "ficha.versionPendienteGeneracion":
+      null,
+
+    /*
+     * También se consume una eventual regeneración correctiva.
+     */
+    "ficha.regenerarMismaVersion":
+      false,
     "ficha.pendienteEnvioCorreo": true,
     "ficha.version": versionData.version,
     "ficha.tipoVersion": versionData.tipoVersion,
