@@ -9486,3 +9486,437 @@ window.backfillObservacionesFicha = async function backfillObservacionesFicha() 
 
   console.log(`Backfill observaciones terminado. Revisadas: ${revisadas}. Actualizadas: ${actualizadas}. Omitidas: ${omitidas}.`);
 };
+
+window.reconstruirVersionFichaGrupo =
+async function ({
+  idGrupo,
+  dryRun = true
+} = {}) {
+  const targetId =
+    cleanText(idGrupo);
+
+  if (!targetId) {
+    throw new Error(
+      "Debes indicar idGrupo. Ejemplo: reconstruirVersionFichaGrupo({ idGrupo: 'ID', dryRun: true })"
+    );
+  }
+
+  console.log(
+    "========================================"
+  );
+
+  console.log(
+    "RECONSTRUCCIÓN VERSIÓN FICHA"
+  );
+
+  console.log({
+    idGrupo:
+      targetId,
+
+    dryRun
+  });
+
+  /*
+   * Buscar grupo por ID documental.
+   */
+  let groupSnapshot =
+    await getDoc(
+      doc(
+        db,
+        "ventas_cotizaciones",
+        targetId
+      )
+    );
+
+  /*
+   * Compatibilidad cuando idGrupo no coincide
+   * con el document ID.
+   */
+  if (!groupSnapshot.exists()) {
+    const groupQuery =
+      query(
+        collection(
+          db,
+          "ventas_cotizaciones"
+        ),
+        where(
+          "idGrupo",
+          "==",
+          targetId
+        )
+      );
+
+    const groupResults =
+      await getDocs(
+        groupQuery
+      );
+
+    groupSnapshot =
+      groupResults.docs[0] ||
+      null;
+  }
+
+  if (
+    !groupSnapshot ||
+    !groupSnapshot.exists()
+  ) {
+    throw new Error(
+      `No encontré el grupo ${targetId}.`
+    );
+  }
+
+  const group =
+    groupSnapshot.data() || {};
+
+  const ficha =
+    group.ficha || {};
+
+  /*
+   * Buscar el historial real del grupo.
+   */
+  const historyQuery =
+    query(
+      collection(
+        db,
+        HISTORIAL_COLLECTION
+      ),
+      where(
+        "idGrupo",
+        "==",
+        String(
+          group.idGrupo ||
+          targetId
+        )
+      )
+    );
+
+  const historySnapshot =
+    await getDocs(
+      historyQuery
+    );
+
+  const history =
+    historySnapshot.docs.map(
+      (item) => ({
+        id:
+          item.id,
+
+        ...item.data()
+      })
+    );
+
+  /*
+   * Solamente cuentan los procedimientos cerrados
+   * que exigieron efectivamente un nuevo PDF.
+   */
+  const procesosConNuevoPdf =
+    history.filter((item) => {
+      const tipo =
+        normalizeSearchLocal(
+          item.tipoMovimiento ||
+          ""
+        );
+
+      const esCierre =
+        tipo ===
+          "solicitud_actualizacion_cerrada" ||
+        tipo ===
+          "solicitud_correccion_cerrada";
+
+      const requiereNuevoPdf =
+        item.metadata?.requiereNuevoPdf ===
+        true;
+
+      return (
+        esCierre &&
+        requiereNuevoPdf
+      );
+    });
+
+  /*
+   * Evita contar dos veces la misma solicitud.
+   */
+  const procesosUnicos = [];
+  const solicitudesVistas =
+    new Set();
+
+  procesosConNuevoPdf.forEach(
+    (item) => {
+      const key =
+        cleanText(
+          item.metadata?.solicitudId ||
+          item.id
+        );
+
+      if (
+        !key ||
+        solicitudesVistas.has(key)
+      ) {
+        return;
+      }
+
+      solicitudesVistas.add(key);
+
+      procesosUnicos.push(item);
+    }
+  );
+
+  const cantidadActualizaciones =
+    procesosUnicos.length;
+
+  const tienePdfOficial =
+    !!cleanText(
+      ficha.pdfUrl ||
+      group.fichaPdfUrl ||
+      ficha.storagePathPdf ||
+      ""
+    ) ||
+    !!ficha.confirmadaEl ||
+    ficha.confirmada === true;
+
+  if (!tienePdfOficial) {
+    return {
+      ok:
+        true,
+
+      dryRun,
+
+      omitido:
+        true,
+
+      motivo:
+        "El grupo no tiene evidencia de un PDF oficial.",
+
+      idGrupo:
+        targetId
+    };
+  }
+
+  const versionCorrecta =
+    cantidadActualizaciones > 0
+      ? {
+          version:
+            "ACTUALIZACIÓN",
+
+          tipoVersion:
+            "actualizacion",
+
+          versionNumero:
+            cantidadActualizaciones,
+
+          versionLabel:
+            `ACTUALIZACIÓN ${cantidadActualizaciones}`
+        }
+
+      : {
+          version:
+            "ORIGINAL",
+
+          tipoVersion:
+            "original",
+
+          versionNumero:
+            1,
+
+          versionLabel:
+            "ORIGINAL"
+        };
+
+  const versionActual = {
+    version:
+      ficha.version ||
+      group.versionFicha ||
+      "",
+
+    tipoVersion:
+      ficha.tipoVersion ||
+      group.tipoVersionFicha ||
+      "",
+
+    versionNumero:
+      Number(
+        ficha.versionNumero ??
+        group.versionFichaNumero ??
+        0
+      )
+  };
+
+  const necesitaCorreccion =
+    normalizeSearchLocal(
+      versionActual.version
+    ) !==
+      normalizeSearchLocal(
+        versionCorrecta.version
+      ) ||
+    Number(
+      versionActual.versionNumero
+    ) !==
+      Number(
+        versionCorrecta.versionNumero
+      );
+
+  const resultado = {
+    ok:
+      true,
+
+    dryRun,
+
+    idGrupo:
+      String(
+        group.idGrupo ||
+        targetId
+      ),
+
+    groupDocId:
+      groupSnapshot.id,
+
+    aliasGrupo:
+      group.aliasGrupo ||
+      group.nombreGrupo ||
+      "",
+
+    versionActual,
+
+    versionCorrecta,
+
+    cantidadProcesos:
+      cantidadActualizaciones,
+
+    procesos:
+      procesosUnicos.map(
+        (item) => ({
+          id:
+            item.id,
+
+          tipoMovimiento:
+            item.tipoMovimiento,
+
+          solicitudId:
+            item.metadata?.solicitudId ||
+            "",
+
+          tipoSolicitud:
+            item.metadata?.tipoSolicitud ||
+            ""
+        })
+      ),
+
+    necesitaCorreccion
+  };
+
+  console.log(
+    "RESULTADO:",
+    resultado
+  );
+
+  if (
+    dryRun ||
+    !necesitaCorreccion
+  ) {
+    return resultado;
+  }
+
+  /*
+   * Corrige Firestore.
+   *
+   * regenerarMismaVersion=true permite generar nuevamente
+   * el PDF físico conservando el número corregido.
+   */
+  await updateDoc(
+    groupSnapshot.ref,
+    {
+      versionFicha:
+        versionCorrecta.version,
+
+      tipoVersionFicha:
+        versionCorrecta.tipoVersion,
+
+      versionFichaNumero:
+        versionCorrecta.versionNumero,
+
+      "ficha.version":
+        versionCorrecta.version,
+
+      "ficha.tipoVersion":
+        versionCorrecta.tipoVersion,
+
+      "ficha.versionNumero":
+        versionCorrecta.versionNumero,
+
+      "ficha.regenerarMismaVersion":
+        true,
+
+      "ficha.versionReconstruida":
+        true,
+
+      "ficha.versionReconstruidaAt":
+        serverTimestamp(),
+
+      "ficha.versionReconstruidaPor":
+        getDisplayName(
+          state.effectiveUser
+        ),
+
+      "ficha.versionReconstruidaPorCorreo":
+        state.effectiveEmail
+    }
+  );
+
+  await createHistoryEntry({
+    tipoMovimiento:
+      "reconstruccion_version_ficha",
+
+    modulo:
+      "ficha",
+
+    titulo:
+      "Reconstrucción de versión de ficha",
+
+    asunto:
+      "Corrección del contador de versión",
+
+    mensaje:
+      [
+        `Se corrigió la versión desde ${
+          versionActual.version ||
+          "sin versión"
+        } ${
+          versionActual.versionNumero ||
+          ""
+        } hacia ${
+          versionCorrecta.versionLabel
+        }.`,
+
+        `Se detectaron ${
+          cantidadActualizaciones
+        } procedimientos reales que requirieron un nuevo PDF.`,
+
+        "El PDF quedó habilitado para regenerarse conservando esta misma versión."
+      ].join(" "),
+
+    metadata: {
+      versionAnterior:
+        versionActual,
+
+      versionNueva:
+        versionCorrecta,
+
+      procesosConsiderados:
+        procesosUnicos.map(
+          (item) =>
+            item.metadata?.solicitudId ||
+            item.id
+        )
+    }
+  });
+
+  resultado.aplicado =
+    true;
+
+  console.log(
+    "CORRECCIÓN APLICADA:",
+    resultado
+  );
+
+  return resultado;
+};
