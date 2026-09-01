@@ -2582,7 +2582,29 @@ async function saveProgramaGrupo() {
 
         pdfPendienteGeneracion:
           true,
+        
+        versionPendienteGeneracion: {
+          solicitudId:
+            "",
 
+          tipoProceso:
+            "reemplazo_programa",
+
+          tipoSolicitud:
+            "reemplazo_programa",
+
+          detalle:
+            "Reemplazo del programa vigente realizado por administración.",
+
+          cerradoPor:
+            displayName,
+
+          cerradoPorCorreo:
+            state.effectiveEmail,
+
+          registradoEl:
+            new Date().toISOString()
+        },
         estado:
           "autorizada_admin"
       };
@@ -2680,6 +2702,29 @@ async function saveProgramaGrupo() {
 
         pdfPendienteGeneracion:
           true,
+        
+        versionPendienteGeneracion: {
+          solicitudId:
+            "",
+
+          tipoProceso:
+            "reemplazo_programa",
+
+          tipoSolicitud:
+            "reemplazo_programa",
+
+          detalle:
+            "Reapertura de ficha por reemplazo del programa vigente.",
+
+          solicitadoPor:
+            displayName,
+
+          solicitadoPorCorreo:
+            state.effectiveEmail,
+
+          registradoEl:
+            new Date().toISOString()
+        },
 
         pdfUrl:
           "",
@@ -5304,7 +5349,54 @@ async function signFlowFromFicha(step) {
          * Administración cerró la solicitud.
          */
         pdfPendienteGeneracion:
+          debeGenerarNuevoPdf,
+
+        /*
+         * Identifica exactamente qué proceso justificará
+         * la siguiente generación oficial del PDF.
+         *
+         * Corrección y actualización producen el mismo resultado:
+         * una nueva versión oficial.
+         */
+        versionPendienteGeneracion:
           debeGenerarNuevoPdf
+            ? {
+                solicitudId:
+                  pendingRequest?.id ||
+                  "",
+
+                tipoProceso:
+                  closingCorrection
+                    ? "correccion_ficha"
+                    : hadPendingRequest
+                      ? "actualizacion_ficha"
+                      : "generacion_original",
+
+                tipoSolicitud:
+                  pendingRequest?.tipoSolicitud ||
+                  "",
+
+                detalle:
+                  pendingRequest?.detalle ||
+                  "",
+
+                respuestaJefa:
+                  pendingRequest?.respuestaJefa ||
+                  "",
+
+                respuestaAdministracion,
+
+                cerradoPor:
+                  nombre,
+
+                cerradoPorCorreo:
+                  state.effectiveEmail,
+
+                registradoEl:
+                  new Date().toISOString()
+              }
+
+            : null
       },
 
       flowFicha:
@@ -7224,7 +7316,43 @@ async function saveFicha({
 
       pdfPendienteGeneracion:
         true,
+      
+      versionPendienteGeneracion: {
+        solicitudId:
+          "",
 
+        tipoProceso:
+          reopenFlowByCarolaCorrection
+            ? "correccion_ficha"
+            : nextFlowMode === "actualizacion"
+              ? "actualizacion_ficha"
+              : "edicion_ficha",
+
+        tipoSolicitud:
+          reopenFlowByCarolaCorrection
+            ? "correccion_ficha"
+            : nextFlowMode === "actualizacion"
+              ? "actualizacion_ficha"
+              : "edicion_ficha",
+
+        detalle:
+          reopenFlowByCarolaCorrection
+            ? "Ficha reabierta por corrección."
+            : nextFlowMode === "actualizacion"
+              ? "Ficha reabierta por solicitud de actualización."
+              : "Ficha reabierta debido a cambios que invalidan el PDF vigente.",
+
+        solicitadoPor:
+          getDisplayName(
+            state.effectiveUser
+          ),
+
+        solicitadoPorCorreo:
+          state.effectiveEmail,
+
+        registradoEl:
+          new Date().toISOString()
+      },
       /*
        * Solo se invalida PDF activo.
        */
