@@ -299,37 +299,210 @@ function syncPdfTopActionsVisibility() {
   box.setAttribute("aria-hidden", visible ? "false" : "true");
 }
 
+function getDisplayedFichaVersionData() {
+  const ficha =
+    getByPath(
+      state.group,
+      "ficha"
+    ) || {};
+
+  /*
+   * Durante una reparación manual no debemos calcular
+   * la próxima versión.
+   *
+   * Debemos mostrar exactamente la versión que será
+   * regenerada.
+   */
+  if (
+    ficha.regenerarMismaVersion === true
+  ) {
+    return getCurrentVersionData();
+  }
+
+  /*
+   * En una generación normal sí se muestra
+   * la próxima versión oficial.
+   */
+  return resolveNextFichaVersion();
+}
+
 /* =========================================================
    RENDER
 ========================================================= */
 function renderPage() {
-  setText("pdfAnoTitulo", state.group?.anoViaje || "—");
-  setText("pdfSolicitudReserva", formatDateForDisplay(state.ficha?.solicitudReserva));
-  setText("pdfNombreGrupo", valueOrDash(state.ficha?.nombreGrupo).toUpperCase());
-  setText("pdfApoderadoEncargado", valueOrDash(state.ficha?.apoderadoEncargado).toUpperCase());
-  setText("pdfTelefono", valueOrDash(state.ficha?.telefono));
-  setText("pdfCorreo", valueOrDash(state.ficha?.correo));
-  setText("pdfNombrePrograma", valueOrDash(state.ficha?.nombrePrograma).toUpperCase());
-  setText("pdfValorPrograma", formatMoneyMaybe(state.ficha?.valorPrograma));
-  setText("pdfNumeroPaxTotal", valueOrDash(state.ficha?.numeroPaxTotal));
-  setText("pdfTramo", valueOrDash(state.ficha?.tramo));
-  setText("pdfLiberados", valueOrDash(state.ficha?.liberados));
-  setText("pdfCategoriaHoteleraContratada", valueOrDash(state.ficha?.categoriaHoteleraContratada).toUpperCase());
-  setText("pdfAutorizacionGerencia", valueOrDash(state.ficha?.autorizacionGerencia).toUpperCase());
-  setText("pdfDescuentoValorBase", valueOrDash(state.ficha?.descuentoValorBase).toUpperCase());
-  setText("pdfFechaViajeTexto", valueOrDash(state.ficha?.fechaViajeTexto));
-  setText("pdfAsistenciaEnViajes", valueOrDash(state.ficha?.asistenciaEnViajes).toUpperCase());
-  setText("pdfNombreVendedor", valueOrDash(state.ficha?.nombreVendedor).toUpperCase());
-  setText("pdfNumeroNegocio", valueOrDash(state.ficha?.numeroNegocio));
-  setText("pdfUsuarioFicha", valueOrDash(state.ficha?.usuarioFicha));
-  setText("pdfClaveAdministrativa", valueOrDash(state.ficha?.claveAdministrativa));
-  const versionPreview = resolveNextFichaVersion();
-  setText("pdfVersionFicha", getFichaVersionLabel(versionPreview));
-  setText("pdfFechaActualizacion", valueOrDash(state.ficha?.fechaActualizacionTexto));
+  setText(
+    "pdfAnoTitulo",
+    state.group?.anoViaje || "—"
+  );
 
-  renderRichAsHtml("pdfInfoOperaciones", state.ficha?.infoOperacionesHtml);
-  renderRichAsHtml("pdfInfoAdministracion", state.ficha?.infoAdministracionHtml);
-  renderRichAsHtml("pdfObservaciones", state.ficha?.observacionesHtml);
+  setText(
+    "pdfSolicitudReserva",
+    formatDateForDisplay(
+      state.ficha?.solicitudReserva
+    )
+  );
+
+  setText(
+    "pdfNombreGrupo",
+    valueOrDash(
+      state.ficha?.nombreGrupo
+    ).toUpperCase()
+  );
+
+  setText(
+    "pdfApoderadoEncargado",
+    valueOrDash(
+      state.ficha?.apoderadoEncargado
+    ).toUpperCase()
+  );
+
+  setText(
+    "pdfTelefono",
+    valueOrDash(
+      state.ficha?.telefono
+    )
+  );
+
+  setText(
+    "pdfCorreo",
+    valueOrDash(
+      state.ficha?.correo
+    )
+  );
+
+  setText(
+    "pdfNombrePrograma",
+    valueOrDash(
+      state.ficha?.nombrePrograma
+    ).toUpperCase()
+  );
+
+  setText(
+    "pdfValorPrograma",
+    formatMoneyMaybe(
+      state.ficha?.valorPrograma
+    )
+  );
+
+  setText(
+    "pdfNumeroPaxTotal",
+    valueOrDash(
+      state.ficha?.numeroPaxTotal
+    )
+  );
+
+  setText(
+    "pdfTramo",
+    valueOrDash(
+      state.ficha?.tramo
+    )
+  );
+
+  setText(
+    "pdfLiberados",
+    valueOrDash(
+      state.ficha?.liberados
+    )
+  );
+
+  setText(
+    "pdfCategoriaHoteleraContratada",
+    valueOrDash(
+      state.ficha?.categoriaHoteleraContratada
+    ).toUpperCase()
+  );
+
+  setText(
+    "pdfAutorizacionGerencia",
+    valueOrDash(
+      state.ficha?.autorizacionGerencia
+    ).toUpperCase()
+  );
+
+  setText(
+    "pdfDescuentoValorBase",
+    valueOrDash(
+      state.ficha?.descuentoValorBase
+    ).toUpperCase()
+  );
+
+  setText(
+    "pdfFechaViajeTexto",
+    valueOrDash(
+      state.ficha?.fechaViajeTexto
+    )
+  );
+
+  setText(
+    "pdfAsistenciaEnViajes",
+    valueOrDash(
+      state.ficha?.asistenciaEnViajes
+    ).toUpperCase()
+  );
+
+  setText(
+    "pdfNombreVendedor",
+    valueOrDash(
+      state.ficha?.nombreVendedor
+    ).toUpperCase()
+  );
+
+  setText(
+    "pdfNumeroNegocio",
+    valueOrDash(
+      state.ficha?.numeroNegocio
+    )
+  );
+
+  setText(
+    "pdfUsuarioFicha",
+    valueOrDash(
+      state.ficha?.usuarioFicha
+    )
+  );
+
+  setText(
+    "pdfClaveAdministrativa",
+    valueOrDash(
+      state.ficha?.claveAdministrativa
+    )
+  );
+
+  /*
+   * Si es una regeneración correctiva muestra la versión actual.
+   * Si es una nueva generación muestra la próxima versión.
+   */
+  const versionVisible =
+    getDisplayedFichaVersionData();
+
+  setText(
+    "pdfVersionFicha",
+    getFichaVersionLabel(
+      versionVisible
+    )
+  );
+
+  setText(
+    "pdfFechaActualizacion",
+    valueOrDash(
+      state.ficha?.fechaActualizacionTexto
+    )
+  );
+
+  renderRichAsHtml(
+    "pdfInfoOperaciones",
+    state.ficha?.infoOperacionesHtml
+  );
+
+  renderRichAsHtml(
+    "pdfInfoAdministracion",
+    state.ficha?.infoAdministracionHtml
+  );
+
+  renderRichAsHtml(
+    "pdfObservaciones",
+    state.ficha?.observacionesHtml
+  );
 
   syncPdfTopActionsVisibility();
   syncPrintButton();
@@ -1036,61 +1209,203 @@ async function handlePrintButtonClick() {
 }
 
 function syncPrintButton() {
-  const btn = $("btnImprimirFichaPdf");
+  const btn =
+    $("btnImprimirFichaPdf");
+
   if (!btn) return;
 
-  if (state.isClosingPdf) {
-    btn.disabled = true;
-    btn.textContent = "Generando PDF real...";
+  if (
+    state.isClosingPdf
+  ) {
+    btn.disabled =
+      true;
+
+    btn.textContent =
+      "Generando PDF real...";
+
     return;
   }
 
-  const existingPdfUrl = getExistingPdfUrl();
+  const ficha =
+    getByPath(
+      state.group,
+      "ficha"
+    ) || {};
 
-  if (isPdfOfficiallyConfirmed()) {
-    btn.disabled = !canFinalizeFichaAsCurrentUser();
-    btn.textContent = existingPdfUrl
-      ? "Abrir PDF real / Generar nueva versión"
-      : "Generar PDF real";
+  const existingPdfUrl =
+    getExistingPdfUrl();
+
+  const regenerarMismaVersion =
+    ficha.regenerarMismaVersion === true;
+
+  const versionVisible =
+    getFichaVersionLabel(
+      getDisplayedFichaVersionData()
+    );
+
+  /*
+   * Reparación manual:
+   * el botón informa exactamente qué versión conservará.
+   */
+  if (
+    regenerarMismaVersion
+  ) {
+    btn.disabled =
+      !canFinalizeFichaAsCurrentUser();
+
+    btn.textContent =
+      `Regenerar PDF como ${versionVisible}`;
+
     return;
   }
 
-  // No se deshabilita por falta de firma/programa/estado.
-  // Si falta algo, al hacer clic mostramos explicación con getFinalizeBlockedMessage().
-  btn.disabled = !canFinalizeFichaAsCurrentUser();
-  btn.textContent = "Confirmar y generar PDF real";
+  if (
+    isPdfOfficiallyConfirmed()
+  ) {
+    btn.disabled =
+      !canFinalizeFichaAsCurrentUser();
+
+    btn.textContent =
+      existingPdfUrl
+        ? "Abrir PDF real"
+        : "Generar PDF real";
+
+    return;
+  }
+
+  /*
+   * No se bloquea por firmas, programa o estado.
+   * Al hacer clic se mostrará la explicación precisa.
+   */
+  btn.disabled =
+    !canFinalizeFichaAsCurrentUser();
+
+  btn.textContent =
+    "Confirmar y generar PDF real";
 }
 
 function canFinalizeFichaPdf() {
-  const puedeUsuario = canFinalizeFichaAsCurrentUser();
-  const tieneGrupo = !!state.group && !!state.groupDocId;
-  const puedeAcceder = state.group ? canAccessGroup(state.group) : false;
-  const tienePrograma = hasProgramaPdf() || hasProgramaOriginalEditable();
+  const puedeUsuario =
+    canFinalizeFichaAsCurrentUser();
 
-  const flow = state.group?.flowFicha || {};
-  const fichaEstado = normalizeSearchLocal(state.group?.fichaEstado || "");
-  const adminFirmado = !!flow?.administracion?.firmado;
+  const tieneGrupo =
+    !!state.group &&
+    !!state.groupDocId;
+
+  const puedeAcceder =
+    state.group
+      ? canAccessGroup(
+          state.group
+        )
+      : false;
+
+  const tienePrograma =
+    hasProgramaPdf() ||
+    hasProgramaOriginalEditable();
+
+  const flow =
+    state.group?.flowFicha || {};
+
+  const ficha =
+    getByPath(
+      state.group,
+      "ficha"
+    ) || {};
+
+  const fichaEstado =
+    normalizeSearchLocal(
+      state.group?.fichaEstado ||
+      ""
+    );
+
+  const adminFirmado =
+    !!flow?.administracion?.firmado;
+
+  const regenerarMismaVersion =
+    ficha.regenerarMismaVersion === true;
+
+  const tienePdfExistente =
+    !!getExistingPdfUrl();
+
+  const estadoConfirmado =
+    fichaEstado === "confirmada_pdf" ||
+    fichaEstado === "pdf_confirmado" ||
+    ficha.confirmada === true;
+
+  /*
+   * Una regeneración correctiva no reabre el proceso
+   * ni exige volver al estado autorizada_admin.
+   *
+   * La ficha ya fue aprobada anteriormente.
+   */
+  const puedeRegenerarMismaVersion =
+    regenerarMismaVersion &&
+    tienePdfExistente &&
+    estadoConfirmado;
+
+  /*
+   * Flujo ordinario para crear un PDF original
+   * o una nueva actualización.
+   */
+  const puedeGenerarNormalmente =
+    fichaEstado === "autorizada_admin" &&
+    adminFirmado;
 
   const ok =
     puedeUsuario &&
     tieneGrupo &&
     puedeAcceder &&
     tienePrograma &&
-    fichaEstado === "autorizada_admin" &&
-    adminFirmado;
+    (
+      puedeRegenerarMismaVersion ||
+      puedeGenerarNormalmente
+    );
 
-  console.log("[ficha-pdf] canFinalizeFichaPdf", {
-    ok,
-    puedeUsuario,
-    tieneGrupo,
-    puedeAcceder,
-    tienePrograma,
-    fichaEstadoOriginal: state.group?.fichaEstado,
-    fichaEstadoNormalizado: fichaEstado,
-    adminFirmado,
-    programaGrupo: state.group?.programaGrupo || null,
-    flowFicha: state.group?.flowFicha || null
-  });
+  console.log(
+    "[ficha-pdf] canFinalizeFichaPdf",
+    {
+      ok,
+
+      puedeUsuario,
+
+      tieneGrupo,
+
+      puedeAcceder,
+
+      tienePrograma,
+
+      fichaEstadoOriginal:
+        state.group?.fichaEstado,
+
+      fichaEstadoNormalizado:
+        fichaEstado,
+
+      adminFirmado,
+
+      regenerarMismaVersion,
+
+      tienePdfExistente,
+
+      estadoConfirmado,
+
+      puedeRegenerarMismaVersion,
+
+      puedeGenerarNormalmente,
+
+      versionVisible:
+        getFichaVersionLabel(
+          getDisplayedFichaVersionData()
+        ),
+
+      programaGrupo:
+        state.group?.programaGrupo ||
+        null,
+
+      flowFicha:
+        state.group?.flowFicha ||
+        null
+    }
+  );
 
   return ok;
 }
@@ -1098,71 +1413,230 @@ function canFinalizeFichaPdf() {
 function getFinalizeBlockedMessage() {
   const motivos = [];
 
-  if (!canFinalizeFichaAsCurrentUser()) {
-    motivos.push("• Tu usuario no tiene permiso para generar el PDF real.");
+  const ficha =
+    getByPath(
+      state.group,
+      "ficha"
+    ) || {};
+
+  const fichaEstado =
+    normalizeSearchLocal(
+      state.group?.fichaEstado ||
+      ""
+    );
+
+  const regenerarMismaVersion =
+    ficha.regenerarMismaVersion === true;
+
+  const tienePdfExistente =
+    !!getExistingPdfUrl();
+
+  const estadoConfirmado =
+    fichaEstado === "confirmada_pdf" ||
+    fichaEstado === "pdf_confirmado" ||
+    ficha.confirmada === true;
+
+  const esRegeneracionCorrectiva =
+    regenerarMismaVersion &&
+    tienePdfExistente &&
+    estadoConfirmado;
+
+  if (
+    !canFinalizeFichaAsCurrentUser()
+  ) {
+    motivos.push(
+      "• Tu usuario no tiene permiso para generar el PDF real."
+    );
   }
 
-  if (!state.group || !state.groupDocId) {
-    motivos.push("• No se cargó correctamente la información del grupo.");
+  if (
+    !state.group ||
+    !state.groupDocId
+  ) {
+    motivos.push(
+      "• No se cargó correctamente la información del grupo."
+    );
   }
 
-  if (state.group && !canAccessGroup(state.group)) {
-    motivos.push("• No tienes acceso a este grupo.");
+  if (
+    state.group &&
+    !canAccessGroup(
+      state.group
+    )
+  ) {
+    motivos.push(
+      "• No tienes acceso a este grupo."
+    );
   }
 
-  if (!hasProgramaPdf() && !hasProgramaOriginalEditable()) {
-    motivos.push("• Falta subir el programa obligatorio.");
+  if (
+    !hasProgramaPdf() &&
+    !hasProgramaOriginalEditable()
+  ) {
+    motivos.push(
+      "• Falta subir el programa obligatorio."
+    );
   }
 
-  const flow = state.group?.flowFicha || {};
+  /*
+   * En una reparación correctiva las firmas ya fueron
+   * completadas en el proceso original.
+   *
+   * No se vuelven a exigir ni se cambia el estado.
+   */
+  if (!esRegeneracionCorrectiva) {
+    const flow =
+      state.group?.flowFicha || {};
 
-  if (!flow?.vendedor?.firmado) {
-    motivos.push("• Falta firma de vendedor(a).");
+    if (
+      !flow?.vendedor?.firmado
+    ) {
+      motivos.push(
+        "• Falta firma de vendedor(a)."
+      );
+    }
+
+    if (
+      !flow?.jefaVentas?.firmado
+    ) {
+      motivos.push(
+        "• Falta firma de jefa de ventas."
+      );
+    }
+
+    if (
+      !flow?.administracion?.firmado
+    ) {
+      motivos.push(
+        "• Falta firma de administración."
+      );
+    }
+
+    if (
+      fichaEstado !==
+      "autorizada_admin"
+    ) {
+      motivos.push(
+        `• La ficha no está en estado autorizada_admin. Estado actual: ${
+          state.group?.fichaEstado ||
+          "sin estado"
+        }.`
+      );
+    }
   }
 
-  if (!flow?.jefaVentas?.firmado) {
-    motivos.push("• Falta firma de jefa de ventas.");
-  }
-
-  if (!flow?.administracion?.firmado) {
-    motivos.push("• Falta firma de administración.");
-  }
-
-  const fichaEstado = normalizeSearchLocal(state.group?.fichaEstado || "");
-
-  if (fichaEstado !== "autorizada_admin") {
-    motivos.push(`• La ficha no está en estado autorizada_admin. Estado actual: ${state.group?.fichaEstado || "sin estado"}.`);
+  /*
+   * Si fue marcada para regenerarse, debe existir
+   * un PDF anterior que reemplazar.
+   */
+  if (
+    regenerarMismaVersion &&
+    !tienePdfExistente
+  ) {
+    motivos.push(
+      "• La ficha está marcada para regeneración, pero no se encontró el PDF oficial anterior."
+    );
   }
 
   return [
-    "No se puede generar el PDF real todavía.",
+    esRegeneracionCorrectiva
+      ? "No se puede regenerar el PDF todavía."
+      : "No se puede generar el PDF real todavía.",
+
     "",
+
     "Motivos detectados:",
-    motivos.length ? motivos.join("\n") : "• No se detectó el motivo exacto. Revisa consola.",
+
+    motivos.length
+      ? motivos.join("\n")
+      : "• No se detectó el motivo exacto. Revisa la consola.",
+
     "",
-    "Cuando se corrijan estos puntos, vuelve a intentar."
+
+    esRegeneracionCorrectiva
+      ? "Cuando se corrijan estos puntos, vuelve a intentar la regeneración."
+      : "Cuando se corrijan estos puntos, vuelve a intentar."
   ].join("\n");
 }
 
 function isPdfOfficiallyConfirmed() {
-  const fichaEstado = normalizeSearchLocal(state.group?.fichaEstado || "");
-  const ficha = getByPath(state.group, "ficha") || {};
+  const fichaEstado =
+    normalizeSearchLocal(
+      state.group?.fichaEstado ||
+      ""
+    );
 
-  const pdfPendienteGeneracion = ficha.pdfPendienteGeneracion === true;
-  const flujoAbierto = state.group?.fichaFlujoAbierto === true;
+  const ficha =
+    getByPath(
+      state.group,
+      "ficha"
+    ) || {};
 
-  // Si la ficha fue reabierta o quedó pendiente de nueva generación,
-  // NO debe tratarse como PDF confirmado, aunque exista un PDF anterior.
-  if (pdfPendienteGeneracion || flujoAbierto) {
-    console.log("[ficha-pdf] PDF anterior detectado, pero ficha reabierta o pendiente de nueva generación.");
+  const tieneEstadoConfirmado =
+    fichaEstado === "confirmada_pdf" ||
+    fichaEstado === "pdf_confirmado" ||
+    ficha.confirmada === true;
+
+  const regenerarMismaVersion =
+    ficha.regenerarMismaVersion === true;
+
+  const tienePdfExistente =
+    !!getExistingPdfUrl();
+
+  /*
+   * Excepción controlada:
+   *
+   * La ficha ya fue confirmada y ahora está marcada para
+   * regenerarse conservando la misma versión.
+   *
+   * Aunque pdfPendienteGeneracion sea true, sigue siendo
+   * una ficha previamente confirmada.
+   */
+  if (
+    regenerarMismaVersion &&
+    tieneEstadoConfirmado &&
+    tienePdfExistente
+  ) {
+    console.log(
+      "[ficha-pdf] PDF confirmado habilitado para regeneración correctiva.",
+      {
+        fichaEstado:
+          state.group?.fichaEstado,
+
+        versionActual:
+          getFichaVersionLabel(
+            getCurrentVersionData()
+          )
+      }
+    );
+
+    return true;
+  }
+
+  const pdfPendienteGeneracion =
+    ficha.pdfPendienteGeneracion === true;
+
+  const flujoAbierto =
+    state.group?.fichaFlujoAbierto === true;
+
+  /*
+   * Flujo normal:
+   *
+   * Si fue reabierta o requiere una nueva versión,
+   * el PDF anterior no representa el cierre vigente.
+   */
+  if (
+    pdfPendienteGeneracion ||
+    flujoAbierto
+  ) {
+    console.log(
+      "[ficha-pdf] PDF anterior detectado, pero la ficha fue reabierta o requiere una nueva generación."
+    );
+
     return false;
   }
 
-  return (
-    fichaEstado === "confirmada_pdf" ||
-    fichaEstado === "pdf_confirmado" ||
-    ficha.confirmada === true
-  );
+  return tieneEstadoConfirmado;
 }
 
 function hasPreviousPdfButNeedsNewGeneration() {
@@ -1373,10 +1847,12 @@ function resolveNextFichaVersion() {
     getOfficialPdfSnapshots();
 
   /*
-   * No existe ningún PDF oficial anterior:
-   * esta generación corresponde al ORIGINAL.
+   * Sin ningún PDF oficial previo:
+   * corresponde crear el ORIGINAL.
    */
-  if (officialPdfs.length === 0) {
+  if (
+    officialPdfs.length === 0
+  ) {
     return {
       tipoVersion:
         "original",
@@ -1384,30 +1860,68 @@ function resolveNextFichaVersion() {
       version:
         "ORIGINAL",
 
-      /*
-       * Se conserva 1 por compatibilidad con los datos antiguos.
-       * El rótulo visible seguirá siendo ORIGINAL.
-       */
       versionNumero:
         1
     };
   }
 
   /*
-   * Después del original, cada nuevo PDF oficial corresponde
-   * a una actualización, independientemente de si se originó
-   * por una corrección o una actualización.
+   * Buscar el número más alto de actualización real.
    *
-   * PDFs anteriores:
-   * 1 = ORIGINAL                  -> próxima ACTUALIZACIÓN 1
-   * 2 = ORIGINAL + ACTUALIZACIÓN 1 -> próxima ACTUALIZACIÓN 2
-   * 3 = ORIGINAL + ACT. 1 + ACT. 2 -> próxima ACTUALIZACIÓN 3
+   * Ya no calculamos solamente desde la cantidad de elementos,
+   * porque una regularización histórica puede no disponer de
+   * todos los PDFs antiguos.
    */
-  const numeroActualizacion =
-    Math.max(
-      1,
-      officialPdfs.length
-    );
+  const numerosActualizacion =
+    officialPdfs
+      .filter(
+        (item) => {
+          const tipo =
+            normalizeSearchLocal(
+              item.tipoVersion ||
+              ""
+            );
+
+          const version =
+            normalizeSearchLocal(
+              item.version ||
+              ""
+            );
+
+          return (
+            tipo === "actualizacion" ||
+            version === "actualizacion"
+          );
+        }
+      )
+      .map(
+        (item) =>
+          Number(
+            item.versionNumero ||
+            0
+          )
+      )
+      .filter(
+        (numero) =>
+          Number.isInteger(numero) &&
+          numero >= 1
+      );
+
+  /*
+   * Si solo existe ORIGINAL, la próxima es ACTUALIZACIÓN 1.
+   *
+   * Si ya existe ACTUALIZACIÓN 1, la próxima es 2.
+   * Si ya existe ACTUALIZACIÓN 2, la próxima es 3.
+   */
+  const ultimaActualizacion =
+    numerosActualizacion.length
+      ? Math.max(
+          ...numerosActualizacion
+        )
+      : 0;
+
+  const siguienteActualizacion =
+    ultimaActualizacion + 1;
 
   return {
     tipoVersion:
@@ -1417,7 +1931,7 @@ function resolveNextFichaVersion() {
       "ACTUALIZACIÓN",
 
     versionNumero:
-      numeroActualizacion
+      siguienteActualizacion
   };
 }
 
