@@ -9487,41 +9487,25 @@ window.backfillObservacionesFicha = async function backfillObservacionesFicha() 
   console.log(`Backfill observaciones terminado. Revisadas: ${revisadas}. Actualizadas: ${actualizadas}. Omitidas: ${omitidas}.`);
 };
 
-window.reconstruirVersionFichaGrupo =
-async function ({
-  idGrupo,
-  dryRun = true
-} = {}) {
+/* =========================================================
+   REGULARIZACIÓN MANUAL DE VERSIONES DE FICHA
+========================================================= */
+
+async function buscarGrupoParaRegularizarVersion(
+  idGrupo
+) {
   const targetId =
     cleanText(idGrupo);
 
   if (!targetId) {
     throw new Error(
-      "Debes indicar idGrupo. Ejemplo: reconstruirVersionFichaGrupo({ idGrupo: '10918', dryRun: true })"
+      "Debes indicar idGrupo."
     );
   }
 
-  console.log(
-    "========================================"
-  );
-
-  console.log(
-    "RECONSTRUCCIÓN VERSIÓN FICHA"
-  );
-
-  console.log({
-    idGrupo:
-      targetId,
-
-    dryRun
-  });
-
   /*
-   * =========================================================
-   * 1. BUSCAR EL GRUPO
-   * =========================================================
+   * Primero busca por ID documental.
    */
-
   let groupSnapshot =
     await getDoc(
       doc(
@@ -9533,7 +9517,7 @@ async function ({
 
   /*
    * Compatibilidad cuando idGrupo no coincide
-   * con el ID documental de Firestore.
+   * con el ID documental.
    */
   if (!groupSnapshot.exists()) {
     const groupQuery =
@@ -9571,547 +9555,363 @@ async function ({
   const group =
     groupSnapshot.data() || {};
 
+  return {
+    targetId,
+
+    groupSnapshot,
+
+    group,
+
+    ficha:
+      group.ficha || {},
+
+    realIdGrupo:
+      String(
+        group.idGrupo ||
+        targetId
+      )
+  };
+}
+
+function obtenerVersionActualFichaManual(
+  group = {}
+) {
   const ficha =
     group.ficha || {};
 
-  const realIdGrupo =
-    String(
-      group.idGrupo ||
-      targetId
+  const version =
+    cleanText(
+      ficha.version ||
+      group.versionFicha ||
+      "ORIGINAL"
     );
 
-  /*
-   * IDs que podrían haberse utilizado históricamente
-   * para relacionar solicitudes e historial.
-   */
-  const posiblesIdsGrupo = [
-    realIdGrupo,
-    String(groupSnapshot.id || ""),
-    String(targetId || "")
-  ].filter(
-    (value, index, array) =>
-      value &&
-      array.indexOf(value) === index
+  const tipoVersion =
+    cleanText(
+      ficha.tipoVersion ||
+      group.tipoVersionFicha ||
+      "original"
+    );
+
+  const versionNumero =
+    Number(
+      ficha.versionNumero ??
+      group.versionFichaNumero ??
+      1
+    ) || 1;
+
+  const versionLabel =
+    normalizeSearchLocal(tipoVersion) ===
+      "actualizacion" ||
+    normalizeSearchLocal(version) ===
+      "actualizacion"
+      ? `ACTUALIZACIÓN ${versionNumero}`
+      : "ORIGINAL";
+
+  return {
+    version,
+    tipoVersion,
+    versionNumero,
+    versionLabel
+  };
+}
+
+async function registrarRegularizacionVersionFicha({
+  realIdGrupo,
+  group,
+  tipoMovimiento,
+  titulo,
+  mensaje,
+  metadata
+}) {
+  await addDoc(
+    collection(
+      db,
+      HISTORIAL_COLLECTION
+    ),
+    {
+      idGrupo:
+        String(realIdGrupo),
+
+      codigoRegistro:
+        cleanText(
+          group.codigoRegistro
+        ),
+
+      aliasGrupo:
+        cleanText(
+          group.aliasGrupo
+        ),
+
+      colegio:
+        cleanText(
+          group.colegio
+        ),
+
+      tipoMovimiento,
+
+      modulo:
+        "ficha",
+
+      titulo,
+
+      mensaje,
+
+      metadata:
+        sanitizeForFirestore(
+          metadata
+        ),
+
+      creadoPor:
+        getDisplayName(
+          state.effectiveUser
+        ),
+
+      creadoPorCorreo:
+        state.effectiveEmail,
+
+      fecha:
+        serverTimestamp()
+    }
   );
+}
 
-  /*
-   * =========================================================
-   * 2. BUSCAR EL HISTORIAL DEL GRUPO
-   * =========================================================
-   */
+/* =========================================================
+   1. REGENERAR COMO ACTUALIZACIÓN
+========================================================= */
 
-  const historyMap =
-    new Map();
+window.regenerarFichaComoActualizacion =
+async function ({
+  idGrupo,
+  versionNumero = 1,
+  motivo
+} = {}) {
+  const numero =
+    Number(versionNumero);
 
-  for (
-    const possibleId of posiblesIdsGrupo
+  if (
+    !Number.isInteger(numero) ||
+    numero < 1
   ) {
-    const historyQuery =
-      query(
-        collection(
-          db,
-          HISTORIAL_COLLECTION
-        ),
-        where(
-          "idGrupo",
-          "==",
-          possibleId
-        )
-      );
-
-    const historySnapshot =
-      await getDocs(
-        historyQuery
-      );
-
-    historySnapshot.docs.forEach(
-      (item) => {
-        historyMap.set(
-          item.id,
-          {
-            id:
-              item.id,
-
-            ...item.data()
-          }
-        );
-      }
+    throw new Error(
+      "versionNumero debe ser un número entero igual o superior a 1."
     );
   }
 
-  const history =
-    Array.from(
-      historyMap.values()
-    );
+  const motivoLimpio =
+    cleanText(motivo);
 
-  /*
-   * =========================================================
-   * 3. BUSCAR SOLICITUDES DE ACTUALIZACIÓN/CORRECCIÓN
-   * =========================================================
-   */
-
-  const solicitudesMap =
-    new Map();
-
-  for (
-    const possibleId of posiblesIdsGrupo
-  ) {
-    const solicitudesQuery =
-      query(
-        collection(
-          db,
-          SOLICITUDES_COLLECTION
-        ),
-        where(
-          "idGrupo",
-          "==",
-          possibleId
-        )
-      );
-
-    const solicitudesSnapshot =
-      await getDocs(
-        solicitudesQuery
-      );
-
-    solicitudesSnapshot.docs.forEach(
-      (item) => {
-        solicitudesMap.set(
-          item.id,
-          {
-            id:
-              item.id,
-
-            ...item.data()
-          }
-        );
-      }
+  if (!motivoLimpio) {
+    throw new Error(
+      "Debes indicar el motivo de la regularización."
     );
   }
 
-  const solicitudes =
-    Array.from(
-      solicitudesMap.values()
+  const {
+    groupSnapshot,
+    group,
+    ficha,
+    realIdGrupo
+  } =
+    await buscarGrupoParaRegularizarVersion(
+      idGrupo
+    );
+
+  const versionAnterior =
+    obtenerVersionActualFichaManual(
+      group
+    );
+
+  const versionNueva = {
+    version:
+      "ACTUALIZACIÓN",
+
+    tipoVersion:
+      "actualizacion",
+
+    versionNumero:
+      numero,
+
+    versionLabel:
+      `ACTUALIZACIÓN ${numero}`
+  };
+
+  const aliasGrupo =
+    cleanText(
+      group.aliasGrupo ||
+      group.nombreGrupo ||
+      ""
     );
 
   console.log(
-    "SOLICITUDES ENCONTRADAS:",
-    solicitudes.map(
-      (item) => ({
-        id:
-          item.id,
-
-        idGrupo:
-          item.idGrupo,
-
-        tipoSolicitud:
-          item.tipoSolicitud,
-
-        estadoSolicitud:
-          item.estadoSolicitud,
-
-        estado:
-          item.estado,
-
-        resuelta:
-          item.resuelta,
-
-        requiereNuevoPdf:
-          item.requiereNuevoPdf,
-
-        detalle:
-          item.detalle,
-
-        respuestaJefa:
-          item.respuestaJefa,
-
-        respuestaAdministracion:
-          item.respuestaAdministracion
-      })
-    )
+    "========================================"
   );
 
-  /*
-   * =========================================================
-   * 4. PROCESOS CONFIRMADOS EN EL HISTORIAL NUEVO
-   * =========================================================
-   */
-
-  const procesosHistorial =
-    history.filter(
-      (item) => {
-        const tipo =
-          normalizeSearchLocal(
-            item.tipoMovimiento ||
-            item.tipo ||
-            ""
-          );
-
-        const esCierre =
-          tipo ===
-            "solicitud_actualizacion_cerrada" ||
-          tipo ===
-            "solicitud_correccion_cerrada";
-
-        const requiereNuevoPdf =
-          item.metadata?.requiereNuevoPdf === true ||
-          item.requiereNuevoPdf === true;
-
-        return (
-          esCierre &&
-          requiereNuevoPdf
-        );
-      }
-    );
-
-  /*
-   * =========================================================
-   * 5. SOLICITUDES ANTIGUAS CERRADAS
-   * =========================================================
-   *
-   * En los registros antiguos puede no existir
-   * metadata.requiereNuevoPdf. Por eso se utiliza el cierre
-   * efectivo de la solicitud como evidencia del proceso.
-   */
-
-  const solicitudesCerradas =
-    solicitudes.filter(
-      (item) => {
-        const tipo =
-          normalizeSearchLocal(
-            item.tipoSolicitud ||
-            item.tipo ||
-            ""
-          );
-
-        const estado =
-          normalizeSearchLocal(
-            item.estadoSolicitud ||
-            item.estado ||
-            ""
-          );
-
-        const tipoValido =
-          tipo === "actualizacion_ficha" ||
-          tipo === "correccion_ficha";
-
-        const estaCerrada =
-          item.resuelta === true ||
-          item.cerrada === true ||
-          item.completada === true ||
-          estado === "resuelta" ||
-          estado === "resuelto" ||
-          estado === "completada" ||
-          estado === "completado" ||
-          estado === "cerrada" ||
-          estado === "cerrado" ||
-          !!cleanText(
-            item.respuestaAdministracion ||
-            item.cierreAdministracion ||
-            ""
-          );
-
-        /*
-         * Si el registro dice expresamente que NO requirió
-         * un nuevo PDF, no debe aumentar la versión.
-         *
-         * Si la propiedad no existía, se aplica compatibilidad
-         * con el formato antiguo.
-         */
-        const noRequirioNuevoPdf =
-          item.requiereNuevoPdf === false ||
-          item.metadata?.requiereNuevoPdf === false;
-
-        return (
-          tipoValido &&
-          estaCerrada &&
-          !noRequirioNuevoPdf
-        );
-      }
-    );
-
-  /*
-   * =========================================================
-   * 6. UNIFICAR LOS PROCESOS SIN DUPLICAR SOLICITUDES
-   * =========================================================
-   */
-
-  const procesosMap =
-    new Map();
-
-  procesosHistorial.forEach(
-    (item) => {
-      const solicitudId =
-        cleanText(
-          item.metadata?.solicitudId ||
-          item.solicitudId ||
-          ""
-        );
-
-      const key =
-        solicitudId
-          ? `solicitud:${solicitudId}`
-          : `historial:${item.id}`;
-
-      procesosMap.set(
-        key,
-        {
-          fuente:
-            "ventas_historial",
-
-          id:
-            item.id,
-
-          solicitudId,
-
-          tipoMovimiento:
-            item.tipoMovimiento ||
-            item.tipo ||
-            "",
-
-          tipoSolicitud:
-            item.metadata?.tipoSolicitud ||
-            item.tipoSolicitud ||
-            "",
-
-          detalle:
-            item.metadata?.detalleSolicitud ||
-            item.metadata?.detalle ||
-            item.detalle ||
-            "",
-
-          requiereNuevoPdf:
-            true,
-
-          compatibilidadLegacy:
-            false
-        }
-      );
-    }
+  console.log(
+    "REGULARIZAR FICHA COMO ACTUALIZACIÓN"
   );
 
-  solicitudesCerradas.forEach(
-    (item) => {
-      const solicitudId =
-        cleanText(item.id);
+  console.log({
+    idGrupo:
+      realIdGrupo,
 
-      const key =
-        `solicitud:${solicitudId}`;
+    groupDocId:
+      groupSnapshot.id,
 
-      /*
-       * Si el historial ya contiene el cierre de esta solicitud,
-       * no debe contarse nuevamente.
-       */
-      if (
-        procesosMap.has(key)
-      ) {
-        return;
-      }
+    aliasGrupo,
 
-      procesosMap.set(
-        key,
-        {
-          fuente:
-            "ventas_solicitudes_actualizacion",
+    versionAnterior,
 
-          id:
-            item.id,
+    versionNueva,
 
-          solicitudId:
-            item.id,
+    motivo:
+      motivoLimpio
+  });
 
-          tipoMovimiento:
-            "",
-
-          tipoSolicitud:
-            item.tipoSolicitud ||
-            item.tipo ||
-            "",
-
-          detalle:
-            item.detalle ||
-            item.asunto ||
-            item.motivo ||
-            "",
-
-          estadoSolicitud:
-            item.estadoSolicitud ||
-            item.estado ||
-            "",
-
-          resuelta:
-            item.resuelta === true,
-
-          requiereNuevoPdf:
-            true,
-
-          /*
-           * Indica que fue inferido desde una solicitud antigua
-           * cerrada que todavía no guardaba requiereNuevoPdf.
-           */
-          compatibilidadLegacy:
-            item.requiereNuevoPdf !== true &&
-            item.metadata?.requiereNuevoPdf !== true
-        }
-      );
-    }
-  );
-
-  const procesosUnicos =
-    Array.from(
-      procesosMap.values()
+  const confirmado =
+    window.confirm(
+      [
+        `Grupo: ${aliasGrupo || realIdGrupo}`,
+        "",
+        `Versión actual registrada: ${versionAnterior.versionLabel}`,
+        `Versión que se regenerará: ${versionNueva.versionLabel}`,
+        "",
+        "La próxima generación reemplazará el PDF vigente conservando exactamente esta versión.",
+        "",
+        `Motivo: ${motivoLimpio}`,
+        "",
+        "¿Confirmas esta regularización?"
+      ].join("\n")
     );
 
-  const cantidadActualizaciones =
-    procesosUnicos.length;
-
-  /*
-   * =========================================================
-   * 7. VERIFICAR QUE EXISTA UN PDF OFICIAL
-   * =========================================================
-   */
-
-  const pdfHistorial =
-    Array.isArray(
-      ficha.pdfHistorial
-    )
-      ? ficha.pdfHistorial
-      : [];
-
-  const tienePdfOficial =
-    !!cleanText(
-      ficha.pdfUrl ||
-      group.fichaPdfUrl ||
-      ficha.storagePathPdf ||
-      ficha.pdfNombre ||
-      group.fichaPdfNombre ||
-      ""
-    ) ||
-    pdfHistorial.length > 0 ||
-    !!ficha.confirmadaEl ||
-    !!ficha.confirmadaPor ||
-    ficha.confirmada === true ||
-    group.fichaConfirmada === true;
-
-  if (!tienePdfOficial) {
-    const resultadoOmitido = {
+  if (!confirmado) {
+    return {
       ok:
+        false,
+
+      cancelado:
         true,
-
-      dryRun,
-
-      omitido:
-        true,
-
-      motivo:
-        "El grupo no tiene evidencia suficiente de un PDF oficial.",
 
       idGrupo:
-        realIdGrupo,
-
-      groupDocId:
-        groupSnapshot.id,
-
-      aliasGrupo:
-        group.aliasGrupo ||
-        group.nombreGrupo ||
-        "",
-
-      cantidadProcesos:
-        cantidadActualizaciones,
-
-      procesos:
-        procesosUnicos
+        realIdGrupo
     };
-
-    console.log(
-      "RESULTADO:",
-      resultadoOmitido
-    );
-
-    return resultadoOmitido;
   }
 
-  /*
-   * =========================================================
-   * 8. CALCULAR LA VERSIÓN CORRECTA
-   * =========================================================
-   */
+  await updateDoc(
+    groupSnapshot.ref,
+    {
+      versionFicha:
+        versionNueva.version,
 
-  const versionCorrecta =
-    cantidadActualizaciones > 0
-      ? {
-          version:
-            "ACTUALIZACIÓN",
+      tipoVersionFicha:
+        versionNueva.tipoVersion,
 
-          tipoVersion:
+      versionFichaNumero:
+        versionNueva.versionNumero,
+
+      "ficha.version":
+        versionNueva.version,
+
+      "ficha.tipoVersion":
+        versionNueva.tipoVersion,
+
+      "ficha.versionNumero":
+        versionNueva.versionNumero,
+
+      /*
+       * Habilita la regeneración sin aumentar el número.
+       */
+      "ficha.regenerarMismaVersion":
+        true,
+
+      "ficha.pdfPendienteGeneracion":
+        true,
+
+      /*
+       * No debe confundirse con una nueva corrección
+       * que incremente la versión.
+       */
+      "ficha.versionPendienteGeneracion":
+        null,
+
+      "ficha.regularizacionVersionManual":
+        {
+          tipo:
             "actualizacion",
 
           versionNumero:
-            cantidadActualizaciones,
+            numero,
 
           versionLabel:
-            `ACTUALIZACIÓN ${cantidadActualizaciones}`
-        }
+            versionNueva.versionLabel,
 
-      : {
-          version:
-            "ORIGINAL",
+          motivo:
+            motivoLimpio,
 
-          tipoVersion:
-            "original",
+          versionAnterior,
 
-          versionNumero:
-            1,
+          realizadaPor:
+            getDisplayName(
+              state.effectiveUser
+            ),
 
-          versionLabel:
-            "ORIGINAL"
-        };
+          realizadaPorCorreo:
+            state.effectiveEmail,
 
-  const versionActual = {
-    version:
-      ficha.version ||
-      group.versionFicha ||
-      "",
+          realizadaEl:
+            new Date().toISOString(),
 
-    tipoVersion:
-      ficha.tipoVersion ||
-      group.tipoVersionFicha ||
-      "",
+          pendienteRegeneracion:
+            true
+        },
 
-    versionNumero:
-      Number(
-        ficha.versionNumero ??
-        group.versionFichaNumero ??
-        0
-      )
-  };
+      "ficha.versionRegularizadaAt":
+        serverTimestamp(),
 
-  const necesitaCorreccion =
-    normalizeSearchLocal(
-      versionActual.version
-    ) !==
-      normalizeSearchLocal(
-        versionCorrecta.version
-      ) ||
-    normalizeSearchLocal(
-      versionActual.tipoVersion
-    ) !==
-      normalizeSearchLocal(
-        versionCorrecta.tipoVersion
-      ) ||
-    Number(
-      versionActual.versionNumero
-    ) !==
-      Number(
-        versionCorrecta.versionNumero
-      );
+      "ficha.versionRegularizadaPor":
+        getDisplayName(
+          state.effectiveUser
+        ),
+
+      "ficha.versionRegularizadaPorCorreo":
+        state.effectiveEmail
+    }
+  );
+
+  await registrarRegularizacionVersionFicha({
+    realIdGrupo,
+
+    group,
+
+    tipoMovimiento:
+      "regularizacion_manual_version_ficha",
+
+    titulo:
+      `Ficha preparada como ${versionNueva.versionLabel}`,
+
+    mensaje:
+      [
+        `Se regularizó manualmente la versión desde ${versionAnterior.versionLabel} hacia ${versionNueva.versionLabel}.`,
+        `Motivo: ${motivoLimpio}.`,
+        `El PDF quedó pendiente de regeneración conservando ${versionNueva.versionLabel}.`
+      ].join(" "),
+
+    metadata: {
+      versionAnterior,
+
+      versionNueva,
+
+      motivo:
+        motivoLimpio,
+
+      accion:
+        "regenerar_misma_version"
+    }
+  });
 
   const resultado = {
     ok:
       true,
-
-    dryRun,
 
     idGrupo:
       realIdGrupo,
@@ -10119,213 +9919,282 @@ async function ({
     groupDocId:
       groupSnapshot.id,
 
-    aliasGrupo:
-      group.aliasGrupo ||
-      group.nombreGrupo ||
-      "",
+    aliasGrupo,
 
-    versionActual,
+    versionAnterior,
 
-    versionCorrecta,
+    versionNueva,
 
-    cantidadProcesos:
-      cantidadActualizaciones,
-
-    procesos:
-      procesosUnicos.map(
-        (item) => ({
-          fuente:
-            item.fuente ||
-            "",
-
-          id:
-            item.id ||
-            "",
-
-          solicitudId:
-            item.solicitudId ||
-            "",
-
-          tipoMovimiento:
-            item.tipoMovimiento ||
-            "",
-
-          tipoSolicitud:
-            item.tipoSolicitud ||
-            "",
-
-          detalle:
-            item.detalle ||
-            "",
-
-          estadoSolicitud:
-            item.estadoSolicitud ||
-            "",
-
-          compatibilidadLegacy:
-            item.compatibilidadLegacy === true
-        })
-      ),
-
-    necesitaCorreccion
+    pendienteRegeneracion:
+      true
   };
 
   console.log(
-    "RESULTADO:",
+    "REGULARIZACIÓN APLICADA:",
     resultado
   );
 
-  /*
-   * En dryRun solamente informa.
-   */
-  if (dryRun) {
-    return resultado;
+  alert(
+    [
+      `La ficha quedó preparada como ${versionNueva.versionLabel}.`,
+      "",
+      "Ahora abre la página del PDF y genera nuevamente el documento.",
+      "",
+      `Se mantendrá como ${versionNueva.versionLabel}; no avanzará a otra versión.`
+    ].join("\n")
+  );
+
+  return resultado;
+};
+
+/* =========================================================
+   2. REGENERAR COMO ORIGINAL
+========================================================= */
+
+window.regenerarFichaComoOriginal =
+async function ({
+  idGrupo,
+  motivo
+} = {}) {
+  const motivoLimpio =
+    cleanText(motivo);
+
+  if (!motivoLimpio) {
+    throw new Error(
+      "Debes indicar el motivo de la regularización."
+    );
   }
 
-  /*
-   * Si ya está correcta, no escribe nada.
-   */
-  if (!necesitaCorreccion) {
-    resultado.aplicado =
-      false;
-
-    resultado.motivo =
-      "La versión ya se encontraba correcta.";
-
-    console.log(
-      "SIN CAMBIOS:",
-      resultado
+  const {
+    groupSnapshot,
+    group,
+    realIdGrupo
+  } =
+    await buscarGrupoParaRegularizarVersion(
+      idGrupo
     );
 
-    return resultado;
-  }
+  const versionAnterior =
+    obtenerVersionActualFichaManual(
+      group
+    );
 
-  /*
-   * =========================================================
-   * 9. APLICAR LA CORRECCIÓN EN FIRESTORE
-   * =========================================================
-   *
-   * regenerarMismaVersion=true permitirá reemplazar físicamente
-   * el PDF incorrecto sin volver a aumentar el contador.
-   */
+  const versionNueva = {
+    version:
+      "ORIGINAL",
+
+    tipoVersion:
+      "original",
+
+    versionNumero:
+      1,
+
+    versionLabel:
+      "ORIGINAL"
+  };
+
+  const aliasGrupo =
+    cleanText(
+      group.aliasGrupo ||
+      group.nombreGrupo ||
+      ""
+    );
+
+  console.log(
+    "========================================"
+  );
+
+  console.log(
+    "REGULARIZAR FICHA COMO ORIGINAL"
+  );
+
+  console.log({
+    idGrupo:
+      realIdGrupo,
+
+    groupDocId:
+      groupSnapshot.id,
+
+    aliasGrupo,
+
+    versionAnterior,
+
+    versionNueva,
+
+    motivo:
+      motivoLimpio
+  });
+
+  const confirmado =
+    window.confirm(
+      [
+        `Grupo: ${aliasGrupo || realIdGrupo}`,
+        "",
+        `Versión actual registrada: ${versionAnterior.versionLabel}`,
+        "Versión que se regenerará: ORIGINAL",
+        "",
+        "La próxima generación reemplazará el PDF vigente manteniéndolo como ORIGINAL.",
+        "",
+        `Motivo: ${motivoLimpio}`,
+        "",
+        "¿Confirmas esta regularización?"
+      ].join("\n")
+    );
+
+  if (!confirmado) {
+    return {
+      ok:
+        false,
+
+      cancelado:
+        true,
+
+      idGrupo:
+        realIdGrupo
+    };
+  }
 
   await updateDoc(
     groupSnapshot.ref,
     {
       versionFicha:
-        versionCorrecta.version,
+        versionNueva.version,
 
       tipoVersionFicha:
-        versionCorrecta.tipoVersion,
+        versionNueva.tipoVersion,
 
       versionFichaNumero:
-        versionCorrecta.versionNumero,
+        versionNueva.versionNumero,
 
       "ficha.version":
-        versionCorrecta.version,
+        versionNueva.version,
 
       "ficha.tipoVersion":
-        versionCorrecta.tipoVersion,
+        versionNueva.tipoVersion,
 
       "ficha.versionNumero":
-        versionCorrecta.versionNumero,
+        versionNueva.versionNumero,
 
+      /*
+       * Regenera sin convertirlo en ACTUALIZACIÓN 1.
+       */
       "ficha.regenerarMismaVersion":
         true,
 
-      "ficha.versionReconstruida":
+      "ficha.pdfPendienteGeneracion":
         true,
 
-      "ficha.versionReconstruidaAt":
+      "ficha.versionPendienteGeneracion":
+        null,
+
+      "ficha.regularizacionVersionManual":
+        {
+          tipo:
+            "original",
+
+          versionNumero:
+            1,
+
+          versionLabel:
+            "ORIGINAL",
+
+          motivo:
+            motivoLimpio,
+
+          versionAnterior,
+
+          realizadaPor:
+            getDisplayName(
+              state.effectiveUser
+            ),
+
+          realizadaPorCorreo:
+            state.effectiveEmail,
+
+          realizadaEl:
+            new Date().toISOString(),
+
+          pendienteRegeneracion:
+            true
+        },
+
+      "ficha.versionRegularizadaAt":
         serverTimestamp(),
 
-      "ficha.versionReconstruidaPor":
+      "ficha.versionRegularizadaPor":
         getDisplayName(
           state.effectiveUser
         ),
 
-      "ficha.versionReconstruidaPorCorreo":
+      "ficha.versionRegularizadaPorCorreo":
         state.effectiveEmail
     }
   );
 
-  /*
-   * Registrar la reconstrucción en el historial.
-   */
-  await createHistoryEntry({
-    tipoMovimiento:
-      "reconstruccion_version_ficha",
+  await registrarRegularizacionVersionFicha({
+    realIdGrupo,
 
-    modulo:
-      "ficha",
+    group,
+
+    tipoMovimiento:
+      "regularizacion_manual_version_ficha",
 
     titulo:
-      "Reconstrucción de versión de ficha",
-
-    asunto:
-      "Corrección del contador de versión",
+      "Ficha preparada como ORIGINAL",
 
     mensaje:
       [
-        `Se corrigió la versión desde ${
-          versionActual.version ||
-          "sin versión"
-        } ${
-          versionActual.versionNumero ||
-          ""
-        } hacia ${
-          versionCorrecta.versionLabel
-        }.`,
-
-        `Se detectaron ${
-          cantidadActualizaciones
-        } procesos reales que requirieron un nuevo PDF.`,
-
-        "El PDF quedó habilitado para regenerarse conservando la versión corregida."
+        `Se regularizó manualmente la versión desde ${versionAnterior.versionLabel} hacia ORIGINAL.`,
+        `Motivo: ${motivoLimpio}.`,
+        "El PDF quedó pendiente de regeneración conservando la versión ORIGINAL."
       ].join(" "),
 
     metadata: {
-      versionAnterior:
-        versionActual,
+      versionAnterior,
 
-      versionNueva:
-        versionCorrecta,
+      versionNueva,
 
-      cantidadProcesos:
-        cantidadActualizaciones,
+      motivo:
+        motivoLimpio,
 
-      procesosConsiderados:
-        procesosUnicos.map(
-          (item) => ({
-            fuente:
-              item.fuente ||
-              "",
-
-            id:
-              item.id ||
-              "",
-
-            solicitudId:
-              item.solicitudId ||
-              "",
-
-            tipoSolicitud:
-              item.tipoSolicitud ||
-              "",
-
-            compatibilidadLegacy:
-              item.compatibilidadLegacy === true
-          })
-        )
+      accion:
+        "regenerar_misma_version"
     }
   });
 
-  resultado.aplicado =
-    true;
+  const resultado = {
+    ok:
+      true,
+
+    idGrupo:
+      realIdGrupo,
+
+    groupDocId:
+      groupSnapshot.id,
+
+    aliasGrupo,
+
+    versionAnterior,
+
+    versionNueva,
+
+    pendienteRegeneracion:
+      true
+  };
 
   console.log(
-    "CORRECCIÓN APLICADA:",
+    "REGULARIZACIÓN APLICADA:",
     resultado
+  );
+
+  alert(
+    [
+      "La ficha quedó preparada como ORIGINAL.",
+      "",
+      "Ahora abre la página del PDF y genera nuevamente el documento.",
+      "",
+      "La próxima actualización real será ACTUALIZACIÓN 1."
+    ].join("\n")
   );
 
   return resultado;
