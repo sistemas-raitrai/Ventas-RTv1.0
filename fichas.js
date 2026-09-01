@@ -9497,7 +9497,7 @@ async function ({
 
   if (!targetId) {
     throw new Error(
-      "Debes indicar idGrupo. Ejemplo: reconstruirVersionFichaGrupo({ idGrupo: 'ID', dryRun: true })"
+      "Debes indicar idGrupo. Ejemplo: reconstruirVersionFichaGrupo({ idGrupo: '10918', dryRun: true })"
     );
   }
 
@@ -9517,8 +9517,11 @@ async function ({
   });
 
   /*
-   * Buscar grupo por ID documental.
+   * =========================================================
+   * 1. BUSCAR EL GRUPO
+   * =========================================================
    */
+
   let groupSnapshot =
     await getDoc(
       doc(
@@ -9530,7 +9533,7 @@ async function ({
 
   /*
    * Compatibilidad cuando idGrupo no coincide
-   * con el document ID.
+   * con el ID documental de Firestore.
    */
   if (!groupSnapshot.exists()) {
     const groupQuery =
@@ -9571,67 +9574,81 @@ async function ({
   const ficha =
     group.ficha || {};
 
-  /*
-   * Buscar el historial real del grupo.
-   */
-  const historyQuery =
-    query(
-      collection(
-        db,
-        HISTORIAL_COLLECTION
-      ),
-      where(
-        "idGrupo",
-        "==",
-        String(
-          group.idGrupo ||
-          targetId
-        )
-      )
-    );
-
-  const historySnapshot =
-    await getDocs(
-      historyQuery
-    );
-
-  const history =
-    historySnapshot.docs.map(
-      (item) => ({
-        id:
-          item.id,
-
-        ...item.data()
-      })
-    );
-
-  /*
-   * Buscar también las solicitudes reales.
-   *
-   * Las solicitudes antiguas pueden estar correctamente cerradas
-   * aunque el historial todavía no tenga
-   * metadata.requiereNuevoPdf.
-   */
-  const posiblesIdsGrupo = [
+  const realIdGrupo =
     String(
       group.idGrupo ||
-      ""
-    ),
+      targetId
+    );
 
-    String(
-      groupSnapshot.id ||
-      ""
-    ),
-
-    String(
-      targetId ||
-      ""
-    )
+  /*
+   * IDs que podrían haberse utilizado históricamente
+   * para relacionar solicitudes e historial.
+   */
+  const posiblesIdsGrupo = [
+    realIdGrupo,
+    String(groupSnapshot.id || ""),
+    String(targetId || "")
   ].filter(
     (value, index, array) =>
       value &&
       array.indexOf(value) === index
   );
+
+  /*
+   * =========================================================
+   * 2. BUSCAR EL HISTORIAL DEL GRUPO
+   * =========================================================
+   */
+
+  const historyMap =
+    new Map();
+
+  for (
+    const possibleId of posiblesIdsGrupo
+  ) {
+    const historyQuery =
+      query(
+        collection(
+          db,
+          HISTORIAL_COLLECTION
+        ),
+        where(
+          "idGrupo",
+          "==",
+          possibleId
+        )
+      );
+
+    const historySnapshot =
+      await getDocs(
+        historyQuery
+      );
+
+    historySnapshot.docs.forEach(
+      (item) => {
+        historyMap.set(
+          item.id,
+          {
+            id:
+              item.id,
+
+            ...item.data()
+          }
+        );
+      }
+    );
+  }
+
+  const history =
+    Array.from(
+      historyMap.values()
+    );
+
+  /*
+   * =========================================================
+   * 3. BUSCAR SOLICITUDES DE ACTUALIZACIÓN/CORRECCIÓN
+   * =========================================================
+   */
 
   const solicitudesMap =
     new Map();
@@ -9684,14 +9701,23 @@ async function ({
         id:
           item.id,
 
+        idGrupo:
+          item.idGrupo,
+
         tipoSolicitud:
           item.tipoSolicitud,
 
         estadoSolicitud:
           item.estadoSolicitud,
 
+        estado:
+          item.estado,
+
         resuelta:
           item.resuelta,
+
+        requiereNuevoPdf:
+          item.requiereNuevoPdf,
 
         detalle:
           item.detalle,
@@ -9706,12 +9732,8 @@ async function ({
   );
 
   /*
-   * Solamente cuentan los procedimientos cerrados
-   * que exigieron efectivamente un nuevo PDF.
-   */
-  /*
    * =========================================================
-   * 1. PROCESOS CONFIRMADOS POR EL HISTORIAL NUEVO
+   * 4. PROCESOS CONFIRMADOS EN EL HISTORIAL NUEVO
    * =========================================================
    */
 
@@ -9721,6 +9743,7 @@ async function ({
         const tipo =
           normalizeSearchLocal(
             item.tipoMovimiento ||
+            item.tipo ||
             ""
           );
 
@@ -9730,20 +9753,25 @@ async function ({
           tipo ===
             "solicitud_correccion_cerrada";
 
+        const requiereNuevoPdf =
+          item.metadata?.requiereNuevoPdf === true ||
+          item.requiereNuevoPdf === true;
+
         return (
           esCierre &&
-          item.metadata?.requiereNuevoPdf === true
+          requiereNuevoPdf
         );
       }
     );
 
   /*
    * =========================================================
-   * 2. SOLICITUDES ANTIGUAS CERRADAS
+   * 5. SOLICITUDES ANTIGUAS CERRADAS
    * =========================================================
    *
-   * Compatibilidad con procedimientos anteriores a la creación
-   * de metadata.requiereNuevoPdf.
+   * En los registros antiguos puede no existir
+   * metadata.requiereNuevoPdf. Por eso se utiliza el cierre
+   * efectivo de la solicitud como evidencia del proceso.
    */
 
   const solicitudesCerradas =
@@ -9752,12 +9780,14 @@ async function ({
         const tipo =
           normalizeSearchLocal(
             item.tipoSolicitud ||
+            item.tipo ||
             ""
           );
 
         const estado =
           normalizeSearchLocal(
             item.estadoSolicitud ||
+            item.estado ||
             ""
           );
 
@@ -9767,23 +9797,42 @@ async function ({
 
         const estaCerrada =
           item.resuelta === true ||
+          item.cerrada === true ||
+          item.completada === true ||
+          estado === "resuelta" ||
+          estado === "resuelto" ||
           estado === "completada" ||
+          estado === "completado" ||
           estado === "cerrada" ||
+          estado === "cerrado" ||
           !!cleanText(
             item.respuestaAdministracion ||
+            item.cierreAdministracion ||
             ""
           );
 
+        /*
+         * Si el registro dice expresamente que NO requirió
+         * un nuevo PDF, no debe aumentar la versión.
+         *
+         * Si la propiedad no existía, se aplica compatibilidad
+         * con el formato antiguo.
+         */
+        const noRequirioNuevoPdf =
+          item.requiereNuevoPdf === false ||
+          item.metadata?.requiereNuevoPdf === false;
+
         return (
           tipoValido &&
-          estaCerrada
+          estaCerrada &&
+          !noRequirioNuevoPdf
         );
       }
     );
 
   /*
    * =========================================================
-   * 3. UNIFICAR SIN DUPLICAR SOLICITUDES
+   * 6. UNIFICAR LOS PROCESOS SIN DUPLICAR SOLICITUDES
    * =========================================================
    */
 
@@ -9795,6 +9844,7 @@ async function ({
       const solicitudId =
         cleanText(
           item.metadata?.solicitudId ||
+          item.solicitudId ||
           ""
         );
 
@@ -9814,16 +9864,27 @@ async function ({
 
           solicitudId,
 
+          tipoMovimiento:
+            item.tipoMovimiento ||
+            item.tipo ||
+            "",
+
           tipoSolicitud:
             item.metadata?.tipoSolicitud ||
+            item.tipoSolicitud ||
             "",
 
           detalle:
             item.metadata?.detalleSolicitud ||
+            item.metadata?.detalle ||
+            item.detalle ||
             "",
 
           requiereNuevoPdf:
-            true
+            true,
+
+          compatibilidadLegacy:
+            false
         }
       );
     }
@@ -9831,12 +9892,15 @@ async function ({
 
   solicitudesCerradas.forEach(
     (item) => {
+      const solicitudId =
+        cleanText(item.id);
+
       const key =
-        `solicitud:${item.id}`;
+        `solicitud:${solicitudId}`;
 
       /*
-       * Si el historial nuevo ya registró esta misma solicitud,
-       * no la agregamos dos veces.
+       * Si el historial ya contiene el cierre de esta solicitud,
+       * no debe contarse nuevamente.
        */
       if (
         procesosMap.has(key)
@@ -9856,32 +9920,38 @@ async function ({
           solicitudId:
             item.id,
 
+          tipoMovimiento:
+            "",
+
           tipoSolicitud:
             item.tipoSolicitud ||
+            item.tipo ||
             "",
 
           detalle:
             item.detalle ||
             item.asunto ||
+            item.motivo ||
             "",
 
           estadoSolicitud:
             item.estadoSolicitud ||
+            item.estado ||
             "",
 
           resuelta:
             item.resuelta === true,
 
-          /*
-           * En solicitudes antiguas no existía esta propiedad.
-           * Al estar cerrada y existir un PDF actualizado vigente,
-           * la utilizamos como evidencia histórica.
-           */
           requiereNuevoPdf:
             true,
 
+          /*
+           * Indica que fue inferido desde una solicitud antigua
+           * cerrada que todavía no guardaba requiereNuevoPdf.
+           */
           compatibilidadLegacy:
-            true
+            item.requiereNuevoPdf !== true &&
+            item.metadata?.requiereNuevoPdf !== true
         }
       );
     }
@@ -9894,18 +9964,37 @@ async function ({
 
   const cantidadActualizaciones =
     procesosUnicos.length;
+
+  /*
+   * =========================================================
+   * 7. VERIFICAR QUE EXISTA UN PDF OFICIAL
+   * =========================================================
+   */
+
+  const pdfHistorial =
+    Array.isArray(
+      ficha.pdfHistorial
+    )
+      ? ficha.pdfHistorial
+      : [];
+
   const tienePdfOficial =
     !!cleanText(
       ficha.pdfUrl ||
       group.fichaPdfUrl ||
       ficha.storagePathPdf ||
+      ficha.pdfNombre ||
+      group.fichaPdfNombre ||
       ""
     ) ||
+    pdfHistorial.length > 0 ||
     !!ficha.confirmadaEl ||
-    ficha.confirmada === true;
+    !!ficha.confirmadaPor ||
+    ficha.confirmada === true ||
+    group.fichaConfirmada === true;
 
   if (!tienePdfOficial) {
-    return {
+    const resultadoOmitido = {
       ok:
         true,
 
@@ -9915,12 +10004,39 @@ async function ({
         true,
 
       motivo:
-        "El grupo no tiene evidencia de un PDF oficial.",
+        "El grupo no tiene evidencia suficiente de un PDF oficial.",
 
       idGrupo:
-        targetId
+        realIdGrupo,
+
+      groupDocId:
+        groupSnapshot.id,
+
+      aliasGrupo:
+        group.aliasGrupo ||
+        group.nombreGrupo ||
+        "",
+
+      cantidadProcesos:
+        cantidadActualizaciones,
+
+      procesos:
+        procesosUnicos
     };
+
+    console.log(
+      "RESULTADO:",
+      resultadoOmitido
+    );
+
+    return resultadoOmitido;
   }
+
+  /*
+   * =========================================================
+   * 8. CALCULAR LA VERSIÓN CORRECTA
+   * =========================================================
+   */
 
   const versionCorrecta =
     cantidadActualizaciones > 0
@@ -9978,6 +10094,12 @@ async function ({
       normalizeSearchLocal(
         versionCorrecta.version
       ) ||
+    normalizeSearchLocal(
+      versionActual.tipoVersion
+    ) !==
+      normalizeSearchLocal(
+        versionCorrecta.tipoVersion
+      ) ||
     Number(
       versionActual.versionNumero
     ) !==
@@ -9992,10 +10114,7 @@ async function ({
     dryRun,
 
     idGrupo:
-      String(
-        group.idGrupo ||
-        targetId
-      ),
+      realIdGrupo,
 
     groupDocId:
       groupSnapshot.id,
@@ -10027,12 +10146,20 @@ async function ({
             item.solicitudId ||
             "",
 
+          tipoMovimiento:
+            item.tipoMovimiento ||
+            "",
+
           tipoSolicitud:
             item.tipoSolicitud ||
             "",
 
           detalle:
             item.detalle ||
+            "",
+
+          estadoSolicitud:
+            item.estadoSolicitud ||
             "",
 
           compatibilidadLegacy:
@@ -10048,19 +10175,40 @@ async function ({
     resultado
   );
 
-  if (
-    dryRun ||
-    !necesitaCorreccion
-  ) {
+  /*
+   * En dryRun solamente informa.
+   */
+  if (dryRun) {
     return resultado;
   }
 
   /*
-   * Corrige Firestore.
-   *
-   * regenerarMismaVersion=true permite generar nuevamente
-   * el PDF físico conservando el número corregido.
+   * Si ya está correcta, no escribe nada.
    */
+  if (!necesitaCorreccion) {
+    resultado.aplicado =
+      false;
+
+    resultado.motivo =
+      "La versión ya se encontraba correcta.";
+
+    console.log(
+      "SIN CAMBIOS:",
+      resultado
+    );
+
+    return resultado;
+  }
+
+  /*
+   * =========================================================
+   * 9. APLICAR LA CORRECCIÓN EN FIRESTORE
+   * =========================================================
+   *
+   * regenerarMismaVersion=true permitirá reemplazar físicamente
+   * el PDF incorrecto sin volver a aumentar el contador.
+   */
+
   await updateDoc(
     groupSnapshot.ref,
     {
@@ -10101,6 +10249,9 @@ async function ({
     }
   );
 
+  /*
+   * Registrar la reconstrucción en el historial.
+   */
   await createHistoryEntry({
     tipoMovimiento:
       "reconstruccion_version_ficha",
@@ -10128,9 +10279,9 @@ async function ({
 
         `Se detectaron ${
           cantidadActualizaciones
-        } procedimientos reales que requirieron un nuevo PDF.`,
+        } procesos reales que requirieron un nuevo PDF.`,
 
-        "El PDF quedó habilitado para regenerarse conservando esta misma versión."
+        "El PDF quedó habilitado para regenerarse conservando la versión corregida."
       ].join(" "),
 
     metadata: {
@@ -10140,11 +10291,31 @@ async function ({
       versionNueva:
         versionCorrecta,
 
+      cantidadProcesos:
+        cantidadActualizaciones,
+
       procesosConsiderados:
         procesosUnicos.map(
-          (item) =>
-            item.metadata?.solicitudId ||
-            item.id
+          (item) => ({
+            fuente:
+              item.fuente ||
+              "",
+
+            id:
+              item.id ||
+              "",
+
+            solicitudId:
+              item.solicitudId ||
+              "",
+
+            tipoSolicitud:
+              item.tipoSolicitud ||
+              "",
+
+            compatibilidadLegacy:
+              item.compatibilidadLegacy === true
+          })
         )
     }
   });
