@@ -954,19 +954,36 @@ function mapClienteDoc(id, data) {
       ""
     );
 
+  const fichaComercial =
+    data.fichaComercial || {};
+
   const programa =
     cleanText(
+      data.nombrePrograma ||
       data.programa ||
+      fichaComercial.nombrePrograma ||
+      fichaComercial.programa ||
       ""
     );
 
-  const cantidadGrupo =
+  /*
+    Pax comercial contratado.
+
+    Priorizamos el nuevo resumen.
+    Si no existe, mantenemos compatibilidad
+    con documentos antiguos.
+  */
+  const paxContratados =
     Number(
-      data.cantidadGrupo ||
+      data.paxContratados ||
       data.numeroPaxTotal ||
-      data?.ficha?.numeroPaxTotal ||
+      fichaComercial.numeroPaxTotal ||
+      data.cantidadGrupo ||
       0
     ) || 0;
+
+  const cantidadGrupo =
+    paxContratados;
 
   const fechaCreacion =
     toDate(
@@ -977,6 +994,7 @@ function mapClienteDoc(id, data) {
   const destino =
     cleanText(
       data.destinoPrincipal ||
+      fichaComercial.destinoPrincipal ||
       data.destino ||
       "Sin destino"
     );
@@ -1055,7 +1073,6 @@ function mapClienteDoc(id, data) {
       data.nominaEstado
     );
 
-  // Si existe PDF real, la ficha del grupo debe figurar como cumplida.
   const fichaEstado =
     fichaPdfUrl
       ? "ok"
@@ -1076,6 +1093,123 @@ function mapClienteDoc(id, data) {
       data.cortesiaEstado
     );
 
+
+  /* =====================================================
+     NUEVA INFORMACIÓN COMERCIAL
+  ===================================================== */
+
+  const categoriaHoteleraContratada =
+    cleanText(
+      data.categoriaHoteleraContratada ||
+      fichaComercial.categoriaHoteleraContratada ||
+      ""
+    );
+
+  const valorPrograma =
+    cleanText(
+      data.valorPrograma ??
+      fichaComercial.valorPrograma ??
+      ""
+    );
+
+  const valorProgramaNumero =
+    Number(
+      data.valorProgramaNumero ??
+      fichaComercial.valorProgramaNumero ??
+      0
+    ) || 0;
+
+  const liberados =
+    cleanText(
+      data.liberados ??
+      fichaComercial.liberados ??
+      ""
+    );
+
+  const liberadosCantidad =
+    Number(
+      data.liberadosCantidad ??
+      fichaComercial.liberadosCantidad ??
+      0
+    ) || 0;
+
+  const tramoSeleccion =
+    cleanText(
+      data.tramoSeleccion ||
+      fichaComercial.tramoSeleccion ||
+      data.tramo ||
+      fichaComercial.tramo ||
+      ""
+    );
+
+  const tramoOtro =
+    cleanText(
+      data.tramoOtro ||
+      fichaComercial.tramoOtro ||
+      ""
+    );
+
+  const tramo =
+    cleanText(
+      data.tramo ||
+      fichaComercial.tramo ||
+      tramoSeleccion ||
+      ""
+    );
+
+  const mesViaje =
+    cleanText(
+      data.mesViaje ||
+      fichaComercial.mesViaje ||
+      ""
+    );
+
+  const mesViajeOtro =
+    cleanText(
+      data.mesViajeOtro ||
+      fichaComercial.mesViajeOtro ||
+      ""
+    );
+
+  const fechaViajeTexto =
+    cleanText(
+      data.fechaViajeTexto ||
+      fichaComercial.fechaViajeTexto ||
+      data.semanaViaje ||
+      mesViajeOtro ||
+      mesViaje ||
+      ""
+    );
+
+  const asistenciaEnViajes =
+    cleanText(
+      data.asistenciaEnViajes ||
+      fichaComercial.asistenciaEnViajes ||
+      ""
+    );
+
+  const solicitudReserva =
+    cleanText(
+      data.solicitudReserva ||
+      fichaComercial.solicitudReserva ||
+      ""
+    );
+
+  const autorizacionGerencia =
+    cleanText(
+      data.autorizacionGerencia ||
+      fichaComercial.autorizacionGerencia ||
+      ""
+    );
+
+  const descuentoValorBase =
+    cleanText(
+      data.descuentoValorBase ??
+      fichaComercial.descuentoValorBase ??
+      ""
+    );
+
+
   const displayTitleRaw =
     aliasGrupo ||
     nombreApoderado ||
@@ -1094,13 +1228,6 @@ function mapClienteDoc(id, data) {
       colegio || nombreGrupo
     );
 
-  /*
-    Debajo del nombre del grupo mostramos:
-
-    Negocio 1380 · Año 2025
-
-    Si alguno no existe, simplemente no aparece.
-  */
   const subtitleParts = [];
 
   if (numeroNegocio) {
@@ -1133,7 +1260,10 @@ function mapClienteDoc(id, data) {
 
     numeroNegocio,
     programa,
+
     cantidadGrupo,
+    paxContratados,
+
     fechaCreacion,
 
     destino,
@@ -1154,6 +1284,30 @@ function mapClienteDoc(id, data) {
     fichaPdfUrl,
     contratoEstado,
     cortesiaEstado,
+
+    /*
+      Información comercial nueva.
+    */
+    categoriaHoteleraContratada,
+
+    valorPrograma,
+    valorProgramaNumero,
+
+    liberados,
+    liberadosCantidad,
+
+    tramo,
+    tramoSeleccion,
+    tramoOtro,
+
+    mesViaje,
+    mesViajeOtro,
+    fechaViajeTexto,
+
+    asistenciaEnViajes,
+    solicitudReserva,
+    autorizacionGerencia,
+    descuentoValorBase,
 
     displayTitle,
     displayTitleRaw,
@@ -1188,6 +1342,15 @@ function mapClienteDoc(id, data) {
 
         destino,
         programa,
+
+        categoriaHoteleraContratada,
+        fechaViajeTexto,
+        tramo,
+
+        valorPrograma,
+        liberados,
+        asistenciaEnViajes,
+
         data.comunaCiudad || "",
 
         data.nombreCliente || "",
@@ -1849,10 +2012,9 @@ async function exportAnalisisLeadsToXlsx() {
     }
 
     /*
-      IMPORTANTE:
-      usamos los grupos VISIBLES.
+      Usamos los grupos visibles.
 
-      Por lo tanto se respetan:
+      Se respetan:
       - año
       - vendedor
       - estado
@@ -1872,6 +2034,7 @@ async function exportAnalisisLeadsToXlsx() {
 
     if (boton) {
       boton.disabled = true;
+
       boton.dataset.textoOriginal =
         boton.textContent || "";
 
@@ -1879,9 +2042,9 @@ async function exportAnalisisLeadsToXlsx() {
         "Generando análisis...";
     }
 
+
     /* =====================================================
        TRAER DOCUMENTOS ORIGINALES
-       SOLO AL MOMENTO DE EXPORTAR
     ===================================================== */
 
     const registros =
@@ -1916,32 +2079,32 @@ async function exportAnalisisLeadsToXlsx() {
                 snap.exists()
                   ? snap.data() || {}
                   : {};
-              
-              
+
+
               /*
-                Para los registros nuevos,
-                fechaAsignacion estará directamente
-                en ventas_cotizaciones.
-              
-                Para los antiguos, intentamos
-                reconstruirla desde historialAsignaciones.
+                Para registros nuevos,
+                fechaAsignacion vive en el grupo.
+
+                Para antiguos,
+                reconstruimos desde historial.
               */
               let asignacionHistorica =
                 null;
-              
+
               if (!data.fechaAsignacion) {
                 asignacionHistorica =
                   await obtenerPrimeraAsignacionHistorica(
                     idGrupo
                   );
               }
-              
-              
+
+
               return construirRegistroLead(
                 row,
                 data,
                 asignacionHistorica
               );
+
             } catch (error) {
               console.warn(
                 `[seguimiento] no se pudo cargar cotización ${idGrupo}`,
@@ -1950,7 +2113,7 @@ async function exportAnalisisLeadsToXlsx() {
 
               /*
                 No abortamos todo el informe
-                porque falle un documento.
+                por un solo documento.
               */
               return construirRegistroLead(
                 row,
@@ -1961,8 +2124,9 @@ async function exportAnalisisLeadsToXlsx() {
         )
       );
 
+
     /* =====================================================
-       ORDEN CRONOLÓGICO REAL
+       ORDEN CRONOLÓGICO
     ===================================================== */
 
     registros.sort(
@@ -1981,18 +2145,15 @@ async function exportAnalisisLeadsToXlsx() {
       }
     );
 
+
     /* =====================================================
-       HOJA 1: LEADS
+       HOJAS
     ===================================================== */
 
     const detalle =
       registros.map(
         registroLeadParaExcel
       );
-
-    /* =====================================================
-       HOJAS DE ANÁLISIS
-    ===================================================== */
 
     const resumenMensual =
       construirResumenMensualLeads(
@@ -2019,12 +2180,37 @@ async function exportAnalisisLeadsToXlsx() {
         registros
       );
 
+    /*
+      Nuevos análisis comerciales.
+    */
+    const resumenDestino =
+      construirResumenDestinoLeads(
+        registros
+      );
+
+    const resumenTemporada =
+      construirResumenTemporadaLeads(
+        registros
+      );
+
+    const resumenHoteleria =
+      construirResumenHoteleriaLeads(
+        registros
+      );
+
+    const resumenGanadas =
+      construirResumenGanadasLeads(
+        registros
+      );
+
+
     /* =====================================================
-       CREAR XLSX
+       CREAR LIBRO
     ===================================================== */
 
     const wb =
       XLSX.utils.book_new();
+
 
     const wsDetalle =
       XLSX.utils.json_to_sheet(
@@ -2056,17 +2242,39 @@ async function exportAnalisisLeadsToXlsx() {
         resumenCalidad
       );
 
+    const wsDestino =
+      XLSX.utils.json_to_sheet(
+        resumenDestino
+      );
+
+    const wsTemporada =
+      XLSX.utils.json_to_sheet(
+        resumenTemporada
+      );
+
+    const wsHoteleria =
+      XLSX.utils.json_to_sheet(
+        resumenHoteleria
+      );
+
+    const wsGanadas =
+      XLSX.utils.json_to_sheet(
+        resumenGanadas
+      );
+
+
     /* =====================================================
-       ANCHOS DE COLUMNAS
+       ANCHOS LEADS
     ===================================================== */
 
     wsDetalle["!cols"] = [
       { wch: 12 }, // FECHA INGRESO
-      { wch: 10 }, // HORA INGRESO
+      { wch: 10 }, // HORA
       { wch: 12 }, // MES INGRESO
       { wch: 12 }, // AÑO INGRESO
-    
-      { wch: 12 }, // ID GRUPO
+
+      { wch: 12 }, // ID
+      { wch: 14 }, // NEGOCIO
       { wch: 18 }, // CÓDIGO
       { wch: 42 }, // GRUPO
       { wch: 35 }, // COLEGIO
@@ -2074,71 +2282,84 @@ async function exportAnalisisLeadsToXlsx() {
       { wch: 14 }, // CURSO
       { wch: 14 }, // CURSO VIAJE
       { wch: 12 }, // AÑO VIAJE
-      { wch: 16 }, // PAX POTENCIALES
-    
-      { wch: 28 }, // CONTACTO 1
-      { wch: 22 }, // ROL CONTACTO 1
-      { wch: 32 }, // CORREO CONTACTO 1
-      { wch: 18 }, // CELULAR CONTACTO 1
-    
-      { wch: 28 }, // CONTACTO 2
-      { wch: 22 }, // ROL CONTACTO 2
-      { wch: 32 }, // CORREO CONTACTO 2
-      { wch: 18 }, // CELULAR CONTACTO 2
-    
-      { wch: 22 }, // INGRESÓ SIN ASIGNAR
-      { wch: 22 }, // FECHA ASIGNACIÓN
-      { wch: 24 }, // HORAS HASTA ASIGNACIÓN
-      { wch: 28 }, // VENDEDOR ASIGNADO INICIAL
-      { wch: 32 }, // CORREO VENDEDOR INICIAL
-    
-      { wch: 28 }, // VENDEDOR(A) ACTUAL
-      { wch: 32 }, // CORREO VENDEDOR(A)
-    
-      { wch: 22 }, // CREADO POR
-      { wch: 32 }, // CORREO CREADOR
-      { wch: 22 }, // ACTUALIZADO POR
-      { wch: 32 }, // CORREO ÚLTIMA ACTUALIZACIÓN
-    
-      { wch: 20 }, // ORIGEN CLIENTE
-      { wch: 20 }, // ORIGEN COLEGIO
-      { wch: 22 }, // MEDIO / CONTACTO
-      { wch: 30 }, // DETALLE ORIGEN
-    
-      { wch: 22 }, // ESTADO ACTUAL
-      { wch: 26 }, // FECHA ÚLTIMO CAMBIO ESTADO
-      { wch: 18 }, // PASÓ POR REUNIÓN
-      { wch: 24 }, // FECHA ÚLTIMA REUNIÓN
-      { wch: 24 }, // ÚLTIMA GESTIÓN
-      { wch: 24 }, // TIPO ÚLTIMA GESTIÓN
-      { wch: 16 }, // RESULTADO
-    
-      { wch: 18 }, // CALIDAD LEAD
-      { wch: 35 }, // DETALLE CALIDAD
-    
-      { wch: 22 }, // DESTINO
-      { wch: 28 }, // PROGRAMA
-      { wch: 18 }, // MES VIAJE
-      { wch: 18 }  // TRAMO
+      { wch: 24 }, // PAX
+
+      { wch: 28 },
+      { wch: 22 },
+      { wch: 32 },
+      { wch: 18 },
+
+      { wch: 28 },
+      { wch: 22 },
+      { wch: 32 },
+      { wch: 18 },
+
+      { wch: 22 },
+      { wch: 22 },
+      { wch: 24 },
+      { wch: 28 },
+      { wch: 32 },
+
+      { wch: 28 },
+      { wch: 32 },
+
+      { wch: 22 },
+      { wch: 32 },
+      { wch: 22 },
+      { wch: 32 },
+
+      { wch: 20 },
+      { wch: 20 },
+      { wch: 22 },
+      { wch: 30 },
+
+      { wch: 22 },
+      { wch: 26 },
+      { wch: 18 },
+      { wch: 24 },
+      { wch: 24 },
+      { wch: 24 },
+      { wch: 16 },
+
+      { wch: 18 },
+      { wch: 35 },
+
+      { wch: 30 }, // DESTINO
+      { wch: 30 }, // PROGRAMA
+      { wch: 18 }, // MES
+      { wch: 28 }, // FECHA/TEMPORADA
+      { wch: 18 }, // TRAMO
+      { wch: 42 }, // HOTELERÍA
+      { wch: 18 }, // VALOR
+      { wch: 14 }, // LIBERADOS
+      { wch: 22 }, // ASISTENCIA
+      { wch: 22 }, // SOL RESERVA
+      { wch: 22 }, // AUT GERENCIA
+      { wch: 22 }  // DESCUENTO
     ];
-    
+
+
+    /* =====================================================
+       ANCHOS RESÚMENES EXISTENTES
+    ===================================================== */
+
     wsMensual["!cols"] = [
-      { wch: 12 }, // mes
-      { wch: 10 }, // leads
-      { wch: 15 }, // pax
-      { wch: 22 }, // sin asignar
-      { wch: 22 }, // % sin asignar
-      { wch: 24 }, // no registrado
-      { wch: 28 }, // promedio horas
-      { wch: 18 }, // ≤4
-      { wch: 18 }, // ≤24
-      { wch: 18 }, // >24
-      { wch: 22 }, // reunión
-      { wch: 12 }, // ganados
-      { wch: 12 }, // perdidos
-      { wch: 14 }, // proceso
-      { wch: 14 }, // % reunión
-      { wch: 16 }  // conversión
+      { wch: 12 },
+      { wch: 10 },
+      { wch: 15 },
+      { wch: 22 },
+      { wch: 22 },
+      { wch: 24 },
+      { wch: 28 },
+      { wch: 18 },
+      { wch: 18 },
+      { wch: 18 },
+      { wch: 22 },
+      { wch: 12 },
+      { wch: 12 },
+      { wch: 14 },
+      { wch: 14 },
+      { wch: 16 }
     ];
 
     wsVendedores["!cols"] = [
@@ -2166,15 +2387,15 @@ async function exportAnalisisLeadsToXlsx() {
     ];
 
     wsRolContacto["!cols"] = [
-      { wch: 28 }, // ROL CONTACTO
-      { wch: 12 }, // LEADS
-      { wch: 18 }, // PAX
-      { wch: 14 }, // REUNIÓN
-      { wch: 14 }, // GANADOS
-      { wch: 14 }, // PERDIDOS
-      { wch: 16 }, // EN PROCESO
-      { wch: 16 }, // % REUNIÓN
-      { wch: 18 }  // % CONVERSIÓN
+      { wch: 28 },
+      { wch: 12 },
+      { wch: 18 },
+      { wch: 14 },
+      { wch: 14 },
+      { wch: 14 },
+      { wch: 16 },
+      { wch: 16 },
+      { wch: 18 }
     ];
 
     wsCalidad["!cols"] = [
@@ -2186,6 +2407,69 @@ async function exportAnalisisLeadsToXlsx() {
       { wch: 12 },
       { wch: 16 }
     ];
+
+
+    /* =====================================================
+       ANCHOS NUEVAS HOJAS
+    ===================================================== */
+
+    wsDestino["!cols"] = [
+      { wch: 32 },
+      { wch: 12 },
+      { wch: 18 },
+      { wch: 14 },
+      { wch: 14 },
+      { wch: 16 },
+      { wch: 14 },
+      { wch: 16 },
+      { wch: 18 }
+    ];
+
+    wsTemporada["!cols"] = [
+      { wch: 14 },
+      { wch: 30 },
+      { wch: 12 },
+      { wch: 18 },
+      { wch: 14 },
+      { wch: 16 },
+      { wch: 14 },
+      { wch: 16 },
+      { wch: 18 }
+    ];
+
+    wsHoteleria["!cols"] = [
+      { wch: 14 },
+      { wch: 32 },
+      { wch: 45 },
+      { wch: 18 },
+      { wch: 20 },
+      { wch: 14 }
+    ];
+
+    wsGanadas["!cols"] = [
+      { wch: 14 },
+      { wch: 14 },
+      { wch: 42 },
+      { wch: 35 },
+      { wch: 28 },
+      { wch: 30 },
+      { wch: 32 },
+      { wch: 32 },
+      { wch: 18 },
+      { wch: 18 },
+      { wch: 14 },
+      { wch: 45 },
+      { wch: 18 },
+      { wch: 22 },
+      { wch: 22 },
+      { wch: 22 },
+      { wch: 22 }
+    ];
+
+
+    /* =====================================================
+       AGREGAR HOJAS
+    ===================================================== */
 
     XLSX.utils.book_append_sheet(
       wb,
@@ -2223,6 +2507,35 @@ async function exportAnalisisLeadsToXlsx() {
       "CALIDAD"
     );
 
+    XLSX.utils.book_append_sheet(
+      wb,
+      wsDestino,
+      "POR DESTINO"
+    );
+
+    XLSX.utils.book_append_sheet(
+      wb,
+      wsTemporada,
+      "POR TEMPORADA"
+    );
+
+    XLSX.utils.book_append_sheet(
+      wb,
+      wsHoteleria,
+      "HOTELERIA"
+    );
+
+    XLSX.utils.book_append_sheet(
+      wb,
+      wsGanadas,
+      "GANADAS"
+    );
+
+
+    /* =====================================================
+       DESCARGAR
+    ===================================================== */
+
     XLSX.writeFile(
       wb,
       `analisis_leads_${fileStamp()}.xlsx`
@@ -2237,6 +2550,7 @@ async function exportAnalisisLeadsToXlsx() {
     alert(
       "No se pudo generar el análisis de leads."
     );
+
   } finally {
     if (boton) {
       boton.disabled = false;
@@ -2247,7 +2561,6 @@ async function exportAnalisisLeadsToXlsx() {
     }
   }
 }
-
 
 /* =========================================================
    CONSTRUIR REGISTRO ANALÍTICO
@@ -2261,6 +2574,7 @@ function construirRegistroLead(
   const fechaCreacion =
     toDate(
       data.fechaCreacion ||
+      row.fechaCreacion ||
       null
     );
 
@@ -2296,19 +2610,6 @@ function construirRegistroLead(
     );
 
 
-  /*
-    Determinación del origen de asignación.
-
-    TRUE:
-    tenemos constancia de que pasó
-    por asignados.js / historialAsignaciones.
-
-    FALSE:
-    ingresó directamente asignado.
-
-    NULL:
-    registro antiguo sin evidencia suficiente.
-  */
   let ingresoSinAsignar =
     null;
 
@@ -2332,10 +2633,6 @@ function construirRegistroLead(
   }
 
 
-  /*
-    Solo calculamos demora cuando sabemos
-    que efectivamente estuvo sin asignar.
-  */
   const horasHastaAsignacion =
     ingresoSinAsignar === true &&
     fechaCreacion &&
@@ -2400,10 +2697,6 @@ function construirRegistroLead(
     );
 
 
-  /*
-    Marcamos reunión cuando existe
-    evidencia concreta disponible.
-  */
   const pasoPorReunion =
     !!fechaUltimaReunion ||
     estado === "reunion_confirmada" ||
@@ -2412,11 +2705,26 @@ function construirRegistroLead(
     ).includes("reunion");
 
 
+  const ficha =
+    data.ficha || {};
+
+  const fichaComercial =
+    data.fichaComercial || {};
+
+
+  /*
+    Pax comercial contratado.
+
+    Priorizamos resumen comercial.
+  */
   const cantidadGrupo =
     Number(
-      data.cantidadGrupo ||
+      row.paxContratados ||
+      data.paxContratados ||
       data.numeroPaxTotal ||
-      data?.ficha?.numeroPaxTotal ||
+      fichaComercial.numeroPaxTotal ||
+      data.cantidadGrupo ||
+      ficha.numeroPaxTotal ||
       0
     ) || 0;
 
@@ -2424,6 +2732,135 @@ function construirRegistroLead(
   const calidadLead =
     normalizarCalidadLead(
       data.calidadLead
+    );
+
+
+  /* =====================================================
+     INFORMACIÓN COMERCIAL NUEVA
+  ===================================================== */
+
+  const categoriaHoteleraContratada =
+    cleanText(
+      row.categoriaHoteleraContratada ||
+      data.categoriaHoteleraContratada ||
+      fichaComercial.categoriaHoteleraContratada ||
+      ficha.categoriaHoteleraContratada ||
+      ""
+    );
+
+
+  const valorPrograma =
+    cleanText(
+      row.valorPrograma ||
+      data.valorPrograma ||
+      fichaComercial.valorPrograma ||
+      ficha.valorPrograma ||
+      ""
+    );
+
+
+  const valorProgramaNumero =
+    Number(
+      row.valorProgramaNumero ||
+      data.valorProgramaNumero ||
+      fichaComercial.valorProgramaNumero ||
+      data.valorPrograma ||
+      ficha.valorPrograma ||
+      0
+    ) || 0;
+
+
+  const liberados =
+    cleanText(
+      row.liberados ||
+      data.liberados ||
+      fichaComercial.liberados ||
+      ficha.liberados ||
+      ""
+    );
+
+
+  const liberadosCantidad =
+    Number(
+      row.liberadosCantidad ||
+      data.liberadosCantidad ||
+      fichaComercial.liberadosCantidad ||
+      data.liberados ||
+      ficha.liberados ||
+      0
+    ) || 0;
+
+
+  const tramo =
+    cleanText(
+      row.tramo ||
+      data.tramo ||
+      fichaComercial.tramo ||
+      ficha.tramo ||
+      ""
+    );
+
+
+  const fechaViajeTexto =
+    cleanText(
+      row.fechaViajeTexto ||
+      data.fechaViajeTexto ||
+      fichaComercial.fechaViajeTexto ||
+      ficha.fechaViajeTexto ||
+      data.semanaViaje ||
+      row.mesViaje ||
+      data.mesViaje ||
+      ""
+    );
+
+
+  const mesViaje =
+    cleanText(
+      row.mesViaje ||
+      data.mesViaje ||
+      fichaComercial.mesViaje ||
+      ficha.mesViaje ||
+      ""
+    );
+
+
+  const asistenciaEnViajes =
+    cleanText(
+      row.asistenciaEnViajes ||
+      data.asistenciaEnViajes ||
+      fichaComercial.asistenciaEnViajes ||
+      ficha.asistenciaEnViajes ||
+      ""
+    );
+
+
+  const solicitudReserva =
+    cleanText(
+      row.solicitudReserva ||
+      data.solicitudReserva ||
+      fichaComercial.solicitudReserva ||
+      ficha.solicitudReserva ||
+      ""
+    );
+
+
+  const autorizacionGerencia =
+    cleanText(
+      row.autorizacionGerencia ||
+      data.autorizacionGerencia ||
+      fichaComercial.autorizacionGerencia ||
+      ficha.autorizacionGerencia ||
+      ""
+    );
+
+
+  const descuentoValorBase =
+    cleanText(
+      row.descuentoValorBase ||
+      data.descuentoValorBase ||
+      fichaComercial.descuentoValorBase ||
+      ficha.descuentoValorBase ||
+      ""
     );
 
 
@@ -2461,6 +2898,13 @@ function construirRegistroLead(
         data.idGrupo ||
         row.idGrupo ||
         row.id ||
+        ""
+      ),
+
+    numeroNegocio:
+      cleanText(
+        data.numeroNegocio ||
+        row.numeroNegocio ||
         ""
       ),
 
@@ -2518,7 +2962,7 @@ function construirRegistroLead(
     nombreCliente:
       cleanText(
         data.nombreCliente ||
-        data?.ficha?.apoderadoEncargado ||
+        ficha.apoderadoEncargado ||
         ""
       ),
 
@@ -2531,14 +2975,14 @@ function construirRegistroLead(
     correoCliente:
       cleanText(
         data.correoCliente ||
-        data?.ficha?.correo ||
+        ficha.correo ||
         ""
       ),
 
     celularCliente:
       cleanText(
         data.celularCliente ||
-        data?.ficha?.telefono ||
+        ficha.telefono ||
         ""
       ),
 
@@ -2592,7 +3036,7 @@ function construirRegistroLead(
 
 
     /* =====================================================
-       QUIÉN CREÓ EL LEAD
+       AUDITORÍA
     ===================================================== */
 
     creadoPor:
@@ -2605,11 +3049,6 @@ function construirRegistroLead(
         data.creadoPorCorreo ||
         ""
       ),
-
-
-    /* =====================================================
-       QUIÉN HIZO LA ÚLTIMA ACTUALIZACIÓN
-    ===================================================== */
 
     actualizadoPor:
       cleanText(
@@ -2670,38 +3109,46 @@ function construirRegistroLead(
 
 
     /* =====================================================
-       VIAJE
+       VIAJE / FICHA COMERCIAL
     ===================================================== */
 
     destino:
       cleanText(
-        data.destinoPrincipal ||
-        data.destino ||
         row.destino ||
+        data.destinoPrincipal ||
+        fichaComercial.destinoPrincipal ||
+        data.destino ||
         ""
       ),
 
     programa:
       cleanText(
-        data.programa ||
+        row.programa ||
         data.nombrePrograma ||
-        data?.ficha?.nombrePrograma ||
+        data.programa ||
+        fichaComercial.nombrePrograma ||
+        ficha.nombrePrograma ||
         ""
       ),
 
-    mesViaje:
-      cleanText(
-        data.mesViaje ||
-        data.semanaViaje ||
-        ""
-      ),
+    mesViaje,
 
-    tramo:
-      cleanText(
-        data.tramo ||
-        data?.ficha?.tramo ||
-        ""
-      )
+    fechaViajeTexto,
+
+    tramo,
+
+    categoriaHoteleraContratada,
+
+    valorPrograma,
+    valorProgramaNumero,
+
+    liberados,
+    liberadosCantidad,
+
+    asistenciaEnViajes,
+    solicitudReserva,
+    autorizacionGerencia,
+    descuentoValorBase
   };
 }
 
@@ -2738,6 +3185,9 @@ function registroLeadParaExcel(
     "ID GRUPO":
       registro.idGrupo,
 
+    "N° NEGOCIO":
+      registro.numeroNegocio,
+
     "CÓDIGO":
       registro.codigoRegistro,
 
@@ -2759,7 +3209,7 @@ function registroLeadParaExcel(
     "AÑO VIAJE":
       registro.anoViaje,
 
-    "PAX POTENCIALES":
+    "PAX POTENCIALES / CONTRATADOS":
       registro.cantidadGrupo,
 
 
@@ -2919,7 +3369,7 @@ function registroLeadParaExcel(
 
 
     /* =====================================================
-       VIAJE
+       VIAJE / PROYECCIÓN COMERCIAL
     ===================================================== */
 
     "DESTINO":
@@ -2931,11 +3381,38 @@ function registroLeadParaExcel(
     "MES VIAJE":
       registro.mesViaje,
 
+    "FECHA / TEMPORADA VIAJE":
+      registro.fechaViajeTexto,
+
     "TRAMO":
-      registro.tramo
+      registro.tramo,
+
+    "CATEGORÍA HOTELERA CONTRATADA":
+      registro.categoriaHoteleraContratada,
+
+    "VALOR PROGRAMA":
+      registro.valorProgramaNumero ||
+      registro.valorPrograma ||
+      "",
+
+    "LIBERADOS":
+      registro.liberadosCantidad ||
+      registro.liberados ||
+      "",
+
+    "ASISTENCIA EN VIAJES":
+      registro.asistenciaEnViajes,
+
+    "SOLICITUD RESERVA":
+      registro.solicitudReserva,
+
+    "AUTORIZACIÓN GERENCIA":
+      registro.autorizacionGerencia,
+
+    "DESCUENTO VALOR BASE":
+      registro.descuentoValorBase
   };
 }
-
 
 /* =========================================================
    RESUMEN MENSUAL
@@ -3353,6 +3830,442 @@ function construirResumenCalidadLeads(
             total.ganados,
             total.leads
           )
+      })
+    );
+}
+
+/* =========================================================
+   RESUMEN POR DESTINO
+========================================================= */
+
+function construirResumenDestinoLeads(
+  registros
+) {
+  const mapa =
+    new Map();
+
+  for (const registro of registros) {
+    const destino =
+      cleanText(
+        registro.destino
+      ) ||
+      "Sin definir";
+
+    if (!mapa.has(destino)) {
+      mapa.set(
+        destino,
+        {
+          destino,
+          leads: 0,
+          pax: 0,
+          reuniones: 0,
+          ganados: 0,
+          paxGanados: 0,
+          perdidos: 0,
+          enProceso: 0
+        }
+      );
+    }
+
+    const total =
+      mapa.get(destino);
+
+    total.leads++;
+
+    total.pax +=
+      Number(
+        registro.cantidadGrupo || 0
+      );
+
+    if (registro.pasoPorReunion) {
+      total.reuniones++;
+    }
+
+    if (registro.estado === "ganada") {
+      total.ganados++;
+
+      total.paxGanados +=
+        Number(
+          registro.cantidadGrupo || 0
+        );
+
+    } else if (
+      registro.estado === "perdida"
+    ) {
+      total.perdidos++;
+
+    } else {
+      total.enProceso++;
+    }
+  }
+
+  return [...mapa.values()]
+    .sort(
+      (a, b) =>
+        compareText(
+          a.destino,
+          b.destino
+        )
+    )
+    .map(
+      (total) => ({
+        "DESTINO":
+          total.destino,
+
+        "LEADS":
+          total.leads,
+
+        "PAX POTENCIALES":
+          total.pax,
+
+        "REUNIÓN":
+          total.reuniones,
+
+        "GANADOS":
+          total.ganados,
+
+        "PAX GANADOS":
+          total.paxGanados,
+
+        "PERDIDOS":
+          total.perdidos,
+
+        "EN PROCESO":
+          total.enProceso,
+
+        "% CONVERSIÓN":
+          porcentaje(
+            total.ganados,
+            total.leads
+          )
+      })
+    );
+}
+
+
+/* =========================================================
+   RESUMEN POR TEMPORADA
+========================================================= */
+
+function construirResumenTemporadaLeads(
+  registros
+) {
+  const mapa =
+    new Map();
+
+  for (const registro of registros) {
+    const ano =
+      registro.anoViaje ||
+      "Sin año";
+
+    const temporada =
+      cleanText(
+        registro.fechaViajeTexto ||
+        registro.mesViaje
+      ) ||
+      "Sin definir";
+
+    const key =
+      `${ano}__${temporada}`;
+
+    if (!mapa.has(key)) {
+      mapa.set(
+        key,
+        {
+          ano,
+          temporada,
+          leads: 0,
+          pax: 0,
+          ganados: 0,
+          paxGanados: 0,
+          perdidos: 0,
+          enProceso: 0
+        }
+      );
+    }
+
+    const total =
+      mapa.get(key);
+
+    total.leads++;
+
+    total.pax +=
+      Number(
+        registro.cantidadGrupo || 0
+      );
+
+    if (registro.estado === "ganada") {
+      total.ganados++;
+
+      total.paxGanados +=
+        Number(
+          registro.cantidadGrupo || 0
+        );
+
+    } else if (
+      registro.estado === "perdida"
+    ) {
+      total.perdidos++;
+
+    } else {
+      total.enProceso++;
+    }
+  }
+
+  return [...mapa.values()]
+    .sort(
+      (a, b) => {
+        const anoCompare =
+          compareNumber(
+            a.ano,
+            b.ano
+          );
+
+        if (anoCompare !== 0) {
+          return anoCompare;
+        }
+
+        return compareText(
+          a.temporada,
+          b.temporada
+        );
+      }
+    )
+    .map(
+      (total) => ({
+        "AÑO VIAJE":
+          total.ano,
+
+        "TEMPORADA / FECHA":
+          total.temporada,
+
+        "LEADS":
+          total.leads,
+
+        "PAX POTENCIALES":
+          total.pax,
+
+        "GANADOS":
+          total.ganados,
+
+        "PAX GANADOS":
+          total.paxGanados,
+
+        "PERDIDOS":
+          total.perdidos,
+
+        "EN PROCESO":
+          total.enProceso,
+
+        "% CONVERSIÓN":
+          porcentaje(
+            total.ganados,
+            total.leads
+          )
+      })
+    );
+}
+
+
+/* =========================================================
+   RESUMEN HOTELERÍA
+========================================================= */
+
+function construirResumenHoteleriaLeads(
+  registros
+) {
+  const mapa =
+    new Map();
+
+  for (const registro of registros) {
+    /*
+      Para hotelería interesa especialmente
+      lo que efectivamente fue ganado.
+    */
+    if (
+      registro.estado !== "ganada"
+    ) {
+      continue;
+    }
+
+    const ano =
+      registro.anoViaje ||
+      "Sin año";
+
+    const destino =
+      cleanText(
+        registro.destino
+      ) ||
+      "Sin destino";
+
+    const hoteleria =
+      cleanText(
+        registro.categoriaHoteleraContratada
+      ) ||
+      "Sin definir";
+
+    const key =
+      `${ano}__${destino}__${hoteleria}`;
+
+    if (!mapa.has(key)) {
+      mapa.set(
+        key,
+        {
+          ano,
+          destino,
+          hoteleria,
+          grupos: 0,
+          pax: 0,
+          liberados: 0
+        }
+      );
+    }
+
+    const total =
+      mapa.get(key);
+
+    total.grupos++;
+
+    total.pax +=
+      Number(
+        registro.cantidadGrupo || 0
+      );
+
+    total.liberados +=
+      Number(
+        registro.liberadosCantidad || 0
+      );
+  }
+
+  return [...mapa.values()]
+    .sort(
+      (a, b) =>
+        compareText(
+          `${a.ano} ${a.destino} ${a.hoteleria}`,
+          `${b.ano} ${b.destino} ${b.hoteleria}`
+        )
+    )
+    .map(
+      (total) => ({
+        "AÑO VIAJE":
+          total.ano,
+
+        "DESTINO":
+          total.destino,
+
+        "CATEGORÍA HOTELERA CONTRATADA":
+          total.hoteleria,
+
+        "GRUPOS GANADOS":
+          total.grupos,
+
+        "PAX CONTRATADOS":
+          total.pax,
+
+        "LIBERADOS":
+          total.liberados
+      })
+    );
+}
+
+
+/* =========================================================
+   DETALLE GRUPOS GANADOS
+========================================================= */
+
+function construirResumenGanadasLeads(
+  registros
+) {
+  return registros
+    .filter(
+      (registro) =>
+        registro.estado === "ganada"
+    )
+    .sort(
+      (a, b) => {
+        const anoCompare =
+          compareNumber(
+            a.anoViaje,
+            b.anoViaje
+          );
+
+        if (anoCompare !== 0) {
+          return anoCompare;
+        }
+
+        const destinoCompare =
+          compareText(
+            a.destino,
+            b.destino
+          );
+
+        if (destinoCompare !== 0) {
+          return destinoCompare;
+        }
+
+        return compareText(
+          a.grupo,
+          b.grupo
+        );
+      }
+    )
+    .map(
+      (registro) => ({
+        "AÑO VIAJE":
+          registro.anoViaje,
+
+        "N° NEGOCIO":
+          registro.numeroNegocio,
+
+        "GRUPO":
+          registro.grupo,
+
+        "COLEGIO":
+          registro.colegio,
+
+        "VENDEDOR(A)":
+          registro.vendedora,
+
+        "TEMPORADA / FECHA":
+          registro.fechaViajeTexto ||
+          registro.mesViaje,
+
+        "DESTINO":
+          registro.destino,
+
+        "PROGRAMA":
+          registro.programa,
+
+        "TRAMO":
+          registro.tramo,
+
+        "PAX CONTRATADOS":
+          registro.cantidadGrupo,
+
+        "LIBERADOS":
+          registro.liberadosCantidad ||
+          registro.liberados ||
+          "",
+
+        "CATEGORÍA HOTELERA CONTRATADA":
+          registro.categoriaHoteleraContratada,
+
+        "VALOR PROGRAMA":
+          registro.valorProgramaNumero ||
+          registro.valorPrograma ||
+          "",
+
+        "ASISTENCIA EN VIAJES":
+          registro.asistenciaEnViajes,
+
+        "SOLICITUD RESERVA":
+          registro.solicitudReserva,
+
+        "AUTORIZACIÓN GERENCIA":
+          registro.autorizacionGerencia,
+
+        "DESCUENTO VALOR BASE":
+          registro.descuentoValorBase
       })
     );
 }
