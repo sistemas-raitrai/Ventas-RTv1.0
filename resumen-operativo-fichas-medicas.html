@@ -886,22 +886,22 @@
       </a>
 
       <div class="mode-group">
-
+      
         <button
           id="btnModoEncargado"
           type="button"
           class="active"
         >
-          Encargado de grupo
+          Delegado
         </button>
-
+      
         <button
           id="btnModoViaje"
           type="button"
         >
-          Equipo de viaje
+          Adultos acompañantes
         </button>
-
+      
       </div>
 
       <button
@@ -991,57 +991,16 @@
 
         <table class="summary-table">
 
-          <thead>
-
-            <tr>
-
-              <th class="col-number">
-                #
-              </th>
-
-              <th class="col-passenger">
-                Pasajero
-              </th>
-
-              <th class="col-sheet">
-                Ficha
-              </th>
-
-              <th class="col-assistance">
-                Asistencia
-              </th>
-
-              <th class="col-considerations">
-                Consideraciones
-              </th>
-
-            </tr>
-
-          </thead>
-
+          <thead id="tableHead"></thead>
           <tbody id="tableBody"></tbody>
 
         </table>
 
 
-        <div class="legend">
-
-          <span>
-            <strong>Asistencia No:</strong>
-            operación habitual.
-          </span>
-
-          <span>
-            <strong>Asistencia Sí:</strong>
-            revisar detalle.
-          </span>
-
-          <span>
-            <strong>Pendiente:</strong>
-            ficha médica aún incompleta.
-          </span>
-
-        </div>
+        <div
+          id="summaryLegend"
+          class="legend"
+        ></div>
 
 
         <div
