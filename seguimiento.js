@@ -522,6 +522,11 @@ function leerCacheSeguimientoAno(
       (row) => ({
         ...row,
 
+        fechaCreacion:
+          toDate(
+            row.fechaCreacion
+          ),
+
         ultimaGestionAt:
           toDate(
             row.ultimaGestionAt
@@ -533,6 +538,7 @@ function leerCacheSeguimientoAno(
           )
       })
     );
+
   } catch (error) {
     console.warn(
       "[seguimiento] caché inválida",
@@ -906,164 +912,297 @@ async function loadSeguimiento() {
    MAPEO DE DATOS
 ========================================================= */
 function mapClienteDoc(id, data) {
-  const aliasGrupo = cleanText(data.aliasGrupo);
+  const aliasGrupo =
+    cleanText(
+      data.aliasGrupo
+    );
 
-  const nombreApoderado = cleanText(
-    data.nombreCliente ||
-    data.nombreApoderado ||
-    data.apoderado ||
-    ""
-  );
+  const nombreApoderado =
+    cleanText(
+      data.nombreCliente ||
+      data.nombreApoderado ||
+      data.apoderado ||
+      ""
+    );
 
-  const nombreGrupo = cleanText(
-    data.nombreGrupo ||
-    data.colegio ||
-    ""
-  );
+  const nombreGrupo =
+    cleanText(
+      data.nombreGrupo ||
+      data.colegio ||
+      ""
+    );
 
-  const colegio = cleanText(data.colegio);
-  const curso = cleanText(data.curso);
-  const anoViaje = Number(data.anoViaje || 0) || 0;
+  const colegio =
+    cleanText(
+      data.colegio
+    );
 
-  const destino = cleanText(
-    data.destinoPrincipal ||
-    data.destino ||
-    "Sin destino"
-  );
+  const curso =
+    cleanText(
+      data.curso
+    );
 
-  const estado = normalizeEstado(
-    data.estado ||
-    data.estadoGrupo ||
-    data.estadoComercial ||
-    data.etapaComercial
-  );
+  const anoViaje =
+    Number(
+      data.anoViaje || 0
+    ) || 0;
 
-  const visualFicha = resolveFichaVisualState(data);
-  
-  const autorizada = visualFicha.autorizadaVisual;
-  const cerrada = visualFicha.fichaCerrada;
+  const numeroNegocio =
+    cleanText(
+      data.numeroNegocio ||
+      data.numero_negocio ||
+      ""
+    );
 
-  const imagen = cleanText(
-    data.imagen ||
-    data.imagenUrl ||
-    ""
-  );
+  const programa =
+    cleanText(
+      data.programa ||
+      ""
+    );
 
-  const ultimaGestionAt = toDate(
-    data.ultimaGestionAt ||
-    data.fechaActualizacion ||
-    data.actualizadoEl ||
-    data.updatedAt ||
-    data.fechaCreacion ||
-    null
-  );
+  const cantidadGrupo =
+    Number(
+      data.cantidadGrupo ||
+      data.numeroPaxTotal ||
+      data?.ficha?.numeroPaxTotal ||
+      0
+    ) || 0;
 
-  const fechaUltimaReunion = toDate(
-    data.fechaUltimaReunion ||
-    data.ultimaReunion ||
-    data.fechaReunion ||
-    null
-  );
+  const fechaCreacion =
+    toDate(
+      data.fechaCreacion ||
+      null
+    );
 
-  const vendedora = cleanText(data.vendedora || "");
-  const vendedoraCorreo = normalizeEmail(data.vendedoraCorreo || "");
+  const destino =
+    cleanText(
+      data.destinoPrincipal ||
+      data.destino ||
+      "Sin destino"
+    );
 
-  const fichaPdfUrl = cleanText(
-    data.fichaPdfUrl ||
-    data?.ficha?.pdfUrl ||
-    data?.ficha?.urlPdf ||
-    ""
-  );
-  
-  const fichaMedicaEstado = normalizeDocState(data.fichaMedicaEstado);
-  const nominaEstado = normalizeDocState(data.nominaEstado);
-  
+  const estado =
+    normalizeEstado(
+      data.estado ||
+      data.estadoGrupo ||
+      data.estadoComercial ||
+      data.etapaComercial
+    );
+
+  const visualFicha =
+    resolveFichaVisualState(
+      data
+    );
+
+  const autorizada =
+    visualFicha.autorizadaVisual;
+
+  const cerrada =
+    visualFicha.fichaCerrada;
+
+  const imagen =
+    cleanText(
+      data.imagen ||
+      data.imagenUrl ||
+      ""
+    );
+
+  const ultimaGestionAt =
+    toDate(
+      data.ultimaGestionAt ||
+      data.fechaActualizacion ||
+      data.actualizadoEl ||
+      data.updatedAt ||
+      data.fechaCreacion ||
+      null
+    );
+
+  const fechaUltimaReunion =
+    toDate(
+      data.fechaUltimaReunion ||
+      data.ultimaReunion ||
+      data.fechaReunion ||
+      null
+    );
+
+  const vendedora =
+    cleanText(
+      data.vendedora ||
+      ""
+    );
+
+  const vendedoraCorreo =
+    normalizeEmail(
+      data.vendedoraCorreo ||
+      ""
+    );
+
+  const fichaPdfUrl =
+    cleanText(
+      data.fichaPdfUrl ||
+      data?.ficha?.pdfUrl ||
+      data?.ficha?.urlPdf ||
+      ""
+    );
+
+  const fichaMedicaEstado =
+    normalizeDocState(
+      data.fichaMedicaEstado
+    );
+
+  const nominaEstado =
+    normalizeDocState(
+      data.nominaEstado
+    );
+
   // Si existe PDF real, la ficha del grupo debe figurar como cumplida.
-  const fichaEstado = fichaPdfUrl
-    ? "ok"
-    : normalizeDocState(
-        data.fichaEstado ||
-        data?.documentos?.fichaGrupo?.estado ||
-        data?.ficha?.estado ||
-        ""
-      );
-  
-  const contratoEstado = normalizeDocState(data.contratoEstado);
-  const cortesiaEstado = normalizeDocState(data.cortesiaEstado);
+  const fichaEstado =
+    fichaPdfUrl
+      ? "ok"
+      : normalizeDocState(
+          data.fichaEstado ||
+          data?.documentos?.fichaGrupo?.estado ||
+          data?.ficha?.estado ||
+          ""
+        );
 
-  const displayTitleRaw = aliasGrupo || nombreApoderado || nombreGrupo || `Grupo ${id}`;
-  const displayTitle = buildGrupoDisplayTitle(displayTitleRaw, colegio || nombreGrupo);
-  
-  const grupoSortTitle = buildGrupoSortTitle(displayTitle, colegio || nombreGrupo);
-  
-  let subtitleParts = [
-    anoViaje ? `Año ${anoViaje}` : ""
-  ].filter(Boolean);
+  const contratoEstado =
+    normalizeDocState(
+      data.contratoEstado
+    );
+
+  const cortesiaEstado =
+    normalizeDocState(
+      data.cortesiaEstado
+    );
+
+  const displayTitleRaw =
+    aliasGrupo ||
+    nombreApoderado ||
+    nombreGrupo ||
+    `Grupo ${id}`;
+
+  const displayTitle =
+    buildGrupoDisplayTitle(
+      displayTitleRaw,
+      colegio || nombreGrupo
+    );
+
+  const grupoSortTitle =
+    buildGrupoSortTitle(
+      displayTitle,
+      colegio || nombreGrupo
+    );
+
+  /*
+    Debajo del nombre del grupo mostramos:
+
+    Negocio 1380 · Año 2025
+
+    Si alguno no existe, simplemente no aparece.
+  */
+  const subtitleParts = [];
+
+  if (numeroNegocio) {
+    subtitleParts.push(
+      `Negocio ${numeroNegocio}`
+    );
+  }
+
+  if (anoViaje) {
+    subtitleParts.push(
+      `Año ${anoViaje}`
+    );
+  }
 
   return {
     id,
-    idGrupo: cleanText(data.idGrupo || id),
+
+    idGrupo:
+      cleanText(
+        data.idGrupo ||
+        id
+      ),
+
     aliasGrupo,
     nombreApoderado,
     nombreGrupo,
     colegio,
     curso,
     anoViaje,
+
+    numeroNegocio,
+    programa,
+    cantidadGrupo,
+    fechaCreacion,
+
     destino,
     estado,
     autorizada,
     cerrada,
     imagen,
+
     ultimaGestionAt,
     fechaUltimaReunion,
+
     vendedora,
     vendedoraCorreo,
+
     fichaMedicaEstado,
     nominaEstado,
     fichaEstado,
     fichaPdfUrl,
     contratoEstado,
     cortesiaEstado,
+
     displayTitle,
     displayTitleRaw,
     grupoSortTitle,
     subtitleParts,
-    hasAlias: !!aliasGrupo,
-    avatarBaseText: colegio || nombreGrupo || nombreApoderado || displayTitle,
+
+    hasAlias:
+      !!aliasGrupo,
+
+    avatarBaseText:
+      colegio ||
+      nombreGrupo ||
+      nombreApoderado ||
+      displayTitle,
+
     searchIndex:
       buildSearchIndex([
         data.busquedaTexto || "",
-    
+
         id,
         data.idGrupo || "",
         data.groupDocId || "",
-    
-        data.numeroNegocio || "",
-        data.numero_negocio || "",
+
+        numeroNegocio,
         data.codigo || "",
-    
+
         aliasGrupo,
         nombreApoderado,
         nombreGrupo,
         colegio,
         curso,
-    
+
         destino,
-        data.programa || "",
+        programa,
         data.comunaCiudad || "",
-    
+
         data.nombreCliente || "",
         data.nombreCliente2 || "",
-    
+
         data.correoCliente || "",
         data.correoCliente2 || "",
-    
+
         data.celularCliente || "",
         data.celularCliente2 || "",
-    
+
         vendedora,
         vendedoraCorreo,
-    
+
+        cantidadGrupo,
         anoViaje
       ])
   };
@@ -1233,77 +1372,235 @@ function renderRows(rows) {
 }
 
 function renderRow(row) {
-  const progressHtml = renderProgress(row.estado);
-  const docsHtml = renderDocs(row);
-  const avatarHtml = renderAvatar(row);
+  const progressHtml =
+    renderProgress(
+      row.estado
+    );
 
-  const ultimaGestion = formatDateTime(row.ultimaGestionAt, "Sin registro");
-  const ultimaReunion = formatDateTime(row.fechaUltimaReunion, "Sin reunión");
+  const docsHtml =
+    renderDocs(
+      row
+    );
+
+  const avatarHtml =
+    renderAvatar(
+      row
+    );
+
+  const fechaCreacion =
+    formatDateRelative(
+      row.fechaCreacion,
+      "Sin fecha"
+    );
+
+  const ultimaGestion =
+    formatDateRelative(
+      row.ultimaGestionAt,
+      "Sin registro"
+    );
+
+  const ultimaReunion =
+    formatDateTime(
+      row.fechaUltimaReunion,
+      "Sin reunión"
+    );
+
+  const programa =
+    cleanText(
+      row.programa ||
+      ""
+    );
+
+  const cantidadGrupo =
+    Number(
+      row.cantidadGrupo || 0
+    ) || 0;
 
   return `
-      <tr>
-        <td>
+    <tr>
+
+      <!-- ===================================================
+           GRUPO
+      ==================================================== -->
+      <td>
         <a
           class="seg-group-link"
           href="grupo.html?id=${encodeURIComponent(row.idGrupo || row.id)}"
           target="_blank"
           rel="noopener noreferrer"
         >
-        <div class="seg-avatar">${avatarHtml}</div>
-      
+          <div class="seg-avatar">
+            ${avatarHtml}
+          </div>
+
           <div class="seg-group-info">
-            <div class="seg-group-title" title="${escapeAttr(row.displayTitleRaw || row.displayTitle)}">
+
+            <div
+              class="seg-group-title"
+              title="${escapeAttr(row.displayTitleRaw || row.displayTitle)}"
+            >
               ${escapeHtml(row.displayTitle)}
             </div>
-      
+
             <div class="seg-group-sub">
-              ${row.subtitleParts.map((part) => `<span>${escapeHtml(part)}</span>`).join("")}
+              ${
+                row.subtitleParts
+                  .map(
+                    (part) =>
+                      `<span>${escapeHtml(part)}</span>`
+                  )
+                  .join("")
+              }
             </div>
+
           </div>
         </a>
       </td>
 
-      <td class="td-vendedor" title="${escapeAttr(row.vendedora || row.vendedoraCorreo || '—')}">
+
+      <!-- ===================================================
+           VENDEDOR
+      ==================================================== -->
+      <td
+        class="td-vendedor"
+        title="${escapeAttr(row.vendedora || row.vendedoraCorreo || "—")}"
+      >
         ${escapeHtml(row.vendedora || row.vendedoraCorreo || "—")}
       </td>
 
-      <td class="seg-destino" title="${escapeAttr(row.destino || 'Sin destino')}">
-        ${escapeHtml(row.destino || "Sin destino")}
+
+      <!-- ===================================================
+           DESTINO + PROGRAMA
+      ==================================================== -->
+      <td
+        class="seg-destino"
+        title="${escapeAttr(row.destino || "Sin destino")}"
+      >
+        <div>
+          ${escapeHtml(row.destino || "Sin destino")}
+        </div>
+
+        ${
+          programa
+            ? `
+              <small class="seg-cell-sub">
+                ${escapeHtml(programa)}
+              </small>
+            `
+            : ""
+        }
       </td>
 
-      <td>${progressHtml}</td>
 
+      <!-- ===================================================
+           PAX
+      ==================================================== -->
+      <td class="seg-pax">
+        ${
+          cantidadGrupo
+            ? escapeHtml(
+                String(
+                  cantidadGrupo
+                )
+              )
+            : "—"
+        }
+      </td>
+
+
+      <!-- ===================================================
+           FECHA CREACIÓN
+      ==================================================== -->
+      <td class="seg-date">
+        ${escapeHtml(fechaCreacion.main)}
+
+        <small>
+          ${escapeHtml(fechaCreacion.sub)}
+        </small>
+      </td>
+
+
+      <!-- ===================================================
+           SEGUIMIENTO
+      ==================================================== -->
+      <td>
+        ${progressHtml}
+      </td>
+
+
+      <!-- ===================================================
+           AUTORIZADA
+      ==================================================== -->
       <td>
         ${
           row.autorizada
-            ? `<span class="seg-badge seg-badge-blue">Autorizada</span>`
-            : `<span class="seg-badge seg-badge-muted">—</span>`
+            ? `
+              <span class="seg-badge seg-badge-blue">
+                Autorizada
+              </span>
+            `
+            : `
+              <span class="seg-badge seg-badge-muted">
+                —
+              </span>
+            `
         }
       </td>
 
+
+      <!-- ===================================================
+           CERRADA
+      ==================================================== -->
       <td>
         ${
           row.cerrada
-            ? `<span class="seg-badge seg-badge-green-dark">Cerrada</span>`
-            : `<span class="seg-badge seg-badge-muted">—</span>`
+            ? `
+              <span class="seg-badge seg-badge-green-dark">
+                Cerrada
+              </span>
+            `
+            : `
+              <span class="seg-badge seg-badge-muted">
+                —
+              </span>
+            `
         }
       </td>
 
+
+      <!-- ===================================================
+           ÚLTIMA GESTIÓN
+      ==================================================== -->
       <td class="seg-date">
         ${escapeHtml(ultimaGestion.main)}
-        <small>${escapeHtml(ultimaGestion.sub)}</small>
+
+        <small>
+          ${escapeHtml(ultimaGestion.sub)}
+        </small>
       </td>
 
+
+      <!-- ===================================================
+           ÚLTIMA REUNIÓN
+      ==================================================== -->
       <td class="seg-date">
         ${escapeHtml(ultimaReunion.main)}
-        <small>${escapeHtml(ultimaReunion.sub)}</small>
+
+        <small>
+          ${escapeHtml(ultimaReunion.sub)}
+        </small>
       </td>
 
+
+      <!-- ===================================================
+           DOCUMENTOS
+      ==================================================== -->
       <td>
         <div class="seg-docs">
           ${docsHtml}
         </div>
       </td>
+
     </tr>
   `;
 }
@@ -1401,14 +1698,28 @@ function renderSummary(rows) {
 }
 
 function renderEmpty(message) {
-  const tbody = $("tbodySeguimiento");
-  if (!tbody) return;
+  const tbody =
+    $("tbodySeguimiento");
 
-  const colspan = document.body.classList.contains("is-vendedor-view") ? 8 : 9;
+  if (!tbody) {
+    return;
+  }
+
+  const colspan =
+    document.body.classList.contains(
+      "is-vendedor-view"
+    )
+      ? 10
+      : 11;
 
   tbody.innerHTML = `
     <tr>
-      <td colspan="${colspan}" class="seg-empty">${escapeHtml(message)}</td>
+      <td
+        colspan="${colspan}"
+        class="seg-empty"
+      >
+        ${escapeHtml(message)}
+      </td>
     </tr>
   `;
 }
@@ -3312,42 +3623,184 @@ function formatTimeOnlyText(
 ========================================================= */
 function exportVisibleRowsToXlsx() {
   try {
-    if (typeof XLSX === "undefined") {
-      alert("No se encontró la librería XLSX.");
+    if (
+      typeof XLSX ===
+      "undefined"
+    ) {
+      alert(
+        "No se encontró la librería XLSX."
+      );
+
       return;
     }
 
-    if (!state.visibleRows.length) {
-      alert("No hay registros visibles para exportar.");
+    if (
+      !state.visibleRows.length
+    ) {
+      alert(
+        "No hay registros visibles para exportar."
+      );
+
       return;
     }
 
-    const rowsToExport = state.visibleRows.map((row) => ({
-      "GRUPO": row.displayTitle || "",
-      "VENDEDOR(A)": row.vendedora || row.vendedoraCorreo || "",
-      "COLEGIO": row.colegio || row.nombreGrupo || "",
-      "CURSO": row.curso || "",
-      "AÑO VIAJE": row.anoViaje || "",
-      "DESTINO": row.destino || "",
-      "PROGRESO": STAGE_META[row.estado]?.label || row.estado || "",
-      "AUTORIZADA": row.autorizada ? "SI" : "NO",
-      "CERRADA": row.cerrada ? "SI" : "NO",
-      "ÚLT. GESTIÓN": formatDateTimeText(row.ultimaGestionAt),
-      "ÚLT. REUNIÓN": formatDateTimeText(row.fechaUltimaReunion),
-      "FICHAS MÉDICAS": getDocLabel(row.fichaMedicaEstado),
-      "NÓMINA": getDocLabel(row.nominaEstado),
-      "FICHA DEL GRUPO": getDocLabel(row.fichaEstado),
-      "CONTRATO": getDocLabel(row.contratoEstado),
-      "CORTESÍAS": getDocLabel(row.cortesiaEstado)
-    }));
+    const rowsToExport =
+      state.visibleRows.map(
+        (row) => ({
+          "ID GRUPO":
+            row.idGrupo ||
+            row.id ||
+            "",
 
-    const wb = XLSX.utils.book_new();
-    const ws = XLSX.utils.json_to_sheet(rowsToExport);
-    XLSX.utils.book_append_sheet(wb, ws, "Seguimiento");
-    XLSX.writeFile(wb, `seguimiento_grupos_${fileStamp()}.xlsx`);
+          "N° NEGOCIO":
+            row.numeroNegocio ||
+            "",
+
+          "GRUPO":
+            row.displayTitle ||
+            "",
+
+          "VENDEDOR(A)":
+            row.vendedora ||
+            row.vendedoraCorreo ||
+            "",
+
+          "COLEGIO":
+            row.colegio ||
+            row.nombreGrupo ||
+            "",
+
+          "CURSO":
+            row.curso ||
+            "",
+
+          "AÑO VIAJE":
+            row.anoViaje ||
+            "",
+
+          "DESTINO":
+            row.destino ||
+            "",
+
+          "PROGRAMA":
+            row.programa ||
+            "",
+
+          "PAX":
+            row.cantidadGrupo ||
+            0,
+
+          "FECHA CREACIÓN":
+            formatDateTimeText(
+              row.fechaCreacion
+            ),
+
+          "PROGRESO":
+            STAGE_META[
+              row.estado
+            ]?.label ||
+            row.estado ||
+            "",
+
+          "AUTORIZADA":
+            row.autorizada
+              ? "SI"
+              : "NO",
+
+          "CERRADA":
+            row.cerrada
+              ? "SI"
+              : "NO",
+
+          "ÚLT. GESTIÓN":
+            formatDateTimeText(
+              row.ultimaGestionAt
+            ),
+
+          "ÚLT. REUNIÓN":
+            formatDateTimeText(
+              row.fechaUltimaReunion
+            ),
+
+          "FICHAS MÉDICAS":
+            getDocLabel(
+              row.fichaMedicaEstado
+            ),
+
+          "NÓMINA":
+            getDocLabel(
+              row.nominaEstado
+            ),
+
+          "FICHA DEL GRUPO":
+            getDocLabel(
+              row.fichaEstado
+            ),
+
+          "CONTRATO":
+            getDocLabel(
+              row.contratoEstado
+            ),
+
+          "CORTESÍAS":
+            getDocLabel(
+              row.cortesiaEstado
+            )
+        })
+      );
+
+    const wb =
+      XLSX.utils.book_new();
+
+    const ws =
+      XLSX.utils.json_to_sheet(
+        rowsToExport
+      );
+
+    ws["!cols"] = [
+      { wch: 12 }, // ID GRUPO
+      { wch: 14 }, // NEGOCIO
+      { wch: 42 }, // GRUPO
+      { wch: 28 }, // VENDEDOR
+      { wch: 35 }, // COLEGIO
+      { wch: 12 }, // CURSO
+      { wch: 12 }, // AÑO
+      { wch: 30 }, // DESTINO
+      { wch: 28 }, // PROGRAMA
+      { wch: 10 }, // PAX
+      { wch: 22 }, // FECHA CREACIÓN
+      { wch: 22 }, // PROGRESO
+      { wch: 14 }, // AUTORIZADA
+      { wch: 14 }, // CERRADA
+      { wch: 22 }, // ÚLT. GESTIÓN
+      { wch: 22 }, // ÚLT. REUNIÓN
+      { wch: 20 }, // FICHAS MÉDICAS
+      { wch: 18 }, // NÓMINA
+      { wch: 22 }, // FICHA GRUPO
+      { wch: 18 }, // CONTRATO
+      { wch: 18 }  // CORTESÍAS
+    ];
+
+    XLSX.utils.book_append_sheet(
+      wb,
+      ws,
+      "Seguimiento"
+    );
+
+    XLSX.writeFile(
+      wb,
+      `seguimiento_grupos_${fileStamp()}.xlsx`
+    );
+
   } catch (error) {
-    console.error("[seguimiento] error exportando xlsx:", error);
-    alert("No se pudo exportar el XLSX.");
+    console.error(
+      "[seguimiento] error exportando xlsx:",
+      error
+    );
+
+    alert(
+      "No se pudo exportar el XLSX."
+    );
   }
 }
 
@@ -3481,58 +3934,166 @@ function getSummaryBucket(estado) {
   return normalized;
 }
 
-function compareRows(a, b, sortKey, sortDir) {
+function compareRows(
+  a,
+  b,
+  sortKey,
+  sortDir
+) {
   let result = 0;
 
   switch (sortKey) {
+
     case "grupo":
-      result = compareText(a.grupoSortTitle || a.displayTitle, b.grupoSortTitle || b.displayTitle);
+      result =
+        compareText(
+          a.grupoSortTitle ||
+          a.displayTitle,
+
+          b.grupoSortTitle ||
+          b.displayTitle
+        );
       break;
+
 
     case "vendedora":
-      result = compareText(a.vendedora || a.vendedoraCorreo, b.vendedora || b.vendedoraCorreo);
+      result =
+        compareText(
+          a.vendedora ||
+          a.vendedoraCorreo,
+
+          b.vendedora ||
+          b.vendedoraCorreo
+        );
       break;
+
 
     case "destino":
-      result = compareText(a.destino, b.destino);
+      result =
+        compareText(
+          a.destino,
+          b.destino
+        );
       break;
+
+
+    case "pax":
+      result =
+        compareNumber(
+          a.cantidadGrupo,
+          b.cantidadGrupo
+        );
+      break;
+
+
+    case "fechaCreacion":
+      result =
+        compareNumber(
+          a.fechaCreacion
+            ? a.fechaCreacion.getTime()
+            : 0,
+
+          b.fechaCreacion
+            ? b.fechaCreacion.getTime()
+            : 0
+        );
+      break;
+
 
     case "estado":
-      result = compareText(STAGE_META[a.estado]?.label || a.estado, STAGE_META[b.estado]?.label || b.estado);
+      result =
+        compareText(
+          STAGE_META[a.estado]?.label ||
+          a.estado,
+
+          STAGE_META[b.estado]?.label ||
+          b.estado
+        );
       break;
+
 
     case "autorizada":
-      result = compareNumber(a.autorizada ? 1 : 0, b.autorizada ? 1 : 0);
+      result =
+        compareNumber(
+          a.autorizada
+            ? 1
+            : 0,
+
+          b.autorizada
+            ? 1
+            : 0
+        );
       break;
+
 
     case "cerrada":
-      result = compareNumber(a.cerrada ? 1 : 0, b.cerrada ? 1 : 0);
+      result =
+        compareNumber(
+          a.cerrada
+            ? 1
+            : 0,
+
+          b.cerrada
+            ? 1
+            : 0
+        );
       break;
+
 
     case "ultimaGestion":
-      result = compareNumber(
-        a.ultimaGestionAt ? a.ultimaGestionAt.getTime() : 0,
-        b.ultimaGestionAt ? b.ultimaGestionAt.getTime() : 0
-      );
+      result =
+        compareNumber(
+          a.ultimaGestionAt
+            ? a.ultimaGestionAt.getTime()
+            : 0,
+
+          b.ultimaGestionAt
+            ? b.ultimaGestionAt.getTime()
+            : 0
+        );
       break;
+
 
     case "ultimaReunion":
-      result = compareNumber(
-        a.fechaUltimaReunion ? a.fechaUltimaReunion.getTime() : 0,
-        b.fechaUltimaReunion ? b.fechaUltimaReunion.getTime() : 0
-      );
+      result =
+        compareNumber(
+          a.fechaUltimaReunion
+            ? a.fechaUltimaReunion.getTime()
+            : 0,
+
+          b.fechaUltimaReunion
+            ? b.fechaUltimaReunion.getTime()
+            : 0
+        );
       break;
+
 
     case "documentos":
-      result = compareText(getDocsSortText(a), getDocsSortText(b));
+      result =
+        compareText(
+          getDocsSortText(a),
+          getDocsSortText(b)
+        );
       break;
 
+
     default:
-      result = compareText(a.grupoSortTitle || a.displayTitle, b.grupoSortTitle || b.displayTitle);
+      result =
+        compareText(
+          a.grupoSortTitle ||
+          a.displayTitle,
+
+          b.grupoSortTitle ||
+          b.displayTitle
+        );
       break;
   }
 
-  return sortDir === "desc" ? -result : result;
+  return (
+    sortDir === "desc"
+      ? -result
+      : result
+  );
 }
 
 function compareText(a, b) {
@@ -3881,6 +4442,114 @@ function formatDateTime(date, emptySub = "Sin registro") {
       hour: "2-digit",
       minute: "2-digit"
     })
+  };
+}
+
+function formatRelativeDays(date) {
+  if (!date) {
+    return "";
+  }
+
+  const fecha =
+    toDate(date);
+
+  if (!fecha) {
+    return "";
+  }
+
+  const hoy =
+    new Date();
+
+  const inicioHoy =
+    new Date(
+      hoy.getFullYear(),
+      hoy.getMonth(),
+      hoy.getDate()
+    );
+
+  const inicioFecha =
+    new Date(
+      fecha.getFullYear(),
+      fecha.getMonth(),
+      fecha.getDate()
+    );
+
+  const diferenciaMs =
+    inicioHoy.getTime() -
+    inicioFecha.getTime();
+
+  const dias =
+    Math.round(
+      diferenciaMs /
+      (
+        1000 *
+        60 *
+        60 *
+        24
+      )
+    );
+
+  if (dias === 0) {
+    return "hoy";
+  }
+
+  if (dias === 1) {
+    return "ayer";
+  }
+
+  if (dias > 1) {
+    return `hace ${dias} días`;
+  }
+
+  if (dias === -1) {
+    return "mañana";
+  }
+
+  return `en ${Math.abs(dias)} días`;
+}
+
+
+function formatDateRelative(
+  date,
+  emptySub = "Sin registro"
+) {
+  const fecha =
+    toDate(date);
+
+  if (!fecha) {
+    return {
+      main: "—",
+      sub: emptySub
+    };
+  }
+
+  const fechaTexto =
+    fecha.toLocaleDateString(
+      "es-CL"
+    );
+
+  const horaTexto =
+    fecha.toLocaleTimeString(
+      "es-CL",
+      {
+        hour: "2-digit",
+        minute: "2-digit"
+      }
+    );
+
+  const relativo =
+    formatRelativeDays(
+      fecha
+    );
+
+  return {
+    main:
+      fechaTexto,
+
+    sub:
+      relativo
+        ? `${horaTexto} · ${relativo}`
+        : horaTexto
   };
 }
 
