@@ -15,9 +15,9 @@
 
   .seguimiento-panel-main{
     background:#efefef;
-    border:3px dashed var(--line);
+    border:none;
     padding:20px 22px;
-  }
+  }  
 
   .seguimiento-topbar{
     display:flex;
@@ -49,7 +49,7 @@
 
 .toolbar-left{
   display:grid;
-  grid-template-columns:repeat(5, minmax(0, 1fr));
+  grid-template-columns:repeat(4, minmax(0, 1fr));
   gap:10px;
   align-items:end;
   width:100%;
@@ -760,176 +760,161 @@
     </div>
 
     <div class="page-toolbar seguimiento-toolbar">
-
-      <div class="field-wrap">
-        <label for="filtroAno">Año viaje</label>
     
-        <select id="filtroAno">
-          <option value="todos">
-            Todos
-          </option>
-        </select>
-      </div>
-    
-    
-      <div class="field-wrap">
-        <label for="filtroEstado">
-          Estado
-        </label>
-    
-        <select id="filtroEstado">
-          <option value="todos">
-            Todos
-          </option>
-    
-          <option value="a_contactar">
-            A contactar
-          </option>
-    
-          <option value="contactado">
-            Contactado
-          </option>
-    
-          <option value="cotizando">
-            Cotizando
-          </option>
-    
-          <option value="recotizando">
-            Recotizando
-          </option>
-    
-          <option value="reunion_confirmada">
-            Reunión confirmada
-          </option>
-    
-          <option value="ganada">
-            Ganada
-          </option>
-    
-          <option value="perdida">
-            Perdida
-          </option>
-        </select>
-      </div>
-    
-    
-      <div class="field-wrap">
-        <label for="filtroVendedora">
-          Vendedor(a)
-        </label>
-    
-        <select id="filtroVendedora">
-          <option value="todos">
-            Todos
-          </option>
-        </select>
-      </div>
-    
-    
-      <!-- ===============================================
-           FECHA DE CREACIÓN DEL LEAD
-      ================================================ -->
-    
-      <div class="field-wrap">
-        <label for="filtroFechaCreacion">
-          Fecha creación
-        </label>
-    
-        <select id="filtroFechaCreacion">
-          <option value="todas">
-            Todas las fechas
-          </option>
-    
-          <option value="ultimos_30">
-            Últimos 30 días
-          </option>
-    
-          <option value="ultimos_90">
-            Últimos 90 días
-          </option>
-    
-          <option value="este_mes">
-            Este mes
-          </option>
-    
-          <option value="mes_anterior">
-            Mes anterior
-          </option>
-    
-          <option value="personalizado">
-            Entre fechas...
-          </option>
-        </select>
-      </div>
-    
-    
-      <!-- ===============================================
-           RANGO PERSONALIZADO
-           Solo aparece al elegir "Entre fechas..."
-      ================================================ -->
-    
-      <div
-        id="filtroFechaCreacionPersonalizado"
-        class="fecha-creacion-custom"
-        hidden
-      >
+      <!-- =====================================================
+           FILTROS PRINCIPALES
+      ====================================================== -->
+      <div class="toolbar-left">
     
         <div class="field-wrap">
-          <label for="filtroFechaDesde">
-            Desde
+          <label for="filtroAno">
+            Año viaje
           </label>
     
-          <input
-            id="filtroFechaDesde"
-            type="date"
-          />
+          <select id="filtroAno">
+            <option value="todos">
+              Todos
+            </option>
+          </select>
         </div>
     
     
         <div class="field-wrap">
-          <label for="filtroFechaHasta">
-            Hasta
+          <label for="filtroEstado">
+            Estado
           </label>
     
-          <input
-            id="filtroFechaHasta"
-            type="date"
-          />
+          <select id="filtroEstado">
+            <option value="todos">Todos</option>
+            <option value="a_contactar">A contactar</option>
+            <option value="contactado">Contactado</option>
+            <option value="cotizando">Cotizando</option>
+            <option value="recotizando">Recotizando</option>
+            <option value="reunion_confirmada">Reunión confirmada</option>
+            <option value="ganada">Ganada</option>
+            <option value="perdida">Perdida</option>
+          </select>
         </div>
     
-      </div>
+    
+        <div class="field-wrap">
+          <label for="filtroVendedora">
+            Vendedor(a)
+          </label>
+    
+          <select id="filtroVendedora">
+            <option value="todos">
+              Todos
+            </option>
+          </select>
+        </div>
     
     
-      <!--
-        Se mantiene porque tu JS actual
-        todavía lo controla, aunque está oculto.
-      -->
+        <div class="field-wrap">
+          <label for="filtroFechaCreacion">
+            Fecha creación
+          </label>
     
-      <div class="field-wrap toggle-wrap">
-        <label for="toggleAnteriores">
-          Mostrar
-        </label>
+          <select id="filtroFechaCreacion">
+            <option value="todas">
+              Todas las fechas
+            </option>
     
-        <label
-          class="toggle-box"
-          for="toggleAnteriores"
+            <option value="ultimos_30">
+              Últimos 30 días
+            </option>
+    
+            <option value="ultimos_90">
+              Últimos 90 días
+            </option>
+    
+            <option value="este_mes">
+              Este mes
+            </option>
+    
+            <option value="mes_anterior">
+              Mes anterior
+            </option>
+    
+            <option value="personalizado">
+              Entre fechas...
+            </option>
+          </select>
+        </div>
+    
+    
+        <!-- =================================================
+             ENTRE FECHAS
+        ================================================== -->
+        <div
+          id="filtroFechaCreacionPersonalizado"
+          class="fecha-creacion-custom"
+          hidden
         >
-          <input
-            id="toggleAnteriores"
-            type="checkbox"
-          />
     
-          <span>
-            Archivados
-          </span>
-        </label>
+          <div class="field-wrap">
+            <label for="filtroFechaDesde">
+              Desde
+            </label>
+    
+            <input
+              id="filtroFechaDesde"
+              type="date"
+            />
+          </div>
+    
+    
+          <div class="field-wrap">
+            <label for="filtroFechaHasta">
+              Hasta
+            </label>
+    
+            <input
+              id="filtroFechaHasta"
+              type="date"
+            />
+          </div>
+    
+        </div>
+    
+    
+        <!--
+          Lo mantenemos porque el JS todavía
+          busca toggleAnteriores, pero se oculta completo.
+        -->
+        <div class="field-wrap toggle-wrap">
+          <label for="toggleAnteriores">
+            Mostrar
+          </label>
+    
+          <label
+            class="toggle-box"
+            for="toggleAnteriores"
+          >
+            <input
+              id="toggleAnteriores"
+              type="checkbox"
+            />
+    
+            <span>
+              Archivados
+            </span>
+          </label>
+        </div>
+    
       </div>
     
-    </div>
-
+    
+      <!-- =====================================================
+           BUSCADOR + ACCIONES
+      ====================================================== -->
       <div class="toolbar-right">
+    
         <div class="field-wrap search-wide">
-          <label for="buscadorSeguimiento">Buscar</label>
+          <label for="buscadorSeguimiento">
+            Buscar
+          </label>
+    
           <input
             id="buscadorSeguimiento"
             type="text"
@@ -937,12 +922,19 @@
             autocomplete="off"
           />
         </div>
-        
+    
+    
         <div class="seguimiento-actions">
-          <button id="btnExportarSeguimiento" class="btn-page sec" type="button">
+    
+          <button
+            id="btnExportarSeguimiento"
+            class="btn-page sec"
+            type="button"
+          >
             Exportar XLSX
           </button>
-
+    
+    
           <button
             type="button"
             id="btnExportarAnalisisLeads"
@@ -950,12 +942,20 @@
           >
             📊 Análisis de Leads XLSX
           </button>
-      
-          <button id="btnRecargarSeguimiento" class="btn-page" type="button">
+    
+    
+          <button
+            id="btnRecargarSeguimiento"
+            class="btn-page"
+            type="button"
+          >
             Recargar
           </button>
+    
         </div>
+    
       </div>
+    
     </div>
 
     <section class="seguimiento-summary" id="seguimientoSummaryFilters">
