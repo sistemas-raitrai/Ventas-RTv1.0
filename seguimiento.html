@@ -630,6 +630,10 @@
   .toolbar-right{
     grid-template-columns:minmax(0, 1fr) auto;
   }
+
+  .fecha-creacion-custom{
+    grid-column:span 2;
+  }
 }
 
 @media (max-width: 760px){
@@ -656,6 +660,11 @@
 
   .seguimiento-summary{
     grid-template-columns:repeat(2, minmax(120px, 1fr));
+  }
+
+  .fecha-creacion-custom{
+    grid-template-columns:1fr;
+    grid-column:span 1;
   }
 }
 
