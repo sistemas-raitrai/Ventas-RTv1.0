@@ -662,6 +662,10 @@ function puedeCompartirConEncargado(
       item
     );
 
+  /*
+    Buscamos todas las variantes históricas
+    que pueden existir en las fichas.
+  */
   const candidatos = [
     consentimiento
       .autorizaApoderadoCoordinador,
@@ -676,40 +680,71 @@ function puedeCompartirConEncargado(
       .autorizaApoderadoCoordinador
   ];
 
-  for (
-    const value of
-    candidatos
-  ) {
-    if (
-      value === true
-    ) {
-      return true;
-    }
-
-    if (
-      value === false
-    ) {
-      return false;
-    }
-  }
 
   /*
-    Fichas antiguas sin respuesta explícita.
+    REGLA ACTUAL:
 
-    No damos por hecho que existe autorización
-    para entregar antecedentes médicos a un tercero.
+    Solo restringimos cuando existe una negativa
+    explícita.
+
+    Esto es importante porque muchas fichas antiguas
+    fueron completadas antes de que existiera esta
+    pregunta y, por lo tanto, el campo simplemente
+    no existe.
   */
+  const existeNegativaExplicita =
+    candidatos.some(
+      (
+        value
+      ) =>
+        value === false ||
+        normalizarFlag(
+          value
+        ) === false
+    );
+
+
   if (
-    getVersionConsentimiento(
-      item
-    ) < 2
+    existeNegativaExplicita
   ) {
     return false;
   }
 
-  return false;
-}
 
+  /*
+    Si existe autorización explícita, naturalmente
+    también permitimos compartir.
+  */
+  const existeAutorizacionExplicita =
+    candidatos.some(
+      (
+        value
+      ) =>
+        value === true ||
+        normalizarFlag(
+          value
+        ) === true
+    );
+
+
+  if (
+    existeAutorizacionExplicita
+  ) {
+    return true;
+  }
+
+
+  /*
+    Fichas antiguas o fichas que nunca tuvieron
+    esta pregunta:
+
+    ausencia de respuesta NO equivale a rechazo.
+
+    Por omisión se permite incluir la información
+    en el resumen del Delegado.
+  */
+  return true;
+}
 
 /*
   El equipo de viaje utiliza la información necesaria
