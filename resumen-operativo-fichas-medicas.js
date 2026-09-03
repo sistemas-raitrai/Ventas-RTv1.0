@@ -1193,6 +1193,250 @@ function getMedicamentosContraindicados(
   return "";
 }
 
+/*
+  =========================================================
+  INDICADORES RESUMIDOS DE SALUD
+  =========================================================
+*/
+
+
+function tieneSituacionSaludDeclarada(
+  item = {}
+) {
+  const salud =
+    item.salud ||
+    {};
+
+  /*
+    Situaciones médicas generales conocidas por este módulo.
+  */
+  const textosGenerales = [
+    salud.emergenciaMedicaDetalle,
+    salud.enfermedadBaseDetalle,
+    salud.saludGeneralDetalle,
+    salud.otrosAntecedentesDetalle,
+
+    salud.discapacidadApoyoTipo,
+    salud.discapacidadRecomendaciones,
+    salud.discapacidadAyudaTecnica,
+    salud.discapacidadAyudaIndicaciones,
+
+    salud.neuroApoyosDetalle,
+    salud.neuroEstrategias,
+    salud.neuroFactores,
+
+    salud.alergiasDetalle
+  ];
+
+  if (
+    textosGenerales.some(
+      (
+        value
+      ) =>
+        Boolean(
+          clean(
+            value
+          )
+        )
+    )
+  ) {
+    return true;
+  }
+
+
+  /*
+    Alergias alimentarias declaradas.
+  */
+  if (
+    Array.isArray(
+      salud.alergiasAlimentarias
+    ) &&
+    salud.alergiasAlimentarias.length
+  ) {
+    return true;
+  }
+
+
+  /*
+    Flags explícitos conocidos actualmente.
+  */
+  const flags = [
+    salud.alergiasFlag,
+
+    salud.discapacidadApoyosFlag,
+    salud.neuroApoyosFlag,
+
+    salud.emergenciaMedicaFlag,
+    salud.enfermedadBaseFlag,
+
+    salud.saludGeneralFlag,
+    salud.otrosAntecedentesFlag
+  ];
+
+  if (
+    flags.some(
+      (
+        value
+      ) =>
+        normalizarFlag(
+          value
+        ) === true
+    )
+  ) {
+    return true;
+  }
+
+
+  return false;
+}
+
+
+function tieneMedicamentosDeclarados(
+  item = {}
+) {
+  const salud =
+    item.salud ||
+    {};
+
+  return (
+    Boolean(
+      clean(
+        salud.medicamentosDetalle
+      )
+    ) ||
+    normalizarFlag(
+      salud.medicamentosFlag
+    ) === true
+  );
+}
+
+
+function tieneAlimentacionEspecial(
+  item = {}
+) {
+  return (
+    getAlimentacionValues(
+      item
+    ).length >
+    0
+  );
+}
+
+
+function getEstadoSituacionSalud(
+  item = {}
+) {
+  if (
+    !fichaCompleta(
+      item
+    )
+  ) {
+    return "Pendiente";
+  }
+
+  if (
+    state.mode ===
+      "encargado" &&
+    !puedeCompartirConEncargado(
+      item
+    )
+  ) {
+    return "Restringido";
+  }
+
+  return tieneSituacionSaludDeclarada(
+    item
+  )
+    ? "Sí"
+    : "No";
+}
+
+
+function getEstadoMedicamentos(
+  item = {}
+) {
+  if (
+    !fichaCompleta(
+      item
+    )
+  ) {
+    return "Pendiente";
+  }
+
+  if (
+    state.mode ===
+      "encargado" &&
+    !puedeCompartirConEncargado(
+      item
+    )
+  ) {
+    return "Restringido";
+  }
+
+  return tieneMedicamentosDeclarados(
+    item
+  )
+    ? "Sí"
+    : "No";
+}
+
+
+function getEstadoAlimentacion(
+  item = {}
+) {
+  if (
+    !fichaCompleta(
+      item
+    )
+  ) {
+    return "Pendiente";
+  }
+
+  if (
+    state.mode ===
+      "encargado" &&
+    !puedeCompartirConEncargado(
+      item
+    )
+  ) {
+    return "Restringido";
+  }
+
+  return tieneAlimentacionEspecial(
+    item
+  )
+    ? "Sí"
+    : "No";
+}
+
+
+function getClaseEstadoResumen(
+  value = ""
+) {
+  if (
+    value ===
+    "Sí"
+  ) {
+    return "assistance-yes";
+  }
+
+  if (
+    value ===
+    "No"
+  ) {
+    return "assistance-no";
+  }
+
+  if (
+    value ===
+    "Restringido"
+  ) {
+    return "assistance-restricted";
+  }
+
+  return "assistance-pending";
+}
+
 
 /*
   =========================================================
@@ -1606,8 +1850,38 @@ function getConsideracionResumen(
     return "Ficha pendiente";
   }
 
+
+  /*
+    El delegado no recibe consideraciones clínicas
+    detalladas en la tabla.
+
+    Su documento solamente informa:
+      - situación de salud;
+      - medicamentos;
+      - alimentación especial.
+  */
   if (
-    !puedeMostrarDetalle(
+    state.mode ===
+    "encargado"
+  ) {
+    if (
+      !puedeCompartirConEncargado(
+        item
+      )
+    ) {
+      return "Información restringida";
+    }
+
+    return "";
+  }
+
+
+  /*
+    ADULTOS ACOMPAÑANTES
+  */
+
+  if (
+    !puedeCompartirConEquipoViaje(
       item
     )
   ) {
@@ -1621,38 +1895,18 @@ function getConsideracionResumen(
   const labels =
     [];
 
-  /*
-    Alimentación.
-  */
-  const alimentacion =
-    getAlimentacionValues(
-      item
-    );
-
-  if (
-    alimentacion.length
-  ) {
-    labels.push(
-      alimentacion.join(
-        ", "
-      )
-    );
-  }
-
 
   /*
-    Alergias.
+    Si existe alguna situación general de salud,
+    advertimos que debe revisarse el detalle.
   */
-  const alergias =
-    getAlergiasValues(
-      item
-    );
-
   if (
-    alergias.length
+    tieneSituacionSaludDeclarada(
+      item
+    )
   ) {
     labels.push(
-      "Alergia"
+      "Ver situación de salud"
     );
   }
 
@@ -1661,81 +1915,64 @@ function getConsideracionResumen(
     Medicamentos.
   */
   if (
-    getMedicamentosDetalle(
+    tieneMedicamentosDeclarados(
       item
     )
   ) {
     labels.push(
-      "Medicación"
+      "Medicamentos"
     );
   }
 
 
   /*
-    Consideraciones de apoyo.
+    Alimentación especial.
   */
   if (
-    clean(
-      salud
-        .discapacidadApoyoTipo
-    ) ||
-    clean(
-      salud
-        .discapacidadRecomendaciones
-    ) ||
-    clean(
-      salud
-        .discapacidadAyudaIndicaciones
-    ) ||
-    clean(
-      salud
-        .neuroApoyosDetalle
-    ) ||
-    clean(
-      salud
-        .neuroEstrategias
-    ) ||
-    clean(
-      salud
-        .neuroFactores
+    tieneAlimentacionEspecial(
+      item
     )
   ) {
     labels.push(
-      "Ver indicaciones"
-    );
-  }
-
-
-  /*
-    En modo viaje también advertimos
-    antecedentes médicos generales.
-  */
-  if (
-    state.mode ===
-      "viaje" &&
-    (
-      clean(
-        salud
-          .emergenciaMedicaDetalle
-      ) ||
-      clean(
-        salud
-          .enfermedadBaseDetalle
-      ) ||
-      clean(
-        salud
-          .saludGeneralDetalle
-      ) ||
-      clean(
-        salud
-          .otrosAntecedentesDetalle
+      getAlimentacionValues(
+        item
+      ).join(
+        ", "
       )
+    );
+  }
+
+
+  /*
+    Contraindicaciones.
+  */
+  if (
+    getMedicamentosContraindicados(
+      item
     )
   ) {
     labels.push(
-      "Antecedente médico"
+      "Contraindicaciones"
     );
   }
+
+
+  /*
+    Requiere asistencia deja de ser una columna.
+
+    Solo se informa como una consideración cuando
+    la ficha realmente declaró que requiere apoyo.
+  */
+  if (
+    getNecesitaAsistencia(
+      item
+    ) === true
+  ) {
+    labels.push(
+      "Requiere apoyo / asistencia"
+    );
+  }
+
 
   const result =
     uniqueText(
@@ -1753,7 +1990,6 @@ function getConsideracionResumen(
   );
 }
 
-
 /*
   =========================================================
   SABER SI UNA PERSONA DEBE SALIR EN EL DETALLE
@@ -1764,31 +2000,92 @@ function getConsideracionResumen(
 function debeAparecerEnDetalle(
   item = {}
 ) {
+  /*
+    El documento del Delegado nunca tiene página
+    individual de detalle.
+  */
+  if (
+    state.mode ===
+    "encargado"
+  ) {
+    return false;
+  }
+
+
+  /*
+    Las fichas pendientes quedan identificadas
+    solamente en la tabla resumen.
+  */
   if (
     !fichaCompleta(
       item
     )
   ) {
-    /*
-      Las fichas pendientes NO llenan la página de detalle.
-      Ya están claramente identificadas en el resumen.
-    */
     return false;
   }
 
+
   /*
-    Si existe información restringida para encargado,
-    sí la mostramos como aviso breve.
+    Respetamos cualquier bloqueo explícito
+    de uso interno.
   */
   if (
-    state.mode ===
-      "encargado" &&
-    !puedeCompartirConEncargado(
+    !puedeCompartirConEquipoViaje(
+      item
+    )
+  ) {
+    return false;
+  }
+
+
+  /*
+    Aparece en detalle si existe cualquier
+    información realmente relevante.
+  */
+  if (
+    tieneSituacionSaludDeclarada(
       item
     )
   ) {
     return true;
   }
+
+
+  if (
+    tieneMedicamentosDeclarados(
+      item
+    )
+  ) {
+    return true;
+  }
+
+
+  if (
+    tieneAlimentacionEspecial(
+      item
+    )
+  ) {
+    return true;
+  }
+
+
+  if (
+    getAlergiasValues(
+      item
+    ).length
+  ) {
+    return true;
+  }
+
+
+  if (
+    getMedicamentosContraindicados(
+      item
+    )
+  ) {
+    return true;
+  }
+
 
   if (
     getNecesitaAsistencia(
@@ -1798,17 +2095,9 @@ function debeAparecerEnDetalle(
     return true;
   }
 
-  const consideraciones =
-    getConsideracionesOperativas(
-      item
-    );
 
-  return (
-    consideraciones.length >
-    0
-  );
+  return false;
 }
-
 
 /*
   =========================================================
@@ -1874,10 +2163,8 @@ function renderHeader() {
 
   const subtitle =
     [
-      group
-        .aliasGrupo ||
-      group
-        .nombreGrupo ||
+      group.aliasGrupo ||
+      group.nombreGrupo ||
       state.groupId,
 
       group.colegio,
@@ -1899,21 +2186,19 @@ function renderHeader() {
     .textContent =
       subtitle;
 
+
   $("documentType")
     .textContent =
       state.mode ===
         "encargado"
-        ? "Encargado de grupo"
-        : "Equipo de viaje";
+        ? "Delegado"
+        : "Adultos acompañantes";
+
 
   $("detailsSubtitle")
     .textContent =
-      state.mode ===
-        "encargado"
-        ? "Se muestran únicamente pasajeros con información operativa relevante autorizada para esta etapa."
-        : "Se muestran únicamente pasajeros con antecedentes, indicaciones o necesidades relevantes para la operación del viaje.";
+      "Se muestran únicamente pasajeros con antecedentes, indicaciones o necesidades relevantes para la operación del viaje.";
 }
-
 
 /*
   =========================================================
@@ -1933,17 +2218,21 @@ function renderPrivacy() {
           Privacidad:
         </strong>
 
-        Este resumen muestra únicamente información
-        autorizada para ser compartida con el/la
-        encargado(a) del grupo.
+        Este documento entrega al delegado únicamente
+        una visión resumida de las situaciones de salud
+        declaradas por los pasajeros.
 
-        Cuando una persona no ha autorizado esta entrega,
-        sus antecedentes médicos específicos permanecen
-        restringidos.
+        No se entregan diagnósticos, medicamentos específicos
+        ni antecedentes médicos detallados.
+
+        Cuando la persona responsable no ha autorizado
+        compartir esta información, los campos correspondientes
+        aparecen como <strong>Restringido</strong>.
       `;
 
     return;
   }
+
 
   $("privacyNotice")
     .innerHTML = `
@@ -1951,15 +2240,15 @@ function renderPrivacy() {
         Uso durante el viaje:
       </strong>
 
-      Documento destinado a los adultos responsables
-      del grupo durante el viaje.
+      Documento destinado exclusivamente a los adultos
+      acompañantes que viajan con el grupo.
 
-      La información debe utilizarse exclusivamente
-      para fines de seguridad, cuidado, asistencia
-      y coordinación operativa.
+      Contiene información necesaria para seguridad,
+      cuidado, acompañamiento y coordinación operativa
+      durante el viaje y debe mantenerse bajo acceso
+      restringido.
     `;
 }
-
 
 /*
   =========================================================
@@ -1981,7 +2270,8 @@ function renderKpis() {
     total -
     completas;
 
-  const asistenciaSi =
+
+  const conSituacionSalud =
     state.items.filter(
       (
         item
@@ -1992,12 +2282,13 @@ function renderKpis() {
         puedeMostrarDetalle(
           item
         ) &&
-        getNecesitaAsistencia(
+        tieneSituacionSaludDeclarada(
           item
-        ) === true
+        )
     ).length;
 
-  const asistenciaNo =
+
+  const conAlimentacionEspecial =
     state.items.filter(
       (
         item
@@ -2008,10 +2299,11 @@ function renderKpis() {
         puedeMostrarDetalle(
           item
         ) &&
-        getNecesitaAsistencia(
+        tieneAlimentacionEspecial(
           item
-        ) === false
+        )
     ).length;
+
 
   $("kpiContainer")
     .innerHTML = `
@@ -2025,6 +2317,7 @@ function renderKpis() {
         </span>
       </div>
 
+
       <div class="summary-item">
         <span class="summary-label">
           Fichas completas
@@ -2035,9 +2328,10 @@ function renderKpis() {
         </span>
       </div>
 
+
       <div class="summary-item">
         <span class="summary-label">
-          Pendientes
+          Fichas pendientes
         </span>
 
         <span class="summary-value">
@@ -2045,23 +2339,25 @@ function renderKpis() {
         </span>
       </div>
 
+
       <div class="summary-item">
         <span class="summary-label">
-          Requieren asistencia
+          Con situación de salud
         </span>
 
         <span class="summary-value">
-          ${asistenciaSi}
+          ${conSituacionSalud}
         </span>
       </div>
 
+
       <div class="summary-item">
         <span class="summary-label">
-          No requieren asistencia
+          Alimentación especial
         </span>
 
         <span class="summary-value">
-          ${asistenciaNo}
+          ${conAlimentacionEspecial}
         </span>
       </div>
     `;
@@ -2076,6 +2372,219 @@ function renderKpis() {
 
 
 function renderTable() {
+  /*
+    =====================================================
+    DELEGADO
+    =====================================================
+  */
+
+  if (
+    state.mode ===
+    "encargado"
+  ) {
+    $("tableHead")
+      .innerHTML = `
+        <tr>
+          <th class="col-number">
+            #
+          </th>
+
+          <th class="col-passenger">
+            Pasajero
+          </th>
+
+          <th>
+            Ficha
+          </th>
+
+          <th>
+            Situación de salud
+          </th>
+
+          <th>
+            Medicamentos
+          </th>
+
+          <th>
+            Alimentación especial
+          </th>
+        </tr>
+      `;
+
+
+    $("summaryLegend")
+      .innerHTML = `
+        <span>
+          <strong>Sí:</strong>
+          existe una situación declarada.
+        </span>
+
+        <span>
+          <strong>No:</strong>
+          no se registra una situación en esa categoría.
+        </span>
+
+        <span>
+          <strong>Restringido:</strong>
+          información no autorizada para ser compartida con el delegado.
+        </span>
+
+        <span>
+          <strong>Pendiente:</strong>
+          ficha médica aún incompleta.
+        </span>
+      `;
+
+
+    $("tableBody")
+      .innerHTML =
+        state.items
+          .map(
+            (
+              item,
+              index
+            ) => {
+              const completa =
+                fichaCompleta(
+                  item
+                );
+
+              const fichaTexto =
+                completa
+                  ? "Completa"
+                  : "Pendiente";
+
+              const fichaClase =
+                completa
+                  ? "status-complete"
+                  : "status-pending";
+
+
+              const situacion =
+                getEstadoSituacionSalud(
+                  item
+                );
+
+              const medicamentos =
+                getEstadoMedicamentos(
+                  item
+                );
+
+              const alimentacion =
+                getEstadoAlimentacion(
+                  item
+                );
+
+
+              return `
+                <tr>
+
+                  <td class="col-number">
+                    ${index + 1}
+                  </td>
+
+                  <td class="passenger-name">
+                    ${escapeHtml(
+                      passengerName(
+                        item
+                      )
+                    )}
+                  </td>
+
+                  <td class="${fichaClase}">
+                    ${escapeHtml(
+                      fichaTexto
+                    )}
+                  </td>
+
+                  <td class="${getClaseEstadoResumen(
+                    situacion
+                  )}">
+                    ${escapeHtml(
+                      situacion
+                    )}
+                  </td>
+
+                  <td class="${getClaseEstadoResumen(
+                    medicamentos
+                  )}">
+                    ${escapeHtml(
+                      medicamentos
+                    )}
+                  </td>
+
+                  <td class="${getClaseEstadoResumen(
+                    alimentacion
+                  )}">
+                    ${escapeHtml(
+                      alimentacion
+                    )}
+                  </td>
+
+                </tr>
+              `;
+            }
+          )
+          .join("");
+
+    return;
+  }
+
+
+  /*
+    =====================================================
+    ADULTOS ACOMPAÑANTES
+    =====================================================
+  */
+
+  $("tableHead")
+    .innerHTML = `
+      <tr>
+        <th class="col-number">
+          #
+        </th>
+
+        <th class="col-passenger">
+          Pasajero
+        </th>
+
+        <th>
+          Ficha
+        </th>
+
+        <th>
+          Situación de salud
+        </th>
+
+        <th>
+          Medicamentos
+        </th>
+
+        <th>
+          Alimentación
+        </th>
+
+        <th class="col-considerations">
+          Consideraciones
+        </th>
+      </tr>
+    `;
+
+
+  $("summaryLegend")
+    .innerHTML = `
+      <span>
+        <strong>Ver detalle:</strong>
+        existen antecedentes o indicaciones relevantes.
+      </span>
+
+      <span>
+        <strong>Pendiente:</strong>
+        ficha médica aún incompleta.
+      </span>
+    `;
+
+
   $("tableBody")
     .innerHTML =
       state.items
@@ -2099,42 +2608,61 @@ function renderTable() {
                 ? "status-complete"
                 : "status-pending";
 
-            const asistencia =
-              getNecesitaAsistenciaTexto(
-                item
-              );
 
-            let asistenciaClase =
-              "assistance-pending";
+            const situacion =
+              completa
+                ? (
+                    tieneSituacionSaludDeclarada(
+                      item
+                    )
+                      ? "Sí"
+                      : "No"
+                  )
+                : "Pendiente";
+
+
+            const medicamentos =
+              completa
+                ? (
+                    tieneMedicamentosDeclarados(
+                      item
+                    )
+                      ? "Sí"
+                      : "No"
+                  )
+                : "Pendiente";
+
+
+            let alimentacion =
+              "No";
 
             if (
-              asistencia ===
-              "Sí"
+              !completa
             ) {
-              asistenciaClase =
-                "assistance-yes";
+              alimentacion =
+                "Pendiente";
+            } else {
+              const alimentacionValues =
+                getAlimentacionValues(
+                  item
+                );
+
+              if (
+                alimentacionValues.length
+              ) {
+                alimentacion =
+                  alimentacionValues.join(
+                    ", "
+                  );
+              }
             }
 
-            if (
-              asistencia ===
-              "No"
-            ) {
-              asistenciaClase =
-                "assistance-no";
-            }
-
-            if (
-              asistencia ===
-              "Restringido"
-            ) {
-              asistenciaClase =
-                "assistance-restricted";
-            }
 
             const consideracion =
               getConsideracionResumen(
                 item
               );
+
 
             let consideracionClase =
               "consideration-text";
@@ -2163,6 +2691,7 @@ function renderTable() {
                 "consideration-restricted";
             }
 
+
             return `
               <tr>
 
@@ -2184,9 +2713,25 @@ function renderTable() {
                   )}
                 </td>
 
-                <td class="${asistenciaClase}">
+                <td class="${getClaseEstadoResumen(
+                  situacion
+                )}">
                   ${escapeHtml(
-                    asistencia
+                    situacion
+                  )}
+                </td>
+
+                <td class="${getClaseEstadoResumen(
+                  medicamentos
+                )}">
+                  ${escapeHtml(
+                    medicamentos
+                  )}
+                </td>
+
+                <td>
+                  ${escapeHtml(
+                    alimentacion
                   )}
                 </td>
 
@@ -2209,31 +2754,48 @@ function renderTable() {
   RESPONSABILIDAD / ALCANCE
   =========================================================
 */
-
-
 function renderResponsibility() {
+  if (
+    state.mode ===
+    "encargado"
+  ) {
+    $("responsibilityNote")
+      .innerHTML = `
+        <strong>
+          Alcance del resumen:
+        </strong>
+
+        Este documento permite al delegado identificar de forma
+        general a los pasajeros que han declarado situaciones de
+        salud, uso de medicamentos o alimentación especial.
+
+        No reemplaza las indicaciones entregadas directamente a
+        los adultos acompañantes responsables durante el viaje.
+      `;
+
+    return;
+  }
+
+
   $("responsibilityNote")
     .innerHTML = `
       <strong>
         Asistencia y acompañamiento:
       </strong>
 
-      La asistencia, acompañamiento y cumplimiento de las
-      indicaciones particulares informadas para cada viajero
-      corresponden a los adultos responsables que acompañan
-      al grupo.
+      Las situaciones, antecedentes e indicaciones particulares
+      informadas para cada viajero deben ser conocidas y consideradas
+      por los adultos acompañantes responsables del grupo.
+
+      Cuando una ficha indique expresamente que una persona requiere
+      apoyo o asistencia, dicha necesidad se señala dentro de sus
+      consideraciones específicas.
 
       Turismo Rai Trai facilita la coordinación y entrega
       oportunamente la información disponible para contribuir
       a una operación segura y adecuada.
-
-      La entrega de este resumen forma parte de las medidas
-      de apoyo y coordinación implementadas por Turismo Rai Trai
-      antes y durante el viaje.
     `;
 }
-
-
 /*
   =========================================================
   DETALLE
@@ -2242,10 +2804,42 @@ function renderResponsibility() {
 
 
 function renderDetails() {
+  /*
+    DELEGADO:
+    solo documento resumen.
+  */
+  if (
+    state.mode ===
+    "encargado"
+  ) {
+    $("detailsContainer")
+      .innerHTML =
+        "";
+
+    $("noDetails")
+      ?.classList
+      .add(
+        "hidden"
+      );
+
+    $("detailsPage")
+      ?.classList
+      .add(
+        "hidden"
+      );
+
+    return;
+  }
+
+
+  /*
+    ADULTOS ACOMPAÑANTES
+  */
   const items =
     state.items.filter(
       debeAparecerEnDetalle
     );
+
 
   if (
     !items.length
@@ -2260,10 +2854,6 @@ function renderDetails() {
         "hidden"
       );
 
-    /*
-      Si realmente no existe ningún detalle,
-      ocultamos página 2 al imprimir y en pantalla.
-    */
     $("detailsPage")
       ?.classList
       .add(
@@ -2273,17 +2863,20 @@ function renderDetails() {
     return;
   }
 
+
   $("detailsPage")
     ?.classList
     .remove(
       "hidden"
     );
 
+
   $("noDetails")
     ?.classList
     .add(
       "hidden"
     );
+
 
   $("detailsContainer")
     .innerHTML =
@@ -2303,85 +2896,103 @@ function renderDetailCard(
       item
     );
 
-  /*
-    PRIVACIDAD ENCARGADO
-  */
-  if (
-    state.mode ===
-      "encargado" &&
-    !puedeCompartirConEncargado(
-      item
-    )
-  ) {
-    return `
-      <article class="detail-card restricted-card">
-
-        <div class="detail-card-head">
-
-          <div class="detail-name">
-            ${escapeHtml(
-              nombre
-            )}
-          </div>
-
-          <div class="detail-assistance assistance-restricted">
-            Información restringida
-          </div>
-
-        </div>
-
-        <div class="detail-body">
-
-          <div class="restricted-text">
-            Existen antecedentes asociados a esta ficha,
-            pero la persona responsable no ha autorizado
-            su entrega al encargado del grupo en esta etapa.
-          </div>
-
-        </div>
-
-      </article>
-    `;
-  }
-
-
-  const asistencia =
-    getNecesitaAsistenciaTexto(
-      item
-    );
-
-  const asistenciaClase =
-    asistencia ===
-      "Sí"
-      ? "assistance-yes"
-      : asistencia ===
-          "No"
-        ? "assistance-no"
-        : "assistance-pending";
-
+  const salud =
+    item.salud ||
+    {};
 
   const rows =
     [];
 
 
   /*
-    CONSIDERACIONES
+    =====================================================
+    SITUACIÓN DE SALUD / ANTECEDENTES
+    =====================================================
   */
 
-  const consideraciones =
-    getConsideracionesOperativas(
+  const situaciones =
+    [];
+
+
+  if (
+    clean(
+      salud.emergenciaMedicaDetalle
+    )
+  ) {
+    situaciones.push(
+      `Emergencia médica: ${clean(
+        salud.emergenciaMedicaDetalle
+      )}`
+    );
+  }
+
+
+  if (
+    clean(
+      salud.enfermedadBaseDetalle
+    )
+  ) {
+    situaciones.push(
+      clean(
+        salud.enfermedadBaseDetalle
+      )
+    );
+  }
+
+
+  if (
+    clean(
+      salud.saludGeneralDetalle
+    )
+  ) {
+    situaciones.push(
+      clean(
+        salud.saludGeneralDetalle
+      )
+    );
+  }
+
+
+  if (
+    clean(
+      salud.otrosAntecedentesDetalle
+    )
+  ) {
+    situaciones.push(
+      clean(
+        salud.otrosAntecedentesDetalle
+      )
+    );
+  }
+
+
+  const alergias =
+    getAlergiasValues(
       item
     );
 
   if (
-    consideraciones.length
+    alergias.length
+  ) {
+    situaciones.push(
+      `Alergias: ${alergias.join(
+        ", "
+      )}`
+    );
+  }
+
+
+  if (
+    situaciones.length
   ) {
     rows.push({
       label:
-        "Consideraciones",
+        "Situación de salud",
 
       value:
-        consideraciones.join(
+        uniqueText(
+          situaciones
+        ).join(
           " · "
         )
     });
@@ -2389,56 +3000,278 @@ function renderDetailCard(
 
 
   /*
-    CONTACTO DE EMERGENCIA
-    Solo equipo de viaje.
+    =====================================================
+    MEDICAMENTOS
+    =====================================================
   */
 
+  const medicamentos =
+    getMedicamentosDetalle(
+      item
+    );
+
   if (
-    state.mode ===
-    "viaje"
+    medicamentos
   ) {
-    const emergencia1 =
-      getContactoEmergencia(
-        item
-      );
+    rows.push({
+      label:
+        "Medicamentos",
 
-    const emergencia2 =
-      getContactoEmergenciaSecundario(
-        item
-      );
+      value:
+        medicamentos
+    });
+  }
 
-    if (
-      emergencia1
-    ) {
-      rows.push({
-        label:
-          "Emergencia 1",
 
-        value:
-          emergencia1
-      });
-    }
+  const contraindicados =
+    getMedicamentosContraindicados(
+      item
+    );
 
-    if (
-      emergencia2
-    ) {
-      rows.push({
-        label:
-          "Emergencia 2",
+  if (
+    contraindicados
+  ) {
+    rows.push({
+      label:
+        "Contraindicaciones",
 
-        value:
-          emergencia2
-      });
-    }
+      value:
+        contraindicados
+    });
   }
 
 
   /*
-    Si por alguna razón la persona quedó marcada
-    para detalle exclusivamente por "Sí asistencia"
-    pero no existen textos adicionales.
+    =====================================================
+    ALIMENTACIÓN
+    =====================================================
   */
 
+  const alimentacion =
+    getAlimentacionValues(
+      item
+    );
+
+  if (
+    alimentacion.length
+  ) {
+    rows.push({
+      label:
+        "Alimentación",
+
+      value:
+        alimentacion.join(
+          ", "
+        )
+    });
+  }
+
+
+  /*
+    =====================================================
+    APOYOS / DISCAPACIDAD
+    =====================================================
+  */
+
+  const apoyos =
+    [];
+
+
+  if (
+    clean(
+      salud.discapacidadApoyoTipo
+    )
+  ) {
+    apoyos.push(
+      clean(
+        salud.discapacidadApoyoTipo
+      )
+    );
+  }
+
+
+  if (
+    clean(
+      salud.discapacidadRecomendaciones
+    )
+  ) {
+    apoyos.push(
+      clean(
+        salud.discapacidadRecomendaciones
+      )
+    );
+  }
+
+
+  if (
+    clean(
+      salud.discapacidadAyudaIndicaciones
+    )
+  ) {
+    apoyos.push(
+      clean(
+        salud.discapacidadAyudaIndicaciones
+      )
+    );
+  }
+
+
+  if (
+    apoyos.length
+  ) {
+    rows.push({
+      label:
+        "Apoyo / asistencia",
+
+      value:
+        uniqueText(
+          apoyos
+        ).join(
+          " · "
+        )
+    });
+  }
+
+
+  /*
+    =====================================================
+    NEURODIVERGENCIA / APOYOS PRÁCTICOS
+    =====================================================
+  */
+
+  const neuro =
+    [];
+
+
+  if (
+    clean(
+      salud.neuroApoyosDetalle
+    )
+  ) {
+    neuro.push(
+      clean(
+        salud.neuroApoyosDetalle
+      )
+    );
+  }
+
+
+  if (
+    clean(
+      salud.neuroEstrategias
+    )
+  ) {
+    neuro.push(
+      clean(
+        salud.neuroEstrategias
+      )
+    );
+  }
+
+
+  if (
+    clean(
+      salud.neuroFactores
+    )
+  ) {
+    neuro.push(
+      `Factores de sobrecarga: ${clean(
+        salud.neuroFactores
+      )}`
+    );
+  }
+
+
+  if (
+    neuro.length
+  ) {
+    rows.push({
+      label:
+        "Indicaciones",
+
+      value:
+        uniqueText(
+          neuro
+        ).join(
+          " · "
+        )
+    });
+  }
+
+
+  /*
+    =====================================================
+    REQUIERE ASISTENCIA
+
+    Solo aparece cuando realmente fue declarado.
+    Nunca como campo fijo.
+    =====================================================
+  */
+
+  if (
+    getNecesitaAsistencia(
+      item
+    ) === true &&
+    !apoyos.length &&
+    !neuro.length
+  ) {
+    rows.push({
+      label:
+        "Apoyo / asistencia",
+
+      value:
+        "La ficha indica que requiere asistencia o apoyo durante el viaje."
+    });
+  }
+
+
+  /*
+    =====================================================
+    CONTACTOS DE EMERGENCIA
+    =====================================================
+  */
+
+  const emergencia1 =
+    getContactoEmergencia(
+      item
+    );
+
+  const emergencia2 =
+    getContactoEmergenciaSecundario(
+      item
+    );
+
+
+  if (
+    emergencia1
+  ) {
+    rows.push({
+      label:
+        "Emergencia 1",
+
+      value:
+        emergencia1
+    });
+  }
+
+
+  if (
+    emergencia2
+  ) {
+    rows.push({
+      label:
+        "Emergencia 2",
+
+      value:
+        emergencia2
+    });
+  }
+
+
+  /*
+    Seguridad por si una ficha fue detectada como relevante
+    pero no logramos construir una fila textual.
+  */
   if (
     !rows.length
   ) {
@@ -2447,10 +3280,7 @@ function renderDetailCard(
         "Consideraciones",
 
       value:
-        asistencia ===
-          "Sí"
-          ? "La ficha indica que requiere asistencia. Revisar coordinación previa al viaje."
-          : "Existe información operativa asociada a esta ficha."
+        "Existe información operativa asociada a esta ficha."
     });
   }
 
@@ -2466,14 +3296,12 @@ function renderDetailCard(
           )}
         </div>
 
-        <div class="detail-assistance ${asistenciaClase}">
-          Asistencia:
-          ${escapeHtml(
-            asistencia
-          )}
+        <div class="detail-assistance assistance-yes">
+          Revisar indicaciones
         </div>
 
       </div>
+
 
       <div class="detail-body">
 
@@ -2508,7 +3336,6 @@ function renderDetailCard(
     </article>
   `;
 }
-
 
 /*
   =========================================================
