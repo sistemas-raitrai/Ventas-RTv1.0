@@ -680,6 +680,33 @@
   font-size:15px;
   font-weight:800;
 }
+
+.seg-cell-sub {
+  display: block;
+  margin-top: 4px;
+  font-size: 11px;
+  line-height: 1.25;
+  opacity: 0.65;
+  white-space: normal;
+}
+
+.seg-pax {
+  text-align: center;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.seg-date {
+  white-space: nowrap;
+}
+
+.seg-date small {
+  display: block;
+  margin-top: 3px;
+  font-size: 11px;
+  line-height: 1.2;
+  opacity: 0.65;
+}
 </style>
 </head>
 
@@ -852,68 +879,128 @@
         <table class="seguimiento-table">
           <thead>
             <tr>
-              <th style="width:440px; min-width:440px;">
-                <button type="button" class="th-sort active" data-sort="grupo" data-default-sort="1">
-                  <span>Grupo</span>
-                  <span class="sort-arrow">↑</span>
-                </button>
-              </th>
-          
-              <th class="col-vendedor">
-                <button type="button" class="th-sort" data-sort="vendedora">
-                  <span>Vendedor(a)</span>
-                  <span class="sort-arrow">↕</span>
-                </button>
-              </th>
-          
-              <th style="width:95px; min-width:95px;">
-                <button type="button" class="th-sort" data-sort="destino">
-                  <span>Destino</span>
-                  <span class="sort-arrow">↕</span>
-                </button>
-              </th>
-          
-              <th style="width:150px; min-width:150px;">
-                <button type="button" class="th-sort" data-sort="estado">
-                  <span>Progreso</span>
-                  <span class="sort-arrow">↕</span>
-                </button>
-              </th>
-          
+            
               <th>
-                <button type="button" class="th-sort" data-sort="autorizada">
-                  <span>Aut.</span>
+                <button
+                  type="button"
+                  class="th-sort"
+                  data-sort="grupo"
+                >
+                  Grupo
                   <span class="sort-arrow">↕</span>
                 </button>
               </th>
-          
+            
+              <th class="td-vendedor">
+                <button
+                  type="button"
+                  class="th-sort"
+                  data-sort="vendedora"
+                >
+                  Vendedor
+                  <span class="sort-arrow">↕</span>
+                </button>
+              </th>
+            
               <th>
-                <button type="button" class="th-sort" data-sort="cerrada">
-                  <span>Cerr.</span>
+                <button
+                  type="button"
+                  class="th-sort"
+                  data-sort="destino"
+                >
+                  Destino
                   <span class="sort-arrow">↕</span>
                 </button>
               </th>
-          
+            
               <th>
-                <button type="button" class="th-sort" data-sort="ultimaGestion">
-                  <span>Últ. gestión</span>
+                <button
+                  type="button"
+                  class="th-sort"
+                  data-sort="pax"
+                >
+                  PAX
                   <span class="sort-arrow">↕</span>
                 </button>
               </th>
-          
+            
               <th>
-                <button type="button" class="th-sort" data-sort="ultimaReunion">
-                  <span>Últ. reunión</span>
+                <button
+                  type="button"
+                  class="th-sort"
+                  data-sort="fechaCreacion"
+                >
+                  Fecha creación
                   <span class="sort-arrow">↕</span>
                 </button>
               </th>
-          
+            
               <th>
-                <button type="button" class="th-sort" data-sort="documentos">
-                  <span>Documentos / hitos</span>
+                <button
+                  type="button"
+                  class="th-sort"
+                  data-sort="estado"
+                >
+                  Seguimiento
                   <span class="sort-arrow">↕</span>
                 </button>
               </th>
+            
+              <th>
+                <button
+                  type="button"
+                  class="th-sort"
+                  data-sort="autorizada"
+                >
+                  Autorizada
+                  <span class="sort-arrow">↕</span>
+                </button>
+              </th>
+            
+              <th>
+                <button
+                  type="button"
+                  class="th-sort"
+                  data-sort="cerrada"
+                >
+                  Cerrada
+                  <span class="sort-arrow">↕</span>
+                </button>
+              </th>
+            
+              <th>
+                <button
+                  type="button"
+                  class="th-sort"
+                  data-sort="ultimaGestion"
+                >
+                  Última gestión
+                  <span class="sort-arrow">↕</span>
+                </button>
+              </th>
+            
+              <th>
+                <button
+                  type="button"
+                  class="th-sort"
+                  data-sort="ultimaReunion"
+                >
+                  Última reunión
+                  <span class="sort-arrow">↕</span>
+                </button>
+              </th>
+            
+              <th>
+                <button
+                  type="button"
+                  class="th-sort"
+                  data-sort="documentos"
+                >
+                  Documentos
+                  <span class="sort-arrow">↕</span>
+                </button>
+              </th>
+            
             </tr>
           </thead>
           <tbody id="tbodySeguimiento">
