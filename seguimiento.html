@@ -49,7 +49,7 @@
 
 .toolbar-left{
   display:grid;
-  grid-template-columns:repeat(4, minmax(0, 1fr));
+  grid-template-columns:repeat(5, minmax(0, 1fr));
   gap:10px;
   align-items:end;
   width:100%;
@@ -88,6 +88,34 @@
   font-size:14px;
   background:#fff;
   color:var(--header);
+}
+
+/* ===============================
+   FILTRO FECHA CREACIÓN
+================================= */
+
+.seguimiento-toolbar input[type="date"]{
+  width:100%;
+  min-width:0;
+  height:42px;
+  border:2px solid var(--line);
+  border-radius:8px;
+  padding:0 12px;
+  font-size:14px;
+  background:#fff;
+  color:var(--header);
+}
+
+.fecha-creacion-custom{
+  display:grid;
+  grid-template-columns:repeat(2, minmax(0, 1fr));
+  gap:10px;
+  grid-column:span 2;
+  min-width:0;
+}
+
+.fecha-creacion-custom[hidden]{
+  display:none !important;
 }
 
 .field-wrap.search-wide{
@@ -723,43 +751,172 @@
     </div>
 
     <div class="page-toolbar seguimiento-toolbar">
-      <div class="toolbar-left">
-        <div class="field-wrap">
-          <label for="filtroAno">Año</label>
-          <select id="filtroAno">
-            <option value="todos">Todos</option>
-          </select>
-        </div>
 
-        <div class="field-wrap">
-          <label for="filtroEstado">Estado</label>
-          <select id="filtroEstado">
-            <option value="todos">Todos</option>
-            <option value="a_contactar">A contactar</option>
-            <option value="contactado">Contactado</option>
-            <option value="cotizando">Cotizando</option>
-            <option value="recotizando">Recotizando</option>
-            <option value="reunion_confirmada">Reunión confirmada</option>
-            <option value="ganada">Ganada</option>
-            <option value="perdida">Perdida</option>
-          </select>
-        </div>
-
-        <div class="field-wrap">
-          <label for="filtroVendedora">Vendedor(a)</label>
-          <select id="filtroVendedora">
-            <option value="todos">Todos</option>
-          </select>
-        </div>
-
-        <div class="field-wrap toggle-wrap">
-          <label for="toggleAnteriores">Mostrar</label>
-          <label class="toggle-box" for="toggleAnteriores">
-            <input id="toggleAnteriores" type="checkbox" />
-            <span>Archivados</span>
-          </label>
-        </div>
+      <div class="field-wrap">
+        <label for="filtroAno">Año viaje</label>
+    
+        <select id="filtroAno">
+          <option value="todos">
+            Todos
+          </option>
+        </select>
       </div>
+    
+    
+      <div class="field-wrap">
+        <label for="filtroEstado">
+          Estado
+        </label>
+    
+        <select id="filtroEstado">
+          <option value="todos">
+            Todos
+          </option>
+    
+          <option value="a_contactar">
+            A contactar
+          </option>
+    
+          <option value="contactado">
+            Contactado
+          </option>
+    
+          <option value="cotizando">
+            Cotizando
+          </option>
+    
+          <option value="recotizando">
+            Recotizando
+          </option>
+    
+          <option value="reunion_confirmada">
+            Reunión confirmada
+          </option>
+    
+          <option value="ganada">
+            Ganada
+          </option>
+    
+          <option value="perdida">
+            Perdida
+          </option>
+        </select>
+      </div>
+    
+    
+      <div class="field-wrap">
+        <label for="filtroVendedora">
+          Vendedor(a)
+        </label>
+    
+        <select id="filtroVendedora">
+          <option value="todos">
+            Todos
+          </option>
+        </select>
+      </div>
+    
+    
+      <!-- ===============================================
+           FECHA DE CREACIÓN DEL LEAD
+      ================================================ -->
+    
+      <div class="field-wrap">
+        <label for="filtroFechaCreacion">
+          Fecha creación
+        </label>
+    
+        <select id="filtroFechaCreacion">
+          <option value="todas">
+            Todas las fechas
+          </option>
+    
+          <option value="ultimos_30">
+            Últimos 30 días
+          </option>
+    
+          <option value="ultimos_90">
+            Últimos 90 días
+          </option>
+    
+          <option value="este_mes">
+            Este mes
+          </option>
+    
+          <option value="mes_anterior">
+            Mes anterior
+          </option>
+    
+          <option value="personalizado">
+            Entre fechas...
+          </option>
+        </select>
+      </div>
+    
+    
+      <!-- ===============================================
+           RANGO PERSONALIZADO
+           Solo aparece al elegir "Entre fechas..."
+      ================================================ -->
+    
+      <div
+        id="filtroFechaCreacionPersonalizado"
+        class="fecha-creacion-custom"
+        hidden
+      >
+    
+        <div class="field-wrap">
+          <label for="filtroFechaDesde">
+            Desde
+          </label>
+    
+          <input
+            id="filtroFechaDesde"
+            type="date"
+          />
+        </div>
+    
+    
+        <div class="field-wrap">
+          <label for="filtroFechaHasta">
+            Hasta
+          </label>
+    
+          <input
+            id="filtroFechaHasta"
+            type="date"
+          />
+        </div>
+    
+      </div>
+    
+    
+      <!--
+        Se mantiene porque tu JS actual
+        todavía lo controla, aunque está oculto.
+      -->
+    
+      <div class="field-wrap toggle-wrap">
+        <label for="toggleAnteriores">
+          Mostrar
+        </label>
+    
+        <label
+          class="toggle-box"
+          for="toggleAnteriores"
+        >
+          <input
+            id="toggleAnteriores"
+            type="checkbox"
+          />
+    
+          <span>
+            Archivados
+          </span>
+        </label>
+      </div>
+    
+    </div>
 
       <div class="toolbar-right">
         <div class="field-wrap search-wide">
