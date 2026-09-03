@@ -196,18 +196,36 @@ function ocultarControlAnosAnteriores() {
   toggle.checked = false;
   toggle.disabled = true;
 
+
+  /*
+    Queremos ocultar TODO el bloque:
+
+      Mostrar
+      [ ] Archivados
+
+    No solamente el label interno
+    que contiene el checkbox.
+  */
   const contenedor =
     toggle.closest(
-      "label, .form-check, .seg-toggle, .filter-check"
+      ".field-wrap"
     );
+
 
   if (contenedor) {
     contenedor.style.display =
       "none";
-  } else {
-    toggle.style.display =
-      "none";
+
+    return;
   }
+
+
+  /*
+    Fallback por si cambia
+    la estructura del HTML.
+  */
+  toggle.style.display =
+    "none";
 }
 
 async function bootstrapFromSession() {
