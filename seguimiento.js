@@ -325,6 +325,10 @@ function renderActingUserSwitcherSimple() {
    EVENTOS
 ========================================================= */
 function bindEvents() {
+  /* =====================================================
+     AÑO VIAJE
+  ===================================================== */
+
   $("filtroAno")?.addEventListener(
     "change",
     async (event) => {
@@ -333,21 +337,79 @@ function bindEvents() {
           event.target.value ||
           getAnoViajePrincipal()
         );
-  
+
       state.anoSeleccionado =
         nuevoAno;
-  
+
       await cargarSeleccionAnoSeguimiento(
         nuevoAno
       );
     }
   );
-  $("filtroEstado")?.addEventListener("change", applyFiltersAndRender);
-  $("filtroVendedora")?.addEventListener("change", applyFiltersAndRender);
 
-  $("buscadorSeguimiento")?.addEventListener("input", debounce(() => {
-    applyFiltersAndRender();
-  }, 180));
+
+  /* =====================================================
+     FILTROS NORMALES
+  ===================================================== */
+
+  $("filtroEstado")?.addEventListener(
+    "change",
+    applyFiltersAndRender
+  );
+
+  $("filtroVendedora")?.addEventListener(
+    "change",
+    applyFiltersAndRender
+  );
+
+
+  /* =====================================================
+     FECHA CREACIÓN
+  ===================================================== */
+
+  $("filtroFechaCreacion")?.addEventListener(
+    "change",
+    () => {
+      actualizarUIFiltroFechaCreacion();
+      applyFiltersAndRender();
+    }
+  );
+
+
+  $("filtroFechaDesde")?.addEventListener(
+    "change",
+    () => {
+      applyFiltersAndRender();
+    }
+  );
+
+
+  $("filtroFechaHasta")?.addEventListener(
+    "change",
+    () => {
+      applyFiltersAndRender();
+    }
+  );
+
+
+  /* =====================================================
+     BUSCADOR
+  ===================================================== */
+
+  $("buscadorSeguimiento")?.addEventListener(
+    "input",
+    debounce(
+      () => {
+        applyFiltersAndRender();
+      },
+      180
+    )
+  );
+
+
+  /* =====================================================
+     RECARGAR
+  ===================================================== */
 
   $("btnRecargarSeguimiento")?.addEventListener(
     "click",
@@ -360,52 +422,133 @@ function bindEvents() {
       );
     }
   );
-  
-  $("btnExportarSeguimiento")?.addEventListener("click", exportVisibleRowsToXlsx);
+
+
+  /* =====================================================
+     EXPORTADORES
+  ===================================================== */
+
+  $("btnExportarSeguimiento")?.addEventListener(
+    "click",
+    exportVisibleRowsToXlsx
+  );
 
   $("btnExportarAnalisisLeads")?.addEventListener(
     "click",
     exportAnalisisLeadsToXlsx
   );
 
-  document.querySelectorAll(".summary-filter").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      const summaryState = String(btn.dataset.summaryState || "");
 
-      if (!summaryState) return;
+  /* =====================================================
+     BOTONES RESUMEN
+  ===================================================== */
 
-      // Total = mostrar todos
-      if (summaryState === "__all__") {
-        state.hiddenSummaryStates.clear();
-      } else {
-        if (state.hiddenSummaryStates.has(summaryState)) {
-          state.hiddenSummaryStates.delete(summaryState);
-        } else {
-          state.hiddenSummaryStates.add(summaryState);
-        }
+  document
+    .querySelectorAll(
+      ".summary-filter"
+    )
+    .forEach(
+      (btn) => {
+        btn.addEventListener(
+          "click",
+          () => {
+            const summaryState =
+              String(
+                btn.dataset.summaryState ||
+                ""
+              );
+
+            if (!summaryState) {
+              return;
+            }
+
+
+            /*
+              TOTAL = mostrar todos.
+            */
+            if (
+              summaryState === "__all__"
+            ) {
+              state.hiddenSummaryStates.clear();
+
+            } else {
+              if (
+                state.hiddenSummaryStates.has(
+                  summaryState
+                )
+              ) {
+                state.hiddenSummaryStates.delete(
+                  summaryState
+                );
+
+              } else {
+                state.hiddenSummaryStates.add(
+                  summaryState
+                );
+              }
+            }
+
+            updateSummaryButtonsUI();
+            applyFiltersAndRender();
+          }
+        );
       }
+    );
 
-      updateSummaryButtonsUI();
-      applyFiltersAndRender();
-    });
-  });
 
-  document.querySelectorAll(".th-sort").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      const sortKey = String(btn.dataset.sort || "");
-      if (!sortKey) return;
+  /* =====================================================
+     ORDEN TABLA
+  ===================================================== */
 
-      if (state.sortKey === sortKey) {
-        state.sortDir = state.sortDir === "asc" ? "desc" : "asc";
-      } else {
-        state.sortKey = sortKey;
-        state.sortDir = "asc";
+  document
+    .querySelectorAll(
+      ".th-sort"
+    )
+    .forEach(
+      (btn) => {
+        btn.addEventListener(
+          "click",
+          () => {
+            const sortKey =
+              String(
+                btn.dataset.sort ||
+                ""
+              );
+
+            if (!sortKey) {
+              return;
+            }
+
+
+            if (
+              state.sortKey === sortKey
+            ) {
+              state.sortDir =
+                state.sortDir === "asc"
+                  ? "desc"
+                  : "asc";
+
+            } else {
+              state.sortKey =
+                sortKey;
+
+              state.sortDir =
+                "asc";
+            }
+
+            updateSortHeaderUI();
+            applyFiltersAndRender();
+          }
+        );
       }
+    );
 
-      updateSortHeaderUI();
-      applyFiltersAndRender();
-    });
-  });
+
+  /*
+    Deja la interfaz consistente
+    desde la primera carga.
+  */
+  actualizarUIFiltroFechaCreacion();
 }
 
 function updateSummaryButtonsUI() {
@@ -1372,151 +1515,789 @@ function mapClienteDoc(id, data) {
 }
 
 /* =========================================================
+   FILTRO FECHA CREACIÓN
+========================================================= */
+
+function actualizarUIFiltroFechaCreacion() {
+  const tipo =
+    $("filtroFechaCreacion")?.value ||
+    "todas";
+
+  const custom =
+    $("filtroFechaCreacionPersonalizado");
+
+  if (!custom) {
+    return;
+  }
+
+  custom.hidden =
+    tipo !== "personalizado";
+}
+
+
+/*
+  Convierte YYYY-MM-DD del input HTML
+  a fecha LOCAL.
+
+  Evitamos new Date("2026-09-03")
+  porque puede interpretarse como UTC
+  y desplazar la fecha según zona horaria.
+*/
+function parseFechaInputLocal(
+  value,
+  finalDelDia = false
+) {
+  const raw =
+    String(
+      value || ""
+    ).trim();
+
+  const match =
+    raw.match(
+      /^(\d{4})-(\d{2})-(\d{2})$/
+    );
+
+  if (!match) {
+    return null;
+  }
+
+  const year =
+    Number(match[1]);
+
+  const month =
+    Number(match[2]) - 1;
+
+  const day =
+    Number(match[3]);
+
+
+  if (finalDelDia) {
+    return new Date(
+      year,
+      month,
+      day,
+      23,
+      59,
+      59,
+      999
+    );
+  }
+
+
+  return new Date(
+    year,
+    month,
+    day,
+    0,
+    0,
+    0,
+    0
+  );
+}
+
+
+/*
+  Devuelve el rango activo:
+
+  {
+    desde: Date | null,
+    hasta: Date | null
+  }
+*/
+function getRangoFechaCreacionActivo() {
+  const tipo =
+    $("filtroFechaCreacion")?.value ||
+    "todas";
+
+
+  /*
+    Sin filtro.
+  */
+  if (tipo === "todas") {
+    return {
+      desde: null,
+      hasta: null
+    };
+  }
+
+
+  const hoy =
+    new Date();
+
+  const inicioHoy =
+    new Date(
+      hoy.getFullYear(),
+      hoy.getMonth(),
+      hoy.getDate(),
+      0,
+      0,
+      0,
+      0
+    );
+
+  const finHoy =
+    new Date(
+      hoy.getFullYear(),
+      hoy.getMonth(),
+      hoy.getDate(),
+      23,
+      59,
+      59,
+      999
+    );
+
+
+  /* =====================================================
+     ÚLTIMOS 30 DÍAS
+     Incluye hoy + 29 días anteriores.
+  ===================================================== */
+
+  if (
+    tipo === "ultimos_30"
+  ) {
+    const desde =
+      new Date(
+        inicioHoy
+      );
+
+    desde.setDate(
+      desde.getDate() - 29
+    );
+
+    return {
+      desde,
+      hasta:
+        finHoy
+    };
+  }
+
+
+  /* =====================================================
+     ÚLTIMOS 90 DÍAS
+     Incluye hoy + 89 días anteriores.
+  ===================================================== */
+
+  if (
+    tipo === "ultimos_90"
+  ) {
+    const desde =
+      new Date(
+        inicioHoy
+      );
+
+    desde.setDate(
+      desde.getDate() - 89
+    );
+
+    return {
+      desde,
+      hasta:
+        finHoy
+    };
+  }
+
+
+  /* =====================================================
+     ESTE MES
+  ===================================================== */
+
+  if (
+    tipo === "este_mes"
+  ) {
+    const desde =
+      new Date(
+        hoy.getFullYear(),
+        hoy.getMonth(),
+        1,
+        0,
+        0,
+        0,
+        0
+      );
+
+    return {
+      desde,
+      hasta:
+        finHoy
+    };
+  }
+
+
+  /* =====================================================
+     MES ANTERIOR COMPLETO
+  ===================================================== */
+
+  if (
+    tipo === "mes_anterior"
+  ) {
+    const desde =
+      new Date(
+        hoy.getFullYear(),
+        hoy.getMonth() - 1,
+        1,
+        0,
+        0,
+        0,
+        0
+      );
+
+    const hasta =
+      new Date(
+        hoy.getFullYear(),
+        hoy.getMonth(),
+        0,
+        23,
+        59,
+        59,
+        999
+      );
+
+    return {
+      desde,
+      hasta
+    };
+  }
+
+
+  /* =====================================================
+     ENTRE FECHAS
+  ===================================================== */
+
+  if (
+    tipo === "personalizado"
+  ) {
+    let desde =
+      parseFechaInputLocal(
+        $("filtroFechaDesde")?.value,
+        false
+      );
+
+    let hasta =
+      parseFechaInputLocal(
+        $("filtroFechaHasta")?.value,
+        true
+      );
+
+
+    /*
+      Si accidentalmente ponen:
+      Desde 20/09
+      Hasta 10/09
+
+      intercambiamos automáticamente.
+    */
+    if (
+      desde &&
+      hasta &&
+      desde.getTime() >
+        hasta.getTime()
+    ) {
+      const desdeOriginal =
+        desde;
+
+      desde =
+        new Date(
+          hasta.getFullYear(),
+          hasta.getMonth(),
+          hasta.getDate(),
+          0,
+          0,
+          0,
+          0
+        );
+
+      hasta =
+        new Date(
+          desdeOriginal.getFullYear(),
+          desdeOriginal.getMonth(),
+          desdeOriginal.getDate(),
+          23,
+          59,
+          59,
+          999
+        );
+    }
+
+
+    return {
+      desde,
+      hasta
+    };
+  }
+
+
+  return {
+    desde: null,
+    hasta: null
+  };
+}
+
+/* =========================================================
    FILTROS
 ========================================================= */
 function applyFiltersAndRender() {
-  const filtroAno = $("filtroAno")?.value || "todos";
-  const filtroEstado = $("filtroEstado")?.value || "todos";
-  const filtroVendedora = $("filtroVendedora")?.value || "todos";
-  const search = normalizeText($("buscadorSeguimiento")?.value || "");
+  const filtroAno =
+    $("filtroAno")?.value ||
+    "todos";
 
-  const currentVendorFullName = normalizeText([
-    state.currentUser?.nombre,
-    state.currentUser?.apellido
-  ].filter(Boolean).join(" "));
+  const filtroEstado =
+    $("filtroEstado")?.value ||
+    "todos";
+
+  const filtroVendedora =
+    $("filtroVendedora")?.value ||
+    "todos";
+
+  const search =
+    normalizeText(
+      $("buscadorSeguimiento")?.value ||
+      ""
+    );
+
+
+  /*
+    Nuevo filtro de fecha de creación.
+  */
+  const rangoFechaCreacion =
+    getRangoFechaCreacionActivo();
+
+
+  const currentVendorFullName =
+    normalizeText(
+      [
+        state.currentUser?.nombre,
+        state.currentUser?.apellido
+      ]
+        .filter(Boolean)
+        .join(" ")
+    );
+
 
   const rawAliases =
     state.currentUser?.aliasCartera ??
     state.currentUser?.aliascartera ??
     [];
-  
-  const currentVendorAliases = Array.isArray(rawAliases)
-    ? rawAliases.map(normalizeText)
-    : (rawAliases ? [normalizeText(rawAliases)] : []);
-  
-  const currentVendorEmails = getVentasUserEmails(state.currentUser);
 
-  let rows = [...state.allRows];
 
-  // Restricción por rol
-  rows = rows.filter((row) => {
-    if (state.canSeeAll) return true;
-
-    const rowVendorEmail = normalizeEmail(row.vendedoraCorreo);
-    const rowVendorName = normalizeText(row.vendedora);
-
-    if (rowVendorEmail && currentVendorEmails.includes(rowVendorEmail)) return true;
-
-    if (currentVendorFullName && rowVendorName.includes(currentVendorFullName)) return true;
-
-    if (currentVendorAliases.length) {
-      return currentVendorAliases.some((alias) => rowVendorName.includes(alias));
-    }
-
-    return false;
-  });
-
-  // Filtro año
-  rows = rows.filter(
-    (row) => {
-      const anoViaje =
-        Number(
-          row.anoViaje || 0
+  const currentVendorAliases =
+    Array.isArray(
+      rawAliases
+    )
+      ? rawAliases.map(
+          normalizeText
+        )
+      : (
+          rawAliases
+            ? [
+                normalizeText(
+                  rawAliases
+                )
+              ]
+            : []
         );
-  
-      if (
-        !anoViaje ||
-        anoViaje <
-          getAnoComercialActual()
-      ) {
+
+
+  const currentVendorEmails =
+    getVentasUserEmails(
+      state.currentUser
+    );
+
+
+  let rows =
+    [...state.allRows];
+
+
+  /* =====================================================
+     RESTRICCIÓN POR ROL
+  ===================================================== */
+
+  rows =
+    rows.filter(
+      (row) => {
+        if (state.canSeeAll) {
+          return true;
+        }
+
+
+        const rowVendorEmail =
+          normalizeEmail(
+            row.vendedoraCorreo
+          );
+
+        const rowVendorName =
+          normalizeText(
+            row.vendedora
+          );
+
+
+        if (
+          rowVendorEmail &&
+          currentVendorEmails.includes(
+            rowVendorEmail
+          )
+        ) {
+          return true;
+        }
+
+
+        if (
+          currentVendorFullName &&
+          rowVendorName.includes(
+            currentVendorFullName
+          )
+        ) {
+          return true;
+        }
+
+
+        if (
+          currentVendorAliases.length
+        ) {
+          return currentVendorAliases.some(
+            (alias) =>
+              rowVendorName.includes(
+                alias
+              )
+          );
+        }
+
+
         return false;
       }
-  
-      if (
-        filtroAno === "todos"
-      ) {
+    );
+
+
+  /* =====================================================
+     FILTRO AÑO VIAJE
+  ===================================================== */
+
+  rows =
+    rows.filter(
+      (row) => {
+        const anoViaje =
+          Number(
+            row.anoViaje || 0
+          );
+
+
+        if (
+          !anoViaje ||
+          anoViaje <
+            getAnoComercialActual()
+        ) {
+          return false;
+        }
+
+
+        if (
+          filtroAno === "todos"
+        ) {
+          return true;
+        }
+
+
+        return (
+          String(
+            anoViaje
+          ) ===
+          String(
+            filtroAno
+          )
+        );
+      }
+    );
+
+
+  /* =====================================================
+     NUEVO:
+     FILTRO FECHA CREACIÓN DEL LEAD
+  ===================================================== */
+
+  rows =
+    rows.filter(
+      (row) => {
+        const {
+          desde,
+          hasta
+        } =
+          rangoFechaCreacion;
+
+
+        /*
+          Si no existe rango activo,
+          no filtramos.
+        */
+        if (
+          !desde &&
+          !hasta
+        ) {
+          return true;
+        }
+
+
+        const fechaCreacion =
+          toDate(
+            row.fechaCreacion
+          );
+
+
+        /*
+          Si estamos filtrando por fecha
+          y el lead no tiene fechaCreacion,
+          no puede pertenecer al período.
+        */
+        if (!fechaCreacion) {
+          return false;
+        }
+
+
+        const time =
+          fechaCreacion.getTime();
+
+
+        if (
+          desde &&
+          time <
+            desde.getTime()
+        ) {
+          return false;
+        }
+
+
+        if (
+          hasta &&
+          time >
+            hasta.getTime()
+        ) {
+          return false;
+        }
+
+
         return true;
       }
-  
-      return (
-        String(anoViaje) ===
-        String(filtroAno)
-      );
-    }
+    );
+
+
+  /* =====================================================
+     FILTRO ESTADO
+  ===================================================== */
+
+  rows =
+    rows.filter(
+      (row) => {
+        if (
+          filtroEstado === "todos"
+        ) {
+          return true;
+        }
+
+        return (
+          row.estado ===
+          filtroEstado
+        );
+      }
+    );
+
+
+  /* =====================================================
+     FILTRO DASHBOARD
+  ===================================================== */
+
+  rows =
+    rows.filter(
+      (row) => {
+        const bucket =
+          state.dashboardPreset?.bucket ||
+          "";
+
+        if (!bucket) {
+          return true;
+        }
+
+
+        if (
+          bucket === "a_contactar"
+        ) {
+          return (
+            row.estado ===
+            "a_contactar"
+          );
+        }
+
+
+        if (
+          bucket === "contactados"
+        ) {
+          return (
+            row.estado ===
+            "contactado"
+          );
+        }
+
+
+        if (
+          bucket === "autorizadas"
+        ) {
+          return (
+            !!row.autorizada
+          );
+        }
+
+
+        if (
+          bucket === "cerradas"
+        ) {
+          return (
+            !!row.cerrada
+          );
+        }
+
+
+        return true;
+      }
+    );
+
+
+  /* =====================================================
+     FILTRO VENDEDOR
+  ===================================================== */
+
+  rows =
+    rows.filter(
+      (row) => {
+        if (!state.canSeeAll) {
+          return true;
+        }
+
+
+        if (
+          filtroVendedora ===
+          "todos"
+        ) {
+          return true;
+        }
+
+
+        const vendorFilter =
+          normalizeText(
+            filtroVendedora
+          );
+
+
+        return (
+          normalizeEmail(
+            row.vendedoraCorreo
+          ) ===
+            normalizeEmail(
+              filtroVendedora
+            ) ||
+
+          normalizeText(
+            row.vendedora
+          ) ===
+            vendorFilter
+        );
+      }
+    );
+
+
+  /* =====================================================
+     BUSCADOR
+  ===================================================== */
+
+  rows =
+    rows.filter(
+      (row) => {
+        if (!search) {
+          return true;
+        }
+
+        return (
+          row.searchIndex.includes(
+            search
+          )
+        );
+      }
+    );
+
+
+  /*
+    Este conjunto alimenta
+    el resumen superior.
+  */
+  state.filteredRows =
+    rows;
+
+
+  renderSummary(
+    rows
   );
 
-  // Filtro estado selector
-  rows = rows.filter((row) => {
-    if (filtroEstado === "todos") return true;
-    return row.estado === filtroEstado;
-  });
-
-  // Filtro extra recibido desde dashboard
-  rows = rows.filter((row) => {
-    const bucket = state.dashboardPreset?.bucket || "";
-    if (!bucket) return true;
-  
-    if (bucket === "a_contactar") {
-      return row.estado === "a_contactar";
-    }
-  
-    if (bucket === "contactados") {
-      return row.estado === "contactado";
-    }
-  
-    // AUTORIZADAS se filtra por flag, no por estado textual
-    if (bucket === "autorizadas") {
-      return !!row.autorizada;
-    }
-  
-    // CERRADAS se filtra por flag, no por estado textual
-    if (bucket === "cerradas") {
-      return !!row.cerrada;
-    }
-  
-    return true;
-  });
-
-  // Filtro vendedor selector
-  rows = rows.filter((row) => {
-    if (!state.canSeeAll) return true;
-    if (filtroVendedora === "todos") return true;
-
-    const vendorFilter = normalizeText(filtroVendedora);
-
-    return (
-      normalizeEmail(row.vendedoraCorreo) === normalizeEmail(filtroVendedora) ||
-      normalizeText(row.vendedora) === vendorFilter
-    );
-  });
-
-  // Buscador
-  rows = rows.filter((row) => {
-    if (!search) return true;
-    return row.searchIndex.includes(search);
-  });
-
-  state.filteredRows = rows;
-
-  // El resumen refleja filtros normales, no los botones toggle
-  renderSummary(rows);
   updateSummaryButtonsUI();
 
-  // Aplicar ocultamiento por botones resumen
-  rows = rows.filter((row) => {
-    const bucket = getSummaryBucket(row.estado);
-    return !state.hiddenSummaryStates.has(bucket);
-  });
 
-  // Orden final
-  // Si por cualquier motivo no hay sortKey válido, forzamos grupo A → Z
-  const sortKey = state.sortKey || "grupo";
-  const sortDir = state.sortDir || "asc";
-  
-  rows.sort((a, b) => compareRows(a, b, sortKey, sortDir));
+  /* =====================================================
+     BOTONES RESUMEN
+  ===================================================== */
 
-  state.visibleRows = rows;
-  renderRows(rows);
+  rows =
+    rows.filter(
+      (row) => {
+        const bucket =
+          getSummaryBucket(
+            row.estado
+          );
+
+        return (
+          !state.hiddenSummaryStates.has(
+            bucket
+          )
+        );
+      }
+    );
+
+
+  /* =====================================================
+     ORDEN FINAL
+  ===================================================== */
+
+  const sortKey =
+    state.sortKey ||
+    "grupo";
+
+  const sortDir =
+    state.sortDir ||
+    "asc";
+
+
+  rows.sort(
+    (a, b) =>
+      compareRows(
+        a,
+        b,
+        sortKey,
+        sortDir
+      )
+  );
+
+
+  /*
+    ESTO ES LO IMPORTANTE:
+
+    Ambas exportaciones utilizan
+    state.visibleRows.
+
+    Por lo tanto desde ahora
+    también respetarán el período
+    de creación seleccionado.
+  */
+  state.visibleRows =
+    rows;
+
+
+  renderRows(
+    rows
+  );
 }
 
 /* =========================================================
