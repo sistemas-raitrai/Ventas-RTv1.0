@@ -10820,6 +10820,1018 @@ async function ({
   };
 };
 
+window.recuperarMasivamenteNominaFinalFallida =
+async function ({
+  dryRun = true,
+  confirmar = true,
+  maximo = 0
+} = {}) {
+  console.log(
+    "======================================================"
+  );
+
+  console.log(
+    "🩺 RECUPERACIÓN MASIVA NÓMINA FINAL"
+  );
+
+  console.log(
+    "======================================================"
+  );
+
+  console.log({
+    dryRun,
+    confirmar,
+    maximo
+  });
+
+  // ================================================================
+  // UTILIDADES
+  // ================================================================
+
+  const fichaCompleta = (
+    item = {}
+  ) => {
+    return (
+      item.fichaMedicaCompleta === true ||
+      item.nominaFinalCompleta === true ||
+      item.fichaMedicaCompletada === true ||
+      item.nominaFinalCompletada === true ||
+      normalizeSearchLocal(
+        item.fichaMedicaEstado || ""
+      ) === "completa" ||
+      normalizeSearchLocal(
+        item.fichaMedicaEstado || ""
+      ) === "completada"
+    );
+  };
+
+  const getNombre = (
+    payload = {}
+  ) => {
+    return cleanText(
+      payload?.identificacion
+        ?.nombreCompleto ||
+      [
+        payload?.identificacion?.nombres,
+        payload?.identificacion?.primerApellido,
+        payload?.identificacion?.segundoApellido
+      ]
+        .filter(Boolean)
+        .join(" ")
+    );
+  };
+
+  // ================================================================
+  // 1. VOLVER A HACER DIAGNÓSTICO
+  // ================================================================
+
+  console.log(
+    "🔎 Revalidando candidatos antes de iniciar..."
+  );
+
+  const diagnostico =
+    await window
+      .diagnosticarRecuperacionMasivaNominaFinal({
+        soloErrorContactoUndefined:
+          true
+      });
+
+  if (
+    !diagnostico?.ok
+  ) {
+    console.error(
+      "❌ No se pudo ejecutar el diagnóstico previo."
+    );
+
+    return {
+      ok: false,
+      motivo:
+        "diagnostico_fallido"
+    };
+  }
+
+  let candidatos =
+    diagnostico.resultados
+      .filter(
+        (item) =>
+          item.clasificacion ===
+          "RECUPERAR"
+      );
+
+  if (
+    Number(maximo) > 0
+  ) {
+    candidatos =
+      candidatos.slice(
+        0,
+        Number(maximo)
+      );
+  }
+
+  console.log(
+    `🎯 Candidatos actuales: ${candidatos.length}`
+  );
+
+  // ================================================================
+  // 2. DRY RUN
+  // ================================================================
+
+  if (dryRun) {
+    console.warn(
+      "⚠️ DRY RUN: no se escribirá nada."
+    );
+
+    console.table(
+      candidatos.map(
+        (item) => ({
+          pendienteId:
+            item.pendienteId,
+
+          idGrupo:
+            item.idGrupo,
+
+          inscripcionId:
+            item.inscripcionId,
+
+          documento:
+            item.documento,
+
+          nombre:
+            item.nombre,
+
+          accion:
+            "RECUPERAR"
+        })
+      )
+    );
+
+    const resumen = {
+      dryRun: true,
+
+      candidatos:
+        candidatos.length,
+
+      recuperar:
+        candidatos.length,
+
+      escritos:
+        0
+    };
+
+    console.table([
+      resumen
+    ]);
+
+    window.__ultimaRecuperacionMasivaNominaFinal =
+      {
+        resumen,
+        resultados:
+          candidatos
+      };
+
+    return {
+      ok: true,
+      ...resumen,
+      resultados:
+        candidatos
+    };
+  }
+
+  // ================================================================
+  // 3. CONFIRMACIÓN ÚNICA
+  // ================================================================
+
+  if (confirmar) {
+    const ok =
+      window.confirm(
+        `RECUPERACIÓN MASIVA NÓMINA FINAL\n\n` +
+        `Se intentarán recuperar ${candidatos.length} ficha(s).\n\n` +
+        `Antes de cada recuperación se volverá a comprobar que:\n` +
+        `- el pendiente siga en error;\n` +
+        `- corresponda a Nómina Final;\n` +
+        `- la inscripción oficial exista;\n` +
+        `- la ficha médica siga pendiente.\n\n` +
+        `Las fichas que ya estén completas serán omitidas.\n\n` +
+        `¿Continuar?`
+      );
+
+    if (!ok) {
+      console.warn(
+        "Recuperación masiva cancelada."
+      );
+
+      return {
+        ok: false,
+        cancelado: true
+      };
+    }
+  }
+
+  // ================================================================
+  // 4. CONTADORES
+  // ================================================================
+
+  const resultados = [];
+
+  let revisados = 0;
+  let recuperados = 0;
+  let omitidosYaCompletos = 0;
+  let omitidosSeguridad = 0;
+  let errores = 0;
+
+  // ================================================================
+  // 5. PROCESAR UNO A UNO
+  // ================================================================
+
+  for (
+    let index = 0;
+    index < candidatos.length;
+    index += 1
+  ) {
+    const candidato =
+      candidatos[index];
+
+    revisados += 1;
+
+    console.log("");
+    console.log(
+      `▶️ ${index + 1}/${candidatos.length}`
+    );
+
+    console.log({
+      pendienteId:
+        candidato.pendienteId,
+
+      idGrupo:
+        candidato.idGrupo,
+
+      inscripcionId:
+        candidato.inscripcionId,
+
+      nombre:
+        candidato.nombre
+    });
+
+    try {
+      // --------------------------------------------------------------
+      // A. LEER PENDIENTE ORIGINAL
+      // --------------------------------------------------------------
+
+      const pendienteRef =
+        doc(
+          db,
+          "inscripciones_pendientes_publicas",
+          candidato.pendienteId
+        );
+
+      const pendienteSnap =
+        await getDoc(
+          pendienteRef
+        );
+
+      if (
+        !pendienteSnap.exists()
+      ) {
+        omitidosSeguridad++;
+
+        resultados.push({
+          estado:
+            "OMITIDO",
+
+          motivo:
+            "pendiente_no_existe",
+
+          pendienteId:
+            candidato.pendienteId,
+
+          idGrupo:
+            candidato.idGrupo,
+
+          inscripcionId:
+            candidato.inscripcionId,
+
+          nombre:
+            candidato.nombre
+        });
+
+        continue;
+      }
+
+      const pendiente =
+        pendienteSnap.data() ||
+        {};
+
+      const estadoPendiente =
+        normalizeSearchLocal(
+          pendiente.estado || ""
+        );
+
+      if (
+        estadoPendiente !== "error"
+      ) {
+        omitidosSeguridad++;
+
+        resultados.push({
+          estado:
+            "OMITIDO",
+
+          motivo:
+            "pendiente_ya_no_esta_en_error",
+
+          pendienteId:
+            candidato.pendienteId,
+
+          idGrupo:
+            candidato.idGrupo,
+
+          inscripcionId:
+            candidato.inscripcionId,
+
+          nombre:
+            candidato.nombre
+        });
+
+        continue;
+      }
+
+      const payloadOriginal =
+        pendiente.payload ||
+        {};
+
+      const idGrupo =
+        cleanText(
+          pendiente.idGrupo ||
+          payloadOriginal?.grupo
+            ?.idGrupo ||
+          candidato.idGrupo ||
+          ""
+        );
+
+      const fase =
+        cleanText(
+          pendiente.fase ||
+          payloadOriginal.faseInscripcion ||
+          ""
+        );
+
+      const faseNormalizada =
+        normalizeSearchLocal(
+          fase
+        ).replace(
+          /\s+/g,
+          "_"
+        );
+
+      const actualizaExistente =
+        payloadOriginal
+          .actualizaInscripcionExistente ===
+        true;
+
+      const token =
+        cleanText(
+          pendiente.token ||
+          payloadOriginal.token ||
+          ""
+        );
+
+      const inscripcionId =
+        cleanText(
+          payloadOriginal
+            .inscripcionSistemaPagosDocId ||
+
+          payloadOriginal
+            ?.identificacion
+            ?.documentoNormalizado ||
+
+          candidato.inscripcionId ||
+          ""
+        );
+
+      const nombre =
+        getNombre(
+          payloadOriginal
+        );
+
+      const documento =
+        cleanText(
+          payloadOriginal
+            ?.identificacion
+            ?.documento ||
+          candidato.documento ||
+          ""
+        );
+
+      // --------------------------------------------------------------
+      // B. VALIDACIONES DE SEGURIDAD
+      // --------------------------------------------------------------
+
+      if (
+        !idGrupo ||
+        !inscripcionId ||
+        !token ||
+        faseNormalizada !==
+          "nomina_final" ||
+        actualizaExistente !==
+          true
+      ) {
+        omitidosSeguridad++;
+
+        resultados.push({
+          estado:
+            "OMITIDO",
+
+          motivo:
+            "validacion_seguridad",
+
+          pendienteId:
+            candidato.pendienteId,
+
+          idGrupo,
+
+          inscripcionId,
+
+          nombre
+        });
+
+        continue;
+      }
+
+      // --------------------------------------------------------------
+      // C. LEER INSCRIPCIÓN OFICIAL
+      // --------------------------------------------------------------
+
+      const oficialRef =
+        doc(
+          db,
+          "ventas_cotizaciones",
+          idGrupo,
+          "inscripciones",
+          inscripcionId
+        );
+
+      const oficialSnap =
+        await getDoc(
+          oficialRef
+        );
+
+      if (
+        !oficialSnap.exists()
+      ) {
+        omitidosSeguridad++;
+
+        resultados.push({
+          estado:
+            "OMITIDO",
+
+          motivo:
+            "inscripcion_oficial_no_existe",
+
+          pendienteId:
+            candidato.pendienteId,
+
+          idGrupo,
+
+          inscripcionId,
+
+          nombre
+        });
+
+        continue;
+      }
+
+      const oficialAntes =
+        oficialSnap.data() ||
+        {};
+
+      // --------------------------------------------------------------
+      // D. SI YA ESTÁ COMPLETA, NO TOCAR
+      // --------------------------------------------------------------
+
+      if (
+        fichaCompleta(
+          oficialAntes
+        )
+      ) {
+        omitidosYaCompletos++;
+
+        console.log(
+          "⏭️ Ya tiene ficha médica completa."
+        );
+
+        resultados.push({
+          estado:
+            "OMITIDO",
+
+          motivo:
+            "ficha_ya_completa",
+
+          pendienteId:
+            candidato.pendienteId,
+
+          idGrupo,
+
+          inscripcionId,
+
+          nombre
+        });
+
+        continue;
+      }
+
+      // --------------------------------------------------------------
+      // E. NORMALIZAR CONTACTOS
+      // --------------------------------------------------------------
+
+      const contactoPrincipalOriginal =
+        payloadOriginal
+          .contactoPrincipal ||
+        {};
+
+      const contactoSecundarioOriginal =
+        payloadOriginal
+          .contactoSecundario ||
+        {};
+
+      const contactoPrincipalCorregido = {
+        ...contactoPrincipalOriginal,
+
+        nombre:
+          cleanText(
+            contactoPrincipalOriginal
+              .nombre ||
+            contactoPrincipalOriginal
+              .nombreCompleto ||
+            ""
+          ),
+
+        nombreCompleto:
+          cleanText(
+            contactoPrincipalOriginal
+              .nombreCompleto ||
+            contactoPrincipalOriginal
+              .nombre ||
+            ""
+          )
+      };
+
+      const contactoSecundarioCorregido = {
+        ...contactoSecundarioOriginal,
+
+        nombre:
+          cleanText(
+            contactoSecundarioOriginal
+              .nombre ||
+            contactoSecundarioOriginal
+              .nombreCompleto ||
+            ""
+          ),
+
+        nombreCompleto:
+          cleanText(
+            contactoSecundarioOriginal
+              .nombreCompleto ||
+            contactoSecundarioOriginal
+              .nombre ||
+            ""
+          )
+      };
+
+      const payloadCorregido = {
+        ...payloadOriginal,
+
+        idGrupo,
+
+        token,
+
+        faseInscripcion:
+          "nomina_final",
+
+        actualizaInscripcionExistente:
+          true,
+
+        inscripcionSistemaPagosDocId:
+          inscripcionId,
+
+        contactoPrincipal:
+          contactoPrincipalCorregido,
+
+        contactoSecundario:
+          contactoSecundarioCorregido
+      };
+
+      // --------------------------------------------------------------
+      // F. CREAR NUEVO PENDIENTE
+      // --------------------------------------------------------------
+
+      const nuevoRef =
+        await addDoc(
+          collection(
+            db,
+            "inscripciones_pendientes_publicas"
+          ),
+          {
+            idGrupo,
+
+            token,
+
+            fase:
+              "nomina_final",
+
+            payload:
+              payloadCorregido,
+
+            estado:
+              "pendiente",
+
+            creadoEn:
+              serverTimestamp(),
+
+            origen:
+              "recuperacion_masiva_nomina_final_grupo_js",
+
+            recuperacion: {
+              activo:
+                true,
+
+              masiva:
+                true,
+
+              pendienteOriginalId:
+                candidato.pendienteId,
+
+              errorOriginal:
+                cleanText(
+                  pendiente.error ||
+                  ""
+                ),
+
+              errorOriginalEn:
+                pendiente.errorEn ||
+                null,
+
+              existiaInscripcionAnterior:
+                true,
+
+              actualizaInscripcionExistente:
+                true,
+
+              esActualizacionNominaFinal:
+                true,
+
+              inscripcionDestinoId:
+                inscripcionId,
+
+              contactoPrincipalNormalizado:
+                contactoPrincipalCorregido
+                  .nombreCompleto,
+
+              recuperadoPor:
+                getDisplayName(
+                  state.effectiveUser
+                ),
+
+              recuperadoPorCorreo:
+                state.effectiveEmail ||
+                "",
+
+              recuperadoEn:
+                serverTimestamp()
+            }
+          }
+        );
+
+      console.log(
+        "📨 Nuevo pendiente creado:",
+        nuevoRef.id
+      );
+
+      // --------------------------------------------------------------
+      // G. ESPERAR CLOUD FUNCTION
+      // --------------------------------------------------------------
+
+      let estadoProceso =
+        "pendiente";
+
+      let resultadoProceso =
+        null;
+
+      for (
+        let intento = 1;
+        intento <= 30;
+        intento += 1
+      ) {
+        await esperar(
+          1000
+        );
+
+        const nuevoSnap =
+          await getDoc(
+            nuevoRef
+          );
+
+        if (
+          !nuevoSnap.exists()
+        ) {
+          estadoProceso =
+            "documento_eliminado";
+
+          break;
+        }
+
+        resultadoProceso =
+          nuevoSnap.data() ||
+          {};
+
+        estadoProceso =
+          normalizeSearchLocal(
+            resultadoProceso.estado ||
+            "pendiente"
+          );
+
+        if (
+          estadoProceso ===
+          "error"
+        ) {
+          throw new Error(
+            resultadoProceso.error ||
+            "El reprocesamiento volvió a fallar."
+          );
+        }
+
+        if (
+          estadoProceso !==
+            "pendiente" &&
+          estadoProceso !==
+            "procesando"
+        ) {
+          break;
+        }
+      }
+
+      // --------------------------------------------------------------
+      // H. VERIFICAR INSCRIPCIÓN OFICIAL
+      // --------------------------------------------------------------
+
+      let oficialDespues =
+        null;
+
+      let quedoCompleta =
+        false;
+
+      for (
+        let intento = 1;
+        intento <= 8;
+        intento += 1
+      ) {
+        await esperar(
+          1000
+        );
+
+        const verificacion =
+          await getDoc(
+            oficialRef
+          );
+
+        if (
+          verificacion.exists()
+        ) {
+          oficialDespues =
+            verificacion.data() ||
+            {};
+
+          quedoCompleta =
+            fichaCompleta(
+              oficialDespues
+            );
+
+          if (
+            quedoCompleta
+          ) {
+            break;
+          }
+        }
+      }
+
+      if (
+        !quedoCompleta
+      ) {
+        throw new Error(
+          "La Cloud Function terminó, pero la inscripción oficial continúa con ficha médica pendiente."
+        );
+      }
+
+      // --------------------------------------------------------------
+      // I. MARCAR ORIGINAL COMO RECUPERADO
+      // --------------------------------------------------------------
+
+      await setDoc(
+        pendienteRef,
+        {
+          estado:
+            "recuperado",
+
+          recuperadoEn:
+            serverTimestamp(),
+
+          recuperadoPor:
+            getDisplayName(
+              state.effectiveUser
+            ),
+
+          recuperadoPorCorreo:
+            state.effectiveEmail ||
+            "",
+
+          recuperacionMasiva: {
+            ok:
+              true,
+
+            nuevoPendienteId:
+              nuevoRef.id,
+
+            idGrupo,
+
+            inscripcionId,
+
+            recuperadoEn:
+              serverTimestamp()
+          }
+        },
+        {
+          merge: true
+        }
+      );
+
+      recuperados++;
+
+      resultados.push({
+        estado:
+          "RECUPERADO",
+
+        pendienteId:
+          candidato.pendienteId,
+
+        nuevoPendienteId:
+          nuevoRef.id,
+
+        idGrupo,
+
+        inscripcionId,
+
+        documento,
+
+        nombre,
+
+        fichaMedicaCompleta:
+          true
+      });
+
+      console.log(
+        "✅ RECUPERADO",
+        {
+          idGrupo,
+          inscripcionId,
+          nombre
+        }
+      );
+
+    } catch (error) {
+      errores++;
+
+      console.error(
+        "❌ ERROR RECUPERANDO",
+        {
+          pendienteId:
+            candidato.pendienteId,
+
+          idGrupo:
+            candidato.idGrupo,
+
+          inscripcionId:
+            candidato.inscripcionId,
+
+          nombre:
+            candidato.nombre,
+
+          error:
+            error?.message ||
+            String(error)
+        }
+      );
+
+      resultados.push({
+        estado:
+          "ERROR",
+
+        pendienteId:
+          candidato.pendienteId,
+
+        idGrupo:
+          candidato.idGrupo,
+
+        inscripcionId:
+          candidato.inscripcionId,
+
+        nombre:
+          candidato.nombre,
+
+        error:
+          error?.message ||
+          String(error)
+      });
+    }
+  }
+
+  // ================================================================
+  // 6. RESUMEN FINAL
+  // ================================================================
+
+  const resumen = {
+    dryRun:
+      false,
+
+    candidatosIniciales:
+      candidatos.length,
+
+    revisados,
+
+    recuperados,
+
+    omitidosYaCompletos,
+
+    omitidosSeguridad,
+
+    errores
+  };
+
+  console.log("");
+  console.log(
+    "======================================================"
+  );
+
+  console.log(
+    "✅ RECUPERACIÓN MASIVA TERMINADA"
+  );
+
+  console.log(
+    "======================================================"
+  );
+
+  console.table([
+    resumen
+  ]);
+
+  console.log("");
+  console.log(
+    "📋 DETALLE"
+  );
+
+  console.table(
+    resultados.map(
+      (item) => ({
+        estado:
+          item.estado,
+
+        pendienteId:
+          item.pendienteId,
+
+        nuevoPendienteId:
+          item.nuevoPendienteId ||
+          "",
+
+        idGrupo:
+          item.idGrupo,
+
+        inscripcionId:
+          item.inscripcionId,
+
+        nombre:
+          item.nombre,
+
+        motivo:
+          item.motivo ||
+          item.error ||
+          ""
+      })
+    )
+  );
+
+  window.__ultimaRecuperacionMasivaNominaFinal =
+    {
+      resumen,
+      resultados
+    };
+
+  return {
+    ok:
+      errores === 0,
+
+    resumen,
+
+    resultados
+  };
+};
+
 window.recuperarInscripcionPublicaFallida = async function ({
   pendienteId = "",
   confirmar = true
