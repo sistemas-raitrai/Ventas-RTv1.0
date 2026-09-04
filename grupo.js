@@ -9292,6 +9292,478 @@ await limpiarAlertasInscripcionesEliminadas({
   };
 };
 
+window.barridoInscripcionesPublicasConError = async function ({
+  soloNominaFinal = false,
+  soloErrorUndefinedContacto = false
+} = {}) {
+  console.log(
+    "======================================================"
+  );
+  console.log(
+    "🔎 BARRIDO GLOBAL INSCRIPCIONES PÚBLICAS CON ERROR"
+  );
+  console.log(
+    "======================================================"
+  );
+
+  console.log({
+    soloNominaFinal,
+    soloErrorUndefinedContacto
+  });
+
+  try {
+    // ================================================================
+    // 1. BUSCAR TODOS LOS DOCUMENTOS EN ESTADO ERROR
+    // ================================================================
+
+    const snap = await getDocs(
+      query(
+        collection(
+          db,
+          "inscripciones_pendientes_publicas"
+        ),
+        where(
+          "estado",
+          "==",
+          "error"
+        )
+      )
+    );
+
+    console.log(
+      `📦 Documentos con estado=error encontrados: ${snap.size}`
+    );
+
+    // ================================================================
+    // 2. NORMALIZAR INFORMACIÓN
+    // ================================================================
+
+    const todos = snap.docs.map(
+      (documentoSnap) => {
+        const data =
+          documentoSnap.data() || {};
+
+        const payload =
+          data.payload || {};
+
+        const identificacion =
+          payload.identificacion || {};
+
+        const errorTexto =
+          String(
+            data.error || ""
+          );
+
+        const fase =
+          String(
+            data.fase ||
+            payload.faseInscripcion ||
+            ""
+          ).trim();
+
+        const idGrupo =
+          String(
+            data.idGrupo ||
+            payload?.grupo?.idGrupo ||
+            ""
+          ).trim();
+
+        const documento =
+          String(
+            identificacion.documento ||
+            ""
+          ).trim();
+
+        const documentoNormalizado =
+          String(
+            identificacion.documentoNormalizado ||
+            ""
+          ).trim();
+
+        const nombre =
+          String(
+            identificacion.nombreCompleto ||
+            [
+              identificacion.nombres,
+              identificacion.primerApellido,
+              identificacion.segundoApellido
+            ]
+              .filter(Boolean)
+              .join(" ")
+          ).trim();
+
+        const esNominaFinal =
+          normalizeSearchLocal(
+            fase
+          ) === "nomina_final";
+
+        const esErrorContactoUndefined =
+          errorTexto.includes(
+            'contactoPrincipal.nombreCompleto'
+          ) &&
+          errorTexto.includes(
+            'undefined'
+          );
+
+        return {
+          pendienteId:
+            documentoSnap.id,
+
+          idGrupo,
+
+          fase,
+
+          documento,
+
+          documentoNormalizado,
+
+          nombre,
+
+          actualizaInscripcionExistente:
+            payload.actualizaInscripcionExistente === true,
+
+          inscripcionSistemaPagosDocId:
+            String(
+              payload.inscripcionSistemaPagosDocId ||
+              ""
+            ),
+
+          fichaMedicaCompleta:
+            payload.fichaMedicaCompleta === true,
+
+          nominaFinalCompleta:
+            payload.nominaFinalCompleta === true,
+
+          error:
+            errorTexto,
+
+          esNominaFinal,
+
+          esErrorContactoUndefined,
+
+          creadoEn:
+            data.creadoEn || null,
+
+          errorEn:
+            data.errorEn || null
+        };
+      }
+    );
+
+    // ================================================================
+    // 3. APLICAR FILTROS OPCIONALES
+    // ================================================================
+
+    let encontrados =
+      [...todos];
+
+    if (soloNominaFinal) {
+      encontrados =
+        encontrados.filter(
+          (item) =>
+            item.esNominaFinal === true
+        );
+    }
+
+    if (soloErrorUndefinedContacto) {
+      encontrados =
+        encontrados.filter(
+          (item) =>
+            item.esErrorContactoUndefined === true
+        );
+    }
+
+    // ================================================================
+    // 4. ORDENAR
+    // ================================================================
+
+    encontrados.sort(
+      (a, b) => {
+        const grupoA =
+          Number(a.idGrupo || 0);
+
+        const grupoB =
+          Number(b.idGrupo || 0);
+
+        if (
+          grupoA !== grupoB
+        ) {
+          return grupoA - grupoB;
+        }
+
+        return String(
+          a.nombre || ""
+        ).localeCompare(
+          String(
+            b.nombre || ""
+          ),
+          "es"
+        );
+      }
+    );
+
+    // ================================================================
+    // 5. AGRUPAR POR TIPO DE ERROR
+    // ================================================================
+
+    const porError =
+      {};
+
+    todos.forEach(
+      (item) => {
+        const key =
+          item.esErrorContactoUndefined
+            ? "contactoPrincipal.nombreCompleto undefined"
+            : (
+                item.error ||
+                "SIN ERROR INFORMADO"
+              );
+
+        porError[key] =
+          (porError[key] || 0) + 1;
+      }
+    );
+
+    const resumenErrores =
+      Object.entries(
+        porError
+      )
+        .map(
+          ([error, cantidad]) => ({
+            cantidad,
+            error
+          })
+        )
+        .sort(
+          (a, b) =>
+            b.cantidad -
+            a.cantidad
+        );
+
+    // ================================================================
+    // 6. AGRUPAR RESULTADOS POR GRUPO
+    // ================================================================
+
+    const gruposMap =
+      new Map();
+
+    encontrados.forEach(
+      (item) => {
+        const key =
+          item.idGrupo ||
+          "SIN_GRUPO";
+
+        if (
+          !gruposMap.has(key)
+        ) {
+          gruposMap.set(
+            key,
+            {
+              idGrupo:
+                key,
+
+              cantidad:
+                0,
+
+              nominaFinal:
+                0,
+
+              errorContactoUndefined:
+                0
+            }
+          );
+        }
+
+        const grupo =
+          gruposMap.get(key);
+
+        grupo.cantidad += 1;
+
+        if (
+          item.esNominaFinal
+        ) {
+          grupo.nominaFinal += 1;
+        }
+
+        if (
+          item.esErrorContactoUndefined
+        ) {
+          grupo.errorContactoUndefined +=
+            1;
+        }
+      }
+    );
+
+    const resumenGrupos =
+      Array.from(
+        gruposMap.values()
+      ).sort(
+        (a, b) =>
+          Number(a.idGrupo || 0) -
+          Number(b.idGrupo || 0)
+      );
+
+    // ================================================================
+    // 7. MOSTRAR RESULTADOS
+    // ================================================================
+
+    console.log("");
+    console.log(
+      "📊 RESUMEN GENERAL"
+    );
+
+    console.table([
+      {
+        erroresTotales:
+          todos.length,
+
+        erroresFiltrados:
+          encontrados.length,
+
+        nominaFinal:
+          todos.filter(
+            (item) =>
+              item.esNominaFinal
+          ).length,
+
+        errorContactoUndefined:
+          todos.filter(
+            (item) =>
+              item.esErrorContactoUndefined
+          ).length,
+
+        gruposAfectados:
+          new Set(
+            encontrados
+              .map(
+                (item) =>
+                  item.idGrupo
+              )
+              .filter(Boolean)
+          ).size
+      }
+    ]);
+
+    console.log("");
+    console.log(
+      "📍 GRUPOS AFECTADOS"
+    );
+
+    console.table(
+      resumenGrupos
+    );
+
+    console.log("");
+    console.log(
+      "⚠️ TIPOS DE ERROR"
+    );
+
+    console.table(
+      resumenErrores
+    );
+
+    console.log("");
+    console.log(
+      "👥 DOCUMENTOS ENCONTRADOS"
+    );
+
+    console.table(
+      encontrados.map(
+        (item) => ({
+          pendienteId:
+            item.pendienteId,
+
+          idGrupo:
+            item.idGrupo,
+
+          fase:
+            item.fase,
+
+          documento:
+            item.documento,
+
+          nombre:
+            item.nombre,
+
+          actualizaExistente:
+            item.actualizaInscripcionExistente,
+
+          fichaCompleta:
+            item.fichaMedicaCompleta,
+
+          errorContactoUndefined:
+            item.esErrorContactoUndefined
+        })
+      )
+    );
+
+    // ================================================================
+    // 8. DEJAR RESULTADO DISPONIBLE PARA CONSULTAR
+    // ================================================================
+
+    window.__ultimoBarridoInscripcionesError =
+      encontrados;
+
+    console.log("");
+    console.log(
+      "✅ Barrido terminado."
+    );
+
+    console.log(
+      "Resultados disponibles también en:"
+    );
+
+    console.log(
+      "window.__ultimoBarridoInscripcionesError"
+    );
+
+    return {
+      ok: true,
+
+      totalErrores:
+        todos.length,
+
+      encontrados:
+        encontrados.length,
+
+      gruposAfectados:
+        resumenGrupos.length,
+
+      nominaFinal:
+        todos.filter(
+          (item) =>
+            item.esNominaFinal
+        ).length,
+
+      errorContactoUndefined:
+        todos.filter(
+          (item) =>
+            item.esErrorContactoUndefined
+        ).length,
+
+      resumenGrupos,
+
+      resumenErrores,
+
+      documentos:
+        encontrados
+    };
+
+  } catch (error) {
+    console.error(
+      "❌ ERROR EN BARRIDO GLOBAL",
+      error
+    );
+
+    return {
+      ok: false,
+      error:
+        error?.message ||
+        String(error)
+    };
+  }
+};
+
 window.recuperarInscripcionPublicaFallida = async function ({
   pendienteId = "",
   confirmar = true
