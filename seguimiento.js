@@ -45,6 +45,12 @@ const CURRENT_YEAR =
 const GRUPOS_RESUMEN_COLLECTION =
   "ventas_grupos_resumen";
 
+const REUNIONES_COLLECTION =
+  "ventas_reuniones";
+
+const HISTORIAL_COLLECTION =
+  "ventas_historial";
+
 const SEGUIMIENTO_CACHE_PREFIX =
   "seguimiento_resumen_ano_";
 
@@ -2787,14 +2793,12 @@ async function exportAnalisisLeadsToXlsx() {
     $("btnExportarAnalisisLeads");
 
   try {
-    /* =====================================================
-       SEGURIDAD POR ROL
-    ===================================================== */
-
     const esVendedor =
       String(
-        state.currentUser?.rol || ""
-      ).toLowerCase() === "vendedor";
+        state.currentUser?.rol ||
+        ""
+      ).toLowerCase() ===
+      "vendedor";
 
     if (esVendedor) {
       alert(
@@ -2803,130 +2807,192 @@ async function exportAnalisisLeadsToXlsx() {
       return;
     }
 
-    if (typeof XLSX === "undefined") {
+    if (
+      typeof XLSX ===
+      "undefined"
+    ) {
       alert(
         "No se encontró la librería XLSX."
       );
       return;
     }
 
+
     /*
-      Usamos los grupos visibles.
+      =====================================================
+      IMPORTANTE
 
-      Se respetan:
-      - año
-      - vendedor
-      - estado
-      - búsqueda
-      - filtros del dashboard
-      - botones de resumen
+      XLSX responde a FILTROS REALES,
+      NO a la visibilidad de la tabla.
+
+      Las pérdidas pueden estar ocultas visualmente,
+      pero siguen entrando al informe si cumplen
+      los filtros seleccionados.
+      =====================================================
     */
-    const gruposVisibles =
-      [...state.visibleRows];
 
-    if (!gruposVisibles.length) {
+    const gruposFiltrados =
+      [
+        ...state.filteredRows
+      ];
+
+    if (
+      !gruposFiltrados.length
+    ) {
       alert(
-        "No hay grupos visibles para generar el análisis."
+        "No hay grupos que cumplan los filtros para generar el análisis."
       );
       return;
     }
 
+
     if (boton) {
-      boton.disabled = true;
+      boton.disabled =
+        true;
 
       boton.dataset.textoOriginal =
-        boton.textContent || "";
+        boton.textContent ||
+        "";
 
       boton.textContent =
-        "Generando análisis...";
+        `Generando análisis 0/${gruposFiltrados.length}...`;
     }
 
 
-    /* =====================================================
-       TRAER DOCUMENTOS ORIGINALES
-    ===================================================== */
+    /*
+      =====================================================
+      CARGA CONTROLADA
+
+      No usamos Promise.all de 1.000+ grupos al mismo tiempo.
+      Procesamos por bloques para no saturar Firestore.
+      =====================================================
+    */
 
     const registros =
-      await Promise.all(
-        gruposVisibles.map(
-          async (row) => {
-            const idGrupo =
-              String(
-                row.idGrupo ||
-                row.id ||
-                ""
-              ).trim();
+      [];
 
-            if (!idGrupo) {
-              return construirRegistroLead(
-                row,
-                {}
-              );
-            }
+    const TAMANO_BLOQUE =
+      20;
 
-            try {
-              const snap =
-                await getDoc(
-                  doc(
-                    db,
-                    "ventas_cotizaciones",
-                    idGrupo
-                  )
+    for (
+      let inicio = 0;
+      inicio <
+        gruposFiltrados.length;
+      inicio +=
+        TAMANO_BLOQUE
+    ) {
+      const bloque =
+        gruposFiltrados.slice(
+          inicio,
+          inicio +
+            TAMANO_BLOQUE
+        );
+
+      const resultados =
+        await Promise.all(
+          bloque.map(
+            async (
+              row
+            ) => {
+              const idGrupo =
+                String(
+                  row.idGrupo ||
+                  row.id ||
+                  ""
+                ).trim();
+
+              if (!idGrupo) {
+                return construirRegistroLead(
+                  row,
+                  {},
+                  null,
+                  null
                 );
-
-              const data =
-                snap.exists()
-                  ? snap.data() || {}
-                  : {};
-
-
-              /*
-                Para registros nuevos,
-                fechaAsignacion vive en el grupo.
-
-                Para antiguos,
-                reconstruimos desde historial.
-              */
-              let asignacionHistorica =
-                null;
-
-              if (!data.fechaAsignacion) {
-                asignacionHistorica =
-                  await obtenerPrimeraAsignacionHistorica(
-                    idGrupo
-                  );
               }
 
+              try {
+                const snap =
+                  await getDoc(
+                    doc(
+                      db,
+                      "ventas_cotizaciones",
+                      idGrupo
+                    )
+                  );
 
-              return construirRegistroLead(
-                row,
-                data,
-                asignacionHistorica
-              );
+                const data =
+                  snap.exists()
+                    ? snap.data() ||
+                      {}
+                    : {};
 
-            } catch (error) {
-              console.warn(
-                `[seguimiento] no se pudo cargar cotización ${idGrupo}`,
+
+                let asignacionHistorica =
+                  null;
+
+                if (
+                  !data.fechaAsignacion
+                ) {
+                  asignacionHistorica =
+                    await obtenerPrimeraAsignacionHistorica(
+                      idGrupo
+                    );
+                }
+
+
+                /*
+                  Reconstruimos reuniones + historial.
+                */
+                const analiticaHistorica =
+                  await obtenerAnaliticaComercialHistorica(
+                    idGrupo
+                  );
+
+
+                return construirRegistroLead(
+                  row,
+                  data,
+                  asignacionHistorica,
+                  analiticaHistorica
+                );
+
+              } catch (
                 error
-              );
+              ) {
+                console.warn(
+                  `[seguimiento] no se pudo cargar cotización ${idGrupo}`,
+                  error
+                );
 
-              /*
-                No abortamos todo el informe
-                por un solo documento.
-              */
-              return construirRegistroLead(
-                row,
-                {}
-              );
+                return construirRegistroLead(
+                  row,
+                  {},
+                  null,
+                  null
+                );
+              }
             }
-          }
-        )
+          )
+        );
+
+      registros.push(
+        ...resultados
       );
 
 
-    /* =====================================================
-       ORDEN CRONOLÓGICO
-    ===================================================== */
+      if (boton) {
+        const procesados =
+          Math.min(
+            inicio +
+              bloque.length,
+            gruposFiltrados.length
+          );
+
+        boton.textContent =
+          `Generando análisis ${procesados}/${gruposFiltrados.length}...`;
+      }
+    }
+
 
     registros.sort(
       (a, b) => {
@@ -2940,13 +3006,16 @@ async function exportAnalisisLeadsToXlsx() {
             ? b._fechaCreacion.getTime()
             : Number.MAX_SAFE_INTEGER;
 
-        return fechaA - fechaB;
+        return (
+          fechaA -
+          fechaB
+        );
       }
     );
 
 
     /* =====================================================
-       HOJAS
+       CONSTRUCCIÓN DE HOJAS
     ===================================================== */
 
     const detalle =
@@ -2979,9 +3048,6 @@ async function exportAnalisisLeadsToXlsx() {
         registros
       );
 
-    /*
-      Nuevos análisis comerciales.
-    */
     const resumenDestino =
       construirResumenDestinoLeads(
         registros
@@ -3002,10 +3068,6 @@ async function exportAnalisisLeadsToXlsx() {
         registros
       );
 
-
-    /* =====================================================
-       CREAR LIBRO
-    ===================================================== */
 
     const wb =
       XLSX.utils.book_new();
@@ -3061,214 +3123,6 @@ async function exportAnalisisLeadsToXlsx() {
         resumenGanadas
       );
 
-
-    /* =====================================================
-       ANCHOS LEADS
-    ===================================================== */
-
-    wsDetalle["!cols"] = [
-      { wch: 12 }, // FECHA INGRESO
-      { wch: 10 }, // HORA
-      { wch: 12 }, // MES INGRESO
-      { wch: 12 }, // AÑO INGRESO
-
-      { wch: 12 }, // ID
-      { wch: 14 }, // NEGOCIO
-      { wch: 18 }, // CÓDIGO
-      { wch: 42 }, // GRUPO
-      { wch: 35 }, // COLEGIO
-      { wch: 22 }, // COMUNA
-      { wch: 14 }, // CURSO
-      { wch: 14 }, // CURSO VIAJE
-      { wch: 12 }, // AÑO VIAJE
-      { wch: 24 }, // PAX
-
-      { wch: 28 },
-      { wch: 22 },
-      { wch: 32 },
-      { wch: 18 },
-
-      { wch: 28 },
-      { wch: 22 },
-      { wch: 32 },
-      { wch: 18 },
-
-      { wch: 22 },
-      { wch: 22 },
-      { wch: 24 },
-      { wch: 28 },
-      { wch: 32 },
-
-      { wch: 28 },
-      { wch: 32 },
-
-      { wch: 22 },
-      { wch: 32 },
-      { wch: 22 },
-      { wch: 32 },
-
-      { wch: 20 },
-      { wch: 20 },
-      { wch: 22 },
-      { wch: 30 },
-
-      { wch: 22 },
-      { wch: 26 },
-      { wch: 18 },
-      { wch: 24 },
-      { wch: 24 },
-      { wch: 24 },
-      { wch: 16 },
-
-      { wch: 18 },
-      { wch: 35 },
-
-      { wch: 30 }, // DESTINO
-      { wch: 30 }, // PROGRAMA
-      { wch: 18 }, // MES
-      { wch: 28 }, // FECHA/TEMPORADA
-      { wch: 18 }, // TRAMO
-      { wch: 42 }, // HOTELERÍA
-      { wch: 18 }, // VALOR
-      { wch: 14 }, // LIBERADOS
-      { wch: 22 }, // ASISTENCIA
-      { wch: 22 }, // SOL RESERVA
-      { wch: 22 }, // AUT GERENCIA
-      { wch: 22 }  // DESCUENTO
-    ];
-
-
-    /* =====================================================
-       ANCHOS RESÚMENES EXISTENTES
-    ===================================================== */
-
-    wsMensual["!cols"] = [
-      { wch: 12 },
-      { wch: 10 },
-      { wch: 15 },
-      { wch: 22 },
-      { wch: 22 },
-      { wch: 24 },
-      { wch: 28 },
-      { wch: 18 },
-      { wch: 18 },
-      { wch: 18 },
-      { wch: 22 },
-      { wch: 12 },
-      { wch: 12 },
-      { wch: 14 },
-      { wch: 14 },
-      { wch: 16 }
-    ];
-
-    wsVendedores["!cols"] = [
-      { wch: 12 },
-      { wch: 26 },
-      { wch: 10 },
-      { wch: 15 },
-      { wch: 14 },
-      { wch: 12 },
-      { wch: 12 },
-      { wch: 14 },
-      { wch: 16 }
-    ];
-
-    wsOrigen["!cols"] = [
-      { wch: 18 },
-      { wch: 18 },
-      { wch: 20 },
-      { wch: 10 },
-      { wch: 15 },
-      { wch: 14 },
-      { wch: 12 },
-      { wch: 12 },
-      { wch: 16 }
-    ];
-
-    wsRolContacto["!cols"] = [
-      { wch: 28 },
-      { wch: 12 },
-      { wch: 18 },
-      { wch: 14 },
-      { wch: 14 },
-      { wch: 14 },
-      { wch: 16 },
-      { wch: 16 },
-      { wch: 18 }
-    ];
-
-    wsCalidad["!cols"] = [
-      { wch: 18 },
-      { wch: 10 },
-      { wch: 15 },
-      { wch: 14 },
-      { wch: 12 },
-      { wch: 12 },
-      { wch: 16 }
-    ];
-
-
-    /* =====================================================
-       ANCHOS NUEVAS HOJAS
-    ===================================================== */
-
-    wsDestino["!cols"] = [
-      { wch: 32 },
-      { wch: 12 },
-      { wch: 18 },
-      { wch: 14 },
-      { wch: 14 },
-      { wch: 16 },
-      { wch: 14 },
-      { wch: 16 },
-      { wch: 18 }
-    ];
-
-    wsTemporada["!cols"] = [
-      { wch: 14 },
-      { wch: 30 },
-      { wch: 12 },
-      { wch: 18 },
-      { wch: 14 },
-      { wch: 16 },
-      { wch: 14 },
-      { wch: 16 },
-      { wch: 18 }
-    ];
-
-    wsHoteleria["!cols"] = [
-      { wch: 14 },
-      { wch: 32 },
-      { wch: 45 },
-      { wch: 18 },
-      { wch: 20 },
-      { wch: 14 }
-    ];
-
-    wsGanadas["!cols"] = [
-      { wch: 14 },
-      { wch: 14 },
-      { wch: 42 },
-      { wch: 35 },
-      { wch: 28 },
-      { wch: 30 },
-      { wch: 32 },
-      { wch: 32 },
-      { wch: 18 },
-      { wch: 18 },
-      { wch: 14 },
-      { wch: 45 },
-      { wch: 18 },
-      { wch: 22 },
-      { wch: 22 },
-      { wch: 22 },
-      { wch: 22 }
-    ];
-
-
-    /* =====================================================
-       AGREGAR HOJAS
-    ===================================================== */
 
     XLSX.utils.book_append_sheet(
       wb,
@@ -3331,10 +3185,6 @@ async function exportAnalisisLeadsToXlsx() {
     );
 
 
-    /* =====================================================
-       DESCARGAR
-    ===================================================== */
-
     XLSX.writeFile(
       wb,
       `analisis_leads_${fileStamp()}.xlsx`
@@ -3352,13 +3202,427 @@ async function exportAnalisisLeadsToXlsx() {
 
   } finally {
     if (boton) {
-      boton.disabled = false;
+      boton.disabled =
+        false;
 
       boton.textContent =
         boton.dataset.textoOriginal ||
         "📊 Análisis de Leads XLSX";
     }
   }
+}
+
+async function obtenerAnaliticaComercialHistorica(
+  idGrupo
+) {
+  const groupId =
+    String(
+      idGrupo || ""
+    ).trim();
+
+  const resultado = {
+    cantidadReuniones: 0,
+    pasoPorReunion: false,
+
+    fechaPrimeraReunion: null,
+    fechaUltimaReunion: null,
+
+    fechaUltimoCambioEstado: null,
+    estadoAnterior: "",
+    estadoNuevo: "",
+
+    ultimaGestionAt: null,
+    ultimaGestionTipo: "",
+
+    reuniones: [],
+    historial: []
+  };
+
+  if (!groupId) {
+    return resultado;
+  }
+
+  try {
+    /*
+      =====================================================
+      REUNIONES REALES DEL GRUPO
+      =====================================================
+    */
+
+    const reunionesSnap =
+      await getDocs(
+        query(
+          collection(
+            db,
+            REUNIONES_COLLECTION
+          ),
+          where(
+            "idGrupo",
+            "==",
+            groupId
+          )
+        )
+      );
+
+    const reuniones =
+      reunionesSnap.docs
+        .map(
+          (snap) => ({
+            id:
+              snap.id,
+
+            ...(
+              snap.data() ||
+              {}
+            )
+          })
+        )
+        .filter(
+          (reunion) => {
+            /*
+              Excluimos únicamente reuniones
+              claramente canceladas/anuladas.
+
+              Agendada, realizada, confirmada, etc.
+              forman parte del recorrido comercial.
+            */
+            const estado =
+              normalizeText(
+                reunion.estadoReunion ||
+                reunion.estado ||
+                ""
+              );
+
+            return ![
+              "cancelada",
+              "cancelado",
+              "anulada",
+              "anulado",
+              "eliminada",
+              "eliminado"
+            ].includes(
+              estado
+            );
+          }
+        )
+        .sort(
+          (a, b) =>
+            (
+              toDate(
+                a.fechaInicio ||
+                a.fecha ||
+                a.creadoAt
+              )?.getTime() ||
+              0
+            ) -
+            (
+              toDate(
+                b.fechaInicio ||
+                b.fecha ||
+                b.creadoAt
+              )?.getTime() ||
+              0
+            )
+        );
+
+    resultado.reuniones =
+      reuniones;
+
+    resultado.cantidadReuniones =
+      reuniones.length;
+
+    resultado.pasoPorReunion =
+      reuniones.length > 0;
+
+    if (
+      reuniones.length
+    ) {
+      resultado.fechaPrimeraReunion =
+        toDate(
+          reuniones[0].fechaInicio ||
+          reuniones[0].fecha ||
+          reuniones[0].creadoAt ||
+          null
+        );
+
+      const ultima =
+        reuniones[
+          reuniones.length - 1
+        ];
+
+      resultado.fechaUltimaReunion =
+        toDate(
+          ultima.fechaInicio ||
+          ultima.fecha ||
+          ultima.creadoAt ||
+          null
+        );
+    }
+
+
+    /*
+      =====================================================
+      HISTORIAL COMERCIAL DEL GRUPO
+      =====================================================
+    */
+
+    const historialSnap =
+      await getDocs(
+        query(
+          collection(
+            db,
+            HISTORIAL_COLLECTION
+          ),
+          where(
+            "idGrupo",
+            "==",
+            groupId
+          )
+        )
+      );
+
+    const historial =
+      historialSnap.docs
+        .map(
+          (snap) => ({
+            id:
+              snap.id,
+
+            ...(
+              snap.data() ||
+              {}
+            )
+          })
+        )
+        .sort(
+          (a, b) =>
+            (
+              toDate(
+                b.fecha ||
+                b.fechaCreacion ||
+                b.creadoAt ||
+                b.actualizadoAt
+              )?.getTime() ||
+              0
+            ) -
+            (
+              toDate(
+                a.fecha ||
+                a.fechaCreacion ||
+                a.creadoAt ||
+                a.actualizadoAt
+              )?.getTime() ||
+              0
+            )
+        );
+
+    resultado.historial =
+      historial;
+
+
+    /*
+      =====================================================
+      ÚLTIMA GESTIÓN REAL
+      =====================================================
+    */
+
+    if (
+      historial.length
+    ) {
+      const ultimaGestion =
+        historial[0];
+
+      resultado.ultimaGestionAt =
+        toDate(
+          ultimaGestion.fecha ||
+          ultimaGestion.fechaCreacion ||
+          ultimaGestion.creadoAt ||
+          ultimaGestion.actualizadoAt ||
+          null
+        );
+
+      resultado.ultimaGestionTipo =
+        cleanText(
+          ultimaGestion.tipoMovimiento ||
+          ultimaGestion.tipo ||
+          ultimaGestion.modulo ||
+          ""
+        );
+    }
+
+
+    /*
+      =====================================================
+      ÚLTIMO CAMBIO DE ESTADO
+      =====================================================
+    */
+
+    const cambioEstado =
+      historial.find(
+        (item) => {
+          const cambios =
+            Array.isArray(
+              item.cambios
+            )
+              ? item.cambios
+              : [];
+
+          const tieneCambioCampo =
+            cambios.some(
+              (cambio) =>
+                String(
+                  cambio?.campo ||
+                  ""
+                ).trim() ===
+                "estado"
+            );
+
+          const tipo =
+            normalizeText(
+              item.tipoMovimiento ||
+              item.tipo ||
+              ""
+            );
+
+          return (
+            tieneCambioCampo ||
+            tipo ===
+              "cambio_estado" ||
+            tipo.includes(
+              "cambio estado"
+            )
+          );
+        }
+      );
+
+    if (
+      cambioEstado
+    ) {
+      resultado.fechaUltimoCambioEstado =
+        toDate(
+          cambioEstado.fecha ||
+          cambioEstado.fechaCreacion ||
+          cambioEstado.creadoAt ||
+          cambioEstado.actualizadoAt ||
+          null
+        );
+
+      const cambio =
+        Array.isArray(
+          cambioEstado.cambios
+        )
+          ? cambioEstado.cambios.find(
+              (item) =>
+                String(
+                  item?.campo ||
+                  ""
+                ).trim() ===
+                "estado"
+            )
+          : null;
+
+      resultado.estadoAnterior =
+        cleanText(
+          cambio?.anterior ||
+          cambioEstado.estadoAnterior ||
+          ""
+        );
+
+      resultado.estadoNuevo =
+        cleanText(
+          cambio?.nuevo ||
+          cambioEstado.estadoNuevo ||
+          ""
+        );
+    }
+
+
+    /*
+      =====================================================
+      RESPALDO HISTÓRICO DE REUNIÓN
+      =====================================================
+
+      Si por algún motivo no existe documento en
+      ventas_reuniones, pero el historial demuestra que
+      pasó por reunión, igualmente marcamos SI.
+    */
+
+    if (
+      !resultado.pasoPorReunion
+    ) {
+      const eventosReunion =
+        historial.filter(
+          (item) => {
+            const texto =
+              normalizeText(
+                [
+                  item.tipoMovimiento,
+                  item.tipo,
+                  item.modulo,
+                  item.titulo,
+                  item.mensaje
+                ]
+                  .filter(Boolean)
+                  .join(" ")
+              );
+
+            const cambios =
+              Array.isArray(
+                item.cambios
+              )
+                ? item.cambios
+                : [];
+
+            const llegoAReunion =
+              cambios.some(
+                (cambio) =>
+                  String(
+                    cambio?.campo ||
+                    ""
+                  ).trim() ===
+                    "estado" &&
+                  normalizeEstado(
+                    cambio?.nuevo ||
+                    ""
+                  ) ===
+                    "reunion_confirmada"
+              );
+
+            return (
+              texto.includes(
+                "reunion"
+              ) ||
+              llegoAReunion
+            );
+          }
+        );
+
+      if (
+        eventosReunion.length
+      ) {
+        resultado.pasoPorReunion =
+          true;
+
+        /*
+          IMPORTANTE:
+          la cantidad real sigue siendo la de
+          ventas_reuniones.
+
+          No inventamos cantidad usando historial,
+          porque un mismo encuentro puede generar
+          varios movimientos históricos.
+        */
+      }
+    }
+
+  } catch (error) {
+    console.warn(
+      `[seguimiento] no se pudo reconstruir analítica histórica ${groupId}`,
+      error
+    );
+  }
+
+  return resultado;
 }
 
 /* =========================================================
@@ -3368,7 +3632,8 @@ async function exportAnalisisLeadsToXlsx() {
 function construirRegistroLead(
   row,
   data = {},
-  asignacionHistorica = null
+  asignacionHistorica = null,
+  analiticaHistorica = null
 ) {
   const fechaCreacion =
     toDate(
@@ -3455,7 +3720,12 @@ function construirRegistroLead(
         );
 
 
+  /* =====================================================
+     SEGUIMIENTO COMERCIAL REAL
+  ===================================================== */
+
   const fechaUltimoCambioEstado =
+    analiticaHistorica?.fechaUltimoCambioEstado ||
     toDate(
       data.fechaUltimoCambioEstado ||
       data?.situacion?.fechaUltimoCambioEstado ||
@@ -3464,6 +3734,7 @@ function construirRegistroLead(
 
 
   const ultimaGestionAt =
+    analiticaHistorica?.ultimaGestionAt ||
     toDate(
       data.ultimaGestionAt ||
       row.ultimaGestionAt ||
@@ -3472,6 +3743,7 @@ function construirRegistroLead(
 
 
   const fechaUltimaReunion =
+    analiticaHistorica?.fechaUltimaReunion ||
     toDate(
       data.fechaUltimaReunion ||
       data.ultimaReunion ||
@@ -3479,6 +3751,18 @@ function construirRegistroLead(
       row.fechaUltimaReunion ||
       null
     );
+
+
+  const fechaPrimeraReunion =
+    analiticaHistorica?.fechaPrimeraReunion ||
+    null;
+
+
+  const cantidadReuniones =
+    Number(
+      analiticaHistorica?.cantidadReuniones ||
+      0
+    ) || 0;
 
 
   const estado =
@@ -3491,18 +3775,30 @@ function construirRegistroLead(
 
   const ultimaGestionTipo =
     cleanText(
+      analiticaHistorica?.ultimaGestionTipo ||
       data.ultimaGestionTipo ||
       ""
     );
 
 
   const pasoPorReunion =
+    analiticaHistorica?.pasoPorReunion === true ||
+    cantidadReuniones > 0 ||
     !!fechaUltimaReunion ||
-    estado === "reunion_confirmada" ||
+    estado ===
+      "reunion_confirmada" ||
     normalizeText(
       ultimaGestionTipo
-    ).includes("reunion");
+    ).includes(
+      "reunion"
+    );
 
+
+  const estadoAnterior =
+    cleanText(
+      analiticaHistorica?.estadoAnterior ||
+      ""
+    );
 
   const ficha =
     data.ficha || {};
@@ -3892,10 +4188,26 @@ function construirRegistroLead(
     ===================================================== */
 
     estado,
-
+    
     pasoPorReunion,
-
+    
+    cantidadReuniones,
+    
+    estadoAnterior,
+    
     ultimaGestionTipo,
+    
+    _fechaPrimeraReunion:
+      fechaPrimeraReunion,
+    
+    _fechaUltimaReunion:
+      fechaUltimaReunion,
+    
+    _fechaUltimoCambioEstado:
+      fechaUltimoCambioEstado,
+    
+    _ultimaGestionAt:
+      ultimaGestionAt,
 
     calidadLead,
 
@@ -4141,11 +4453,31 @@ function registroLeadParaExcel(
       registro.pasoPorReunion
         ? "SI"
         : "NO",
-
+    
+    "CANTIDAD DE REUNIONES":
+      Number(
+        registro.cantidadReuniones ||
+        0
+      ),
+    
+    "FECHA PRIMERA REUNIÓN":
+      formatDateTimeText(
+        registro._fechaPrimeraReunion
+      ),
+    
     "FECHA ÚLTIMA REUNIÓN":
       formatDateTimeText(
         registro._fechaUltimaReunion
       ),
+    
+    "ESTADO ANTERIOR":
+      STAGE_META[
+        normalizeEstado(
+          registro.estadoAnterior
+        )
+      ]?.label ||
+      registro.estadoAnterior ||
+      "",
 
     "ÚLTIMA GESTIÓN":
       formatDateTimeText(
@@ -4223,15 +4555,23 @@ function construirResumenMensualLeads(
   const mapa =
     new Map();
 
-  for (const registro of registros) {
+  for (
+    const registro of registros
+  ) {
     const mes =
       getMonthKey(
         registro._fechaCreacion
       );
 
-    if (!mes) continue;
+    if (!mes) {
+      continue;
+    }
 
-    if (!mapa.has(mes)) {
+    if (
+      !mapa.has(
+        mes
+      )
+    ) {
       mapa.set(
         mes,
         crearAcumuladorLeads()
@@ -4239,39 +4579,45 @@ function construirResumenMensualLeads(
     }
 
     acumularLead(
-      mapa.get(mes),
+      mapa.get(
+        mes
+      ),
       registro
     );
   }
 
-  return [...mapa.entries()]
+  return [
+    ...mapa.entries()
+  ]
     .sort(
       ([a], [b]) =>
-        a.localeCompare(b)
+        a.localeCompare(
+          b
+        )
     )
     .map(
       ([mes, total]) => ({
         "MES INGRESO":
           mes,
-      
+
         "LEADS":
           total.leads,
-      
+
         "PAX POTENCIALES":
           total.pax,
-      
+
         "INGRESARON SIN ASIGNAR":
           total.sinAsignarIngreso,
-      
+
         "% INGRESO SIN ASIGNAR":
           porcentaje(
             total.sinAsignarIngreso,
             total.leads
           ),
-      
+
         "ASIGNACIÓN NO REGISTRADA":
           total.asignacionNoRegistrada,
-      
+
         "PROMEDIO HORAS HASTA ASIGNACIÓN":
           total.asignacionConTiempo
             ? Number(
@@ -4281,34 +4627,29 @@ function construirResumenMensualLeads(
                 ).toFixed(2)
               )
             : "",
-      
+
         "ASIGNADOS ≤ 4 H":
           total.asignadosHasta4Horas,
-      
+
         "ASIGNADOS ≤ 24 H":
           total.asignadosHasta24Horas,
-      
+
         "ASIGNADOS > 24 H":
           total.asignadosMas24Horas,
-      
-        "PASARON POR REUNIÓN":
-          total.reuniones,
-      
+
+        ...getMetricasReunionResumen(
+          total
+        ),
+
         "GANADOS":
           total.ganados,
-      
+
         "PERDIDOS":
           total.perdidos,
-      
+
         "EN PROCESO":
           total.enProceso,
-      
-        "% REUNIÓN":
-          porcentaje(
-            total.reuniones,
-            total.leads
-          ),
-      
+
         "% CONVERSIÓN":
           porcentaje(
             total.ganados,
@@ -4329,7 +4670,9 @@ function construirResumenVendedoresLeads(
   const mapa =
     new Map();
 
-  for (const registro of registros) {
+  for (
+    const registro of registros
+  ) {
     const mes =
       getMonthKey(
         registro._fechaCreacion
@@ -4343,7 +4686,11 @@ function construirResumenVendedoresLeads(
     const key =
       `${mes}__${vendedor}`;
 
-    if (!mapa.has(key)) {
+    if (
+      !mapa.has(
+        key
+      )
+    ) {
       mapa.set(
         key,
         {
@@ -4355,12 +4702,16 @@ function construirResumenVendedoresLeads(
     }
 
     acumularLead(
-      mapa.get(key),
+      mapa.get(
+        key
+      ),
       registro
     );
   }
 
-  return [...mapa.values()]
+  return [
+    ...mapa.values()
+  ]
     .sort(
       (a, b) =>
         compareText(
@@ -4382,8 +4733,9 @@ function construirResumenVendedoresLeads(
         "PAX POTENCIALES":
           total.pax,
 
-        "REUNIÓN":
-          total.reuniones,
+        ...getMetricasReunionResumen(
+          total
+        ),
 
         "GANADOS":
           total.ganados,
@@ -4413,18 +4765,20 @@ function construirResumenRolContactos(
   const mapa =
     new Map();
 
-  for (const registro of registros) {
-    /*
-      El análisis se realiza sobre el
-      CONTACTO PRINCIPAL que originó el lead.
-    */
+  for (
+    const registro of registros
+  ) {
     const rol =
       cleanText(
         registro.rolCliente
       ) ||
       "Sin definir";
 
-    if (!mapa.has(rol)) {
+    if (
+      !mapa.has(
+        rol
+      )
+    ) {
       mapa.set(
         rol,
         {
@@ -4435,12 +4789,16 @@ function construirResumenRolContactos(
     }
 
     acumularLead(
-      mapa.get(rol),
+      mapa.get(
+        rol
+      ),
       registro
     );
   }
 
-  return [...mapa.values()]
+  return [
+    ...mapa.values()
+  ]
     .sort(
       (a, b) =>
         compareText(
@@ -4459,8 +4817,9 @@ function construirResumenRolContactos(
         "PAX POTENCIALES":
           total.pax,
 
-        "REUNIÓN":
-          total.reuniones,
+        ...getMetricasReunionResumen(
+          total
+        ),
 
         "GANADOS":
           total.ganados,
@@ -4470,12 +4829,6 @@ function construirResumenRolContactos(
 
         "EN PROCESO":
           total.enProceso,
-
-        "% REUNIÓN":
-          porcentaje(
-            total.reuniones,
-            total.leads
-          ),
 
         "% CONVERSIÓN":
           porcentaje(
@@ -4496,7 +4849,9 @@ function construirResumenOrigenLeads(
   const mapa =
     new Map();
 
-  for (const registro of registros) {
+  for (
+    const registro of registros
+  ) {
     const origen =
       registro.origenColegio ||
       registro.origenCliente ||
@@ -4513,7 +4868,11 @@ function construirResumenOrigenLeads(
     const key =
       `${origen}__${medio}__${detalle}`;
 
-    if (!mapa.has(key)) {
+    if (
+      !mapa.has(
+        key
+      )
+    ) {
       mapa.set(
         key,
         {
@@ -4526,12 +4885,16 @@ function construirResumenOrigenLeads(
     }
 
     acumularLead(
-      mapa.get(key),
+      mapa.get(
+        key
+      ),
       registro
     );
   }
 
-  return [...mapa.values()]
+  return [
+    ...mapa.values()
+  ]
     .sort(
       (a, b) =>
         compareText(
@@ -4556,14 +4919,18 @@ function construirResumenOrigenLeads(
         "PAX POTENCIALES":
           total.pax,
 
-        "REUNIÓN":
-          total.reuniones,
+        ...getMetricasReunionResumen(
+          total
+        ),
 
         "GANADOS":
           total.ganados,
 
         "PERDIDOS":
           total.perdidos,
+
+        "EN PROCESO":
+          total.enProceso,
 
         "% CONVERSIÓN":
           porcentaje(
@@ -4585,12 +4952,18 @@ function construirResumenCalidadLeads(
   const mapa =
     new Map();
 
-  for (const registro of registros) {
+  for (
+    const registro of registros
+  ) {
     const calidad =
       registro.calidadLead ||
       "SIN EVALUAR";
 
-    if (!mapa.has(calidad)) {
+    if (
+      !mapa.has(
+        calidad
+      )
+    ) {
       mapa.set(
         calidad,
         crearAcumuladorLeads()
@@ -4598,39 +4971,46 @@ function construirResumenCalidadLeads(
     }
 
     acumularLead(
-      mapa.get(calidad),
+      mapa.get(
+        calidad
+      ),
       registro
     );
   }
 
-  return [...mapa.entries()]
-    .map(
-      ([calidad, total]) => ({
-        "CALIDAD":
-          calidad,
+  return [
+    ...mapa.entries()
+  ].map(
+    ([calidad, total]) => ({
+      "CALIDAD":
+        calidad,
 
-        "LEADS":
-          total.leads,
+      "LEADS":
+        total.leads,
 
-        "PAX POTENCIALES":
-          total.pax,
+      "PAX POTENCIALES":
+        total.pax,
 
-        "REUNIÓN":
-          total.reuniones,
+      ...getMetricasReunionResumen(
+        total
+      ),
 
-        "GANADOS":
+      "GANADOS":
+        total.ganados,
+
+      "PERDIDOS":
+        total.perdidos,
+
+      "EN PROCESO":
+        total.enProceso,
+
+      "% CONVERSIÓN":
+        porcentaje(
           total.ganados,
-
-        "PERDIDOS":
-          total.perdidos,
-
-        "% CONVERSIÓN":
-          porcentaje(
-            total.ganados,
-            total.leads
-          )
-      })
-    );
+          total.leads
+        )
+    })
+  );
 }
 
 /* =========================================================
@@ -4643,62 +5023,55 @@ function construirResumenDestinoLeads(
   const mapa =
     new Map();
 
-  for (const registro of registros) {
+  for (
+    const registro of registros
+  ) {
     const destino =
       cleanText(
         registro.destino
       ) ||
       "Sin definir";
 
-    if (!mapa.has(destino)) {
+    if (
+      !mapa.has(
+        destino
+      )
+    ) {
       mapa.set(
         destino,
         {
           destino,
-          leads: 0,
-          pax: 0,
-          reuniones: 0,
-          ganados: 0,
           paxGanados: 0,
-          perdidos: 0,
-          enProceso: 0
+          ...crearAcumuladorLeads()
         }
       );
     }
 
     const total =
-      mapa.get(destino);
-
-    total.leads++;
-
-    total.pax +=
-      Number(
-        registro.cantidadGrupo || 0
+      mapa.get(
+        destino
       );
 
-    if (registro.pasoPorReunion) {
-      total.reuniones++;
-    }
+    acumularLead(
+      total,
+      registro
+    );
 
-    if (registro.estado === "ganada") {
-      total.ganados++;
-
+    if (
+      registro.estado ===
+      "ganada"
+    ) {
       total.paxGanados +=
         Number(
-          registro.cantidadGrupo || 0
+          registro.cantidadGrupo ||
+          0
         );
-
-    } else if (
-      registro.estado === "perdida"
-    ) {
-      total.perdidos++;
-
-    } else {
-      total.enProceso++;
     }
   }
 
-  return [...mapa.values()]
+  return [
+    ...mapa.values()
+  ]
     .sort(
       (a, b) =>
         compareText(
@@ -4717,8 +5090,9 @@ function construirResumenDestinoLeads(
         "PAX POTENCIALES":
           total.pax,
 
-        "REUNIÓN":
-          total.reuniones,
+        ...getMetricasReunionResumen(
+          total
+        ),
 
         "GANADOS":
           total.ganados,
@@ -4741,7 +5115,6 @@ function construirResumenDestinoLeads(
     );
 }
 
-
 /* =========================================================
    RESUMEN POR TEMPORADA
 ========================================================= */
@@ -4752,7 +5125,9 @@ function construirResumenTemporadaLeads(
   const mapa =
     new Map();
 
-  for (const registro of registros) {
+  for (
+    const registro of registros
+  ) {
     const ano =
       registro.anoViaje ||
       "Sin año";
@@ -4767,51 +5142,47 @@ function construirResumenTemporadaLeads(
     const key =
       `${ano}__${temporada}`;
 
-    if (!mapa.has(key)) {
+    if (
+      !mapa.has(
+        key
+      )
+    ) {
       mapa.set(
         key,
         {
           ano,
           temporada,
-          leads: 0,
-          pax: 0,
-          ganados: 0,
           paxGanados: 0,
-          perdidos: 0,
-          enProceso: 0
+          ...crearAcumuladorLeads()
         }
       );
     }
 
     const total =
-      mapa.get(key);
-
-    total.leads++;
-
-    total.pax +=
-      Number(
-        registro.cantidadGrupo || 0
+      mapa.get(
+        key
       );
 
-    if (registro.estado === "ganada") {
-      total.ganados++;
+    acumularLead(
+      total,
+      registro
+    );
 
+    if (
+      registro.estado ===
+      "ganada"
+    ) {
       total.paxGanados +=
         Number(
-          registro.cantidadGrupo || 0
+          registro.cantidadGrupo ||
+          0
         );
-
-    } else if (
-      registro.estado === "perdida"
-    ) {
-      total.perdidos++;
-
-    } else {
-      total.enProceso++;
     }
   }
 
-  return [...mapa.values()]
+  return [
+    ...mapa.values()
+  ]
     .sort(
       (a, b) => {
         const anoCompare =
@@ -4820,7 +5191,10 @@ function construirResumenTemporadaLeads(
             b.ano
           );
 
-        if (anoCompare !== 0) {
+        if (
+          anoCompare !==
+          0
+        ) {
           return anoCompare;
         }
 
@@ -4843,6 +5217,10 @@ function construirResumenTemporadaLeads(
 
         "PAX POTENCIALES":
           total.pax,
+
+        ...getMetricasReunionResumen(
+          total
+        ),
 
         "GANADOS":
           total.ganados,
@@ -4876,13 +5254,12 @@ function construirResumenHoteleriaLeads(
   const mapa =
     new Map();
 
-  for (const registro of registros) {
-    /*
-      Para hotelería interesa especialmente
-      lo que efectivamente fue ganado.
-    */
+  for (
+    const registro of registros
+  ) {
     if (
-      registro.estado !== "ganada"
+      registro.estado !==
+      "ganada"
     ) {
       continue;
     }
@@ -4906,37 +5283,63 @@ function construirResumenHoteleriaLeads(
     const key =
       `${ano}__${destino}__${hoteleria}`;
 
-    if (!mapa.has(key)) {
+    if (
+      !mapa.has(
+        key
+      )
+    ) {
       mapa.set(
         key,
         {
           ano,
           destino,
           hoteleria,
+
           grupos: 0,
           pax: 0,
-          liberados: 0
+          liberados: 0,
+
+          leadsConReunion: 0,
+          totalReuniones: 0
         }
       );
     }
 
     const total =
-      mapa.get(key);
+      mapa.get(
+        key
+      );
 
     total.grupos++;
 
     total.pax +=
       Number(
-        registro.cantidadGrupo || 0
+        registro.cantidadGrupo ||
+        0
       );
 
     total.liberados +=
       Number(
-        registro.liberadosCantidad || 0
+        registro.liberadosCantidad ||
+        0
+      );
+
+    if (
+      registro.pasoPorReunion
+    ) {
+      total.leadsConReunion++;
+    }
+
+    total.totalReuniones +=
+      Number(
+        registro.cantidadReuniones ||
+        0
       );
   }
 
-  return [...mapa.values()]
+  return [
+    ...mapa.values()
+  ]
     .sort(
       (a, b) =>
         compareText(
@@ -4958,6 +5361,22 @@ function construirResumenHoteleriaLeads(
         "GRUPOS GANADOS":
           total.grupos,
 
+        "GRUPOS CON REUNIÓN":
+          total.leadsConReunion,
+
+        "TOTAL REUNIONES":
+          total.totalReuniones,
+
+        "PROMEDIO REUNIONES":
+          total.grupos
+            ? Number(
+                (
+                  total.totalReuniones /
+                  total.grupos
+                ).toFixed(2)
+              )
+            : 0,
+
         "PAX CONTRATADOS":
           total.pax,
 
@@ -4966,7 +5385,6 @@ function construirResumenHoteleriaLeads(
       })
     );
 }
-
 
 /* =========================================================
    DETALLE GRUPOS GANADOS
@@ -4978,7 +5396,8 @@ function construirResumenGanadasLeads(
   return registros
     .filter(
       (registro) =>
-        registro.estado === "ganada"
+        registro.estado ===
+        "ganada"
     )
     .sort(
       (a, b) => {
@@ -4988,7 +5407,10 @@ function construirResumenGanadasLeads(
             b.anoViaje
           );
 
-        if (anoCompare !== 0) {
+        if (
+          anoCompare !==
+          0
+        ) {
           return anoCompare;
         }
 
@@ -4998,7 +5420,10 @@ function construirResumenGanadasLeads(
             b.destino
           );
 
-        if (destinoCompare !== 0) {
+        if (
+          destinoCompare !==
+          0
+        ) {
           return destinoCompare;
         }
 
@@ -5009,63 +5434,140 @@ function construirResumenGanadasLeads(
       }
     )
     .map(
-      (registro) => ({
-        "AÑO VIAJE":
-          registro.anoViaje,
+      (registro) => {
+        let diasIngresoPrimeraReunion =
+          "";
 
-        "N° NEGOCIO":
-          registro.numeroNegocio,
+        if (
+          registro._fechaCreacion &&
+          registro._fechaPrimeraReunion
+        ) {
+          diasIngresoPrimeraReunion =
+            Number(
+              (
+                (
+                  registro._fechaPrimeraReunion.getTime() -
+                  registro._fechaCreacion.getTime()
+                ) /
+                (
+                  1000 *
+                  60 *
+                  60 *
+                  24
+                )
+              ).toFixed(1)
+            );
+        }
 
-        "GRUPO":
-          registro.grupo,
+        let diasPrimeraReunionGanada =
+          "";
 
-        "COLEGIO":
-          registro.colegio,
+        if (
+          registro._fechaPrimeraReunion &&
+          registro._fechaUltimoCambioEstado
+        ) {
+          diasPrimeraReunionGanada =
+            Number(
+              (
+                (
+                  registro._fechaUltimoCambioEstado.getTime() -
+                  registro._fechaPrimeraReunion.getTime()
+                ) /
+                (
+                  1000 *
+                  60 *
+                  60 *
+                  24
+                )
+              ).toFixed(1)
+            );
+        }
 
-        "VENDEDOR(A)":
-          registro.vendedora,
+        return {
+          "AÑO VIAJE":
+            registro.anoViaje,
 
-        "TEMPORADA / FECHA":
-          registro.fechaViajeTexto ||
-          registro.mesViaje,
+          "N° NEGOCIO":
+            registro.numeroNegocio,
 
-        "DESTINO":
-          registro.destino,
+          "GRUPO":
+            registro.grupo,
 
-        "PROGRAMA":
-          registro.programa,
+          "COLEGIO":
+            registro.colegio,
 
-        "TRAMO":
-          registro.tramo,
+          "VENDEDOR(A)":
+            registro.vendedora,
 
-        "PAX CONTRATADOS":
-          registro.cantidadGrupo,
+          "PASÓ POR REUNIÓN":
+            registro.pasoPorReunion
+              ? "SI"
+              : "NO",
 
-        "LIBERADOS":
-          registro.liberadosCantidad ||
-          registro.liberados ||
-          "",
+          "CANTIDAD REUNIONES":
+            Number(
+              registro.cantidadReuniones ||
+              0
+            ),
 
-        "CATEGORÍA HOTELERA CONTRATADA":
-          registro.categoriaHoteleraContratada,
+          "PRIMERA REUNIÓN":
+            formatDateTimeText(
+              registro._fechaPrimeraReunion
+            ),
 
-        "VALOR PROGRAMA":
-          registro.valorProgramaNumero ||
-          registro.valorPrograma ||
-          "",
+          "ÚLTIMA REUNIÓN":
+            formatDateTimeText(
+              registro._fechaUltimaReunion
+            ),
 
-        "ASISTENCIA EN VIAJES":
-          registro.asistenciaEnViajes,
+          "DÍAS INGRESO → PRIMERA REUNIÓN":
+            diasIngresoPrimeraReunion,
 
-        "SOLICITUD RESERVA":
-          registro.solicitudReserva,
+          "DÍAS PRIMERA REUNIÓN → GANADA":
+            diasPrimeraReunionGanada,
 
-        "AUTORIZACIÓN GERENCIA":
-          registro.autorizacionGerencia,
+          "TEMPORADA / FECHA":
+            registro.fechaViajeTexto ||
+            registro.mesViaje,
 
-        "DESCUENTO VALOR BASE":
-          registro.descuentoValorBase
-      })
+          "DESTINO":
+            registro.destino,
+
+          "PROGRAMA":
+            registro.programa,
+
+          "TRAMO":
+            registro.tramo,
+
+          "PAX CONTRATADOS":
+            registro.cantidadGrupo,
+
+          "LIBERADOS":
+            registro.liberadosCantidad ||
+            registro.liberados ||
+            "",
+
+          "CATEGORÍA HOTELERA CONTRATADA":
+            registro.categoriaHoteleraContratada,
+
+          "VALOR PROGRAMA":
+            registro.valorProgramaNumero ||
+            registro.valorPrograma ||
+            "",
+
+          "ASISTENCIA EN VIAJES":
+            registro.asistenciaEnViajes,
+
+          "SOLICITUD RESERVA":
+            registro.solicitudReserva,
+
+          "AUTORIZACIÓN GERENCIA":
+            registro.autorizacionGerencia,
+
+          "DESCUENTO VALOR BASE":
+            registro.descuentoValorBase
+        };
+      }
     );
 }
 
@@ -5078,26 +5580,25 @@ function crearAcumuladorLeads() {
   return {
     leads: 0,
     pax: 0,
-    reuniones: 0,
+
+    /*
+      Funnel reunión:
+      - leadsConReunion = cantidad de leads que llegaron a reunión.
+      - totalReuniones = cantidad real de reuniones registradas.
+    */
+    leadsConReunion: 0,
+    totalReuniones: 0,
+
     ganados: 0,
     perdidos: 0,
     enProceso: 0,
 
-    /*
-      Métricas asignación
-    */
     sinAsignarIngreso: 0,
-
     asignacionConTiempo: 0,
-
     totalHorasAsignacion: 0,
-
     asignadosHasta4Horas: 0,
-
     asignadosHasta24Horas: 0,
-
     asignadosMas24Horas: 0,
-
     asignacionNoRegistrada: 0
   };
 }
@@ -5111,7 +5612,8 @@ function acumularLead(
 
   total.pax +=
     Number(
-      registro.cantidadGrupo || 0
+      registro.cantidadGrupo ||
+      0
     );
 
 
@@ -5120,21 +5622,22 @@ function acumularLead(
   ===================================================== */
 
   if (
-    registro.ingresoSinAsignar === true
+    registro.ingresoSinAsignar ===
+    true
   ) {
     total.sinAsignarIngreso++;
   }
 
-
   if (
-    registro.ingresoSinAsignar === null
+    registro.ingresoSinAsignar ===
+    null
   ) {
     total.asignacionNoRegistrada++;
   }
 
-
   if (
-    registro.horasHastaAsignacion !== null &&
+    registro.horasHastaAsignacion !==
+      null &&
     Number.isFinite(
       registro.horasHastaAsignacion
     )
@@ -5149,13 +5652,17 @@ function acumularLead(
     total.totalHorasAsignacion +=
       horas;
 
-
-    if (horas <= 4) {
+    if (
+      horas <=
+      4
+    ) {
       total.asignadosHasta4Horas++;
     }
 
-
-    if (horas <= 24) {
+    if (
+      horas <=
+      24
+    ) {
       total.asignadosHasta24Horas++;
     } else {
       total.asignadosMas24Horas++;
@@ -5164,29 +5671,79 @@ function acumularLead(
 
 
   /* =====================================================
-     FUNNEL
+     REUNIONES
   ===================================================== */
 
   if (
     registro.pasoPorReunion
   ) {
-    total.reuniones++;
+    total.leadsConReunion++;
   }
 
+  total.totalReuniones +=
+    Number(
+      registro.cantidadReuniones ||
+      0
+    );
+
+
+  /* =====================================================
+     RESULTADO
+  ===================================================== */
 
   if (
-    registro.estado === "ganada"
+    registro.estado ===
+    "ganada"
   ) {
     total.ganados++;
 
   } else if (
-    registro.estado === "perdida"
+    registro.estado ===
+    "perdida"
   ) {
     total.perdidos++;
 
   } else {
     total.enProceso++;
   }
+}
+
+function getMetricasReunionResumen(
+  total
+) {
+  return {
+    "LEADS CON REUNIÓN":
+      total.leadsConReunion,
+
+    "% LEADS CON REUNIÓN":
+      porcentaje(
+        total.leadsConReunion,
+        total.leads
+      ),
+
+    "TOTAL REUNIONES":
+      total.totalReuniones,
+
+    "PROMEDIO REUNIONES POR LEAD":
+      total.leads
+        ? Number(
+            (
+              total.totalReuniones /
+              total.leads
+            ).toFixed(2)
+          )
+        : 0,
+
+    "PROMEDIO REUNIONES POR LEAD CON REUNIÓN":
+      total.leadsConReunion
+        ? Number(
+            (
+              total.totalReuniones /
+              total.leadsConReunion
+            ).toFixed(2)
+          )
+        : 0
+  };
 }
 
 
