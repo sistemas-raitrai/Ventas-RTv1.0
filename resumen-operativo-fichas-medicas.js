@@ -1472,6 +1472,68 @@ function getClaseEstadoResumen(
   return "assistance-pending";
 }
 
+function getClasesAlertaFila(
+  {
+    situacion = "",
+    medicamentos = "",
+    alimentacion = ""
+  } = {}
+) {
+  const alertaSalud =
+    situacion ===
+    "Sí";
+
+  const alertaMedicamentos =
+    medicamentos ===
+    "Sí";
+
+  const alimentacionNormalizada =
+    normalize(
+      alimentacion
+    );
+
+  const alertaAlimentacion =
+    Boolean(
+      alimentacionNormalizada
+    ) &&
+    ![
+      "no",
+      "pendiente",
+      "restringido"
+    ].includes(
+      alimentacionNormalizada
+    );
+
+
+  return {
+    alertaSalud,
+    alertaMedicamentos,
+    alertaAlimentacion,
+
+    claseFila:
+      alertaSalud ||
+      alertaMedicamentos ||
+      alertaAlimentacion
+        ? "row-attention"
+        : "",
+
+    claseSalud:
+      alertaSalud
+        ? "cell-attention-health"
+        : "",
+
+    claseMedicamentos:
+      alertaMedicamentos
+        ? "cell-attention-medication"
+        : "",
+
+    claseAlimentacion:
+      alertaAlimentacion
+        ? "cell-attention-food"
+        : ""
+  };
+}
+
 
 /*
   =========================================================
@@ -1887,14 +1949,10 @@ function getConsideracionResumen(
 
 
   /*
-    El delegado no recibe consideraciones clínicas
-    detalladas en la tabla.
-
-    Su documento solamente informa:
-      - situación de salud;
-      - medicamentos;
-      - alimentación especial.
+    El documento del delegado no entrega el detalle
+    clínico al final.
   */
+
   if (
     state.mode ===
     "encargado"
@@ -1912,7 +1970,7 @@ function getConsideracionResumen(
 
 
   /*
-    ADULTOS ACOMPAÑANTES
+    Adultos acompañantes.
   */
 
   if (
@@ -1923,106 +1981,35 @@ function getConsideracionResumen(
     return "Información restringida";
   }
 
-  const salud =
-    item.salud ||
-    {};
 
-  const labels =
-    [];
-
-
-  /*
-    Si existe alguna situación general de salud,
-    advertimos que debe revisarse el detalle.
-  */
-  if (
+  const tieneDetalle =
     tieneSituacionSaludDeclarada(
       item
-    )
-  ) {
-    labels.push(
-      "Ver situación de salud"
-    );
-  }
-
-
-  /*
-    Medicamentos.
-  */
-  if (
+    ) ||
     tieneMedicamentosDeclarados(
       item
-    )
-  ) {
-    labels.push(
-      "Medicamentos"
-    );
-  }
-
-
-  /*
-    Alimentación especial.
-  */
-  if (
+    ) ||
     tieneAlimentacionEspecial(
       item
-    )
-  ) {
-    labels.push(
-      getAlimentacionValues(
-        item
-      ).join(
-        ", "
-      )
-    );
-  }
-
-
-  /*
-    Contraindicaciones.
-  */
-  if (
-    getMedicamentosContraindicados(
+    ) ||
+    getAlergiasValues(
       item
-    )
-  ) {
-    labels.push(
-      "Contraindicaciones"
-    );
-  }
-
-
-  /*
-    Requiere asistencia deja de ser una columna.
-
-    Solo se informa como una consideración cuando
-    la ficha realmente declaró que requiere apoyo.
-  */
-  if (
+    ).length >
+      0 ||
+    Boolean(
+      getMedicamentosContraindicados(
+        item
+      )
+    ) ||
     getNecesitaAsistencia(
       item
-    ) === true
-  ) {
-    labels.push(
-      "Requiere apoyo / asistencia"
-    );
-  }
+    ) ===
+      true;
 
 
-  const result =
-    uniqueText(
-      labels
-    );
-
-  if (
-    !result.length
-  ) {
-    return "Sin consideraciones";
-  }
-
-  return result.join(
-    " · "
-  );
+  return tieneDetalle
+    ? "Ver detalle al final del documento"
+    : "Sin consideraciones";
 }
 
 /*
@@ -2428,7 +2415,7 @@ function renderTable() {
             Pasajero
           </th>
 
-          <th>
+          <th class="col-sheet">
             Ficha
           </th>
 
@@ -2450,6 +2437,11 @@ function renderTable() {
     $("summaryLegend")
       .innerHTML = `
         <span>
+          <strong>Campos resaltados:</strong>
+          requieren atención o consideración.
+        </span>
+
+        <span>
           <strong>Sí:</strong>
           existe una situación declarada.
         </span>
@@ -2461,7 +2453,7 @@ function renderTable() {
 
         <span>
           <strong>Restringido:</strong>
-          información no autorizada para ser compartida con el delegado.
+          información no autorizada para el delegado.
         </span>
 
         <span>
@@ -2484,10 +2476,12 @@ function renderTable() {
                   item
                 );
 
+
               const fichaTexto =
                 completa
                   ? "Completa"
                   : "Pendiente";
+
 
               const fichaClase =
                 completa
@@ -2500,10 +2494,12 @@ function renderTable() {
                   item
                 );
 
+
               const medicamentos =
                 getEstadoMedicamentos(
                   item
                 );
+
 
               const alimentacion =
                 getEstadoAlimentacion(
@@ -2511,8 +2507,18 @@ function renderTable() {
                 );
 
 
+              const alertas =
+                getClasesAlertaFila(
+                  {
+                    situacion,
+                    medicamentos,
+                    alimentacion
+                  }
+                );
+
+
               return `
-                <tr>
+                <tr class="${alertas.claseFila}">
 
                   <td class="col-number">
                     ${index + 1}
@@ -2532,25 +2538,52 @@ function renderTable() {
                     )}
                   </td>
 
-                  <td class="${getClaseEstadoResumen(
-                    situacion
-                  )}">
+                  <td class="${[
+                    getClaseEstadoResumen(
+                      situacion
+                    ),
+                    alertas.claseSalud
+                  ]
+                    .filter(
+                      Boolean
+                    )
+                    .join(
+                      " "
+                    )}">
                     ${escapeHtml(
                       situacion
                     )}
                   </td>
 
-                  <td class="${getClaseEstadoResumen(
-                    medicamentos
-                  )}">
+                  <td class="${[
+                    getClaseEstadoResumen(
+                      medicamentos
+                    ),
+                    alertas.claseMedicamentos
+                  ]
+                    .filter(
+                      Boolean
+                    )
+                    .join(
+                      " "
+                    )}">
                     ${escapeHtml(
                       medicamentos
                     )}
                   </td>
 
-                  <td class="${getClaseEstadoResumen(
-                    alimentacion
-                  )}">
+                  <td class="${[
+                    getClaseEstadoResumen(
+                      alimentacion
+                    ),
+                    alertas.claseAlimentacion
+                  ]
+                    .filter(
+                      Boolean
+                    )
+                    .join(
+                      " "
+                    )}">
                     ${escapeHtml(
                       alimentacion
                     )}
@@ -2560,7 +2593,9 @@ function renderTable() {
               `;
             }
           )
-          .join("");
+          .join(
+            ""
+          );
 
     return;
   }
@@ -2583,7 +2618,7 @@ function renderTable() {
           Pasajero
         </th>
 
-        <th>
+        <th class="col-sheet">
           Ficha
         </th>
 
@@ -2609,7 +2644,12 @@ function renderTable() {
   $("summaryLegend")
     .innerHTML = `
       <span>
-        <strong>Ver detalle:</strong>
+        <strong>Campos resaltados:</strong>
+        requieren atención o consideración.
+      </span>
+
+      <span>
+        <strong>Ver detalle al final del documento:</strong>
         existen antecedentes o indicaciones relevantes.
       </span>
 
@@ -2633,10 +2673,12 @@ function renderTable() {
                 item
               );
 
+
             const fichaTexto =
               completa
                 ? "Completa"
                 : "Pendiente";
+
 
             const fichaClase =
               completa
@@ -2671,6 +2713,7 @@ function renderTable() {
             let alimentacion =
               "No";
 
+
             if (
               !completa
             ) {
@@ -2702,6 +2745,7 @@ function renderTable() {
             let consideracionClase =
               "consideration-text";
 
+
             if (
               consideracion ===
               "Sin consideraciones"
@@ -2710,6 +2754,7 @@ function renderTable() {
                 "consideration-none";
             }
 
+
             if (
               consideracion ===
               "Ficha pendiente"
@@ -2717,6 +2762,7 @@ function renderTable() {
               consideracionClase =
                 "consideration-pending";
             }
+
 
             if (
               consideracion ===
@@ -2727,8 +2773,27 @@ function renderTable() {
             }
 
 
+            if (
+              consideracion ===
+              "Ver detalle al final del documento"
+            ) {
+              consideracionClase =
+                "cell-see-detail";
+            }
+
+
+            const alertas =
+              getClasesAlertaFila(
+                {
+                  situacion,
+                  medicamentos,
+                  alimentacion
+                }
+              );
+
+
             return `
-              <tr>
+              <tr class="${alertas.claseFila}">
 
                 <td class="col-number">
                   ${index + 1}
@@ -2748,23 +2813,41 @@ function renderTable() {
                   )}
                 </td>
 
-                <td class="${getClaseEstadoResumen(
-                  situacion
-                )}">
+                <td class="${[
+                  getClaseEstadoResumen(
+                    situacion
+                  ),
+                  alertas.claseSalud
+                ]
+                  .filter(
+                    Boolean
+                  )
+                  .join(
+                    " "
+                  )}">
                   ${escapeHtml(
                     situacion
                   )}
                 </td>
 
-                <td class="${getClaseEstadoResumen(
-                  medicamentos
-                )}">
+                <td class="${[
+                  getClaseEstadoResumen(
+                    medicamentos
+                  ),
+                  alertas.claseMedicamentos
+                ]
+                  .filter(
+                    Boolean
+                  )
+                  .join(
+                    " "
+                  )}">
                   ${escapeHtml(
                     medicamentos
                   )}
                 </td>
 
-                <td>
+                <td class="${alertas.claseAlimentacion}">
                   ${escapeHtml(
                     alimentacion
                   )}
@@ -2780,9 +2863,10 @@ function renderTable() {
             `;
           }
         )
-        .join("");
+        .join(
+          ""
+        );
 }
-
 
 /*
   =========================================================
