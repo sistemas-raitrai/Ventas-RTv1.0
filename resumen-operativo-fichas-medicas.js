@@ -2183,45 +2183,72 @@ function renderHeader() {
     state.group ||
     {};
 
-  const subtitle =
-    [
+
+  const colegio =
+    clean(
+      group.colegio ||
+      group.nombreColegio ||
+      group.establecimiento ||
       group.aliasGrupo ||
-      group.nombreGrupo ||
-      state.groupId,
+      state.groupId
+    );
 
-      group.colegio,
 
-      group.curso,
+  const curso =
+    clean(
+      group.curso ||
+      group.cursoViaje ||
+      group.nivelCurso
+    );
 
-      group.anoViaje
-        ? `Viaje ${group.anoViaje}`
-        : ""
-    ]
-      .filter(
-        Boolean
-      )
-      .join(
-        " · "
-      );
+
+  const anoViaje =
+    clean(
+      group.anoViaje ||
+      group.anioViaje
+    );
+
+
+  const partesTitulo = [
+    colegio,
+
+    curso,
+
+    anoViaje
+      ? `VIAJE ${anoViaje}`
+      : ""
+  ]
+    .filter(
+      Boolean
+    );
+
+
+  $("groupTitle")
+    .textContent =
+      partesTitulo
+        .join(
+          " · "
+        )
+        .toUpperCase();
+
 
   $("groupSubtitle")
     .textContent =
-      subtitle;
+      "RESUMEN OPERATIVO DE SALUD";
 
 
   $("documentType")
     .textContent =
       state.mode ===
         "encargado"
-        ? "Delegado"
-        : "Adultos acompañantes";
+        ? "DELEGADO"
+        : "ADULTOS ACOMPAÑANTES";
 
 
   $("detailsSubtitle")
     .textContent =
       "Se muestran únicamente pasajeros con antecedentes, indicaciones o necesidades relevantes para la operación del viaje.";
 }
-
 /*
   =========================================================
   PRIVACIDAD
