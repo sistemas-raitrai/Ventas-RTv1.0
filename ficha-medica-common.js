@@ -117,14 +117,173 @@ export function isCancelled(item = {}) {
     normalize(item?.privacidad?.estado) === "anulada";
 }
 
-export function fichaCompleta(item = {}) {
-  return item?.fichaMedicaCompleta === true ||
-    item?.nominaFinalCompleta === true ||
-    item?.fichaMedicaCompletada === true ||
-    item?.nominaFinalCompletada === true ||
-    ["completa", "completada"].includes(normalize(item?.fichaMedicaEstado));
+function tieneRespuestaMedicaContestada(
+  value
+) {
+  if (
+    value === true ||
+    value === false
+  ) {
+    return true;
+  }
+
+  const normalized =
+    normalize(
+      value
+    );
+
+  return [
+    "si",
+    "no"
+  ].includes(
+    normalized
+  );
 }
 
+
+export function fichaCompleta(
+  item = {}
+) {
+  /*
+    Primero respetamos todos los indicadores explícitos
+    utilizados por las distintas versiones del formulario.
+  */
+
+  const indicadoresBooleanos = [
+    item.fichaMedicaCompleta,
+    item.nominaFinalCompleta,
+    item.fichaMedicaCompletada,
+    item.nominaFinalCompletada,
+    item.saludCompleta,
+    item.saludCompletada
+  ];
+
+  if (
+    indicadoresBooleanos.some(
+      value =>
+        value === true
+    )
+  ) {
+    return true;
+  }
+
+
+  const estadosExplicitos = [
+    item.fichaMedicaEstado,
+    item.estadoFichaMedica,
+    item.saludEstado
+  ]
+    .map(
+      normalize
+    );
+
+  if (
+    estadosExplicitos.some(
+      estado =>
+        [
+          "completa",
+          "completada",
+          "finalizada",
+          "finalizado"
+        ].includes(
+          estado
+        )
+    )
+  ) {
+    return true;
+  }
+
+
+  /*
+    Nuevo ingreso, Lista de espera y Adulto liberado
+    pueden incluir la ficha médica dentro del mismo
+    formulario.
+
+    En esos casos puede no existir el indicador
+    fichaMedicaCompleta, por lo que verificamos si
+    realmente contestaron el cuestionario de salud.
+  */
+
+  const salud =
+    item.salud &&
+    typeof item.salud ===
+      "object"
+      ? item.salud
+      : {};
+
+
+  const camposDeRespuesta = [
+    salud.enfermedadBaseFlag,
+    salud.saludGeneralFlag,
+    salud.cirugiasPreviasFlag,
+    salud.emergenciaMedicaFlag,
+    salud.medicamentosFlag,
+    salud.medicamentosProhibidosFlag,
+    salud.alergiasFlag,
+    salud.dietaFlag,
+    salud.discapacidadFlag,
+    salud.neurodivergenciaFlag,
+    salud.saludMentalFlag,
+    salud.otrosAntecedentesFlag
+  ];
+
+
+  const respuestasContestadas =
+    camposDeRespuesta.filter(
+      tieneRespuestaMedicaContestada
+    ).length;
+
+
+  /*
+    También revisamos consentimiento, pero nunca
+    consideramos que el consentimiento por sí solo
+    equivalga a una ficha médica completa.
+  */
+
+  const consentimiento =
+    item.consentimiento &&
+    typeof item.consentimiento ===
+      "object"
+      ? item.consentimiento
+      : {};
+
+
+  const aceptaVeracidad =
+    consentimiento.aceptaVeracidad ===
+      true ||
+    normalize(
+      consentimiento.aceptaVeracidad
+    ) ===
+      "si";
+
+
+  /*
+    Cinco o más respuestas médicas permiten reconocer
+    un formulario completo de los flujos actuales.
+
+    Para formularios antiguos, aceptamos tres respuestas
+    cuando además quedó registrada la aceptación de
+    veracidad.
+  */
+
+  if (
+    respuestasContestadas >=
+    5
+  ) {
+    return true;
+  }
+
+  if (
+    respuestasContestadas >=
+      3 &&
+    aceptaVeracidad
+  ) {
+    return true;
+  }
+
+
+  return false;
+}
 export function medicalAlerts(item = {}) {
   const salud = item?.salud || {};
   const alerts = [];
