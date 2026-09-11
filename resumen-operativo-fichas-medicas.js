@@ -128,6 +128,36 @@ function bindEvents() {
   CARGA
   =========================================================
 */
+function aplicarModoDesdeParametros(
+  params
+) {
+  const modoSolicitado =
+    normalize(
+      params.get(
+        "modo"
+      )
+    );
+
+
+  if (
+    [
+      "viaje",
+      "adultos",
+      "adultos acompanantes"
+    ].includes(
+      modoSolicitado
+    )
+  ) {
+    state.mode =
+      "viaje";
+
+    return;
+  }
+
+
+  state.mode =
+    "encargado";
+}
 
 async function loadPage() {
   try {
@@ -136,6 +166,10 @@ async function loadPage() {
         location.search
       );
 
+    aplicarModoDesdeParametros(
+      params
+    );
+    
     const requested =
       clean(
         params.get(
