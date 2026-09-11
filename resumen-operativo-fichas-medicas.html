@@ -169,6 +169,7 @@
     .document-heading {
       min-width: 0;
       flex: 1 1 auto;
+      padding-top: 4px;
     }
     
     .document-title {
@@ -191,18 +192,28 @@
       text-transform: uppercase;
     }
     
+    .document-type {
+      margin-top: 5px;
+      color: #263a70;
+      font-size: 11px;
+      font-weight: 900;
+      line-height: 1.2;
+      letter-spacing: .55px;
+      text-transform: uppercase;
+    }
+    
     .document-brand {
-      flex: 0 0 auto;
+      flex: 0 0 220px;
       display: flex;
-      flex-direction: column;
-      align-items: flex-end;
-      gap: 7px;
+      align-items: center;
+      justify-content: flex-end;
+      align-self: stretch;
     }
     
     .document-logo {
       display: block;
-      width: 330px;
-      height: 140px;
+      width: 220px;
+      height: 92px;
       object-fit: contain;
       object-position: right center;
     }
@@ -721,12 +732,22 @@
         ENCABEZADO
       */
     
-      .document-header {
-        gap: 16px;
+        .document-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 18px;
+        min-height: 88px;
         padding-bottom: 10px;
       
         break-inside: avoid;
         page-break-inside: avoid;
+      }
+      
+      .document-heading {
+        flex: 1 1 auto;
+        min-width: 0;
+        padding-top: 0;
       }
       
       .document-title {
@@ -742,20 +763,29 @@
         letter-spacing: .35px;
       }
       
+      .document-type {
+        margin-top: 4px;
+        color: #263a70;
+        font-size: 9px;
+        font-weight: 900;
+        line-height: 1.2;
+        letter-spacing: .45px;
+      }
+      
       .document-brand {
-        gap: 5px;
+        flex: 0 0 210px;
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        align-self: stretch;
       }
       
       .document-logo {
-        width: 220px;
-        height: 90px;
+        width: 210px;
+        height: 82px;
+        object-fit: contain;
+        object-position: right center;
       }
-      
-      .document-badge {
-        padding: 4px 7px;
-        font-size: 8px;
-      }
-      
       /*
         INDICADORES
       */
