@@ -1,6 +1,7 @@
 import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.7.3/firebase-auth.js";
 import {
   collection,
+  collectionGroup,
   query,
   where,
   limit,
@@ -31215,5 +31216,1145 @@ async function ({
 
     resultados:
       procesados
+  };
+};
+
+window.listarInscripcionesArchivadas =
+async function ({
+  idGrupo = "",
+  todosLosGrupos = false
+} = {}) {
+  /*
+    =========================================================
+    LISTAR INSCRIPCIONES ARCHIVADAS
+
+    Grupo actualmente abierto:
+
+    await window.listarInscripcionesArchivadas();
+
+    Grupo específico:
+
+    await window.listarInscripcionesArchivadas({
+      idGrupo: "10667"
+    });
+
+    Todos los grupos:
+
+    await window.listarInscripcionesArchivadas({
+      todosLosGrupos: true
+    });
+    =========================================================
+  */
+
+  if (
+    !canEditarNominaInscripcion()
+  ) {
+    console.error(
+      "No tienes permisos para revisar inscripciones archivadas."
+    );
+
+    return {
+      ok: false,
+      motivo:
+        "sin_permisos"
+    };
+  }
+
+  const grupoSolicitado =
+    cleanText(
+      idGrupo ||
+      state.groupDocId ||
+      state.groupId ||
+      ""
+    );
+
+  if (
+    !todosLosGrupos &&
+    !grupoSolicitado
+  ) {
+    console.error(
+      "Debes indicar un idGrupo o abrir el grupo correspondiente."
+    );
+
+    return {
+      ok: false,
+      motivo:
+        "id_grupo_vacio"
+    };
+  }
+
+  console.log(
+    "======================================================"
+  );
+
+  console.log(
+    todosLosGrupos
+      ? "🔎 INSCRIPCIONES ARCHIVADAS · TODOS LOS GRUPOS"
+      : `🔎 INSCRIPCIONES ARCHIVADAS · GRUPO ${grupoSolicitado}`
+  );
+
+  console.log(
+    "======================================================"
+  );
+
+  try {
+    let inscripcionesSnap;
+
+    if (
+      todosLosGrupos
+    ) {
+      inscripcionesSnap =
+        await getDocs(
+          query(
+            collectionGroup(
+              db,
+              "inscripciones"
+            ),
+            where(
+              "privacidad.estado",
+              "==",
+              "archivada"
+            )
+          )
+        );
+    } else {
+      inscripcionesSnap =
+        await getDocs(
+          query(
+            collection(
+              db,
+              "ventas_cotizaciones",
+              grupoSolicitado,
+              "inscripciones"
+            ),
+            where(
+              "privacidad.estado",
+              "==",
+              "archivada"
+            )
+          )
+        );
+    }
+
+    const encontradosBase =
+      inscripcionesSnap.docs.map(
+        inscripcionSnap => {
+          const data =
+            inscripcionSnap.data() ||
+            {};
+
+          /*
+            Estructura de la referencia:
+
+            ventas_cotizaciones/{grupo}/inscripciones/{persona}
+
+            parent                 -> inscripciones
+            parent.parent          -> documento del grupo
+          */
+
+          const groupRef =
+            inscripcionSnap.ref
+              .parent
+              .parent;
+
+          const groupDocId =
+            cleanText(
+              groupRef?.id ||
+              grupoSolicitado ||
+              ""
+            );
+
+          return {
+            groupDocId,
+
+            inscripcionId:
+              inscripcionSnap.id,
+
+            inscripcionRef:
+              inscripcionSnap.ref,
+
+            data,
+
+            documento:
+              getInscripcionDocumento(
+                {
+                  id:
+                    inscripcionSnap.id,
+
+                  ...data
+                }
+              ),
+
+            nombre:
+              buildNombreCompletoInscripcion(
+                {
+                  id:
+                    inscripcionSnap.id,
+
+                  ...data
+                }
+              ),
+
+            tipo:
+              getEstadoOperativoInscripcionLabel(
+                {
+                  id:
+                    inscripcionSnap.id,
+
+                  ...data
+                }
+              ),
+
+            archivoId:
+              cleanText(
+                data
+                  ?.privacidad
+                  ?.archivoId ||
+                ""
+              ),
+
+            motivoArchivo:
+              cleanText(
+                data
+                  ?.privacidad
+                  ?.motivoArchivo ||
+                ""
+              ),
+
+            archivadaPor:
+              cleanText(
+                data
+                  ?.privacidad
+                  ?.archivadaPor ||
+                ""
+              ),
+
+            archivadaPorCorreo:
+              cleanText(
+                data
+                  ?.privacidad
+                  ?.archivadaPorCorreo ||
+                ""
+              ),
+
+            archivadaAt:
+              data
+                ?.privacidad
+                ?.archivadaAt ||
+              null
+          };
+        }
+      );
+
+    /*
+      Cargar información básica de cada grupo.
+    */
+
+    const idsGrupos =
+      Array.from(
+        new Set(
+          encontradosBase
+            .map(
+              item =>
+                item.groupDocId
+            )
+            .filter(Boolean)
+        )
+      );
+
+    const gruposMap =
+      new Map();
+
+    await Promise.all(
+      idsGrupos.map(
+        async groupDocId => {
+          try {
+            const grupoSnap =
+              await getDoc(
+                doc(
+                  db,
+                  "ventas_cotizaciones",
+                  groupDocId
+                )
+              );
+
+            if (
+              grupoSnap.exists()
+            ) {
+              gruposMap.set(
+                groupDocId,
+                {
+                  id:
+                    grupoSnap.id,
+
+                  ...grupoSnap.data()
+                }
+              );
+            }
+          } catch (
+            error
+          ) {
+            console.warn(
+              "No se pudo cargar el grupo:",
+              {
+                groupDocId,
+
+                error:
+                  error?.message ||
+                  String(
+                    error
+                  )
+              }
+            );
+          }
+        }
+      )
+    );
+
+    const encontrados =
+      encontradosBase
+        .map(
+          item => {
+            const grupo =
+              gruposMap.get(
+                item.groupDocId
+              ) ||
+              {};
+
+            return {
+              ...item,
+
+              idGrupo:
+                cleanText(
+                  grupo.idGrupo ||
+                  item.groupDocId
+                ),
+
+              aliasGrupo:
+                cleanText(
+                  grupo.aliasGrupo ||
+                  grupo.nombreGrupo ||
+                  grupo.colegio ||
+                  item.groupDocId
+                ),
+
+              colegio:
+                cleanText(
+                  grupo.colegio ||
+                  ""
+                ),
+
+              anoViaje:
+                grupo.anoViaje ||
+                ""
+            };
+          }
+        )
+        .sort(
+          (a, b) => {
+            const grupoComparacion =
+              String(
+                a.idGrupo ||
+                ""
+              ).localeCompare(
+                String(
+                  b.idGrupo ||
+                  ""
+                ),
+                "es",
+                {
+                  numeric: true
+                }
+              );
+
+            if (
+              grupoComparacion !== 0
+            ) {
+              return grupoComparacion;
+            }
+
+            return String(
+              a.nombre ||
+              ""
+            ).localeCompare(
+              String(
+                b.nombre ||
+                ""
+              ),
+              "es"
+            );
+          }
+        )
+        .map(
+          (
+            item,
+            index
+          ) => ({
+            numero:
+              index + 1,
+
+            ...item
+          })
+        );
+
+    /*
+      Guardar el resultado para seleccionar después.
+    */
+
+    window.__inscripcionesArchivadasEncontradas =
+      encontrados;
+
+    console.log("");
+    console.log(
+      `📦 Archivadas encontradas: ${encontrados.length}`
+    );
+
+    console.table(
+      encontrados.map(
+        item => ({
+          numero:
+            item.numero,
+
+          idGrupo:
+            item.idGrupo,
+
+          grupo:
+            item.aliasGrupo,
+
+          inscripcionId:
+            item.inscripcionId,
+
+          documento:
+            item.documento,
+
+          nombre:
+            item.nombre,
+
+          tipo:
+            item.tipo,
+
+          motivo:
+            item.motivoArchivo,
+
+          archivadaPor:
+            item.archivadaPor,
+
+          archivoId:
+            item.archivoId
+        })
+      )
+    );
+
+    if (
+      encontrados.length
+    ) {
+      console.log("");
+      console.log(
+        "Para restaurar una persona ejecuta:"
+      );
+
+      console.log(
+        `await window.desarchivarInscripcionSeleccionada({ numero: 1, motivo: "Continúa en Sistema de Pagos", confirmar: true });`
+      );
+
+      console.log("");
+      console.log(
+        "Cambia numero: 1 por el número mostrado en la tabla."
+      );
+    } else {
+      console.log(
+        "No se encontraron inscripciones archivadas."
+      );
+    }
+
+    return {
+      ok: true,
+
+      todosLosGrupos,
+
+      grupoSolicitado:
+        todosLosGrupos
+          ? ""
+          : grupoSolicitado,
+
+      total:
+        encontrados.length,
+
+      resultados:
+        encontrados
+    };
+
+  } catch (
+    error
+  ) {
+    console.error(
+      "❌ Error buscando inscripciones archivadas.",
+      error
+    );
+
+    return {
+      ok: false,
+
+      motivo:
+        "error_busqueda",
+
+      error:
+        error?.message ||
+        String(
+          error
+        )
+    };
+  }
+};
+
+
+window.desarchivarInscripcionSeleccionada =
+async function ({
+  numero = 0,
+  motivo = "",
+  confirmar = false
+} = {}) {
+  /*
+    =========================================================
+    DESARCHIVAR UNA INSCRIPCIÓN DEL ÚLTIMO LISTADO
+
+    Ejemplo:
+
+    await window.desarchivarInscripcionSeleccionada({
+      numero: 1,
+      motivo: "Continúa en Sistema de Pagos",
+      confirmar: true
+    });
+    =========================================================
+  */
+
+  if (
+    !canEditarNominaInscripcion()
+  ) {
+    console.error(
+      "No tienes permisos para desarchivar inscripciones."
+    );
+
+    return {
+      ok: false,
+      motivo:
+        "sin_permisos"
+    };
+  }
+
+  const listado =
+    Array.isArray(
+      window
+        .__inscripcionesArchivadasEncontradas
+    )
+      ? window
+          .__inscripcionesArchivadasEncontradas
+      : [];
+
+  if (
+    !listado.length
+  ) {
+    console.error(
+      "Primero debes ejecutar listarInscripcionesArchivadas()."
+    );
+
+    return {
+      ok: false,
+      motivo:
+        "sin_listado_previo"
+    };
+  }
+
+  const numeroSeleccionado =
+    Number(
+      numero
+    );
+
+  if (
+    !Number.isInteger(
+      numeroSeleccionado
+    ) ||
+    numeroSeleccionado < 1
+  ) {
+    console.error(
+      "Debes indicar un número válido de la tabla."
+    );
+
+    return {
+      ok: false,
+      motivo:
+        "numero_invalido"
+    };
+  }
+
+  const seleccionado =
+    listado.find(
+      item =>
+        item.numero ===
+        numeroSeleccionado
+    );
+
+  if (
+    !seleccionado
+  ) {
+    console.error(
+      "El número seleccionado no existe en el último listado.",
+      {
+        numero:
+          numeroSeleccionado,
+
+        total:
+          listado.length
+      }
+    );
+
+    return {
+      ok: false,
+
+      motivo:
+        "seleccion_no_existe",
+
+      numero:
+        numeroSeleccionado,
+
+      total:
+        listado.length
+    };
+  }
+
+  const motivoFinal =
+    cleanText(
+      motivo ||
+      ""
+    );
+
+  if (
+    !motivoFinal
+  ) {
+    console.error(
+      "Debes indicar el motivo de la restauración."
+    );
+
+    return {
+      ok: false,
+      motivo:
+        "motivo_vacio"
+    };
+  }
+
+  /*
+    Releer la inscripción desde Firestore.
+  */
+
+  const inscripcionRef =
+    doc(
+      db,
+      "ventas_cotizaciones",
+      seleccionado.groupDocId,
+      "inscripciones",
+      seleccionado.inscripcionId
+    );
+
+  const inscripcionSnap =
+    await getDoc(
+      inscripcionRef
+    );
+
+  if (
+    !inscripcionSnap.exists()
+  ) {
+    console.error(
+      "La inscripción seleccionada ya no existe.",
+      {
+        idGrupo:
+          seleccionado.idGrupo,
+
+        inscripcionId:
+          seleccionado.inscripcionId
+      }
+    );
+
+    return {
+      ok: false,
+      motivo:
+        "inscripcion_no_existe"
+    };
+  }
+
+  const inscripcionActual =
+    {
+      id:
+        inscripcionSnap.id,
+
+      ...inscripcionSnap.data()
+    };
+
+  const estadoPrivacidad =
+    normalizeSearchLocal(
+      inscripcionActual
+        ?.privacidad
+        ?.estado ||
+      ""
+    );
+
+  if (
+    estadoPrivacidad !==
+      "archivada"
+  ) {
+    console.warn(
+      "La inscripción seleccionada ya no está archivada.",
+      {
+        idGrupo:
+          seleccionado.idGrupo,
+
+        inscripcionId:
+          seleccionado.inscripcionId,
+
+        estadoPrivacidad
+      }
+    );
+
+    return {
+      ok: false,
+
+      motivo:
+        "inscripcion_ya_no_esta_archivada",
+
+      estadoPrivacidad
+    };
+  }
+
+  const datosConfirmacion = {
+    numero:
+      seleccionado.numero,
+
+    idGrupo:
+      seleccionado.idGrupo,
+
+    grupo:
+      seleccionado.aliasGrupo,
+
+    inscripcionId:
+      seleccionado.inscripcionId,
+
+    documento:
+      seleccionado.documento,
+
+    nombre:
+      seleccionado.nombre,
+
+    tipo:
+      seleccionado.tipo,
+
+    archivoId:
+      seleccionado.archivoId,
+
+    motivoArchivo:
+      seleccionado.motivoArchivo,
+
+    motivoRestauracion:
+      motivoFinal
+  };
+
+  console.log(
+    "Inscripción seleccionada para restaurar:"
+  );
+
+  console.table([
+    datosConfirmacion
+  ]);
+
+  if (
+    !confirmar
+  ) {
+    console.warn(
+      "No se modificó nada. Para confirmar, vuelve a ejecutar con confirmar:true."
+    );
+
+    return {
+      ok: false,
+
+      dryRun: true,
+
+      motivo:
+        "falta_confirmacion",
+
+      seleccion:
+        datosConfirmacion
+    };
+  }
+
+  const ok =
+    window.confirm(
+      `RESTAURAR INSCRIPCIÓN\n\n` +
+      `Grupo: ${seleccionado.idGrupo} · ${seleccionado.aliasGrupo}\n` +
+      `Pasajero: ${seleccionado.nombre || "(sin nombre)"}\n` +
+      `Documento: ${seleccionado.documento || "(sin documento)"}\n` +
+      `Tipo: ${seleccionado.tipo || "(sin tipo)"}\n\n` +
+      `Motivo: ${motivoFinal}\n\n` +
+      `La inscripción volverá a aparecer en la nómina.\n\n` +
+      `¿Continuar?`
+    );
+
+  if (
+    !ok
+  ) {
+    console.warn(
+      "Restauración cancelada."
+    );
+
+    return {
+      ok: false,
+      cancelado: true
+    };
+  }
+
+  /*
+    Guardamos el estado anterior para mantener trazabilidad.
+  */
+
+  const privacidadAnterior =
+    inscripcionActual.privacidad ||
+    {};
+
+  const archivoIdAnterior =
+    cleanText(
+      privacidadAnterior.archivoId ||
+      seleccionado.archivoId ||
+      ""
+    );
+
+  /*
+    Reactivar inscripción.
+
+    No eliminamos la subcolección inscripciones_archivadas:
+    sigue funcionando como respaldo histórico.
+  */
+
+  await updateDoc(
+    inscripcionRef,
+    {
+      "privacidad.estado":
+        "activa",
+
+      "privacidad.archivoId":
+        deleteField(),
+
+      "privacidad.archivadaAt":
+        deleteField(),
+
+      "privacidad.archivadaPor":
+        deleteField(),
+
+      "privacidad.archivadaPorCorreo":
+        deleteField(),
+
+      "privacidad.motivoArchivo":
+        deleteField(),
+
+      "privacidad.restauradaAt":
+        serverTimestamp(),
+
+      "privacidad.restauradaPor":
+        getDisplayName(
+          state.effectiveUser
+        ),
+
+      "privacidad.restauradaPorCorreo":
+        state.effectiveEmail ||
+        "",
+
+      "privacidad.motivoRestauracion":
+        motivoFinal,
+
+      "privacidad.ultimoArchivoId":
+        archivoIdAnterior,
+
+      "privacidad.ultimoMotivoArchivo":
+        cleanText(
+          privacidadAnterior
+            .motivoArchivo ||
+          seleccionado.motivoArchivo ||
+          ""
+        )
+    }
+  );
+
+  /*
+    Registrar historial directamente, porque esta herramienta
+    también puede restaurar personas de otro grupo distinto
+    al grupo actualmente abierto.
+  */
+
+  await addDoc(
+    collection(
+      db,
+      HISTORIAL_COLLECTION
+    ),
+    {
+      idGrupo:
+        String(
+          seleccionado.idGrupo ||
+          seleccionado.groupDocId ||
+          ""
+        ),
+
+      groupDocId:
+        String(
+          seleccionado.groupDocId ||
+          ""
+        ),
+
+      codigoRegistro:
+        "",
+
+      aliasGrupo:
+        cleanText(
+          seleccionado.aliasGrupo ||
+          ""
+        ),
+
+      colegio:
+        cleanText(
+          seleccionado.colegio ||
+          ""
+        ),
+
+      tipoMovimiento:
+        "inscripcion_restaurada",
+
+      modulo:
+        "inscripcion",
+
+      titulo:
+        "Pasajero restaurado",
+
+      asunto:
+        `Pasajero restaurado: ${
+          seleccionado.nombre ||
+          seleccionado.documento ||
+          seleccionado.inscripcionId
+        }`,
+
+      mensaje:
+        `${getDisplayName(state.effectiveUser)} restauró a ` +
+        `${seleccionado.nombre || seleccionado.documento || seleccionado.inscripcionId}. ` +
+        `Motivo: ${motivoFinal}.`,
+
+      metadata: {
+        inscripcionId:
+          seleccionado.inscripcionId,
+
+        documento:
+          seleccionado.documento,
+
+        nombreCompleto:
+          seleccionado.nombre,
+
+        tipo:
+          seleccionado.tipo,
+
+        archivoIdAnterior,
+
+        motivoArchivoAnterior:
+          seleccionado.motivoArchivo,
+
+        motivoRestauracion:
+          motivoFinal
+      },
+
+      destacado:
+        false,
+
+      destacadoAt:
+        null,
+
+      destacadoPor:
+        "",
+
+      destacadoPorCorreo:
+        "",
+
+      oculto:
+        false,
+
+      ocultadoAt:
+        null,
+
+      ocultadoPor:
+        "",
+
+      ocultadoPorCorreo:
+        "",
+
+      creadoPor:
+        getDisplayName(
+          state.effectiveUser
+        ),
+
+      creadoPorCorreo:
+        state.effectiveEmail ||
+        "",
+
+      fecha:
+        serverTimestamp()
+    }
+  );
+
+  /*
+    El backend sincronizarAlertaAlCambiarInscripcion
+    debería reconstruir la alerta cuando detecte este cambio.
+
+    Si restauramos una inscripción del grupo actualmente
+    abierto, además hacemos la sincronización local inmediata.
+  */
+
+  const grupoActualCoincide =
+    [
+      state.groupDocId,
+      state.groupId
+    ]
+      .map(
+        value =>
+          cleanText(
+            value ||
+            ""
+          )
+      )
+      .filter(Boolean)
+      .includes(
+        seleccionado.groupDocId
+      ) ||
+    [
+      state.groupDocId,
+      state.groupId
+    ]
+      .map(
+        value =>
+          cleanText(
+            value ||
+            ""
+          )
+      )
+      .filter(Boolean)
+      .includes(
+        seleccionado.idGrupo
+      );
+
+  if (
+    grupoActualCoincide
+  ) {
+    const inscripcionRestaurada = {
+      ...inscripcionActual,
+
+      privacidad: {
+        ...privacidadAnterior,
+
+        estado:
+          "activa",
+
+        archivoId:
+          "",
+
+        restauradaPor:
+          getDisplayName(
+            state.effectiveUser
+          ),
+
+        restauradaPorCorreo:
+          state.effectiveEmail ||
+          "",
+
+        motivoRestauracion:
+          motivoFinal
+      }
+    };
+
+    await sincronizarAlertaInscripcion(
+      inscripcionRestaurada
+    );
+
+    await recargarNominaDespuesDeCambio();
+  }
+
+  /*
+    Sacar la inscripción restaurada del listado temporal.
+  */
+
+  window.__inscripcionesArchivadasEncontradas =
+    listado
+      .filter(
+        item =>
+          !(
+            item.groupDocId ===
+              seleccionado.groupDocId &&
+            item.inscripcionId ===
+              seleccionado.inscripcionId
+          )
+      )
+      .map(
+        (
+          item,
+          index
+        ) => ({
+          ...item,
+
+          numero:
+            index + 1
+        })
+      );
+
+  console.log(
+    "✅ INSCRIPCIÓN RESTAURADA",
+    {
+      idGrupo:
+        seleccionado.idGrupo,
+
+      grupo:
+        seleccionado.aliasGrupo,
+
+      inscripcionId:
+        seleccionado.inscripcionId,
+
+      documento:
+        seleccionado.documento,
+
+      nombre:
+        seleccionado.nombre,
+
+      motivo:
+        motivoFinal
+    }
+  );
+
+  console.log(
+    "La copia histórica de inscripciones_archivadas se conservó."
+  );
+
+  return {
+    ok: true,
+
+    estado:
+      "RESTAURADA",
+
+    idGrupo:
+      seleccionado.idGrupo,
+
+    groupDocId:
+      seleccionado.groupDocId,
+
+    inscripcionId:
+      seleccionado.inscripcionId,
+
+    documento:
+      seleccionado.documento,
+
+    nombre:
+      seleccionado.nombre,
+
+    archivoIdAnterior,
+
+    motivoRestauracion:
+      motivoFinal
   };
 };
