@@ -55,15 +55,45 @@
 
     .toolbar {
       display: grid;
+    
       grid-template-columns:
-        minmax(260px, 2fr)
-        minmax(180px, 1fr)
-        minmax(120px, .55fr)
-        minmax(190px, 1fr)
+        minmax(300px, 1fr)
+        190px
+        130px
+        minmax(190px, 240px)
+        auto
         auto;
     
-      gap: 12px;
+      gap: 10px;
+      align-items: center;
       margin: 20px 0;
+    }
+    
+    .toolbar input,
+    .toolbar select {
+      min-width: 0;
+    }
+    
+    #gnVendedor {
+      width: 190px;
+      max-width: 190px;
+    }
+    
+    #gnAno {
+      width: 130px;
+    }
+    
+    #gnEstado {
+      width: 100%;
+      max-width: 240px;
+    }
+    
+    .toolbar button {
+      width: auto;
+      height: 44px;
+      min-height: 44px;
+      padding: 0 15px;
+      white-space: nowrap;
     }
 
     .toolbar input,
@@ -2077,22 +2107,55 @@
           );
       }
     }
+    
+    @media (max-width: 1180px) {
+      .toolbar {
+        grid-template-columns:
+          minmax(260px, 1fr)
+          190px
+          130px;
+      }
+    
+      #gnVendedor,
+      #gnAno,
+      #gnEstado {
+        width: 100%;
+        max-width: none;
+      }
+    
+      .toolbar button {
+        width: 100%;
+      }
+    }
 
     @media (max-width: 1000px) {
       .toolbar {
-        grid-template-columns: 1fr 1fr;
+        grid-template-columns:
+          minmax(0, 1fr)
+          minmax(0, 1fr);
       }
-
+    
+      #gnVendedor,
+      #gnAno,
+      #gnEstado {
+        width: 100%;
+        max-width: none;
+      }
+    
+      .toolbar button {
+        width: 100%;
+      }
+    
       .modal-toolbar {
         grid-template-columns: 1fr;
       }
-
+    
       .phase-grid {
         grid-template-columns: 1fr 1fr;
       }
-
+    
       .operations-kpis {
-        grid-template-columns: 1fr;
+        grid-template-columns: 1fr 1fr;
       }
     }
 
@@ -2201,15 +2264,16 @@
       
         <button
           id="gnRecargar"
-          class="btn-primary"
+          class="btn-secondary toolbar-btn"
           type="button"
         >
           Recargar
         </button>
+        
         <button
           id="gnExportarXlsx"
+          class="btn-primary toolbar-btn"
           type="button"
-          class="gn-btn"
         >
           Exportar XLSX
         </button>
