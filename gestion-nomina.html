@@ -2206,6 +2206,13 @@
         >
           Recargar
         </button>
+        <button
+          id="gnExportarXlsx"
+          type="button"
+          class="gn-btn"
+        >
+          Exportar XLSX
+        </button>
       </div>
 
       <section
@@ -2605,6 +2612,14 @@
                 type="button"
               >
                 Exportar CSV
+              </button>
+
+              <button
+                id="btnExportarXlsx"
+                type="button"
+                class="gn-btn"
+              >
+                Exportar XLSX
               </button>
         
               <button
@@ -3270,9 +3285,11 @@
     src="layout.js"
   ></script>
 
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+
   <script
     type="module"
-    src="gestion-nomina.js"
+    src="./gestion-nomina.js"
   ></script>
 </body>
 </html>
