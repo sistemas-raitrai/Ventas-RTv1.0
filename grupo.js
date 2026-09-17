@@ -29274,3 +29274,1946 @@ window.eliminarDefinitivamenteMigrados11053 = async function ({
     borrados
   };
 };
+
+window.recuperarLiberadosComoNominaFinalGrupo =
+async function ({
+  idGrupo = "",
+  dryRun = true,
+  confirmar = true,
+  cantidadEsperada = 0,
+  maximo = 0
+} = {}) {
+  /*
+    =========================================================
+    RECUPERAR FORMULARIOS DE LIBERADOS COMO NÓMINA FINAL
+
+    Uso diagnóstico:
+
+    await window.recuperarLiberadosComoNominaFinalGrupo({
+      idGrupo: "10667",
+      dryRun: true,
+      cantidadEsperada: 28
+    });
+
+    Uso real:
+
+    await window.recuperarLiberadosComoNominaFinalGrupo({
+      idGrupo: "10667",
+      dryRun: false,
+      confirmar: true,
+      cantidadEsperada: 28
+    });
+    =========================================================
+  */
+
+  const ID_GRUPO_OBJETIVO =
+    cleanText(
+      idGrupo ||
+      state.groupDocId ||
+      state.groupId ||
+      ""
+    );
+
+  console.log(
+    "======================================================"
+  );
+
+  console.log(
+    "🔧 RECUPERACIÓN LIBERADOS → NÓMINA FINAL"
+  );
+
+  console.log(
+    "======================================================"
+  );
+
+  console.log({
+    idGrupo:
+      ID_GRUPO_OBJETIVO,
+
+    dryRun,
+
+    confirmar,
+
+    cantidadEsperada,
+
+    maximo
+  });
+
+  /*
+    =========================================================
+    1. VALIDAR GRUPO
+    =========================================================
+  */
+
+  if (
+    !ID_GRUPO_OBJETIVO
+  ) {
+    console.error(
+      "❌ Debes indicar un idGrupo o abrir el grupo correspondiente."
+    );
+
+    return {
+      ok: false,
+      motivo:
+        "id_grupo_vacio"
+    };
+  }
+
+  /*
+    Si estamos dentro de un grupo abierto, comprobamos
+    que coincida con el grupo solicitado.
+  */
+
+  const gruposPagina =
+    new Set(
+      [
+        state.groupDocId,
+        state.groupId
+      ]
+        .map(
+          value =>
+            cleanText(
+              value || ""
+            )
+        )
+        .filter(Boolean)
+    );
+
+  if (
+    gruposPagina.size > 0 &&
+    !gruposPagina.has(
+      ID_GRUPO_OBJETIVO
+    )
+  ) {
+    console.error(
+      "❌ El grupo abierto no coincide con el grupo solicitado.",
+      {
+        grupoSolicitado:
+          ID_GRUPO_OBJETIVO,
+
+        groupDocIdAbierto:
+          state.groupDocId,
+
+        idGrupoAbierto:
+          state.groupId
+      }
+    );
+
+    return {
+      ok: false,
+
+      motivo:
+        "grupo_abierto_no_coincide",
+
+      grupoSolicitado:
+        ID_GRUPO_OBJETIVO,
+
+      groupDocIdAbierto:
+        state.groupDocId,
+
+      idGrupoAbierto:
+        state.groupId
+    };
+  }
+
+  /*
+    =========================================================
+    2. UTILIDADES
+    =========================================================
+  */
+
+  const normalizarRutRecuperacion = (
+    value = ""
+  ) => {
+    return String(
+      value || ""
+    )
+      .toUpperCase()
+      .trim()
+      .replace(
+        /^RUT_/,
+        ""
+      )
+      .replace(
+        /[^0-9K]/g,
+        ""
+      );
+  };
+
+  const fechaAValor = (
+    value
+  ) => {
+    if (
+      !value
+    ) {
+      return 0;
+    }
+
+    try {
+      if (
+        typeof value?.toDate ===
+        "function"
+      ) {
+        return value
+          .toDate()
+          .getTime();
+      }
+
+      if (
+        value instanceof Date
+      ) {
+        return value.getTime();
+      }
+
+      const fecha =
+        new Date(
+          value
+        );
+
+      return Number.isNaN(
+        fecha.getTime()
+      )
+        ? 0
+        : fecha.getTime();
+
+    } catch {
+      return 0;
+    }
+  };
+
+  const fichaCompleta = (
+    item = {}
+  ) => {
+    return (
+      item.fichaMedicaCompleta === true ||
+      item.nominaFinalCompleta === true ||
+      item.fichaMedicaCompletada === true ||
+      item.nominaFinalCompletada === true ||
+      normalizeSearchLocal(
+        item.fichaMedicaEstado || ""
+      ) === "completa" ||
+      normalizeSearchLocal(
+        item.fichaMedicaEstado || ""
+      ) === "completada"
+    );
+  };
+
+  const inscripcionAnulada = (
+    item = {}
+  ) => {
+    const estado =
+      normalizeSearchLocal(
+        item.estado || ""
+      );
+
+    const estadoCupo =
+      normalizeSearchLocal(
+        item.estadoCupo || ""
+      );
+
+    return (
+      item.anulado === true ||
+      estado === "anulado" ||
+      estado === "anulada" ||
+      estadoCupo === "anulado" ||
+      estadoCupo === "anulada"
+    );
+  };
+
+  const inscripcionArchivada = (
+    item = {}
+  ) => {
+    return (
+      item.archivado === true ||
+      normalizeSearchLocal(
+        item.estadoArchivo || ""
+      ) === "archivado"
+    );
+  };
+
+  const getNombrePayload = (
+    payload = {}
+  ) => {
+    return cleanText(
+      payload
+        ?.identificacion
+        ?.nombreCompleto ||
+      [
+        payload
+          ?.identificacion
+          ?.nombres,
+
+        payload
+          ?.identificacion
+          ?.primerApellido,
+
+        payload
+          ?.identificacion
+          ?.segundoApellido
+      ]
+        .filter(Boolean)
+        .join(" ")
+    );
+  };
+
+  const getDocumentoPayload = (
+    payload = {}
+  ) => {
+    return cleanText(
+      payload
+        ?.identificacion
+        ?.documentoNormalizado ||
+      payload
+        ?.identificacion
+        ?.documento ||
+      payload
+        ?.identificacion
+        ?.rut ||
+      ""
+    );
+  };
+
+  const getRutsInscripcion = (
+    idDocumento,
+    data = {}
+  ) => {
+    return Array.from(
+      new Set(
+        [
+          idDocumento,
+
+          data.documento,
+          data.rut,
+          data.pasajero_id,
+
+          data
+            ?.identificacion
+            ?.documento,
+
+          data
+            ?.identificacion
+            ?.documentoNormalizado,
+
+          data
+            ?.identificacion
+            ?.rut,
+
+          data
+            ?.sistemaPagos
+            ?.pasajero_id
+        ]
+          .map(
+            normalizarRutRecuperacion
+          )
+          .filter(Boolean)
+      )
+    );
+  };
+
+  const tieneDatosSalud = (
+    payload = {}
+  ) => {
+    return (
+      payload.salud &&
+      typeof payload.salud ===
+        "object" &&
+      Object.keys(
+        payload.salud
+      ).length > 0
+    );
+  };
+
+  /*
+    =========================================================
+    3. COMPROBAR QUE EL GRUPO EXISTA
+    =========================================================
+  */
+
+  const grupoRef =
+    doc(
+      db,
+      "ventas_cotizaciones",
+      ID_GRUPO_OBJETIVO
+    );
+
+  const grupoSnap =
+    await getDoc(
+      grupoRef
+    );
+
+  if (
+    !grupoSnap.exists()
+  ) {
+    console.error(
+      "❌ No existe el grupo en ventas_cotizaciones.",
+      {
+        idGrupo:
+          ID_GRUPO_OBJETIVO
+      }
+    );
+
+    return {
+      ok: false,
+
+      motivo:
+        "grupo_no_existe",
+
+      idGrupo:
+        ID_GRUPO_OBJETIVO
+    };
+  }
+
+  /*
+    =========================================================
+    4. CARGAR PENDIENTES CON ESTADO ERROR
+    =========================================================
+  */
+
+  const pendientesSnap =
+    await getDocs(
+      query(
+        collection(
+          db,
+          "inscripciones_pendientes_publicas"
+        ),
+        where(
+          "estado",
+          "==",
+          "error"
+        )
+      )
+    );
+
+  let pendientesEncontrados =
+    pendientesSnap.docs
+      .map(
+        pendienteSnap => {
+          const pendiente =
+            pendienteSnap.data() ||
+            {};
+
+          const payload =
+            pendiente.payload ||
+            {};
+
+          const grupoPendiente =
+            cleanText(
+              pendiente.idGrupo ||
+              payload.idGrupo ||
+              payload
+                ?.grupo
+                ?.idGrupo ||
+              ""
+            );
+
+          const fase =
+            cleanText(
+              pendiente.fase ||
+              payload.faseInscripcion ||
+              payload.tipoInscripcion ||
+              ""
+            );
+
+          const faseNormalizada =
+            normalizeSearchLocal(
+              fase
+            ).replace(
+              /\s+/g,
+              "_"
+            );
+
+          const documento =
+            getDocumentoPayload(
+              payload
+            );
+
+          const error =
+            cleanText(
+              pendiente.error ||
+              ""
+            );
+
+          return {
+            pendienteId:
+              pendienteSnap.id,
+
+            pendienteRef:
+              pendienteSnap.ref,
+
+            pendiente,
+
+            payload,
+
+            idGrupo:
+              grupoPendiente,
+
+            fase,
+
+            faseNormalizada,
+
+            documento,
+
+            rutNormalizado:
+              normalizarRutRecuperacion(
+                documento
+              ),
+
+            nombre:
+              getNombrePayload(
+                payload
+              ),
+
+            token:
+              cleanText(
+                pendiente.token ||
+                payload.token ||
+                ""
+              ),
+
+            error,
+
+            fechaPendiente:
+              pendiente.errorEn ||
+              pendiente.actualizadoEn ||
+              pendiente.creadoEn ||
+              null
+          };
+        }
+      )
+      .filter(
+        item =>
+          item.idGrupo ===
+            ID_GRUPO_OBJETIVO &&
+          item.faseNormalizada ===
+            "liberado" &&
+          normalizeSearchLocal(
+            item.error
+          ).includes(
+            "documento duplicado"
+          )
+      );
+
+  /*
+    =========================================================
+    5. EVITAR PROCESAR DOS INTENTOS DE LA MISMA PERSONA
+
+    Si hubiese más de un pendiente para el mismo RUT,
+    se utiliza solamente el más reciente.
+    =========================================================
+  */
+
+  const pendientesSinRut =
+    pendientesEncontrados.filter(
+      item =>
+        !item.rutNormalizado
+    );
+
+  const pendientesPorRut =
+    new Map();
+
+  pendientesEncontrados.forEach(
+    item => {
+      if (
+        !item.rutNormalizado
+      ) {
+        return;
+      }
+
+      const anterior =
+        pendientesPorRut.get(
+          item.rutNormalizado
+        );
+
+      if (
+        !anterior ||
+        fechaAValor(
+          item.fechaPendiente
+        ) >
+          fechaAValor(
+            anterior.fechaPendiente
+          )
+      ) {
+        pendientesPorRut.set(
+          item.rutNormalizado,
+          item
+        );
+      }
+    }
+  );
+
+  const pendientesUnicos = [
+    ...Array.from(
+      pendientesPorRut.values()
+    ),
+
+    ...pendientesSinRut
+  ];
+
+  /*
+    =========================================================
+    6. CARGAR INSCRIPCIONES OFICIALES DEL GRUPO
+    =========================================================
+  */
+
+  const oficialesSnap =
+    await getDocs(
+      collection(
+        db,
+        "ventas_cotizaciones",
+        ID_GRUPO_OBJETIVO,
+        "inscripciones"
+      )
+    );
+
+  const oficiales =
+    oficialesSnap.docs.map(
+      oficialSnap => ({
+        id:
+          oficialSnap.id,
+
+        ref:
+          oficialSnap.ref,
+
+        ...oficialSnap.data()
+      })
+    );
+
+  /*
+    Índice:
+
+    RUT normalizado -> inscripciones oficiales
+  */
+
+  const oficialesPorRut =
+    new Map();
+
+  oficiales.forEach(
+    oficial => {
+      const ruts =
+        getRutsInscripcion(
+          oficial.id,
+          oficial
+        );
+
+      ruts.forEach(
+        rut => {
+          if (
+            !oficialesPorRut.has(
+              rut
+            )
+          ) {
+            oficialesPorRut.set(
+              rut,
+              []
+            );
+          }
+
+          const lista =
+            oficialesPorRut.get(
+              rut
+            );
+
+          if (
+            !lista.some(
+              item =>
+                item.id ===
+                oficial.id
+            )
+          ) {
+            lista.push(
+              oficial
+            );
+          }
+        }
+      );
+    }
+  );
+
+  /*
+    =========================================================
+    7. CLASIFICAR CASOS
+    =========================================================
+  */
+
+  const resultados =
+    pendientesUnicos.map(
+      item => {
+        if (
+          !item.rutNormalizado
+        ) {
+          return {
+            ...item,
+
+            clasificacion:
+              "REVISAR_SIN_RUT",
+
+            detalle:
+              "El formulario no contiene un RUT utilizable."
+          };
+        }
+
+        if (
+          !item.token
+        ) {
+          return {
+            ...item,
+
+            clasificacion:
+              "REVISAR_SIN_TOKEN",
+
+            detalle:
+              "El formulario pendiente no contiene token."
+          };
+        }
+
+        const coincidencias =
+          oficialesPorRut.get(
+            item.rutNormalizado
+          ) ||
+          [];
+
+        if (
+          coincidencias.length === 0
+        ) {
+          return {
+            ...item,
+
+            clasificacion:
+              "REVISAR_SIN_OFICIAL",
+
+            detalle:
+              "No se encontró una inscripción oficial con el mismo RUT."
+          };
+        }
+
+        if (
+          coincidencias.length > 1
+        ) {
+          return {
+            ...item,
+
+            clasificacion:
+              "REVISAR_AMBIGUO",
+
+            coincidencias:
+              coincidencias.map(
+                oficial =>
+                  oficial.id
+              ),
+
+            detalle:
+              "Hay más de una inscripción oficial con el mismo RUT."
+          };
+        }
+
+        const oficial =
+          coincidencias[0];
+
+        if (
+          inscripcionArchivada(
+            oficial
+          )
+        ) {
+          return {
+            ...item,
+
+            oficial,
+
+            inscripcionId:
+              oficial.id,
+
+            clasificacion:
+              "REVISAR_OFICIAL_ARCHIVADA",
+
+            detalle:
+              "La inscripción oficial está archivada."
+          };
+        }
+
+        if (
+          inscripcionAnulada(
+            oficial
+          )
+        ) {
+          return {
+            ...item,
+
+            oficial,
+
+            inscripcionId:
+              oficial.id,
+
+            clasificacion:
+              "REVISAR_OFICIAL_ANULADA",
+
+            detalle:
+              "La inscripción oficial está anulada."
+          };
+        }
+
+        if (
+          fichaCompleta(
+            oficial
+          )
+        ) {
+          return {
+            ...item,
+
+            oficial,
+
+            inscripcionId:
+              oficial.id,
+
+            clasificacion:
+              "OMITIR_YA_COMPLETA",
+
+            detalle:
+              "La inscripción oficial ya tiene la ficha médica completa."
+          };
+        }
+
+        if (
+          !tieneDatosSalud(
+            item.payload
+          )
+        ) {
+          return {
+            ...item,
+
+            oficial,
+
+            inscripcionId:
+              oficial.id,
+
+            clasificacion:
+              "REVISAR_SIN_SALUD",
+
+            detalle:
+              "El formulario fallido no contiene el mapa salud."
+          };
+        }
+
+        return {
+          ...item,
+
+          oficial,
+
+          inscripcionId:
+            oficial.id,
+
+          clasificacion:
+            "RECUPERAR",
+
+          detalle:
+            "Formulario de Liberados recuperable como Nómina Final."
+        };
+      }
+    );
+
+  const candidatosTotales =
+    resultados.filter(
+      item =>
+        item.clasificacion ===
+          "RECUPERAR"
+    );
+
+  const candidatos =
+    Number(
+      maximo
+    ) > 0
+      ? candidatosTotales.slice(
+          0,
+          Number(
+            maximo
+          )
+        )
+      : candidatosTotales;
+
+  /*
+    =========================================================
+    8. RESUMEN DEL DIAGNÓSTICO
+    =========================================================
+  */
+
+  const registrosDuplicadosInternos =
+    pendientesEncontrados.length -
+    pendientesUnicos.length;
+
+  const revisar =
+    resultados.filter(
+      item =>
+        ![
+          "RECUPERAR",
+          "OMITIR_YA_COMPLETA"
+        ].includes(
+          item.clasificacion
+        )
+    ).length;
+
+  const resumenDiagnostico = {
+    idGrupo:
+      ID_GRUPO_OBJETIVO,
+
+    erroresLiberadoDuplicado:
+      pendientesEncontrados.length,
+
+    personasUnicas:
+      pendientesUnicos.length,
+
+    intentosRepetidos:
+      registrosDuplicadosInternos,
+
+    inscripcionesOficiales:
+      oficiales.length,
+
+    candidatosTotales:
+      candidatosTotales.length,
+
+    seleccionados:
+      candidatos.length,
+
+    yaCompletas:
+      resultados.filter(
+        item =>
+          item.clasificacion ===
+            "OMITIR_YA_COMPLETA"
+      ).length,
+
+    revisar
+  };
+
+  console.log("");
+  console.log(
+    "📊 DIAGNÓSTICO"
+  );
+
+  console.table([
+    resumenDiagnostico
+  ]);
+
+  console.log("");
+  console.log(
+    "✅ CANDIDATOS A RECUPERAR"
+  );
+
+  console.table(
+    candidatosTotales.map(
+      item => ({
+        pendienteId:
+          item.pendienteId,
+
+        idGrupo:
+          item.idGrupo,
+
+        inscripcionId:
+          item.inscripcionId,
+
+        documento:
+          item.documento,
+
+        nombre:
+          item.nombre,
+
+        faseOriginal:
+          item.fase,
+
+        accion:
+          "LIBERADO → NÓMINA FINAL"
+      })
+    )
+  );
+
+  console.log("");
+  console.log(
+    "⚠️ OMITIDOS O PARA REVISAR"
+  );
+
+  console.table(
+    resultados
+      .filter(
+        item =>
+          item.clasificacion !==
+            "RECUPERAR"
+      )
+      .map(
+        item => ({
+          clasificacion:
+            item.clasificacion,
+
+          pendienteId:
+            item.pendienteId,
+
+          documento:
+            item.documento,
+
+          nombre:
+            item.nombre,
+
+          inscripcionId:
+            item.inscripcionId ||
+            "",
+
+          detalle:
+            item.detalle
+        })
+      )
+  );
+
+  window.__diagnosticoLiberadosComoNominaFinal =
+    {
+      resumen:
+        resumenDiagnostico,
+
+      resultados,
+
+      candidatos:
+        candidatosTotales
+    };
+
+  /*
+    =========================================================
+    9. DRY RUN
+
+    Hasta aquí no se escribió nada.
+    =========================================================
+  */
+
+  if (
+    dryRun
+  ) {
+    console.warn(
+      "⚠️ DRY RUN TERMINADO: no se escribió nada."
+    );
+
+    console.log(
+      "Resultado disponible en:"
+    );
+
+    console.log(
+      "window.__diagnosticoLiberadosComoNominaFinal"
+    );
+
+    return {
+      ok: true,
+
+      dryRun: true,
+
+      resumen:
+        resumenDiagnostico,
+
+      resultados
+    };
+  }
+
+  /*
+    =========================================================
+    10. VALIDACIONES ANTES DE ESCRIBIR
+    =========================================================
+  */
+
+  if (
+    revisar > 0
+  ) {
+    console.error(
+      "❌ BLOQUEADO: existen casos que requieren revisión.",
+      {
+        idGrupo:
+          ID_GRUPO_OBJETIVO,
+
+        revisar
+      }
+    );
+
+    return {
+      ok: false,
+
+      motivo:
+        "existen_casos_para_revisar",
+
+      resumen:
+        resumenDiagnostico,
+
+      resultados
+    };
+  }
+
+  if (
+    Number(
+      cantidadEsperada
+    ) > 0 &&
+    candidatosTotales.length !==
+      Number(
+        cantidadEsperada
+      )
+  ) {
+    console.error(
+      "❌ BLOQUEADO: la cantidad de candidatos no coincide con la esperada.",
+      {
+        idGrupo:
+          ID_GRUPO_OBJETIVO,
+
+        cantidadEsperada:
+          Number(
+            cantidadEsperada
+          ),
+
+        candidatosEncontrados:
+          candidatosTotales.length
+      }
+    );
+
+    return {
+      ok: false,
+
+      motivo:
+        "cantidad_no_coincide_con_la_esperada",
+
+      idGrupo:
+        ID_GRUPO_OBJETIVO,
+
+      cantidadEsperada:
+        Number(
+          cantidadEsperada
+        ),
+
+      candidatosEncontrados:
+        candidatosTotales.length,
+
+      resumen:
+        resumenDiagnostico,
+
+      resultados
+    };
+  }
+
+  if (
+    candidatos.length === 0
+  ) {
+    console.warn(
+      "No existen candidatos para recuperar."
+    );
+
+    return {
+      ok: true,
+
+      motivo:
+        "sin_candidatos",
+
+      resumen:
+        resumenDiagnostico,
+
+      resultados
+    };
+  }
+
+  /*
+    =========================================================
+    11. CONFIRMACIÓN
+    =========================================================
+  */
+
+  if (
+    confirmar
+  ) {
+    const textoMaximo =
+      Number(
+        maximo
+      ) > 0
+        ? (
+            `\nModo limitado: se procesarán ${candidatos.length} ` +
+            `de ${candidatosTotales.length} candidatos.\n`
+          )
+        : "";
+
+    const ok =
+      window.confirm(
+        `RECUPERAR GRUPO ${ID_GRUPO_OBJETIVO}\n\n` +
+        `Se recuperarán ${candidatos.length} formulario(s) enviados como Liberados.\n\n` +
+        `Cada formulario será aplicado como Nómina Final sobre la inscripción existente.\n` +
+        textoMaximo +
+        `\nNo se crearán pasajeros nuevos.\n\n` +
+        `¿Continuar?`
+      );
+
+    if (
+      !ok
+    ) {
+      console.warn(
+        "Recuperación cancelada."
+      );
+
+      return {
+        ok: false,
+        cancelado: true
+      };
+    }
+  }
+
+  /*
+    =========================================================
+    12. RECUPERAR UNO A UNO
+    =========================================================
+  */
+
+  const procesados = [];
+
+  let recuperados = 0;
+  let omitidos = 0;
+  let errores = 0;
+
+  for (
+    let index = 0;
+    index < candidatos.length;
+    index += 1
+  ) {
+    const candidato =
+      candidatos[index];
+
+    console.log("");
+    console.log(
+      `▶️ ${index + 1}/${candidatos.length}`,
+      {
+        nombre:
+          candidato.nombre,
+
+        documento:
+          candidato.documento,
+
+        inscripcionId:
+          candidato.inscripcionId
+      }
+    );
+
+    try {
+      /*
+        -------------------------------------------------------
+        A. RELEER EL PENDIENTE ORIGINAL
+        -------------------------------------------------------
+      */
+
+      const pendienteSnap =
+        await getDoc(
+          candidato.pendienteRef
+        );
+
+      if (
+        !pendienteSnap.exists()
+      ) {
+        throw new Error(
+          "El pendiente original ya no existe."
+        );
+      }
+
+      const pendienteActual =
+        pendienteSnap.data() ||
+        {};
+
+      if (
+        normalizeSearchLocal(
+          pendienteActual.estado ||
+          ""
+        ) !== "error"
+      ) {
+        omitidos += 1;
+
+        procesados.push({
+          estado:
+            "OMITIDO",
+
+          motivo:
+            "pendiente_ya_no_esta_en_error",
+
+          pendienteId:
+            candidato.pendienteId,
+
+          inscripcionId:
+            candidato.inscripcionId,
+
+          nombre:
+            candidato.nombre,
+
+          documento:
+            candidato.documento
+        });
+
+        continue;
+      }
+
+      const errorActual =
+        normalizeSearchLocal(
+          pendienteActual.error ||
+          ""
+        );
+
+      if (
+        !errorActual.includes(
+          "documento duplicado"
+        )
+      ) {
+        throw new Error(
+          "El error del pendiente ya no corresponde a Documento duplicado."
+        );
+      }
+
+      /*
+        -------------------------------------------------------
+        B. RELEER LA INSCRIPCIÓN OFICIAL
+        -------------------------------------------------------
+      */
+
+      const oficialRef =
+        doc(
+          db,
+          "ventas_cotizaciones",
+          ID_GRUPO_OBJETIVO,
+          "inscripciones",
+          candidato.inscripcionId
+        );
+
+      const oficialSnap =
+        await getDoc(
+          oficialRef
+        );
+
+      if (
+        !oficialSnap.exists()
+      ) {
+        throw new Error(
+          "La inscripción oficial dejó de existir."
+        );
+      }
+
+      const oficialActual =
+        oficialSnap.data() ||
+        {};
+
+      if (
+        inscripcionArchivada(
+          oficialActual
+        )
+      ) {
+        throw new Error(
+          "La inscripción oficial está archivada."
+        );
+      }
+
+      if (
+        inscripcionAnulada(
+          oficialActual
+        )
+      ) {
+        throw new Error(
+          "La inscripción oficial está anulada."
+        );
+      }
+
+      if (
+        fichaCompleta(
+          oficialActual
+        )
+      ) {
+        omitidos += 1;
+
+        procesados.push({
+          estado:
+            "OMITIDO",
+
+          motivo:
+            "ficha_ya_completa",
+
+          pendienteId:
+            candidato.pendienteId,
+
+          inscripcionId:
+            candidato.inscripcionId,
+
+          nombre:
+            candidato.nombre,
+
+          documento:
+            candidato.documento
+        });
+
+        continue;
+      }
+
+      /*
+        -------------------------------------------------------
+        C. PREPARAR EL PAYLOAD CORREGIDO
+        -------------------------------------------------------
+      */
+
+      const payloadOriginal =
+        pendienteActual.payload ||
+        {};
+
+      const token =
+        cleanText(
+          pendienteActual.token ||
+          payloadOriginal.token ||
+          candidato.token ||
+          ""
+        );
+
+      if (
+        !token
+      ) {
+        throw new Error(
+          "El pendiente original no contiene token."
+        );
+      }
+
+      if (
+        !tieneDatosSalud(
+          payloadOriginal
+        )
+      ) {
+        throw new Error(
+          "El payload original no contiene datos de salud."
+        );
+      }
+
+      const contactoPrincipalOriginal =
+        payloadOriginal
+          .contactoPrincipal ||
+        {};
+
+      const contactoSecundarioOriginal =
+        payloadOriginal
+          .contactoSecundario ||
+        {};
+
+      const contactoPrincipalCorregido = {
+        ...contactoPrincipalOriginal,
+
+        nombre:
+          cleanText(
+            contactoPrincipalOriginal
+              .nombre ||
+            contactoPrincipalOriginal
+              .nombreCompleto ||
+            ""
+          ),
+
+        nombreCompleto:
+          cleanText(
+            contactoPrincipalOriginal
+              .nombreCompleto ||
+            contactoPrincipalOriginal
+              .nombre ||
+            ""
+          )
+      };
+
+      const contactoSecundarioCorregido = {
+        ...contactoSecundarioOriginal,
+
+        nombre:
+          cleanText(
+            contactoSecundarioOriginal
+              .nombre ||
+            contactoSecundarioOriginal
+              .nombreCompleto ||
+            ""
+          ),
+
+        nombreCompleto:
+          cleanText(
+            contactoSecundarioOriginal
+              .nombreCompleto ||
+            contactoSecundarioOriginal
+              .nombre ||
+            ""
+          )
+      };
+
+      const payloadCorregido = {
+        ...payloadOriginal,
+
+        idGrupo:
+          ID_GRUPO_OBJETIVO,
+
+        token,
+
+        faseInscripcion:
+          "nomina_final",
+
+        tipoInscripcion:
+          "nomina_final",
+
+        actualizaInscripcionExistente:
+          true,
+
+        inscripcionSistemaPagosDocId:
+          candidato.inscripcionId,
+
+        contactoPrincipal:
+          contactoPrincipalCorregido,
+
+        contactoSecundario:
+          contactoSecundarioCorregido
+      };
+
+      /*
+        -------------------------------------------------------
+        D. CREAR NUEVO PENDIENTE CORREGIDO
+
+        La Cloud Function guardarInscripcionPublica realizará
+        la actualización normal de Nómina Final.
+        -------------------------------------------------------
+      */
+
+      const nuevoRef =
+        await addDoc(
+          collection(
+            db,
+            "inscripciones_pendientes_publicas"
+          ),
+          {
+            idGrupo:
+              ID_GRUPO_OBJETIVO,
+
+            token,
+
+            fase:
+              "nomina_final",
+
+            payload:
+              payloadCorregido,
+
+            estado:
+              "pendiente",
+
+            creadoEn:
+              serverTimestamp(),
+
+            origen:
+              "recuperacion_liberado_como_nomina_final_grupo_js",
+
+            recuperacion: {
+              activo: true,
+
+              masiva:
+                candidatos.length > 1,
+
+              conversionFase: {
+                desde:
+                  "liberado",
+
+                hacia:
+                  "nomina_final"
+              },
+
+              pendienteOriginalId:
+                candidato.pendienteId,
+
+              errorOriginal:
+                cleanText(
+                  pendienteActual.error ||
+                  ""
+                ),
+
+              errorOriginalEn:
+                pendienteActual.errorEn ||
+                null,
+
+              inscripcionDestinoId:
+                candidato.inscripcionId,
+
+              actualizaInscripcionExistente:
+                true,
+
+              recuperadoPor:
+                getDisplayName(
+                  state.effectiveUser
+                ),
+
+              recuperadoPorCorreo:
+                state.effectiveEmail ||
+                "",
+
+              recuperadoEn:
+                serverTimestamp()
+            }
+          }
+        );
+
+      console.log(
+        "📨 Pendiente corregido creado:",
+        {
+          nuevoPendienteId:
+            nuevoRef.id,
+
+          nombre:
+            candidato.nombre
+        }
+      );
+
+      /*
+        -------------------------------------------------------
+        E. ESPERAR LA CLOUD FUNCTION
+        -------------------------------------------------------
+      */
+
+      for (
+        let intento = 1;
+        intento <= 30;
+        intento += 1
+      ) {
+        await esperar(
+          1000
+        );
+
+        const procesoSnap =
+          await getDoc(
+            nuevoRef
+          );
+
+        /*
+          Algunas implementaciones eliminan el pendiente
+          una vez procesado.
+        */
+
+        if (
+          !procesoSnap.exists()
+        ) {
+          break;
+        }
+
+        const resultadoProceso =
+          procesoSnap.data() ||
+          {};
+
+        const estadoProceso =
+          normalizeSearchLocal(
+            resultadoProceso.estado ||
+            ""
+          );
+
+        console.log(
+          `⏳ ${candidato.nombre || candidato.documento} · ${intento}/30`,
+          {
+            estado:
+              resultadoProceso.estado ||
+              "pendiente"
+          }
+        );
+
+        if (
+          estadoProceso ===
+            "error"
+        ) {
+          throw new Error(
+            resultadoProceso.error ||
+            "El reprocesamiento volvió a fallar."
+          );
+        }
+
+        if (
+          estadoProceso !==
+            "pendiente" &&
+          estadoProceso !==
+            "procesando"
+        ) {
+          break;
+        }
+      }
+
+      /*
+        -------------------------------------------------------
+        F. VERIFICAR LA INSCRIPCIÓN OFICIAL
+        -------------------------------------------------------
+      */
+
+      let quedoCompleta =
+        false;
+
+      for (
+        let intento = 1;
+        intento <= 10;
+        intento += 1
+      ) {
+        await esperar(
+          1000
+        );
+
+        const verificarSnap =
+          await getDoc(
+            oficialRef
+          );
+
+        if (
+          verificarSnap.exists() &&
+          fichaCompleta(
+            verificarSnap.data() ||
+            {}
+          )
+        ) {
+          quedoCompleta =
+            true;
+
+          break;
+        }
+      }
+
+      if (
+        !quedoCompleta
+      ) {
+        throw new Error(
+          "La inscripción oficial continúa con la ficha médica pendiente."
+        );
+      }
+
+      /*
+        -------------------------------------------------------
+        G. MARCAR EL PENDIENTE ORIGINAL COMO RECUPERADO
+        -------------------------------------------------------
+      */
+
+      await setDoc(
+        candidato.pendienteRef,
+        {
+          estado:
+            "recuperado",
+
+          recuperadoEn:
+            serverTimestamp(),
+
+          recuperadoPor:
+            getDisplayName(
+              state.effectiveUser
+            ),
+
+          recuperadoPorCorreo:
+            state.effectiveEmail ||
+            "",
+
+          recuperacionLiberadoANominaFinal: {
+            ok: true,
+
+            idGrupo:
+              ID_GRUPO_OBJETIVO,
+
+            nuevoPendienteId:
+              nuevoRef.id,
+
+            inscripcionDestinoId:
+              candidato.inscripcionId,
+
+            faseOriginal:
+              "liberado",
+
+            faseFinal:
+              "nomina_final",
+
+            recuperadoEn:
+              serverTimestamp()
+          }
+        },
+        {
+          merge: true
+        }
+      );
+
+      recuperados += 1;
+
+      procesados.push({
+        estado:
+          "RECUPERADO",
+
+        pendienteId:
+          candidato.pendienteId,
+
+        nuevoPendienteId:
+          nuevoRef.id,
+
+        idGrupo:
+          ID_GRUPO_OBJETIVO,
+
+        inscripcionId:
+          candidato.inscripcionId,
+
+        documento:
+          candidato.documento,
+
+        nombre:
+          candidato.nombre
+      });
+
+      console.log(
+        "✅ RECUPERADO",
+        {
+          idGrupo:
+            ID_GRUPO_OBJETIVO,
+
+          nombre:
+            candidato.nombre,
+
+          documento:
+            candidato.documento,
+
+          inscripcionId:
+            candidato.inscripcionId
+        }
+      );
+
+    } catch (
+      error
+    ) {
+      errores += 1;
+
+      procesados.push({
+        estado:
+          "ERROR",
+
+        pendienteId:
+          candidato.pendienteId,
+
+        idGrupo:
+          ID_GRUPO_OBJETIVO,
+
+        inscripcionId:
+          candidato.inscripcionId,
+
+        documento:
+          candidato.documento,
+
+        nombre:
+          candidato.nombre,
+
+        error:
+          error?.message ||
+          String(
+            error
+          )
+      });
+
+      console.error(
+        "❌ ERROR RECUPERANDO",
+        {
+          idGrupo:
+            ID_GRUPO_OBJETIVO,
+
+          nombre:
+            candidato.nombre,
+
+          documento:
+            candidato.documento,
+
+          error:
+            error?.message ||
+            String(
+              error
+            )
+        }
+      );
+    }
+  }
+
+  /*
+    =========================================================
+    13. REGISTRAR HISTORIAL GENERAL
+    =========================================================
+  */
+
+  await createHistoryEntry({
+    tipoMovimiento:
+      "recuperacion_liberados_nomina_final",
+
+    modulo:
+      "inscripcion",
+
+    titulo:
+      "Liberados recuperados como Nómina Final",
+
+    mensaje:
+      `${getDisplayName(state.effectiveUser)} ejecutó la recuperación de formularios enviados incorrectamente como Liberados. ` +
+      `Recuperados: ${recuperados}; omitidos: ${omitidos}; errores: ${errores}.`,
+
+    metadata: {
+      idGrupo:
+        ID_GRUPO_OBJETIVO,
+
+      candidatosTotales:
+        candidatosTotales.length,
+
+      candidatosProcesados:
+        candidatos.length,
+
+      recuperados,
+
+      omitidos,
+
+      errores
+    }
+  });
+
+  /*
+    =========================================================
+    14. RESULTADO FINAL
+    =========================================================
+  */
+
+  const resumenFinal = {
+    idGrupo:
+      ID_GRUPO_OBJETIVO,
+
+    candidatosTotales:
+      candidatosTotales.length,
+
+    candidatosProcesados:
+      candidatos.length,
+
+    recuperados,
+
+    omitidos,
+
+    errores
+  };
+
+  console.log("");
+  console.log(
+    "======================================================"
+  );
+
+  console.log(
+    "✅ RECUPERACIÓN TERMINADA"
+  );
+
+  console.log(
+    "======================================================"
+  );
+
+  console.table([
+    resumenFinal
+  ]);
+
+  console.log("");
+  console.log(
+    "📋 DETALLE"
+  );
+
+  console.table(
+    procesados
+  );
+
+  window.__ultimaRecuperacionLiberadosComoNominaFinal =
+    {
+      resumen:
+        resumenFinal,
+
+      resultados:
+        procesados
+    };
+
+  return {
+    ok:
+      errores === 0,
+
+    resumen:
+      resumenFinal,
+
+    resultados:
+      procesados
+  };
+};
