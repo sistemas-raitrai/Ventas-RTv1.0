@@ -1716,6 +1716,12 @@ function bindEvents() {
       cargarPantalla
     );
 
+  $("gnExportarXlsx")
+    ?.addEventListener(
+      "click",
+      exportarGestionNominasXlsx
+    );
+
   $("modalCerrar")
     ?.addEventListener(
       "click",
@@ -1769,6 +1775,12 @@ function bindEvents() {
             "grupo"
           }.csv`
         )
+    );
+
+  $("btnExportarXlsx")
+    ?.addEventListener(
+      "click",
+      exportarNominaGrupoXlsx
     );
 
   $("btnCargadoPagos")
@@ -1961,6 +1973,1149 @@ function bindEvents() {
       }
     }
   );
+}
+
+function verificarLibreriaXlsx() {
+  if (
+    typeof window.XLSX ===
+    "undefined"
+  ) {
+    throw new Error(
+      "No se pudo cargar la librería para generar el archivo XLSX."
+    );
+  }
+
+  return window.XLSX;
+}
+
+function limpiarNombreArchivo(
+  value = ""
+) {
+  return String(
+    value ||
+    ""
+  )
+    .normalize("NFD")
+    .replace(
+      /[\u0300-\u036f]/g,
+      ""
+    )
+    .replace(
+      /[^a-zA-Z0-9_-]+/g,
+      "_"
+    )
+    .replace(
+      /^_+|_+$/g,
+      ""
+    )
+    .replace(
+      /_+/g,
+      "_"
+    )
+    .slice(
+      0,
+      100
+    ) ||
+    "archivo";
+}
+
+function getFechaHoraExportacion() {
+  return new Date()
+    .toLocaleString(
+      "es-CL",
+      {
+        dateStyle:
+          "short",
+
+        timeStyle:
+          "short"
+      }
+    );
+}
+
+function getValorCeldaXlsx(
+  value,
+  fallback = ""
+) {
+  if (
+    value === undefined ||
+    value === null
+  ) {
+    return fallback;
+  }
+
+  if (
+    typeof value ===
+      "number" &&
+    !Number.isFinite(
+      value
+    )
+  ) {
+    return fallback;
+  }
+
+  return value;
+}
+
+function ajustarColumnasXlsx(
+  worksheet,
+  rows = [],
+  opciones = {}
+) {
+  const minimo =
+    Number(
+      opciones.minimo ||
+      10
+    );
+
+  const maximo =
+    Number(
+      opciones.maximo ||
+      45
+    );
+
+  const totalColumnas =
+    rows.reduce(
+      (maximoActual, row) =>
+        Math.max(
+          maximoActual,
+          Array.isArray(row)
+            ? row.length
+            : 0
+        ),
+      0
+    );
+
+  worksheet["!cols"] =
+    Array.from(
+      {
+        length:
+          totalColumnas
+      },
+      (
+        _,
+        columnIndex
+      ) => {
+        const largoMayor =
+          rows.reduce(
+            (
+              largoActual,
+              row
+            ) => {
+              const valor =
+                Array.isArray(row)
+                  ? row[
+                      columnIndex
+                    ]
+                  : "";
+
+              const texto =
+                valor ===
+                  undefined ||
+                valor ===
+                  null
+                  ? ""
+                  : String(
+                      valor
+                    );
+
+              return Math.max(
+                largoActual,
+                texto.length
+              );
+            },
+            minimo
+          );
+
+        return {
+          wch:
+            Math.min(
+              Math.max(
+                largoMayor +
+                  2,
+                minimo
+              ),
+              maximo
+            )
+        };
+      }
+    );
+}
+
+function descargarLibroXlsx(
+  workbook,
+  nombreArchivo
+) {
+  const XLSX =
+    verificarLibreriaXlsx();
+
+  XLSX.writeFile(
+    workbook,
+    nombreArchivo,
+    {
+      compression:
+        true
+    }
+  );
+}
+
+function getFiltroGestionLabel() {
+  const filtro =
+    $("gnEstado")
+      ?.value ||
+    "todos";
+
+  const labels = {
+    todos:
+      "Todos",
+
+    pendiente:
+      "Ficha médica pendiente",
+
+    sin_carnet:
+      "Sin carnet",
+
+    completa:
+      "Ficha médica completa",
+
+    link_activo:
+      "Link activo",
+
+    archivada:
+      "Nómina archivada"
+  };
+
+  return (
+    labels[filtro] ||
+    filtro
+  );
+}
+
+function getVendedorGestionLabel() {
+  const select =
+    $("gnVendedor");
+
+  if (
+    !select ||
+    select.value ===
+      "todos"
+  ) {
+    return state.canSeeAll
+      ? "Todos"
+      : (
+          [
+            state.user?.nombre,
+            state.user?.apellido
+          ]
+            .filter(Boolean)
+            .join(" ")
+            .trim() ||
+          state.email ||
+          "Usuario"
+        );
+  }
+
+  return (
+    select.options[
+      select.selectedIndex
+    ]?.textContent ||
+    select.value
+  );
+}
+
+function getEstadoLinkGrupoXlsx(
+  row = {}
+) {
+  const estado =
+    normalizar(
+      row.estadoNominaGeneral ||
+      ""
+    );
+
+  const abierta =
+    estado === "abierta" ||
+    row.inscripcionHabilitada ===
+      true ||
+    row.linkActivo ===
+      true;
+
+  return abierta
+    ? "Abierto"
+    : "Cerrado";
+}
+
+function getEstadoFichaGrupoXlsx(
+  row = {}
+) {
+  const completas =
+    Number(
+      row.fichaCompleta ||
+      0
+    );
+
+  const pendientes =
+    Number(
+      row.pendientes ||
+      0
+    );
+
+  if (
+    completas +
+      pendientes ===
+    0
+  ) {
+    return "Sin registros";
+  }
+
+  if (
+    pendientes ===
+    0
+  ) {
+    return "Completa";
+  }
+
+  return "Pendiente";
+}
+
+function exportarGestionNominasXlsx() {
+  try {
+    const XLSX =
+      verificarLibreriaXlsx();
+
+    /*
+      state.filtered contiene exactamente
+      los grupos que el usuario está viendo:
+
+      - año
+      - búsqueda
+      - vendedor
+      - estado
+      - permisos del rol
+    */
+    const rows =
+      Array.isArray(
+        state.filtered
+      )
+        ? state.filtered
+        : [];
+
+    if (!rows.length) {
+      alert(
+        "No hay grupos visibles para exportar."
+      );
+
+      return;
+    }
+
+    /*
+      Estas columnas solamente existen
+      para los roles autorizados.
+
+      Un vendedor recibirá un arreglo vacío.
+    */
+    const columnasAdmin =
+      getColumnasAdministracionActivas();
+
+    const encabezados = [
+      "Grupo",
+      "Colegio",
+      "Curso",
+      "ID Grupo",
+      "Número de negocio",
+      "Vendedor",
+      "Destino",
+      "Pax que viajan",
+      "Cupos reservados",
+      "Fichas completas",
+      "Fichas pendientes",
+      "Estado ficha médica",
+      "Con carnet",
+      "Sin carnet",
+      "Fase actual",
+      "Estado del link",
+      "Nómina archivada",
+
+      ...columnasAdmin.map(
+        (columna) =>
+          columna.nombre
+      )
+    ];
+
+    const datos =
+      rows.map(
+        (row) => [
+          getValorCeldaXlsx(
+            row.titulo
+          ),
+
+          getValorCeldaXlsx(
+            row.colegio
+          ),
+
+          getValorCeldaXlsx(
+            row.curso
+          ),
+
+          getValorCeldaXlsx(
+            row.groupId ||
+            row.docId
+          ),
+
+          getValorCeldaXlsx(
+            row.negocio
+          ),
+
+          getValorCeldaXlsx(
+            row.vendedora
+          ),
+
+          getValorCeldaXlsx(
+            row.destino
+          ),
+
+          Number(
+            row.total ||
+            0
+          ),
+
+          Number(
+            row.cuposReservados ||
+            0
+          ),
+
+          Number(
+            row.fichaCompleta ||
+            0
+          ),
+
+          Number(
+            row.pendientes ||
+            0
+          ),
+
+          getEstadoFichaGrupoXlsx(
+            row
+          ),
+
+          row.tieneResumenCarnet ===
+            true
+            ? Number(
+                row.conCarnet ||
+                0
+              )
+            : "Resumen pendiente",
+
+          row.tieneResumenCarnet ===
+            true
+            ? Number(
+                row.sinCarnet ||
+                0
+              )
+            : "Resumen pendiente",
+
+          getFaseNominaLabel(
+            row.faseNominaActual
+          ),
+
+          getEstadoLinkGrupoXlsx(
+            row
+          ),
+
+          row.archivada ===
+            true
+            ? "Sí"
+            : "No",
+
+          ...columnasAdmin.map(
+            (columna) =>
+              getEstadoControlAdministracion(
+                row,
+                columna.id
+              ) ===
+              "ok"
+                ? "OK"
+                : "Pendiente"
+          )
+        ]
+      );
+
+    const filasResumen = [
+      [
+        "GESTIÓN DE NÓMINAS"
+      ],
+
+      [
+        "Año",
+        Number(
+          state.anoSeleccionado
+        )
+      ],
+
+      [
+        "Vendedor",
+        getVendedorGestionLabel()
+      ],
+
+      [
+        "Filtro",
+        getFiltroGestionLabel()
+      ],
+
+      [
+        "Búsqueda",
+        String(
+          $("gnBuscar")
+            ?.value ||
+          ""
+        ).trim() ||
+        "Sin búsqueda"
+      ],
+
+      [
+        "Grupos exportados",
+        rows.length
+      ],
+
+      [
+        "Generado",
+        getFechaHoraExportacion()
+      ],
+
+      []
+    ];
+
+    const contenido = [
+      ...filasResumen,
+      encabezados,
+      ...datos
+    ];
+
+    const worksheet =
+      XLSX.utils
+        .aoa_to_sheet(
+          contenido
+        );
+
+    const filaEncabezado =
+      filasResumen.length;
+
+    worksheet["!autofilter"] = {
+      ref:
+        XLSX.utils.encode_range({
+          s: {
+            r:
+              filaEncabezado,
+            c:
+              0
+          },
+
+          e: {
+            r:
+              filaEncabezado +
+              datos.length,
+            c:
+              encabezados.length -
+              1
+          }
+        })
+    };
+
+    worksheet["!merges"] = [
+      {
+        s: {
+          r:
+            0,
+          c:
+            0
+        },
+
+        e: {
+          r:
+            0,
+          c:
+            Math.max(
+              encabezados.length -
+                1,
+              0
+            )
+        }
+      }
+    ];
+
+    ajustarColumnasXlsx(
+      worksheet,
+      contenido,
+      {
+        minimo:
+          11,
+
+        maximo:
+          42
+      }
+    );
+
+    const workbook =
+      XLSX.utils
+        .book_new();
+
+    XLSX.utils
+      .book_append_sheet(
+        workbook,
+        worksheet,
+        "Gestión de nóminas"
+      );
+
+    const vendedor =
+      limpiarNombreArchivo(
+        getVendedorGestionLabel()
+      );
+
+    const filtro =
+      limpiarNombreArchivo(
+        getFiltroGestionLabel()
+      );
+
+    const nombreArchivo =
+      `gestion_nominas_${
+        state.anoSeleccionado
+      }_${vendedor}_${filtro}.xlsx`;
+
+    descargarLibroXlsx(
+      workbook,
+      nombreArchivo
+    );
+  } catch (error) {
+    console.error(
+      "[gestion-nomina] exportarGestionNominasXlsx",
+      error
+    );
+
+    alert(
+      error.message ||
+      "No se pudo generar el archivo XLSX."
+    );
+  }
+}
+
+function getNombreGrupoActualXlsx() {
+  const grupo =
+    state.current?.data ||
+    {};
+
+  return (
+    grupo.aliasGrupo ||
+    [
+      grupo.colegio,
+      grupo.curso
+    ]
+      .filter(Boolean)
+      .join(" ") ||
+    `Grupo ${
+      state.current?.groupId ||
+      ""
+    }`
+  );
+}
+
+function getDestinoGrupoActualXlsx() {
+  const grupo =
+    state.current?.data ||
+    {};
+
+  return (
+    grupo.destinoPrincipal ||
+    grupo.destino ||
+    "—"
+  );
+}
+
+function getVendedorGrupoActualXlsx() {
+  const grupo =
+    state.current?.data ||
+    {};
+
+  return (
+    grupo.vendedora ||
+    grupo.vendedoraCorreo ||
+    "—"
+  );
+}
+
+function getDatosResponsablesXlsx(
+  item = {}
+) {
+  const principal =
+    getResponsableNomina(
+      item,
+      "principal"
+    );
+
+  const secundario =
+    getResponsableNomina(
+      item,
+      "secundario"
+    );
+
+  return {
+    principalNombre:
+      principal.aplica
+        ? principal.nombre
+        : "",
+
+    principalRelacion:
+      principal.aplica
+        ? principal.relacion
+        : "",
+
+    principalTelefono:
+      principal.aplica
+        ? principal.telefono
+        : "",
+
+    principalCorreo:
+      principal.aplica
+        ? principal.correo
+        : "",
+
+    secundarioNombre:
+      secundario.aplica
+        ? secundario.nombre
+        : "",
+
+    secundarioRelacion:
+      secundario.aplica
+        ? secundario.relacion
+        : "",
+
+    secundarioTelefono:
+      secundario.aplica
+        ? secundario.telefono
+        : "",
+
+    secundarioCorreo:
+      secundario.aplica
+        ? secundario.correo
+        : ""
+  };
+}
+
+function getDocumentoNominaXlsx(
+  item = {}
+) {
+  if (
+    esCupoReservadoNomina(
+      item
+    )
+  ) {
+    return "SIN RUT";
+  }
+
+  return (
+    camposPasajero.documento(
+      item
+    ) ||
+    ""
+  );
+}
+
+function getNombresNominaXlsx(
+  item = {}
+) {
+  if (
+    esCupoReservadoNomina(
+      item
+    )
+  ) {
+    return "CUPO RESERVADO";
+  }
+
+  return (
+    camposPasajero.nombres(
+      item
+    ) ||
+    ""
+  );
+}
+
+function getApellidosNominaXlsx(
+  item = {}
+) {
+  if (
+    esCupoReservadoPendienteNomina(
+      item
+    )
+  ) {
+    return "LIBERADO PENDIENTE";
+  }
+
+  if (
+    esCupoReservadoNomina(
+      item
+    )
+  ) {
+    return "CONSUMIDO";
+  }
+
+  return (
+    camposPasajero.apellidos(
+      item
+    ) ||
+    ""
+  );
+}
+
+function getEstadoFichaNominaXlsx(
+  item = {}
+) {
+  if (
+    esCupoReservadoNomina(
+      item
+    )
+  ) {
+    return "No aplica";
+  }
+
+  return fichaCompletaNomina(
+    item
+  )
+    ? "Completa"
+    : "Pendiente";
+}
+
+function getEstadoCarnetNominaXlsx(
+  item = {}
+) {
+  if (
+    esCupoReservadoNomina(
+      item
+    )
+  ) {
+    return "No aplica";
+  }
+
+  return camposPasajero
+    .tieneCarnet(
+      item
+    )
+      ? "Sí"
+      : "No";
+}
+
+function exportarNominaGrupoXlsx() {
+  try {
+    const XLSX =
+      verificarLibreriaXlsx();
+
+    if (
+      !state.current
+    ) {
+      alert(
+        "Primero debes abrir un grupo."
+      );
+
+      return;
+    }
+
+    /*
+      Esta es exactamente la misma lógica
+      utilizada por renderPasajeros():
+
+      1. Aplica el filtro elegido en los KPI.
+      2. Aplica el orden operativo visible.
+    */
+    const pasajeros =
+      ordenarNominaOperativa(
+        filtrarNominaModal(
+          state.nomina
+        )
+      );
+
+    if (!pasajeros.length) {
+      alert(
+        "No hay pasajeros visibles para exportar con este filtro."
+      );
+
+      return;
+    }
+
+    const grupo =
+      state.current.data ||
+      {};
+
+    const filtroLabel =
+      getFiltroNominaLabel(
+        state.nominaFiltro
+      );
+
+    const encabezados = [
+      "Sección",
+      "RUT / Documento",
+      "Nombres",
+      "Apellidos",
+      "Tipo",
+      "Estado operativo",
+      "Ficha médica",
+      "Anulado",
+      "Responsable principal",
+      "Relación principal",
+      "Teléfono principal",
+      "Correo principal",
+      "Responsable secundario",
+      "Relación secundaria",
+      "Teléfono secundario",
+      "Correo secundario",
+      "Fecha de ingreso",
+      "Carnet cargado"
+    ];
+
+    const datos =
+      pasajeros.map(
+        (item) => {
+          const responsables =
+            getDatosResponsablesXlsx(
+              item
+            );
+
+          return [
+            getSeccionNominaLabel(
+              getSeccionNomina(
+                item
+              )
+            ),
+
+            getDocumentoNominaXlsx(
+              item
+            ),
+
+            getNombresNominaXlsx(
+              item
+            ),
+
+            getApellidosNominaXlsx(
+              item
+            ),
+
+            getTipoVisibleNomina(
+              item
+            ),
+
+            getEstadoOperativoLabel(
+              item
+            ),
+
+            getEstadoFichaNominaXlsx(
+              item
+            ),
+
+            estaAnuladoNomina(
+              item
+            )
+              ? "Sí"
+              : "No",
+
+            responsables
+              .principalNombre,
+
+            responsables
+              .principalRelacion,
+
+            responsables
+              .principalTelefono,
+
+            responsables
+              .principalCorreo,
+
+            responsables
+              .secundarioNombre,
+
+            responsables
+              .secundarioRelacion,
+
+            responsables
+              .secundarioTelefono,
+
+            responsables
+              .secundarioCorreo,
+
+            formatFechaIngresoNomina(
+              item
+            ),
+
+            getEstadoCarnetNominaXlsx(
+              item
+            )
+          ];
+        }
+      );
+
+    const filasResumen = [
+      [
+        "NÓMINA DEL GRUPO"
+      ],
+
+      [
+        "Grupo",
+        getNombreGrupoActualXlsx()
+      ],
+
+      [
+        "ID Grupo",
+        state.current.groupId ||
+        grupo.idGrupo ||
+        "—"
+      ],
+
+      [
+        "Número de negocio",
+        grupo.numeroNegocio ||
+        grupo.negocioId ||
+        "—"
+      ],
+
+      [
+        "Año de viaje",
+        Number(
+          grupo.anoViaje ||
+          state.anoSeleccionado
+        )
+      ],
+
+      [
+        "Destino",
+        getDestinoGrupoActualXlsx()
+      ],
+
+      [
+        "Vendedor",
+        getVendedorGrupoActualXlsx()
+      ],
+
+      [
+        "Filtro exportado",
+        filtroLabel
+      ],
+
+      [
+        "Pasajeros exportados",
+        pasajeros.length
+      ],
+
+      [
+        "Generado",
+        getFechaHoraExportacion()
+      ],
+
+      []
+    ];
+
+    const contenido = [
+      ...filasResumen,
+      encabezados,
+      ...datos
+    ];
+
+    const worksheet =
+      XLSX.utils
+        .aoa_to_sheet(
+          contenido
+        );
+
+    const filaEncabezado =
+      filasResumen.length;
+
+    worksheet["!autofilter"] = {
+      ref:
+        XLSX.utils.encode_range({
+          s: {
+            r:
+              filaEncabezado,
+            c:
+              0
+          },
+
+          e: {
+            r:
+              filaEncabezado +
+              datos.length,
+            c:
+              encabezados.length -
+              1
+          }
+        })
+    };
+
+    worksheet["!merges"] = [
+      {
+        s: {
+          r:
+            0,
+          c:
+            0
+        },
+
+        e: {
+          r:
+            0,
+          c:
+            encabezados.length -
+              1
+        }
+      }
+    ];
+
+    ajustarColumnasXlsx(
+      worksheet,
+      contenido,
+      {
+        minimo:
+          12,
+
+        maximo:
+          42
+      }
+    );
+
+    const workbook =
+      XLSX.utils
+        .book_new();
+
+    XLSX.utils
+      .book_append_sheet(
+        workbook,
+        worksheet,
+        "Nómina"
+      );
+
+    const grupoNombre =
+      limpiarNombreArchivo(
+        state.current.groupId ||
+        grupo.idGrupo ||
+        getNombreGrupoActualXlsx()
+      );
+
+    const filtroNombre =
+      limpiarNombreArchivo(
+        filtroLabel
+      );
+
+    const nombreArchivo =
+      `nomina_${grupoNombre}_${filtroNombre}.xlsx`;
+
+    descargarLibroXlsx(
+      workbook,
+      nombreArchivo
+    );
+  } catch (error) {
+    console.error(
+      "[gestion-nomina] exportarNominaGrupoXlsx",
+      error
+    );
+
+    alert(
+      error.message ||
+      "No se pudo generar el archivo XLSX de la nómina."
+    );
+  }
 }
 
 function bindAdministracionEvents() {
