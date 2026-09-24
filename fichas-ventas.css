@@ -208,3 +208,29 @@
     display: none !important;
   }
 }
+
+/* Ajustes de la pantalla Consolidado de poleras */
+.rt-medical-page .filtros {
+  border: 1px solid #e0d9e5;
+  border-radius: 16px;
+  box-shadow: none;
+}
+
+.rt-medical-page .filtros button {
+  border: 1px solid #352040;
+  border-radius: 9px;
+  background: #352040;
+  color: #fff;
+  font-weight: 700;
+}
+
+.rt-medical-page .filtros button:disabled {
+  opacity: .55;
+  cursor: not-allowed;
+}
+
+.rt-medical-page #resultadoPoleras {
+  border: 1px solid #e0d9e5;
+  border-radius: 16px;
+  box-shadow: none;
+}
