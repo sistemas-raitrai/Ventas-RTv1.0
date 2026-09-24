@@ -6,24 +6,46 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Ficha médica | Sistema Ventas RT</title>
   <link rel="stylesheet" href="ficha-medica.css">
+  <link rel="stylesheet" href="fichas-ventas.css">
 </head>
-<body>
+<body class="rt-medical-page">
   <main class="app-shell">
-    <header class="topbar no-print">
-      <div>
-        <h1>Ficha médica individual</h1>
-        <p id="pageSubtitle">Cargando pasajero...</p>
+    <header class="topbar no-print rt-head">
+      <div class="rt-head-main">
+        <div class="rt-head-title">
+          <h1>Ficha médica individual</h1>
+          <p id="pageSubtitle">Cargando pasajero...</p>
+        </div>
+    
+        <img
+          class="rt-head-logo"
+          src="Logo Raitrai.png"
+          alt="Rai Trai"
+        >
       </div>
-
-      <div class="actions">
-        <a id="btnVolver" class="button-link btn-light" href="#">Volver a gestión</a>
-        <button id="btnPrint" class="btn-yellow" type="button">Descargar / imprimir PDF</button>
+    
+      <div class="actions rt-actions">
+        <a
+          id="btnVolver"
+          class="rt-action"
+          href="#"
+        >
+          Volver a gestión
+        </a>
+    
+        <button
+          id="btnPrint"
+          class="rt-action rt-action-primary rt-action-last"
+          type="button"
+        >
+          Descargar / imprimir PDF
+        </button>
       </div>
     </header>
-
-    <section id="loadingBox" class="loading">Cargando ficha...</section>
-    <section id="errorBox" class="error-box hidden"></section>
-    <section id="sheetContainer"></section>
+    
+        <section id="loadingBox" class="loading">Cargando ficha...</section>
+        <section id="errorBox" class="error-box hidden"></section>
+        <section id="sheetContainer"></section>
   </main>
 
   <script type="module" src="ficha-medica.js"></script>
