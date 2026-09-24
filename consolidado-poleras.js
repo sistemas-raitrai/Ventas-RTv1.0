@@ -11,7 +11,11 @@ import {
 } from "./ficha-medica-common.js";
 
 import {
-  getDocs
+  getDocs,
+  getDoc,
+  doc,
+  query,
+  where
 } from "https://www.gstatic.com/firebasejs/11.7.3/firebase-firestore.js";
 
 import {
@@ -28,7 +32,8 @@ const $ = (id) => document.getElementById(id);
 const estado = {
   grupos: [],
   resultados: [],
-  consultando: false
+  consultando: false,
+  filtrosConsultados: null
 };
 
 onAuthStateChanged(auth, async (firebaseUser) => {
@@ -55,55 +60,78 @@ onAuthStateChanged(auth, async (firebaseUser) => {
     imprimirConsolidadoPoleras
   );
 
-  try {
-    $("estadoPoleras").textContent = "Cargando grupos…";
+  $("filtroAnoPoleras").addEventListener(
+    "change",
+    async () => {
+      invalidarConsultaPoleras();
+      await cargarGruposGanadosPoleras();
+    }
+  );
 
-    const snapshot = await getDocs(
-      collection(db, "ventas_cotizaciones")
-    );
+  [
+    "filtroDestinoPoleras",
+    "filtroDesdePoleras",
+    "filtroHastaPoleras"
+  ].forEach((id) => {
+    $(id).addEventListener("change", invalidarConsultaPoleras);
+  });
 
-    estado.grupos = snapshot.docs.map((documento) => ({
-      docId: documento.id,
-      datos: documento.data()
-    }));
+  prepararAnosPoleras();
 
-    cargarFiltrosPoleras();
-
-    $("estadoPoleras").textContent =
-      "Elige los filtros y pulsa Consultar.";
-  } catch (error) {
-    console.error(error);
-    $("estadoPoleras").textContent =
-      "No fue posible cargar los grupos.";
-    $("estadoPoleras").classList.add("error");
-  }
+  await cargarGruposGanadosPoleras();
 });
 
-function cargarFiltrosPoleras() {
-  const anos = [...new Set(
-    estado.grupos
-      .map((grupo) => clean(grupo.datos.anoViaje))
-      .filter(Boolean)
-  )].sort((a, b) => b.localeCompare(a, "es"));
+function normalizarEstadoPoleras(valor) {
+  return String(valor ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
+}
 
-  const anoActual = String(new Date().getFullYear());
+function prepararAnosPoleras() {
+  const anoActual = new Date().getFullYear();
 
-  $("filtroAnoPoleras").innerHTML = `
-    <option value="">Todos los años</option>
-    ${anos.map((ano) => `
-      <option value="${escapeHtml(ano)}">
-        ${escapeHtml(ano)}
-      </option>
-    `).join("")}
-  `;
+  /*
+    Mismo rango operativo que declara gestion-nomina.js:
+    año anterior, actual y dos siguientes.
+  */
+  const anos = [
+    anoActual - 1,
+    anoActual,
+    anoActual + 1,
+    anoActual + 2
+  ];
 
-  if (anos.includes(anoActual)) {
-    $("filtroAnoPoleras").value = anoActual;
+  $("filtroAnoPoleras").innerHTML = anos.map((ano) => `
+    <option value="${ano}">${ano}</option>
+  `).join("");
+
+  $("filtroAnoPoleras").value = String(anoActual);
+}
+
+function invalidarConsultaPoleras() {
+  estado.resultados = [];
+  estado.filtrosConsultados = null;
+
+  $("resultadoPoleras").hidden = true;
+  $("btnImprimirPoleras").disabled = true;
+
+  if (!estado.consultando) {
+    $("estadoPoleras").textContent =
+      "Los filtros cambiaron. Pulsa Consultar para actualizar los totales.";
+    $("estadoPoleras").classList.remove("error");
   }
+}
+
+function actualizarDestinosPoleras() {
+  const seleccionAnterior = $("filtroDestinoPoleras").value;
 
   const destinos = [...new Set(
     estado.grupos
-      .map((grupo) => clean(grupo.datos.destino))
+      .map(({ datos }) =>
+        clean(datos.destinoPrincipal || datos.destino)
+      )
       .filter(Boolean)
   )].sort((a, b) => a.localeCompare(b, "es"));
 
@@ -115,13 +143,147 @@ function cargarFiltrosPoleras() {
       </option>
     `).join("")}
   `;
+
+  if (destinos.includes(seleccionAnterior)) {
+    $("filtroDestinoPoleras").value = seleccionAnterior;
+  }
+}
+
+async function cargarGruposGanadosPoleras() {
+  const ano = Number($("filtroAnoPoleras").value);
+
+  estado.grupos = [];
+  invalidarConsultaPoleras();
+
+  $("btnConsultarPoleras").disabled = true;
+  $("filtroAnoPoleras").disabled = true;
+  $("estadoPoleras").textContent =
+    `Cargando grupos ganados ${ano}…`;
+
+  try {
+    /*
+      Esta es la misma colección y consulta por año
+      que utiliza Gestión de Nómina.
+    */
+    const snapshot = await getDocs(
+      query(
+        collection(db, "ventas_grupos_resumen"),
+        where("anoViaje", "==", ano)
+      )
+    );
+
+    const ganados = snapshot.docs
+      .map((documento) => ({
+        resumenId: documento.id,
+        datos: documento.data() || {}
+      }))
+      .filter(({ datos }) =>
+        normalizarEstadoPoleras(
+          datos.estado || datos.estadoComercial
+        ) === "ganada"
+      );
+
+    /*
+      El resumen indica cuáles grupos corresponden.
+      El documento original aporta la fecha de inicio
+      y los demás datos oficiales del grupo.
+    */
+    const grupos = [];
+
+    for (let indice = 0; indice < ganados.length; indice += 5) {
+      const lote = ganados.slice(indice, indice + 5);
+
+      const parciales = await Promise.all(
+        lote.map(async ({ resumenId, datos }) => {
+          const docId = String(
+            datos.groupDocId || resumenId
+          );
+
+          const snapshotGrupo = await getDoc(
+            doc(db, "ventas_cotizaciones", docId)
+          );
+
+          if (!snapshotGrupo.exists()) {
+            throw new Error(
+              `No existe el documento del grupo ${docId}.`
+            );
+          }
+
+          const grupoOriginal = snapshotGrupo.data() || {};
+
+          return {
+            docId,
+            datos: {
+              ...datos,
+              ...grupoOriginal,
+
+              /*
+                Estos valores identifican al grupo tal como
+                aparece en el resumen de Gestión de Nómina.
+              */
+              aliasGrupo:
+                datos.aliasGrupo ||
+                grupoOriginal.aliasGrupo,
+              destino:
+                datos.destinoPrincipal ||
+                datos.destino ||
+                grupoOriginal.destino,
+              anoViaje: ano
+            }
+          };
+        })
+      );
+
+      grupos.push(...parciales);
+
+      $("estadoPoleras").textContent =
+        `Cargando datos de ${Math.min(
+          indice + 5,
+          ganados.length
+        )} de ${ganados.length} grupos ganados…`;
+    }
+
+    estado.grupos = grupos;
+
+    actualizarDestinosPoleras();
+
+    $("estadoPoleras").textContent =
+      `${grupos.length} grupos ganados en ${ano}. ` +
+      "Elige los filtros y pulsa Consultar.";
+
+    $("estadoPoleras").classList.remove("error");
+  } catch (error) {
+    console.error("[poleras] cargarGruposGanadosPoleras", error);
+
+    estado.grupos = [];
+    actualizarDestinosPoleras();
+
+    $("estadoPoleras").textContent =
+      error.message ||
+      "No fue posible cargar los grupos ganados.";
+
+    $("estadoPoleras").classList.add("error");
+  } finally {
+    $("btnConsultarPoleras").disabled = false;
+    $("filtroAnoPoleras").disabled = false;
+  }
+}
+
+function obtenerFiltrosPoleras() {
+  return {
+    ano: $("filtroAnoPoleras").value,
+    destino: $("filtroDestinoPoleras").value,
+    desde: $("filtroDesdePoleras").value,
+    hasta: $("filtroHastaPoleras").value
+  };
 }
 
 function seleccionarGruposPoleras() {
-  const ano = $("filtroAnoPoleras").value;
-  const destino = $("filtroDestinoPoleras").value;
-  const desde = $("filtroDesdePoleras").value;
-  const hasta = $("filtroHastaPoleras").value;
+  const {
+    destino,
+    desde,
+    hasta
+  } = obtenerFiltrosPoleras();
 
   if (desde && hasta && desde > hasta) {
     throw new Error(
@@ -132,17 +294,22 @@ function seleccionarGruposPoleras() {
   return estado.grupos
     .filter(({ datos }) => {
       const inicio = fechaInicioPoleras(datos);
+      const destinoGrupo = clean(
+        datos.destinoPrincipal || datos.destino
+      );
 
-      if (ano && clean(datos.anoViaje) !== ano) return false;
-      if (destino && clean(datos.destino) !== destino) return false;
+      if (destino && destinoGrupo !== destino) return false;
       if (desde && (!inicio || inicio < desde)) return false;
       if (hasta && (!inicio || inicio > hasta)) return false;
 
       return true;
     })
     .sort((a, b) => {
-      const fechaA = fechaInicioPoleras(a.datos) || "9999-99-99";
-      const fechaB = fechaInicioPoleras(b.datos) || "9999-99-99";
+      const fechaA =
+        fechaInicioPoleras(a.datos) || "9999-99-99";
+
+      const fechaB =
+        fechaInicioPoleras(b.datos) || "9999-99-99";
 
       return fechaA.localeCompare(fechaB) ||
         a.docId.localeCompare(b.docId);
@@ -164,6 +331,7 @@ async function consultarConsolidadoPoleras() {
 
   estado.consultando = true;
   estado.resultados = [];
+  estado.filtrosConsultados = null;
 
   $("resultadoPoleras").hidden = true;
   $("btnConsultarPoleras").disabled = true;
@@ -171,18 +339,19 @@ async function consultarConsolidadoPoleras() {
   $("estadoPoleras").classList.remove("error");
 
   try {
-    /*
-      Se consultan cinco grupos a la vez. Evitamos lanzar
-      cientos de lecturas simultáneas al abrir la página.
-    */
     const resultados = [];
 
-    for (let indice = 0; indice < seleccion.length; indice += 5) {
+    for (
+      let indice = 0;
+      indice < seleccion.length;
+      indice += 5
+    ) {
       const lote = seleccion.slice(indice, indice + 5);
 
       const parciales = await Promise.all(
         lote.map(async ({ docId, datos }) => {
-          const inscripciones = await loadGroupInscriptions(docId);
+          const inscripciones =
+            await loadGroupInscriptions(docId);
 
           return resumirPolerasGrupo(
             datos,
@@ -195,26 +364,31 @@ async function consultarConsolidadoPoleras() {
       resultados.push(...parciales);
 
       $("estadoPoleras").textContent =
-        `Consultados ${Math.min(indice + 5, seleccion.length)} ` +
-        `de ${seleccion.length} grupos…`;
+        `Consultados ${Math.min(
+          indice + 5,
+          seleccion.length
+        )} de ${seleccion.length} grupos…`;
     }
 
     estado.resultados = resultados;
+    estado.filtrosConsultados = obtenerFiltrosPoleras();
+
     renderConsolidadoPoleras();
 
     $("estadoPoleras").textContent =
-      `Consulta completa: ${resultados.length} grupos.`;
+      `Consulta completa: ${resultados.length} grupos ganados.`;
 
-    $("btnImprimirPoleras").disabled = !resultados.length;
+    $("btnImprimirPoleras").disabled =
+      !resultados.length;
   } catch (error) {
-    console.error(error);
+    console.error("[poleras] consultarConsolidadoPoleras", error);
 
-    /*
-      No se publica un total parcial como si fuera completo.
-    */
     estado.resultados = [];
+    estado.filtrosConsultados = null;
+
     $("estadoPoleras").textContent =
       "La consulta no se completó. No se mostrarán totales parciales.";
+
     $("estadoPoleras").classList.add("error");
   } finally {
     estado.consultando = false;
@@ -275,20 +449,22 @@ function renderConsolidadoPoleras() {
 }
 
 function imprimirConsolidadoPoleras() {
-  if (!estado.resultados.length) return;
-
+  if (
+    !estado.resultados.length ||
+    !estado.filtrosConsultados
+  ) {
+    return;
+  }
+  
   const totales = totalesPoleras(estado.resultados);
-
+  const consultados = estado.filtrosConsultados;
+  
   const filtros = [
-    $("filtroAnoPoleras").value &&
-      `Año ${$("filtroAnoPoleras").value}`,
-    $("filtroDestinoPoleras").value &&
-      $("filtroDestinoPoleras").value,
-    $("filtroDesdePoleras").value &&
-      `Desde ${$("filtroDesdePoleras").value}`,
-    $("filtroHastaPoleras").value &&
-      `Hasta ${$("filtroHastaPoleras").value}`
-  ].filter(Boolean).join(" · ") || "Todos los grupos";
+    consultados.ano && `Año ${consultados.ano}`,
+    consultados.destino,
+    consultados.desde && `Desde ${consultados.desde}`,
+    consultados.hasta && `Hasta ${consultados.hasta}`
+  ].filter(Boolean).join(" · ");
 
   const contenido = `
     <h1>Consolidado de poleras</h1>
