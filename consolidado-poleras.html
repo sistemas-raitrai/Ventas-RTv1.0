@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Consolidado de poleras · Rai Trai</title>
+
+  <style>
+    body {
+      margin: 0;
+      background: #f3f6f9;
+      color: #172334;
+      font-family: Arial, sans-serif;
+    }
+
+    main {
+      max-width: 1250px;
+      margin: 28px auto;
+      padding: 0 16px;
+    }
+
+    h1 { margin-bottom: 6px; }
+    .ayuda { color: #5e6875; }
+
+    .panel {
+      background: white;
+      border-radius: 10px;
+      padding: 18px;
+      margin: 16px 0;
+      box-shadow: 0 2px 10px #17233410;
+    }
+
+    .filtros {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: end;
+      gap: 12px;
+    }
+
+    label {
+      display: grid;
+      gap: 5px;
+      font-size: 13px;
+      font-weight: bold;
+    }
+
+    select, input, button {
+      min-height: 38px;
+      padding: 7px 10px;
+      font: inherit;
+    }
+
+    button { cursor: pointer; }
+
+    .totales {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .totales span, .tallas span {
+      display: inline-block;
+      padding: 8px 10px;
+      background: #eef3f8;
+      border-radius: 6px;
+      margin: 3px;
+    }
+
+    .tabla-contenedor { overflow-x: auto; }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      white-space: nowrap;
+      font-size: 13px;
+    }
+
+    th, td {
+      border-bottom: 1px solid #e1e7ed;
+      padding: 10px 7px;
+      text-align: right;
+    }
+
+    th:first-child, td:first-child { text-align: left; }
+    th { background: #eef3f8; }
+
+    .error { color: #a52222; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Consolidado de poleras</h1>
+    <p class="ayuda">
+      Filtra los grupos por fecha de inicio y revisa las tallas
+      registradas en sus inscripciones.
+    </p>
+
+    <section class="panel filtros">
+      <label>
+        Año de viaje
+        <select id="filtroAnoPoleras"></select>
+      </label>
+
+      <label>
+        Destino
+        <select id="filtroDestinoPoleras">
+          <option value="">Todos los destinos</option>
+        </select>
+      </label>
+
+      <label>
+        Inicio desde
+        <input id="filtroDesdePoleras" type="date">
+      </label>
+
+      <label>
+        Inicio hasta
+        <input id="filtroHastaPoleras" type="date">
+      </label>
+
+      <button id="btnConsultarPoleras" type="button">
+        Consultar
+      </button>
+
+      <button id="btnImprimirPoleras" type="button" disabled>
+        Imprimir / guardar PDF
+      </button>
+    </section>
+
+    <p id="estadoPoleras" role="status"></p>
+
+    <section id="resultadoPoleras" class="panel" hidden>
+      <div id="totalesPoleras"></div>
+
+      <h2>Grupos</h2>
+      <div class="tabla-contenedor">
+        <table>
+          <thead>
+            <tr>
+              <th>Grupo</th>
+              <th>Destino</th>
+              <th>Inicio</th>
+              <th>Personas</th>
+              <th>Con talla</th>
+              <th>Sin talla</th>
+              <th>XS</th>
+              <th>S</th>
+              <th>M</th>
+              <th>L</th>
+              <th>XL</th>
+              <th>2XL</th>
+              <th>3XL</th>
+              <th>4XL</th>
+              <th>Detalle</th>
+            </tr>
+          </thead>
+          <tbody id="tablaPoleras"></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <script type="module" src="./consolidado-poleras.js"></script>
+</body>
+</html>
