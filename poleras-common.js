@@ -187,9 +187,10 @@ export function htmlReporteGrupoPoleras(resumen) {
 }
 
 export function imprimirReportePoleras({
-  titulo,
+  titulo: "Consolidado de poleras",
+  subtitulo: filtros,
   contenido,
-  subtitulo = ""
+  horizontal: true
 }) {
   const ventana = window.open("", "_blank");
 
@@ -208,7 +209,7 @@ export function imprimirReportePoleras({
       <meta charset="utf-8">
       <title>${escapeHtml(titulo)}</title>
       <style>
-        @page { size: A4; margin: 14mm; }
+        @page { size: A4 ${horizontal ? "landscape" : "portrait"}; margin: 12mm; }
 
         * { box-sizing: border-box; }
 
@@ -350,7 +351,6 @@ export function imprimirReportePoleras({
             } catch (error) {
               alert(
                 "No se pudo cargar el logo de Rai Trai. " +
-                "Revisa que Logo Raitrai.png esté publicado en la raíz."
               );
               return;
             }
