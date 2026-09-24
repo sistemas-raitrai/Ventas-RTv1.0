@@ -1,0 +1,210 @@
+/*
+  Apariencia de las pantallas internas de fichas médicas y poleras.
+  Las reglas están acotadas a .rt-medical-page para no modificar
+  otras páginas del sistema.
+*/
+
+.rt-medical-page {
+  background: #f5f2f7;
+  color: #241b2b;
+}
+
+.rt-medical-page .app-shell {
+  width: min(1440px, calc(100% - 40px));
+  max-width: none;
+  margin: 24px auto 40px;
+}
+
+.rt-medical-page .rt-head {
+  display: block;
+  background: #f2f0f5;
+  border: 1px solid #d8d1df;
+  border-radius: 22px;
+  padding: 22px;
+  margin-bottom: 18px;
+  box-shadow: none;
+}
+
+.rt-medical-page .rt-head-main {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.rt-medical-page .rt-head-title {
+  min-width: 0;
+}
+
+.rt-medical-page .rt-head h1 {
+  margin: 0;
+  color: #352040;
+  font-size: clamp(24px, 2.5vw, 30px);
+  line-height: 1.15;
+}
+
+.rt-medical-page .rt-head #groupSubtitle,
+.rt-medical-page .rt-head #pageSubtitle {
+  margin: 7px 0 0;
+  color: #6a6075;
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.rt-medical-page .rt-head-logo {
+  display: block;
+  width: auto;
+  max-width: 125px;
+  max-height: 55px;
+  object-fit: contain;
+  flex: none;
+}
+
+.rt-medical-page .rt-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 9px;
+  margin-top: 20px;
+  padding-top: 17px;
+  border-top: 1px solid #d8d1df;
+}
+
+/*
+  Se aplica tanto a enlaces como a botones.
+  Esto corrige los dos controles de poleras que hoy se ven
+  como texto pequeño en la captura.
+*/
+.rt-medical-page .rt-actions .rt-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 40px;
+  width: auto;
+  max-width: 100%;
+  padding: 9px 13px;
+  border: 1px solid #d6ccdc;
+  border-radius: 9px;
+  background: #fff;
+  color: #352040;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.2;
+  text-align: center;
+  text-decoration: none;
+  white-space: normal;
+  cursor: pointer;
+  box-shadow: none;
+}
+
+.rt-medical-page .rt-actions .rt-action:hover {
+  background: #ede8f1;
+  border-color: #ad9bb8;
+}
+
+.rt-medical-page .rt-actions .rt-action-primary {
+  background: #352040;
+  border-color: #352040;
+  color: #fff;
+}
+
+.rt-medical-page .rt-actions .rt-action-primary:hover {
+  background: #4b3057;
+  border-color: #4b3057;
+  color: #fff;
+}
+
+.rt-medical-page .rt-actions .rt-action-poleras {
+  background: #f8edf4;
+  border-color: #dbc6d6;
+  color: #65324f;
+}
+
+.rt-medical-page .rt-actions .rt-action-poleras:hover {
+  background: #f1e0eb;
+}
+
+.rt-medical-page .rt-actions .rt-action-last {
+  margin-left: auto;
+}
+
+.rt-medical-page .rt-actions select {
+  min-height: 40px;
+  max-width: 250px;
+  padding: 8px 10px;
+  border: 1px solid #d6ccdc;
+  border-radius: 9px;
+  background: #fff;
+  font: inherit;
+  font-size: 13px;
+}
+
+.rt-medical-page .rt-actions .rt-action:focus-visible,
+.rt-medical-page .rt-actions select:focus-visible {
+  outline: 3px solid #b695c8;
+  outline-offset: 2px;
+}
+
+/*
+  Conserva las tarjetas actuales y les da un contenedor
+  más cercano a Gestión de Nómina.
+*/
+.rt-medical-page #content > .panel,
+.rt-medical-page #summaryPanel {
+  border: 1px solid #e0d9e5;
+  border-radius: 16px;
+}
+
+@media (max-width: 760px) {
+  .rt-medical-page .app-shell {
+    width: min(100% - 24px, 1440px);
+    margin-top: 12px;
+  }
+
+  .rt-medical-page .rt-head {
+    padding: 17px;
+    border-radius: 16px;
+  }
+
+  .rt-medical-page .rt-head-logo {
+    max-width: 85px;
+    max-height: 42px;
+  }
+
+  .rt-medical-page .rt-actions {
+    align-items: stretch;
+  }
+
+  .rt-medical-page .rt-actions .rt-action,
+  .rt-medical-page .rt-actions select {
+    flex: 1 1 165px;
+    max-width: none;
+  }
+
+  .rt-medical-page .rt-actions .rt-action-last {
+    margin-left: 0;
+  }
+}
+
+/*
+  La cabecera de navegación no debe salir en los PDF médicos.
+  El contenido de las fichas mantiene las reglas de impresión
+  que ya tiene ficha-medica.css.
+*/
+@media print {
+  .rt-medical-page {
+    background: #fff;
+  }
+
+  .rt-medical-page .app-shell {
+    width: auto;
+    max-width: none;
+    margin: 0;
+  }
+
+  .rt-medical-page .rt-head,
+  .rt-medical-page .no-print {
+    display: none !important;
+  }
+}
