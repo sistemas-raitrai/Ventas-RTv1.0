@@ -9,7 +9,7 @@ import {
   AJUSTAR SOLO ESTA RUTA si el logo de Rai Trai
   tiene otro nombre o está en otra carpeta.
 */
-const LOGO_RAI_TRAI = "./logo-raitrai.png";
+const LOGO_RAI_TRAI = "./Logo Raitrai.png";
 
 export const TALLAS_POLERAS = [
   "XS", "S", "M", "L", "XL", "2XL", "3XL", "4XL"
