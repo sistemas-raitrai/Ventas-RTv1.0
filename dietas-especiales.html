@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Dietas especiales | Sistema Ventas RT</title>
+  <link rel="stylesheet" href="fichas-ventas.css">
+  <style>
+    .de-panel{background:#fff;border:1px solid #e0d9e5;border-radius:16px;padding:18px;margin:16px 0}
+    .de-filtros{display:flex;gap:10px;flex-wrap:wrap;align-items:end}
+    .de-filtros label{display:grid;gap:4px;font-size:13px;font-weight:700}
+    .de-filtros select,.de-filtros input,.de-filtros button{min-height:38px;padding:7px;max-width:240px}
+    .de-tabla{overflow:auto}.de-tabla table{border-collapse:collapse;width:100%;font-size:13px}
+    .de-tabla th,.de-tabla td{padding:8px;border-bottom:1px solid #ddd;text-align:left;vertical-align:top}
+    .de-tabla th{background:#f2f0f5}.de-tabla td:nth-child(5){min-width:220px}
+    .de-danger{color:#a22222}.de-muted{color:#645f68}
+    .de-detalle{background:#fff;border:1px solid #ddd;border-radius:12px;padding:20px;max-height:85vh;overflow:auto;max-width:900px;width:95%}
+    .de-overlay{position:fixed;inset:0;background:#0009;display:flex;align-items:center;justify-content:center;z-index:1000}
+    .de-detalle li{margin:7px 0}
+  </style>
+</head>
+<body class="rt-medical-page">
+  <main class="app-shell">
+    <header class="rt-head">
+      <div class="rt-head-main"><div><h1>Dietas especiales</h1><p>Grupos, hoteles y servicios de alimentación</p></div><img class="rt-head-logo" src="IMG/logo-raitrai.png" alt="Rai Trai"></div>
+      <nav class="rt-actions"><a class="rt-action" href="gestion-nomina.html">Volver a Gestión de Nómina</a></nav>
+    </header>
+    <section class="de-panel de-filtros">
+      <label>Año <select id="deAno"></select></label>
+      <label>Desde <input id="deDesde" type="date"></label>
+      <label>Hasta <input id="deHasta" type="date"></label>
+      <label>Grupo <select id="deGrupo"><option value="">Todos</option></select></label>
+      <label>Hotel <select id="deHotel"><option value="">Todos</option></select></label>
+      <label>Proveedor <select id="deProveedor"><option value="">Todos</option></select></label>
+      <label>Tipo <select id="deTipo"><option value="">Todos</option><option value="hotel">Hotel</option><option value="servicio">Servicio de comida</option></select></label>
+      <button id="deCargar" type="button">Consultar</button>
+      <button id="deImprimir" type="button" disabled>Imprimir / guardar PDF</button>
+    </section>
+    <p id="deEstado" role="status"></p>
+    <details id="deRevision" class="de-panel" hidden><summary>Vínculos que requieren revisión</summary><ul id="deRevisionLista"></ul></details>
+    <section id="deResultados" class="de-panel" hidden>
+      <p id="deTotales"></p>
+      <div class="de-tabla"><table><thead><tr><th>Fecha / estadía</th><th>Grupo · negocio</th><th>Tipo</th><th>Hotel / servicio</th><th>Proveedor</th><th>Personas</th><th>Detalle</th></tr></thead><tbody id="deFilas"></tbody></table></div>
+    </section>
+  </main>
+  <script type="module" src="dietas-especiales.js"></script>
+</body>
+</html>
