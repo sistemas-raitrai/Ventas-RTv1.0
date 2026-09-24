@@ -34,6 +34,12 @@ import {
   orderBy
 } from "https://www.gstatic.com/firebasejs/11.7.3/firebase-firestore.js";
 
+import {
+  htmlReporteGrupoPoleras,
+  imprimirReportePoleras,
+  resumirPolerasGrupo
+} from "./poleras-common.js";
+
 /*
   CAMPOS DEL EDITOR MÉDICO
 
@@ -721,6 +727,10 @@ function bindEvents() {
   document.body.dataset.bound = "1";
 
   $("btnRecargar")?.addEventListener("click", loadPage);
+  $("btnPolerasGrupo")?.addEventListener(
+    "click",
+    abrirModalPolerasGrupo
+  );
   $("searchInput")?.addEventListener("input", renderTable);
   $("statusFilter")?.addEventListener("change", renderTable);
   $("typeFilter")?.addEventListener("change", renderTable);
@@ -810,6 +820,189 @@ function bindEvents() {
           );
         }
       );
+}
+
+function asegurarEstilosPolerasGrupo() {
+  if (document.getElementById("estilosPolerasGrupo")) return;
+
+  const style = document.createElement("style");
+  style.id = "estilosPolerasGrupo";
+  style.textContent = `
+    .poleras-modal-fondo {
+      position: fixed;
+      inset: 0;
+      z-index: 10000;
+      background: rgba(12, 24, 39, .68);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+    }
+
+    .poleras-modal-contenido {
+      background: #fff;
+      color: #172334;
+      width: min(920px, 100%);
+      max-height: 92vh;
+      overflow: auto;
+      border-radius: 12px;
+      padding: 22px;
+    }
+
+    .poleras-modal-cabecera {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 14px;
+    }
+
+    .poleras-modal-cabecera h2 {
+      margin: 0 0 10px;
+    }
+
+    .poleras-modal-acciones {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .poleras-modal-acciones button,
+    .poleras-modal-acciones a {
+      cursor: pointer;
+      padding: 8px 11px;
+      border: 1px solid #bccbd9;
+      border-radius: 6px;
+      background: #f3f7fb;
+      color: #173d63;
+      text-decoration: none;
+      font: inherit;
+    }
+
+    .poleras-modal-resumen {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 9px 16px;
+      padding: 12px;
+      background: #eef3f8;
+      border-radius: 7px;
+      margin: 12px 0;
+    }
+
+    .poleras-modal-tallas {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin: 12px 0 20px;
+    }
+
+    .poleras-modal-tallas span {
+      border: 1px solid #d7e1eb;
+      border-radius: 6px;
+      padding: 7px 10px;
+    }
+
+    .poleras-modal-listas {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 12px;
+    }
+
+    .poleras-modal-listas section {
+      border: 1px solid #d7e1eb;
+      border-radius: 7px;
+      padding: 10px;
+    }
+
+    .poleras-modal-listas h3 {
+      margin: 0 0 8px;
+    }
+
+    .poleras-modal-listas ol {
+      margin: 0;
+      padding-left: 22px;
+    }
+
+    .poleras-modal-listas li {
+      padding: 3px 0;
+    }
+  `;
+
+  document.head.append(style);
+}
+
+function cerrarModalPolerasGrupo() {
+  document.getElementById("modalPolerasGrupo")?.remove();
+}
+
+function abrirModalPolerasGrupo() {
+  if (!state.group || !state.groupDocId) {
+    alert("Primero debe cargarse el grupo.");
+    return;
+  }
+
+  asegurarEstilosPolerasGrupo();
+  cerrarModalPolerasGrupo();
+
+  const resumen = resumirPolerasGrupo(
+    state.group,
+    state.groupId || state.groupDocId,
+    state.items
+  );
+
+  const modal = document.createElement("div");
+  modal.id = "modalPolerasGrupo";
+  modal.className = "poleras-modal-fondo";
+  modal.setAttribute("role", "dialog");
+  modal.setAttribute("aria-modal", "true");
+  modal.setAttribute("aria-label", "Poleras del grupo");
+
+  /*
+    Reutilizamos el HTML de cálculo, pero el modal tiene
+    sus propios estilos. El reporte impreso usa los suyos.
+  */
+  modal.innerHTML = `
+    <div class="poleras-modal-contenido">
+      <div class="poleras-modal-cabecera">
+        <h2>Poleras del grupo</h2>
+
+        <div class="poleras-modal-acciones">
+          <a href="consolidado-poleras.html">
+            Ver todos los grupos
+          </a>
+
+          <button type="button" data-imprimir-poleras>
+            Imprimir / guardar PDF
+          </button>
+
+          <button type="button" data-cerrar-poleras>
+            Cerrar
+          </button>
+        </div>
+      </div>
+
+      <div class="poleras-modal-cuerpo">
+        ${htmlReporteGrupoPoleras(resumen)}
+      </div>
+    </div>
+  `;
+
+  modal.querySelector("[data-cerrar-poleras]")
+    .addEventListener("click", cerrarModalPolerasGrupo);
+
+  modal.querySelector("[data-imprimir-poleras]")
+    .addEventListener("click", () => {
+      imprimirReportePoleras({
+        titulo: `Poleras - ${resumen.nombre}`,
+        subtitulo: resumen.nombre,
+        contenido: htmlReporteGrupoPoleras(resumen)
+      });
+    });
+
+  modal.addEventListener("click", (event) => {
+    if (event.target === modal) cerrarModalPolerasGrupo();
+  });
+
+  document.body.append(modal);
 }
 
 async function loadMedicalHistory() {
