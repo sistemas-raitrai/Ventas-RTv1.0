@@ -328,8 +328,35 @@ export function imprimirReportePoleras({
       </p>
 
       <script>
-        window.addEventListener("load", () => {
-          setTimeout(() => window.print(), 350);
+        window.addEventListener("load", async () => {
+          const logo = document.querySelector("header img");
+      
+          if (logo) {
+            try {
+              if (!logo.complete) {
+                await new Promise((resolve, reject) => {
+                  logo.addEventListener("load", resolve, { once: true });
+                  logo.addEventListener("error", reject, { once: true });
+                });
+              }
+      
+              if (!logo.naturalWidth) {
+                throw new Error("No se cargó el logo");
+              }
+      
+              if (logo.decode) {
+                await logo.decode();
+              }
+            } catch (error) {
+              alert(
+                "No se pudo cargar el logo de Rai Trai. " +
+                "Revisa que Logo Raitrai.png esté publicado en la raíz."
+              );
+              return;
+            }
+          }
+      
+          window.print();
         });
       <\/script>
     </body>
