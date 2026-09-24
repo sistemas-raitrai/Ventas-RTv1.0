@@ -6,61 +6,78 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Gestión de fichas médicas | Sistema Ventas RT</title>
   <link rel="stylesheet" href="ficha-medica.css">
+  <link rel="stylesheet" href="fichas-ventas.css">
   <link
     rel="icon"
     type="image/png"
     href="IMG/logo-raitrai.png"
   />
 </head>
-<body>
+<body class="rt-medical-page">
   <main class="app-shell">
-    <header class="topbar">
-      <div>
-        <h1>Gestión de fichas médicas</h1>
-        <p id="groupSubtitle">Cargando grupo...</p>
+    <header class="topbar rt-head">
+      <div class="rt-head-main">
+        <div class="rt-head-title">
+          <h1>Gestión de fichas médicas</h1>
+          <p id="groupSubtitle">Cargando grupo...</p>
+        </div>
+    
+        <img
+          class="rt-head-logo"
+          src="Logo Raitrai.png"
+          alt="Rai Trai"
+        >
       </div>
-
-      <div class="actions no-print">
+    
+      <nav class="actions no-print rt-actions" aria-label="Acciones del grupo">
         <a
           id="btnVolverNomina"
-          class="button-link btn-light"
+          class="rt-action"
           href="#"
         >
-          Volver a gestión de nómina
+          Volver a Gestión de Nómina
         </a>
-      
+    
         <a
           id="btnVerGrupo"
-          class="button-link btn-light"
+          class="rt-action"
           href="#"
         >
           Ficha consolidada
         </a>
-      
+    
         <a
           id="btnResumenOperativo"
-          class="button-link btn-primary"
+          class="rt-action rt-action-primary"
           href="#"
         >
-          Resumen Fichas Médicas
+          Resumen de fichas médicas
         </a>
-
-        <button type="button" id="btnPolerasGrupo">
+    
+        <button
+          id="btnPolerasGrupo"
+          class="rt-action rt-action-poleras"
+          type="button"
+        >
           Poleras del grupo
         </button>
-        
-        <a id="btnConsolidadoPoleras" href="consolidado-poleras.html">
-          Total de poleras
+    
+        <a
+          id="btnConsolidadoPoleras"
+          class="rt-action rt-action-poleras"
+          href="consolidado-poleras.html"
+        >
+          Consolidado de poleras
         </a>
-      
+    
         <button
           id="btnRecargar"
-          class="btn-primary"
+          class="rt-action rt-action-last"
           type="button"
         >
           Recargar
         </button>
-      </div>
+      </nav>
     </header>
 
     <section id="loadingBox" class="loading">Cargando fichas médicas...</section>
