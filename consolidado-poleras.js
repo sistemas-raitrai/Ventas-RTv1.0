@@ -825,6 +825,7 @@ function imprimirConsolidadoPoleras() {
   imprimirReportePoleras({
     titulo: "Consolidado de poleras",
     subtitulo: filtros,
-    contenido
+    contenido,
+    horizontal: true
   });
 }
