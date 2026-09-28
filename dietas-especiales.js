@@ -6,7 +6,7 @@ import {
 import { getDocs, getDoc, doc, query, where } from 'https://www.gstatic.com/firebasejs/11.7.3/firebase-firestore.js';
 
 const $ = id => document.getElementById(id);
-const estado = { filas: [], filtradas: [], incidencias: [], cargando: false };
+const estado = { grupos: [], filas: [], filtradas: [], incidencias: [], cargando: false };
 const DESTINOS_SERVICIOS = ['BRASIL', 'BARILOCHE', 'SUR DE CHILE', 'NORTE DE CHILE'];
 
 function normalizar(v) {
@@ -86,21 +86,6 @@ async function cargarCatalogo(ano) {
 function claveGrupoCalendario(g) {
   return String(g.numeroNegocio || '').trim();
 }
-function filtrarFilas() {
-  const desde = $('deDesde').value, hasta = $('deHasta').value;
-  if (desde && hasta && desde > hasta) throw new Error('La fecha desde es posterior a la fecha hasta.');
-  const grupo = $('deGrupo').value, hotel = $('deHotel').value;
-  const proveedor = $('deProveedor').value, tipo = $('deTipo').value;
-  return estado.filas.filter(r => {
-    if (grupo && r.idGrupo !== grupo) return false;
-    if (hotel && !(r.tipo === 'hotel' && r.entidadId === hotel)) return false;
-    if (proveedor && !(r.tipo === 'servicio' && r.proveedor === proveedor)) return false;
-    if (tipo && r.tipo !== tipo) return false;
-    if (desde && (!(r.fechaFin || r.fecha) || (r.fechaFin || r.fecha) < desde)) return false;
-    if (hasta && (!r.fecha || r.fecha > hasta)) return false;
-    return true;
-  }).sort((a,b) => (a.fecha||'9999').localeCompare(b.fecha||'9999') || a.grupo.localeCompare(b.grupo,'es'));
-}
 function llenarSelect(id, values, nombreTodos) {
   const el = $(id), anterior = el.value;
   el.replaceChildren(new Option(nombreTodos,''),...values.map(v => new Option(v.label,v.value)));
@@ -108,7 +93,7 @@ function llenarSelect(id, values, nombreTodos) {
 }
 async function cargar() {
   if (estado.cargando) return;
-  estado.cargando = true; estado.filas = []; estado.filtradas = []; estado.incidencias = [];
+  estado.cargando = true; estado.grupos = []; estado.filas = []; estado.filtradas = []; estado.incidencias = [];
   $('deResultados').hidden = true; $('deImprimir').disabled = true; $('deCargar').disabled = true;
   const ano = Number($('deAno').value);
   try {
@@ -133,13 +118,16 @@ async function cargar() {
         const ref = await getDoc(doc(db,'ventas_cotizaciones',docId));
         if (!ref.exists()) throw new Error(`Falta grupo de Ventas ${docId}`);
         const g = ref.data() || {}, negocio = numerosNegocio(g) || numerosNegocio(x);
-        if (!negocio) { estado.incidencias.push(`Grupo ${docId} sin N.º de negocio`); return []; }
-        const c = calendario.get(negocio);
-        if (!c) { estado.incidencias.push(`Negocio ${negocio} sin calendario operativo`); return []; }
+        if (!negocio) estado.incidencias.push(`Grupo ${docId} sin N.º de negocio`);
+        const c = calendario.get(negocio) || {};
+        if (!calendario.has(negocio)) estado.incidencias.push(`Negocio ${negocio || docId} sin calendario operativo`);
         const inscripciones = await loadGroupInscriptions(docId);
         const personas = datosAlimentacion(inscripciones);
         if (!personas.length) return [];
-        const nombre = clean(x.aliasGrupo || g.aliasGrupo || g.nombreGrupo || c.aliasGrupo || negocio);
+        const nombre = clean(x.aliasGrupo || g.aliasGrupo || g.nombreGrupo || c.aliasGrupo || negocio || docId);
+        estado.grupos.push({ idGrupo: docId, negocio, grupo: nombre, personas,
+          fecha: fechaISO(g.fechaInicio || c.fechaInicio),
+          fechaFin: fechaISO(g.fechaFin || c.fechaFin) });
         const base = { idGrupo:docId, negocio, grupo:nombre, personas, destino:clean(c.destino || g.destino) };
         const out = [];
         for (const raw of (Array.isArray(c.hoteles) ? c.hoteles : [])) {
@@ -179,7 +167,8 @@ async function cargar() {
       $('deEstado').textContent = `Revisados ${Math.min(i+5,resumenes.length)} de ${resumenes.length} grupos ganados…`;
     }
     estado.filas = [...new Map(filas.map(r => [[r.idGrupo,r.tipo,r.entidadId,r.fecha].join('|'),r])).values()];
-    llenarSelect('deGrupo',[...new Map(estado.filas.map(r=>[r.idGrupo,{value:r.idGrupo,label:`${r.grupo} · ${r.negocio}`}])).values()].sort((a,b)=>a.label.localeCompare(b.label,'es')),'Todos');
+    estado.grupos.sort((a,b)=>(a.fecha||'9999').localeCompare(b.fecha||'9999') || a.grupo.localeCompare(b.grupo,'es'));
+    llenarSelect('deGrupo',[...new Map(estado.grupos.map(r=>[r.idGrupo,{value:r.idGrupo,label:`${r.grupo} · ${r.negocio}`}])).values()].sort((a,b)=>a.label.localeCompare(b.label,'es')),'Todos');
     const grupoSolicitado = new URLSearchParams(location.search).get('id');
     if (grupoSolicitado) $('deGrupo').value = grupoSolicitado;
     llenarSelect('deHotel',[...new Map(estado.filas.filter(r=>r.tipo==='hotel').map(r=>[r.entidadId,{value:r.entidadId,label:r.entidad}])).values()].sort((a,b)=>a.label.localeCompare(b.label,'es')),'Todos');
@@ -187,41 +176,96 @@ async function cargar() {
     mostrar();
   } catch(e) {
     console.error('[dietas]',e); $('deEstado').textContent = `No se completó la consulta: ${e.message}`;
-    $('deEstado').className = 'de-danger'; estado.filas=[]; $('deResultados').hidden=true;
+    $('deEstado').className = 'de-danger'; estado.filas=[];estado.grupos=[]; $('deResultados').hidden=true;
   } finally { estado.cargando=false; $('deCargar').disabled=false; }
 }
 function personasHTML(personas) {
   return `<ol>${personas.map(p=>`<li><strong>${escapeHtml(p.nombre)}</strong> — ${escapeHtml(p.tipos.join(', ') || 'Tipo sin especificar')}${p.detalle?` · ${escapeHtml(p.detalle)}`:''}${p.restricciones.length?` · Restricciones: ${escapeHtml(p.restricciones.join(', '))}`:''}${p.alergias.length?` · Alergias alimentarias: ${escapeHtml(p.alergias.join(', '))}`:''}${p.pendiente?' · PENDIENTE DE DETALLE':''}</li>`).join('')}</ol>`;
 }
+
+function visibleGrupo(g) {
+  const grupo=$('deGrupo').value, desde=$('deDesde').value, hasta=$('deHasta').value;
+  if (desde && hasta && desde>hasta) throw new Error('La fecha desde es posterior a la fecha hasta.');
+  if (grupo && g.idGrupo!==grupo) return false;
+  if (desde && (!g.fechaFin && !g.fecha || (g.fechaFin || g.fecha)<desde)) return false;
+  if (hasta && (!g.fecha || g.fecha>hasta)) return false;
+  return true;
+}
+function tipos(personas) {
+  const conteo=new Map();
+  for(const p of personas) for(const t of p.tipos.length?p.tipos:['Tipo pendiente'])
+    conteo.set(t,(conteo.get(t)||0)+1);
+  return [...conteo].sort((a,b)=>a[0].localeCompare(b[0],'es'))
+    .map(([t,n])=>t+': '+n).join(' · ');
+}
+function filasProveedor(grupos) {
+  const ids=new Set(grupos.map(g=>g.idGrupo));
+  const hotel=$('deHotel').value, proveedor=$('deProveedor').value;
+  return estado.filas.filter(r=>ids.has(r.idGrupo)
+    && (!hotel || r.tipo==='hotel' && r.entidadId===hotel)
+    && (!proveedor || r.tipo==='servicio' && r.proveedor===proveedor)
+    && (!($('deDesde').value) || (r.fechaFin||r.fecha)>=$('deDesde').value)
+    && (!($('deHasta').value) || r.fecha<=$('deHasta').value))
+    .sort((a,b)=>(a.fecha||'9999').localeCompare(b.fecha||'9999') || a.grupo.localeCompare(b.grupo,'es'));
+}
 function mostrar() {
-  try { estado.filtradas = filtrarFilas(); }
-  catch(e) { $('deEstado').textContent=e.message; return; }
-  const filas = estado.filtradas, grupos = new Set(filas.map(r=>r.idGrupo));
-  const comidas = filas.filter(r => r.tipo === 'servicio');
-  $('deTotales').textContent = `${filas.length} asignaciones · ${grupos.size} grupos · ${comidas.reduce((n,r)=>n+r.personas.length,0)} requerimientos potenciales por servicio de comida. Confirmar asistencia antes de informar cantidades definitivas. Las filas de hotel informan la estadía y no se suman como comidas.`;
-  $('deFilas').innerHTML = filas.map((r,i)=>`<tr><td>${escapeHtml(fechaVisible(r.fecha))}${r.fechaFin?` → ${escapeHtml(fechaVisible(r.fechaFin))}`:''}</td><td>${escapeHtml(r.grupo)} · ${escapeHtml(r.negocio)}</td><td>${r.tipo==='hotel'?'Hotel':'Comida'}</td><td>${escapeHtml(r.entidad)}</td><td>${escapeHtml(r.proveedor)}</td><td>${r.personas.length} · ${escapeHtml(resumenPersonas(r.personas))}</td><td><button type="button" data-de="${i}">Ver personas</button></td></tr>`).join('') || '<tr><td colspan="7">Sin asignaciones para estos filtros.</td></tr>';
-  $('deResultados').hidden=false; $('deImprimir').disabled=!filas.length;
-  $('deEstado').className = 'de-muted';
-  $('deEstado').textContent = `${estado.incidencias.length} vinculaciones requieren revisión.`;
-  $('deRevision').hidden = !estado.incidencias.length;
-  $('deRevisionLista').innerHTML = estado.incidencias.map(v=>`<li>${escapeHtml(v)}</li>`).join('');
+  let grupos, filas;
+  try {
+    grupos=estado.grupos.filter(visibleGrupo);
+    filas=filasProveedor(grupos);
+  } catch(e) { $('deEstado').textContent=e.message;$('deEstado').className='error';return; }
+  const vista=$('deVista').value;
+  const relevantes=vista==='proveedor'?grupos.filter(g=>filas.some(r=>r.idGrupo===g.idGrupo)):grupos;
+  const unicas=relevantes.flatMap(g=>g.personas.map(p=>({ ...p, clave:g.idGrupo+'|'+p.id })));
+  $('deTotales').textContent=relevantes.length+' grupos · '+unicas.length+' personas únicas · '+tipos(unicas)
+    +(vista==='proveedor'?' · '+filas.length+' asignaciones; confirmar asistentes antes de enviar cantidades.':'');
+  estado.mostrados={grupos,filas};
+  $('deCabecera').innerHTML=vista==='proveedor'
+    ? '<tr><th>Fecha</th><th>Grupo · negocio</th><th>Tipo</th><th>Hotel / servicio</th><th>Proveedor</th><th>Personas y dietas</th><th>Detalle</th></tr>'
+    : '<tr><th>Salida</th><th>Grupo</th><th>N.º negocio</th><th>Personas</th><th>Tipos de dieta</th><th>Detalle</th></tr>';
+  $('deFilas').innerHTML=vista==='proveedor'
+    ? filas.map((r,i)=>'<tr><td>'+escapeHtml(fechaVisible(r.fecha))+(r.fechaFin?' → '+escapeHtml(fechaVisible(r.fechaFin)):'')+'</td><td>'+escapeHtml(r.grupo)+' · '+escapeHtml(r.negocio)+'</td><td>'+(r.tipo==='hotel'?'Hotel':'Comida')+'</td><td>'+escapeHtml(r.entidad)+'</td><td>'+escapeHtml(r.proveedor)+'</td><td>'+r.personas.length+' · '+escapeHtml(tipos(r.personas))+'</td><td><button type="button" data-vista="proveedor" data-indice="'+i+'">Ver nómina</button></td></tr>').join('')
+    : grupos.map((g,i)=>'<tr><td>'+escapeHtml(fechaVisible(g.fecha))+'</td><td>'+escapeHtml(g.grupo)+'</td><td>'+escapeHtml(g.negocio)+'</td><td>'+g.personas.length+'</td><td>'+escapeHtml(tipos(g.personas))+'</td><td><button type="button" data-vista="grupo" data-indice="'+i+'">Ver nómina</button></td></tr>').join('');
+  if (!$('deFilas').innerHTML) $('deFilas').innerHTML='<tr><td colspan="7">Sin datos para estos filtros.</td></tr>';
+  $('deResultados').hidden=false;$('deImprimir').disabled=!(vista==='proveedor'?filas.length:grupos.length);
+  $('deEstado').className='de-muted';$('deEstado').textContent=estado.incidencias.length+' vínculos requieren revisión.';
+  $('deRevision').hidden=!estado.incidencias.length;
+  $('deRevisionLista').innerHTML=estado.incidencias.map(v=>'<li>'+escapeHtml(v)+'</li>').join('');
 }
 function imprimir() {
-  if (!estado.filtradas.length) return;
-  const w=window.open('','_blank'); if (!w) { alert('Permite ventanas emergentes para imprimir.'); return; }
-  const html=estado.filtradas.map(r=>`<section><h2>${escapeHtml(r.tipo==='hotel'?'Hotel':'Comida')} · ${escapeHtml(r.entidad)}</h2><p>${escapeHtml(fechaVisible(r.fecha))}${r.fechaFin?` → ${escapeHtml(fechaVisible(r.fechaFin))}`:''} · ${escapeHtml(r.grupo)} · Negocio ${escapeHtml(r.negocio)} · Proveedor: ${escapeHtml(r.proveedor)}</p><p>${r.personas.length} personas con requerimientos</p>${personasHTML(r.personas)}</section>`).join('');
-  w.document.open(); w.document.write(`<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Dietas especiales</title><style>@page{size:A4;margin:13mm}body{font:10pt Arial;color:#172334}header{display:flex;justify-content:space-between;border-bottom:2px solid #173d63}header img{max-width:110px;max-height:55px}section{break-inside:avoid;border-bottom:1px solid #ddd;padding:8px 0}h1{font-size:17pt}h2{font-size:11pt;margin:7px 0}p{margin:5px 0}li{padding:3px 0}small{color:#555}</style></head><body><header><img src="${new URL('IMG/logo-raitrai.png',location.href).href}" alt="Rai Trai"><small>Emitido ${new Date().toLocaleString('es-CL')}</small></header><h1>Dietas especiales</h1><p>${escapeHtml($('deAno').value)} · ${estado.filtradas.length} asignaciones</p>${html}<small>Fuente: fichas de pasajeros no anulados. Revisar los casos pendientes de detalle antes de comunicar al proveedor.</small><script>window.onload=()=>{const i=document.querySelector('header img');if(i?.complete)window.print();else if(i)i.onload=()=>window.print();else window.print()}<\/script></body></html>`); w.document.close();
+  const vista=$('deVista').value, mostrados=estado.mostrados||{grupos:[],filas:[]};
+  const datos=vista==='proveedor'?mostrados.filas:mostrados.grupos;
+  if(!datos.length)return;
+  if(vista==='proveedor' && !$('deProveedor').value && !$('deHotel').value){alert('Selecciona un proveedor o un hotel para imprimir su nómina.');return;}
+  const w=window.open('','_blank');if(!w){alert('Permite ventanas emergentes para imprimir.');return;}
+  const grupos=vista==='proveedor'?mostrados.grupos.filter(g=>datos.some(r=>r.idGrupo===g.idGrupo)):mostrados.grupos;
+  const titulo=vista==='proveedor'?('Dietas para '+($('deProveedor').value||'proveedores y hoteles')):'Dietas especiales por grupo';
+  const detalle=datos.map(r=>'<section><h2>'+escapeHtml(vista==='proveedor'?r.proveedor+' · '+r.entidad:r.grupo)+'</h2><p>'+(vista==='proveedor'?escapeHtml(fechaVisible(r.fecha))+' · ':'')+escapeHtml(r.grupo)+' · Negocio '+escapeHtml(r.negocio)+' · '+r.personas.length+' personas · '+escapeHtml(tipos(r.personas))+'</p>'+personasHTML(r.personas)+'</section>').join('');
+  const logo=new URL('IMG/logo-raitrai.png',location.href).href;
+  const cuerpo='<!doctype html><html lang="es"><head><meta charset="utf-8"><title>'+escapeHtml(titulo)+'</title><style>@page{size:A4;margin:13mm}body{font:10pt Arial;color:#172334}header{display:flex;justify-content:space-between;border-bottom:2px solid #173d63}header img{max-width:110px;max-height:55px}section{break-inside:avoid;border-bottom:1px solid #ddd;padding:8px 0}h1{font-size:17pt}h2{font-size:11pt;margin:7px 0}p{margin:5px 0}li{padding:3px 0}small{color:#555}</style></head><body><header><img src="'+logo+'" alt="Rai Trai"><small>Emitido '+new Date().toLocaleString('es-CL')+'</small></header><h1>'+escapeHtml(titulo)+'</h1><p>Año '+escapeHtml($('deAno').value)+' · '+grupos.reduce((n,g)=>n+g.personas.length,0)+' personas únicas · '+datos.length+' '+(vista==='proveedor'?'asignaciones':'grupos')+'</p>'+detalle+'<small>Fuente: fichas de pasajeros no anulados. Confirmar asistentes y vínculos pendientes antes de entregar nóminas a proveedores.</small></body></html>';
+  w.document.open();w.document.write(cuerpo);w.document.close();
+  w.addEventListener('load',()=>{const img=w.document.querySelector('header img');if(img&&!img.complete){img.onload=()=>w.print();img.onerror=()=>w.print()}else w.print()},{once:true});
 }
-onAuthStateChanged(auth, async user => {
-  if (!user) { location.href='login.html'; return; }
-  if (!canViewMedicalData(getCurrentSystemUser(user))) { $('deEstado').textContent='Sin permiso para ver datos médicos.'; return; }
-  const ano = new Date().getFullYear();
-  for (let n=ano-1;n<=ano+2;n++) $('deAno').add(new Option(String(n),String(n)));
+onAuthStateChanged(auth, async user=>{
+  if(!user){location.href='login.html';return;}
+  if(!canViewMedicalData(getCurrentSystemUser(user))){$('deEstado').textContent='Sin permiso para ver datos médicos.';return;}
+  if(document.body.dataset.dietasIniciadas)return;
+  document.body.dataset.dietasIniciadas='1';
+  const ano=new Date().getFullYear();
+  for(let n=ano-1;n<=ano+2;n++)$('deAno').add(new Option(String(n),String(n)));
   $('deAno').value=String(ano);
   $('deCargar').addEventListener('click',cargar);
   $('deImprimir').addEventListener('click',imprimir);
-  for (const id of ['deGrupo','deHotel','deProveedor','deTipo','deDesde','deHasta']) $(id).addEventListener('change',mostrar);
-  $('deAno').addEventListener('change',()=>{estado.filas=[];estado.filtradas=[];$('deResultados').hidden=true;$('deImprimir').disabled=true;$('deEstado').textContent='Pulsa Consultar para el año seleccionado.'});
-  $('deFilas').addEventListener('click',e=>{const b=e.target.closest('[data-de]');if(!b)return;const r=estado.filtradas[Number(b.dataset.de)];if(!r)return;const el=document.createElement('div');el.className='de-overlay';el.innerHTML=`<div class="de-detalle"><button type="button" data-cerrar>Cerrar</button><h2>${escapeHtml(r.entidad)}</h2><p>${escapeHtml(r.grupo)} · ${escapeHtml(fechaVisible(r.fecha))}</p>${personasHTML(r.personas)}</div>`;el.addEventListener('click',ev=>{if(ev.target===el||ev.target.closest('[data-cerrar]'))el.remove()});document.body.append(el)});
+  for(const id of ['deVista','deGrupo','deHotel','deProveedor','deDesde','deHasta'])$(id).addEventListener('change',mostrar);
+  $('deAno').addEventListener('change',()=>{estado.grupos=[];estado.filas=[];$('deResultados').hidden=true;$('deImprimir').disabled=true;$('deEstado').textContent='Pulsa Consultar para el año seleccionado.'});
+  $('deFilas').addEventListener('click',e=>{
+    const boton=e.target.closest('[data-indice]');if(!boton)return;
+    const r=estado.mostrados[boton.dataset.vista==='grupo'?'grupos':'filas'][Number(boton.dataset.indice)];
+    if(!r)return;
+    const capa=document.createElement('div');capa.className='de-overlay';
+    capa.innerHTML='<div class="de-detalle" role="dialog" aria-modal="true"><button type="button" data-cerrar>Cerrar</button><h2>'+escapeHtml(boton.dataset.vista==='grupo'?r.grupo:r.entidad)+'</h2><p>Negocio '+escapeHtml(r.negocio)+' · '+r.personas.length+' personas</p>'+personasHTML(r.personas)+'</div>';
+    capa.addEventListener('click',ev=>{if(ev.target===capa||ev.target.closest('[data-cerrar]'))capa.remove()});
+    document.body.append(capa);capa.querySelector('button').focus();
+  });
   await cargar();
 });
