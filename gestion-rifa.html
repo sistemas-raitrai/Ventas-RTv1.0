@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Gestión de Rifa | Sistema Ventas RT</title>
+  <link rel="stylesheet" href="estilos.css">
+  <link rel="icon" type="image/png" href="IMG/logo-raitrai.png">
+  <style>
+    .rifa-page{padding:24px;max-width:1500px;margin:auto;color:#2b1940}
+    .rifa-panel{background:#fff;border:1px solid #ddd4e6;border-radius:18px;padding:22px;margin-bottom:18px}
+    .rifa-head{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap}
+    .rifa-head h1{margin:0;font-size:1.8rem}.rifa-muted{color:#645a70}
+    .rifa-toolbar{display:grid;grid-template-columns:minmax(220px,2fr) minmax(160px,1fr) minmax(150px,1fr) auto;gap:10px;margin-top:18px}
+    .rifa-toolbar input,.rifa-toolbar select,.rifa-field input,.rifa-field select,.rifa-field textarea{width:100%;min-height:43px;padding:9px 11px;border:1px solid #b9adca;border-radius:9px;background:#fff;color:#281d35;font:inherit}
+    .rifa-field{display:block;margin:10px 0}.rifa-field span{display:block;font-weight:650;margin-bottom:5px}
+    .rifa-kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin:18px 0}
+    .rifa-kpi{background:#f5f0f9;padding:16px;border-radius:12px}.rifa-kpi span{display:block;color:#645a70}.rifa-kpi strong{display:block;font-size:1.7rem;margin-top:5px}
+    .rifa-btn{border:1px solid #38234d;border-radius:9px;background:#38234d;color:#fff;padding:10px 14px;font:inherit;cursor:pointer}
+    .rifa-btn.secondary{background:#fff;color:#38234d}.rifa-btn.danger{background:#8a3341;border-color:#8a3341}.rifa-btn:disabled{opacity:.5;cursor:wait}
+    .rifa-table-wrap{overflow:auto}.rifa-table{width:100%;border-collapse:collapse;min-width:860px}
+    .rifa-table th,.rifa-table td{text-align:left;padding:11px;border-bottom:1px solid #ece6f0;vertical-align:top}
+    .rifa-table th{background:#f6f1f9;position:sticky;top:0}.rifa-table tr:hover{background:#fbf8fd}
+    .rifa-status{display:inline-block;border-radius:99px;padding:4px 9px;background:#e5f3e9;color:#155d31;font-size:.85rem}
+    .rifa-status.archivada{background:#f2ebed;color:#713a47}
+    .rifa-message{padding:11px;border-radius:9px;background:#f1edf6;margin:12px 0}.rifa-message.error{background:#ffefef;color:#8c2424}
+    .rifa-overlay{position:fixed;inset:0;background:#160b20a8;z-index:1000;display:grid;place-items:center;padding:16px}
+    .rifa-dialog{background:#fff;border-radius:16px;max-width:740px;width:100%;max-height:92vh;overflow:auto;padding:22px}
+    .rifa-dialog-head{display:flex;justify-content:space-between;gap:15px;align-items:center;position:sticky;top:-22px;background:#fff;padding:8px 0 12px;z-index:1;border-bottom:1px solid #ece6f0}
+    .rifa-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 14px}
+    .rifa-persona{border:1px solid #e2d8ea;border-radius:12px;padding:13px;margin:12px 0}
+    .rifa-persona-head{display:flex;align-items:center;justify-content:space-between;gap:10px}
+    .rifa-actions{display:flex;gap:9px;flex-wrap:wrap;justify-content:flex-end;margin-top:16px}
+    .rifa-small{font-size:.88rem}.rifa-hidden{display:none!important}
+    @media(max-width:800px){.rifa-page{padding:12px}.rifa-toolbar{grid-template-columns:1fr 1fr}.rifa-kpis{grid-template-columns:1fr 1fr}}
+    @media(max-width:550px){.rifa-toolbar,.rifa-grid{grid-template-columns:1fr}.rifa-dialog{padding:15px}.rifa-dialog-head{top:-15px}}
+  </style>
+</head>
+<body class="ventas-body" data-page="gestion-rifa">
+  <div id="layout-top"></div>
+  <main class="page-shell rifa-page">
+    <section class="rifa-panel">
+      <div class="rifa-head">
+        <div><h1>Gestión de Rifa 2026</h1><p class="rifa-muted">Reservas para el sorteo del 17 de octubre · Club Providencia.</p></div>
+        <button id="rifaRecargar" class="rifa-btn secondary" type="button">Recargar</button>
+      </div>
+      <div class="rifa-kpis" aria-live="polite">
+        <div class="rifa-kpi"><span>Reservas activas</span><strong id="kpiReservas">0</strong></div>
+        <div class="rifa-kpi"><span>Asistentes</span><strong id="kpiAsistentes">0</strong></div>
+        <div class="rifa-kpi"><span>Grupos con reserva</span><strong id="kpiGrupos">0</strong></div>
+        <div class="rifa-kpi"><span>Archivadas</span><strong id="kpiArchivadas">0</strong></div>
+      </div>
+      <div class="rifa-toolbar">
+        <input id="rifaBuscar" type="search" placeholder="Buscar ID, colegio, curso, persona o celular" aria-label="Buscar reservas">
+        <select id="rifaGrupo" aria-label="Filtrar por grupo"><option value="">Todos los grupos</option></select>
+        <select id="rifaEstado" aria-label="Filtrar por estado"><option value="confirmada">Activas</option><option value="archivada">Archivadas</option><option value="todos">Todas</option></select>
+        <button id="rifaLimpiar" class="rifa-btn secondary" type="button">Limpiar filtros</button>
+      </div>
+      <p id="rifaEstadoCarga" class="rifa-message" role="status">Esperando sesión...</p>
+      <p id="rifaConteo" class="rifa-muted"></p>
+      <div class="rifa-table-wrap">
+        <table class="rifa-table">
+          <thead><tr><th>Grupo</th><th>ID</th><th>Contacto</th><th>Celular</th><th>Asistentes</th><th>Registrada</th><th>Estado</th><th>Acción</th></tr></thead>
+          <tbody id="rifaFilas"></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+  <div id="rifaOverlay" class="rifa-overlay rifa-hidden" role="presentation">
+    <section class="rifa-dialog" role="dialog" aria-modal="true" aria-labelledby="rifaDialogTitulo">
+      <div class="rifa-dialog-head"><h2 id="rifaDialogTitulo">Reserva</h2><button id="rifaCerrar" class="rifa-btn secondary" type="button">Cerrar</button></div>
+      <p id="rifaDialogGrupo" class="rifa-muted"></p>
+      <p id="rifaDialogEstado" class="rifa-message rifa-hidden" role="status"></p>
+      <form id="rifaEditarForm">
+        <h3>Contacto principal</h3>
+        <div class="rifa-grid">
+          <label class="rifa-field"><span>Nombre(s)</span><input id="rifaContactoNombres" required maxlength="100"></label>
+          <label class="rifa-field"><span>Apellidos</span><input id="rifaContactoApellidos" required maxlength="100"></label>
+          <label class="rifa-field"><span>Celular</span><input id="rifaContactoTelefono" type="tel" required></label>
+          <label class="rifa-field"><span>Correo</span><input id="rifaContactoCorreo" type="email" required></label>
+          <label class="rifa-field"><span>Relación con el grupo</span><select id="rifaContactoRelacion" required><option value="estudiante">Estudiante</option><option value="apoderado">Apoderado(a)</option><option value="profesor">Profesor(a)</option><option value="otro">Otro</option></select></label>
+          <label class="rifa-field"><span>Especificar si es «Otro»</span><input id="rifaContactoOtra" maxlength="80"></label>
+        </div>
+        <label class="rifa-field"><input id="rifaContactoAsiste" type="checkbox" style="width:auto;min-height:auto"> El contacto asistirá (oculto en el formulario público)</label>
+        <h3>Otras personas</h3>
+        <div id="rifaPersonas"></div>
+        <button id="rifaAgregarPersona" class="rifa-btn secondary" type="button">+ Agregar persona</button>
+        <p id="rifaTotalEditado" class="rifa-muted"></p>
+        <div class="rifa-actions">
+          <button id="rifaGuardar" class="rifa-btn" type="submit">Guardar cambios</button>
+          <button id="rifaArchivar" class="rifa-btn danger" type="button">Archivar reserva</button>
+          <button id="rifaRestaurar" class="rifa-btn secondary rifa-hidden" type="button">Restaurar reserva</button>
+        </div>
+      </form>
+      <p class="rifa-muted rifa-small">Los cambios guardan usuario, fecha y resumen de modificaciones. Archivar conserva el registro y deja de sumar sus asistentes.</p>
+    </section>
+  </div>
+  <script type="module" src="layout.js"></script>
+  <script type="module" src="./gestion-rifa.js"></script>
+</body>
+</html>
