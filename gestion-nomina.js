@@ -45,6 +45,10 @@ import {
   crearInscripcionViewer
 } from "./inscripcion-viewer.js";
 
+import {
+  crearResumenSaludGeneral
+} from "./resumen-salud-general.js";
+
 const $ = (id) =>
   document.getElementById(id);
 
@@ -204,6 +208,15 @@ const state = {
     ""
 };
 
+const resumenSaludGeneral =
+  crearResumenSaludGeneral({
+    getUsuario: () =>
+      state.user,
+
+    getAno: () =>
+      state.anoSeleccionado
+  });
+
 init();
 
 async function init() {
@@ -213,18 +226,47 @@ async function init() {
 
   configurarSelectorAnos();
   actualizarTituloAno();
+
   bindEvents();
   bindAdministracionEvents();
+
+  $("btnResumenSaludGeneral")
+    ?.addEventListener(
+      "click",
+      async () => {
+        try {
+          await resumenSaludGeneral.abrir();
+        } catch (error) {
+          console.error(
+            "[gestion-nomina] resumen general de salud",
+            error
+          );
+
+          alert(
+            error.message ||
+            "No fue posible abrir el resumen general de salud."
+          );
+        }
+      }
+    );
 
   onAuthStateChanged(
     auth,
     async (user) => {
       if (!user) {
+        resumenSaludGeneral
+          .actualizarVisibilidad();
+
         return;
       }
 
       await bootstrap();
+
+      resumenSaludGeneral
+        .actualizarVisibilidad();
+
       bindHeader();
+
       await cargarPantalla();
     }
   );
