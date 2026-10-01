@@ -3970,12 +3970,9 @@ function mapRow(
   id,
   data
 ) {
-  const totalViajan =
-    Number(
-      data.totalViajan ??
-      data.totalRegistros ??
-      0
-    );
+  const totalViajan = Number(
+    data.totalViajan ?? 0
+  );
 
   const fichaCompleta =
     Number(
@@ -6893,30 +6890,8 @@ function ordenarNominaGestion(
   );
 }
 
-function esViajaConfirmado(
-  item = {}
-) {
-  return [
-    "lista_confirmada",
-    "nuevo_confirmado",
-    "liberado",
-
-    /*
-      IMPORTANTE:
-      el cupo todavía no tiene persona,
-      pero físicamente ese lugar VIAJA.
-    */
-    "cupo_reservado",
-
-    "nomina_base_completa",
-    "nomina_base_pendiente",
-    "sistema_completo",
-    "sistema_pendiente"
-  ].includes(
-    getCategoriaOperativa(
-      item
-    )
-  );
+function esViajaConfirmado(item = {}) {
+  return esPersonaViajeraConteo(item);
 }
 
 function requiereGestion(
@@ -6933,7 +6908,7 @@ function requiereGestion(
   );
 }
 
-function getResumenOperativoNomina() {
+function getResumenOperativoNominaBase()
   const items =
     state.nomina;
 
@@ -7063,6 +7038,38 @@ function getResumenOperativoNomina() {
       countCategoria(
         "lista_pendiente"
       )
+  };
+}
+
+function getResumenOperativoNomina() {
+  const resumen = getResumenOperativoNominaBase();
+
+  const items = state.nomina || [];
+
+  const viajeros = items.filter(
+    esPersonaViajeraConteo
+  );
+
+  return {
+    ...resumen,
+
+    viajan: viajeros.length,
+
+    cuposReservados: items.filter(
+      esReservaPendienteConteo
+    ).length,
+
+    fichaPendiente: viajeros.filter(
+      (item) => !fichaCompletaConteoNomina(item)
+    ).length,
+
+    sinCarnet: viajeros.filter(
+      (item) => !carnetCompletoConteoNomina(item)
+    ).length,
+
+    liberados: viajeros.filter(
+      (item) => tipoConteoNomina(item) === "liberado"
+    ).length
   };
 }
 
