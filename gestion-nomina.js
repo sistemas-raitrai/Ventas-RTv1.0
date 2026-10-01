@@ -6908,7 +6908,7 @@ function requiereGestion(
   );
 }
 
-function getResumenOperativoNominaBase()
+function getResumenOperativoNominaBase() {
   const items =
     state.nomina;
 
