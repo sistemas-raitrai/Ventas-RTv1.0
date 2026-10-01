@@ -3952,3 +3952,290 @@ function estaAnulada(i) { return i?.anulado === true || i?.anulada === true || n
 function texto(v) { return String(v ?? "").trim(); }
 function normalizar(v) { return texto(v).normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase(); }
 function normalizarEmail(v) { return normalizar(v).replace(/\s+/g, ""); }
+
+/* =========================================================
+   CRITERIO COMÚN: PERSONAS QUE VIAJAN
+========================================================= */
+
+function claveConteoNomina(value = "") {
+  return String(value ?? "")
+    .trim()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/\s+/g, "_");
+}
+
+function tipoConteoNomina(item = {}) {
+  const key = claveConteoNomina(
+    item.tipoInscripcion ||
+    item.estadoInscripcion ||
+    item.faseInscripcion ||
+    item.tipo ||
+    item.pasajero?.tipo ||
+    "nomina_inicial"
+  );
+
+  const equivalencias = {
+    inscripcion_inicial: "nomina_inicial",
+    normal: "nomina_inicial",
+    nomina_final_ficha_medica: "nomina_final",
+    sistema_de_pagos: "sistema_pagos",
+    nuevos: "nuevo_ingreso",
+    nuevo_inscrito: "nuevo_ingreso",
+    lista_de_espera: "lista_espera",
+    cupo_liberado: "liberado",
+    liberados: "liberado",
+    ingreso_liberado: "liberado",
+    liberado_confirmado: "liberado"
+  };
+
+  return equivalencias[key] || key;
+}
+
+function esReservaConteoNomina(item = {}) {
+  return (
+    item.esCupoReservado === true ||
+    claveConteoNomina(item.tipoRegistro) === "cupo_reservado" ||
+    tipoConteoNomina(item) === "cupo_reservado"
+  );
+}
+
+function estaExcluidoConteoNomina(item = {}) {
+  const privacidad = claveConteoNomina(
+    item.privacidad?.estado ||
+    item.estadoPrivacidad
+  );
+
+  if (
+    item.archivada === true ||
+    item.anulado === true ||
+    item.anulada === true ||
+    item.noViaja === true ||
+    [
+      "archivada",
+      "eliminada",
+      "eliminada_logica"
+    ].includes(privacidad)
+  ) {
+    return true;
+  }
+
+  const estados = [
+    item.estado,
+    item.estadoViaje,
+    item.estadoCupo,
+    item.sistemaPagos?.estado,
+    item.sistemaPagos?.estadoViaje
+  ].map(claveConteoNomina);
+
+  if (
+    estados.some((estado) =>
+      estado.includes("anulad") ||
+      [
+        "no_viaja",
+        "eliminado_en_sp",
+        "eliminada_en_sp"
+      ].includes(estado)
+    )
+  ) {
+    return true;
+  }
+
+  return [
+    item.viaja,
+    item.sistemaPagos?.viaja
+  ].some((value) =>
+    value !== undefined &&
+    value !== null &&
+    value !== "" &&
+    ["false", "no", "0", "no_viaja"].includes(
+      claveConteoNomina(value)
+    )
+  );
+}
+
+function esPersonaViajeraConteo(item = {}) {
+  if (
+    estaExcluidoConteoNomina(item) ||
+    esReservaConteoNomina(item)
+  ) {
+    return false;
+  }
+
+  const tipo = tipoConteoNomina(item);
+
+  const estadoCupo = claveConteoNomina(
+    item.estadoCupo ||
+    item.cupo?.estado ||
+    item.estado ||
+    ""
+  );
+
+  if (
+    tipo === "lista_espera" ||
+    tipo === "lista_espera_pagada"
+  ) {
+    return estadoCupo === "confirmado";
+  }
+
+  if (tipo === "nuevo_ingreso") {
+    return estadoCupo === "confirmado";
+  }
+
+  if (tipo === "liberado") {
+    // Los liberados registrados viajan.
+    // Una marca explícita pendiente impide contarlos.
+    return ![
+      "pendiente",
+      "por_confirmar",
+      "rechazado"
+    ].includes(estadoCupo);
+  }
+
+  return [
+    "nomina_inicial",
+    "nomina_inicial_confirmada",
+    "nomina_final",
+    "sistema_pagos",
+    "nuevo_ingreso_confirmado",
+    "lista_espera_confirmada"
+  ].includes(tipo);
+}
+
+function esReservaPendienteConteo(item = {}) {
+  if (
+    !esReservaConteoNomina(item) ||
+    estaExcluidoConteoNomina(item)
+  ) {
+    return false;
+  }
+
+  const estado = claveConteoNomina(
+    item.estadoCupoReservado ||
+    item.cupoReservado?.estado ||
+    item.estadoCupo ||
+    ""
+  );
+
+  return ![
+    "consumido",
+    "anulado",
+    "eliminado",
+    "cerrado"
+  ].includes(estado);
+}
+
+function fichaCompletaConteoNomina(item = {}) {
+  if (esReservaConteoNomina(item)) {
+    return false;
+  }
+
+  const tipo = tipoConteoNomina(item);
+
+  // Misma regla que ya utiliza inscripciones-manager.js:
+  // estos formularios exigen ficha médica al guardarse.
+  if (
+    [
+      "nomina_inicial",
+      "nomina_inicial_confirmada",
+      "nomina_final",
+      "nuevo_ingreso",
+      "nuevo_ingreso_confirmado",
+      "lista_espera",
+      "lista_espera_pagada",
+      "lista_espera_confirmada",
+      "liberado"
+    ].includes(tipo)
+  ) {
+    return true;
+  }
+
+  const marcas = [
+    item.fichaCompleta,
+    item.fichaMedicaCompleta,
+    item.nominaFinalCompleta,
+    item.fichaMedicaCompletada,
+    item.nominaFinalCompletada,
+    item.fichaMedica?.completa
+  ];
+
+  if (marcas.some((value) => value === true)) {
+    return true;
+  }
+
+  return [
+    item.fichaMedicaEstado,
+    item.estadoFichaMedica,
+    item.fichaMedica?.estado
+  ].some((value) =>
+    [
+      "completa",
+      "completada",
+      "completo",
+      "ok",
+      "confirmada"
+    ].includes(claveConteoNomina(value))
+  );
+}
+
+function carnetCompletoConteoNomina(item = {}) {
+  const esSi = (value) =>
+    value === true ||
+    ["true", "si", "1"].includes(
+      claveConteoNomina(value)
+    );
+
+  const marcas = [
+    item.tieneCarnet,
+    item.tieneCarnetIdentidad,
+    item.carnet?.tieneCarnetIdentidad,
+    item.tieneCredencialSistemaPagos,
+    item.sistemaPagos?.tieneCarnet,
+    item.sistemaPagos?.tieneCredencial,
+    item.sistemaPagos?.tiene_credencial,
+    item.pagos?.tieneCredencial,
+    item.pagos?.tiene_credencial,
+    item.tieneCredencial,
+    item.tiene_credencial,
+    item.credencial?.tiene,
+    item.documentos?.carnetIdentidad
+  ];
+
+  if (marcas.some(esSi)) {
+    return true;
+  }
+
+  const existeArchivo = (archivo) => {
+    if (typeof archivo === "string") {
+      return archivo.trim().length > 0;
+    }
+
+    if (!archivo || typeof archivo !== "object") {
+      return false;
+    }
+
+    return [
+      archivo.ruta,
+      archivo.path,
+      archivo.url,
+      archivo.downloadURL,
+      archivo.nombreOriginal
+    ].some((value) =>
+      typeof value === "string" &&
+      value.trim().length > 0
+    );
+  };
+
+  const tieneLado = (lado) =>
+    [
+      item.archivosEspeciales?.[lado],
+      item.archivos?.[lado],
+      item.documentos?.[lado]
+    ].some(existeArchivo);
+
+  return (
+    tieneLado("carnetFrente") &&
+    tieneLado("carnetReverso")
+  );
+}
