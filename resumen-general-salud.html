@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Resumen general de salud · Rai Trai</title>
+  <style>
+    body{margin:0;background:#f4f6fa;color:#263247;font:14px/1.5 Arial,sans-serif}
+    #estadoPagina{margin:40px auto;padding:24px;max-width:650px;background:#fff;border-radius:14px}
+    #estadoPagina[hidden]{display:none}
+    #estadoPagina a{color:#633c85}
+  </style>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
+</head>
+<body>
+  <main id="estadoPagina" role="status">Validando sesión…</main>
+  <script type="module">
+    import {auth,getVentasUser} from './firebase-init.js';
+    import {onAuthStateChanged} from './ficha-medica-common.js';
+    import {crearResumenSaludGeneral} from './resumen-salud-general.js';
+
+    const estado=document.getElementById('estadoPagina');
+    const actual=new Date().getFullYear();
+    const parametro=Number(new URLSearchParams(location.search).get('ano'));
+    let ano=Number.isInteger(parametro)&&parametro>=2026&&parametro<=2100?parametro:actual;
+    let usuario=null;
+    let sesion=0;
+    const resumen=crearResumenSaludGeneral({getUsuario:()=>usuario,getAno:()=>ano,independiente:true});
+
+    function mensaje(texto){estado.textContent=texto;estado.hidden=false;}
+    function selectorAno(){
+      if(document.getElementById('rsgAnoPagina'))return;
+      const label=document.createElement('label');label.className='rsg-year';label.textContent='AÑO DE VIAJE';
+      const select=document.createElement('select');select.id='rsgAnoPagina';
+      const fin=Math.max(actual+3,ano);
+      for(let n=2026;n<=fin;n++){const option=document.createElement('option');option.value=String(n);option.textContent=String(n);select.append(option);}
+      select.value=String(ano);label.append(select);
+      document.querySelector('#rsgModal .rsg-header .rsg-actions').prepend(label);
+      select.addEventListener('change',async()=>{
+        ano=Number(select.value);select.disabled=true;
+        const url=new URL(location.href);url.searchParams.set('ano',String(ano));history.replaceState(null,'',url);
+        try{await resumen.abrir();}catch(error){mensaje(error.message||'No fue posible cargar el resumen.');}
+        finally{select.disabled=false;}
+      });
+    }
+
+    onAuthStateChanged(auth,async firebaseUser=>{
+      const turno=++sesion;
+      if(!firebaseUser){location.replace('login.html');return;}
+      usuario=getVentasUser(firebaseUser.email||'');
+      try{
+        await resumen.abrir();
+        if(turno!==sesion)return;
+        estado.hidden=true;selectorAno();
+      }catch(error){mensaje(error.message||'No fue posible acceder al resumen.');}
+    });
+  </script>
+</body>
+</html>
