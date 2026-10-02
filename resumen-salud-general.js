@@ -91,7 +91,74 @@ function compararGrupos(a,b,orden,sentido='desc') {
   const av=valor(a),bv=valor(b);
   return (av===null&&bv!==null?1:bv===null&&av!==null?-1:factor*((av||0)-(bv||0)))||(a.inicio||'9999').localeCompare(b.inicio||'9999')||a.titulo.localeCompare(b.titulo,'es');
 }
-function personasSeleccionadas(g,situacion) {return g.error?[]:g.pasajeros.filter(p=>!situacion||p[situacion]);}
+function terminosBusqueda(valor) {
+  return unico(
+    String(valor || '')
+      .split(',')
+      .map(v => normalize(v).replace(/\s+/g, ' ').trim())
+      .filter(Boolean)
+  );
+}
+
+function coincideTexto(valor, termino) {
+  const contenido = normalize(valor).replace(/\s+/g, ' ').trim();
+
+  // Comillas: coincidencia exacta del nombre completo.
+  if (
+    termino.length >= 2 &&
+    termino.startsWith('"') &&
+    termino.endsWith('"')
+  ) {
+    return contenido === termino.slice(1, -1).trim();
+  }
+
+  return contenido.includes(termino);
+}
+
+function coincideGrupo(g, terminos) {
+  if (!terminos.length) return true;
+
+  return terminos.some(termino => {
+    // Un número busca exclusivamente ID o número de negocio.
+    if (/^\d+$/.test(termino)) {
+      const numero = normalizarNegocio(termino);
+
+      return [
+        g.id,
+        g.gid,
+        g.negocio
+      ].some(v => normalizarNegocio(v) === numero);
+    }
+
+    return coincideTexto(g.titulo, termino);
+  });
+}
+
+function coincidePersona(p, terminos) {
+  if (!terminos.length) return true;
+
+  return terminos.some(termino =>
+    [
+      p.nombre,
+      p.nombreDocumento,
+      p.documento
+    ].some(v => coincideTexto(v, termino))
+  );
+}
+
+function personasSeleccionadas(g, situacion) {
+  if (g.error) return [];
+
+  const terminos = terminosBusqueda(
+    $('rsgPersona')?.value || ''
+  );
+
+  return g.pasajeros.filter(p =>
+    (!situacion || p[situacion]) &&
+    coincidePersona(p, terminos)
+  );
+}
+
 function datosSalud(p) {
   const s=p.salud||{}, completa=fichaCompleta(p),interno=usoInterno(p);
   const textoFlag=(f,d)=>flag(s[f])===true||!!texto(s[d]);
@@ -232,17 +299,91 @@ export function crearResumenSaludGeneral({getUsuario,getAno,independiente=false}
       <header class="rsg-header"><div><p class="rsg-eyebrow">Preparación de viajes</p><h2 id="rsgTitulo">Salud y coordinadores</h2><p id="rsgSubtitulo" class="rsg-muted"></p></div>
       <div class="rsg-actions"><button id="rsgExcel">Excel</button><button id="rsgPdf" class="rsg-primary">PDF</button><button id="rsgCerrar" aria-label="Cerrar resumen de salud">Cerrar ✕</button></div></header>
       <div class="rsg-scroll"><div class="rsg-filters">
-        <label>BUSCAR<input id="rsgBuscar" type="search" placeholder="Colegio, ID, negocio o pasajero"></label>
-        <label>DESTINO<select id="rsgDestino"><option value="">Todos los destinos</option></select></label>
-        <label>COORDINADOR<select id="rsgCoord"><option value="">Todos los coordinadores</option></select></label>
-        <label>SALIDA DESDE<input id="rsgDesde" type="date"></label><label>SALIDA HASTA<input id="rsgHasta" type="date"></label>
+        <label>
+          BUSCAR GRUPOS · COMA PARA VARIOS
+          <input
+            id="rsgBuscar"
+            type="search"
+            placeholder="Cambridge, Germania, 10231"
+          >
+        </label>
+        
+        <label>
+          GRUPO EXACTO
+          <select id="rsgGrupoExacto">
+            <option value="">Todos los grupos coincidentes</option>
+          </select>
+        </label>
+        
+        <label>
+          DESTINO
+          <select id="rsgDestino">
+            <option value="">Todos los destinos</option>
+          </select>
+        </label>
+        
+        <label>
+          BUSCAR COORDINADORES · COMA PARA VARIOS
+          <input
+            id="rsgBuscarCoord"
+            type="search"
+            placeholder="Juan Pérez, María Soto"
+          >
+        </label>
+        
+        <label>
+          COORDINADOR EXACTO / ASIGNACIÓN
+          <select id="rsgCoord">
+            <option value="">Todos los coordinadores</option>
+          </select>
+        </label>
+        
+        <label>
+          VENDEDOR(A)
+          <select id="rsgVendedor">
+            <option value="">Todos los vendedores</option>
+          </select>
+        </label>
+        
+        <label>
+          BUSCAR PERSONAS · COMA PARA VARIAS
+          <input
+            id="rsgPersona"
+            type="search"
+            placeholder="Nombre registrado, documental o documento"
+          >
+        </label>
+        
+        <label>
+          SALIDA DESDE
+          <input id="rsgDesde" type="date">
+        </label>
+        
+        <label>
+          SALIDA HASTA
+          <input id="rsgHasta" type="date">
+        </label>
       </div><div class="rsg-controls"><div class="rsg-selects">
         <label>AGRUPAR POR<select id="rsgAgrupar"><option value="grupo">Todos los grupos, sin agrupar</option><option value="destino">Destino</option><option value="fecha">Día de inicio</option><option value="coordinador">Coordinador</option></select></label>
         <label>ORDENAR GRUPOS<select id="rsgOrden"><option value="pct:neuro">% Neurodivergencias</option>${METRICAS.filter(m=>m[0]!=='neuro').map(([k,t])=>`<option value="pct:${k}">% ${esc(t)}</option>`).join('')}${METRICAS.map(([k,t])=>`<option value="n:${k}">Cantidad: ${esc(t)}</option>`).join('')}<option value="inicio">Fecha de inicio</option></select></label>
         <label>SENTIDO<select id="rsgSentido"><option value="desc">Mayor a menor / Más lejana</option><option value="asc">Menor a mayor / Más próxima</option></select></label>
         <label>MOSTRAR GRUPOS CON<select id="rsgSituacion"><option value="">Todas las situaciones</option>${Object.entries(ETIQUETAS).filter(([k])=>k!=='total').map(([k,v])=>`<option value="${k}">${esc(v)}</option>`).join('')}</select></label>
       </div><div class="rsg-actions"><button id="rsgLimpiar">Limpiar filtros</button><button id="rsgRecargar">Actualizar</button></div></div>
-      <div id="rsgMensaje" class="rsg-status" role="status" aria-live="polite"></div><div id="rsgCalidad" class="rsg-quality" hidden></div>
+      <div
+        id="rsgExportacion"
+        class="rsg-status"
+        role="status"
+        aria-live="polite"
+      ></div>
+      
+      <div
+        id="rsgMensaje"
+        class="rsg-status"
+        role="status"
+        aria-live="polite"
+      ></div>
+      
+      <div id="rsgCalidad" class="rsg-quality" hidden></div>
       <div id="rsgKpis" class="rsg-kpis"></div><p class="rsg-explainer" id="rsgBase"></p><div id="rsgResultados"></div></div></section>`;
     document.body.append(modal);
     if(independiente){const shell=modal.querySelector('.rsg-shell');shell.setAttribute('role','region');shell.removeAttribute('aria-modal');$('rsgCerrar').textContent='Volver a Gestión Nómina';$('rsgCerrar').removeAttribute('aria-label');$('rsgCerrar').onclick=()=>{location.href='gestion-nomina.html';};}else $('rsgCerrar').onclick=cerrar;modal.addEventListener('click',ev=>{if(ev.target===modal)cerrar();});
@@ -255,8 +396,57 @@ export function crearResumenSaludGeneral({getUsuario,getAno,independiente=false}
         else if(!ev.shiftKey&&document.activeElement===last){ev.preventDefault();first?.focus();}
       }
     });
-    for(const id of ['rsgBuscar','rsgDestino','rsgCoord','rsgDesde','rsgHasta','rsgAgrupar','rsgOrden','rsgSentido','rsgSituacion'])$(id).addEventListener('input',filtrar);
-    $('rsgLimpiar').onclick=()=>{for(const id of ['rsgBuscar','rsgDestino','rsgCoord','rsgDesde','rsgHasta','rsgSituacion'])$(id).value='';filtrar();};
+    const idsFiltros = [
+      'rsgBuscar',
+      'rsgGrupoExacto',
+      'rsgDestino',
+      'rsgBuscarCoord',
+      'rsgCoord',
+      'rsgVendedor',
+      'rsgPersona',
+      'rsgDesde',
+      'rsgHasta',
+      'rsgAgrupar',
+      'rsgOrden',
+      'rsgSentido',
+      'rsgSituacion'
+    ];
+    
+    for (const id of idsFiltros) {
+      const elemento = $(id);
+    
+      const aplicar = () => {
+        if (id === 'rsgBuscar') {
+          $('rsgGrupoExacto').value = '';
+          llenarSelectorGrupos();
+        }
+    
+        filtrar();
+      };
+    
+      elemento?.addEventListener('input', aplicar);
+      elemento?.addEventListener('change', aplicar);
+    }
+    
+    $('rsgLimpiar').onclick = () => {
+      for (const id of [
+        'rsgBuscar',
+        'rsgGrupoExacto',
+        'rsgDestino',
+        'rsgBuscarCoord',
+        'rsgCoord',
+        'rsgVendedor',
+        'rsgPersona',
+        'rsgDesde',
+        'rsgHasta',
+        'rsgSituacion'
+      ]) {
+        $(id).value = '';
+      }
+    
+      llenarSelectorGrupos();
+      filtrar();
+    };
     $('rsgRecargar').onclick=()=>cargar();$('rsgExcel').onclick=()=>accion(exportarExcel);$('rsgPdf').onclick=()=>accion(exportarPdf);
     $('rsgKpis').addEventListener('click',ev=>{const b=ev.target.closest('[data-rsg-metrica]');if(!b)return;const key=b.dataset.rsgMetrica;$('rsgSituacion').value=$('rsgSituacion').value===key?'':key;filtrar();});
   }
@@ -342,23 +532,175 @@ export function crearResumenSaludGeneral({getUsuario,getAno,independiente=false}
     } catch(err){if(token===generacion)mensaje(err.message);}
     finally{ocupado=false;botones();}
   }
+  function llenarSelectorGrupos() {
+    const selector = $('rsgGrupoExacto');
+    const anterior = selector.value;
+    const terminos = terminosBusqueda($('rsgBuscar').value);
+  
+    const candidatos = grupos
+      .filter(g => coincideGrupo(g, terminos))
+      .slice()
+      .sort((a, b) =>
+        a.titulo.localeCompare(b.titulo, 'es') ||
+        String(a.gid).localeCompare(String(b.gid))
+      );
+  
+    selector.innerHTML =
+      '<option value="">Todos los grupos coincidentes</option>' +
+      candidatos.map(g => {
+        const etiqueta = [
+          g.titulo,
+          g.destino,
+          `Negocio ${g.negocio || 'pendiente'}`,
+          `ID ${g.gid}`,
+          `Inicio ${fechaTexto(g.inicio)}`
+        ].join(' · ');
+  
+        return `
+          <option value="${esc(g.id)}">
+            ${esc(etiqueta)}
+          </option>
+        `;
+      }).join('');
+  
+    if (candidatos.some(g => g.id === anterior)) {
+      selector.value = anterior;
+    }
+  }
+  
   function llenarFiltros() {
-    const anteriorDestino=$('rsgDestino').value,anteriorCoord=$('rsgCoord').value;
-    const destinos=unico(grupos.map(g=>g.destino)).sort((a,b)=>a.localeCompare(b,'es'));
-    $('rsgDestino').innerHTML='<option value="">Todos los destinos</option>'+destinos.map(v=>`<option value="${esc(v)}">${esc(v)}</option>`).join('');
-    const coords=new Map(grupos.flatMap(g=>g.coordinadores).map(c=>[c.id,c]));
-    $('rsgCoord').innerHTML='<option value="">Todos los coordinadores</option><option value="__sin">Sin coordinador asignado</option><option value="__desconocido">Asignación no disponible</option>'+[...coords.values()].sort((a,b)=>a.nombre.localeCompare(b.nombre,'es')).map(c=>`<option value="${esc(c.id)}">${esc(c.nombre)}</option>`).join('');
-    if(destinos.includes(anteriorDestino))$('rsgDestino').value=anteriorDestino;
-    if(coords.has(anteriorCoord)||['__sin','__desconocido'].includes(anteriorCoord))$('rsgCoord').value=anteriorCoord;
+    const anteriorDestino = $('rsgDestino').value;
+    const anteriorCoord = $('rsgCoord').value;
+    const anteriorVendedor = $('rsgVendedor').value;
+  
+    const destinos = unico(grupos.map(g => g.destino))
+      .sort((a, b) => a.localeCompare(b, 'es'));
+  
+    $('rsgDestino').innerHTML =
+      '<option value="">Todos los destinos</option>' +
+      destinos.map(v =>
+        `<option value="${esc(v)}">${esc(v)}</option>`
+      ).join('');
+  
+    const coords = new Map(
+      grupos.flatMap(g => g.coordinadores).map(c => [c.id, c])
+    );
+  
+    $('rsgCoord').innerHTML =
+      '<option value="">Todos los coordinadores</option>' +
+      '<option value="__sin">Sin coordinador asignado</option>' +
+      '<option value="__desconocido">Asignación no disponible</option>' +
+      [...coords.values()]
+        .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'))
+        .map(c =>
+          `<option value="${esc(c.id)}">${esc(c.nombre)}</option>`
+        ).join('');
+  
+    const vendedores = unico(grupos.map(g => g.vendedor))
+      .sort((a, b) => a.localeCompare(b, 'es'));
+  
+    $('rsgVendedor').innerHTML =
+      '<option value="">Todos los vendedores</option>' +
+      vendedores.map(v =>
+        `<option value="${esc(v)}">${esc(v)}</option>`
+      ).join('');
+  
+    if (destinos.includes(anteriorDestino)) {
+      $('rsgDestino').value = anteriorDestino;
+    }
+  
+    if (
+      coords.has(anteriorCoord) ||
+      ['__sin', '__desconocido'].includes(anteriorCoord)
+    ) {
+      $('rsgCoord').value = anteriorCoord;
+    }
+  
+    if (vendedores.includes(anteriorVendedor)) {
+      $('rsgVendedor').value = anteriorVendedor;
+    }
+  
+    llenarSelectorGrupos();
   }
   function filtrar() {
-    if(!permitido()){actualizarVisibilidad();return;}
-    const buscar=normalize($('rsgBuscar').value),destino=$('rsgDestino').value,coord=$('rsgCoord').value,desde=$('rsgDesde').value,hasta=$('rsgHasta').value,situacion=$('rsgSituacion').value;
-    visibles=grupos.filter(g=>(!buscar||normalize([g.titulo,g.gid,g.negocio,g.destino,g.vendedor,...g.coordinadores.map(c=>c.nombre),...g.pasajeros.flatMap(p=>[p.nombre,p.documento,p.nombreDocumento,p.contacto.nombre,p.contacto.telefono,p.contacto.correo])].join(' ')).includes(buscar))
-      &&(!destino||g.destino===destino)&&(!coord||(coord==='__sin'?!g.coordError&&!g.coordinadores.length:coord==='__desconocido'?g.coordError:g.coordinadores.some(c=>c.id===coord)))
-      &&(!desde||(g.inicio&&g.inicio>=desde))&&(!hasta||(g.inicio&&g.inicio<=hasta))&&(!situacion||!g.error&&g.cuentas[situacion]>0));
-    visibles.sort((a,b)=>compararGrupos(a,b,$('rsgOrden').value,$('rsgSentido').value));
-    render();botones();
+    if (!permitido()) {
+      actualizarVisibilidad();
+      return;
+    }
+  
+    const gruposBuscados = terminosBusqueda($('rsgBuscar').value);
+    const coordinadoresBuscados = terminosBusqueda(
+      $('rsgBuscarCoord').value
+    );
+  
+    const grupoExacto = $('rsgGrupoExacto').value;
+    const destino = $('rsgDestino').value;
+    const coord = $('rsgCoord').value;
+    const vendedor = $('rsgVendedor').value;
+    const desde = $('rsgDesde').value;
+    const hasta = $('rsgHasta').value;
+    const situacion = $('rsgSituacion').value;
+    const buscaPersona = terminosBusqueda($('rsgPersona').value).length > 0;
+  
+    visibles = grupos.filter(g => {
+      if (!coincideGrupo(g, gruposBuscados)) return false;
+      if (grupoExacto && g.id !== grupoExacto) return false;
+      if (destino && g.destino !== destino) return false;
+      if (vendedor && g.vendedor !== vendedor) return false;
+  
+      if (
+        coordinadoresBuscados.length &&
+        !g.coordinadores.some(c =>
+          coordinadoresBuscados.some(t => coincideTexto(c.nombre, t))
+        )
+      ) {
+        return false;
+      }
+  
+      if (coord === '__sin') {
+        if (g.coordError || g.coordinadores.length) return false;
+      } else if (coord === '__desconocido') {
+        if (!g.coordError) return false;
+      } else if (coord) {
+        if (!g.coordinadores.some(c => c.id === coord)) return false;
+      }
+  
+      if (desde && (!g.inicio || g.inicio < desde)) return false;
+      if (hasta && (!g.inicio || g.inicio > hasta)) return false;
+  
+      // Persona y situación deben coincidir en la misma persona.
+      if (
+        (situacion || buscaPersona) &&
+        personasSeleccionadas(g, situacion).length === 0
+      ) {
+        return false;
+      }
+  
+      return true;
+    });
+  
+    visibles.sort((a, b) =>
+      compararGrupos(
+        a,
+        b,
+        $('rsgOrden').value,
+        $('rsgSentido').value
+      )
+    );
+  
+    render();
+    botones();
+  
+    const personas = visibles.reduce(
+      (total, g) => total + personasSeleccionadas(g, situacion).length,
+      0
+    );
+  
+    $('rsgExportacion').textContent =
+      `Se exportarán ${visibles.length} grupos · ` +
+      `${personas} personas en el detalle. ` +
+      `El resumen y los porcentajes usan todos los viajeros ` +
+      `de esos grupos.`;
   }
   function render() {
     if(!$('rsgResultados'))return;
@@ -381,8 +723,29 @@ export function crearResumenSaludGeneral({getUsuario,getAno,independiente=false}
     const p=porcentaje(c.medica,c.total)||0;
     const metricas=[['neuro','Neurodivergencias'],['dieta','Dietas especiales'],['apoyo','Necesitan apoyo'],['alergias','Alergias'],['enfermedades','Enfermedades'],['medicamentos','Medicamentos']];
     const seleccion=$('rsgSituacion').value;
-    const relevantes=g.pasajeros.filter(x=>seleccion?x[seleccion]:x.medica||x.neuro||x.dieta||x.apoyo||x.pendientes||x.delegadoNo||x.nombreNo||x.nombreRevisar||x.internoNo);
-    const ids=new Set(relevantes.map(x=>x.id)),otros=g.pasajeros.filter(x=>!ids.has(x.id));
+    const detalleFiltrado =
+      !!seleccion ||
+      terminosBusqueda($('rsgPersona').value).length > 0;
+    
+    const relevantes = detalleFiltrado
+      ? personasSeleccionadas(g, seleccion)
+      : g.pasajeros.filter(x =>
+          x.medica ||
+          x.neuro ||
+          x.dieta ||
+          x.apoyo ||
+          x.pendientes ||
+          x.delegadoNo ||
+          x.nombreNo ||
+          x.nombreRevisar ||
+          x.internoNo
+        );
+    
+    const ids = new Set(relevantes.map(x => x.id));
+    
+    const otros = detalleFiltrado
+      ? []
+      : g.pasajeros.filter(x => !ids.has(x.id));
     return `<article class="rsg-group ${issue?'issue':warning?'alert':''}">${base}
       <div class="rsg-featured">${METRICAS.slice(0,4).map(([k,t,help,color])=>`<div class="rsg-metric ${color}"><span>${esc(t)}</span><strong>${c.total?pctFmt.format(porcentaje(c[k],c.total))+' %':'—'}</strong><small>${c[k]} de ${c.total} personas que viajan</small></div>`).join('')}</div>
       <div class="rsg-group-foot">${['alergias','enfermedades','medicamentos'].map(k=>`<span class="rsg-pill">${esc(ETIQUETAS[k])} ${cuenta(c[k],c.total)}</span>`).join('')}</div>
@@ -399,7 +762,49 @@ export function crearResumenSaludGeneral({getUsuario,getAno,independiente=false}
     return `<div class="rsg-person"><strong>${esc(p.nombre)}</strong><p>${esc(g.titulo)} · ${esc(g.destino)} · Negocio ${esc(g.negocio||"Pendiente")} · ID ${esc(g.gid)} · Inicio ${esc(fechaTexto(g.inicio))}</p><p>Vendedor(a): ${esc(g.vendedor)}</p><p>${p.contacto.propio?"Contacto del viajero":"Apoderado / contacto principal"}: <b>${esc(p.contacto.nombre||"Sin nombre informado")}</b> · ${esc(p.contacto.relacion||"Relación sin informar")}<br>Teléfono: ${esc(p.contacto.telefono||"Sin teléfono")} · Correo: ${esc(p.contacto.correo||"Sin correo")}</p><p>${esc(p.documento)} · ${p.completas?'Ficha completa':'Ficha pendiente'}</p><p>Delegado: <b>${autoriza}</b> · ${esc(identidad)}${p.nombreRevisar?' · REVISAR DATOS':''}</p>${p.nombreDocumento?`<p>Nombre según documento: <b>${esc(p.nombreDocumento)}</b></p>`:''}<ul>${p.detalles.map(x=>`<li>${esc(x)}</li>`).join('')||'<li>Sin situaciones declaradas para uso interno.</li>'}</ul><a class="rsg-link" href="ficha-medica.html?grupo=${encodeURIComponent(g.id)}&id=${encodeURIComponent(p.id)}" target="_blank" rel="noopener">Ver ficha ↗</a></div>`;
   }
   function filtrosTexto() {
-    return ['rsgDestino','rsgCoord','rsgSituacion','rsgOrden','rsgSentido'].map(id=>$(id).value?$(id).selectedOptions[0].textContent:'').concat($('rsgBuscar').value?`Buscar: ${$('rsgBuscar').value}`:'',$('rsgDesde').value?`Desde ${fechaTexto($('rsgDesde').value)}`:'',$('rsgHasta').value?`Hasta ${fechaTexto($('rsgHasta').value)}`:'').filter(Boolean).join(' · ')||'Todos los grupos del año';
+    const partes = [];
+  
+    for (const [id, etiqueta] of [
+      ['rsgBuscar', 'Grupos'],
+      ['rsgBuscarCoord', 'Coordinadores'],
+      ['rsgPersona', 'Personas']
+    ]) {
+      const valor = $(id).value.trim();
+  
+      if (valor) {
+        partes.push(`${etiqueta}: ${valor}`);
+      }
+    }
+  
+    for (const [id, etiqueta] of [
+      ['rsgGrupoExacto', 'Grupo exacto'],
+      ['rsgDestino', 'Destino'],
+      ['rsgCoord', 'Coordinador exacto / asignación'],
+      ['rsgVendedor', 'Vendedor(a)'],
+      ['rsgSituacion', 'Situación']
+    ]) {
+      if ($(id).value) {
+        partes.push(
+          `${etiqueta}: ${$(id).selectedOptions[0].textContent.trim()}`
+        );
+      }
+    }
+  
+    if ($('rsgDesde').value) {
+      partes.push(`Desde ${fechaTexto($('rsgDesde').value)}`);
+    }
+  
+    if ($('rsgHasta').value) {
+      partes.push(`Hasta ${fechaTexto($('rsgHasta').value)}`);
+    }
+  
+    partes.push(
+      `Agrupación: ${$('rsgAgrupar').selectedOptions[0].textContent.trim()}`,
+      `Orden: ${$('rsgOrden').selectedOptions[0].textContent.trim()}`,
+      `Sentido: ${$('rsgSentido').selectedOptions[0].textContent.trim()}`
+    );
+  
+    return partes.join(' · ');
   }
   function crearHoja(X,headers,rows,widths) {
     const sheet=X.utils.aoa_to_sheet([headers,...rows]);sheet['!cols']=headers.map((_,i)=>({wch:widths?.[i]||18}));sheet['!autofilter']={ref:sheet['!ref']};return sheet;
@@ -409,7 +814,15 @@ export function crearResumenSaludGeneral({getUsuario,getAno,independiente=false}
     headers.forEach((h,c)=>{if(h.startsWith('% '))for(let r=1;r<=rows.length;r++){const cell=sheet[window.XLSX.utils.encode_cell({r,c})];if(cell&&cell.t==='n')cell.z='0.0%';}});
   }
   function exportarExcel() {
-    if(ocupado||!visibles.length)return;
+    if (ocupado) return;
+  
+    validar();
+    filtrar();
+  
+    if (!visibles.length) {
+      mensaje('No hay resultados que cumplan los filtros para descargar.');
+      return;
+    }
     if(!window.XLSX)throw new Error('No se pudo cargar la herramienta de Excel.');
     const X=window.XLSX,book=X.utils.book_new(),c=sumar(visibles),modo=$('rsgAgrupar').value;
     const info=[['Año',anoCargado],['Generado',instante],['Filtros',filtrosTexto()],['Agrupación',modo],['Base',`${c.total} personas que viajan; fichas pendientes incluidas. ${c.errores} grupos con fichas no disponibles fuera del denominador.`],['Observaciones',avisos.join(' · ')],['Categorías','Una persona puede estar en varias categorías. Situaciones médicas cuenta cada persona una vez.'],['Detalle de personas','Solo personas que cumplen la situación seleccionada. Sin situación seleccionada: todos los viajeros de los grupos filtrados. La base de porcentajes conserva todos los viajeros del grupo.'],['Coordinadores','Un grupo con varios coordinadores aparece en varias agrupaciones; el total general no se duplica.']];
@@ -430,7 +843,15 @@ export function crearResumenSaludGeneral({getUsuario,getAno,independiente=false}
     X.writeFile(book,`salud_coordinadores_${anoCargado}.xlsx`);
   }
   function exportarPdf() {
-    if(ocupado||!visibles.length)return;
+    if (ocupado) return;
+  
+    validar();
+    filtrar();
+  
+    if (!visibles.length) {
+      mensaje('No hay resultados que cumplan los filtros para descargar.');
+      return;
+    }
     if(!window.jspdf?.jsPDF)throw new Error('No se pudo cargar la herramienta de PDF.');
     const pdf=new window.jspdf.jsPDF({orientation:'landscape',unit:'mm',format:'a4'});
     if(typeof pdf.autoTable!=='function')throw new Error('No se pudo cargar el complemento de tablas PDF.');
