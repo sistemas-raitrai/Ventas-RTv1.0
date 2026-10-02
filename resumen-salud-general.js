@@ -159,7 +159,7 @@ function indexarOperaciones(docs) {
   return mapa;
 }
 
-export function crearResumenSaludGeneral({getUsuario,getAno}) {
+export function crearResumenSaludGeneral({getUsuario,getAno,independiente=false}) {
   let grupos=[],visibles=[],ocupado=false,generacion=0,anoCargado=null,instante='',avisos=[],focoAnterior=null,overflowAnterior='';
   function permitido() {
     const efectivo=getUsuario(),real=getVentasUser(auth.currentUser?.email||'');
@@ -217,6 +217,9 @@ export function crearResumenSaludGeneral({getUsuario,getAno}) {
     @media(max-width:1050px){#rsgModal .rsg-kpis{grid-template-columns:repeat(3,minmax(0,1fr))}#rsgModal .rsg-filters{grid-template-columns:repeat(3,minmax(0,1fr))}}
     @media(max-width:720px){#rsgModal{padding:6px}#rsgModal .rsg-shell{height:98vh;height:98dvh;border-radius:12px}#rsgModal .rsg-header{padding:14px;align-items:start;gap:8px}#rsgModal h2{font-size:19px}#rsgModal .rsg-header .rsg-actions{justify-content:end;max-width:160px}#rsgModal .rsg-header button{padding:7px 9px;font-size:11px}#rsgModal .rsg-scroll{padding:14px}#rsgModal .rsg-kpis{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}#rsgModal .rsg-filters{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}#rsgModal .rsg-filters label:first-child{grid-column:1/-1}#rsgModal .rsg-grid{grid-template-columns:1fr}#rsgModal .rsg-bucket-head{align-items:start}#rsgModal .rsg-value{font-size:25px}#rsgModal .rsg-pct{font-size:11px}#rsgModal .rsg-bucket-numbers{font-size:10px}}
     
+    #rsgModal.rsg-independiente{padding:0;background:#f4f6fa;position:relative;min-height:100vh;min-height:100dvh}
+    #rsgModal.rsg-independiente .rsg-shell{width:100%;height:100vh;height:100dvh;max-height:none;border-radius:0;box-shadow:none}
+    #rsgModal .rsg-year{min-width:95px}#rsgModal .rsg-year select{padding:7px}
     #rsgModal .rsg-featured{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin:14px 0}
     #rsgModal .rsg-metric{border-radius:10px;padding:12px;background:#f4eefb;color:#633c85}
     #rsgModal .rsg-metric.blue{background:#edf3ff;color:#285ea5}#rsgModal .rsg-metric.teal{background:#eaf7f3;color:#177567}#rsgModal .rsg-metric.orange{background:#fff5e5;color:#9a6415}
@@ -224,7 +227,7 @@ export function crearResumenSaludGeneral({getUsuario,getAno}) {
     #rsgModal .rsg-person p{overflow-wrap:anywhere}
     @media(max-width:720px){#rsgModal .rsg-featured{grid-template-columns:repeat(2,minmax(0,1fr))}#rsgModal .rsg-metric strong{font-size:27px}}
 `;document.head.append(style);
-    const modal=document.createElement('div');modal.id='rsgModal';modal.hidden=true;
+    const modal=document.createElement('div');modal.id='rsgModal';modal.hidden=true;if(independiente)modal.classList.add('rsg-independiente');
     modal.innerHTML=`<section class="rsg-shell" role="dialog" aria-modal="true" aria-labelledby="rsgTitulo" tabindex="-1">
       <header class="rsg-header"><div><p class="rsg-eyebrow">Preparación de viajes</p><h2 id="rsgTitulo">Salud y coordinadores</h2><p id="rsgSubtitulo" class="rsg-muted"></p></div>
       <div class="rsg-actions"><button id="rsgExcel">Excel</button><button id="rsgPdf" class="rsg-primary">PDF</button><button id="rsgCerrar" aria-label="Cerrar resumen de salud">Cerrar ✕</button></div></header>
@@ -242,10 +245,10 @@ export function crearResumenSaludGeneral({getUsuario,getAno}) {
       <div id="rsgMensaje" class="rsg-status" role="status" aria-live="polite"></div><div id="rsgCalidad" class="rsg-quality" hidden></div>
       <div id="rsgKpis" class="rsg-kpis"></div><p class="rsg-explainer" id="rsgBase"></p><div id="rsgResultados"></div></div></section>`;
     document.body.append(modal);
-    $('rsgCerrar').onclick=cerrar;modal.addEventListener('click',ev=>{if(ev.target===modal)cerrar();});
+    if(independiente){const shell=modal.querySelector('.rsg-shell');shell.setAttribute('role','region');shell.removeAttribute('aria-modal');$('rsgCerrar').textContent='Volver a Gestión Nómina';$('rsgCerrar').removeAttribute('aria-label');$('rsgCerrar').onclick=()=>{location.href='gestion-nomina.html';};}else $('rsgCerrar').onclick=cerrar;modal.addEventListener('click',ev=>{if(ev.target===modal)cerrar();});
     modal.addEventListener('keydown',ev=>{
-      if(ev.key==='Escape')cerrar();
-      if(ev.key==='Tab') {
+      if(ev.key==='Escape'&&!independiente)cerrar();
+      if(ev.key==='Tab'&&!independiente) {
         const focusables=[...modal.querySelectorAll('button:not(:disabled),input,select,summary,a[href]')].filter(el=>el.getClientRects().length);
         const first=focusables[0],last=focusables.at(-1);
         if(ev.shiftKey&&document.activeElement===first){ev.preventDefault();last?.focus();}
@@ -259,7 +262,7 @@ export function crearResumenSaludGeneral({getUsuario,getAno}) {
   }
   function accion(fn){try{validar();fn();}catch(err){mensaje(err.message);}}
   function mensaje(v){if($('rsgMensaje'))$('rsgMensaje').textContent=v;}
-  function botones(){for(const id of ['rsgExcel','rsgPdf'])$(id).disabled=ocupado||!visibles.length||!permitido();$('rsgRecargar').disabled=ocupado;}
+  function botones(){for(const id of ['rsgExcel','rsgPdf'])$(id).disabled=ocupado||!visibles.length||!permitido();$('rsgRecargar').disabled=ocupado;if($('rsgAnoPagina'))$('rsgAnoPagina').disabled=ocupado;}
   async function abrir() {
     validar();montar();focoAnterior=document.activeElement;overflowAnterior=document.body.style.overflow;document.body.style.overflow='hidden';$('rsgModal').hidden=false;$('rsgCerrar').focus();
     await cargar();
