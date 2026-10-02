@@ -9963,7 +9963,7 @@ async function abrirEditorNomina(
 
     ${renderSeccionEditorNomina(
       "Datos según documento",
-      "Información estructurada declarada respecto del documento de identidad."
+      "Si detectaste una diferencia entre el nombre de uso y el documento, selecciona «No» y completa los nombres según documento. Conserva el nombre de uso del pasajero y explica la corrección en el motivo."
     )}
 
     ${renderSelectEditorNomina({
@@ -10694,6 +10694,65 @@ function leerValoresEditorNomina() {
   return valores;
 }
 
+function validarNombreDocumentoEditorNomina(valores = {}) {
+  const coincide = normalizar(
+    valores["documentoIdentidad.nombreCoincideDocumento"] || ""
+  );
+
+  const nombresDocumento = String(
+    valores["documentoIdentidad.nombresDocumento"] || ""
+  ).trim();
+
+  const primerApellidoDocumento = String(
+    valores["documentoIdentidad.primerApellidoDocumento"] || ""
+  ).trim();
+
+  if (coincide === "no") {
+    if (!nombresDocumento || !primerApellidoDocumento) {
+      throw new Error(
+        "Si el nombre no coincide con el documento, completa " +
+        "los nombres y el primer apellido según documento. " +
+        "Conserva el nombre de uso en los datos del pasajero."
+      );
+    }
+  }
+
+  if (coincide === "si" && nombresDocumento) {
+    const nombreUso = [
+      valores["identificacion.nombres"],
+      valores["identificacion.primerApellido"],
+      valores["identificacion.segundoApellido"]
+    ]
+      .filter(Boolean)
+      .join(" ");
+
+    const nombreDocumento = [
+      nombresDocumento,
+      primerApellidoDocumento,
+      valores["documentoIdentidad.segundoApellidoDocumento"]
+    ]
+      .filter(Boolean)
+      .join(" ");
+
+    const comparable = (value) =>
+      normalizar(value)
+        .replace(/\s+/g, " ")
+        .trim();
+
+    if (
+      nombreUso &&
+      comparable(nombreUso) !== comparable(nombreDocumento)
+    ) {
+      throw new Error(
+        "Marcaste que el nombre coincide, pero el nombre de uso " +
+        "y el nombre según documento son diferentes. " +
+        "Revisa la declaración: si son distintos, selecciona «No». " +
+        "Una diferencia no se identifica automáticamente como nombre social."
+      );
+    }
+  }
+}
+
 async function guardarEditorNomina() {
   if (
     !state.editingNominaId ||
@@ -10702,21 +10761,16 @@ async function guardarEditorNomina() {
     return;
   }
 
-  const motivo =
-    String(
-      $("editarNominaMotivo")
-        ?.value ||
-      ""
-    ).trim();
+  const motivo = String(
+    $("editarNominaMotivo")?.value || ""
+  ).trim();
 
   if (!motivo) {
     alert(
       "Debes explicar el motivo de la modificación."
     );
 
-    $("editarNominaMotivo")
-      ?.focus();
-
+    $("editarNominaMotivo")?.focus();
     return;
   }
 
@@ -10728,26 +10782,27 @@ async function guardarEditorNomina() {
     "Guardar cambios";
 
   try {
-    if (button) {
-      button.disabled =
-        true;
+    const valores =
+      leerValoresEditorNomina();
 
-      button.textContent =
-        "Guardando...";
+    validarNombreDocumentoEditorNomina(
+      valores
+    );
+
+    if (button) {
+      button.disabled = true;
+      button.textContent = "Guardando...";
     }
 
     const resultado =
-      await state.manager
-        .actualizarDatosNomina(
-          state.current,
-          state.editingNominaId,
-          leerValoresEditorNomina(),
-          motivo
-        );
+      await state.manager.actualizarDatosNomina(
+        state.current,
+        state.editingNominaId,
+        valores,
+        motivo
+      );
 
-    if (
-      resultado?.sinCambios
-    ) {
+    if (resultado?.sinCambios) {
       alert(
         "No hay cambios para guardar."
       );
@@ -10760,16 +10815,10 @@ async function guardarEditorNomina() {
     await refrescarModal();
     await cargarAlertasInscripciones();
 
-    /*
-      Vuelve a renderizar para que pueda aparecer
-      la advertencia "Revisar pagos".
-    */
     renderPasajeros();
 
     const estadoPublico =
-      resultado
-        ?.sincronizacionPublica
-        ?.estado ||
+      resultado?.sincronizacionPublica?.estado ||
       "no_aplica";
 
     if (
@@ -10777,15 +10826,15 @@ async function guardarEditorNomina() {
         "error",
         "no_encontrado",
         "ambiguo"
-      ].includes(
-        estadoPublico
-      )
+      ].includes(estadoPublico)
     ) {
       alert(
         "Los datos oficiales fueron actualizados correctamente.\n\n" +
-        "ATENCIÓN: no fue posible sincronizar automáticamente el nombre de la nómina pública.\n\n" +
+        "ATENCIÓN: no fue posible sincronizar automáticamente " +
+        "el nombre de la nómina pública.\n\n" +
         `Estado: ${estadoPublico}\n\n` +
-        "La inscripción oficial está guardada. Revisa la sincronización pública del grupo."
+        "La inscripción oficial está guardada. " +
+        "Revisa la sincronización pública del grupo."
       );
 
       return;
@@ -10806,11 +10855,8 @@ async function guardarEditorNomina() {
     );
   } finally {
     if (button) {
-      button.disabled =
-        false;
-
-      button.textContent =
-        textoOriginal;
+      button.disabled = false;
+      button.textContent = textoOriginal;
     }
   }
 }
