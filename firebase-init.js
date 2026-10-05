@@ -39,6 +39,11 @@ export const VENTAS_USERS = [
     nombre: "Tomás",
     rol: "admin"
   },
+    {
+    email: "victoria@raitrai.cl",
+    nombre: "Victoria",
+    rol: "supervision"
+  },
   {
     email: "chernandez@raitrai.cl",
     nombre: "Caro Hernández",
