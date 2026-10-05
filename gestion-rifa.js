@@ -15,7 +15,11 @@ const CORREOS_GESTORES = new Set([
   "sistemas@raitrai.cl",
   "administracion@raitrai.cl",
   "anamaria@raitrai.cl",
-  "yenny@raitrai.cl"
+  "yenny@raitrai.cl",
+  "chernandez@raitrai.cl",
+  "griveros@raitrai.cl",
+  "tomas@raitrai.cl",
+  "victoria@raitrai.cl"
 ]);
 const RELACIONES = { estudiante: "Estudiante", apoderado: "Apoderado(a)", profesor: "Profesor(a)", otro: "Otro" };
 const $ = id => document.getElementById(id);
