@@ -155,6 +155,7 @@ const state = {
   alertaListadoActual: [],
   alertaTipoActual: "",
   pasajeroFocoId: "",
+  carnetObservacionItemId: "",
 
   // Filtro aplicado dentro del modal de nómina.
   nominaFiltro: "todos",
@@ -2024,6 +2025,51 @@ function bindEvents() {
     ?.addEventListener(
       "click",
       manejarAccionPasajero
+    );
+
+  $("btnCerrarObservacionCarnet")
+    ?.addEventListener(
+      "click",
+      cerrarObservacionCarnet
+    );
+  
+  $("btnCancelarObservacionCarnet")
+    ?.addEventListener(
+      "click",
+      cerrarObservacionCarnet
+    );
+  
+  $("btnGuardarObservacionCarnet")
+    ?.addEventListener(
+      "click",
+      () =>
+        guardarEstadoObservacionCarnet({
+          resolver:
+            false
+        })
+    );
+  
+  $("btnResolverObservacionCarnet")
+    ?.addEventListener(
+      "click",
+      () =>
+        guardarEstadoObservacionCarnet({
+          resolver:
+            true
+        })
+    );
+  
+  $("modalObservacionCarnet")
+    ?.addEventListener(
+      "click",
+      (event) => {
+        if (
+          event.target ===
+          $("modalObservacionCarnet")
+        ) {
+          cerrarObservacionCarnet();
+        }
+      }
     );
 
   $("modalKpisNomina")
@@ -4223,6 +4269,13 @@ function mapRow(
             0
           )
         : null,
+    
+    motivosSinCarnet:
+      data.motivosSinCarnet &&
+      typeof data.motivosSinCarnet ===
+        "object"
+        ? data.motivosSinCarnet
+        : {},
 
     tieneResumenCarnet,
 
@@ -4497,6 +4550,7 @@ function getCarnetResumenHtml(
       <span class="badge muted">
         —
       </span>
+
       <div class="gn-sub">
         Resumen pendiente
       </div>
@@ -4519,16 +4573,94 @@ function getCarnetResumenHtml(
     conCarnet +
     sinCarnet;
 
+  const motivos =
+    row.motivosSinCarnet ||
+    {};
+
+  const etiquetas = [
+    [
+      "vencido",
+      "vencido",
+      "vencidos"
+    ],
+    [
+      "ilegible",
+      "ilegible",
+      "ilegibles"
+    ],
+    [
+      "incompleto",
+      "incompleto",
+      "incompletos"
+    ],
+    [
+      "no_corresponde",
+      "no corresponde",
+      "no corresponden"
+    ],
+    [
+      "no_cargado",
+      "no cargado",
+      "no cargados"
+    ],
+    [
+      "otro",
+      "otro",
+      "otros"
+    ]
+  ];
+
+  const detalleMotivos =
+    etiquetas
+      .map(
+        ([
+          clave,
+          singular,
+          plural
+        ]) => {
+          const cantidad =
+            Number(
+              motivos[clave] ||
+              0
+            );
+
+          if (!cantidad) {
+            return "";
+          }
+
+          return `${cantidad} ${
+            cantidad === 1
+              ? singular
+              : plural
+          }`;
+        }
+      )
+      .filter(Boolean)
+      .join(" · ");
+
   return `
     <strong>
       ${conCarnet}/${total}
     </strong>
+
     ${
       sinCarnet
         ? `
           <div class="gn-sub">
             ${sinCarnet} sin carnet
           </div>
+
+          ${
+            detalleMotivos
+              ? `
+                <div class="carnet-observation-detail">
+                  ${esc(
+                    detalleMotivos
+                  )}
+                </div>
+              `
+              : ""
+          }
         `
         : ""
     }
@@ -7448,10 +7580,9 @@ function filtrarNominaModal(
         !estaAnuladoNomina(
           item
         ) &&
-        !camposPasajero
-          .tieneCarnet(
-            item
-          )
+        !carnetCompletoConteoNomina(
+          item
+        )
     );
   }
 
@@ -8274,6 +8405,514 @@ function ordenarNominaOperativa(
   );
 }
 
+const CARNET_MOTIVO_LABELS = {
+  no_cargado:
+    "No cargado",
+
+  vencido:
+    "Está vencido",
+
+  ilegible:
+    "Está ilegible",
+
+  incompleto:
+    "Falta frente o reverso",
+
+  no_corresponde:
+    "No corresponde a la persona",
+
+  otro:
+    "Otro"
+};
+
+function getRevisionCarnetGestion(
+  item = {}
+) {
+  const revision =
+    item.revisionCarnet ||
+    item.carnet?.revisionCarnet ||
+    {};
+
+  const estado =
+    normalizar(
+      revision.estado ||
+      ""
+    );
+
+  const motivo =
+    normalizar(
+      revision.motivo ||
+      ""
+    );
+
+  return {
+    ...revision,
+
+    estado,
+
+    motivo,
+
+    detalle:
+      String(
+        revision.detalle ||
+        ""
+      ).trim(),
+
+    activa:
+      estado === "observado" &&
+      !!motivo
+  };
+}
+
+function getMotivoCarnetAutomaticoGestion(
+  item = {}
+) {
+  const revision =
+    getRevisionCarnetGestion(
+      item
+    );
+
+  if (revision.activa) {
+    return revision.motivo;
+  }
+
+  const frente =
+    item.tieneCarnetFrente ===
+    true;
+
+  const reverso =
+    item.tieneCarnetReverso ===
+    true;
+
+  if (
+    frente ||
+    reverso
+  ) {
+    return "incompleto";
+  }
+
+  return "no_cargado";
+}
+
+function getCarnetPasajeroHtml(
+  item = {}
+) {
+  if (
+    esCupoReservadoNomina(
+      item
+    )
+  ) {
+    return `
+      <span class="badge muted">
+        No aplica
+      </span>
+    `;
+  }
+
+  const valido =
+    carnetCompletoConteoNomina(
+      item
+    );
+
+  const revision =
+    getRevisionCarnetGestion(
+      item
+    );
+
+  const motivo =
+    valido
+      ? ""
+      : getMotivoCarnetAutomaticoGestion(
+          item
+        );
+
+  const puedeEditar =
+    state.manager
+      ?.puedeAdministrarNomina() ===
+    true;
+
+  const textoEstado =
+    valido
+      ? "Sí"
+      : "No";
+
+  const clase =
+    valido
+      ? "ok"
+      : "warn";
+
+  const estadoHtml =
+    puedeEditar
+      ? `
+        <button
+          type="button"
+          class="badge ${clase} carnet-status-button"
+          data-carnet-observar="${esc(
+            item.id ||
+            ""
+          )}"
+          title="Revisar estado del carnet"
+        >
+          ${textoEstado}
+        </button>
+      `
+      : `
+        <span class="badge ${clase}">
+          ${textoEstado}
+        </span>
+      `;
+
+  return `
+    ${estadoHtml}
+
+    ${
+      !valido &&
+      motivo
+        ? `
+          <div class="carnet-observation-detail">
+            ${esc(
+              CARNET_MOTIVO_LABELS[
+                motivo
+              ] ||
+              motivo
+            )}
+
+            ${
+              revision.detalle
+                ? `· ${esc(
+                    revision.detalle
+                  )}`
+                : ""
+            }
+          </div>
+        `
+        : ""
+    }
+  `;
+}
+
+function cerrarObservacionCarnet() {
+  state.carnetObservacionItemId =
+    "";
+
+  $("modalObservacionCarnet")
+    ?.classList.remove(
+      "show"
+    );
+}
+
+function abrirObservacionCarnet(
+  inscripcionId = ""
+) {
+  if (
+    state.manager
+      ?.puedeAdministrarNomina() !==
+    true
+  ) {
+    alert(
+      "No tienes permisos para revisar carnets."
+    );
+
+    return;
+  }
+
+  const item =
+    state.nomina.find(
+      (row) =>
+        String(
+          row.id ||
+          ""
+        ) ===
+        String(
+          inscripcionId ||
+          ""
+        )
+    );
+
+  if (!item) {
+    alert(
+      "No se encontró la inscripción."
+    );
+
+    return;
+  }
+
+  state.carnetObservacionItemId =
+    String(
+      item.id ||
+      ""
+    );
+
+  const revision =
+    getRevisionCarnetGestion(
+      item
+    );
+
+  const nombre = [
+    camposPasajero.nombres(
+      item
+    ),
+
+    camposPasajero.apellidos(
+      item
+    )
+  ]
+    .filter(Boolean)
+    .join(" ") ||
+    "Pasajero";
+
+  $(
+    "carnetObservacionPasajero"
+  ).textContent =
+    nombre;
+
+  $(
+    "carnetObservacionMotivo"
+  ).value =
+    revision.activa
+      ? revision.motivo
+      : getMotivoCarnetAutomaticoGestion(
+          item
+        );
+
+  $(
+    "carnetObservacionDetalle"
+  ).value =
+    revision.detalle ||
+    "";
+
+  const valido =
+    carnetCompletoConteoNomina(
+      item
+    );
+
+  const motivoActual =
+    revision.activa
+      ? revision.motivo
+      : getMotivoCarnetAutomaticoGestion(
+          item
+        );
+
+  $(
+    "carnetEstadoActual"
+  ).textContent =
+    valido
+      ? (
+          "Estado actual: carnet válido. " +
+          "Puedes registrar una observación si está vencido, ilegible o no corresponde."
+        )
+      : (
+          "Estado actual: carnet no válido · " +
+          (
+            CARNET_MOTIVO_LABELS[
+              motivoActual
+            ] ||
+            "Sin motivo"
+          )
+        );
+
+  $(
+    "btnResolverObservacionCarnet"
+  ).disabled =
+    !revision.activa;
+
+  $("modalObservacionCarnet")
+    ?.classList.add(
+      "show"
+    );
+}
+
+async function guardarEstadoObservacionCarnet({
+  resolver = false
+} = {}) {
+  const inscripcionId =
+    String(
+      state.carnetObservacionItemId ||
+      ""
+    );
+
+  const groupDocId =
+    String(
+      state.current?.docId ||
+      ""
+    );
+
+  if (
+    !inscripcionId ||
+    !groupDocId
+  ) {
+    alert(
+      "No se pudo identificar la inscripción."
+    );
+
+    return;
+  }
+
+  const motivo =
+    normalizar(
+      $(
+        "carnetObservacionMotivo"
+      )?.value ||
+      ""
+    );
+
+  const detalle =
+    String(
+      $(
+        "carnetObservacionDetalle"
+      )?.value ||
+      ""
+    ).trim();
+
+  if (
+    !resolver &&
+    !motivo
+  ) {
+    alert(
+      "Selecciona el motivo de la observación."
+    );
+
+    return;
+  }
+
+  if (
+    !resolver &&
+    motivo === "otro" &&
+    !detalle
+  ) {
+    alert(
+      "Debes explicar el motivo cuando seleccionas Otro."
+    );
+
+    return;
+  }
+
+  const button =
+    resolver
+      ? $(
+          "btnResolverObservacionCarnet"
+        )
+      : $(
+          "btnGuardarObservacionCarnet"
+        );
+
+  if (button) {
+    button.disabled =
+      true;
+  }
+
+  const revisionCarnet = {
+    estado:
+      resolver
+        ? "resuelto"
+        : "observado",
+
+    motivo:
+      resolver
+        ? ""
+        : motivo,
+
+    detalle:
+      resolver
+        ? ""
+        : detalle,
+
+    actualizadoAt:
+      serverTimestamp(),
+
+    actualizadoPor:
+      String(
+        state.user?.nombre ||
+        state.user?.displayName ||
+        state.email ||
+        "Usuario"
+      ),
+
+    actualizadoPorCorreo:
+      state.email ||
+      ""
+  };
+
+  if (resolver) {
+    revisionCarnet.resueltoAt =
+      serverTimestamp();
+  }
+
+  try {
+    await setDoc(
+      doc(
+        db,
+        "ventas_cotizaciones",
+        groupDocId,
+        "inscripciones",
+        inscripcionId
+      ),
+      {
+        revisionCarnet
+      },
+      {
+        merge: true
+      }
+    );
+
+    const item =
+      state.nomina.find(
+        (row) =>
+          String(
+            row.id ||
+            ""
+          ) ===
+          inscripcionId
+      );
+
+    if (item) {
+      item.revisionCarnet = {
+        ...revisionCarnet,
+
+        actualizadoAt:
+          new Date(),
+
+        resueltoAt:
+          resolver
+            ? new Date()
+            : undefined
+      };
+    }
+
+    cerrarObservacionCarnet();
+
+    renderKpisModal();
+    renderPasajeros();
+
+    /*
+      El trigger actualiza el resumen liviano.
+      Damos un pequeño margen antes de recargar
+      la tabla general.
+    */
+    setTimeout(
+      () => {
+        cargarPantalla();
+      },
+      1800
+    );
+  } catch (error) {
+    console.error(
+      "[gestion-nomina] observación carnet",
+      error
+    );
+
+    alert(
+      error.message ||
+      "No se pudo guardar la observación del carnet."
+    );
+  } finally {
+    if (button) {
+      button.disabled =
+        false;
+    }
+  }
+}
+
 function renderPasajeros() {
   const tbody =
     $("pasajerosTbody");
@@ -8532,17 +9171,9 @@ function renderPasajeros() {
               </td>
 
               <td>
-                ${
-                  esReserva
-                    ? "No aplica"
-                    : (
-                        camposPasajero.tieneCarnet(
-                          item
-                        )
-                          ? "Sí"
-                          : "No"
-                      )
-                }
+                ${getCarnetPasajeroHtml(
+                  item
+                )}
               </td>
 
               <td>
@@ -8562,6 +9193,21 @@ function renderPasajeros() {
 async function manejarAccionPasajero(
   event
 ) {
+  const carnetButton =
+    event.target.closest(
+      "[data-carnet-observar]"
+    );
+  
+  if (carnetButton) {
+    abrirObservacionCarnet(
+      carnetButton.dataset
+        .carnetObservar ||
+      ""
+    );
+  
+    return;
+  }
+  
   const viewButton =
     event.target.closest(
       "[data-ver-ficha-inscripcion]"
@@ -12573,38 +13219,82 @@ function fichaCompletaConteoNomina(item = {}) {
 }
 
 function carnetCompletoConteoNomina(item = {}) {
+  const revision =
+    getRevisionCarnetGestion(
+      item
+    );
+
+  /*
+    Si existe una observación activa,
+    el carnet no se considera válido aunque
+    tenga ambos archivos.
+  */
+  if (revision.activa) {
+    return false;
+  }
+
   const esSi = (value) =>
     value === true ||
-    ["true", "si", "1"].includes(
-      claveConteoNomina(value)
+    [
+      "true",
+      "si",
+      "1"
+    ].includes(
+      claveConteoNomina(
+        value
+      )
     );
 
   const marcas = [
     item.tieneCarnet,
     item.tieneCarnetIdentidad,
-    item.carnet?.tieneCarnetIdentidad,
-    item.tieneCredencialSistemaPagos,
-    item.sistemaPagos?.tieneCarnet,
-    item.sistemaPagos?.tieneCredencial,
-    item.sistemaPagos?.tiene_credencial,
-    item.pagos?.tieneCredencial,
-    item.pagos?.tiene_credencial,
+    item.carnet
+      ?.tieneCarnetIdentidad,
+    item
+      .tieneCredencialSistemaPagos,
+    item.sistemaPagos
+      ?.tieneCarnet,
+    item.sistemaPagos
+      ?.tieneCredencial,
+    item.sistemaPagos
+      ?.tiene_credencial,
+    item.pagos
+      ?.tieneCredencial,
+    item.pagos
+      ?.tiene_credencial,
     item.tieneCredencial,
     item.tiene_credencial,
     item.credencial?.tiene,
-    item.documentos?.carnetIdentidad
+    item.documentos
+      ?.carnetIdentidad
   ];
 
-  if (marcas.some(esSi)) {
+  if (
+    marcas.some(
+      esSi
+    )
+  ) {
     return true;
   }
 
-  const existeArchivo = (archivo) => {
-    if (typeof archivo === "string") {
-      return archivo.trim().length > 0;
+  const existeArchivo = (
+    archivo
+  ) => {
+    if (
+      typeof archivo ===
+      "string"
+    ) {
+      return (
+        archivo.trim().length >
+        0
+      );
     }
 
-    if (!archivo || typeof archivo !== "object") {
+    if (
+      !archivo ||
+      typeof archivo !==
+        "object"
+    ) {
       return false;
     }
 
@@ -12614,21 +13304,37 @@ function carnetCompletoConteoNomina(item = {}) {
       archivo.url,
       archivo.downloadURL,
       archivo.nombreOriginal
-    ].some((value) =>
-      typeof value === "string" &&
-      value.trim().length > 0
+    ].some(
+      (value) =>
+        typeof value ===
+          "string" &&
+        value.trim().length >
+          0
     );
   };
 
-  const tieneLado = (lado) =>
+  const tieneLado = (
+    lado
+  ) =>
     [
-      item.archivosEspeciales?.[lado],
-      item.archivos?.[lado],
-      item.documentos?.[lado]
-    ].some(existeArchivo);
+      item.archivosEspeciales
+        ?.[lado],
+
+      item.archivos
+        ?.[lado],
+
+      item.documentos
+        ?.[lado]
+    ].some(
+      existeArchivo
+    );
 
   return (
-    tieneLado("carnetFrente") &&
-    tieneLado("carnetReverso")
+    tieneLado(
+      "carnetFrente"
+    ) &&
+    tieneLado(
+      "carnetReverso"
+    )
   );
 }
