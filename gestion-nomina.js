@@ -272,6 +272,8 @@ async function init() {
       bindHeader();
 
       await cargarPantalla();
+
+      await abrirGrupoDesdeUrlGestionNomina();
     }
   );
 }
@@ -1028,6 +1030,67 @@ function aplicarAnoDesdeUrlGestionNomina() {
     state.anoSeleccionado =
       ano;
   }
+}
+
+async function abrirGrupoDesdeUrlGestionNomina() {
+  const params =
+    new URLSearchParams(
+      location.search
+    );
+
+  const grupoId =
+    String(
+      params.get("grupo") ||
+      ""
+    ).trim();
+
+  const inscripcionId =
+    String(
+      params.get("inscripcion") ||
+      ""
+    ).trim();
+
+  if (!grupoId) {
+    return;
+  }
+
+  /*
+    Si la alerta corresponde a una persona,
+    gestión nómina intentará enfocarla al abrir
+    el modal.
+  */
+  state.pasajeroFocoId =
+    inscripcionId;
+
+  /*
+    Limpiamos grupo e inscripción de la URL
+    para que el modal no vuelva a abrirse si
+    posteriormente se recarga el listado.
+  */
+  const urlLimpia =
+    new URL(
+      location.href
+    );
+
+  urlLimpia.searchParams.delete(
+    "grupo"
+  );
+
+  urlLimpia.searchParams.delete(
+    "inscripcion"
+  );
+
+  history.replaceState(
+    {},
+    document.title,
+    urlLimpia.pathname +
+      urlLimpia.search +
+      urlLimpia.hash
+  );
+
+  await abrirGrupo(
+    grupoId
+  );
 }
 
 function configurarSelectorAnos() {
