@@ -45,6 +45,13 @@ import {
   waitForLayoutReady
 } from "./ui.js";
 
+import {
+  tipoConteoNomina as tipoConteoCompartido,
+  estaExcluidoConteoNomina as estaExcluidoCompartido,
+  esPersonaViajeraConteo as esPersonaViajeraCompartida,
+  esReservaPendienteConteo as esReservaPendienteCompartida
+} from "./inscripciones-manager.js";
+
 const $ = (id) => document.getElementById(id);
 
 const GITHUB_HOME_URL = "https://sistemas-raitrai.github.io/Ventas-RT/";
@@ -3512,29 +3519,7 @@ function getInscripcionTipoReal(item = {}) {
 }
 
 function esNominaFinalOperativa(item = {}) {
-  const tipo = normalizeSearchLocal(getInscripcionTipoReal(item));
-  const estadoCupo = normalizeSearchLocal(item.estadoCupo || "");
-
-  if (tipo === "nuevo_ingreso") {
-    return estadoCupo === "confirmado";
-  }
-
-  if (tipo === "lista_espera") {
-    return estadoCupo === "confirmado";
-  }
-
-  if (tipo === "lista_espera_pagada") {
-    return false;
-  }
-
-  return (
-    tipo === "nomina_inicial" ||
-    tipo === "nomina_final" ||
-    tipo === "sistema_pagos" ||
-    tipo === "nuevo_ingreso_confirmado" ||
-    tipo === "lista_espera_confirmada" ||
-    tipo === "liberado"
-  );
+  return esPersonaViajeraCompartida(item);
 }
 
 function getInscripcionesSistemaPagos() {
@@ -3707,34 +3692,7 @@ function esCupoReservado(item = {}) {
 }
 
 function esCupoReservadoPendiente(item = {}) {
-  if (!esCupoReservado(item)) {
-    return false;
-  }
-
-  const estado =
-    normalizeSearchLocal(
-      item.estadoCupoReservado ||
-      item.cupoReservado?.estado ||
-      item.estadoCupo ||
-      ""
-    ).replace(/\s+/g, "_");
-
-  /*
-    Compatibilidad:
-    si todavía no trae estado explícito,
-    un documento marcado como cupo reservado
-    se considera pendiente.
-  */
-  if (!estado) {
-    return true;
-  }
-
-  return ![
-    "consumido",
-    "anulado",
-    "eliminado",
-    "cerrado"
-  ].includes(estado);
+  return esReservaPendienteCompartida(item);
 }
 
 function getCuposReservadosPendientes() {
@@ -13731,15 +13689,7 @@ function buildNombreCompletoInscripcion(item = {}) {
 }
 
 function estaInscripcionAnulada(item = {}) {
-  const estadoViaje = normalizeSearchLocal(
-    item.estadoViaje || ""
-  );
-
-  return (
-    item.anulado === true ||
-    item.viaja === false ||
-    estadoViaje === "no_viaja"
-  );
+  return estaExcluidoCompartido(item);
 }
 
 function estaInscripcionActiva(item = {}) {
