@@ -5991,22 +5991,54 @@ function renderModal(
   const grupo =
     state.current.data;
 
-  $("modalTitulo").textContent =
-    grupo.aliasGrupo ||
+  const anoGrupo =
+    grupo.anoViaje ||
+    state.anoSeleccionado ||
+    "";
+  
+  const colegioGrupo =
+    String(
+      grupo.colegio ||
+      ""
+    ).trim();
+  
+  const cursoGrupo =
+    String(
+      grupo.curso ||
+      ""
+    ).trim();
+  
+  const idGrupoVisible =
+    String(
+      grupo.idGrupo ||
+      state.current?.groupId ||
+      state.current?.docId ||
+      "—"
+    ).trim();
+  
+  const nombreGrupoVisible =
     [
-      grupo.colegio,
-      grupo.curso
+      colegioGrupo,
+      cursoGrupo
     ]
       .filter(Boolean)
-      .join(" ") ||
-    `Grupo ${
-      state.current.groupId
-    }`;
-
+      .join(" ");
+  
+  $("modalTitulo").textContent =
+    nombreGrupoVisible
+      ? (
+          anoGrupo
+            ? `${nombreGrupoVisible} (${anoGrupo})`
+            : nombreGrupoVisible
+        )
+      : (
+          grupo.aliasGrupo ||
+          `Grupo ${idGrupoVisible}`
+        );
+  
   $("modalSubtitulo").textContent =
-    `Año ${
-      grupo.anoViaje ||
-      state.anoSeleccionado
+    `ID Grupo ${
+      idGrupoVisible
     } · Negocio ${
       grupo.numeroNegocio ||
       "—"
@@ -8941,12 +8973,49 @@ function renderPasajeros() {
     ordenarNominaOperativa(
       filtrados
     );
-
+  
+  /*
+    Generamos la numeración utilizando
+    la nómina completa, no el filtro visible.
+  
+    De esta forma, si el pasajero es el número 14,
+    conservará el número 14 aunque se aplique
+    un filtro dentro del modal.
+  */
+  const viajerosNumerados =
+    ordenarNominaOperativa(
+      state.nomina.filter(
+        (item) =>
+          esViajaConfirmado(
+            item
+          ) &&
+          !esCupoReservadoNomina(
+            item
+          )
+      )
+    );
+  
+  const numeroViajeroPorId =
+    new Map(
+      viajerosNumerados.map(
+        (
+          item,
+          index
+        ) => [
+          String(
+            item.id ||
+            ""
+          ),
+          index + 1
+        ]
+      )
+    );
+  
   if (!visibles.length) {
     tbody.innerHTML = `
       <tr>
         <td
-          colspan="11"
+          colspan="12"
           class="gn-empty"
         >
           No hay pasajeros para este filtro.
@@ -8974,7 +9043,7 @@ function renderPasajeros() {
             seccionAnterior
               ? `
                 <tr class="nomina-section-row">
-                  <td colspan="11">
+                  <td colspan="12">
                     ${esc(
                       getSeccionNominaLabel(
                         seccion
@@ -9013,6 +9082,22 @@ function renderPasajeros() {
               item
             );
 
+          const numeroViajero =
+            numeroViajeroPorId.get(
+              String(
+                item.id ||
+                ""
+              )
+            );
+          
+          const numeroVisible =
+            esReserva
+              ? "Reserva"
+              : (
+                  numeroViajero ||
+                  "—"
+                );
+
           return `
             ${separador}
 
@@ -9037,6 +9122,13 @@ function renderPasajeros() {
                   .join(" ")
               )}"
             >
+              <td>
+                <strong>
+                  ${esc(
+                    numeroVisible
+                  )}
+                </strong>
+              </td>
               <td>
                 ${
                   esReserva
@@ -11698,25 +11790,76 @@ function enfocarPasajeroPendiente() {
 
 function sincronizarBotonesNominaPublica() {
   const puedeGestionar =
-    state.manager?.puedeGestionarLinks(state.current?.data || {}) === true;
+    state.manager
+      ?.puedeGestionarLinks(
+        state.current?.data ||
+        {}
+      ) ===
+    true;
 
-  const estado = state.manager?.obtenerEstadoNominaPublica(
-    state.current || {}
-  ) || { activo: false, link: "" };
+  const estado =
+    state.manager
+      ?.obtenerEstadoNominaPublica(
+        state.current ||
+        {}
+      ) ||
+    {
+      activo:
+        false,
 
-  $("btnActivarNominaPublica")?.classList.toggle(
+      link:
+        ""
+    };
+
+  const estadoTexto =
+    $(
+      "nominaPublicaEstadoTexto"
+    );
+
+  if (estadoTexto) {
+    estadoTexto.textContent =
+      estado.activo
+        ? "Activa"
+        : "Inactiva";
+  }
+
+  /*
+    Activar:
+    solo quienes tienen permiso y
+    únicamente cuando está inactiva.
+  */
+  $(
+    "btnActivarNominaPublica"
+  )?.classList.toggle(
     "hidden",
-    !puedeGestionar || estado.activo
+    !puedeGestionar ||
+    estado.activo
   );
 
-  $("btnCopiarNominaPublica")?.classList.toggle(
+  /*
+    Copiar:
+    se muestra cuando el link está activo
+    y existe una URL.
+  */
+  $(
+    "btnCopiarNominaPublica"
+  )?.classList.toggle(
     "hidden",
-    !estado.activo || !estado.link
+    !estado.activo ||
+    !estado.link
   );
 
-  $("btnDesactivarNominaPublica")?.classList.toggle(
+  /*
+    Desactivar:
+    solamente quienes tienen permiso y
+    cuando el link está activo.
+  */
+  $(
+    "btnDesactivarNominaPublica"
+  )?.classList.toggle(
     "hidden",
-    !puedeGestionar || !estado.activo
+    !puedeGestionar ||
+    !estado.activo
   );
 }
 
