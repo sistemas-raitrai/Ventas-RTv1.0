@@ -1705,6 +1705,58 @@ function sortInscripcionesHome(rows = []) {
   });
 }
 
+function getGestionNominaUrlHome(
+  item = {}
+) {
+  const params =
+    new URLSearchParams();
+
+  const grupoId =
+    String(
+      item.groupDocId ||
+      item.idGrupo ||
+      ""
+    ).trim();
+
+  const anoViaje =
+    Number(
+      item.anoViaje ||
+      0
+    );
+
+  const inscripcionId =
+    String(
+      item.inscripcionId ||
+      ""
+    ).trim();
+
+  if (anoViaje) {
+    params.set(
+      "ano",
+      String(anoViaje)
+    );
+  }
+
+  if (grupoId) {
+    params.set(
+      "grupo",
+      grupoId
+    );
+  }
+
+  if (inscripcionId) {
+    params.set(
+      "inscripcion",
+      inscripcionId
+    );
+  }
+
+  return (
+    "gestion-nomina.html?" +
+    params.toString()
+  );
+}
+
 function renderInscripcionesHomeCards(rows = []) {
   if (!rows.length) return emptyHtml("No hay inscripciones para mostrar.");
 
@@ -1729,12 +1781,14 @@ function renderInscripcionesHomeCards(rows = []) {
         </div>
 
         <a
-          href="grupo.html?id=${encodeURIComponent(idGrupo)}"
+          href="${escapeHtml(
+            getGestionNominaUrlHome(item)
+          )}"
           target="_blank"
           rel="noopener"
           class="home-btn"
         >
-          Abrir grupo
+          Gestionar nómina
         </a>
       </div>
     `;
@@ -1834,14 +1888,14 @@ function renderFormularioLiberadosHomeCards(
             >
 
               <a
-                href="grupo.html?id=${encodeURIComponent(
-                  idGrupo
+                href="${escapeHtml(
+                  getGestionNominaUrlHome(item)
                 )}"
                 target="_blank"
                 rel="noopener"
                 class="home-btn"
               >
-                Abrir grupo
+                Gestionar nómina
               </a>
 
               <button
@@ -2012,14 +2066,14 @@ function renderRutPendientePagosCards(
           >
 
             <a
-              href="grupo.html?id=${encodeURIComponent(
-                idGrupo
+              href="${escapeHtml(
+                getGestionNominaUrlHome(item)
               )}"
               target="_blank"
               rel="noopener"
               class="home-btn"
             >
-              Abrir grupo
+              Gestionar nómina
             </a>
 
             <button
@@ -2174,14 +2228,14 @@ function renderNominaPagosDesalineadaCards(
 
           <div>
             <a
-              href="grupo.html?id=${encodeURIComponent(
-                idGrupo
+              href="${escapeHtml(
+                getGestionNominaUrlHome(item)
               )}"
               target="_blank"
               rel="noopener"
               class="home-btn"
             >
-              Abrir grupo
+              Gestionar nómina
             </a>
           </div>
 
