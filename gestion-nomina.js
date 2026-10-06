@@ -7101,7 +7101,10 @@ function getResumenOperativoNomina() {
   const resumen = getResumenOperativoNominaBase();
   const items = state.nomina || [];
   const viajeros = items.filter(esPersonaViajeraConteo);
-  const cuposReservados = items.filter(esReservaPendienteConteoNomina);
+  const cuposReservados =
+    items.filter(
+      esReservaPendienteConteo
+    );
 
   return {
     ...resumen,
