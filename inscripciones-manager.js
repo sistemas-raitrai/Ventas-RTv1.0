@@ -3242,6 +3242,154 @@ export function crearInscripcionesManager({ db, usuario = {}, onChange = null } 
     };
   }
 
+  function getLinkNominaPublica(token = "") {
+    const tokenLimpio = texto(token);
+  
+    if (!tokenLimpio) return "";
+  
+    return `${location.origin}${location.pathname.replace(
+      /gestion-nomina\.html$/i,
+      "nomina.html"
+    )}?t=${encodeURIComponent(tokenLimpio)}`;
+  }
+  
+  function obtenerEstadoNominaPublica(grupoCtx = {}) {
+    const data = grupoCtx?.data || {};
+    const info = data.nominaPublica || {};
+    const token = texto(info.token);
+  
+    return {
+      activo: info.activo === true && !!token,
+      token,
+      link: texto(info.link) || getLinkNominaPublica(token)
+    };
+  }
+  
+  async function activarNominaPublica(grupoCtx = {}) {
+    if (!puedeGestionarLinks(grupoCtx?.data || {})) {
+      throw new Error(
+        "No tienes permisos para administrar el link público de nómina."
+      );
+    }
+  
+    if (!grupoCtx?.docId) {
+      throw new Error("No se pudo identificar el grupo.");
+    }
+  
+    const anterior = obtenerEstadoNominaPublica(grupoCtx);
+    const token = anterior.token || generarToken();
+    const link = getLinkNominaPublica(token);
+    const ahora = serverTimestamp();
+  
+    await setDoc(
+      doc(db, "nominas_publicas", token),
+      {
+        token,
+        activo: true,
+        idGrupo: String(grupoCtx.groupId || grupoCtx.docId),
+        groupDocId: String(grupoCtx.docId),
+        colegio: texto(grupoCtx.data?.colegio),
+        curso: texto(grupoCtx.data?.curso),
+        anoViaje: grupoCtx.data?.anoViaje || "",
+        destino:
+          texto(grupoCtx.data?.destinoPrincipal) ||
+          texto(grupoCtx.data?.destino),
+        nombreGrupo:
+          texto(grupoCtx.data?.aliasGrupo) ||
+          texto(grupoCtx.data?.nombreGrupo) ||
+          texto(grupoCtx.data?.colegio),
+        tipo: "nomina_viva",
+        actualizadoEn: ahora,
+        actualizadoPor: nombreUsuario,
+        actualizadoPorCorreo: email,
+        ...(!anterior.token ? { creadoEn: ahora } : {})
+      },
+      { merge: true }
+    );
+  
+    await setDoc(
+      doc(db, "ventas_cotizaciones", String(grupoCtx.docId)),
+      {
+        nominaPublica: {
+          activo: true,
+          token,
+          link,
+          tipo: "nomina_viva",
+          actualizadoEn: ahora,
+          actualizadoPor: nombreUsuario,
+          actualizadoPorCorreo: email
+        }
+      },
+      { merge: true }
+    );
+  
+    grupoCtx.data = {
+      ...(grupoCtx.data || {}),
+      nominaPublica: {
+        activo: true,
+        token,
+        link,
+        tipo: "nomina_viva"
+      }
+    };
+  
+    await notificarCambio(grupoCtx, "nomina_publica_activada", { token });
+  
+    return { activo: true, token, link };
+  }
+  
+  async function desactivarNominaPublica(grupoCtx = {}) {
+    if (!puedeGestionarLinks(grupoCtx?.data || {})) {
+      throw new Error(
+        "No tienes permisos para administrar el link público de nómina."
+      );
+    }
+  
+    const actual = obtenerEstadoNominaPublica(grupoCtx);
+  
+    if (!actual.token) {
+      return { activo: false, token: "", link: "" };
+    }
+  
+    const ahora = serverTimestamp();
+  
+    await setDoc(
+      doc(db, "nominas_publicas", actual.token),
+      {
+        activo: false,
+        actualizadoEn: ahora,
+        actualizadoPor: nombreUsuario,
+        actualizadoPorCorreo: email
+      },
+      { merge: true }
+    );
+  
+    await setDoc(
+      doc(db, "ventas_cotizaciones", String(grupoCtx.docId)),
+      {
+        "nominaPublica.activo": false,
+        "nominaPublica.actualizadoEn": ahora,
+        "nominaPublica.actualizadoPor": nombreUsuario,
+        "nominaPublica.actualizadoPorCorreo": email
+      },
+      { merge: true }
+    );
+  
+    grupoCtx.data = {
+      ...(grupoCtx.data || {}),
+      nominaPublica: {
+        ...(grupoCtx.data?.nominaPublica || {}),
+        activo: false
+      }
+    };
+  
+    await notificarCambio(grupoCtx, "nomina_publica_desactivada", {
+      token: actual.token
+    });
+  
+    return { ...actual, activo: false };
+  }
+
   async function recargarGrupo(grupoCtx) {
     const snap = await getDoc(doc(db, "ventas_cotizaciones", grupoCtx.docId));
     if (!snap.exists()) return null;
@@ -3281,6 +3429,10 @@ export function crearInscripcionesManager({ db, usuario = {}, onChange = null } 
     resolverGrupo,
     recargarGrupo,
     detectarOrigenNomina,
+    
+    obtenerEstadoNominaPublica,
+    activarNominaPublica,
+    desactivarNominaPublica,
 
     cargarNomina,
     cargarInscripcionCompleta,
@@ -3689,7 +3841,9 @@ export function fichaCompleta(item = {}) {
 function tieneCarnet(item = {}) {
   return carnetCompletoConteoNomina(item);
 }
-function estaAnulada(i) { return i?.anulado === true || i?.anulada === true || normalizar(estado(i)).includes("anulad") || normalizar(i?.estadoViaje).includes("no viaja"); }
+function estaAnulada(item = {}) {
+  return estaExcluidoConteoNomina(item);
+}
 function texto(v) { return String(v ?? "").trim(); }
 function normalizar(v) { return texto(v).normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase(); }
 function normalizarEmail(v) { return normalizar(v).replace(/\s+/g, ""); }
@@ -3707,7 +3861,7 @@ function claveConteoNomina(value = "") {
     .replace(/\s+/g, "_");
 }
 
-function tipoConteoNomina(item = {}) {
+export function tipoConteoNomina(item = {}) {
   const key = claveConteoNomina(
     item.tipoInscripcion ||
     item.estadoInscripcion ||
@@ -3742,7 +3896,7 @@ function esReservaConteoNomina(item = {}) {
   );
 }
 
-function estaExcluidoConteoNomina(item = {}) {
+export function estaExcluidoConteoNomina(item = {}) {
   const privacidad = claveConteoNomina(
     item.privacidad?.estado ||
     item.estadoPrivacidad
@@ -3796,7 +3950,7 @@ function estaExcluidoConteoNomina(item = {}) {
   );
 }
 
-function esPersonaViajeraConteo(item = {}) {
+export function esPersonaViajeraConteo(item = {}) {
   if (
     estaExcluidoConteoNomina(item) ||
     esReservaConteoNomina(item)
@@ -3844,7 +3998,7 @@ function esPersonaViajeraConteo(item = {}) {
   ].includes(tipo);
 }
 
-function esReservaPendienteConteo(item = {}) {
+export function esReservaPendienteConteo(item = {}) {
   if (
     !esReservaConteoNomina(item) ||
     estaExcluidoConteoNomina(item)
