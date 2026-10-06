@@ -556,6 +556,76 @@
       color: #6b6178;
     }
 
+    .carnet-status-button {
+      border: 0;
+      cursor: pointer;
+      font: inherit;
+    }
+    
+    .carnet-status-button:hover {
+      filter: brightness(.96);
+      transform: translateY(-1px);
+    }
+    
+    .carnet-observation-detail {
+      margin-top: 5px;
+      max-width: 190px;
+      color: #8a5b00;
+      font-size: 11px;
+      line-height: 1.3;
+    }
+    
+    .carnet-modal-card {
+      width: min(620px, calc(100vw - 30px));
+      height: auto;
+      max-height: calc(100vh - 30px);
+    }
+    
+    .carnet-form-grid {
+      display: grid;
+      gap: 14px;
+    }
+    
+    .carnet-form-grid label {
+      display: grid;
+      gap: 6px;
+      color: #352943;
+      font-weight: 800;
+    }
+    
+    .carnet-form-grid select,
+    .carnet-form-grid textarea {
+      width: 100%;
+      box-sizing: border-box;
+      border: 1px solid #d7cde1;
+      border-radius: 10px;
+      padding: 10px 12px;
+      background: #fff;
+      color: #2b1940;
+      font: inherit;
+    }
+    
+    .carnet-form-grid textarea {
+      min-height: 100px;
+      resize: vertical;
+    }
+    
+    .carnet-modal-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-top: 18px;
+    }
+    
+    .carnet-current-state {
+      padding: 10px 12px;
+      border-radius: 10px;
+      background: #f6f1fa;
+      color: #51445f;
+      line-height: 1.45;
+    }
+
     .modal {
       position: fixed;
       inset: 0;
@@ -3371,6 +3441,114 @@
               Selecciona una imagen.
             </div>
           </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- OBSERVACIÓN DEL CARNET -->
+  <div
+    class="modal"
+    id="modalObservacionCarnet"
+  >
+    <div class="modal-card carnet-modal-card">
+      <header class="modal-head">
+        <div>
+          <h2>
+            Estado del carnet
+          </h2>
+  
+          <p id="carnetObservacionPasajero"></p>
+        </div>
+  
+        <button
+          id="btnCerrarObservacionCarnet"
+          class="modal-close"
+          type="button"
+          aria-label="Cerrar"
+        >
+          ×
+        </button>
+      </header>
+  
+      <div class="modal-content">
+        <div
+          id="carnetEstadoActual"
+          class="carnet-current-state"
+        ></div>
+  
+        <div
+          class="carnet-form-grid"
+          style="margin-top:14px;"
+        >
+          <label>
+            Motivo por el cual el carnet no es válido
+  
+            <select id="carnetObservacionMotivo">
+              <option value="">
+                Selecciona un motivo
+              </option>
+  
+              <option value="no_cargado">
+                No cargado
+              </option>
+  
+              <option value="vencido">
+                Está vencido
+              </option>
+  
+              <option value="ilegible">
+                Está ilegible
+              </option>
+  
+              <option value="incompleto">
+                Falta frente o reverso
+              </option>
+  
+              <option value="no_corresponde">
+                No corresponde a la persona
+              </option>
+  
+              <option value="otro">
+                Otro
+              </option>
+            </select>
+          </label>
+  
+          <label>
+            Explicación
+  
+            <textarea
+              id="carnetObservacionDetalle"
+              placeholder="Agrega antecedentes cuando sea necesario. Para Otro es obligatorio."
+            ></textarea>
+          </label>
+        </div>
+  
+        <div class="carnet-modal-actions">
+          <button
+            id="btnResolverObservacionCarnet"
+            class="btn-secondary"
+            type="button"
+          >
+            Marcar como resuelto
+          </button>
+  
+          <button
+            id="btnCancelarObservacionCarnet"
+            class="btn-secondary"
+            type="button"
+          >
+            Cancelar
+          </button>
+  
+          <button
+            id="btnGuardarObservacionCarnet"
+            class="btn-primary"
+            type="button"
+          >
+            Guardar observación
+          </button>
         </div>
       </div>
     </div>
