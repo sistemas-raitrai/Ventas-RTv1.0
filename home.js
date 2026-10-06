@@ -8,7 +8,8 @@ import {
   query,
   doc,
   updateDoc,
-  serverTimestamp
+  serverTimestamp,
+  onSnapshot
 } from "https://www.gstatic.com/firebasejs/11.7.3/firebase-firestore.js";
 
 import { auth, db, VENTAS_USERS } from "./firebase-init.js";
@@ -95,6 +96,16 @@ const state = {
   reuniones3DiasRows: []
 };
 
+/*
+  Guarda la función que cierra el listener
+  de alertas de inscripciones.
+
+  Es importante cuando un administrador cambia
+  de usuario representado, para no dejar varios
+  listeners funcionando simultáneamente.
+*/
+let detenerAlertasInscripcionesHome =
+  null;
 /* =========================================================
    HELPERS GENERALES
 ========================================================= */
@@ -1508,17 +1519,74 @@ function getInscripcionEstadoCupoHome(item = {}) {
 function esAlertaInscripcionActivaHome(
   item = {}
 ) {
-  const estadoViaje =
+  const privacidad =
     normalizeLoose(
-      item.estadoViaje || ""
+      item.privacidad?.estado ||
+      item.estadoPrivacidad ||
+      ""
+    );
+
+  const estados = [
+    item.estado,
+    item.estadoViaje,
+    item.estadoCupo,
+    item.sistemaPagos?.estado,
+    item.sistemaPagos?.estadoViaje
+  ].map(
+    (value) =>
+      normalizeLoose(
+        value || ""
+      )
+  );
+
+  const tieneViajaFalse = [
+    item.viaja,
+    item.sistemaPagos?.viaja
+  ].some(
+    (value) =>
+      value !== undefined &&
+      value !== null &&
+      value !== "" &&
+      [
+        "false",
+        "no",
+        "0",
+        "no_viaja"
+      ].includes(
+        normalizeLoose(value)
+      )
+  );
+
+  const excluida =
+    item.anulado === true ||
+    item.anulada === true ||
+    item.noViaja === true ||
+    tieneViajaFalse ||
+    [
+      "archivada",
+      "eliminada",
+      "eliminada_logica"
+    ].includes(
+      privacidad
+    ) ||
+    estados.some(
+      (estado) =>
+        estado.includes(
+          "anulad"
+        ) ||
+        [
+          "no_viaja",
+          "eliminado_en_sp",
+          "eliminada_en_sp"
+        ].includes(
+          estado
+        )
     );
 
   return (
     item.activa !== false &&
     item.resuelta !== true &&
-    item.anulado !== true &&
-    item.viaja !== false &&
-    estadoViaje !== "no_viaja"
+    !excluida
   );
 }
 
@@ -4376,55 +4444,166 @@ function bindAlertButtons() {
    INIT
 ========================================================= */
 
-async function renderPantalla() {
-  const realUser = getRealUser();
-  const effectiveUser = getEffectiveUser();
+function iniciarAlertasInscripcionesTiempoReal() {
+  /*
+    Si ya existía un listener, lo cerramos.
 
-  if (!realUser || !effectiveUser) {
-    location.href = "login.html";
+    Esto ocurre, por ejemplo, cuando un administrador
+    cambia el usuario representado.
+  */
+  if (
+    typeof detenerAlertasInscripcionesHome ===
+    "function"
+  ) {
+    detenerAlertasInscripcionesHome();
+
+    detenerAlertasInscripcionesHome =
+      null;
+  }
+
+  const consultaAlertas =
+    query(
+      collection(
+        db,
+        ALERTAS_INSCRIPCIONES_COLLECTION
+      ),
+      where(
+        "activa",
+        "==",
+        true
+      )
+    );
+
+  detenerAlertasInscripcionesHome =
+    onSnapshot(
+      consultaAlertas,
+
+      (snapshot) => {
+        state.inscripcionesRows =
+          snapshot.docs.map(
+            (docSnap) => ({
+              id:
+                docSnap.id,
+
+              ...docSnap.data()
+            })
+          );
+
+        /*
+          renderHome vuelve a aplicar:
+          - alcance según usuario;
+          - vendedor correspondiente;
+          - grupos visibles;
+          - tipos de alerta;
+          - contadores.
+        */
+        renderHome();
+
+        /*
+          Los buscadores tienen protecciones
+          para no duplicar eventos.
+        */
+        initSearchers();
+
+        console.log(
+          "[HOME] Alertas de inscripciones actualizadas en tiempo real",
+          {
+            documentos:
+              state.inscripcionesRows
+                .length
+          }
+        );
+      },
+
+      (error) => {
+        console.error(
+          "[HOME] Error escuchando alertas de inscripciones",
+          error
+        );
+      }
+    );
+}
+
+async function renderPantalla() {
+  const realUser =
+    getRealUser();
+
+  const effectiveUser =
+    getEffectiveUser();
+
+  if (
+    !realUser ||
+    !effectiveUser
+  ) {
+    location.href =
+      "login.html";
+
     return;
   }
 
-  // BLOQUEAR HOME PARA ROL VENDEDOR
-  if (isVendedorRole(effectiveUser)) {
-    location.href = "index.html";
+  /*
+    El Home administrativo no está disponible
+    para el rol vendedor.
+  */
+  if (
+    isVendedorRole(
+      effectiveUser
+    )
+  ) {
+    location.href =
+      "index.html";
+
     return;
   }
 
   setHeaderState({
     realUser,
     effectiveUser,
-    title: "Inicio",
-    subtitle: "Panel principal"
+    title:
+      "Inicio",
+    subtitle:
+      "Panel principal"
   });
 
   renderActingUserSwitcher(
     VENTAS_USERS
   );
-  
+
   /*
-    Si existe caché, pintamos inmediatamente
-    grupos, fichas y buscadores.
+    Si existe caché, mostramos inmediatamente
+    grupos, fichas y buscadores mientras se
+    completa la consulta actualizada.
   */
   const gruposCache =
     leerCacheGruposHome();
-  
+
   if (gruposCache) {
     aplicarGruposHome(
       gruposCache
     );
-  
+
     renderHome();
     initSearchers();
   }
-  
+
   /*
-    Después actualizamos desde Firestore.
+    Carga inicial completa.
+
+    Esta consulta se conserva porque permite
+    que toda la pantalla quede lista antes de
+    comenzar la actualización en tiempo real.
   */
   await loadHomeData();
-  
+
   renderHome();
   initSearchers();
+
+  /*
+    Desde este punto, cualquier cambio en
+    ventas_alertas_inscripciones se reflejará
+    automáticamente en Home.
+  */
+  iniciarAlertasInscripcionesTiempoReal();
 }
 
 async function initPage() {
