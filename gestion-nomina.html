@@ -2728,31 +2728,7 @@
               >
                 Ver fichas del grupo
               </button>
-
-              <button
-                id="btnActivarNominaPublica"
-                class="btn-primary"
-                type="button"
-              >
-                Crear link nómina
-              </button>
-              
-              <button
-                id="btnCopiarNominaPublica"
-                class="btn-secondary hidden"
-                type="button"
-              >
-                Copiar link nómina
-              </button>
-              
-              <button
-                id="btnDesactivarNominaPublica"
-                class="btn-secondary hidden"
-                type="button"
-              >
-                Desactivar link nómina
-              </button>
-        
+       
               <button
                 id="btnGestionarPulseras"
                 class="btn-primary"
@@ -3105,12 +3081,60 @@
           <h3>
             Links y fases de inscripción
           </h3>
-
-          <div
-            id="fasesContenedor"
-            class="phase-grid"
-          ></div>
-        </section>
+        
+          <div class="phase-grid">
+            <!--
+              Las cuatro fases de inscripción
+              se generan desde gestion-nomina.js.
+              display:contents permite que las tarjetas
+              queden en la misma grilla.
+            -->
+            <div
+              id="fasesContenedor"
+              style="display:contents;"
+            ></div>
+        
+            <!-- LINK PÚBLICO DE LA NÓMINA -->
+            <div class="gn-fase">
+              <h4>
+                Nómina pública
+              </h4>
+        
+              <div
+                id="nominaPublicaEstadoTexto"
+                class="gn-sub"
+              >
+                Inactiva
+              </div>
+        
+              <div class="gn-actions">
+                <button
+                  id="btnActivarNominaPublica"
+                  class="gn-btn"
+                  type="button"
+                >
+                  Activar link
+                </button>
+        
+                <button
+                  id="btnCopiarNominaPublica"
+                  class="gn-btn ok hidden"
+                  type="button"
+                >
+                  Copiar link
+                </button>
+        
+                <button
+                  id="btnDesactivarNominaPublica"
+                  class="gn-btn danger hidden"
+                  type="button"
+                >
+                  Desactivar
+                </button>
+              </div>
+            </div>
+          </div>
+</section>
 
         <section class="modal-section">
           <div class="nomina-tabs">
