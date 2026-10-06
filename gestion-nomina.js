@@ -38,7 +38,11 @@ import {
   crearInscripcionesManager,
   resumirNomina,
   exportarNominaCsv,
-  camposPasajero
+  camposPasajero,
+  tipoConteoNomina as tipoConteoCompartido,
+  estaExcluidoConteoNomina as estaExcluidoCompartido,
+  esPersonaViajeraConteo as esPersonaViajeraCompartida,
+  esReservaPendienteConteo as esReservaPendienteCompartida
 } from "./inscripciones-manager.js";
 
 import {
@@ -1799,6 +1803,15 @@ function bindEvents() {
         }
       }
     );
+
+  $("btnActivarNominaPublica")
+    ?.addEventListener("click", activarNominaPublicaGestion);
+  
+  $("btnCopiarNominaPublica")
+    ?.addEventListener("click", copiarNominaPublicaGestion);
+  
+  $("btnDesactivarNominaPublica")
+    ?.addEventListener("click", desactivarNominaPublicaGestion);
 
   $("fasesContenedor")
     ?.addEventListener(
@@ -5851,6 +5864,7 @@ function renderModal(
       ?.esAdminOSupervision() ===
     true;
 
+  sincronizarBotonesNominaPublica();
   /*
   Gestión NFC también forma parte
   de la administración operativa.
@@ -7085,30 +7099,21 @@ function getResumenOperativoNominaBase() {
 
 function getResumenOperativoNomina() {
   const resumen = getResumenOperativoNominaBase();
-
   const items = state.nomina || [];
-
-  const viajeros = items.filter(
-    esPersonaViajeraConteo
-  );
+  const viajeros = items.filter(esPersonaViajeraConteo);
+  const cuposReservados = items.filter(esReservaPendienteConteoNomina);
 
   return {
     ...resumen,
-
-    viajan: viajeros.length,
-
-    cuposReservados: items.filter(
-      esReservaPendienteConteo
-    ).length,
-
+    viajan: viajeros.length + cuposReservados.length,
+    viajanIdentificados: viajeros.length,
+    cuposReservados: cuposReservados.length,
     fichaPendiente: viajeros.filter(
       (item) => !fichaCompletaConteoNomina(item)
     ).length,
-
     sinCarnet: viajeros.filter(
       (item) => !carnetCompletoConteoNomina(item)
     ).length,
-
     liberados: viajeros.filter(
       (item) => tipoConteoNomina(item) === "liberado"
     ).length
@@ -10975,6 +10980,79 @@ function enfocarPasajeroPendiente() {
   );
 }
 
+function sincronizarBotonesNominaPublica() {
+  const puedeGestionar =
+    state.manager?.puedeGestionarLinks(state.current?.data || {}) === true;
+
+  const estado = state.manager?.obtenerEstadoNominaPublica(
+    state.current || {}
+  ) || { activo: false, link: "" };
+
+  $("btnActivarNominaPublica")?.classList.toggle(
+    "hidden",
+    !puedeGestionar || estado.activo
+  );
+
+  $("btnCopiarNominaPublica")?.classList.toggle(
+    "hidden",
+    !estado.activo || !estado.link
+  );
+
+  $("btnDesactivarNominaPublica")?.classList.toggle(
+    "hidden",
+    !puedeGestionar || !estado.activo
+  );
+}
+
+async function activarNominaPublicaGestion() {
+  if (!state.current) return;
+
+  if (!confirm(
+    "Se creará un link público de nómina viva. Mostrará nombres, apellidos y fecha de inscripción. ¿Continuar?"
+  )) return;
+
+  const estado = await state.manager.activarNominaPublica(state.current);
+
+  sincronizarBotonesNominaPublica();
+
+  try {
+    await navigator.clipboard.writeText(estado.link);
+    alert("Link público de nómina creado y copiado.");
+  } catch {
+    alert(`Link público de nómina:\n\n${estado.link}`);
+  }
+}
+
+async function copiarNominaPublicaGestion() {
+  const estado = state.manager?.obtenerEstadoNominaPublica(
+    state.current || {}
+  );
+
+  if (!estado?.activo || !estado.link) {
+    alert("Este grupo no tiene un link público activo.");
+    return;
+  }
+
+  try {
+    await navigator.clipboard.writeText(estado.link);
+    alert("Link público de nómina copiado.");
+  } catch {
+    alert(`Link público de nómina:\n\n${estado.link}`);
+  }
+}
+
+async function desactivarNominaPublicaGestion() {
+  if (!state.current) return;
+
+  if (!confirm(
+    "¿Desactivar el link público de esta nómina? El enlace dejará de estar disponible."
+  )) return;
+
+  await state.manager.desactivarNominaPublica(state.current);
+  sincronizarBotonesNominaPublica();
+  alert("Link público de nómina desactivado.");
+}
+
 async function manejarFase(
   event
 ) {
@@ -12348,30 +12426,7 @@ function claveConteoNomina(value = "") {
 }
 
 function tipoConteoNomina(item = {}) {
-  const key = claveConteoNomina(
-    item.tipoInscripcion ||
-    item.estadoInscripcion ||
-    item.faseInscripcion ||
-    item.tipo ||
-    item.pasajero?.tipo ||
-    "nomina_inicial"
-  );
-
-  const equivalencias = {
-    inscripcion_inicial: "nomina_inicial",
-    normal: "nomina_inicial",
-    nomina_final_ficha_medica: "nomina_final",
-    sistema_de_pagos: "sistema_pagos",
-    nuevos: "nuevo_ingreso",
-    nuevo_inscrito: "nuevo_ingreso",
-    lista_de_espera: "lista_espera",
-    cupo_liberado: "liberado",
-    liberados: "liberado",
-    ingreso_liberado: "liberado",
-    liberado_confirmado: "liberado"
-  };
-
-  return equivalencias[key] || key;
+  return tipoConteoCompartido(item);
 }
 
 function esReservaConteoNomina(item = {}) {
@@ -12383,128 +12438,15 @@ function esReservaConteoNomina(item = {}) {
 }
 
 function estaExcluidoConteoNomina(item = {}) {
-  const privacidad = claveConteoNomina(
-    item.privacidad?.estado ||
-    item.estadoPrivacidad
-  );
-
-  if (
-    item.archivada === true ||
-    item.anulado === true ||
-    item.anulada === true ||
-    item.noViaja === true ||
-    [
-      "archivada",
-      "eliminada",
-      "eliminada_logica"
-    ].includes(privacidad)
-  ) {
-    return true;
-  }
-
-  const estados = [
-    item.estado,
-    item.estadoViaje,
-    item.estadoCupo,
-    item.sistemaPagos?.estado,
-    item.sistemaPagos?.estadoViaje
-  ].map(claveConteoNomina);
-
-  if (
-    estados.some((estado) =>
-      estado.includes("anulad") ||
-      [
-        "no_viaja",
-        "eliminado_en_sp",
-        "eliminada_en_sp"
-      ].includes(estado)
-    )
-  ) {
-    return true;
-  }
-
-  return [
-    item.viaja,
-    item.sistemaPagos?.viaja
-  ].some((value) =>
-    value !== undefined &&
-    value !== null &&
-    value !== "" &&
-    ["false", "no", "0", "no_viaja"].includes(
-      claveConteoNomina(value)
-    )
-  );
+  return estaExcluidoCompartido(item);
 }
 
 function esPersonaViajeraConteo(item = {}) {
-  if (
-    estaExcluidoConteoNomina(item) ||
-    esReservaConteoNomina(item)
-  ) {
-    return false;
-  }
-
-  const tipo = tipoConteoNomina(item);
-
-  const estadoCupo = claveConteoNomina(
-    item.estadoCupo ||
-    item.cupo?.estado ||
-    item.estado ||
-    ""
-  );
-
-  if (
-    tipo === "lista_espera" ||
-    tipo === "lista_espera_pagada"
-  ) {
-    return estadoCupo === "confirmado";
-  }
-
-  if (tipo === "nuevo_ingreso") {
-    return estadoCupo === "confirmado";
-  }
-
-  if (tipo === "liberado") {
-    // Los liberados registrados viajan.
-    // Una marca explícita pendiente impide contarlos.
-    return ![
-      "pendiente",
-      "por_confirmar",
-      "rechazado"
-    ].includes(estadoCupo);
-  }
-
-  return [
-    "nomina_inicial",
-    "nomina_inicial_confirmada",
-    "nomina_final",
-    "sistema_pagos",
-    "nuevo_ingreso_confirmado",
-    "lista_espera_confirmada"
-  ].includes(tipo);
+  return esPersonaViajeraCompartida(item);
 }
 
 function esReservaPendienteConteo(item = {}) {
-  if (
-    !esReservaConteoNomina(item) ||
-    estaExcluidoConteoNomina(item)
-  ) {
-    return false;
-  }
-
-  const estado = claveConteoNomina(
-    item.estadoCupoReservado ||
-    item.cupoReservado?.estado ||
-    item.estadoCupo ||
-    ""
-  );
-
-  return ![
-    "consumido",
-    "anulado",
-    "eliminado",
-    "cerrado"
-  ].includes(estado);
+  return esReservaPendienteCompartida(item);
 }
 
 function fichaCompletaConteoNomina(item = {}) {
