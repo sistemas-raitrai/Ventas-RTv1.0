@@ -4984,13 +4984,6 @@ function renderRows() {
           >
             <td>
               <div class="gn-group">
-                ${esc(
-                  row.titulo ||
-                  "—"
-                )}
-              </div>
-
-              <div class="gn-sub">
                 ${
                   [
                     row.colegio,
@@ -5000,8 +4993,19 @@ function renderRows() {
                     .map(
                       esc
                     )
-                    .join(" · ")
+                    .join(" · ") ||
+                  esc(
+                    row.titulo ||
+                    "—"
+                  )
                 }
+              </div>
+            
+              <div class="gn-sub">
+                ${esc(
+                  row.titulo ||
+                  "—"
+                )}
               </div>
             </td>
 
