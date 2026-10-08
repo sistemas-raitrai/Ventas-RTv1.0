@@ -32,6 +32,12 @@ const menuItems = [
     roles: ["admin", "supervision", "registro", "vendedor"]
   },
   {
+    key: "gestion-rifa",
+    href: "gestion-rifa.html",
+    label: "Gestión RIFA",
+    roles: ["admin", "supervision", "registro", "vendedor"]
+  },
+  {
     key: "editar-asignados",
     href: "asignados.html",
     label: "Editar Asignados",
