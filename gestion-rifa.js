@@ -1,359 +1,335 @@
-import { auth, db, normalizeEmail } from "./firebase-init.js";
+import { auth } from "./firebase-init.js";
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.7.3/firebase-auth.js";
-import { collection, doc, getDocs, runTransaction, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.7.3/firebase-firestore.js";
-import { getRealUser } from "./roles.js";
+import { getEffectiveUser } from "./roles.js";
 import { waitForLayoutReady } from "./ui.js";
 
-/*
-  Gestiona documentos de rifa_raitrai_2026_reservas.
-  Los permisos REALES deben coincidir con las reglas de Firestore.
-  Ajusta la lista de correos según el equipo autorizado.
-  Nunca habilites lectura pública de esta colección.
-*/
-const COLECCION = "rifa_raitrai_2026_reservas";
-const CORREOS_GESTORES = new Set([
-  "sistemas@raitrai.cl",
-  "administracion@raitrai.cl",
-  "anamaria@raitrai.cl",
-  "yenny@raitrai.cl",
-  "chernandez@raitrai.cl",
-  "griveros@raitrai.cl",
-  "tomas@raitrai.cl",
-  "victoria@raitrai.cl"
-]);
-const RELACIONES = { estudiante: "Estudiante", apoderado: "Apoderado(a)", profesor: "Profesor(a)", otro: "Otro" };
+const RIFA_API = "https://southamerica-west1-sist-op-rt.cloudfunctions.net/gestionRifaRaiTrai";
+const RELACIONES = { estudiante: "ESTUDIANTE", apoderado: "APODERADO(A)", profesor: "PROFESOR(A)", otro: "OTRO" };
 const $ = id => document.getElementById(id);
-const state = { reservas: [], actual: null, busy: false, email: "", ultimaActualizacion: null };
+const texto = v => String(v ?? "").trim();
+const mayus = v => texto(v).toLocaleUpperCase("es-CL");
+const normalizar = v => texto(v).normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+const nombre = p => [p?.nombres, p?.apellidos].map(texto).filter(Boolean).join(" ");
+const asistentes = r => [...(r.contacto?.asiste === false ? [] : [r.contacto || {}]), ...(r.asistentesAdicionales || [])];
+const totalCalculado = r => asistentes(r).length;
+const state = { reservas: [], grupos: [], actual: null, nuevo: false, busy: false, usuario: null, solicitudId: "", foco: null };
 
-init();
-
-async function init() {
-  await waitForLayoutReady();
-  $("rifaRecargar").addEventListener("click", cargarReservas);
-  $("rifaBuscar").addEventListener("input", render);
-  $("rifaGrupo").addEventListener("change", render);
-  $("rifaEstado").addEventListener("change", render);
-  $("rifaLimpiar").addEventListener("click", () => {
-    $("rifaBuscar").value = "";
-    $("rifaGrupo").value = "";
-    $("rifaEstado").value = "confirmada";
-    render();
-  });
-  $("rifaCerrar").addEventListener("click", cerrarDetalle);
-  $("rifaOverlay").addEventListener("click", event => {
-    if (event.target === $("rifaOverlay")) cerrarDetalle();
-  });
-  document.addEventListener("keydown", event => {
-    if (event.key === "Escape" && !$("rifaOverlay").classList.contains("rifa-hidden")) cerrarDetalle();
-  });
-  $("rifaAgregarPersona").addEventListener("click", () => {
-    if ($("rifaPersonas").children.length >= 20) return avisoDetalle("Máximo 20 personas adicionales.", true);
-    agregarPersona({ nombres: "", apellidos: "", relacion: "apoderado", otraRelacion: "" });
-  });
-  $("rifaContactoAsiste").addEventListener("change", actualizarTotalEditado);
-  $("rifaEditarForm").addEventListener("submit", guardarDetalle);
-  $("rifaArchivar").addEventListener("click", () => cambiarArchivo(true));
-  $("rifaRestaurar").addEventListener("click", () => cambiarArchivo(false));
-
-  onAuthStateChanged(auth, async user => {
-    if (!user) {
-      aviso("Inicia sesión en el programa de ventas para gestionar la rifa.", true);
-      window.location.href = "login.html";
-      return;
-    }
-    // La identidad real evita que un usuario simulado eleve permisos.
-    state.email = normalizeEmail(getRealUser()?.email || user.email || "");
-    if (!CORREOS_GESTORES.has(state.email)) {
-      aviso("Tu cuenta no tiene acceso a la gestión de la rifa.", true);
-      return;
-    }
-    await cargarReservas();
-  });
+function fecha(v) {
+  if (!v) return "—";
+  const d = new Date(v);
+  return Number.isNaN(d.getTime()) ? "—" : new Intl.DateTimeFormat("es-CL", { dateStyle: "short", timeStyle: "short", timeZone: "America/Santiago" }).format(d);
 }
-
-function aviso(mensaje, error = false) {
-  const el = $("rifaEstadoCarga");
-  el.textContent = mensaje;
+function mensaje(id, valor, error = false) {
+  const el = $(id);
+  el.textContent = mayus(valor);
+  el.classList.toggle("rifa-hidden", !valor);
   el.classList.toggle("error", error);
 }
-function avisoDetalle(mensaje, error = false) {
-  const el = $("rifaDialogEstado");
-  el.textContent = mensaje;
-  el.classList.remove("rifa-hidden");
-  el.classList.toggle("error", error);
+function aviso(v, e = false) { mensaje("rifaEstadoCarga", v, e); }
+function avisoDetalle(v, e = false) { mensaje("rifaDialogEstado", v, e); }
+function bloquear(valor) {
+  state.busy = valor;
+  ["rifaNueva", "rifaExportar", "rifaRecargar", "rifaGuardar", "rifaArchivar", "rifaRestaurar", "rifaCerrar", "rifaAgregarPersona", "rifaNuevoGrupo", "rifaBuscarNuevoGrupo"].forEach(id => $(id).disabled = valor || !state.usuario);
 }
-function texto(valor) { return String(valor ?? "").trim(); }
-function normalizar(valor) {
-  return texto(valor).normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+async function solicitar(accion, datos = {}) {
+  const user = auth.currentUser;
+  if (!user) throw new Error("INICIA SESIÓN PARA CONTINUAR.");
+  const efectivo = getEffectiveUser();
+  if (!efectivo) throw new Error("TU CUENTA NO TIENE ACCESO A VENTAS.");
+  if (accion !== "listar" && efectivo.email !== state.usuario?.email) throw new Error("EL USUARIO DE LA VISTA CAMBIÓ. RECARGA ANTES DE CONTINUAR.");
+  const token = await user.getIdToken();
+  const respuesta = await fetch(RIFA_API, {
+    method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ ...datos, accion, actuarComo: efectivo.email })
+  });
+  const resultado = await respuesta.json().catch(() => null);
+  if (!respuesta.ok || !resultado?.ok) throw new Error(resultado?.error || "NO SE PUDO CONSULTAR LA GESTIÓN DE RIFA. REVISA EL DESPLIEGUE DEL BACKEND.");
+  return resultado;
 }
-function nombre(p) { return [p?.nombres, p?.apellidos].map(texto).filter(Boolean).join(" "); }
-function fecha(valor) {
-  const d = valor?.toDate?.();
-  return d ? new Intl.DateTimeFormat("es-CL", { dateStyle: "short", timeStyle: "short" }).format(d) : "—";
-}
-function estado(reserva) { return reserva.estado === "archivada" ? "archivada" : "confirmada"; }
-function totalCalculado(reserva) {
-  return (reserva.contacto?.asiste === false ? 0 : 1) + (Array.isArray(reserva.asistentesAdicionales) ? reserva.asistentesAdicionales.length : 0);
-}
-
 async function cargarReservas() {
-  if (state.busy || !CORREOS_GESTORES.has(state.email)) return;
-  state.busy = true;
-  $("rifaRecargar").disabled = true;
-  aviso("Cargando reservas...");
+  if (state.busy || !auth.currentUser) return;
+  bloquear(true);
+  aviso("CARGANDO RESERVAS...");
   try {
-    const snap = await getDocs(collection(db, COLECCION));
-    state.reservas = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-    state.reservas.sort((a, b) => (b.creadoEn?.toMillis?.() || 0) - (a.creadoEn?.toMillis?.() || 0));
-    poblarGrupos();
+    const datos = await solicitar("listar");
+    state.usuario = datos.usuario;
+    state.reservas = datos.reservas.sort((a, b) => (Date.parse(b.creadoEn) || 0) - (Date.parse(a.creadoEn) || 0) || a.id.localeCompare(b.id));
+    state.grupos = datos.grupos.sort((a, b) => a.colegio.localeCompare(b.colegio, "es") || a.curso.localeCompare(b.curso, "es", { numeric: true }) || a.anoViaje.localeCompare(b.anoViaje) || a.idGrupo.localeCompare(b.idGrupo));
+    $("rifaAlcance").textContent = mayus(state.usuario.rol === "vendedor" ? `GRUPOS DE ${state.usuario.nombre}` : "VISTA GENERAL · TODOS LOS VENDEDORES");
+    poblarFiltros();
     render();
-    aviso(`${state.reservas.length} reservas cargadas.`);
+    aviso("");
   } catch (error) {
-    console.error("Error cargando reservas de rifa:", error);
-    aviso("No se pudieron leer las reservas. Revisa las reglas de Firestore y tu sesión.", true);
+    // No mantener información de una vista anterior si cambia la sesión o el alcance.
+    state.reservas = []; state.grupos = []; state.usuario = null;
+    render();
+    aviso(error.message, true);
   } finally {
-    state.busy = false;
-    $("rifaRecargar").disabled = false;
+    bloquear(false);
+    $("rifaRecargar").disabled = !auth.currentUser;
   }
 }
-
-function poblarGrupos() {
-  const select = $("rifaGrupo");
-  const elegido = select.value;
-  select.replaceChildren(new Option("Todos los grupos", ""));
-  const mapa = new Map();
-  state.reservas.forEach(r => mapa.set(texto(r.idGrupo), `${texto(r.idGrupo)} · ${texto(r.colegio)} · ${texto(r.curso)}`));
-  [...mapa].sort((a, b) => a[1].localeCompare(b[1], "es")).forEach(([id, etiqueta]) => select.add(new Option(etiqueta, id)));
+function opciones(id, mapa, inicial, ordenar = true) {
+  const select = $(id), elegido = select.value;
+  select.replaceChildren(new Option(inicial, ""));
+  const entradas = [...mapa];
+  if (ordenar) entradas.sort((a, b) => a[1].localeCompare(b[1], "es", { numeric: true }));
+  entradas.forEach(([valor, etiqueta]) => select.add(new Option(mayus(etiqueta), valor)));
   if (mapa.has(elegido)) select.value = elegido;
 }
-
-function render() {
-  const activas = state.reservas.filter(r => estado(r) === "confirmada");
-  $("kpiReservas").textContent = String(activas.length);
-  $("kpiAsistentes").textContent = String(activas.reduce((n, r) => n + totalCalculado(r), 0));
-  $("kpiGrupos").textContent = String(new Set(activas.map(r => texto(r.idGrupo))).size);
-  $("kpiArchivadas").textContent = String(state.reservas.length - activas.length);
-
+function claveVendedor(r) { return texto(r.vendedoraCorreo) || `nombre:${normalizar(r.vendedora)}`; }
+function poblarFiltros() {
+  opciones("rifaVendedor", new Map(state.reservas.map(r => [claveVendedor(r), r.vendedora])), "TODOS LOS VENDEDORES");
+  opciones("rifaAno", new Map(state.reservas.filter(r => r.anoViaje).map(r => [r.anoViaje, r.anoViaje])), "TODOS LOS AÑOS");
+  opciones("rifaGrupo", new Map(state.reservas.map(r => [r.idGrupo, `${r.idGrupo} · ${r.colegio} · ${r.curso} · ${r.anoViaje}`])), "TODOS LOS GRUPOS");
+  $("rifaVendedor").classList.toggle("rifa-hidden", state.usuario?.rol === "vendedor");
+}
+function reservasBaseFiltradas() {
   const q = normalizar($("rifaBuscar").value);
-  const filtroGrupo = $("rifaGrupo").value;
-  const filtroEstado = $("rifaEstado").value;
-  const visibles = state.reservas.filter(r => {
-    if (filtroGrupo && texto(r.idGrupo) !== filtroGrupo) return false;
-    if (filtroEstado !== "todos" && estado(r) !== filtroEstado) return false;
-    const busqueda = [r.idGrupo, r.colegio, r.curso, r.contacto?.nombres, r.contacto?.apellidos,
-      r.contacto?.telefono, r.contacto?.correo, ...(r.asistentesAdicionales || []).flatMap(p => [p.nombres, p.apellidos])].join(" ");
-    return normalizar(busqueda).includes(q);
-  });
-  $("rifaConteo").textContent = `${visibles.length} reservas visibles · ${visibles.reduce((n, r) => n + (estado(r) === "confirmada" ? totalCalculado(r) : 0), 0)} asistentes activos`;
-  const tbody = $("rifaFilas");
-  tbody.replaceChildren();
-  if (!visibles.length) {
-    const tr = document.createElement("tr");
-    const td = document.createElement("td");
-    td.colSpan = 8;
-    td.textContent = "No hay reservas para estos filtros.";
-    tr.append(td);
-    tbody.append(tr);
-    return;
-  }
-  visibles.forEach(r => {
-    const tr = document.createElement("tr");
-    const celda = value => {
-      const td = document.createElement("td");
-      td.textContent = String(value ?? "—");
-      tr.append(td);
-      return td;
-    };
-    celda(`${texto(r.colegio)} · ${texto(r.curso)}`);
-    celda(r.idGrupo);
-    celda(nombre(r.contacto));
-    celda(r.contacto?.telefono);
-    celda(totalCalculado(r));
-    celda(fecha(r.creadoEn));
-    const tdEstado = celda("");
-    const badge = document.createElement("span");
-    badge.className = `rifa-status ${estado(r) === "archivada" ? "archivada" : ""}`;
-    badge.textContent = estado(r) === "archivada" ? "Archivada" : "Confirmada";
-    tdEstado.append(badge);
-    const tdAccion = celda("");
-    const boton = document.createElement("button");
-    boton.className = "rifa-btn secondary";
-    boton.type = "button";
-    boton.textContent = "Ver / editar";
-    boton.addEventListener("click", () => abrirDetalle(r.id));
-    tdAccion.append(boton);
-    tbody.append(tr);
+  return state.reservas.filter(r => {
+    if ($("rifaGrupo").value && r.idGrupo !== $("rifaGrupo").value) return false;
+    if ($("rifaAno").value && r.anoViaje !== $("rifaAno").value) return false;
+    if ($("rifaVendedor").value && claveVendedor(r) !== $("rifaVendedor").value) return false;
+    return normalizar([r.idGrupo, r.colegio, r.curso, r.anoViaje, r.vendedora, nombre(r.contacto), r.contacto?.telefono, r.contacto?.correo, ...(r.asistentesAdicionales || []).map(nombre)].join(" ")).includes(q);
   });
 }
-
-function abrirDetalle(id) {
-  const r = state.reservas.find(item => item.id === id);
-  if (!r) return;
-  state.actual = r;
-  state.ultimaActualizacion = r.actualizadoEn?.toMillis?.() ?? null;
-  $("rifaDialogTitulo").textContent = `Reserva · ${r.idGrupo}`;
-  $("rifaDialogGrupo").textContent = `${texto(r.colegio)} · ${texto(r.curso)} · ID ${texto(r.idGrupo)} · Registrada ${fecha(r.creadoEn)}${r.archivadoMotivo ? ` · Motivo archivo: ${r.archivadoMotivo}` : ""}`;
-  $("rifaDialogEstado").classList.add("rifa-hidden");
-  const c = r.contacto || {};
-  $("rifaContactoNombres").value = texto(c.nombres);
-  $("rifaContactoApellidos").value = texto(c.apellidos);
-  $("rifaContactoTelefono").value = texto(c.telefono);
-  $("rifaContactoCorreo").value = texto(c.correo);
-  $("rifaContactoRelacion").value = RELACIONES[c.relacion] ? c.relacion : "otro";
-  $("rifaContactoOtra").value = texto(c.otraRelacion);
-  $("rifaContactoAsiste").checked = c.asiste !== false;
-  $("rifaPersonas").replaceChildren();
-  (Array.isArray(r.asistentesAdicionales) ? r.asistentesAdicionales : []).forEach(agregarPersona);
-  $("rifaArchivar").classList.toggle("rifa-hidden", estado(r) === "archivada");
-  $("rifaRestaurar").classList.toggle("rifa-hidden", estado(r) !== "archivada");
-  actualizarTotalEditado();
+function reservasVisibles() {
+  const filtro = $("rifaEstado").value;
+  return reservasBaseFiltradas().filter(r => filtro === "todos" || r.estado === filtro);
+}
+function render() {
+  // KPI del alcance y filtros de búsqueda/grupo/año/vendedor, independientes del selector de estado.
+  const base = reservasBaseFiltradas(), activas = base.filter(r => r.estado === "confirmada");
+  $("kpiReservas").textContent = activas.length;
+  $("kpiAsistentes").textContent = activas.reduce((n, r) => n + totalCalculado(r), 0);
+  $("kpiGrupos").textContent = new Set(activas.map(r => r.idGrupo)).size;
+  $("kpiArchivadas").textContent = base.length - activas.length;
+  const tbody = $("rifaFilas"); tbody.replaceChildren();
+  const visibles = reservasVisibles();
+  if (!visibles.length) {
+    const tr = document.createElement("tr"), td = document.createElement("td");
+    td.colSpan = 12; td.textContent = "NO HAY RESERVAS PARA ESTOS FILTROS."; tr.append(td); tbody.append(tr); return;
+  }
+  visibles.forEach((r, indice) => {
+    const tr = document.createElement("tr");
+    const celda = v => { const td = document.createElement("td"); td.textContent = mayus(v) || "—"; tr.append(td); return td; };
+    celda(indice + 1); celda(`${r.colegio} · ${r.curso}`); celda(r.idGrupo); celda(r.anoViaje);
+    celda(r.vendedora); celda(nombre(r.contacto)); celda(r.contacto?.telefono);
+    const nombres = celda(asistentes(r).map((p, i) => `${i + 1}. ${nombre(p)} · ${RELACIONES[p.relacion] || "OTRO"}${p.relacion === "otro" && p.otraRelacion ? `: ${p.otraRelacion}` : ""}`).join("\n"));
+    nombres.className = "nombres";
+    celda(totalCalculado(r)); celda(fecha(r.creadoEn));
+    const tdEstado = celda(""); tdEstado.replaceChildren();
+    const badge = document.createElement("span"); badge.className = `rifa-status ${r.estado === "archivada" ? "archivada" : ""}`;
+    badge.textContent = r.estado === "archivada" ? "ARCHIVADA" : "CONFIRMADA"; tdEstado.append(badge);
+    const tdAccion = celda(""); tdAccion.replaceChildren();
+    const boton = document.createElement("button"); boton.type = "button"; boton.className = "rifa-btn"; boton.textContent = "VER / EDITAR";
+    boton.addEventListener("click", () => { if (!state.busy) abrirDetalle(r.id); }); tdAccion.append(boton); tbody.append(tr);
+  });
+}
+function mostrarModal() {
+  if ($("rifaOverlay").classList.contains("rifa-hidden")) state.foco = document.activeElement;
   $("rifaOverlay").classList.remove("rifa-hidden");
+  document.body.style.overflow = "hidden";
   $("rifaCerrar").focus();
 }
-
 function cerrarDetalle() {
   if (state.busy) return;
-  $("rifaOverlay").classList.add("rifa-hidden");
-  state.actual = null;
+  $("rifaOverlay").classList.add("rifa-hidden"); document.body.style.overflow = "";
+  state.actual = null; state.nuevo = false;
+  state.foco?.focus?.();
 }
-
-function agregarPersona(persona) {
-  const bloque = document.createElement("div");
-  bloque.className = "rifa-persona";
-  const cabecera = document.createElement("div");
-  cabecera.className = "rifa-persona-head";
-  const titulo = document.createElement("strong");
-  titulo.textContent = "Asistente adicional";
-  const quitar = document.createElement("button");
-  quitar.type = "button";
-  quitar.className = "rifa-btn secondary";
-  quitar.textContent = "Quitar";
-  quitar.addEventListener("click", () => { bloque.remove(); actualizarTotalEditado(); });
-  cabecera.append(titulo, quitar);
-  const grid = document.createElement("div");
-  grid.className = "rifa-grid";
-  const campo = (etiqueta, valor, tipo = "text") => {
-    const label = document.createElement("label");
-    label.className = "rifa-field";
-    const span = document.createElement("span");
-    span.textContent = etiqueta;
-    const input = document.createElement(tipo === "select" ? "select" : "input");
-    if (tipo === "select") Object.entries(RELACIONES).forEach(([v, t]) => input.add(new Option(t, v)));
-    else input.maxLength = etiqueta.includes("Especificar") ? 80 : 100;
-    input.value = texto(valor);
-    input.required = !etiqueta.includes("Especificar");
-    label.append(span, input);
-    grid.append(label);
-    return input;
+function llenarFormulario(r = {}) {
+  const c = r.contacto || {};
+  $("rifaEditarForm").reset();
+  $("rifaContactoNombres").value = mayus(c.nombres); $("rifaContactoApellidos").value = mayus(c.apellidos);
+  $("rifaContactoTelefono").value = texto(c.telefono); $("rifaContactoCorreo").value = texto(c.correo);
+  $("rifaContactoRelacion").value = RELACIONES[c.relacion] ? c.relacion : "apoderado";
+  $("rifaContactoOtra").value = mayus(c.otraRelacion); $("rifaContactoAsiste").checked = c.asiste !== false;
+  $("rifaPersonas").replaceChildren(); (r.asistentesAdicionales || []).forEach(agregarPersona);
+  avisoDetalle(""); actualizarTotalEditado();
+}
+function abrirDetalle(id) {
+  const r = state.reservas.find(r => r.id === id); if (!r || state.busy) return;
+  state.actual = r; state.nuevo = false;
+  llenarFormulario(r);
+  $("rifaSeleccionGrupo").classList.add("rifa-hidden"); $("rifaNuevoGrupo").required = false;
+  $("rifaDialogTitulo").textContent = `RESERVA · ${r.idGrupo}`;
+  $("rifaDialogGrupo").textContent = mayus(`${r.colegio} · ${r.curso} · AÑO ${r.anoViaje || "—"} · VENDEDOR ${r.vendedora} · REGISTRADA ${fecha(r.creadoEn)}${r.archivadoMotivo ? ` · MOTIVO DE ARCHIVO: ${r.archivadoMotivo}` : ""}`);
+  $("rifaGuardar").textContent = "GUARDAR CAMBIOS";
+  $("rifaArchivar").classList.toggle("rifa-hidden", r.estado === "archivada");
+  $("rifaRestaurar").classList.toggle("rifa-hidden", r.estado !== "archivada"); mostrarModal();
+}
+function abrirNueva() {
+  if (state.busy || !state.usuario) return;
+  if (!state.grupos.length) return aviso("NO HAY GRUPOS GANADA DISPONIBLES PARA TU USUARIO.", true);
+  state.actual = null; state.nuevo = true; state.solicitudId = crypto.randomUUID();
+  llenarFormulario(); $("rifaBuscarNuevoGrupo").value = "";
+  $("rifaNuevoGrupo").replaceChildren(new Option("SELECCIONA UN GRUPO", ""));
+  poblarNuevosGrupos(); $("rifaSeleccionGrupo").classList.remove("rifa-hidden"); $("rifaNuevoGrupo").required = true;
+  $("rifaDialogTitulo").textContent = "AGREGAR RESERVA"; $("rifaDialogGrupo").textContent = "SELECCIONA UN GRUPO GANADA DE CUALQUIER AÑO.";
+  $("rifaGuardar").textContent = "CREAR RESERVA";
+  $("rifaArchivar").classList.add("rifa-hidden"); $("rifaRestaurar").classList.add("rifa-hidden"); mostrarModal();
+}
+function poblarNuevosGrupos() {
+  const q = normalizar($("rifaBuscarNuevoGrupo").value), elegido = $("rifaNuevoGrupo").value;
+  const grupos = state.grupos.filter(g => g.idGrupo === elegido || normalizar(`${g.idGrupo} ${g.colegio} ${g.curso} ${g.anoViaje} ${g.vendedora}`).includes(q));
+  opciones("rifaNuevoGrupo", new Map(grupos.map(g => [g.idGrupo, `${g.idGrupo} · ${g.colegio} · ${g.curso} · ${g.anoViaje} · ${g.vendedora}`])), "SELECCIONA UN GRUPO", false);
+}
+function seleccionarNuevoGrupo() {
+  const g = state.grupos.find(g => g.idGrupo === $("rifaNuevoGrupo").value);
+  if (!g) { $("rifaDialogGrupo").textContent = "SELECCIONA UN GRUPO."; return; }
+  const existente = state.reservas.find(r => r.idGrupo === g.idGrupo && r.estado === "confirmada");
+  if (existente) { abrirDetalle(existente.id); avisoDetalle("EL GRUPO YA TIENE ESTA RESERVA ACTIVA. PUEDES EDITARLA O AGREGAR ASISTENTES."); return; }
+  $("rifaDialogGrupo").textContent = mayus(`${g.colegio} · ${g.curso} · ID ${g.idGrupo} · AÑO ${g.anoViaje} · VENDEDOR ${g.vendedora}`);
+}
+function agregarPersona(p = {}) {
+  if ($("rifaPersonas").children.length >= 20) return avisoDetalle("MÁXIMO 20 ASISTENTES ADICIONALES.", true);
+  const bloque = document.createElement("div"); bloque.className = "rifa-persona";
+  const head = document.createElement("div"); head.className = "rifa-persona-head";
+  const titulo = document.createElement("strong"); titulo.textContent = "ASISTENTE ADICIONAL";
+  const quitar = document.createElement("button"); quitar.type = "button"; quitar.className = "rifa-btn secondary"; quitar.textContent = "QUITAR";
+  quitar.addEventListener("click", () => { if (!state.busy) { bloque.remove(); actualizarTotalEditado(); } }); head.append(titulo, quitar);
+  const grid = document.createElement("div"); grid.className = "rifa-grid";
+  function campo(etiqueta, valor, selector = false, requerido = true) {
+    const label = document.createElement("label"); label.className = "rifa-field";
+    const span = document.createElement("span"); span.textContent = etiqueta;
+    const input = document.createElement(selector ? "select" : "input");
+    if (selector) Object.entries(RELACIONES).forEach(([v, t]) => input.add(new Option(t, v)));
+    else input.maxLength = requerido ? 100 : 80;
+    input.value = selector ? valor : mayus(valor); input.required = requerido;
+    label.append(span, input); grid.append(label); return input;
+  }
+  bloque._campos = {
+    nombres: campo("NOMBRE(S)", p.nombres), apellidos: campo("APELLIDOS", p.apellidos),
+    relacion: campo("RELACIÓN", RELACIONES[p.relacion] ? p.relacion : "apoderado", true),
+    otraRelacion: campo("ESPECIFICAR SI ES OTRO", p.otraRelacion, false, false)
   };
-  const nombres = campo("Nombre(s)", persona.nombres);
-  const apellidos = campo("Apellidos", persona.apellidos);
-  const relacion = campo("Relación", RELACIONES[persona.relacion] ? persona.relacion : "otro", "select");
-  const otraRelacion = campo("Especificar si es «Otro»", persona.otraRelacion);
-  bloque._campos = { nombres, apellidos, relacion, otraRelacion };
-  bloque.append(cabecera, grid);
-  $("rifaPersonas").append(bloque);
-  actualizarTotalEditado();
+  bloque.append(head, grid); $("rifaPersonas").append(bloque); actualizarTotalEditado();
 }
-
-function actualizarTotalEditado() {
-  $("rifaTotalEditado").textContent = `Personas que asistirán: ${$("rifaPersonas").children.length + ($("rifaContactoAsiste").checked ? 1 : 0)}`;
-}
-
-function validarNombre(valor, etiqueta, max = 100) {
-  const v = texto(valor).replace(/\s+/g, " ");
-  if (v.length < 2 || v.length > max) throw new Error(`${etiqueta}: ingresa entre 2 y ${max} caracteres.`);
-  return v;
+function actualizarTotalEditado() { $("rifaTotalEditado").textContent = `PERSONAS QUE ASISTIRÁN: ${$("rifaPersonas").children.length + ($("rifaContactoAsiste").checked ? 1 : 0)}`; }
+function validarNombre(v, etiqueta, max = 100) {
+  const limpio = mayus(v).replace(/\s+/g, " ");
+  if (limpio.length < 2 || limpio.length > max) throw new Error(`${etiqueta}: INGRESA ENTRE 2 Y ${max} CARACTERES.`);
+  return limpio;
 }
 function relacionValida(relacion, otra) {
-  if (!RELACIONES[relacion]) throw new Error("Selecciona una relación válida.");
-  return { relacion, otraRelacion: relacion === "otro" ? validarNombre(otra, "Relación «Otro»", 80) : "" };
+  if (!RELACIONES[relacion]) throw new Error("SELECCIONA UNA RELACIÓN VÁLIDA.");
+  return { relacion, otraRelacion: relacion === "otro" ? validarNombre(otra, "RELACIÓN OTRO", 80) : "" };
 }
 function leerEdicion() {
   const digitos = $("rifaContactoTelefono").value.replace(/\D/g, "");
   const telefono = /^9\d{8}$/.test(digitos) ? `+56${digitos}` : /^569\d{8}$/.test(digitos) ? `+${digitos}` : "";
-  if (!telefono) throw new Error("Ingresa un celular chileno válido.");
+  if (!telefono) throw new Error("INGRESA UN CELULAR CHILENO VÁLIDO.");
   const correo = texto($("rifaContactoCorreo").value).toLowerCase();
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(correo)) throw new Error("Ingresa un correo válido.");
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(correo)) throw new Error("INGRESA UN CORREO VÁLIDO.");
   const contacto = {
-    nombres: validarNombre($("rifaContactoNombres").value, "Nombre del contacto"),
-    apellidos: validarNombre($("rifaContactoApellidos").value, "Apellidos del contacto"),
+    nombres: validarNombre($("rifaContactoNombres").value, "NOMBRE DEL CONTACTO"), apellidos: validarNombre($("rifaContactoApellidos").value, "APELLIDOS DEL CONTACTO"),
     telefono, correo, asiste: $("rifaContactoAsiste").checked,
     ...relacionValida($("rifaContactoRelacion").value, $("rifaContactoOtra").value)
   };
   const asistentesAdicionales = [...$("rifaPersonas").children].map((bloque, i) => {
     const c = bloque._campos;
-    return { nombres: validarNombre(c.nombres.value, `Nombre ${i + 1}`), apellidos: validarNombre(c.apellidos.value, `Apellidos ${i + 1}`),
-      ...relacionValida(c.relacion.value, c.otraRelacion.value) };
+    return { nombres: validarNombre(c.nombres.value, `NOMBRE ${i + 1}`), apellidos: validarNombre(c.apellidos.value, `APELLIDOS ${i + 1}`), ...relacionValida(c.relacion.value, c.otraRelacion.value) };
   });
-  const totalAsistentes = asistentesAdicionales.length + (contacto.asiste ? 1 : 0);
-  if (!totalAsistentes) throw new Error("Debe quedar al menos un asistente.");
-  return { contacto, asistentesAdicionales, totalAsistentes };
+  const personas = asistentes({ contacto, asistentesAdicionales });
+  if (!personas.length) throw new Error("DEBE QUEDAR AL MENOS UN ASISTENTE.");
+  const claves = personas.map(p => normalizar(nombre(p)));
+  if (new Set(claves).size !== claves.length) throw new Error("HAY UNA PERSONA REPETIDA EN LA RESERVA.");
+  return { contacto, asistentesAdicionales };
 }
-
 async function guardarDetalle(event) {
-  event.preventDefault();
-  if (!state.actual || state.busy) return;
+  event.preventDefault(); if (state.busy || (!state.nuevo && !state.actual)) return;
   try {
-    const cambios = leerEdicion();
-    if (JSON.stringify({ contacto: state.actual.contacto, asistentesAdicionales: state.actual.asistentesAdicionales || [], totalAsistentes: totalCalculado(state.actual) }) === JSON.stringify(cambios)) {
-      avisoDetalle("No hay cambios para guardar."); return;
-    }
-    await mutarReserva("edicion", cambios);
-  } catch (error) { avisoDetalle(error.message || "No se pudieron guardar los cambios.", true); }
+    const datos = leerEdicion();
+    if (state.nuevo && !$("rifaNuevoGrupo").value) throw new Error("SELECCIONA UN GRUPO.");
+    await mutarReserva(state.nuevo ? "crear" : "editar", datos);
+  } catch (error) { avisoDetalle(error.message, true); }
 }
-
 async function cambiarArchivo(archivar) {
   if (!state.actual || state.busy) return;
   let motivo = "";
   if (archivar) {
-    motivo = prompt("Motivo para archivar esta reserva:", "");
-    if (motivo === null) return;
-    motivo = texto(motivo);
-    if (motivo.length < 5 || motivo.length > 250) return avisoDetalle("Indica un motivo de 5 a 250 caracteres.", true);
+    const respuesta = prompt("MOTIVO PARA ARCHIVAR ESTA RESERVA:", ""); if (respuesta === null) return;
+    motivo = mayus(respuesta);
+    if (motivo.length < 5 || motivo.length > 250) return avisoDetalle("INDICA UN MOTIVO DE 5 A 250 CARACTERES.", true);
   }
-  if (!confirm(archivar ? "¿Archivar esta reserva completa y descontar sus asistentes?" : "¿Restaurar esta reserva y volver a contar sus asistentes?")) return;
-  try { await mutarReserva(archivar ? "archivo" : "restauracion", { motivo }); }
-  catch (error) { avisoDetalle(error.message || "No se pudo cambiar el estado.", true); }
+  if (!confirm(archivar ? "¿ARCHIVAR LA RESERVA Y DESCONTAR SUS ASISTENTES?" : "¿RESTAURAR LA RESERVA Y VOLVER A CONTAR SUS ASISTENTES?")) return;
+  try { await mutarReserva(archivar ? "archivar" : "restaurar", { motivo }); }
+  catch (error) { avisoDetalle(error.message, true); }
 }
-
-async function mutarReserva(tipo, datos) {
-  const id = state.actual.id;
-  state.busy = true;
-  ["rifaGuardar", "rifaArchivar", "rifaRestaurar"].forEach(key => $(key).disabled = true);
-  avisoDetalle("Guardando...");
+async function mutarReserva(accion, datos) {
+  bloquear(true); avisoDetalle("GUARDANDO...");
+  let guardado = false;
   try {
-    const referencia = doc(db, COLECCION, id);
-    const historial = doc(collection(db, COLECCION, id, "historial"));
-    await runTransaction(db, async tx => {
-      const snap = await tx.get(referencia);
-      if (!snap.exists()) throw new Error("La reserva ya no existe.");
-      const actual = snap.data();
-      const versionActual = actual.actualizadoEn?.toMillis?.() ?? null;
-      if (versionActual !== state.ultimaActualizacion) throw new Error("Otra persona modificó esta reserva. Recarga antes de editar.");
-      const base = { actualizadoEn: serverTimestamp(), actualizadoPor: state.email };
-      let cambio;
-      if (tipo === "edicion") cambio = { ...base, ...datos };
-      else if (tipo === "archivo") {
-        if (actual.estado === "archivada") throw new Error("Esta reserva ya está archivada.");
-        cambio = { ...base, estado: "archivada", archivadoMotivo: datos.motivo, archivadoEn: serverTimestamp(), archivadoPor: state.email };
-      } else {
-        if (actual.estado !== "archivada") throw new Error("Esta reserva ya está activa.");
-        cambio = { ...base, estado: "confirmada", archivadoMotivo: "", archivadoEn: null, archivadoPor: "" };
-      }
-      tx.update(referencia, cambio);
-      tx.set(historial, {
-        tipo, usuario: state.email, fecha: serverTimestamp(),
-        anterior: { estado: actual.estado || "confirmada", contacto: actual.contacto || {}, asistentesAdicionales: actual.asistentesAdicionales || [], totalAsistentes: totalCalculado(actual) },
-        nuevo: tipo === "edicion" ? datos : { estado: cambio.estado, motivo: datos.motivo || "" }
-      });
+    await solicitar(accion, {
+      ...datos, idGrupo: state.nuevo ? $("rifaNuevoGrupo").value : state.actual?.idGrupo,
+      reservaId: state.actual?.id, version: state.actual?.version, solicitudId: state.solicitudId
     });
-    $("rifaOverlay").classList.add("rifa-hidden");
-    state.actual = null;
-    aviso("Cambio guardado correctamente.");
-  } finally {
-    state.busy = false;
-    ["rifaGuardar", "rifaArchivar", "rifaRestaurar"].forEach(key => $(key).disabled = false);
-    if (!state.actual) await cargarReservas();
-  }
+    guardado = true;
+  } finally { bloquear(false); }
+  if (guardado) { cerrarDetalle(); await cargarReservas(); }
 }
+function exportarExcel() {
+  if (state.busy || !state.usuario) return;
+  if (!window.XLSX) return aviso("NO SE CARGÓ LA LIBRERÍA DE EXCEL. RECARGA LA PÁGINA.", true);
+  const visibles = reservasVisibles();
+  if (!visibles.length) return aviso("NO HAY RESERVAS PARA EXPORTAR CON ESTOS FILTROS.", true);
+  const cabecera = ["N.º", "N.º RESERVA", "IDGRUPO", "COLEGIO", "CURSO", "AÑO VIAJE", "VENDEDOR", "ASISTENTE", "RELACIÓN", "CONTACTO", "CELULAR", "CORREO", "ESTADO", "REGISTRADA", "ORIGEN"];
+  const filas = [];
+  visibles.forEach((r, i) => asistentes(r).forEach(p => filas.push([
+    filas.length + 1, i + 1, r.idGrupo, mayus(r.colegio), mayus(r.curso), r.anoViaje,
+    mayus(r.vendedora), mayus(nombre(p)), mayus(p.relacion === "otro" ? p.otraRelacion || "OTRO" : RELACIONES[p.relacion] || p.relacion),
+    mayus(nombre(r.contacto)), texto(r.contacto?.telefono), mayus(r.contacto?.correo),
+    r.estado === "archivada" ? "ARCHIVADA" : "CONFIRMADA", fecha(r.creadoEn), mayus(r.origen)
+  ])));
+  const hoja = XLSX.utils.aoa_to_sheet([cabecera, ...filas]);
+  hoja["!cols"] = [6, 12, 12, 40, 16, 12, 24, 35, 24, 35, 20, 35, 16, 22, 12].map(wch => ({ wch }));
+  hoja["!autofilter"] = { ref: hoja["!ref"] };
+  const libro = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(libro, hoja, "ASISTENTES");
+  const resumen = XLSX.utils.aoa_to_sheet([
+    ["RIFA RAI TRAI 2026", "17 DE OCTUBRE · CLUB PROVIDENCIA"],
+    ["USUARIO DE LA VISTA", mayus(state.usuario.nombre)],
+    ["ESTADO EXPORTADO", mayus($("rifaEstado").selectedOptions[0].textContent)],
+    ["BÚSQUEDA", mayus($("rifaBuscar").value)],
+    ["VENDEDOR", mayus($("rifaVendedor").value ? $("rifaVendedor").selectedOptions[0].textContent : state.usuario.rol === "vendedor" ? state.usuario.nombre : "TODOS")],
+    ["AÑO", $("rifaAno").value || "TODOS"],
+    ["GRUPO", $("rifaGrupo").value || "TODOS"],
+    ["RESERVAS EXPORTADAS", visibles.length], ["ASISTENTES EXPORTADOS", filas.length],
+    ["GENERADO", fecha(new Date().toISOString())]
+  ]);
+  resumen["!cols"] = [{ wch: 28 }, { wch: 70 }]; XLSX.utils.book_append_sheet(libro, resumen, "RESUMEN");
+  const dia = new Intl.DateTimeFormat("sv-SE", { timeZone: "America/Santiago" }).format(new Date());
+  XLSX.writeFile(libro, `RIFA_RAI_TRAI_2026_${dia}.xlsx`);
+}
+async function init() {
+  await waitForLayoutReady();
+  $("rifaRecargar").addEventListener("click", cargarReservas);
+  $("rifaNueva").addEventListener("click", abrirNueva); $("rifaExportar").addEventListener("click", exportarExcel);
+  $("rifaBuscar").addEventListener("input", render);
+  ["rifaGrupo", "rifaVendedor", "rifaAno", "rifaEstado"].forEach(id => $(id).addEventListener("change", render));
+  $("rifaLimpiar").addEventListener("click", () => {
+    ["rifaBuscar", "rifaGrupo", "rifaVendedor", "rifaAno"].forEach(id => $(id).value = ""); $("rifaEstado").value = "confirmada"; render();
+  });
+  $("rifaCerrar").addEventListener("click", cerrarDetalle);
+  $("rifaOverlay").addEventListener("click", e => { if (e.target === $("rifaOverlay")) cerrarDetalle(); });
+  document.addEventListener("keydown", e => {
+    if ($("rifaOverlay").classList.contains("rifa-hidden")) return;
+    if (e.key === "Escape") cerrarDetalle();
+    if (e.key === "Tab") {
+      const elementos = [...$("rifaOverlay").querySelectorAll("button, input, select")].filter(el => !el.disabled && el.getClientRects().length);
+      const primero = elementos[0], ultimo = elementos.at(-1);
+      if (e.shiftKey && document.activeElement === primero) { e.preventDefault(); ultimo?.focus(); }
+      else if (!e.shiftKey && document.activeElement === ultimo) { e.preventDefault(); primero?.focus(); }
+    }
+  });
+  $("rifaBuscarNuevoGrupo").addEventListener("input", poblarNuevosGrupos); $("rifaNuevoGrupo").addEventListener("change", seleccionarNuevoGrupo);
+  $("rifaAgregarPersona").addEventListener("click", () => { if (!state.busy) agregarPersona(); });
+  $("rifaContactoAsiste").addEventListener("change", actualizarTotalEditado);
+  $("rifaEditarForm").addEventListener("submit", guardarDetalle);
+  $("rifaArchivar").addEventListener("click", () => cambiarArchivo(true)); $("rifaRestaurar").addEventListener("click", () => cambiarArchivo(false));
+  onAuthStateChanged(auth, user => {
+    if (!user) { state.usuario = null; state.reservas = []; state.grupos = []; render(); bloquear(false); location.replace("login.html"); return; }
+    cargarReservas();
+  });
+}
+init().catch(error => { console.error(error); aviso("NO SE PUDO INICIAR LA PÁGINA. RECARGA PARA CONTINUAR.", true); });
