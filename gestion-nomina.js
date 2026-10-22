@@ -5985,6 +5985,55 @@ async function abrirGrupo(
   }
 }
 
+function getLinkAnulacionGrupoActual() {
+  const grupo = state.current?.data || {};
+  const anoActual = Number(new Intl.DateTimeFormat("en", {
+    timeZone: "America/Santiago", year: "numeric"
+  }).format(new Date()));
+  const normalizarEstado = (valor) => String(valor || "")
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toLowerCase();
+  const esGanada = [grupo.estado, grupo.estadoVenta, grupo.estadoComercial]
+    .some(valor => normalizarEstado(valor) === "ganada");
+  const anoViaje = Number(grupo.anoViaje);
+  if (!esGanada || !Number.isInteger(anoViaje) || anoViaje < anoActual) return "";
+
+  // Prioridad al documento real: evita confundir docId, idGrupo y número de negocio.
+  const id = String(state.current?.docId || state.current?.groupId || grupo.idGrupo || "").trim();
+  if (!id) return "";
+  const url = new URL("https://comunicaciones-raitrai.vercel.app/anulacion.html");
+  url.searchParams.set("grupo", id);
+  return url.href;
+}
+
+function renderLinkAnulacionGrupo() {
+  const link = getLinkAnulacionGrupoActual();
+  const puedeGestionar = state.manager?.puedeGestionarLinks(state.current?.data || {}) === true;
+  if (!link) {
+    return `
+      <div class="gn-fase">
+        <h4>Solicitud de anulación</h4>
+        <div class="gn-sub">Disponible para grupos Ganada con viaje desde el año actual.</div>
+      </div>
+    `;
+  }
+  return `
+    <div class="gn-fase">
+      <h4>Solicitud de anulación</h4>
+      <div class="gn-sub">Formulario público de este grupo. El pasajero comienza ingresando su RUT.</div>
+      ${puedeGestionar ? `
+        <div class="gn-actions">
+          <a class="gn-btn" href="${esc(link)}" target="_blank" rel="noopener noreferrer">
+            Abrir formulario de anulación
+          </a>
+          <button class="gn-btn ok" data-action="copiar" data-link="${esc(link)}" type="button">
+            Copiar link de anulación
+          </button>
+        </div>
+      ` : `<div class="gn-sub">Solo lectura</div>`}
+    </div>
+  `;
+}
+
 function renderModal(
   fases
 ) {
@@ -6075,7 +6124,7 @@ function renderModal(
       .map(
         renderFase
       )
-      .join("");
+      .join("") + renderLinkAnulacionGrupo();
 
   renderPasajeros();
 
