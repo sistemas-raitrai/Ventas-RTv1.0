@@ -6012,21 +6012,20 @@ function renderLinkAnulacionGrupo() {
     return `
       <div class="gn-fase">
         <h4>Solicitud de anulación</h4>
-        <div class="gn-sub">Disponible para grupos Ganada con viaje desde el año actual.</div>
+        <div class="gn-sub">No disponible</div>
       </div>
     `;
   }
   return `
     <div class="gn-fase">
       <h4>Solicitud de anulación</h4>
-      <div class="gn-sub">Formulario público de este grupo. El pasajero comienza ingresando su RUT.</div>
       ${puedeGestionar ? `
         <div class="gn-actions">
-          <a class="gn-btn" href="${esc(link)}" target="_blank" rel="noopener noreferrer">
-            Abrir formulario de anulación
-          </a>
+          <button class="gn-btn" data-action="abrir_anulacion" type="button">
+            Abrir
+          </button>
           <button class="gn-btn ok" data-action="copiar" data-link="${esc(link)}" type="button">
-            Copiar link de anulación
+            Copiar link
           </button>
         </div>
       ` : `<div class="gn-sub">Solo lectura</div>`}
@@ -11999,6 +11998,15 @@ async function manejarFase(
   try {
     button.disabled =
       true;
+
+    if (button.dataset.action === "abrir_anulacion") {
+      const link = getLinkAnulacionGrupoActual();
+      if (!link) {
+        throw new Error("El formulario de anulación no está disponible para este grupo.");
+      }
+      window.open(link, "_blank", "noopener,noreferrer");
+      return;
+    }
 
     if (
       button.dataset.action ===
