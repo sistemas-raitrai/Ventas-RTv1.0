@@ -329,17 +329,9 @@ function mostrar() {
   $('deRevisionLista').innerHTML=estado.incidencias.map(v=>'<li>'+escapeHtml(v)+'</li>').join('');
 }
 function imprimir() {
-  const vista = $('deVista').value;
-
-  const mostrados = estado.mostrados || {
-    grupos: [],
-    filas: []
-  };
-
-  const esProveedor = vista === 'proveedor';
-  const datos = esProveedor
-    ? mostrados.filas
-    : mostrados.grupos;
+  const esProveedor = $('deVista').value === 'proveedor';
+  const mostrados = estado.mostrados || { grupos: [], filas: [] };
+  const datos = esProveedor ? mostrados.filas : mostrados.grupos;
 
   if (!datos.length) return;
 
@@ -348,7 +340,7 @@ function imprimir() {
     !$('deProveedor').value &&
     !$('deHotel').value
   ) {
-    alert('Selecciona un proveedor o un hotel para imprimir su nómina.');
+    alert('Selecciona un proveedor o un hotel para imprimir.');
     return;
   }
 
@@ -370,39 +362,116 @@ function imprimir() {
     minute: '2-digit'
   });
 
-  function tablaPersonas(personas) {
-    const filas = personas.map((p, indice) => {
-      const dietas = etiquetasAlimentacion(p.tipos);
-      const restricciones = etiquetasAlimentacion(p.restricciones);
-      const alergias = etiquetasAlimentacion(p.alergias);
+  // Permite comparar etiquetas sin diferencias de mayúsculas,
+  // tildes o guiones bajos.
+  function claveTexto(valor) {
+    return normalizar(valor)
+      .replace(/[_-]+/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
 
+  function etiquetasUnicas(valores = []) {
+    const resultado = new Map();
+
+    for (const valor of valores) {
+      const etiqueta = etiquetaAlimentacion(valor);
+      const clave = claveTexto(etiqueta);
+
+      if (clave && !resultado.has(clave)) {
+        resultado.set(clave, etiqueta);
+      }
+    }
+
+    return [...resultado.values()];
+  }
+
+  function requerimientos(persona) {
+    return etiquetasUnicas([
+      ...(persona.tipos || []),
+      ...(persona.restricciones || [])
+    ]);
+  }
+
+  // Presenta la comida sin repetir el nombre del restaurante.
+  // Si hay más de una, conserva ambas.
+  function nombreComida(entidad) {
+    const texto = normalizar(entidad);
+
+    const opciones = [
+      ['DESAYUNO', 'Desayuno'],
+      ['ALMUERZO', 'Almuerzo'],
+      ['CENA', 'Cena'],
+      ['ONCE', 'Once'],
+      ['COLACION', 'Colación'],
+      ['COFFEE BREAK', 'Coffee break'],
+      ['CAFE BREAK', 'Coffee break'],
+      ['BOX LUNCH', 'Box lunch'],
+      ['PICNIC', 'Picnic'],
+      ['MERIENDA', 'Merienda']
+    ];
+
+    const encontradas = opciones
+      .filter(([clave]) => texto.includes(clave))
+      .map(([, etiqueta]) => etiqueta);
+
+    return [...new Set(encontradas)].join(' y ')
+      || clean(entidad).replace(/_+/g, ' ')
+      || 'Servicio de alimentación';
+  }
+
+  function resumenGrupo(personas) {
+    const conteo = new Map();
+
+    for (const persona of personas) {
+      for (const etiqueta of requerimientos(persona)) {
+        const clave = claveTexto(etiqueta);
+
+        if (!conteo.has(clave)) {
+          conteo.set(clave, { etiqueta, cantidad: 0 });
+        }
+
+        conteo.get(clave).cantidad++;
+      }
+    }
+
+    return [...conteo.values()]
+      .sort((a, b) => a.etiqueta.localeCompare(b.etiqueta, 'es'))
+      .map(item => `${item.etiqueta}: ${item.cantidad}`)
+      .join(' · ');
+  }
+
+  function tablaPersonas(personas) {
+    const filas = personas.map((persona, indice) => {
+      const requisitos = requerimientos(persona);
+      const alergias = etiquetasUnicas(persona.alergias || []);
       const observaciones = [];
 
+      // Las alergias siempre se mantienen explícitas.
       if (alergias.length) {
         observaciones.push(`
           <div class="alergia">
-            <strong>Alergias alimentarias:</strong>
+            Alergias alimentarias:
             ${escapeHtml(alergias.join(', '))}
           </div>
         `);
       }
 
-      if (restricciones.length) {
+      const detalle = clean(persona.detalle);
+
+      // Evita repetir un detalle que sea exactamente igual
+      // a un requerimiento. Conserva los textos más extensos.
+      const detalleRepetido = detalle && requisitos.some(
+        requisito => claveTexto(requisito) === claveTexto(detalle)
+      );
+
+      if (detalle && !detalleRepetido) {
         observaciones.push(`
-          <div>
-            <strong>Restricciones:</strong>
-            ${escapeHtml(restricciones.join(', '))}
-          </div>
+          <div>${escapeHtml(detalle)}</div>
         `);
       }
 
-      if (p.detalle) {
-        observaciones.push(`
-          <div>${escapeHtml(p.detalle)}</div>
-        `);
-      }
-
-      if (p.pendiente) {
+      if (persona.pendiente) {
         observaciones.push(`
           <div><strong>Pendiente de especificación.</strong></div>
         `);
@@ -411,10 +480,10 @@ function imprimir() {
       return `
         <tr>
           <td class="numero">${indice + 1}</td>
-          <td class="pasajero">${escapeHtml(p.nombre)}</td>
+          <td class="pasajero">${escapeHtml(persona.nombre)}</td>
           <td>${
-            dietas.length
-              ? escapeHtml(dietas.join(', '))
+            requisitos.length
+              ? escapeHtml(requisitos.join(' · '))
               : 'Ver observaciones'
           }</td>
           <td>${observaciones.join('') || '—'}</td>
@@ -426,10 +495,10 @@ function imprimir() {
       <table>
         <thead>
           <tr>
-            <th class="numero">N.º</th>
+            <th>N.º</th>
             <th>Pasajero</th>
-            <th>Alimentación requerida</th>
-            <th>Restricciones y observaciones</th>
+            <th>Requerimiento alimentario</th>
+            <th>Observaciones</th>
           </tr>
         </thead>
         <tbody>${filas}</tbody>
@@ -437,44 +506,70 @@ function imprimir() {
     `;
   }
 
-  function bloqueGrupo(grupo) {
+  function bloqueGrupo(grupo, mostrarFechas = false) {
+    const personas = grupo.personas || [];
+    const resumen = resumenGrupo(personas);
+
+    const cantidad = personas.length === 1
+      ? '1 persona con requerimientos'
+      : `${personas.length} personas con requerimientos`;
+
     return `
       <section class="grupo">
         <div class="grupo-cabecera">
           <h3>${escapeHtml(grupo.grupo)}</h3>
-          <p>
+
+          <p class="grupo-datos">
             <strong>N.º de negocio:</strong>
             ${escapeHtml(grupo.negocio || 'Sin informar')}
+            <span class="separador">·</span>
+            ${cantidad}
           </p>
-          <p>
-            <strong>Personas con requerimientos alimentarios:</strong>
-            ${grupo.personas.length}
-          </p>
+
+          ${mostrarFechas ? `
+            <p class="fechas-viaje">
+              <strong>Viaje:</strong>
+              ${escapeHtml(fechaDocumento(grupo.fecha))}
+              ${grupo.fechaFin ? `
+                al ${escapeHtml(fechaDocumento(grupo.fechaFin))}
+              ` : ''}
+            </p>
+          ` : ''}
         </div>
 
-        ${tablaPersonas(grupo.personas)}
+        ${tablaPersonas(personas)}
 
-        <p class="resumen">
-          <strong>Resumen de dietas:</strong>
-          ${escapeHtml(tipos(grupo.personas))}
-        </p>
+        ${resumen ? `
+          <p class="resumen">
+            <strong>Resumen:</strong>
+            ${escapeHtml(resumen)}
+          </p>
+        ` : ''}
       </section>
     `;
   }
 
   let contenido = '';
+  let destinatario = '';
 
   if (esProveedor) {
+    destinatario = clean(datos[0].proveedor || datos[0].entidad);
+
     const servicios = new Map();
 
     for (const fila of datos) {
+      const esHotel = fila.tipo === 'hotel';
+
+      // No se divide por destino: el proveedor necesita
+      // identificar el servicio y sus fechas.
+      // Se conserva la identidad del servicio para no mezclar
+      // actividades diferentes que compartan tipo de comida.
       const clave = JSON.stringify([
         fila.tipo,
         fila.proveedor,
         fila.entidadId || fila.entidad,
         fila.fecha,
-        fila.fechaFin,
-        fila.destino
+        esHotel ? fila.fechaFin : ''
       ]);
 
       if (!servicios.has(clave)) {
@@ -484,7 +579,6 @@ function imprimir() {
         });
       }
 
-      // Un grupo se presenta una sola vez dentro del mismo servicio.
       servicios.get(clave).grupos.set(fila.idGrupo, fila);
     }
 
@@ -496,21 +590,23 @@ function imprimir() {
       .map(servicio => {
         const esHotel = servicio.tipo === 'hotel';
 
-        const fechas = esHotel
+        const encabezado = esHotel
           ? `
-            <p>
-              <strong>Ingreso:</strong>
+            <h2>
+              Ingreso:
               ${escapeHtml(fechaDocumento(servicio.fecha))}
-              <span class="separador">·</span>
+            </h2>
+            <p>
               <strong>Salida:</strong>
               ${escapeHtml(fechaDocumento(servicio.fechaFin))}
             </p>
           `
           : `
-            <p>
-              <strong>Fecha del servicio:</strong>
+            <h2>
               ${escapeHtml(fechaDocumento(servicio.fecha))}
-            </p>
+              <span class="separador">·</span>
+              ${escapeHtml(nombreComida(servicio.entidad))}
+            </h2>
           `;
 
         const grupos = [...servicio.grupos.values()]
@@ -519,24 +615,10 @@ function imprimir() {
         return `
           <section class="servicio">
             <div class="servicio-cabecera">
-              <h2>${escapeHtml(servicio.entidad)}</h2>
-
-              <p>
-                <strong>${esHotel ? 'Hotel' : 'Proveedor'}:</strong>
-                ${escapeHtml(servicio.proveedor)}
-              </p>
-
-              ${servicio.destino ? `
-                <p>
-                  <strong>Destino:</strong>
-                  ${escapeHtml(servicio.destino)}
-                </p>
-              ` : ''}
-
-              ${fechas}
+              ${encabezado}
             </div>
 
-            ${grupos.map(bloqueGrupo).join('')}
+            ${grupos.map(grupo => bloqueGrupo(grupo)).join('')}
           </section>
         `;
       }).join('');
@@ -546,28 +628,9 @@ function imprimir() {
         (a.fecha || '9999').localeCompare(b.fecha || '9999') ||
         a.grupo.localeCompare(b.grupo, 'es')
       )
-      .map(grupo => `
-        <section class="servicio">
-          <div class="servicio-cabecera">
-            <p>
-              <strong>Inicio del viaje:</strong>
-              ${escapeHtml(fechaDocumento(grupo.fecha))}
-              ${grupo.fechaFin ? `
-                <span class="separador">·</span>
-                <strong>Término:</strong>
-                ${escapeHtml(fechaDocumento(grupo.fechaFin))}
-              ` : ''}
-            </p>
-          </div>
-
-          ${bloqueGrupo(grupo)}
-        </section>
-      `).join('');
+      .map(grupo => bloqueGrupo(grupo, true))
+      .join('');
   }
-
-  const destinatario = esProveedor
-    ? datos[0].proveedor
-    : '';
 
   const titulo = 'Dietas especiales';
 
@@ -576,6 +639,7 @@ function imprimir() {
     <html lang="es">
     <head>
       <meta charset="utf-8">
+
       <title>${escapeHtml(titulo)}${
         destinatario ? ' · ' + escapeHtml(destinatario) : ''
       }</title>
@@ -592,19 +656,20 @@ function imprimir() {
 
         body {
           margin: 0;
-          color: #263247;
           background: #fff;
-          font: 10pt/1.45 Arial, sans-serif;
+          color: #263247;
+          font: 10pt/1.4 Arial, sans-serif;
         }
 
         .documento-cabecera {
           display: flex;
-          align-items: flex-start;
           justify-content: space-between;
+          align-items: flex-start;
           gap: 20px;
-          padding-bottom: 15px;
+          padding-bottom: 12px;
           margin-bottom: 18px;
-          border-bottom: 3px solid #633c85;
+          border-bottom: 2px solid #633c85;
+          break-inside: avoid;
         }
 
         .documento-titulo {
@@ -615,71 +680,83 @@ function imprimir() {
         .marca {
           margin: 0 0 5px;
           color: #633c85;
-          font-size: 9pt;
+          font-size: 8pt;
           font-weight: bold;
           letter-spacing: 1px;
         }
 
         h1 {
-          margin: 0 0 8px;
-          font-size: 23pt;
+          margin: 0 0 6px;
+          font-size: 22pt;
           line-height: 1.15;
         }
 
+        .destinatario {
+          margin: 0 0 5px;
+          font-size: 11pt;
+          font-weight: bold;
+        }
+
+        .emision {
+          margin: 0;
+          color: #625b69;
+          font-size: 8pt;
+        }
+
         .logo {
-          flex: 0 0 auto;
           display: block;
+          flex: 0 0 auto;
           width: 125px;
           height: auto;
           max-height: 75px;
+          margin-left: auto;
           object-fit: contain;
           object-position: right top;
-          margin-left: auto;
         }
 
         p {
           margin: 4px 0;
         }
 
-        .emision {
-          color: #625b69;
-          font-size: 9pt;
-        }
-
-        .introduccion {
-          margin: 0 0 20px;
-        }
-
         .servicio {
-          margin-bottom: 24px;
+          margin-bottom: 22px;
         }
 
         .servicio-cabecera {
-          padding: 10px 12px;
-          border-left: 4px solid #633c85;
-          border-bottom: 1px solid #d9d1e1;
+          padding: 8px 0;
+          border-bottom: 1px solid #bcb2c6;
           break-inside: avoid;
           break-after: avoid;
         }
 
         h2 {
-          margin: 0 0 6px;
-          font-size: 14pt;
+          margin: 0;
+          font-size: 12pt;
+          line-height: 1.4;
         }
 
         .grupo {
-          margin: 16px 0 22px;
+          margin: 13px 0 20px;
         }
 
         .grupo-cabecera {
-          margin-bottom: 9px;
+          margin-bottom: 8px;
           break-inside: avoid;
           break-after: avoid;
         }
 
         h3 {
-          margin: 0 0 5px;
-          font-size: 12pt;
+          margin: 0 0 4px;
+          font-size: 11pt;
+        }
+
+        .grupo-datos,
+        .fechas-viaje {
+          font-size: 9pt;
+        }
+
+        .separador {
+          padding: 0 5px;
         }
 
         table {
@@ -695,7 +772,7 @@ function imprimir() {
 
         th,
         td {
-          padding: 8px;
+          padding: 7px;
           border: 1px solid #d8d4dd;
           text-align: left;
           vertical-align: top;
@@ -705,23 +782,23 @@ function imprimir() {
         th {
           background: #f2eef6;
           color: #382846;
-          font-weight: bold;
         }
 
         th:nth-child(1) {
           width: 7%;
+          text-align: center;
         }
 
         th:nth-child(2) {
-          width: 26%;
+          width: 29%;
         }
 
         th:nth-child(3) {
-          width: 25%;
+          width: 28%;
         }
 
         th:nth-child(4) {
-          width: 42%;
+          width: 36%;
         }
 
         tr {
@@ -732,7 +809,8 @@ function imprimir() {
           text-align: center;
         }
 
-        .pasajero {
+        .pasajero,
+        .alergia {
           font-weight: bold;
         }
 
@@ -740,23 +818,15 @@ function imprimir() {
           margin-top: 5px;
         }
 
-        .alergia {
-          font-weight: bold;
-        }
-
         .resumen {
-          margin-top: 8px;
+          margin-top: 7px;
           font-size: 9pt;
           color: #4d4355;
         }
 
-        .separador {
-          padding: 0 6px;
-        }
-
         .documento-pie {
-          margin-top: 22px;
-          padding-top: 10px;
+          margin-top: 18px;
+          padding-top: 8px;
           border-top: 1px solid #d8d4dd;
           color: #625b69;
           font-size: 8pt;
@@ -776,14 +846,17 @@ function imprimir() {
       <header class="documento-cabecera">
         <div class="documento-titulo">
           <p class="marca">OPERACIONES · RAI TRAI</p>
+
           <h1>Dietas especiales</h1>
 
           ${destinatario ? `
-            <p><strong>${escapeHtml(destinatario)}</strong></p>
+            <p class="destinatario">
+              ${escapeHtml(destinatario)}
+            </p>
           ` : ''}
 
           <p class="emision">
-            Fecha de emisión: ${escapeHtml(emitido)}
+            Emitido: ${escapeHtml(emitido)}
           </p>
         </div>
 
@@ -794,24 +867,11 @@ function imprimir() {
         >
       </header>
 
-      <p class="introduccion">
-        Detalle de las dietas especiales, restricciones y alergias
-        alimentarias informadas a Rai Trai para la planificación
-        de los servicios de alimentación.
-      </p>
-
       ${contenido}
 
       <footer class="documento-pie">
-        <p>
-          Una persona puede presentar más de un requerimiento.
-          Las cantidades por categoría no deben sumarse como
-          personas diferentes.
-        </p>
-        <p>
-          Información alimentaria informada a Rai Trai.
-          Documento emitido el ${escapeHtml(emitido)}.
-        </p>
+        Información alimentaria informada a Rai Trai.
+        Una persona puede presentar más de un requerimiento.
       </footer>
     </body>
     </html>
@@ -821,20 +881,32 @@ function imprimir() {
   ventana.document.write(documento);
   ventana.document.close();
 
-  // Espera la carga del logo antes de abrir la impresión.
-  const imagen = ventana.document.querySelector('.logo');
+  // Espera a que el documento y el logo estén listos.
+  let impresionIniciada = false;
 
-  const imprimirDocumento = () => {
+  async function prepararImpresion() {
+    if (impresionIniciada || ventana.closed) return;
+    impresionIniciada = true;
+
+    const imagen = ventana.document.querySelector('.logo');
+
+    if (imagen && !imagen.complete) {
+      await new Promise(resolve => {
+        imagen.addEventListener('load', resolve, { once: true });
+        imagen.addEventListener('error', resolve, { once: true });
+      });
+    }
+
     if (ventana.closed) return;
+
     ventana.focus();
     ventana.print();
-  };
+  }
 
-  if (!imagen || imagen.complete) {
-    imprimirDocumento();
+  if (ventana.document.readyState === 'complete') {
+    prepararImpresion();
   } else {
-    imagen.addEventListener('load', imprimirDocumento, { once: true });
-    imagen.addEventListener('error', imprimirDocumento, { once: true });
+    ventana.addEventListener('load', prepararImpresion, { once: true });
   }
 }
 onAuthStateChanged(auth, async user=>{
