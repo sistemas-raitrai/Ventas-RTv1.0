@@ -291,6 +291,241 @@ export function abrirRegistroGestion({
     </form>
   `;
 
+  /* =========================================================
+   ESTILOS DEL FORMULARIO DE GESTIÓN
+
+   Se aplican tanto en Grupo como en Cartera.
+  ========================================================= */
+  
+  const estilosGestion = document.createElement("style");
+  
+  estilosGestion.textContent = `
+    #registroGestionComercial {
+      width: min(580px, calc(100vw - 32px)) !important;
+      max-width: 580px;
+      max-height: calc(100vh - 32px) !important;
+  
+      padding: 0 !important;
+  
+      border: 1px solid #ded9e6 !important;
+      border-radius: 18px !important;
+  
+      background: #ffffff;
+      color: #30263c;
+  
+      box-shadow: 0 24px 70px rgba(25, 15, 38, 0.28);
+  
+      overflow-y: auto;
+      box-sizing: border-box;
+  
+      font-family: Arial, sans-serif;
+    }
+  
+    #registroGestionComercial::backdrop {
+      background: rgba(20, 12, 30, 0.55);
+    }
+  
+    #registroGestionComercial form {
+      display: grid;
+      gap: 14px !important;
+  
+      padding: 0 22px 22px;
+    }
+  
+    #registroGestionComercial h2 {
+      margin: 0 -22px !important;
+      padding: 19px 22px;
+  
+      background: var(--header, #2e1942);
+      color: #ffffff;
+  
+      font-size: 21px;
+      font-weight: 800;
+      line-height: 1.2;
+    }
+  
+    #registroGestionComercial [data-contexto] {
+      margin: 2px 0 0 !important;
+  
+      color: #655b70;
+      font-size: 13px;
+      font-weight: 600;
+      line-height: 1.4;
+    }
+  
+    #registroGestionComercial fieldset {
+      min-width: 0;
+  
+      margin: 0;
+      padding: 14px;
+  
+      border: 1px solid #ddd4e8;
+      border-radius: 12px;
+  
+      background: #faf8fd;
+    }
+  
+    #registroGestionComercial fieldset[hidden] {
+      display: none !important;
+    }
+  
+    #registroGestionComercial legend {
+      padding: 0 7px;
+  
+      color: #4c3265;
+      font-size: 13px;
+      font-weight: 800;
+    }
+  
+    #registroGestionComercial label {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+  
+      color: #453750;
+      font-size: 13px;
+      font-weight: 700;
+      line-height: 1.35;
+    }
+  
+    #registroGestionComercial input,
+    #registroGestionComercial select,
+    #registroGestionComercial textarea {
+      display: block;
+  
+      width: 100% !important;
+      min-width: 0;
+      min-height: 42px;
+  
+      padding: 10px 12px;
+  
+      border: 1px solid #cfc8d9;
+      border-radius: 9px;
+  
+      background: #ffffff;
+      color: #30263c;
+  
+      box-sizing: border-box;
+  
+      font: inherit;
+      font-size: 14px;
+      font-weight: 400;
+    }
+  
+    #registroGestionComercial textarea {
+      min-height: 105px;
+      resize: vertical;
+    }
+  
+    #registroGestionComercial input:focus,
+    #registroGestionComercial select:focus,
+    #registroGestionComercial textarea:focus {
+      outline: none;
+  
+      border-color: #8060a5;
+  
+      box-shadow: 0 0 0 3px rgba(128, 96, 165, 0.16);
+    }
+  
+    #registroGestionComercial small {
+      color: #6c6375;
+      font-size: 12px;
+      line-height: 1.4;
+    }
+  
+    #registroGestionComercial button {
+      min-height: 40px;
+  
+      padding: 9px 15px;
+  
+      border: none;
+      border-radius: 9px;
+  
+      cursor: pointer;
+  
+      font-family: inherit;
+      font-size: 13px;
+      font-weight: 800;
+  
+      transition: opacity 0.15s ease, transform 0.15s ease;
+    }
+  
+    #registroGestionComercial button:hover:not(:disabled) {
+      opacity: 0.9;
+      transform: translateY(-1px);
+    }
+  
+    #registroGestionComercial button:disabled {
+      cursor: wait;
+      opacity: 0.6;
+    }
+  
+    #registroGestionComercial [data-cargar] {
+      width: fit-content;
+  
+      background: #eae3f2;
+      color: #4c3265;
+    }
+  
+    #registroGestionComercial button[type="submit"] {
+      background: #157347;
+      color: #ffffff;
+    }
+  
+    #registroGestionComercial [data-cerrar] {
+      background: #eeeaf1;
+      color: #51465c;
+    }
+  
+    #registroGestionComercial form > div:last-child {
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+      flex-wrap: wrap;
+  
+      margin-top: 4px;
+      padding-top: 14px;
+  
+      border-top: 1px solid #ebe7ef;
+    }
+  
+    #registroGestionComercial [data-error] {
+      color: #b42318 !important;
+      font-size: 13px;
+      font-weight: 700;
+      line-height: 1.4;
+    }
+  
+    #registroGestionComercial [data-error]:empty {
+      display: none;
+    }
+  
+    @media (max-width: 600px) {
+      #registroGestionComercial {
+        width: calc(100vw - 24px) !important;
+        max-height: calc(100vh - 24px) !important;
+      }
+  
+      #registroGestionComercial form {
+        padding-right: 16px;
+        padding-left: 16px;
+      }
+  
+      #registroGestionComercial h2 {
+        margin-right: -16px !important;
+        margin-left: -16px !important;
+        padding-right: 16px;
+        padding-left: 16px;
+      }
+  
+      #registroGestionComercial form > div:last-child button {
+        flex: 1 1 auto;
+      }
+    }
+  `;
+  
+  dialog.appendChild(estilosGestion);
+
   const form = dialog.querySelector("form");
 
   const campo = (name) => {
