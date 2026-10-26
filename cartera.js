@@ -2181,13 +2181,20 @@ async function openHistoryModal(row) {
 
   if (!modal || !body || !title || !row) return;
 
-  title.textContent = `Historial · ${row.colegio || row.numeroColegio}`;
-  body.innerHTML = `<div class="history-empty">Cargando historial...</div>`;
+  title.textContent =
+    `Historial · ${row.colegio || row.numeroColegio}`;
+
+  body.innerHTML =
+    `<div class="history-empty">Cargando historial...</div>`;
+
   modal.classList.add("show");
 
   try {
     const qy = query(
-      getHistoryCollectionRef(row.correoVendedor, row.numeroColegio),
+      getHistoryCollectionRef(
+        row.correoVendedor,
+        row.numeroColegio
+      ),
       orderBy("fecha", "desc"),
       limit(30)
     );
@@ -2195,42 +2202,166 @@ async function openHistoryModal(row) {
     const snap = await getDocs(qy);
 
     if (snap.empty) {
-      body.innerHTML = `<div class="history-empty">No hay historial para este colegio todavía.</div>`;
+      body.innerHTML = `
+        <div class="history-empty">
+          No hay historial para este colegio todavía.
+        </div>
+      `;
+
       return;
     }
 
     body.innerHTML = snap.docs.map((docSnap) => {
       const item = docSnap.data() || {};
-      const changes = Array.isArray(item.metadata?.changes) ? item.metadata.changes : [];
+
+      const metadata = item.metadata || {};
+
+      const changes = Array.isArray(metadata.changes)
+        ? metadata.changes
+        : [];
+
+      const esGestion = esGestionComercial(item);
+
+      const origen = item.origen || metadata.origen || "";
+
+      const idGrupo = metadata.idGrupo || "";
+
+      const nombreGrupo =
+        metadata.aliasGrupo ||
+        (idGrupo ? `Grupo ${idGrupo}` : "");
+
+      const fechaReal = esGestion
+        ? fechaEventoGestion(item)
+        : null;
+
+      const fechaMostrada = fechaReal || item.fecha;
+
+      let origenHtml = "";
+
+      if (esGestion && origen === "grupo") {
+        const identificacion = nombreGrupo || "Grupo";
+
+        origenHtml = `
+          <div class="history-line">
+            <strong>Origen:</strong>
+            Gestión del grupo
+            ${escapeHtml(identificacion)}
+            ${
+              idGrupo
+                ? ` · ID ${escapeHtml(String(idGrupo))}`
+                : ""
+            }
+          </div>
+        `;
+      } else if (esGestion && origen === "cartera") {
+        origenHtml = `
+          <div class="history-line">
+            <strong>Origen:</strong>
+            Gestión general del colegio
+          </div>
+        `;
+      }
+
+      const tipoMostrado = normalizeText(
+        item.tipo || "Movimiento"
+      );
 
       return `
         <div class="history-item">
+
           <div class="history-top">
-            <strong>${escapeHtml(normalizeText(item.tipo || "Movimiento"))}</strong>
-            <span>${escapeHtml(formatDateOnly(item.fecha) || "")}</span>
+            <strong>
+              ${escapeHtml(tipoMostrado)}
+            </strong>
+
+            <span>
+              ${escapeHtml(
+                formatDateOnly(fechaMostrada) || ""
+              )}
+            </span>
           </div>
 
-          ${item.asunto ? `<div class="history-line"><strong>Asunto:</strong> ${escapeHtml(item.asunto)}</div>` : ""}
-          ${item.mensaje ? `<div class="history-line"><strong>Detalle:</strong> ${escapeHtml(item.mensaje)}</div>` : ""}
+          ${origenHtml}
 
-          ${changes.length ? `
-            <div class="history-line"><strong>Cambios:</strong></div>
-            ${changes.map((change) => `
-              <div class="history-line">• <strong>${escapeHtml(change.label || change.key || "Campo")}:</strong> ${escapeHtml(change.before || "vacío")} → ${escapeHtml(change.after || "vacío")}</div>
-            `).join("")}
-          ` : ""}
+          ${
+            item.asunto
+              ? `
+                <div class="history-line">
+                  <strong>Asunto:</strong>
+                  ${escapeHtml(item.asunto)}
+                </div>
+              `
+              : ""
+          }
+
+          ${
+            item.mensaje
+              ? `
+                <div class="history-line">
+                  <strong>Detalle:</strong>
+                  ${escapeHtml(item.mensaje)}
+                </div>
+              `
+              : ""
+          }
+
+          ${
+            changes.length
+              ? `
+                <div class="history-line">
+                  <strong>Cambios:</strong>
+                </div>
+
+                ${changes.map((change) => `
+                  <div class="history-line">
+                    •
+                    <strong>
+                      ${escapeHtml(
+                        change.label ||
+                        change.key ||
+                        "Campo"
+                      )}:
+                    </strong>
+
+                    ${escapeHtml(change.before || "vacío")}
+                    →
+                    ${escapeHtml(change.after || "vacío")}
+                  </div>
+                `).join("")}
+              `
+              : ""
+          }
 
           <div class="history-line">
             <strong>Hecho por:</strong>
-            ${escapeHtml(normalizeText(item.hechoPor || "—"))}
-            ${item.hechoPorCorreo ? ` · ${escapeHtml(normalizeEmail(item.hechoPorCorreo))}` : ""}
+
+            ${escapeHtml(
+              normalizeText(item.hechoPor || "—")
+            )}
+
+            ${
+              item.hechoPorCorreo
+                ? `
+                  · ${escapeHtml(
+                    normalizeEmail(item.hechoPorCorreo)
+                  )}
+                `
+                : ""
+            }
           </div>
+
         </div>
       `;
     }).join("");
+
   } catch (error) {
     console.error(error);
-    body.innerHTML = `<div class="history-empty">No se pudo cargar el historial.</div>`;
+
+    body.innerHTML = `
+      <div class="history-empty">
+        No se pudo cargar el historial.
+      </div>
+    `;
   }
 }
 
