@@ -53,6 +53,8 @@ import {
   waitForLayoutReady
 } from "./ui.js";
 
+import { abrirRegistroGestion, esGestionComercial, fechaEventoGestion, gestionEn30Dias } from "./gestion-comercial.js";
+
 /* =========================================================
    CONFIG
 ========================================================= */
@@ -617,70 +619,22 @@ async function countVisitsForRowInSeason(row = {}) {
 }
 
 async function getGestionSummaryFromHistory(row = {}) {
-  try {
-    const snap = await getDocs(getHistoryCollectionRef(row.correoVendedor, row.numeroColegio));
-
-    let latestGestion = null;
-    let hasGestion = false;
-    let gestionMes = false;
-
-    const limitDate = new Date();
-    limitDate.setMonth(limitDate.getMonth() - 1);
-
-    snap.forEach((docSnap) => {
-      const item = docSnap.data() || {};
-
-      const tipo = normalizeText(item.tipo || "");
-      const asunto = normalizeText(item.asunto || "");
-      const mensaje = normalizeText(item.mensaje || "");
-
-      const isGestion = !!(
-        tipo ||
-        asunto ||
-        mensaje ||
-        item.metadata?.fechaGestion ||
-        item.metadata?.fechaVisita
-      );
-
-      if (!isGestion) return;
-
-      hasGestion = true;
-
-      const fechaBase =
-        item.metadata?.fechaGestion ||
-        item.metadata?.fechaVisita ||
-        item.fechaGestion ||
-        item.fechaVisita ||
-        item.fecha;
-
-      const d = toDateValue(fechaBase);
-
-      if (d && d >= limitDate) gestionMes = true;
-
-      if (!latestGestion) {
-        latestGestion = {
-          tipo,
-          asunto,
-          mensaje,
-          fechaText: formatDateOnly(fechaBase),
-          fechaRaw: fechaBase
-        };
-      }
-    });
-
-    return {
-      hasGestion,
-      gestionMes,
-      latestGestion
-    };
-  } catch (error) {
-    console.warn("No se pudo leer historial de gestión:", row.numeroColegio, error);
-    return {
-      hasGestion: false,
-      gestionMes: false,
-      latestGestion: null
-    };
-  }
+// Si falla la lectura, loadData mostrará error: no inventar «sin gestión».
+const snap = await getDocs(getHistoryCollectionRef(row.correoVendedor, row.numeroColegio));
+const eventos = snap.docs.map(d => d.data()).filter(esGestionComercial);
+eventos.sort((a,b) => (fechaEventoGestion(b)?.getTime() || 0) - (fechaEventoGestion(a)?.getTime() || 0));
+const item = eventos[0];
+return {
+hasGestion: eventos.length > 0,
+gestionMes: eventos.some(item => gestionEn30Dias(item)),
+latestGestion: item ? {
+tipo: item.tipo || "Gestión comercial",
+asunto: item.asunto || "",
+mensaje: item.mensaje || "",
+fechaText: formatDateOnly(fechaEventoGestion(item)),
+fechaRaw: fechaEventoGestion(item)
+} : null
+};
 }
 
 function computeRowMetrics(row = {}) {
@@ -1398,15 +1352,7 @@ function renderSortButton(key) {
 }
 
 function isManagedLastMonth(row = {}) {
-  if (row.metrics?.gestionMes) return true;
-
-  const d = toDateValue(row.ultimaGestionAt || row.fechaUltimaVisita || row.ultimaGestionFechaText);
-  if (!d) return false;
-
-  const limitDate = new Date();
-  limitDate.setMonth(limitDate.getMonth() - 1);
-
-  return d >= limitDate;
+return row.metrics?.gestionMes === true;
 }
 
 function isFullCoverage(row = {}) {
@@ -1447,63 +1393,59 @@ function rowHasGestion(row = {}) {
 
 function renderCarteraSummary(rows = []) {
   const total = rows.length;
-  const visitados = rows.filter((r) => r.metrics?.wasVisitedInSeason || r.visitado).length;
   const gestionMes = rows.filter(isManagedLastMonth).length;
-  const sinGestion = rows.filter((r) => !rowHasGestion(r)).length;
+  const sinGestion = total - gestionMes;
   const conCotizacion = rows.filter((r) => (r.metrics?.totalQuotes || 0) > 0).length;
   const full = rows.filter(isFullCoverage).length;
   const top = getTopQuoteSchool(rows);
-
+  
   setTextSafe("sumCarteraTotal", total);
-  setTextSafe("sumCarteraVisitados", visitados);
   setTextSafe("sumCarteraGestionMes", gestionMes);
   setTextSafe("sumCarteraSinGestion", sinGestion);
   setTextSafe("sumCarteraConCotizacion", conCotizacion);
   setTextSafe("sumCarteraFull", full);
-
+  
   setTextSafe(
-    "sumCarteraTopCotizaciones",
-    top ? `${top.colegio || top.numeroColegio} · ${top.metrics?.totalQuotes || 0}` : "—"
+  "sumCarteraTopCotizaciones",
+  top ? ${top.colegio || top.numeroColegio} · ${top.metrics?.totalQuotes || 0} : "—"
   );
-
+  
   document.querySelectorAll(".cartera-summary-card").forEach((btn) => {
-    btn.classList.toggle("is-active", btn.dataset.quickFilter === state.quickFilter);
+  btn.classList.toggle("is-active", btn.dataset.quickFilter === state.quickFilter);
   });
 }
+ COMPLETA
+======================================================================
+Ubicación original: línea 1474.
 
 function applyQuickFilter(rows = []) {
-  if (state.quickFilter === "visitados") {
-    return rows.filter((r) => r.metrics?.wasVisitedInSeason || r.visitado);
-  }
-
   if (state.quickFilter === "gestionMes") {
-    return rows.filter(isManagedLastMonth);
+  return rows.filter(isManagedLastMonth);
   }
-
+  
   if (state.quickFilter === "sinGestion") {
-    return rows.filter((r) => !rowHasGestion(r));
+  return rows.filter((r) => !isManagedLastMonth(r));
   }
-
+  
   if (state.quickFilter === "conCotizacion") {
-    return rows.filter((r) => (r.metrics?.totalQuotes || 0) > 0);
+  return rows.filter((r) => (r.metrics?.totalQuotes || 0) > 0);
   }
-
+  
   if (state.quickFilter === "full") {
-    return rows.filter(isFullCoverage);
+  return rows.filter(isFullCoverage);
   }
-
+  
   if (state.quickFilter === "topCotizaciones") {
-    const top = getTopQuoteSchool(rows);
-    if (!top) return [];
-    return rows.filter((r) =>
-      String(r.numeroColegio) === String(top.numeroColegio) &&
-      normalizeEmail(r.correoVendedor) === normalizeEmail(top.correoVendedor)
-    );
+  const top = getTopQuoteSchool(rows);
+  if (!top) return [];
+  return rows.filter((r) =>
+  String(r.numeroColegio) === String(top.numeroColegio) &&
+  normalizeEmail(r.correoVendedor) === normalizeEmail(top.correoVendedor)
+  );
   }
-
+  
   return rows;
 }
-
 function applyFilters() {
   let rows = [...state.rows];
 
@@ -1879,7 +1821,7 @@ async function loadQuoteRows() {
 async function loadData() {
   try {
     await loadQuoteRows();
-
+    
     if (isVendedorRole(state.effectiveUser)) {
       const sellerEmails = getVentasUserEmails(state.effectiveUser);
       state.vendorFilter = normalizeEmail(sellerEmails[0] || state.effectiveUser.email);
@@ -1887,11 +1829,11 @@ async function loadData() {
     } else {
       state.rows = await loadAllItems();
     }
-
+    
     state.rows = await Promise.all(
       state.rows.map(async (row) => {
         const metrics = computeRowMetrics(row);
-        const visitCountSeason = await countVisitsForRowInSeason(row);
+        const visitCountSeason = 0; // Ya no se consulta el historial dos veces por colegio.
         const gestionSummary = await getGestionSummaryFromHistory(row);
     
         const latest = gestionSummary.latestGestion;
@@ -1899,12 +1841,11 @@ async function loadData() {
         return {
           ...row,
     
-          // Si el documento principal no tiene última gestión,
-          // se completa desde el historial real.
-          ultimaGestionTipo: row.ultimaGestionTipo || latest?.tipo || "",
-          ultimaGestionAsunto: row.ultimaGestionAsunto || latest?.asunto || "",
-          ultimaGestionMensaje: row.ultimaGestionMensaje || latest?.mensaje || "",
-          ultimaGestionFechaText: row.ultimaGestionFechaText || latest?.fechaText || "",
+          // La última gestión comercial se calcula desde el historial, por fecha efectiva.
+          ultimaGestionTipo: latest?.tipo || "",
+          ultimaGestionAsunto: latest?.asunto || "",
+          ultimaGestionMensaje: latest?.mensaje || "",
+          ultimaGestionFechaText: latest?.fechaText || "",
     
           metrics: {
             ...metrics,
@@ -1916,17 +1857,18 @@ async function loadData() {
         };
       })
     );
-
+    
     renderRoleButtons();
     renderVendorFilter();
     applyFilters();
-  } catch (error) {
+    
+    } catch (error) {
     console.error(error);
     setProgressStatus({
-      text: "Error cargando cartera.",
-      meta: error.message || "No se pudo leer Firestore.",
-      progress: 100,
-      type: "error"
+    text: "Error cargando cartera.",
+    meta: error.message || "No se pudo leer Firestore.",
+    progress: 100,
+    type: "error"
     });
   }
 }
@@ -2406,22 +2348,17 @@ async function openVisitDetailModal(row) {
 }
 
 function openSeguimientoModal(row) {
-  const modal = $("seguimientoModal");
-  const title = $("seguimientoTitle");
-
-  if (!modal || !title || !row) return;
-
-  state.seguimientoRow = { ...row };
-
-  title.textContent = `Seguimiento comercial · ${row.colegio || row.numeroColegio}`;
-
-  $("seguimientoTipoInput").value = row.ultimaGestionTipo || "";
-  $("seguimientoFechaInput").value = row.fechaUltimaVisita || getDefaultCurrentDateInput();
-  $("seguimientoAsuntoInput").value = row.ultimaGestionAsunto || "";
-  $("seguimientoMensajeInput").value = row.ultimaGestionMensaje || "";
-  $("seguimientoVisitadoCheck").checked = !!row.visitado;
-
-  modal.classList.add("show");
+  if (!row) return;
+  abrirRegistroGestion({
+  db,
+  usuario: state.effectiveUser,
+  usuarioReal: state.realUser,
+  colegio: row,
+  puedeGuardar: () => canManageVentasRole(state.effectiveUser) ||
+  (isVendedorRole(state.effectiveUser) &&
+  getVentasUserEmails(state.effectiveUser).map(normalizeEmail).includes(normalizeEmail(row.correoVendedor))),
+  onSaved: () => loadData()
+  });
 }
 
 function closeSeguimientoModal() {
