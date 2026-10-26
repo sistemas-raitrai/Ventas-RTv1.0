@@ -261,21 +261,6 @@ async function bootstrapFromSession() {
     "is-vendedor-view",
     String(state.currentUser?.rol || "").toLowerCase() === "vendedor"
   );
-
-  const btnAnalisisLeads =
-  $("btnExportarAnalisisLeads");
-
-  if (btnAnalisisLeads) {
-    const esVendedor =
-      String(
-        state.currentUser?.rol || ""
-      ).toLowerCase() === "vendedor";
-  
-    btnAnalisisLeads.style.display =
-      esVendedor
-        ? "none"
-        : "";
-  }
 }
 
 function bindHeaderActions() {
@@ -2793,20 +2778,6 @@ async function exportAnalisisLeadsToXlsx() {
     $("btnExportarAnalisisLeads");
 
   try {
-    const esVendedor =
-      String(
-        state.currentUser?.rol ||
-        ""
-      ).toLowerCase() ===
-      "vendedor";
-
-    if (esVendedor) {
-      alert(
-        "Tu perfil no tiene permisos para exportar el análisis de leads."
-      );
-      return;
-    }
-
     if (
       typeof XLSX ===
       "undefined"
