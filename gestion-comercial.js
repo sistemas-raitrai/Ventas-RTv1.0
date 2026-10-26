@@ -579,32 +579,45 @@ export function abrirRegistroGestion({
     En Cartera ya sabemos a qué colegio corresponde.
   */
   const fieldsetVinculo = dialog.querySelector("[data-vinculo]");
-
-  fieldsetVinculo.hidden = !grupo;
+  
+  /*
+    Desde Cartera ya se conoce el colegio.
+  
+    Desde Grupo intentaremos encontrarlo automáticamente.
+    El selector solo aparecerá si no podemos identificarlo
+    de forma segura.
+  */
+  fieldsetVinculo.hidden = true;
   fieldsetVinculo.disabled = !grupo;
-
   /* =======================================================
      CARGAR COLEGIOS DE LA CARTERA DEL VENDEDOR
   ======================================================= */
 
   async function cargarColegios() {
     errorEl.textContent = "";
-
+  
     const vendedor = email(campo("vendedor").value);
-
+  
     opciones = [];
-
+  
     campo("colegio").replaceChildren(
       new Option("Seleccionar colegio", "")
     );
-
+  
+    /*
+      Si no conocemos la cartera de la vendedora,
+      mostramos los campos para que se puedan completar.
+    */
     if (!vendedor || vendedor.includes("/")) {
+      fieldsetVinculo.hidden = false;
+      fieldsetVinculo.disabled = false;
+  
       errorEl.textContent =
-        "Indica el correo del vendedor de la cartera.";
-
+        "Indica el correo de la cartera para identificar el colegio.";
+  
       return;
     }
-
+  
     try {
       const snap = await getDocs(
         collection(
@@ -614,38 +627,39 @@ export function abrirRegistroGestion({
           "items"
         )
       );
-
+  
       opciones = snap.docs.map((documento) => ({
         ...documento.data(),
-
+  
         numeroColegio: documento.id,
-
+  
         correoVendedor: vendedor
       }));
-
+  
       opciones.sort((a, b) => {
         return texto(a.colegio).localeCompare(
           texto(b.colegio)
         );
       });
-
+  
       opciones.forEach((registro, indice) => {
         const nombre =
           registro.colegio ||
           registro.numeroColegio;
-
+  
         const comuna = registro.comuna || "";
-
+  
         const etiqueta =
           `${nombre} · ${comuna} · N° ${registro.numeroColegio}`;
-
+  
         campo("colegio").add(
           new Option(etiqueta, String(indice))
         );
       });
-
+  
       /*
-        Primero se busca un vínculo previamente guardado.
+        1. Primero buscamos el vínculo que ya se guardó
+           anteriormente en el grupo.
       */
       let indiceSeleccionado = opciones.findIndex((registro) => {
         return (
@@ -655,60 +669,112 @@ export function abrirRegistroGestion({
             String(registro.numeroColegio)
         );
       });
-
+  
       /*
-        Si todavía no existe vínculo, se intenta encontrar
-        una coincidencia única por nombre y comuna.
+        Si el grupo tenía un vínculo guardado pero ya no
+        existe en esa cartera, pedimos revisar la selección.
+      */
+      if (enlace && indiceSeleccionado < 0) {
+        fieldsetVinculo.hidden = false;
+        fieldsetVinculo.disabled = false;
+  
+        errorEl.textContent =
+          "El colegio vinculado anteriormente no se encontró. " +
+          "Selecciona nuevamente el colegio de la cartera.";
+  
+        return;
+      }
+  
+      /*
+        2. Si todavía no existe vínculo, buscamos una
+           coincidencia única por nombre y comuna.
       */
       if (indiceSeleccionado < 0) {
+        const nombreGrupo = normal(grupo?.data?.colegio);
+  
+        const comunaGrupo = normal(
+          grupo?.data?.comunaCiudad ||
+          grupo?.data?.comuna ||
+          ""
+        );
+  
         const coincidencias = opciones
           .map((registro, indice) => ({
             registro,
             indice
           }))
           .filter(({ registro }) => {
-            const mismoNombre =
-              normal(registro.colegio) ===
-              normal(grupo?.data?.colegio);
-
-            const comunaGrupo =
-              grupo?.data?.comunaCiudad || "";
-
-            const mismaComuna =
-              !registro.comuna ||
-              !comunaGrupo ||
-              normal(registro.comuna) ===
-                normal(comunaGrupo);
-
-            return mismoNombre && mismaComuna;
+            const nombreCartera = normal(registro.colegio);
+  
+            if (!nombreGrupo || nombreCartera !== nombreGrupo) {
+              return false;
+            }
+  
+            const comunaCartera = normal(
+              registro.comuna || ""
+            );
+  
+            /*
+              Si ambas comunas existen, deben coincidir.
+              Si alguna está vacía, seguimos considerando
+              la coincidencia por nombre.
+            */
+            if (comunaGrupo && comunaCartera) {
+              return comunaGrupo === comunaCartera;
+            }
+  
+            return true;
           });
-
+  
         if (coincidencias.length === 1) {
           indiceSeleccionado = coincidencias[0].indice;
         }
       }
-
+  
+      /*
+        Si encontramos un único colegio, lo seleccionamos
+        internamente y ocultamos el selector.
+      */
       if (indiceSeleccionado >= 0) {
         campo("colegio").value = String(indiceSeleccionado);
+  
+        fieldsetVinculo.hidden = true;
+        fieldsetVinculo.disabled = false;
+  
+        return;
       }
-
+  
+      /*
+        Si no hay coincidencia o hay varias, dejamos
+        que el usuario indique el colegio correcto.
+      */
+      fieldsetVinculo.hidden = false;
+      fieldsetVinculo.disabled = false;
+  
       if (!opciones.length) {
         errorEl.textContent =
-          "No hay colegios en esta cartera. Revisa el correo.";
+          "No se encontraron colegios en esta cartera. " +
+          "Revisa el correo de la vendedora.";
+      } else {
+        errorEl.textContent =
+          "No se pudo identificar un colegio único. " +
+          "Selecciona el colegio correspondiente.";
       }
-
+  
     } catch (error) {
       console.error(
         "No se pudieron cargar los colegios:",
         error
       );
-
+  
+      fieldsetVinculo.hidden = false;
+      fieldsetVinculo.disabled = false;
+  
       errorEl.textContent =
-        error.message ||
-        "No se pudieron cargar los colegios.";
+        "No se pudo consultar la cartera: " +
+        (error.message || "error desconocido");
     }
   }
-
   dialog.querySelector("[data-cargar]").onclick =
     cargarColegios;
 
@@ -752,9 +818,15 @@ export function abrirRegistroGestion({
       : colegio;
 
     if (!destino) {
+      if (grupo) {
+        fieldsetVinculo.hidden = false;
+        fieldsetVinculo.disabled = false;
+      }
+    
       errorEl.textContent =
-        "Selecciona el colegio de la cartera.";
-
+        "Aún no se ha identificado el colegio de la cartera. " +
+        "Espera la búsqueda o selecciona el colegio correspondiente.";
+    
       return;
     }
 
@@ -1004,7 +1076,16 @@ export function abrirRegistroGestion({
     Si se abre desde un grupo y ya conocemos el correo
     de la cartera, intentamos cargar sus colegios.
   */
-  if (grupo && campo("vendedor").value) {
-    void cargarColegios();
+  if (grupo) {
+    if (campo("vendedor").value) {
+      void cargarColegios();
+    } else {
+      fieldsetVinculo.hidden = false;
+      fieldsetVinculo.disabled = false;
+  
+      errorEl.textContent =
+        "No se encontró el correo de la cartera. " +
+        "Indícalo para buscar el colegio.";
+    }
   }
 }
