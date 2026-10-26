@@ -780,10 +780,10 @@
     /* =========================================================
        RESUMEN CARTERA TIPO SEGUIMIENTO
     ========================================================= */
-    
+
     .cartera-summary{
       display:grid;
-      grid-template-columns:repeat(7, minmax(120px, 1fr));
+      grid-template-columns:repeat(6, minmax(120px, 1fr));
       gap:12px;
       margin-bottom:18px;
     }
@@ -1136,40 +1136,63 @@
         </div>
 
         <section class="cartera-summary" id="carteraSummary">
-          <button type="button" class="cartera-summary-card is-active" data-quick-filter="all">
+        
+          <button
+            type="button"
+            class="cartera-summary-card is-active"
+            data-quick-filter="all"
+          >
             <div class="label">Total colegios</div>
             <div class="value" id="sumCarteraTotal">0</div>
           </button>
         
-          <button type="button" class="cartera-summary-card" data-quick-filter="visitados">
-            <div class="label">Visitados temporada</div>
-            <div class="value" id="sumCarteraVisitados">0</div>
-          </button>
-        
-          <button type="button" class="cartera-summary-card" data-quick-filter="gestionMes">
-            <div class="label">Gestión último mes</div>
+          <button
+            type="button"
+            class="cartera-summary-card"
+            data-quick-filter="gestionMes"
+            title="Colegios con al menos una gestión comercial en los últimos 30 días"
+          >
+            <div class="label">Con gestión últimos 30 días</div>
             <div class="value" id="sumCarteraGestionMes">0</div>
           </button>
         
-          <button type="button" class="cartera-summary-card" data-quick-filter="sinGestion">
-            <div class="label">Sin gestión</div>
+          <button
+            type="button"
+            class="cartera-summary-card"
+            data-quick-filter="sinGestion"
+            title="Colegios sin gestión comercial en los últimos 30 días, aunque tengan gestiones anteriores"
+          >
+            <div class="label">Sin gestión últimos 30 días</div>
             <div class="value" id="sumCarteraSinGestion">0</div>
           </button>
         
-          <button type="button" class="cartera-summary-card" data-quick-filter="conCotizacion">
+          <button
+            type="button"
+            class="cartera-summary-card"
+            data-quick-filter="conCotizacion"
+          >
             <div class="label">Con cotización</div>
             <div class="value" id="sumCarteraConCotizacion">0</div>
           </button>
         
-          <button type="button" class="cartera-summary-card" data-quick-filter="full">
+          <button
+            type="button"
+            class="cartera-summary-card"
+            data-quick-filter="full"
+          >
             <div class="label">Full niveles</div>
             <div class="value" id="sumCarteraFull">0</div>
           </button>
         
-          <button type="button" class="cartera-summary-card" data-quick-filter="topCotizaciones">
+          <button
+            type="button"
+            class="cartera-summary-card"
+            data-quick-filter="topCotizaciones"
+          >
             <div class="label">Más cotizaciones</div>
             <div class="value small" id="sumCarteraTopCotizaciones">—</div>
           </button>
+        
         </section>
   
         <div class="table-meta">
