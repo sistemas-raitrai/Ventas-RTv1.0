@@ -1393,30 +1393,41 @@ function rowHasGestion(row = {}) {
 
 function renderCarteraSummary(rows = []) {
   const total = rows.length;
+
   const gestionMes = rows.filter(isManagedLastMonth).length;
+
   const sinGestion = total - gestionMes;
-  const conCotizacion = rows.filter((r) => (r.metrics?.totalQuotes || 0) > 0).length;
+
+  const conCotizacion = rows.filter(
+    (row) => (row.metrics?.totalQuotes || 0) > 0
+  ).length;
+
   const full = rows.filter(isFullCoverage).length;
+
   const top = getTopQuoteSchool(rows);
-  
+
   setTextSafe("sumCarteraTotal", total);
   setTextSafe("sumCarteraGestionMes", gestionMes);
   setTextSafe("sumCarteraSinGestion", sinGestion);
   setTextSafe("sumCarteraConCotizacion", conCotizacion);
   setTextSafe("sumCarteraFull", full);
-  
+
   setTextSafe(
-  "sumCarteraTopCotizaciones",
-  top ? ${top.colegio || top.numeroColegio} · ${top.metrics?.totalQuotes || 0} : "—"
+    "sumCarteraTopCotizaciones",
+    top
+      ? `${top.colegio || top.numeroColegio} · ${top.metrics?.totalQuotes || 0}`
+      : "—"
   );
-  
-  document.querySelectorAll(".cartera-summary-card").forEach((btn) => {
-  btn.classList.toggle("is-active", btn.dataset.quickFilter === state.quickFilter);
-  });
+
+  document
+    .querySelectorAll(".cartera-summary-card")
+    .forEach((btn) => {
+      btn.classList.toggle(
+        "is-active",
+        btn.dataset.quickFilter === state.quickFilter
+      );
+    });
 }
- COMPLETA
-======================================================================
-Ubicación original: línea 1474.
 
 function applyQuickFilter(rows = []) {
   if (state.quickFilter === "gestionMes") {
