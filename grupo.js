@@ -52,6 +52,8 @@ import {
   esReservaPendienteConteo as esReservaPendienteCompartida
 } from "./inscripciones-manager.js";
 
+import { abrirRegistroGestion } from "./gestion-comercial.js";
+
 const $ = (id) => document.getElementById(id);
 
 const GITHUB_HOME_URL = "https://sistemas-raitrai.github.io/Ventas-RT/";
@@ -15288,7 +15290,33 @@ function buildDuplicateReviewHtml(item = {}) {
   `;
 }
 
+function prepararBotonRegistroGestion() {
+  const list = $("historyList");
+  if (!list) return;
+  let btn = $("btnRegistrarGestionComercial");
+  if (!btn) {
+  btn = document.createElement("button");
+  btn.id = "btnRegistrarGestionComercial";
+  btn.type = "button";
+  btn.className = "btn-pill";
+  btn.textContent = "+ Registrar gestión";
+  list.before(btn);
+  btn.addEventListener("click", () => {
+  abrirRegistroGestion({
+  db,
+  usuario: state.effectiveUser,
+  usuarioReal: state.realUser,
+  puedeGuardar: () => canEditGroup(),
+  grupo: { id: state.groupId, docId: state.groupDocId, data: state.group },
+  onSaved: () => loadAll()
+  });
+  });
+  }
+  btn.hidden = !canEditGroup();
+}
+
 function renderHistory() {
+  prepararBotonRegistroGestion();
   const list = $("historyList");
   const note = $("historyToolbarNote");
   const btnMore = $("btnHistoryMore");
