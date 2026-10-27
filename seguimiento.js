@@ -4087,7 +4087,7 @@ function construirRegistroLead(
     ===================================================== */
 
     vendedora:
-      cleanText(
+      nombreVendedorInforme(
         data.vendedora ||
         row.vendedora ||
         ""
@@ -4195,7 +4195,7 @@ function construirRegistroLead(
     ===================================================== */
 
     destino:
-      cleanText(
+      destinoInforme(
         row.destino ||
         data.destinoPrincipal ||
         fichaComercial.destinoPrincipal ||
@@ -5901,9 +5901,11 @@ function exportVisibleRowsToXlsx() {
             "",
 
           "VENDEDOR(A)":
-            row.vendedora ||
-            row.vendedoraCorreo ||
-            "",
+            nombreVendedorInforme(
+              row.vendedora ||
+              row.vendedoraCorreo ||
+              ""
+            ),
 
           "COLEGIO":
             row.colegio ||
@@ -5919,8 +5921,10 @@ function exportVisibleRowsToXlsx() {
             "",
 
           "DESTINO":
-            row.destino ||
-            "",
+            destinoInforme(
+              row.destino ||
+              ""
+            ),
 
           "PROGRAMA":
             row.programa ||
@@ -6627,6 +6631,38 @@ function normalizeText(value) {
     .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase()
     .trim();
+}
+
+function nombreVendedorInforme(value) {
+  const nombre = cleanText(value);
+
+  if (!nombre) {
+    return "";
+  }
+
+  const nombreNormalizado = normalizeText(nombre)
+    .replace(/\s+/g, " ");
+
+  // Carola y Carolina corresponden a la misma vendedora.
+  if (
+    nombreNormalizado === "carola" ||
+    nombreNormalizado === "carolina"
+  ) {
+    return "Carolina";
+  }
+
+  return nombre.replace(/\s+/g, " ");
+}
+
+function destinoInforme(value) {
+  const destino = cleanText(value)
+    .replace(/\s+/g, " ");
+
+  if (!destino) {
+    return "";
+  }
+
+  return destino.toLocaleUpperCase("es-CL");
 }
 
 function cleanText(value) {
