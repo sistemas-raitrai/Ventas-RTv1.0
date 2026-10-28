@@ -32336,3 +32336,117 @@ async function ({
       motivoFinal
   };
 };
+
+window.reporteNacionalidadGrupos = async function (ano = 2026, opciones = {}) {
+  const { incluirAnuladas = false } = opciones;
+  const year = Number(ano);
+  if (!Number.isInteger(year) || year < 2000 || year > 2100) {
+    throw new Error('Indica un año válido, por ejemplo 2026.');
+  }
+  const txt = (v) => String(v ?? '').trim();
+  const norm = (v) => txt(v).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+  const vacio = (v) => !txt(v) || txt(v) === '—';
+  // Dos consultas simples: admite año guardado como número o texto, sin índice compuesto.
+  const snapshots = await Promise.all([year, String(year)].map(valor =>
+    getDocs(query(collection(db, 'ventas_cotizaciones'), where('anoViaje', '==', valor)))
+  ));
+  const documentos = new Map();
+  snapshots.forEach(s => s.docs.forEach(d => documentos.set(d.id, d)));
+  const grupos = [...documentos.values()].map(d => ({ ...d.data(), docId: d.id }))
+    .filter(g => norm(g.estado) === 'ganada');
+  const detalle = [], resumenGrupos = [], errores = [];
+  let inscripcionesLeidas = 0, anuladasOmitidas = 0, duplicadosAgrupados = 0;
+
+  for (const [indice, g] of grupos.entries()) {
+    console.log(`Revisando ${indice + 1}/${grupos.length} · ${g.idGrupo || g.docId}`);
+    try {
+      const snap = await getDocs(collection(db, 'ventas_cotizaciones', g.docId, 'inscripciones'));
+      inscripcionesLeidas += snap.size;
+      const personas = new Map();
+      for (const d of snap.docs) {
+        const item = d.data();
+        if (!incluirAnuladas && estaInscripcionAnulada(item)) { anuladasOmitidas++; continue; }
+        const ident = item.identificacion || {};
+        const campos = ['nacionalidadBase', 'nacionalidad', 'nacionalidadDetalle', 'nacionalidadOtra', 'otraNacionalidad'];
+        const nacionalidades = [...new Set(campos.map(k => txt(ident[k])).filter(Boolean))];
+        // Incluye también doble nacionalidad y textos como "chilena / venezolana".
+        if (!nacionalidades.some(v => /\bvenez(?:olana|olano|olanas|olanos|uela)\b/.test(norm(v)))) continue;
+        const documento = txt(getInscripcionDocumento(item));
+        // No deduplicar por correo del apoderado: podría tener varios hijos.
+        const clave = vacio(documento) ? `inscripcion:${d.id}` : `doc:${norm(documento).replace(/[^a-z0-9]/g, '')}`;
+        const cp = item.contactoPrincipal || {};
+        const fila = {
+          vendedor: txt(g.vendedora || g.vendedoraCorreo) || 'Sin vendedor',
+          correoVendedor: txt(g.vendedoraCorreo),
+          anoViaje: year,
+          idGrupo: txt(g.idGrupo || g.docId),
+          grupoDocId: g.docId,
+          numeroNegocio: txt(g.numeroNegocio || g.ficha?.numeroNegocio),
+          colegio: txt(g.colegio), curso: txt(g.curso), aliasGrupo: txt(g.aliasGrupo),
+          apoderadoGrupo: txt(g.nombreCliente), rolContactoGrupo: txt(g.rolCliente),
+          telefonoGrupo: txt(g.celularCliente), correoGrupo: txt(g.correoCliente),
+          contactoGrupo2: txt(g.nombreCliente2), rolContactoGrupo2: txt(g.rolCliente2),
+          telefonoGrupo2: txt(g.celularCliente2), correoGrupo2: txt(g.correoCliente2),
+          nombre: [getInscripcionNombres(item), getInscripcionApellidos(item)].filter(v => !vacio(v)).join(' '),
+          documento, nacionalidad: getInscripcionNacionalidad(item),
+          nacionalidadRegistrada: nacionalidades.join(' | '),
+          tipoViajante: txt(item.tipoViajante || item.tipoParticipacion),
+          tipoInscripcion: txt(item.tipoInscripcion),
+          apoderadoPersona: getResponsablePrincipalNombre(item),
+          telefonoPersona: txt(cp.celular || cp.telefono || cp.whatsapp),
+          correoPersona: txt(cp.correo), inscripcionIds: d.id
+        };
+        if (!personas.has(clave)) personas.set(clave, fila);
+        else {
+          duplicadosAgrupados++;
+          const anterior = personas.get(clave);
+          anterior.inscripcionIds += ` | ${d.id}`;
+          anterior.nacionalidadRegistrada = [...new Set([anterior.nacionalidadRegistrada, fila.nacionalidadRegistrada])].join(' | ');
+          for (const k of Object.keys(fila)) if (vacio(anterior[k]) && !vacio(fila[k])) anterior[k] = fila[k];
+        }
+      }
+      const filas = [...personas.values()];
+      if (!filas.length) continue;
+      detalle.push(...filas);
+      const { nombre, documento, nacionalidad, nacionalidadRegistrada, tipoViajante, tipoInscripcion,
+        apoderadoPersona, telefonoPersona, correoPersona, inscripcionIds, ...datosGrupo } = filas[0];
+      resumenGrupos.push({ ...datosGrupo, cantidadPersonas: filas.length });
+    } catch (error) {
+      errores.push({ idGrupo: txt(g.idGrupo || g.docId), grupoDocId: g.docId, error: error.message || String(error) });
+    }
+  }
+  const vendedores = new Map();
+  for (const g of resumenGrupos) {
+    const key = norm(g.correoVendedor || g.vendedor);
+    if (!vendedores.has(key)) vendedores.set(key, { vendedor: g.vendedor, correoVendedor: g.correoVendedor, cantidadGrupos: 0, cantidadPersonas: 0 });
+    const v = vendedores.get(key); v.cantidadGrupos++; v.cantidadPersonas += g.cantidadPersonas;
+  }
+  const resumenVendedores = [...vendedores.values()].sort((a,b) => a.vendedor.localeCompare(b.vendedor, 'es'));
+  const ordenar = (a,b) => a.vendedor.localeCompare(b.vendedor, 'es') || a.idGrupo.localeCompare(b.idGrupo, 'es', { numeric: true });
+  resumenGrupos.sort(ordenar); detalle.sort((a,b) => ordenar(a,b) || a.nombre.localeCompare(b.nombre, 'es'));
+  const resumen = {
+    anoViaje: year, estado: 'Ganada', completo: errores.length === 0,
+    gruposGanados: grupos.length, gruposRevisados: grupos.length - errores.length,
+    gruposConCoincidencias: resumenGrupos.length, vendedoresConCoincidencias: resumenVendedores.length,
+    personasPorGrupoTotal: detalle.length, inscripcionesLeidas, anuladasOmitidas,
+    duplicadosAgrupados, gruposConError: errores.length
+  };
+  console.table([resumen]);
+  console.log('RESUMEN POR VENDEDOR'); console.table(resumenVendedores);
+  console.log('RESUMEN POR GRUPO'); console.table(resumenGrupos);
+  for (const v of resumenVendedores) {
+    const key = norm(v.correoVendedor || v.vendedor);
+    console.group(`${v.vendedor} · ${v.cantidadGrupos} grupos · ${v.cantidadPersonas} personas`);
+    for (const g of resumenGrupos.filter(g => norm(g.correoVendedor || g.vendedor) === key)) {
+      console.group(`Grupo ${g.idGrupo} · negocio ${g.numeroNegocio || 'sin número'} · ${g.cantidadPersonas} personas`);
+      console.table([g]);
+      console.table(detalle.filter(p => p.grupoDocId === g.grupoDocId));
+      console.groupEnd();
+    }
+    console.groupEnd();
+  }
+  if (errores.length) { console.warn('REPORTE INCOMPLETO: no se pudieron leer estos grupos'); console.table(errores); }
+  const resultado = { resumen, resumenVendedores, resumenGrupos, detalle, errores };
+  window.ultimoReporteNacionalidadGrupos = resultado;
+  return resultado;
+};
