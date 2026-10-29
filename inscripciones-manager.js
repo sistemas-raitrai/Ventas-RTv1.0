@@ -3902,11 +3902,11 @@ export function estaExcluidoConteoNomina(item = {}) {
     item.estadoPrivacidad
   );
 
+  /*
+    El archivo o eliminación siempre se respeta.
+  */
   if (
     item.archivada === true ||
-    item.anulado === true ||
-    item.anulada === true ||
-    item.noViaja === true ||
     [
       "archivada",
       "eliminada",
@@ -3916,13 +3916,64 @@ export function estaExcluidoConteoNomina(item = {}) {
     return true;
   }
 
-  const estados = [
+  /*
+    Las anulaciones explícitas siguen teniendo prioridad.
+    No confundimos estas marcas con el "no viaja"
+    heredado desde Sistema de Pagos.
+  */
+  if (
+    item.anulado === true ||
+    item.anulada === true
+  ) {
+    return true;
+  }
+
+  const estadosPropios = [
     item.estado,
     item.estadoViaje,
-    item.estadoCupo,
-    item.sistemaPagos?.estado,
-    item.sistemaPagos?.estadoViaje
+    item.estadoCupo
   ].map(claveConteoNomina);
+
+  if (
+    estadosPropios.some((estado) =>
+      estado.includes("anulad")
+    )
+  ) {
+    return true;
+  }
+
+  /*
+    La lista de espera vigente prevalece sobre
+    las marcas de "no viaja" de Sistema de Pagos.
+
+    Esto NO confirma el cupo:
+    esPersonaViajeraConteo() sigue determinando
+    si la persona cuenta como viajero confirmado.
+  */
+  const tipoActual = tipoConteoNomina(item);
+
+  const esListaEspera = [
+    "lista_espera",
+    "lista_espera_pagada",
+    "lista_espera_confirmada"
+  ].includes(tipoActual);
+
+  if (esListaEspera) {
+    return false;
+  }
+
+  /*
+    Para los demás tipos conservamos el criterio anterior.
+  */
+  if (item.noViaja === true) {
+    return true;
+  }
+
+  const estados = [
+    ...estadosPropios,
+    claveConteoNomina(item.sistemaPagos?.estado),
+    claveConteoNomina(item.sistemaPagos?.estadoViaje)
+  ];
 
   if (
     estados.some((estado) =>
