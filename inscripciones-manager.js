@@ -44,46 +44,63 @@ export function crearInscripcionesManager({ db, usuario = {}, onChange = null } 
     ].includes(email);
   }
 
-  function puedeGestionarLinks(
-    grupo = {}
-  ) {
-    /*
-      Los links de inscripción forman parte
-      de la administración de la nómina.
+  function puedeGestionarLinks(grupo = {}) {
+    const estado = normalizar(
+      grupo.estado || grupo.estadoComercial || ""
+    ).trim();
   
-      IMPORTANTE:
-      los vendedores NO pueden:
-      - abrir links,
-      - cerrar links,
-      - regenerarlos,
-      - administrar las fases.
-  
-      Aunque el grupo sea de ese vendedor,
-      Gestión Nómina queda en modo consulta.
-    */
-  
-    if (
-      normalizar(
-        grupo.estado
-      ) !==
-      "ganada"
-    ) {
+    // Los links se administran solamente en grupos ganados.
+    if (estado !== "ganada") {
       return false;
     }
   
-    /*
-      Reutilizamos exactamente el mismo
-      criterio administrativo de la nómina.
+    // Mantener los permisos administrativos actuales.
+    if (puedeAdministrarNomina()) {
+      return true;
+    }
   
-      Esto permite:
-      - admin
-      - supervisión
-      - registro
-      - usuarios administrativos autorizados
+    // Permitir al vendedor gestionar los links de sus grupos.
+    if (rol !== "vendedor") {
+      return false;
+    }
   
-      y deja fuera al vendedor.
-    */
-    return puedeAdministrarNomina();
+    const correoAsignado = normalizarEmail(
+      grupo.vendedoraCorreo || ""
+    );
+  
+    const vendedorAsignado = normalizarEmail(
+      grupo.vendedora || ""
+    );
+  
+    // Si existe un correo asignado, comprobarlo primero.
+    if (correoAsignado) {
+      return Boolean(email) && correoAsignado === email;
+    }
+  
+    // Algunos grupos guardan el correo en "vendedora".
+    if (vendedorAsignado.includes("@")) {
+      return Boolean(email) && vendedorAsignado === email;
+    }
+  
+    // Compatibilidad con grupos que solo guardan el nombre.
+    const limpiarNombre = (valor) =>
+      normalizar(valor || "")
+        .replace(/\s+/g, " ")
+        .trim();
+  
+    const nombreAsignado = limpiarNombre(grupo.vendedora);
+  
+    const nombreVendedor = limpiarNombre(
+      [usuario.nombre, usuario.apellido]
+        .filter(Boolean)
+        .join(" ")
+    );
+  
+    return Boolean(
+      nombreAsignado &&
+      nombreVendedor &&
+      nombreAsignado === nombreVendedor
+    );
   }
 
   async function resolverGrupo(id) {
