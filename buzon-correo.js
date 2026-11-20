@@ -812,16 +812,11 @@ onAuthStateChanged(auth, async user => {
     const correo = normalizeEmail(texto(claims.email));
     if (!correo) throw new Error("Firebase no devolvió un correo para esta sesión.");
 
-    if (claims.email_verified !== true) {
-      informar(`Firebase registra ${correo} como correo sin verificar.`, true);
-      return;
-    }
-
     try {
       await llamar("acceso");
     } catch (error) {
       if (error.code === "functions/permission-denied") {
-        throw new Error(`La API del buzón rechazó la sesión verificada de ${correo}.`);
+        throw new Error(`La API del buzón rechazó el acceso de ${correo}.`);
       }
       throw error;
     }
