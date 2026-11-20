@@ -37,6 +37,8 @@ const tipos = {
   profesor: "profesores"
 };
 
+const filtrosNomina = ["fNombreDocumento", "fInteres", "fCercanos", "fNacionalidad", "fPaisDestino", "fAutorizaEncargado"];
+
 const state = {
   real: null,
   efectivo: null,
@@ -227,6 +229,8 @@ async function cargarGrupos(version = state.version) {
       docId: texto(g.groupDocId || documento.id),
       nombre: texto(g.aliasGrupo || [g.colegio, g.curso].filter(Boolean).join(" ") || documento.id),
       negocio: texto(g.numeroNegocio || g.negocioId),
+      colegio: texto(g.colegio),
+      curso: texto(g.curso),
       destino: texto(g.destinoPrincipal || g.destino),
       fecha: fechaISO(g.fechaInicio || g.fechaSalida),
       totalResumen: g.totalViajan == null || !Number.isFinite(Number(g.totalViajan))
@@ -303,6 +307,16 @@ async function cargarPersonas(version) {
             identificable: !!p.id && !!nombre,
             grupo: g.nombre,
             destino: g.destino,
+            colegio: g.colegio || texto(grupo.colegio),
+            curso: g.curso || texto(grupo.curso),
+            fechaSalida: (g.fecha || fechaISO(grupo.fechaInicio || grupo.fechaSalida)).split("-").reverse().join("/"),
+            nacionalidad: [identificacion.nacionalidadBase, identificacion.nacionalidadDetalle,
+              identificacion.nacionalidad].map(normalizar).filter(Boolean).join(" "),
+            coincideDocumento: p.documentoIdentidad?.nombreCoincideDocumento,
+            interes: tipo === "profesor" ? p.profesor?.interesConoceRaitrai : p.adultoAcompanante?.interesConoceRaitrai,
+            cercanos: p.adultoAcompanante?.acompananteTieneHijosViaje,
+            nacionalidadDestino: p.documentacion?.nacionalidadPaisDestino,
+            autorizaEncargado: p.consentimiento?.autorizaApoderadoCoordinador,
             correoViajero: identificacion.correoViajante,
             correoResponsable: contacto.correo,
             responsable: nombreContacto(contacto),
@@ -359,8 +373,38 @@ function destinatario(persona) {
   };
 }
 
+function respuestaNomina(valor) {
+  const v = normalizar(valor);
+  if (["true", "si"].includes(v)) return "si";
+  if (["false", "no"].includes(v)) return "no";
+  return v === "prefiere_no" ? v : "sin";
+}
+
+function coincideFiltrosNomina(p) {
+  const distinto = respuestaNomina(p.coincideDocumento);
+  const estadoNombre = distinto === "no" ? "si" : distinto === "si" ? "no" : "sin";
+  const interes = $("fInteres").value;
+  const cercanos = $("fCercanos").value;
+  const nacionalidad = normalizar($("fNacionalidad").value);
+  const filtroNombre = $("fNombreDocumento").value;
+  const filtroPais = $("fPaisDestino").value;
+  const filtroEncargado = $("fAutorizaEncargado").value;
+
+  return (!filtroNombre || estadoNombre === filtroNombre) &&
+    (!interes || (p.tipo === interes && respuestaNomina(p.interes) === "si")) &&
+    (!cercanos || (p.tipo === "adulto_acompanante" && respuestaNomina(p.cercanos) === cercanos)) &&
+    (!nacionalidad || p.nacionalidad.includes(nacionalidad)) &&
+    (!filtroPais || respuestaNomina(p.nacionalidadDestino) === filtroPais) &&
+    (!filtroEncargado || respuestaNomina(p.autorizaEncargado) === filtroEncargado);
+}
+
+function tipoIncluido(p) {
+  return !Object.hasOwn(tipos, p.tipo) || !!$(tipos[p.tipo])?.checked;
+}
+
 function personaEnGruposYTipos(persona) {
-  return state.gruposMarcados.has(persona.idGrupo) && !!$(tipos[persona.tipo])?.checked;
+  return state.gruposMarcados.has(persona.idGrupo) &&
+    tipoIncluido(persona) && coincideFiltrosNomina(persona);
 }
 
 function personasVisibles() {
@@ -384,7 +428,11 @@ function seleccionActual() {
         grupo: p.grupo,
         destino: p.destino,
         email: contacto.email,
-        nombreDestinatario: contacto.nombreDestinatario
+        nombreDestinatario: contacto.nombreDestinatario,
+        nombreEstudiante: p.tipo === "estudiante" ? p.nombre : "",
+        colegio: p.colegio,
+        curso: p.curso,
+        fechaSalida: p.fechaSalida
       }];
     });
 }
@@ -412,7 +460,7 @@ function renderPersonas() {
 
 function personasSinEnvio() {
   return state.personas.filter(persona => state.gruposMarcados.has(persona.idGrupo) &&
-    (!Object.hasOwn(tipos, persona.tipo) || personaEnGruposYTipos(persona)) &&
+    personaEnGruposYTipos(persona) &&
     !destinatario(persona).email);
 }
 
@@ -441,7 +489,7 @@ function renderResumenPersonas() {
   const confirmados = state.personas.filter(p => state.gruposMarcados.has(p.idGrupo)).length;
 
   $("resumenPersonas").textContent =
-    `${confirmados} viajeros confirmados en nóminas cargadas · ${seleccion.length} seleccionados · ${correos.size} direcciones únicas` +
+    `${confirmados} viajeros confirmados en nóminas cargadas · ${seleccion.length} seleccionados · ${seleccion.length} correos · ${correos.size} direcciones únicas` +
     (pendientes ? ` · ${pendientes} grupos sin nómina cargada.` : ".");
 
   const boton = $("verSinEnvio");
@@ -453,7 +501,7 @@ function renderResumenPersonas() {
     const stats = state.estadisticas.get(p.idGrupo);
     if (!stats) continue;
     stats.total++;
-    if ((!Object.hasOwn(tipos, p.tipo) || $(tipos[p.tipo]).checked) && !destinatario(p).email) stats.sinEnvio++;
+    if (tipoIncluido(p) && coincideFiltrosNomina(p) && !destinatario(p).email) stats.sinEnvio++;
   }
 
   const muestra = $("muestra");
@@ -476,6 +524,7 @@ function sincronizarCodigos() {
   $("opcionesExcel").hidden = modo !== "excel";
   $("resumenCodigos").hidden = modo !== "excel";
   $("agregarCodigo").hidden = modo === "ninguno";
+  $("insertarCodigo").hidden = modo === "ninguno";
 }
 
 function hojaCodigos() {
@@ -676,6 +725,7 @@ function receta(exigirCorreo = true) {
     cuerpo: texto($("cuerpo").value),
     tipo: $("tipoCampana").value,
     modoCodigos: modoCodigos(),
+    responderA: $("responderA").value,
     prefijo: texto($("prefijo").value),
     largo: Number($("largo").value),
     imagen: state.imagen,
@@ -695,15 +745,6 @@ function receta(exigirCorreo = true) {
 
 function muestraActual() {
   return seleccionActual().find(p => p.id === $("muestra").value) || null;
-}
-
-function agruparPorCorreo(personas) {
-  const lotes = new Map();
-  for (const persona of personas) {
-    if (!lotes.has(persona.email)) lotes.set(persona.email, []);
-    lotes.get(persona.email).push(persona);
-  }
-  return [...lotes.values()];
 }
 
 async function cargarHistorial(version = state.version) {
@@ -737,7 +778,11 @@ async function cargarHistorial(version = state.version) {
       }
     };
 
-    fila.append(`${item.asunto} · ${item.estado} · ${item.total} correos `, boton);
+    fila.append(
+      `${item.asunto} · ${item.estado} · ${item.correosPreparados ?? item.total} correos preparados · ` +
+      `${item.direccionesUnicas ?? item.total} direcciones únicas · Responder a ${item.responderA || "administracion@raitrai.cl"} `,
+      boton
+    );
     if (item.modoCodigos && item.modoCodigos !== "ninguno") {
       fila.append(" ", botonExcel(item.id, "asignados", "Descargar códigos asignados", version));
     }
@@ -821,12 +866,11 @@ async function verDetalle(id, version) {
 function revisarEnvio() {
   if (!state.borrador) {
     const personas = seleccionActual();
-    const lotes = agruparPorCorreo(personas);
+    const lotes = personas.map(persona => [persona]);
+    const direccionesUnicas = new Set(personas.map(persona => persona.email)).size;
     const configuracion = receta();
     if (!lotes.length) throw new Error("Selecciona al menos un viajero con correo disponible.");
-    if (lotes.some(lote => lote.length > 10)) {
-      throw new Error("Una dirección reúne más de diez viajeros. Divide esa selección en campañas.");
-    }
+
 
     const codigos = configuracion.modoCodigos === "excel" ? [...state.codigos] : [];
     if (configuracion.modoCodigos === "excel") {
@@ -838,7 +882,7 @@ function revisarEnvio() {
 
     state.revision = {
       id: crypto.randomUUID(), configuracion, lotes, codigos,
-      totalViajeros: personas.length, sinEnvio: personasSinEnvio().length,
+      totalViajeros: personas.length, direccionesUnicas, sinEnvio: personasSinEnvio().length,
       pendientes: [...state.gruposMarcados].filter(id => !state.nominasCargadas.has(id)).length,
       siguiente: 0
     };
@@ -850,7 +894,8 @@ function revisarEnvio() {
   const tipo = envio.configuracion.tipo === "viaje" ? "Información del viaje" : "Marketing · Descuentos y promociones";
   const lineas = [
     envio.configuracion.asunto, tipo,
-    `${envio.totalViajeros} viajeros · ${envio.lotes.length} direcciones únicas`,
+    `${envio.totalViajeros} viajeros · ${envio.lotes.length} correos · ${envio.direccionesUnicas} direcciones únicas`,
+    `Responder a ${envio.configuracion.responderA}`,
     `${envio.sinEnvio} viajeros sin envío disponible según los filtros`
   ];
   if (envio.pendientes) lineas.push(`${envio.pendientes} grupos sin nómina cargada quedan fuera del envío.`);
@@ -875,6 +920,7 @@ async function iniciarCampana(version) {
       receta: borrador.configuracion,
       total: borrador.lotes.length,
       totalViajeros: borrador.totalViajeros,
+      porViajero: true,
       codigos: borrador.codigos
     });
   } catch (error) {
@@ -1066,6 +1112,38 @@ for (const id of ["estudiantes", "adultos", "profesores", "rutaEstudiante", "bus
   });
 }
 
+for (const id of filtrosNomina) {
+  $(id).addEventListener("input", () => {
+    renderPersonas();
+    renderGrupos();
+  });
+}
+evento("limpiarFiltrosNomina", () => {
+  for (const id of filtrosNomina) $(id).value = "";
+  renderPersonas();
+  renderGrupos();
+});
+
+let campoRedaccion = null;
+for (const id of ["asunto", "cuerpo"]) {
+  $(id).addEventListener("focus", event => { campoRedaccion = event.currentTarget; });
+}
+$("insertarDato").addEventListener("click", event => {
+  const boton = event.target.closest("button[data-dato]");
+  if (!boton) return;
+
+  const campo = campoRedaccion || $("cuerpo");
+  const inicio = campoRedaccion ? campo.selectionStart : campo.value.length;
+  const fin = campoRedaccion ? campo.selectionEnd : campo.value.length;
+  const variable = `{{${boton.dataset.dato}}}`;
+  if (campo.maxLength >= 0 && campo.value.length - (fin - inicio) + variable.length > campo.maxLength) {
+    informar("El campo alcanzó su largo máximo.", true);
+    return;
+  }
+  campo.setRangeText(variable, inicio, fin, "end");
+  campo.focus();
+});
+
 await waitForLayoutReady();
 
 onAuthStateChanged(auth, async user => {
@@ -1092,7 +1170,17 @@ onAuthStateChanged(auth, async user => {
     if (!correo) throw new Error("Firebase no devolvió un correo para esta sesión.");
 
     try {
-      await llamar("acceso");
+      const acceso = await llamar("acceso");
+      if (version !== state.version) return;
+      const responderA = $("responderA");
+      const etiquetas = {
+        "administracion@raitrai.cl": "Administración",
+        "operaciones@raitrai.cl": "Operaciones"
+      };
+      responderA.replaceChildren();
+      for (const casilla of acceso.opcionesResponderA || ["administracion@raitrai.cl"]) {
+        responderA.add(new Option(etiquetas[casilla] ? `${etiquetas[casilla]} · ${casilla}` : casilla, casilla));
+      }
     } catch (error) {
       if (error.code === "functions/permission-denied") {
         throw new Error(`La API del buzón rechazó el acceso de ${correo}.`);
