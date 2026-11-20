@@ -105,6 +105,27 @@
       margin-top: 12px;
       border-radius: 10px;
     }
+    .buzon-desplegable > summary {
+      cursor: pointer;
+      color: #4a2570;
+      font-weight: 750;
+    }
+    .buzon-desplegable[open] > summary { margin-bottom: 12px; }
+    .buzon-enlace {
+      border: 0 !important;
+      padding: 0 !important;
+      min-height: auto !important;
+      text-decoration: underline !important;
+    }
+    .buzon-dialogo {
+      width: min(560px, 92vw);
+      max-height: 85vh;
+      border: 1px solid #d8d1df;
+      border-radius: 16px;
+      padding: 20px;
+      color: #261638;
+    }
+    .buzon-dialogo::backdrop { background: rgb(38 22 56 / 45%); }
     @media (max-width: 650px) {
       .buzon-page, .buzon-panel, .buzon-seccion { padding: 14px; }
       .buzon-head h1 { font-size: 24px; }
@@ -129,7 +150,13 @@
 
       <div id="app" hidden>
         <section class="buzon-seccion">
-          <h2>Grupos</h2>
+          <h2>Para</h2>
+          <p id="resumenPersonas" class="buzon-ayuda"></p>
+          <div class="buzon-linea">
+            <button id="verSinEnvio" class="buzon-enlace" type="button" hidden></button>
+          </div>
+        <details class="buzon-seccion buzon-desplegable">
+          <summary>Elegir grupos <span id="cuentaGrupos"></span></summary>
           <div class="buzon-grid">
             <label class="buzon-campo">Año
               <input id="ano" type="number" min="2020" max="2100" value="2026">
@@ -149,10 +176,10 @@
           <div id="grupos" class="buzon-lista"></div>
           <p id="resumenGrupos" class="buzon-ayuda"></p>
           <button id="cargarPersonas" type="button" class="buzon-principal">Cargar nóminas seleccionadas</button>
-        </section>
+        </details>
 
-        <section class="buzon-seccion">
-          <h2>Destinatarios</h2>
+        <details class="buzon-seccion buzon-desplegable">
+          <summary>Ver y elegir destinatarios</summary>
           <div class="buzon-linea">
             <label><input id="estudiantes" type="checkbox" checked> Estudiantes</label>
             <label><input id="adultos" type="checkbox"> Adultos acompañantes</label>
@@ -172,17 +199,18 @@
             <button id="limpiarPersonas" type="button">Limpiar selección</button>
           </div>
           <div id="personas" class="buzon-lista"></div>
-          <p id="resumenPersonas" class="buzon-ayuda"></p>
+        </details>
+
         </section>
 
         <section class="buzon-seccion">
-          <h2>Correo</h2>
+          <h2>Redactar correo</h2>
           <div class="buzon-grid">
             <label class="buzon-campo">Asunto <input id="asunto" maxlength="150"></label>
             <label class="buzon-campo">Tipo de campaña
               <select id="tipoCampana">
                 <option value="viaje">Información del viaje</option>
-                <option value="descuento">Descuentos</option>
+                <option value="descuento">Marketing · Descuentos y promociones</option>
               </select>
             </label>
           </div>
@@ -191,7 +219,27 @@
               placeholder="Hola, {{nombre_destinatario}}."></textarea>
           </label>
           <p class="buzon-ayuda">Campos del correo: {{nombre_destinatario}} y {{lista_viajeros}}.</p>
-          <div id="opcionesCodigo" class="buzon-grid" hidden>
+          <div id="configCodigos" hidden>
+            <label><input id="incluirCodigos" type="checkbox"> Incluir códigos</label>
+            <label id="origenCodigos" class="buzon-campo buzon-espacio" hidden>Origen de los códigos
+              <select id="modoCodigos">
+                <option value="generados">Generar códigos</option>
+                <option value="excel">Importar códigos de Excel</option>
+              </select>
+            </label>
+            <div id="opcionesExcel" class="buzon-grid buzon-espacio" hidden>
+              <label class="buzon-campo">Archivo de códigos
+                <input type="file" id="archivoCodigos" accept=".xlsx,.xls">
+              </label>
+              <label class="buzon-campo">Hoja <select id="hojaCodigos"></select></label>
+              <label class="buzon-campo">Columna <select id="columnaCodigos"></select></label>
+              <label class="buzon-campo">Primera fila de códigos
+                <input type="number" min="1" id="filaCodigos" value="2">
+              </label>
+            </div>
+            <p id="resumenCodigos" class="buzon-ayuda" hidden></p>
+          </div>
+          <div id="opcionesCodigo" class="buzon-grid buzon-espacio" hidden>
             <label class="buzon-campo">Prefijo del código
               <input id="prefijo" value="RAI" maxlength="10">
             </label>
@@ -201,8 +249,8 @@
           </div>
         </section>
 
-        <section class="buzon-seccion">
-          <h2>Imagen</h2>
+        <details class="buzon-seccion buzon-desplegable">
+          <summary>Adjuntar imagen y vista previa</summary>
           <div class="buzon-grid">
             <label class="buzon-campo">Imagen base opcional
               <input id="imagen" type="file" accept="image/png,image/jpeg,image/webp">
@@ -221,25 +269,43 @@
             <button id="agregarCapa" type="button">Agregar cuadro de texto</button>
             <button id="agregarCodigo" type="button" hidden>Agregar cuadro de código</button>
           </div>
-          <label class="buzon-campo buzon-espacio">Viajero para la vista previa
+          <label class="buzon-campo buzon-espacio">Previsualizar como
             <select id="muestra"><option value="">Datos de ejemplo</option></select>
           </label>
           <div class="buzon-linea buzon-espacio">
             <button id="previsualizar" type="button">Previsualizar imagen</button>
-            <button id="prueba" type="button">Enviar prueba a mi correo</button>
           </div>
           <img id="preview" class="buzon-vista" alt="Vista previa de la imagen del correo" hidden>
-        </section>
+        </details>
 
-        <section class="buzon-seccion">
-          <h2>Envío e historial</h2>
-          <div class="buzon-linea">
-            <button id="enviar" type="button" class="buzon-principal">Iniciar campaña</button>
-            <button id="actualizar" type="button">Actualizar historial</button>
-          </div>
+        <div class="buzon-linea buzon-espacio">
+          <button id="enviar" type="button" class="buzon-principal">Revisar envío</button>
+          <button id="prueba" type="button">Enviar prueba a mi correo</button>
+        </div>
+        <details class="buzon-seccion buzon-desplegable">
+          <summary>Historial de campañas</summary>
+          <button id="actualizar" type="button">Actualizar historial</button>
           <div id="historial" class="buzon-espacio"></div>
           <div id="detalle" class="buzon-lista"></div>
-        </section>
+        </details>
+        <dialog id="dialogoEnvio" class="buzon-dialogo" aria-labelledby="tituloRevision">
+          <h2 id="tituloRevision">Revisar envío</h2>
+          <div id="revisionEnvio"></div>
+          <div class="buzon-linea">
+            <button id="volverEdicion" type="button">Volver</button>
+            <button id="confirmarEnvio" type="button" class="buzon-principal">Enviar campaña</button>
+          </div>
+        </dialog>
+        <dialog id="dialogoSinEnvio" class="buzon-dialogo" aria-labelledby="tituloSinEnvio">
+          <h2 id="tituloSinEnvio">Personas sin envío disponible</h2>
+          <label class="buzon-campo">Buscar nombre, grupo o motivo
+            <input id="buscarSinEnvio" type="search">
+          </label>
+          <div id="listaSinEnvio" class="buzon-lista"></div>
+          <form method="dialog">
+            <button type="submit">Cerrar</button>
+          </form>
+        </dialog>
       </div>
     </section>
   </main>
@@ -310,6 +376,7 @@
     </fieldset>
   </template>
 
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js" defer></script>
   <script type="module" src="./layout.js"></script>
   <script type="module" src="./buzon-correo.js"></script>
 </body>
