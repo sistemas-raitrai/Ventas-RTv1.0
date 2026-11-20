@@ -164,8 +164,9 @@
             <label class="buzon-campo">Destino
               <select id="destino"><option value="">Todos</option></select>
             </label>
-            <label class="buzon-campo">Salida desde <input id="desde" type="date"></label>
-            <label class="buzon-campo">Salida hasta <input id="hasta" type="date"></label>
+            <label class="buzon-campo">Vendedor(a)
+              <select id="vendedorGrupo"><option value="">Todos</option></select>
+            </label>
             <label class="buzon-campo">Colegio, ID o negocio <input id="buscarGrupo" type="search"></label>
           </div>
           <div class="buzon-linea buzon-espacio">
@@ -239,9 +240,9 @@
             </label>
           </div>
           <label class="buzon-campo buzon-espacio">Responder a
-            <select id="responderA">
-              <option value="administracion@raitrai.cl">Administración</option>
-            </select>
+            <input id="responderA" type="email" value="administracion@raitrai.cl"
+              maxlength="254" required aria-describedby="ayudaResponderA" autocomplete="off">
+            <small id="ayudaResponderA">Escribe una casilla @raitrai.cl.</small>
           </label>
           <label class="buzon-campo buzon-espacio">Mensaje
             <textarea id="cuerpo" rows="6" maxlength="6000"
@@ -254,7 +255,7 @@
             <button type="button" data-dato="colegio">Colegio</button>
             <button type="button" data-dato="curso">Curso</button>
             <button type="button" data-dato="destino">Destino</button>
-            <button type="button" data-dato="fecha_salida">Fecha de salida</button>
+            <button type="button" data-dato="vendedor">Vendedor(a)</button>
             <button type="button" data-dato="codigo" id="insertarCodigo" hidden>Código de descuento</button>
           </div>
           <div id="configCodigos" hidden>
