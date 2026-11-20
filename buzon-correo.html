@@ -198,6 +198,30 @@
             <button id="marcarPersonas" type="button">Marcar personas visibles</button>
             <button id="limpiarPersonas" type="button">Limpiar selección</button>
           </div>
+          <details class="buzon-desplegable buzon-espacio">
+            <summary>Filtros de nómina</summary>
+            <div class="buzon-grid">
+              <label class="buzon-campo">Nombre distinto al documento
+                <select id="fNombreDocumento"><option value="">Todos</option><option value="si">Sí</option><option value="no">No</option><option value="sin">Sin respuesta</option></select>
+              </label>
+              <label class="buzon-campo">Interés en Conoce Rai Trai
+                <select id="fInteres"><option value="">Todos</option><option value="profesor">Profesores interesados</option><option value="adulto_acompanante">Acompañantes interesados</option></select>
+              </label>
+              <label class="buzon-campo">Acompañantes con hijos u otros estudiantes cercanos
+                <select id="fCercanos"><option value="">Todos</option><option value="si">Sí</option><option value="no">No</option><option value="prefiere_no">Prefiere no responder</option><option value="sin">Sin respuesta</option></select>
+              </label>
+              <label class="buzon-campo">Nacionalidad
+                <input id="fNacionalidad" type="search" placeholder="Ej. venezolana" autocomplete="off">
+              </label>
+              <label class="buzon-campo">Nacionalidad del país de destino
+                <select id="fPaisDestino"><option value="">Todos</option><option value="si">Sí</option><option value="no">No</option><option value="sin">Sin respuesta</option></select>
+              </label>
+              <label class="buzon-campo">Autoriza compartir con apoderado encargado del grupo
+                <select id="fAutorizaEncargado"><option value="">Todos</option><option value="si">Sí</option><option value="no">No</option><option value="sin">Sin respuesta</option></select>
+              </label>
+            </div>
+            <button id="limpiarFiltrosNomina" type="button" class="buzon-espacio">Limpiar filtros de nómina</button>
+          </details>
           <div id="personas" class="buzon-lista"></div>
         </details>
 
@@ -214,11 +238,25 @@
               </select>
             </label>
           </div>
+          <label class="buzon-campo buzon-espacio">Responder a
+            <select id="responderA">
+              <option value="administracion@raitrai.cl">Administración</option>
+            </select>
+          </label>
           <label class="buzon-campo buzon-espacio">Mensaje
             <textarea id="cuerpo" rows="6" maxlength="6000"
-              placeholder="Hola, {{nombre_destinatario}}."></textarea>
+              placeholder="Escribe tu mensaje…"></textarea>
           </label>
-          <p class="buzon-ayuda">Campos del correo: {{nombre_destinatario}} y {{lista_viajeros}}.</p>
+          <div class="buzon-linea buzon-espacio" id="insertarDato" role="group" aria-label="Insertar dato">
+            <strong>Insertar dato</strong>
+            <button type="button" data-dato="nombre">Nombre</button>
+            <button type="button" data-dato="nombre_estudiante">Nombre del estudiante</button>
+            <button type="button" data-dato="colegio">Colegio</button>
+            <button type="button" data-dato="curso">Curso</button>
+            <button type="button" data-dato="destino">Destino</button>
+            <button type="button" data-dato="fecha_salida">Fecha de salida</button>
+            <button type="button" data-dato="codigo" id="insertarCodigo" hidden>Código de descuento</button>
+          </div>
           <div id="configCodigos" hidden>
             <label><input id="incluirCodigos" type="checkbox"> Incluir códigos</label>
             <label id="origenCodigos" class="buzon-campo buzon-espacio" hidden>Origen de los códigos
@@ -241,7 +279,7 @@
           </div>
           <div id="opcionesCodigo" class="buzon-grid buzon-espacio" hidden>
             <label class="buzon-campo">Prefijo del código
-              <input id="prefijo" value="RAI" maxlength="10">
+              <input id="prefijo" value="RT" maxlength="10">
             </label>
             <label class="buzon-campo">Caracteres aleatorios
               <input id="largo" type="number" min="8" max="16" value="10">
