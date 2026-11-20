@@ -1,0 +1,727 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Buzón de correo | Sistema Ventas RT</title>
+  <style>
+    :root {
+      color-scheme: light;
+      font: 15px/1.5 system-ui, sans-serif;
+      color: #202735;
+      background: #f3f5f9;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; }
+    main { max-width: 1160px; margin: auto; padding: 24px 16px 64px; }
+    h1, h2, h3, p { margin: 0 0 12px; }
+    a { color: #203e79; }
+    section, fieldset {
+      background: #fff;
+      border: 1px solid #d9e1ed;
+      border-radius: 12px;
+      margin: 16px 0;
+      padding: 18px;
+      min-width: 0;
+    }
+    fieldset { margin: 12px 0; }
+    legend { padding: 0 6px; font-weight: 650; }
+    .grid {
+      display: grid;
+      gap: 12px;
+      grid-template-columns: repeat(auto-fit, minmax(min(100%, 190px), 1fr));
+    }
+    .row { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; }
+    label.field { display: grid; gap: 4px; }
+    input, select, textarea, button { font: inherit; }
+    input:not([type=checkbox]), select, textarea, button {
+      border: 1px solid #aebacf;
+      border-radius: 7px;
+      padding: 7px 10px;
+      min-height: 36px;
+    }
+    textarea { width: 100%; resize: vertical; }
+    button { background: #fff; color: #203e79; cursor: pointer; }
+    button.primary { background: #203e79; color: #fff; border-color: #203e79; }
+    button:disabled { opacity: .55; cursor: wait; }
+    .list { max-height: 320px; overflow: auto; margin: 12px 0; }
+    .line { display: block; padding: 7px 3px; border-bottom: 1px solid #e9edf3; }
+    .muted { color: #4a576c; }
+    .error { color: #a12121; }
+    .preview { display: block; max-width: 100%; max-height: 620px; margin: 12px 0; }
+    .preview[hidden], [hidden] { display: none; }
+    small { font-size: .87em; }
+  </style>
+</head>
+<body>
+<main>
+  <a href="./gestion-nomina.html">Volver a Gestión de Nómina</a>
+  <h1>Buzón de correo</h1>
+  <p id="mensaje" role="status" aria-live="polite">Verificando acceso…</p>
+
+  <div id="app" hidden>
+    <section>
+      <h2>Grupos</h2>
+      <div class="grid">
+        <label class="field">Año
+          <input id="ano" type="number" min="2020" max="2100" value="2026">
+        </label>
+        <label class="field">Destino
+          <select id="destino"><option value="">Todos</option></select>
+        </label>
+        <label class="field">Salida desde <input id="desde" type="date"></label>
+        <label class="field">Salida hasta <input id="hasta" type="date"></label>
+        <label class="field">Colegio, ID o negocio <input id="buscarGrupo" type="search"></label>
+      </div>
+      <div class="row" style="margin-top:12px">
+        <button id="cargarGrupos">Cargar año</button>
+        <button id="marcarGrupos">Marcar grupos visibles</button>
+        <button id="limpiarGrupos">Limpiar selección</button>
+      </div>
+      <div id="grupos" class="list"></div>
+      <p id="resumenGrupos"></p>
+      <button id="cargarPersonas" class="primary">Cargar nóminas seleccionadas</button>
+    </section>
+
+    <section>
+      <h2>Destinatarios</h2>
+      <div class="row">
+        <label><input id="estudiantes" type="checkbox" checked> Estudiantes</label>
+        <label><input id="adultos" type="checkbox"> Adultos acompañantes</label>
+        <label><input id="profesores" type="checkbox"> Profesores</label>
+      </div>
+      <div class="grid" style="margin-top:12px">
+        <label class="field">Enviar para estudiantes a
+          <select id="rutaEstudiante">
+            <option value="responsable">Responsable principal</option>
+            <option value="directo">Estudiante con autorización</option>
+          </select>
+        </label>
+        <label class="field">Buscar persona <input id="buscarPersona" type="search"></label>
+      </div>
+      <div class="row" style="margin-top:12px">
+        <button id="marcarPersonas">Marcar personas visibles</button>
+        <button id="limpiarPersonas">Limpiar selección</button>
+      </div>
+      <div id="personas" class="list"></div>
+      <p id="resumenPersonas"></p>
+    </section>
+
+    <section>
+      <h2>Correo</h2>
+      <label class="field">Asunto <input id="asunto" maxlength="150"></label>
+      <label class="field" style="margin-top:12px">Mensaje
+        <textarea id="cuerpo" rows="6" maxlength="6000"
+          placeholder="Hola, {{nombre_destinatario}}.&#10;&#10;{{lista_viajeros}}"></textarea>
+      </label>
+      <p class="muted">
+        Campos del correo: {{nombre_destinatario}} y {{lista_viajeros}}.
+        Los campos individuales se agregan a cada imagen.
+      </p>
+      <label class="field">Tipo de envío
+        <select id="tipoCampana">
+          <option value="viaje">Información del viaje</option>
+          <option value="descuento">Descuentos</option>
+        </select>
+      </label>
+      <div id="opcionesCodigo" class="grid" hidden>
+        <label class="field">Prefijo
+          <input id="prefijo" value="RAI" maxlength="10">
+        </label>
+        <label class="field">Caracteres aleatorios
+          <input id="largo" type="number" min="8" max="16" value="10">
+        </label>
+      </div>
+    </section>
+
+    <section>
+      <h2>Imagen</h2>
+      <div class="grid">
+        <label class="field">Imagen base opcional
+          <input id="imagen" type="file" accept="image/png,image/jpeg,image/webp">
+        </label>
+        <label class="field">Mostrar imagen
+          <select id="modoImagen">
+            <option value="adjunta">Como archivo adjunto</option>
+            <option value="inline">Dentro del correo</option>
+            <option value="ambas">Dentro del correo y como archivo</option>
+          </select>
+        </label>
+      </div>
+      <p id="infoImagen" class="muted"></p>
+      <p class="muted">
+        Campos de imagen: {{nombre_viajero}}, {{nombre_destinatario}},
+        {{grupo}}, {{destino}} y {{codigo}}.
+      </p>
+      <div id="capas"></div>
+      <div class="row">
+        <button id="agregarCapa">Agregar cuadro de texto</button>
+        <button id="agregarCodigo">Agregar cuadro de código</button>
+      </div>
+      <label class="field" style="margin-top:12px">Viajero para la vista previa
+        <select id="muestra"><option value="">Datos de ejemplo</option></select>
+      </label>
+      <div class="row" style="margin-top:12px">
+        <button id="previsualizar">Previsualizar imagen</button>
+        <button id="prueba">Enviar prueba a mi correo</button>
+      </div>
+      <img id="preview" class="preview" alt="Vista previa de la imagen adjunta" hidden>
+    </section>
+
+    <section>
+      <h2>Envío e historial</h2>
+      <div class="row">
+        <button id="enviar" class="primary">Iniciar campaña</button>
+        <button id="actualizar">Actualizar historial</button>
+      </div>
+      <div id="historial"></div>
+      <div id="detalle" class="list"></div>
+    </section>
+  </div>
+</main>
+
+<template id="plantillaCapa">
+  <fieldset>
+    <legend>Cuadro de texto</legend>
+    <label class="field">Texto
+      <textarea data-k="texto" rows="3" maxlength="500"></textarea>
+    </label>
+    <div class="grid">
+      <label class="field">Insertar campo
+        <select data-insertar>
+          <option value="">Elegir…</option>
+          <option value="nombre_viajero">Nombre del viajero</option>
+          <option value="nombre_destinatario">Nombre del destinatario</option>
+          <option value="grupo">Grupo</option>
+          <option value="destino">Destino</option>
+          <option value="codigo">Código</option>
+        </select>
+      </label>
+      <label class="field">Posición
+        <select data-posicion>
+          <option value="">Personalizada</option>
+          <option value="10,12,izquierda">Arriba a la izquierda</option>
+          <option value="50,12,centro">Arriba al centro</option>
+          <option value="90,12,derecha">Arriba a la derecha</option>
+          <option value="10,50,izquierda">Al medio a la izquierda</option>
+          <option value="50,50,centro">Al medio al centro</option>
+          <option value="90,50,derecha">Al medio a la derecha</option>
+          <option value="10,87,izquierda">Abajo a la izquierda</option>
+          <option value="50,87,centro">Abajo al centro</option>
+          <option value="90,87,derecha">Abajo a la derecha</option>
+        </select>
+      </label>
+      <label class="field">Horizontal % <input data-k="x" type="number" min="0" max="100" value="50"></label>
+      <label class="field">Vertical % <input data-k="y" type="number" min="0" max="100" value="50"></label>
+      <label class="field">Alineación
+        <select data-k="alineacion">
+          <option value="centro">Centro</option>
+          <option value="izquierda">Izquierda</option>
+          <option value="derecha">Derecha</option>
+        </select>
+      </label>
+      <label class="field">Tipografía
+        <select data-k="fuente">
+          <option value="sans">Sans serif</option>
+          <option value="serif">Serif</option>
+          <option value="mono">Monoespaciada</option>
+        </select>
+      </label>
+      <label class="field">Tamaño % del ancho
+        <input data-k="tamano" type="number" min="1" max="20" step="0.1" value="4">
+      </label>
+      <label class="field">Color <input data-k="color" type="color" value="#ffffff"></label>
+    </div>
+    <div class="row">
+      <label><input data-k="negrita" type="checkbox" checked> Negrita</label>
+      <label><input data-k="cursiva" type="checkbox"> Cursiva</label>
+      <button type="button" data-quitar>Quitar cuadro</button>
+    </div>
+  </fieldset>
+</template>
+
+<script type="module">
+import { auth, db, getVentasUser } from "./firebase-init.js";
+import {
+  crearInscripcionesManager,
+  camposPasajero,
+  esPersonaViajeraConteo
+} from "./inscripciones-manager.js";
+import {
+  collection, query, where, getDocs
+} from "https://www.gstatic.com/firebasejs/11.7.3/firebase-firestore.js";
+import {
+  onAuthStateChanged
+} from "https://www.gstatic.com/firebasejs/11.7.3/firebase-auth.js";
+import {
+  getFunctions, httpsCallable
+} from "https://www.gstatic.com/firebasejs/11.7.3/firebase-functions.js";
+
+const api = httpsCallable(getFunctions(auth.app, "southamerica-west1"), "buzonCorreoApi", {
+  timeout: 180000
+});
+
+const $ = id => document.getElementById(id);
+const texto = value => String(value ?? "").trim();
+const correoValido = value => /^[^\s@,;<>]+@[^\s@,;<>]+\.[^\s@,;<>]+$/.test(value);
+const normalizar = value => texto(value).normalize("NFD")
+  .replace(/[\u0300-\u036f]/g, "").toLowerCase();
+const gruposMarcados = new Set();
+const personasMarcadas = new Set();
+
+let manager;
+let grupos = [];
+let personas = [];
+let imagen = "";
+let ocupada = false;
+let borrador = null;
+
+async function llamar(accion, datos = {}) {
+  return (await api({ accion, ...datos })).data;
+}
+
+function informar(mensaje, error = false) {
+  $("mensaje").textContent = mensaje;
+  $("mensaje").classList.toggle("error", error);
+}
+
+function evento(id, tarea) {
+  $(id).addEventListener("click", async () => {
+    if (ocupada) return;
+    ocupada = true;
+    $(id).disabled = true;
+    try {
+      await tarea();
+    } catch (error) {
+      informar(error.message || "Ocurrió un error.", true);
+      $("mensaje").scrollIntoView({ block: "nearest" });
+    } finally {
+      ocupada = false;
+      $(id).disabled = false;
+    }
+  });
+}
+
+function fechaISO(value) {
+  if (!value) return "";
+  if (typeof value === "string") {
+    const iso = value.match(/^(\d{4}-\d{2}-\d{2})(?:$|T)/);
+    if (iso) return iso[1];
+    const local = value.match(/^(\d{2})[/-](\d{2})[/-](\d{4})$/);
+    if (local) return `${local[3]}-${local[2]}-${local[1]}`;
+    return "";
+  }
+  const date = typeof value.toDate === "function" ? value.toDate() : new Date(value);
+  if (!Number.isFinite(date.getTime())) return "";
+  const p = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Santiago", year: "numeric", month: "2-digit", day: "2-digit"
+  }).formatToParts(date);
+  const parte = tipo => p.find(item => item.type === tipo)?.value;
+  return `${parte("year")}-${parte("month")}-${parte("day")}`;
+}
+
+function nombreContacto(contacto) {
+  return texto(contacto.nombre || contacto.nombreCompleto ||
+    [contacto.nombres, contacto.primerApellido, contacto.segundoApellido].filter(Boolean).join(" "));
+}
+
+function checkbox(lista, etiqueta, checked, disabled, cambiar) {
+  const fila = document.createElement("label");
+  fila.className = "line";
+  const input = document.createElement("input");
+  input.type = "checkbox";
+  input.checked = checked;
+  input.disabled = disabled;
+  input.onchange = () => cambiar(input.checked);
+  fila.append(input, ` ${etiqueta}`);
+  lista.append(fila);
+}
+
+function gruposVisibles() {
+  return grupos.filter(g => {
+    const consulta = normalizar($("buscarGrupo").value);
+    const desde = $("desde").value;
+    const hasta = $("hasta").value;
+    return (!consulta || normalizar(`${g.nombre} ${g.id} ${g.negocio}`).includes(consulta)) &&
+      (!$("destino").value || normalizar(g.destino) === $("destino").value) &&
+      (!desde || (g.fecha && g.fecha >= desde)) &&
+      (!hasta || (g.fecha && g.fecha <= hasta));
+  });
+}
+
+function renderGrupos() {
+  const lista = $("grupos");
+  lista.replaceChildren();
+  const visibles = gruposVisibles();
+  for (const g of visibles) {
+    checkbox(lista, `${g.id} · ${g.nombre} · ${g.destino || "Sin destino"} · ${g.fecha || "Sin fecha"}`,
+      gruposMarcados.has(g.id), false, marcado => {
+        if (marcado) gruposMarcados.add(g.id);
+        else gruposMarcados.delete(g.id);
+        $("resumenGrupos").textContent = `${gruposMarcados.size} grupos seleccionados.`;
+        renderPersonas();
+      });
+  }
+  $("resumenGrupos").textContent =
+    `${gruposMarcados.size} seleccionados · ${visibles.length} visibles de ${grupos.length}.`;
+}
+
+function destinatario(p) {
+  const responsable = p.tipo === "estudiante" && $("rutaEstudiante").value === "responsable";
+  const email = texto(responsable ? p.correoResponsable : p.correoViajero).toLowerCase();
+  const nombreDestinatario = responsable ? p.responsable : p.nombre;
+  if (!responsable && p.tipo === "estudiante" && !p.autorizado) {
+    return { email: "", motivo: "Sin autorización de correo directo" };
+  }
+  if (!correoValido(email)) return { email: "", motivo: "Sin correo válido" };
+  return { email, nombreDestinatario };
+}
+
+function coincideTipo(p) {
+  return (p.tipo === "estudiante" && $("estudiantes").checked) ||
+    (p.tipo === "adulto_acompanante" && $("adultos").checked) ||
+    (p.tipo === "profesor" && $("profesores").checked);
+}
+
+function personasVisibles() {
+  const term = normalizar($("buscarPersona").value);
+  return personas.filter(p => gruposMarcados.has(p.idGrupo) && coincideTipo(p) &&
+    normalizar(`${p.nombre} ${p.grupo} ${p.idGrupo} ${destinatario(p).email}`).includes(term));
+}
+
+function seleccionActual() {
+  return personas
+    .filter(p => gruposMarcados.has(p.idGrupo) && coincideTipo(p) && personasMarcadas.has(p.id))
+    .map(p => ({ p, contacto: destinatario(p) }))
+    .filter(({ contacto }) => contacto.email)
+    .map(({ p, contacto }) => ({
+      id: p.id, nombre: p.nombre, grupo: p.grupo, destino: p.destino,
+      email: contacto.email, nombreDestinatario: contacto.nombreDestinatario
+    }));
+}
+
+function renderPersonas() {
+  $("personas").replaceChildren();
+  for (const p of personasVisibles()) {
+    const contacto = destinatario(p);
+    checkbox($("personas"),
+      `${p.nombre} · ${p.grupo} · ${contacto.email || contacto.motivo}`,
+      personasMarcadas.has(p.id) && !!contacto.email, !contacto.email, marcado => {
+        if (marcado) personasMarcadas.add(p.id);
+        else personasMarcadas.delete(p.id);
+        renderResumenPersonas();
+      });
+  }
+  renderResumenPersonas();
+}
+
+function renderResumenPersonas() {
+  const seleccion = seleccionActual();
+  const correos = new Set(seleccion.map(p => p.email));
+  const sinCorreo = personasVisibles().filter(p => !destinatario(p).email).length;
+  $("resumenPersonas").textContent =
+    `${seleccion.length} viajeros seleccionados · ${correos.size} correos · ${sinCorreo} visibles sin envío disponible.`;
+  const anterior = $("muestra").value;
+  $("muestra").replaceChildren(new Option("Datos de ejemplo", ""));
+  for (const p of seleccion) $("muestra").add(new Option(`${p.nombre} · ${p.grupo}`, p.id));
+  if (seleccion.some(p => p.id === anterior)) $("muestra").value = anterior;
+}
+
+function agregarCapa(contenido = "") {
+  if ($("capas").children.length >= 8) return informar("Máximo ocho cuadros de texto.", true);
+  const capa = $("plantillaCapa").content.firstElementChild.cloneNode(true);
+  const campo = key => capa.querySelector(`[data-k="${key}"]`);
+  campo("texto").value = contenido;
+  capa.querySelector("[data-quitar]").onclick = () => capa.remove();
+  capa.querySelector("[data-posicion]").onchange = event => {
+    if (!event.target.value) return;
+    const [x, y, alineacion] = event.target.value.split(",");
+    campo("x").value = x;
+    campo("y").value = y;
+    campo("alineacion").value = alineacion;
+  };
+  capa.querySelector("[data-insertar]").onchange = event => {
+    if (!event.target.value) return;
+    const textarea = campo("texto");
+    textarea.setRangeText(`{{${event.target.value}}}`, textarea.selectionStart, textarea.selectionEnd, "end");
+    event.target.value = "";
+    textarea.focus();
+  };
+  $("capas").append(capa);
+}
+
+function receta() {
+  const capas = Array.from($("capas").children, capa =>
+    Object.fromEntries(Array.from(capa.querySelectorAll("[data-k]"), input => [
+      input.dataset.k, input.type === "checkbox" ? input.checked : input.value
+    ]))
+  ).filter(capa => capa.texto.trim());
+  return {
+    asunto: $("asunto").value, cuerpo: $("cuerpo").value, imagen, capas,
+    modoImagen: $("modoImagen").value, tipo: $("tipoCampana").value,
+    prefijo: $("prefijo").value, largo: Number($("largo").value)
+  };
+}
+
+function muestraActual() {
+  return seleccionActual().find(p => p.id === $("muestra").value) || null;
+}
+
+function agrupar(seleccion) {
+  const porEmail = new Map();
+  for (const persona of seleccion) {
+    if (!porEmail.has(persona.email)) porEmail.set(persona.email, []);
+    porEmail.get(persona.email).push(persona);
+  }
+  return [...porEmail.values()];
+}
+
+async function cargarHistorial() {
+  const items = await llamar("historial");
+  const panel = $("historial");
+  panel.replaceChildren();
+  $("detalle").replaceChildren();
+  for (const c of items) {
+    const fila = document.createElement("p");
+    fila.className = "line";
+    const boton = document.createElement("button");
+    boton.textContent = "Ver envíos";
+    boton.onclick = async () => {
+      try {
+        const items = await llamar("detalle", { id: c.id });
+        const panel = $("detalle");
+        panel.replaceChildren();
+        for (const item of items) {
+          const fila = document.createElement("p");
+          fila.className = "line";
+          const personas = item.personas.map(p => `${p.nombre}${p.codigo ? ` (${p.codigo})` : ""}`);
+          fila.textContent = `${item.estado} · ${item.email} · ${personas.join(", ")}${item.error ? ` · ${item.error}` : ""}`;
+          panel.append(fila);
+          if (item.estado === "Rechazado") {
+            const retry = document.createElement("button");
+            retry.textContent = "Reintentar este correo";
+            retry.onclick = async () => {
+              retry.disabled = true;
+              try {
+                await llamar("reintentar", { id: c.id, envioId: item.id });
+                await cargarHistorial();
+                informar("Correo devuelto a la cola. Conserva sus códigos.");
+              } catch (error) {
+                informar(error.message, true);
+                retry.disabled = false;
+              }
+            };
+            fila.append(" ", retry);
+          }
+        }
+      } catch (error) { informar(error.message, true); }
+    };
+    fila.append(`${c.asunto} · ${c.estado} · ${c.total} correos `, boton);
+    panel.append(fila);
+  }
+}
+
+evento("cargarGrupos", async () => {
+  const ano = Number($("ano").value);
+  if (!Number.isInteger(ano) || ano < 2020 || ano > 2100) throw new Error("Ingresa un año válido.");
+  informar(`Cargando grupos ${ano}…`);
+  const snap = await getDocs(query(collection(db, "ventas_grupos_resumen"), where("anoViaje", "==", ano)));
+  grupos = snap.docs.flatMap(documento => {
+    const g = documento.data();
+    if (normalizar(g.estado || g.estadoComercial) !== "ganada") return [];
+    return [{
+      id: texto(g.idGrupo || documento.id),
+      docId: texto(g.groupDocId || documento.id),
+      nombre: texto(g.aliasGrupo || [g.colegio, g.curso].filter(Boolean).join(" ") || documento.id),
+      negocio: texto(g.numeroNegocio || g.negocioId),
+      destino: texto(g.destinoPrincipal || g.destino),
+      fecha: fechaISO(g.fechaInicio || g.fechaSalida)
+    }];
+  }).sort((a, b) => a.nombre.localeCompare(b.nombre, "es"));
+  const destinos = new Map(grupos.filter(g => g.destino).map(g => [normalizar(g.destino), g.destino]));
+  $("destino").replaceChildren(new Option("Todos", ""));
+  for (const [key, value] of [...destinos].sort((a, b) => a[1].localeCompare(b[1], "es"))) {
+    $("destino").add(new Option(value, key));
+  }
+  gruposMarcados.clear();
+  personasMarcadas.clear();
+  personas = [];
+  renderGrupos();
+  renderPersonas();
+  informar(`${grupos.length} grupos ganados cargados para ${ano}.`);
+});
+
+evento("marcarGrupos", () => {
+  for (const g of gruposVisibles()) gruposMarcados.add(g.id);
+  renderGrupos();
+  renderPersonas();
+});
+
+evento("limpiarGrupos", () => {
+  gruposMarcados.clear();
+  renderGrupos();
+  renderPersonas();
+});
+
+evento("cargarPersonas", async () => {
+  const seleccion = grupos.filter(g => gruposMarcados.has(g.id));
+  if (!seleccion.length) throw new Error("Selecciona al menos un grupo.");
+  const cargadas = new Map();
+  const fallidos = [];
+  for (let i = 0; i < seleccion.length; i += 6) {
+    informar(`Cargando nóminas ${i + 1}–${Math.min(i + 6, seleccion.length)} de ${seleccion.length}…`);
+    const lote = seleccion.slice(i, i + 6);
+    const resultados = await Promise.allSettled(lote.map(async g => {
+      const grupo = await manager.resolverGrupo(g.id);
+      if (!grupo) throw new Error(`Grupo ${g.id} no encontrado.`);
+      const nomina = await manager.cargarNomina(grupo);
+      for (const p of nomina.filter(esPersonaViajeraConteo)) {
+        const tipo = normalizar(p.tipoViajante || p.tipoParticipacion).replace(/\s+/g, "_");
+        if (!["estudiante", "adulto_acompanante", "profesor"].includes(tipo)) continue;
+        const docId = texto(p.id);
+        if (!docId) continue;
+        const identificacion = p.identificacion || {};
+        const contacto = p.contactoPrincipal || {};
+        const nombre = texto(identificacion.nombreCompleto ||
+          [camposPasajero.nombres(p), camposPasajero.apellidos(p)].filter(Boolean).join(" "));
+        if (!nombre) continue;
+        const documento = normalizar(camposPasajero.documento(p)).replace(/[^a-z0-9]/g, "");
+        const id = `${g.docId}:${documento && documento !== "sinrut" ? documento : docId}`;
+        if (cargadas.has(id)) continue;
+        cargadas.set(id, {
+          id, idGrupo: g.id, tipo, nombre, grupo: g.nombre, destino: g.destino,
+          correoViajero: identificacion.correoViajante,
+          autorizado: identificacion.autorizaCorreosPreviosPersonaQueViaja === true,
+          correoResponsable: contacto.correo, responsable: nombreContacto(contacto)
+        });
+      }
+    }));
+    resultados.forEach((r, index) => { if (r.status === "rejected") fallidos.push(lote[index].id); });
+  }
+  personas = [...cargadas.values()].sort((a, b) => a.nombre.localeCompare(b.nombre, "es"));
+  personasMarcadas.clear();
+  renderPersonas();
+  informar(fallidos.length
+    ? `${personas.length} viajeros cargados. Fallaron los grupos ${fallidos.join(", ")}.`
+    : `${personas.length} viajeros confirmados cargados.`, !!fallidos.length);
+});
+
+evento("marcarPersonas", () => {
+  for (const p of personasVisibles()) if (destinatario(p).email) personasMarcadas.add(p.id);
+  renderPersonas();
+});
+
+evento("limpiarPersonas", () => {
+  personasMarcadas.clear();
+  renderPersonas();
+});
+
+evento("agregarCapa", () => agregarCapa());
+evento("agregarCodigo", () => agregarCapa("Tu código es {{codigo}}"));
+
+$("imagen").onchange = async () => {
+  imagen = "";
+  $("preview").hidden = true;
+  $("infoImagen").textContent = "";
+  const file = $("imagen").files[0];
+  if (!file) return;
+  try {
+    const bitmap = await createImageBitmap(file);
+    try {
+      for (const lado of [1600, 1200, 900]) {
+        const escala = Math.min(1, lado / Math.max(bitmap.width, bitmap.height));
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.max(1, Math.round(bitmap.width * escala));
+        canvas.height = Math.max(1, Math.round(bitmap.height * escala));
+        const ctx = canvas.getContext("2d");
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+        const base64 = canvas.toDataURL("image/jpeg", 0.84).split(",")[1];
+        if (base64 && base64.length <= 600000) {
+          imagen = base64;
+          $("infoImagen").textContent = `Imagen lista · ${canvas.width} × ${canvas.height} px.`;
+          return;
+        }
+      }
+      throw new Error("No se pudo reducir la imagen al tamaño admitido.");
+    } finally {
+      bitmap.close();
+    }
+  } catch (error) {
+    $("imagen").value = "";
+    informar(error.message, true);
+  }
+};
+
+$("tipoCampana").onchange = () => {
+  $("opcionesCodigo").hidden = $("tipoCampana").value !== "descuento";
+};
+for (const id of ["destino", "desde", "hasta", "buscarGrupo"]) {
+  $(id).addEventListener("input", renderGrupos);
+}
+for (const id of ["estudiantes", "adultos", "profesores", "rutaEstudiante", "buscarPersona"]) {
+  $(id).addEventListener("input", renderPersonas);
+}
+
+evento("previsualizar", async () => {
+  const resultado = await llamar("preview", { receta: receta(), persona: muestraActual() });
+  $("preview").src = `data:image/jpeg;base64,${resultado.imagen}`;
+  $("preview").hidden = false;
+  informar("Vista previa generada.");
+});
+
+evento("prueba", async () => {
+  await llamar("prueba", { receta: receta(), persona: muestraActual() });
+  informar(`SendGrid aceptó el correo de prueba para ${auth.currentUser.email}.`);
+});
+
+evento("enviar", async () => {
+  if (!borrador) {
+    const seleccion = seleccionActual();
+    const lotes = agrupar(seleccion);
+    if (!lotes.length) throw new Error("Selecciona al menos un viajero con correo disponible.");
+    if (lotes.some(lote => lote.length > 10)) {
+      throw new Error("Hay una dirección que reúne más de diez viajeros. Divide esa selección en campañas.");
+    }
+    if (!confirm(`¿Enviar a ${lotes.length} direcciones para ${seleccion.length} viajeros?`)) return;
+    borrador = { id: crypto.randomUUID(), receta: receta(), lotes };
+  }
+
+  const { id, receta: configuracion, lotes } = borrador;
+  await llamar("crear", { id, receta: configuracion, total: lotes.length });
+  for (let i = 0; i < lotes.length; i += 10) {
+    informar(`Preparando correos ${i + 1}–${Math.min(i + 10, lotes.length)} de ${lotes.length}…`);
+    await llamar("cargarLote", { id, lotes: lotes.slice(i, i + 10) });
+  }
+  await llamar("iniciar", { id });
+  borrador = null;
+  $("enviar").textContent = "Iniciar campaña";
+  informar(`Campaña en cola con ${lotes.length} correos. Ya puedes cerrar la pantalla.`);
+  await cargarHistorial();
+});
+
+$("enviar").addEventListener("click", () => {
+  setTimeout(() => {
+    if (borrador && !ocupada) $("enviar").textContent = "Continuar preparación";
+  }, 500);
+});
+evento("actualizar", cargarHistorial);
+
+onAuthStateChanged(auth, async user => {
+  $("app").hidden = true;
+  if (!user) return informar("Inicia sesión en el Sistema Ventas RT y vuelve a esta página.", true);
+  try {
+    await llamar("acceso");
+    const perfil = getVentasUser(user.email) || {};
+    manager = crearInscripcionesManager({ db, usuario: { ...perfil, email: user.email } });
+    $("app").hidden = false;
+    informar(`Sesión autorizada · ${user.email}`);
+    await cargarHistorial();
+  } catch (error) {
+    informar(error.message, true);
+  }
+});
+</script>
+</body>
+</html>
