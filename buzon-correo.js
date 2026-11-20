@@ -102,31 +102,6 @@ function evento(id, ejecutar) {
   });
 }
 
-function fechaISO(value) {
-  if (!value) return "";
-
-  if (typeof value === "string") {
-    const iso = value.match(/^\d{4}-\d{2}-\d{2}(?=$|T|\s)/);
-    if (iso) return iso[0];
-
-    const local = value.match(/^(\d{2})[/-](\d{2})[/-](\d{4})$/);
-    return local ? `${local[3]}-${local[2]}-${local[1]}` : "";
-  }
-
-  const date = typeof value.toDate === "function" ? value.toDate() : new Date(value);
-  if (!Number.isFinite(date.getTime())) return "";
-
-  const partes = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "America/Santiago",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit"
-  }).formatToParts(date);
-
-  const parte = tipo => partes.find(item => item.type === tipo)?.value;
-  return `${parte("year")}-${parte("month")}-${parte("day")}`;
-}
-
 function filaSeleccion(panel, etiqueta, checked, disabled, cambiar) {
   const fila = document.createElement("label");
   fila.className = "buzon-fila";
@@ -159,14 +134,12 @@ function grupoPermitido(grupo) {
 function gruposVisibles() {
   const term = normalizar($("buscarGrupo").value);
   const destino = $("destino").value;
-  const desde = $("desde").value;
-  const hasta = $("hasta").value;
+  const vendedor = $("vendedorGrupo").value;
 
   return state.grupos.filter(g =>
     (!term || normalizar(`${g.nombre} ${g.id} ${g.negocio}`).includes(term)) &&
     (!destino || normalizar(g.destino) === destino) &&
-    (!desde || (g.fecha && g.fecha >= desde)) &&
-    (!hasta || (g.fecha && g.fecha <= hasta))
+    (!vendedor || normalizar(g.vendedora) === vendedor)
   );
 }
 
@@ -180,7 +153,7 @@ function renderGrupos() {
     const total = stats ? `${stats.total} confirmados` :
       g.totalResumen !== null ? `${g.totalResumen} confirmados (resumen)` : "Total por cargar";
     const sinEnvio = stats ? `${stats.sinEnvio} sin envío` : "Contactos por revisar";
-    const etiqueta = [g.id, g.nombre, g.negocio, g.destino, g.fecha || "Sin fecha", total, sinEnvio]
+    const etiqueta = [g.id, g.nombre, g.negocio, g.destino, g.vendedora || "Sin vendedor", total, sinEnvio]
       .filter(Boolean).join(" · ");
 
     filaSeleccion(panel, etiqueta, state.gruposMarcados.has(g.id), false, checked => {
@@ -232,7 +205,6 @@ async function cargarGrupos(version = state.version) {
       colegio: texto(g.colegio),
       curso: texto(g.curso),
       destino: texto(g.destinoPrincipal || g.destino),
-      fecha: fechaISO(g.fechaInicio || g.fechaSalida),
       totalResumen: g.totalViajan == null || !Number.isFinite(Number(g.totalViajan))
         ? null : Number(g.totalViajan),
       vendedora: texto(g.vendedora || g.vendedoraCorreo),
@@ -248,6 +220,16 @@ async function cargarGrupos(version = state.version) {
   for (const [key, label] of [...destinos].sort((a, b) => a[1].localeCompare(b[1], "es"))) {
     destino.add(new Option(label, key));
   }
+
+  const vendedores = new Map(state.grupos.filter(g => g.vendedora)
+    .map(g => [normalizar(g.vendedora), g.vendedora]));
+  const vendedor = $("vendedorGrupo");
+  const anterior = vendedor.value;
+  vendedor.replaceChildren(new Option("Todos", ""));
+  for (const [key, label] of [...vendedores].sort((a, b) => a[1].localeCompare(b[1], "es"))) {
+    vendedor.add(new Option(label, key));
+  }
+  if (vendedores.has(anterior)) vendedor.value = anterior;
 
   state.gruposMarcados.clear();
   state.personasMarcadas.clear();
@@ -309,7 +291,7 @@ async function cargarPersonas(version) {
             destino: g.destino,
             colegio: g.colegio || texto(grupo.colegio),
             curso: g.curso || texto(grupo.curso),
-            fechaSalida: (g.fecha || fechaISO(grupo.fechaInicio || grupo.fechaSalida)).split("-").reverse().join("/"),
+            vendedor: g.vendedora,
             nacionalidad: [identificacion.nacionalidadBase, identificacion.nacionalidadDetalle,
               identificacion.nacionalidad].map(normalizar).filter(Boolean).join(" "),
             coincideDocumento: p.documentoIdentidad?.nombreCoincideDocumento,
@@ -432,7 +414,7 @@ function seleccionActual() {
         nombreEstudiante: p.tipo === "estudiante" ? p.nombre : "",
         colegio: p.colegio,
         curso: p.curso,
-        fechaSalida: p.fechaSalida
+        vendedor: p.vendedor
       }];
     });
 }
@@ -710,6 +692,15 @@ async function prepararImagen() {
   }
 }
 
+function correoResponderA() {
+  const correo = $("responderA").value.trim().toLowerCase();
+  if (!/^[a-z0-9!#$%&'*+/=?^_`{|}~-]+(?:\.[a-z0-9!#$%&'*+/=?^_`{|}~-]+)*@raitrai\.cl$/.test(correo) ||
+      correo.split("@")[0].length > 64) {
+    throw new Error("Escribe una dirección válida @raitrai.cl en Responder a.");
+  }
+  return correo;
+}
+
 function receta(exigirCorreo = true) {
   if (state.cargandoImagen) throw new Error("Espera a que termine de cargar la imagen.");
 
@@ -725,7 +716,7 @@ function receta(exigirCorreo = true) {
     cuerpo: texto($("cuerpo").value),
     tipo: $("tipoCampana").value,
     modoCodigos: modoCodigos(),
-    responderA: $("responderA").value,
+    responderA: correoResponderA(),
     prefijo: texto($("prefijo").value),
     largo: Number($("largo").value),
     imagen: state.imagen,
@@ -1101,7 +1092,7 @@ $("hojaCodigos").addEventListener("change", cargarColumnasExcel);
 $("columnaCodigos").addEventListener("change", leerCodigosExcel);
 $("filaCodigos").addEventListener("change", cargarColumnasExcel);
 
-for (const id of ["destino", "desde", "hasta", "buscarGrupo"]) {
+for (const id of ["destino", "vendedorGrupo", "buscarGrupo"]) {
   $(id).addEventListener("input", renderGrupos);
 }
 
@@ -1170,17 +1161,7 @@ onAuthStateChanged(auth, async user => {
     if (!correo) throw new Error("Firebase no devolvió un correo para esta sesión.");
 
     try {
-      const acceso = await llamar("acceso");
-      if (version !== state.version) return;
-      const responderA = $("responderA");
-      const etiquetas = {
-        "administracion@raitrai.cl": "Administración",
-        "operaciones@raitrai.cl": "Operaciones"
-      };
-      responderA.replaceChildren();
-      for (const casilla of acceso.opcionesResponderA || ["administracion@raitrai.cl"]) {
-        responderA.add(new Option(etiquetas[casilla] ? `${etiquetas[casilla]} · ${casilla}` : casilla, casilla));
-      }
+      await llamar("acceso");
     } catch (error) {
       if (error.code === "functions/permission-denied") {
         throw new Error(`La API del buzón rechazó el acceso de ${correo}.`);
