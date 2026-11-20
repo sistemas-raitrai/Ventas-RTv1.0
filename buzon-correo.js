@@ -45,6 +45,14 @@ const state = {
   manager: null,
   grupos: [],
   personas: [],
+  nominasCargadas: new Set(),
+  estadisticas: new Map(),
+  libroCodigos: null,
+  codigos: [],
+  versionExcel: 0,
+  cargandoExcel: false,
+  revision: null,
+  grupoSinEnvio: "",
   gruposMarcados: new Set(),
   personasMarcadas: new Set(),
   imagen: "",
@@ -87,7 +95,7 @@ function evento(id, ejecutar) {
     } finally {
       state.ocupado = false;
       boton.disabled = false;
-      $("enviar").textContent = state.borrador ? "Continuar preparación" : "Iniciar campaña";
+      $("enviar").textContent = state.borrador ? "Continuar preparación" : "Revisar envío";
     }
   });
 }
@@ -166,20 +174,33 @@ function renderGrupos() {
   const visibles = gruposVisibles();
 
   for (const g of visibles) {
-    const etiqueta = [g.id, g.nombre, g.negocio, g.destino, g.fecha || "Sin fecha"]
+    const stats = state.estadisticas.get(g.id);
+    const total = stats ? `${stats.total} confirmados` :
+      g.totalResumen !== null ? `${g.totalResumen} confirmados (resumen)` : "Total por cargar";
+    const sinEnvio = stats ? `${stats.sinEnvio} sin envío` : "Contactos por revisar";
+    const etiqueta = [g.id, g.nombre, g.negocio, g.destino, g.fecha || "Sin fecha", total, sinEnvio]
       .filter(Boolean).join(" · ");
 
     filaSeleccion(panel, etiqueta, state.gruposMarcados.has(g.id), false, checked => {
       marcar(state.gruposMarcados, g.id, checked);
-      renderResumenGrupos();
       renderPersonas();
+      renderGrupos();
     });
+    if (stats?.sinEnvio && state.gruposMarcados.has(g.id)) {
+      const boton = document.createElement("button");
+      boton.type = "button";
+      boton.className = "buzon-enlace";
+      boton.textContent = `Ver personas sin envío del grupo ${g.id}`;
+      boton.onclick = () => abrirSinEnvio(g.id);
+      panel.append(boton);
+    }
   }
 
   renderResumenGrupos(visibles.length);
 }
 
 function renderResumenGrupos(visibles = gruposVisibles().length) {
+  $("cuentaGrupos").textContent = state.gruposMarcados.size ? `· ${state.gruposMarcados.size} seleccionados` : "";
   $("resumenGrupos").textContent =
     `${state.gruposMarcados.size} seleccionados · ${visibles} visibles de ${state.grupos.length}.`;
 }
@@ -208,6 +229,8 @@ async function cargarGrupos(version = state.version) {
       negocio: texto(g.numeroNegocio || g.negocioId),
       destino: texto(g.destinoPrincipal || g.destino),
       fecha: fechaISO(g.fechaInicio || g.fechaSalida),
+      totalResumen: g.totalViajan == null || !Number.isFinite(Number(g.totalViajan))
+        ? null : Number(g.totalViajan),
       vendedora: texto(g.vendedora || g.vendedoraCorreo),
       vendedoraCorreo: normalizeEmail(g.vendedoraCorreo || "")
     }];
@@ -225,6 +248,8 @@ async function cargarGrupos(version = state.version) {
   state.gruposMarcados.clear();
   state.personasMarcadas.clear();
   state.personas = [];
+  state.nominasCargadas.clear();
+  state.estadisticas.clear();
   renderGrupos();
   renderPersonas();
   informar(`${state.grupos.length} grupos ganados cargados para ${ano}.`);
@@ -241,6 +266,7 @@ async function cargarPersonas(version) {
 
   const manager = state.manager;
   const cargadas = new Map();
+  const gruposCargados = new Set();
   const fallidos = [];
 
   for (let i = 0; i < seleccion.length; i += 6) {
@@ -255,33 +281,33 @@ async function cargarPersonas(version) {
 
       return (await manager.cargarNomina(grupo))
         .filter(p => esPersonaViajeraConteo(p))
-        .flatMap(p => {
+        .map((p, index) => {
           const tipo = normalizar(p.tipoViajante || p.tipoParticipacion).replace(/\s+/g, "_");
-          if (!Object.hasOwn(tipos, tipo) || !p.id) return [];
 
           const identificacion = p.identificacion || {};
           const contacto = p.contactoPrincipal || {};
           const nombre = texto(identificacion.nombreCompleto ||
             [camposPasajero.nombres(p), camposPasajero.apellidos(p)].filter(Boolean).join(" "));
-          if (!nombre) return [];
+
 
           const documento = normalizar(camposPasajero.documento(p)).replace(/[^a-z0-9]/g, "");
           const identidad = documento && !["sinrut", "sindocumento"].includes(documento)
             ? documento
-            : p.id;
+            : p.id || `sin-identificador-${index + 1}`;
 
-          return [{
+          return {
             id: `${g.docId}:${identidad}`,
             idGrupo: g.id,
             tipo,
-            nombre,
+            nombre: nombre || "Viajero sin nombre",
+            identificable: !!p.id && !!nombre,
             grupo: g.nombre,
             destino: g.destino,
             correoViajero: identificacion.correoViajante,
             correoResponsable: contacto.correo,
             responsable: nombreContacto(contacto),
             autorizado: identificacion.autorizaCorreosPreviosPersonaQueViaja === true
-          }];
+          };
         });
     }));
 
@@ -291,6 +317,7 @@ async function cargarPersonas(version) {
         return;
       }
 
+      gruposCargados.add(lote[index].id);
       for (const persona of resultado.value) {
         if (!cargadas.has(persona.id)) cargadas.set(persona.id, persona);
       }
@@ -298,9 +325,11 @@ async function cargarPersonas(version) {
   }
 
   if (version !== state.version) return;
+  state.nominasCargadas = gruposCargados;
   state.personas = [...cargadas.values()].sort((a, b) => a.nombre.localeCompare(b.nombre, "es"));
   state.personasMarcadas.clear();
   renderPersonas();
+  renderGrupos();
 
   informar(
     fallidos.length
@@ -311,6 +340,8 @@ async function cargarPersonas(version) {
 }
 
 function destinatario(persona) {
+  if (!persona.identificable) return { email: "", motivo: "Falta nombre o identificación" };
+  if (!Object.hasOwn(tipos, persona.tipo)) return { email: "", motivo: "Tipo de viajero sin clasificar" };
   const esEstudiante = persona.tipo === "estudiante";
   const responsable = esEstudiante && $("rutaEstudiante").value === "responsable";
 
@@ -319,7 +350,8 @@ function destinatario(persona) {
   }
 
   const email = normalizeEmail(texto(responsable ? persona.correoResponsable : persona.correoViajero));
-  if (!correoValido(email)) return { email: "", motivo: "Sin correo válido" };
+  if (!email) return { email: "", motivo: responsable ? "Sin correo del responsable principal" : "Sin correo del viajero" };
+  if (!correoValido(email)) return { email: "", motivo: "Correo inválido" };
 
   return {
     email,
@@ -328,7 +360,7 @@ function destinatario(persona) {
 }
 
 function personaEnGruposYTipos(persona) {
-  return state.gruposMarcados.has(persona.idGrupo) && $(tipos[persona.tipo]).checked;
+  return state.gruposMarcados.has(persona.idGrupo) && !!$(tipos[persona.tipo])?.checked;
 }
 
 function personasVisibles() {
@@ -378,20 +410,169 @@ function renderPersonas() {
   renderResumenPersonas();
 }
 
+function personasSinEnvio() {
+  return state.personas.filter(persona => state.gruposMarcados.has(persona.idGrupo) &&
+    (!Object.hasOwn(tipos, persona.tipo) || personaEnGruposYTipos(persona)) &&
+    !destinatario(persona).email);
+}
+
+function renderSinEnvio() {
+  const panel = $("listaSinEnvio");
+  const termino = normalizar($("buscarSinEnvio").value);
+  panel.replaceChildren();
+  for (const persona of personasSinEnvio()) {
+    if (state.grupoSinEnvio && persona.idGrupo !== state.grupoSinEnvio) continue;
+    const motivo = destinatario(persona).motivo;
+    const textoFila = `${persona.nombre} · ${persona.idGrupo} · ${persona.grupo} · ${motivo}`;
+    if (!normalizar(textoFila).includes(termino)) continue;
+    const fila = document.createElement("p");
+    fila.className = "buzon-fila";
+    fila.textContent = textoFila;
+    panel.append(fila);
+  }
+  if (!panel.childElementCount) panel.textContent = "No hay resultados para la búsqueda.";
+}
+
 function renderResumenPersonas() {
   const seleccion = seleccionActual();
   const correos = new Set(seleccion.map(p => p.email));
-  const sinEnvio = personasVisibles().filter(p => !destinatario(p).email).length;
+  const sinEnvio = personasSinEnvio();
+  const pendientes = [...state.gruposMarcados].filter(id => !state.nominasCargadas.has(id)).length;
+  const confirmados = state.personas.filter(p => state.gruposMarcados.has(p.idGrupo)).length;
 
   $("resumenPersonas").textContent =
-    `${seleccion.length} viajeros seleccionados · ${correos.size} correos · ${sinEnvio} visibles sin envío disponible.`;
+    `${confirmados} viajeros confirmados en nóminas cargadas · ${seleccion.length} seleccionados · ${correos.size} direcciones únicas` +
+    (pendientes ? ` · ${pendientes} grupos sin nómina cargada.` : ".");
+
+  const boton = $("verSinEnvio");
+  boton.hidden = state.gruposMarcados.size === 0 || confirmados === 0;
+  boton.textContent = `Ver ${sinEnvio.length} viajeros sin envío disponible`;
+
+  state.estadisticas = new Map([...state.nominasCargadas].map(id => [id, { total: 0, sinEnvio: 0 }]));
+  for (const p of state.personas) {
+    const stats = state.estadisticas.get(p.idGrupo);
+    if (!stats) continue;
+    stats.total++;
+    if ((!Object.hasOwn(tipos, p.tipo) || $(tipos[p.tipo]).checked) && !destinatario(p).email) stats.sinEnvio++;
+  }
 
   const muestra = $("muestra");
   const anterior = muestra.value;
   muestra.replaceChildren(new Option("Datos de ejemplo", ""));
-
   for (const p of seleccion) muestra.add(new Option(`${p.nombre} · ${p.grupo}`, p.id));
   if (seleccion.some(p => p.id === anterior)) muestra.value = anterior;
+}
+
+function modoCodigos() {
+  return $("tipoCampana").value === "descuento" && $("incluirCodigos").checked
+    ? $("modoCodigos").value : "ninguno";
+}
+
+function sincronizarCodigos() {
+  const modo = modoCodigos();
+  $("configCodigos").hidden = $("tipoCampana").value !== "descuento";
+  $("origenCodigos").hidden = modo === "ninguno";
+  $("opcionesCodigo").hidden = modo !== "generados";
+  $("opcionesExcel").hidden = modo !== "excel";
+  $("resumenCodigos").hidden = modo !== "excel";
+  $("agregarCodigo").hidden = modo === "ninguno";
+}
+
+function hojaCodigos() {
+  return state.libroCodigos?.Sheets[$("hojaCodigos").value];
+}
+
+function cargarColumnasExcel() {
+  const select = $("columnaCodigos");
+  select.replaceChildren();
+  const hoja = hojaCodigos();
+  if (!hoja?.["!ref"]) return leerCodigosExcel();
+
+  const rango = XLSX.utils.decode_range(hoja["!ref"]);
+  const filaCabecera = Math.max(0, Number($("filaCodigos").value) - 2);
+  for (let c = rango.s.c; c <= Math.min(rango.e.c, rango.s.c + 199); c++) {
+    const letra = XLSX.utils.encode_col(c);
+    const cabecera = texto(hoja[XLSX.utils.encode_cell({ r: filaCabecera, c })]?.v);
+    select.add(new Option(cabecera ? `${letra} · ${cabecera}` : letra, String(c)));
+    if (["codigo", "codigos", "code", "codes"].includes(normalizar(cabecera))) select.value = String(c);
+  }
+  leerCodigosExcel();
+}
+
+function leerCodigosExcel() {
+  state.codigos = [];
+  const hoja = hojaCodigos();
+  const columna = $("columnaCodigos").value;
+  const fila = Number($("filaCodigos").value);
+  if (!hoja?.["!ref"] || columna === "" || !Number.isSafeInteger(fila) || fila < 1) {
+    $("resumenCodigos").textContent = "Elige una hoja, columna y fila inicial válidas.";
+    return;
+  }
+
+  const rango = XLSX.utils.decode_range(hoja["!ref"]);
+  if (rango.e.r - fila + 2 > 10000) {
+    $("resumenCodigos").textContent = "Selecciona una columna con un máximo de 10.000 filas desde el inicio indicado.";
+    return;
+  }
+
+  let vacios = 0;
+  let duplicados = 0;
+  let invalidos = 0;
+  let numericos = 0;
+  const vistos = new Set();
+  const encoder = new TextEncoder();
+  for (let r = fila - 1; r <= rango.e.r; r++) {
+    const celda = hoja[XLSX.utils.encode_cell({ r, c: Number(columna) })];
+    const codigo = texto(celda?.t === "n" ? celda.w ?? celda.v : celda?.v);
+    if (celda?.f || (codigo && (!["n", "s", "str"].includes(celda.t) ||
+        encoder.encode(codigo).length > 64 || /[\u0000-\u001F\u007F]/.test(codigo)))) {
+      invalidos++;
+      continue;
+    }
+    if (!codigo) {
+      vacios++;
+      continue;
+    }
+    const clave = codigo.normalize("NFC").toUpperCase();
+    if (vistos.has(clave)) {
+      duplicados++;
+      continue;
+    }
+    vistos.add(clave);
+    if (celda.t === "n") numericos++;
+    state.codigos.push(codigo);
+  }
+
+  $("resumenCodigos").textContent =
+    `${state.codigos.length} códigos válidos · ${duplicados} duplicados, ${vacios} vacíos y ${invalidos} inválidos omitidos.` +
+    (numericos ? " Para conservar ceros iniciales y códigos largos, guarda la columna como texto en Excel." : "");
+}
+
+async function importarExcel() {
+  const version = ++state.versionExcel;
+  const archivo = $("archivoCodigos").files[0];
+  state.libroCodigos = null;
+  state.codigos = [];
+  state.cargandoExcel = !!archivo;
+  $("hojaCodigos").replaceChildren();
+  $("columnaCodigos").replaceChildren();
+  $("resumenCodigos").textContent = archivo ? "Leyendo Excel…" : "";
+  if (!archivo) return;
+
+  try {
+    if (!globalThis.XLSX) throw new Error("No se pudo cargar el lector de Excel.");
+    if (archivo.size > 10 * 1024 * 1024) throw new Error("El Excel supera los 10 MB.");
+    const datos = await archivo.arrayBuffer();
+    if (version !== state.versionExcel) return;
+
+    state.libroCodigos = XLSX.read(datos, { type: "array", cellText: true });
+    for (const nombre of state.libroCodigos.SheetNames) $("hojaCodigos").add(new Option(nombre, nombre));
+    cargarColumnasExcel();
+  } catch (error) {
+    if (version === state.versionExcel) $("resumenCodigos").textContent = error.message;
+  } finally {
+    if (version === state.versionExcel) state.cargandoExcel = false;
+  }
 }
 
 function agregarCapa(contenido = "") {
@@ -417,8 +598,8 @@ function agregarCapa(contenido = "") {
     event.target.value = "";
     if (!key) return;
 
-    if (key === "codigo" && $("tipoCampana").value !== "descuento") {
-      informar("Selecciona Descuentos para insertar un código.", true);
+    if (key === "codigo" && modoCodigos() === "ninguno") {
+      informar("Activa Incluir códigos para insertar un código.", true);
       return;
     }
 
@@ -494,6 +675,7 @@ function receta(exigirCorreo = true) {
     asunto: texto($("asunto").value),
     cuerpo: texto($("cuerpo").value),
     tipo: $("tipoCampana").value,
+    modoCodigos: modoCodigos(),
     prefijo: texto($("prefijo").value),
     largo: Number($("largo").value),
     imagen: state.imagen,
@@ -556,8 +738,46 @@ async function cargarHistorial(version = state.version) {
     };
 
     fila.append(`${item.asunto} · ${item.estado} · ${item.total} correos `, boton);
+    if (item.modoCodigos && item.modoCodigos !== "ninguno") {
+      fila.append(" ", botonExcel(item.id, "asignados", "Descargar códigos asignados", version));
+    }
+    if (item.modoCodigos === "excel" && item.disponibleParaExportar) {
+      fila.append(" ", botonExcel(item.id, "disponibles", "Descargar códigos disponibles", version));
+    }
     panel.append(fila);
   }
+}
+
+function botonExcel(id, clase, etiqueta, version) {
+  const boton = document.createElement("button");
+  boton.type = "button";
+  boton.textContent = etiqueta;
+  boton.onclick = async () => {
+    boton.disabled = true;
+    try {
+      if (!globalThis.XLSX) throw new Error("No se pudo cargar el exportador de Excel.");
+      const filas = clase === "asignados" ? [["Código", "Viajero", "Grupo", "Estado de envío"]] : [["Código"]];
+      let cursor = "";
+      do {
+        const pagina = await llamar("exportarCodigos", { id, clase, cursor });
+        if (version !== state.version) return;
+        for (const fila of pagina.filas) {
+          filas.push(clase === "asignados"
+            ? [fila.codigo, fila.viajero, fila.grupo, fila.estado] : [fila.codigo]);
+        }
+        cursor = pagina.siguiente;
+      } while (cursor);
+
+      const libro = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(libro, XLSX.utils.aoa_to_sheet(filas), "Códigos");
+      XLSX.writeFile(libro, `codigos-${clase}-${id.slice(0, 8)}.xlsx`);
+    } catch (error) {
+      if (version === state.version) mostrarError(error);
+    } finally {
+      boton.disabled = false;
+    }
+  };
+  return boton;
 }
 
 async function verDetalle(id, version) {
@@ -598,33 +818,70 @@ async function verDetalle(id, version) {
   }
 }
 
-async function iniciarCampana(version) {
+function revisarEnvio() {
   if (!state.borrador) {
     const personas = seleccionActual();
     const lotes = agruparPorCorreo(personas);
-
+    const configuracion = receta();
     if (!lotes.length) throw new Error("Selecciona al menos un viajero con correo disponible.");
     if (lotes.some(lote => lote.length > 10)) {
       throw new Error("Una dirección reúne más de diez viajeros. Divide esa selección en campañas.");
     }
 
-    const configuracion = receta();
-    if (!window.confirm(`¿Iniciar el envío para ${personas.length} viajeros en ${lotes.length} correos?`)) return;
+    const codigos = configuracion.modoCodigos === "excel" ? [...state.codigos] : [];
+    if (configuracion.modoCodigos === "excel") {
+      if (state.cargandoExcel) throw new Error("Espera a que termine de cargar el Excel.");
+      if (codigos.length < personas.length) {
+        throw new Error(`Faltan ${personas.length - codigos.length} códigos para este envío.`);
+      }
+    }
 
-    state.borrador = {
-      id: crypto.randomUUID(),
-      configuracion,
-      lotes,
+    state.revision = {
+      id: crypto.randomUUID(), configuracion, lotes, codigos,
+      totalViajeros: personas.length, sinEnvio: personasSinEnvio().length,
+      pendientes: [...state.gruposMarcados].filter(id => !state.nominasCargadas.has(id)).length,
       siguiente: 0
     };
   }
 
+  const envio = state.borrador || state.revision;
+  const resumen = $("revisionEnvio");
+  resumen.replaceChildren();
+  const tipo = envio.configuracion.tipo === "viaje" ? "Información del viaje" : "Marketing · Descuentos y promociones";
+  const lineas = [
+    envio.configuracion.asunto, tipo,
+    `${envio.totalViajeros} viajeros · ${envio.lotes.length} direcciones únicas`,
+    `${envio.sinEnvio} viajeros sin envío disponible según los filtros`
+  ];
+  if (envio.pendientes) lineas.push(`${envio.pendientes} grupos sin nómina cargada quedan fuera del envío.`);
+  if (envio.configuracion.modoCodigos !== "ninguno") lineas.push(`${envio.totalViajeros} códigos por asignar`);
+  for (const linea of lineas) {
+    const p = document.createElement("p");
+    p.textContent = linea;
+    resumen.append(p);
+  }
+  $("dialogoEnvio").showModal();
+}
+
+async function iniciarCampana(version) {
+  if (!state.borrador) state.borrador = state.revision;
+  if (!state.borrador) return;
+  $("dialogoEnvio").close();
+
   const borrador = state.borrador;
-  await llamar("crear", {
-    id: borrador.id,
-    receta: borrador.configuracion,
-    total: borrador.lotes.length
-  });
+  try {
+    await llamar("crear", {
+      id: borrador.id,
+      receta: borrador.configuracion,
+      total: borrador.lotes.length,
+      totalViajeros: borrador.totalViajeros,
+      codigos: borrador.codigos
+    });
+  } catch (error) {
+    if (["functions/invalid-argument", "functions/failed-precondition"].includes(error.code) &&
+        borrador.siguiente === 0) state.borrador = null;
+    throw error;
+  }
 
   while (borrador.siguiente < borrador.lotes.length) {
     if (version !== state.version) return;
@@ -642,6 +899,7 @@ async function iniciarCampana(version) {
   if (version !== state.version) return;
 
   state.borrador = null;
+  state.revision = null;
   informar(`Campaña en cola con ${borrador.lotes.length} correos. Ya puedes cerrar la pantalla.`);
   await cargarHistorial(version);
 }
@@ -660,6 +918,8 @@ async function cargarUsuarioEfectivo() {
 
   state.grupos = [];
   state.personas = [];
+  state.nominasCargadas.clear();
+  state.estadisticas.clear();
   state.gruposMarcados.clear();
   state.personasMarcadas.clear();
   $("historial").replaceChildren();
@@ -724,7 +984,19 @@ function vincularCabecera() {
 evento("cargarGrupos", cargarGrupos);
 evento("cargarPersonas", cargarPersonas);
 evento("actualizar", cargarHistorial);
-evento("enviar", iniciarCampana);
+evento("enviar", revisarEnvio);
+evento("confirmarEnvio", iniciarCampana);
+$("volverEdicion").onclick = () => $("dialogoEnvio").close();
+$("dialogoEnvio").addEventListener("close", () => { state.revision = null; });
+
+function abrirSinEnvio(grupoId = "") {
+  state.grupoSinEnvio = grupoId;
+  $("buscarSinEnvio").value = "";
+  renderSinEnvio();
+  $("dialogoSinEnvio").showModal();
+}
+evento("verSinEnvio", () => abrirSinEnvio());
+$("buscarSinEnvio").addEventListener("input", renderSinEnvio);
 evento("agregarCapa", () => agregarCapa());
 evento("agregarCodigo", () => agregarCapa("Tu código es {{codigo}}"));
 
@@ -774,18 +1046,24 @@ evento("prueba", async version => {
 
 $("imagen").addEventListener("change", prepararImagen);
 
-$("tipoCampana").addEventListener("change", () => {
-  const descuento = $("tipoCampana").value === "descuento";
-  $("opcionesCodigo").hidden = !descuento;
-  $("agregarCodigo").hidden = !descuento;
-});
+for (const id of ["tipoCampana", "incluirCodigos", "modoCodigos"]) {
+  $(id).addEventListener("change", sincronizarCodigos);
+}
+sincronizarCodigos();
+$("archivoCodigos").addEventListener("change", importarExcel);
+$("hojaCodigos").addEventListener("change", cargarColumnasExcel);
+$("columnaCodigos").addEventListener("change", leerCodigosExcel);
+$("filaCodigos").addEventListener("change", cargarColumnasExcel);
 
 for (const id of ["destino", "desde", "hasta", "buscarGrupo"]) {
   $(id).addEventListener("input", renderGrupos);
 }
 
 for (const id of ["estudiantes", "adultos", "profesores", "rutaEstudiante", "buscarPersona"]) {
-  $(id).addEventListener("input", renderPersonas);
+  $(id).addEventListener("input", () => {
+    renderPersonas();
+    if (id !== "buscarPersona") renderGrupos();
+  });
 }
 
 await waitForLayoutReady();
@@ -794,6 +1072,7 @@ onAuthStateChanged(auth, async user => {
   const version = ++state.version;
   state.autorizado = false;
   state.borrador = null;
+  state.revision = null;
   $("app").hidden = true;
 
   if (!user) {
