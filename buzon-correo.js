@@ -283,7 +283,7 @@ async function cargarPersonas(version) {
       const grupo = await manager.resolverGrupo(g.id);
       if (!grupo) throw new Error(`Grupo ${g.id} no encontrado.`);
 
-      return (await manager.cargarNomina(grupo))
+      return (await manager.cargarNomina(grupo, { completa: true }))
         .filter(p => esPersonaViajeraConteo(p))
         .map((p, index) => {
           const tipo = normalizar(p.tipoViajante || p.tipoParticipacion).replace(/\s+/g, "_");
