@@ -10,10 +10,12 @@ import {
   deleteDoc,
   doc,
   getDocs,
+  getDocsFromServer,
   limit,
   onSnapshot,
   orderBy,
   query,
+  runTransaction,
   serverTimestamp,
   setDoc,
   updateDoc,
@@ -65,7 +67,10 @@ const state = {
   unsubscribeLote: null,
   unsubscribePulseras: null,
 
-  procesando: false
+  procesando: false,
+  agregandoPersona: false,
+  consultaPersonas: 0,
+  pulseraParaGrabar: ""
 };
 
 init();
@@ -201,6 +206,13 @@ function bindEvents() {
       "click",
       crearLote
     );
+
+  $("btnAgregarPersona").addEventListener("click", abrirAgregarPersona);
+  $("formAgregarPersona").addEventListener("submit", agregarPersonaAlLote);
+  $("btnCancelarPersona").addEventListener("click", () => $("dialogAgregarPersona").close());
+  $("dialogAgregarPersona").addEventListener("cancel", (event) => {
+    if (state.agregandoPersona) event.preventDefault();
+  });
 
   $("btnCopiarEnlace")
     ?.addEventListener(
@@ -715,81 +727,176 @@ async function crearLote() {
 }
 
 function generarPulserasIndividuales() {
-  return state.pasajerosViajan
-    .map(
-      (
-        pasajero,
-        index
-      ) => {
-        const numero =
-          index + 1;
+  return state.pasajerosViajan.map((pasajero, index) =>
+    construirPulseraIndividual(pasajero, index + 1)
+  );
+}
 
-        const nombres =
-          camposPasajero
-            .nombres(
-              pasajero
-            );
+function construirPulseraIndividual(pasajero, numero) {
+  const nombres = camposPasajero.nombres(pasajero);
+  const apellidos = camposPasajero.apellidos(pasajero);
+  const correlativo = String(numero).padStart(3, "0");
+  const codigo = [
+    limpiarParteCodigo(getNumeroNegocio()),
+    correlativo,
+    obtenerIniciales(nombres, apellidos)
+  ].join("-");
 
-        const apellidos =
-          camposPasajero
-            .apellidos(
-              pasajero
-            );
+  return {
+    docId: `P${correlativo}`,
+    numero,
+    codigo,
+    modalidad: "individual",
+    inscripcionId: String(pasajero.id || ""),
+    rut: camposPasajero.documento(pasajero),
+    nombres,
+    apellidos,
+    nombrePasajero: [nombres, apellidos].filter(Boolean).join(" ").trim()
+  };
+}
 
-        const iniciales =
-          obtenerIniciales(
-            nombres,
-            apellidos
-          );
+function loteIndividualActivo() {
+  return Boolean(state.grupoCtx && state.loteId &&
+    state.lote?.activo === true && state.lote.modalidad === "individual");
+}
 
-        const codigo =
-          [
-            limpiarParteCodigo(
-              getNumeroNegocio()
-            ),
-            String(numero)
-              .padStart(3, "0"),
-            iniciales
-          ].join("-");
+async function abrirAgregarPersona() {
+  if (!loteIndividualActivo() || state.procesando) return;
 
-        return {
-          docId:
-            `P${String(numero).padStart(3, "0")}`,
+  const dialog = $("dialogAgregarPersona");
+  const select = $("personaNuevaNfc");
+  const confirmar = $("btnConfirmarPersona");
+  const estado = $("estadoAgregarPersona");
+  const loteRef = doc(db, LOTES_COLLECTION, state.loteId);
+  select.replaceChildren();
+  select.disabled = true;
+  confirmar.disabled = true;
+  estado.textContent = "Buscando pasajeros en la nómina...";
+  const consulta = ++state.consultaPersonas;
+  dialog.showModal();
 
-          numero,
+  try {
+    const [nomina, pulseras] = await Promise.all([
+      state.manager.cargarNomina(state.grupoCtx),
+      getDocsFromServer(collection(loteRef, "pulseras"))
+    ]);
+    if (!dialog.open || consulta !== state.consultaPersonas || state.loteId !== loteRef.id) return;
 
-          codigo,
+    const inscritosEnLote = new Set(pulseras.docs.map((item) =>
+      String(item.data().inscripcionId || "")
+    ));
+    const disponibles = nomina.filter((persona) =>
+      persona.id && esPasajeroQueViaja(persona) && !inscritosEnLote.has(String(persona.id))
+    ).sort(ordenarPasajeros);
 
-          modalidad:
-            "individual",
+    if (!disponibles.length) {
+      estado.textContent = "Todos los pasajeros que viajan ya tienen una pulsera en este lote.";
+      return;
+    }
 
-          inscripcionId:
-            String(
-              pasajero.id ||
-              ""
-            ),
+    select.add(new Option("Selecciona una persona", ""));
+    for (const persona of disponibles) {
+      const pulsera = construirPulseraIndividual(persona, 1);
+      const nombre = pulsera.nombrePasajero || "Pasajero";
+      select.add(new Option([nombre, pulsera.rut].filter(Boolean).join(" · "), pulsera.inscripcionId));
+    }
+    select.disabled = false;
+    confirmar.disabled = false;
+    estado.textContent = "";
+  } catch (error) {
+    if (dialog.open && consulta === state.consultaPersonas) {
+      estado.textContent = error.message || "No se pudo consultar la nómina.";
+    }
+  }
+}
 
-          rut:
-            camposPasajero
-              .documento(
-                pasajero
-              ),
+async function agregarPersonaAlLote(event) {
+  event.preventDefault();
+  const inscripcionId = $("personaNuevaNfc").value;
+  if (!inscripcionId || !loteIndividualActivo() || state.agregandoPersona) return;
 
-          nombres,
+  const grupo = state.grupoCtx;
+  const loteRef = doc(db, LOTES_COLLECTION, state.loteId);
+  const estado = $("estadoAgregarPersona");
+  const confirmar = $("btnConfirmarPersona");
+  const cancelar = $("btnCancelarPersona");
+  state.agregandoPersona = true;
+  confirmar.disabled = true;
+  cancelar.disabled = true;
+  estado.textContent = "Agregando persona al lote...";
 
-          apellidos,
-
-          nombrePasajero:
-            [
-              nombres,
-              apellidos
-            ]
-              .filter(Boolean)
-              .join(" ")
-              .trim()
-        };
-      }
+  try {
+    const nomina = await state.manager.cargarNomina(grupo);
+    const persona = nomina.find((item) =>
+      String(item.id || "") === inscripcionId && esPasajeroQueViaja(item)
     );
+    if (!persona) throw new Error("La persona ya no figura entre los pasajeros que viajan.");
+
+    const pulsera = await runTransaction(db, async (transaction) => {
+      const lote = (await transaction.get(loteRef)).data();
+      if (lote?.activo !== true || lote.modalidad !== "individual" ||
+          String(lote.groupDocId) !== String(grupo.docId)) {
+        throw new Error("El lote individual ya no está activo. Vuelve a cargar el grupo.");
+      }
+
+      // Cada alta actualiza el lote padre. Si otra alta modifica ese documento,
+      // Firestore reintenta y vuelve a consultar los números e inscripciones.
+      const registros = await getDocsFromServer(collection(loteRef, "pulseras"));
+      const existentes = registros.docs.map((item) => item.data());
+      if (existentes.some((item) => String(item.inscripcionId || "") === inscripcionId)) {
+        throw new Error("Esta persona ya tiene una pulsera en el lote.");
+      }
+
+      const numero = existentes.reduce((mayor, item) =>
+        Math.max(mayor, Number(item.numero) || 0), 0
+      ) + 1;
+      const nueva = construirPulseraIndividual(persona, numero);
+      const pulseraRef = doc(loteRef, "pulseras", nueva.docId);
+      if ((await transaction.get(pulseraRef)).exists()) {
+        throw new Error("El número de pulsera ya está ocupado. Revisa la numeración del lote.");
+      }
+
+      const total = existentes.length + 1;
+      const grabadas = existentes.filter((item) => item.grabada === true).length;
+      transaction.set(pulseraRef, {
+        ...nueva,
+        loteId: loteRef.id,
+        numeroNegocio: lote.numeroNegocio,
+        groupDocId: lote.groupDocId,
+        idGrupo: lote.idGrupo,
+        estado: "PENDIENTE",
+        grabada: false,
+        error: false,
+        intentos: 0,
+        activo: true,
+        creadoAt: serverTimestamp(),
+        actualizadoAt: serverTimestamp()
+      });
+      transaction.update(loteRef, {
+        total,
+        pendientes: total - grabadas,
+        estado: grabadas || lote.iniciadoAt ? "EN_PROCESO" : "PENDIENTE",
+        completadoAt: null,
+        actualizadoAt: serverTimestamp()
+      });
+      return nueva;
+    });
+
+    state.pulseraParaGrabar = pulsera.docId;
+    $("urlMovil").textContent = obtenerUrlMovil();
+    $("dialogAgregarPersona").close();
+    setEstadoLote(
+      `${pulsera.nombrePasajero} se agregó como pendiente. Abre el enlace móvil para grabar su pulsera.`,
+      false,
+      true
+    );
+  } catch (error) {
+    estado.textContent = error.message || "No se pudo agregar la persona.";
+  } finally {
+    state.agregandoPersona = false;
+    confirmar.disabled = false;
+    cancelar.disabled = false;
+  }
 }
 
 function generarPulserasGrupales(
@@ -1045,6 +1152,7 @@ function renderGrupo() {
 }
 
 function renderLote() {
+  $("btnAgregarPersona").disabled = !loteIndividualActivo();
   if (
     !state.lote
   ) {
@@ -1066,11 +1174,13 @@ function renderLote() {
     .disabled =
     state.lote.activo === false;
 
-  setEstadoLote(
-    "Sincronización activa. Los cambios realizados desde el celular aparecerán automáticamente.",
-    false,
-    true
-  );
+  if (!state.agregandoPersona && !state.pulseraParaGrabar) {
+    setEstadoLote(
+      "Sincronización activa. Los cambios realizados desde el celular aparecerán automáticamente.",
+      false,
+      true
+    );
+  }
 }
 
 function renderPulseras() {
@@ -1326,15 +1436,17 @@ function obtenerUrlMovil() {
     return "";
   }
 
-  return new URL(
-    `grabar-pulseras-nfc.html?lote=${encodeURIComponent(
-      state.loteId
-    )}`,
-    location.href
-  ).href;
+  const url = new URL("grabar-pulseras-nfc.html", location.href);
+  url.searchParams.set("lote", state.loteId);
+  if (state.pulseraParaGrabar) {
+    url.searchParams.set("pulsera", state.pulseraParaGrabar);
+  }
+  return url.href;
 }
 
 function limpiarLoteActual() {
+  state.pulseraParaGrabar = "";
+  $("btnAgregarPersona").disabled = true;
   state.loteId =
     "";
 
