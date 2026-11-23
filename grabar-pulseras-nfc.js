@@ -40,6 +40,7 @@ const state = {
   lote: null,
   pulseras: [],
   indice: 0,
+  pulseraSolicitada: new URLSearchParams(location.search).get("pulsera") || "",
 
   realUser: null,
   user: null,
@@ -357,6 +358,16 @@ async function iniciarLote() {
           }
         } else {
           seleccionarPrimeraPendiente();
+        }
+
+        if (state.pulseraSolicitada) {
+          const indiceSolicitado = state.pulseras.findIndex(
+            (item) => item.id === state.pulseraSolicitada
+          );
+          if (indiceSolicitado >= 0) {
+            state.indice = indiceSolicitado;
+            state.pulseraSolicitada = "";
+          }
         }
 
         asegurarIndiceValido();
