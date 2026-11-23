@@ -333,6 +333,17 @@
         grid-template-columns: 1fr;
       }
     }
+    #dialogAgregarPersona {
+      width: min(32rem, calc(100% - 2rem));
+      box-sizing: border-box;
+      border: 1px solid #d7dde5;
+      border-radius: 12px;
+      padding: 1.25rem;
+    }
+
+    #dialogAgregarPersona::backdrop {
+      background: rgba(15, 23, 42, 0.5);
+    }
   </style>
 </head>
 
@@ -471,8 +482,26 @@
             >
               Crear lote
             </button>
+            <button id="btnAgregarPersona" class="nfc-btn secondary" type="button" disabled>
+              Agregar persona
+            </button>
           </div>
         </div>
+
+        <dialog id="dialogAgregarPersona" aria-labelledby="tituloAgregarPersona">
+          <form id="formAgregarPersona">
+            <h2 id="tituloAgregarPersona">Agregar persona al lote</h2>
+            <div class="field">
+              <label for="personaNuevaNfc">Pasajero</label>
+              <select id="personaNuevaNfc" class="nfc-select" required disabled></select>
+            </div>
+            <p id="estadoAgregarPersona" role="status"></p>
+            <div class="nfc-actions">
+              <button id="btnCancelarPersona" class="nfc-btn secondary" type="button">Cerrar</button>
+              <button id="btnConfirmarPersona" class="nfc-btn success" type="submit" disabled>Agregar al lote</button>
+            </div>
+          </form>
+        </dialog>
 
         <div
           id="panelLoteActivo"
